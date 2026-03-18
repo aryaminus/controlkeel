@@ -1,0 +1,24 @@
+[
+  {
+    "id": "cost.budget_warning",
+    "category": "cost",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "This session is close to its budget cap. Approve more spend before long agent runs.",
+    "matcher": {
+      "type": "budget",
+      "ratio_gte": 0.8
+    }
+  },
+  {
+    "id": "cost.budget_guard",
+    "category": "cost",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "This session has reached its budget cap. Stop and approve more spend before continuing.",
+    "matcher": {
+      "type": "budget",
+      "ratio_gte": 1.0
+    }
+  }
+]

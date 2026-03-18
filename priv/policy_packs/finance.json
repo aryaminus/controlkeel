@@ -1,0 +1,15 @@
+[
+  {
+    "id": "finance.payment_marker",
+    "category": "compliance",
+    "severity": "critical",
+    "action": "warn",
+    "plain_message": "Finance mode expects payment isolation, auditability, and explicit reconciliation controls before launch.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)payment|card|reconciliation|ledger"
+      ]
+    }
+  }
+]

@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+APP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+PROJECT_ROOT=$(/bin/pwd -P)
+
+if [ -n "${CONTROLKEEL_BIN:-}" ]; then
+  exec "$CONTROLKEEL_BIN" mcp --project-root "$PROJECT_ROOT" "$@"
+fi
+
+if command -v controlkeel >/dev/null 2>&1; then
+  exec controlkeel mcp --project-root "$PROJECT_ROOT" "$@"
+fi
+
+cd "$APP_ROOT"
+exec mix ck.mcp --project-root "$PROJECT_ROOT" "$@"

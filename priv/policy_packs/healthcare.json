@@ -1,0 +1,15 @@
+[
+  {
+    "id": "healthcare.phi_marker",
+    "category": "privacy",
+    "severity": "critical",
+    "action": "warn",
+    "plain_message": "Healthcare mode expects explicit access control, audit logging, and PHI handling rules before production use.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)patient|diagnosis|insurance|medical"
+      ]
+    }
+  }
+]

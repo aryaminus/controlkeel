@@ -1,0 +1,44 @@
+rules:
+  - id: controlkeel.sql-injection
+    message: "Semgrep detected query construction that looks vulnerable to SQL injection."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(?is)(SELECT|INSERT|UPDATE|DELETE).{0,120}(\\+|<>|%\\(|format\\(|f\\\"|f').{0,120}(WHERE|FROM|INTO|SET)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.sql_injection
+      controlkeel_severity: high
+
+  - id: controlkeel.xss-sink
+    message: "Semgrep detected an unsafe HTML sink that can introduce XSS."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "(?i)(innerHTML\\s*=|outerHTML\\s*=|document\\.write\\s*\\()"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.xss_sink
+      controlkeel_severity: high
+
+  - id: controlkeel.inline-script
+    message: "Semgrep detected inline script content that should be reviewed before execution."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "(?i)<script\\b"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.inline_script
+      controlkeel_severity: medium
+
+  - id: controlkeel.hardcoded-secret
+    message: "Semgrep detected a likely hardcoded secret assignment."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(?i)(api[_-]?key|secret|token|password)\\s*[:=]\\s*[\"'][^\"']{8,}[\"']"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.hardcoded_secret
+      controlkeel_severity: high

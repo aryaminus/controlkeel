@@ -1,0 +1,72 @@
+[
+  {
+    "id": "secret.aws_access_key",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "We found what looks like a hardcoded AWS access key. Move it into an environment variable or secret manager before continuing.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "AKIA[0-9A-Z]{16}"
+      ]
+    }
+  },
+  {
+    "id": "secret.hardcoded_credential",
+    "category": "security",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "This looks like a hardcoded credential. Keep credentials out of source and pass them in through environment variables or a secrets manager.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(api[_-]?key|secret|token|password)\\s*[:=]\\s*[\"'][^\"'\\n]{6,}[\"']"
+      ]
+    }
+  },
+  {
+    "id": "secret.high_entropy_token",
+    "category": "security",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "We found a secret-like token in plain text. Replace it with a reference to a secure secret store before execution continues.",
+    "matcher": {
+      "type": "entropy",
+      "candidate_pattern": "[A-Za-z0-9_\\-=/+]{20,}",
+      "min_length": 20,
+      "threshold": 3.5
+    }
+  },
+  {
+    "id": "security.sql_injection",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "This content looks like SQL built directly from user input. Switch to parameterized queries before the agent keeps going.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(['\"])\\s*or\\s*1=1",
+        "(?i)union\\s+select",
+        "(?i)drop\\s+table",
+        "(?i)select\\s+.+\\s+from\\s+.+(\\+|#\\{|\\$\\{)"
+      ]
+    }
+  },
+  {
+    "id": "security.xss_unsafe_html",
+    "category": "security",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "This content writes raw HTML into the page. Prefer safer rendering paths before shipping it.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)<script\\b",
+        "(?i)innerHTML\\s*=",
+        "(?i)dangerouslySetInnerHTML"
+      ]
+    }
+  }
+]

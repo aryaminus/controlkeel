@@ -1,0 +1,15 @@
+[
+  {
+    "id": "education.student_data_marker",
+    "category": "privacy",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Education mode expects student-data handling, consent boundaries, and age-appropriate content review before release.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)student|classroom|gradebook|parent"
+      ]
+    }
+  }
+]

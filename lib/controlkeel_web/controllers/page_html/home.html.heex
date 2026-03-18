@@ -1,0 +1,96 @@
+<Layouts.flash_group flash={@flash} />
+<section class="ck-shell">
+  <div class="ck-grid">
+    <div class="ck-hero-panel">
+      <p class="ck-kicker">Control tower for agent-built software</p>
+      <h1 class="ck-display">Turn vibe coding into production engineering.</h1>
+      <p class="ck-lead">
+        ControlKeel sits above Claude Code, Codex, Cursor, Replit, and other agents. It compiles intent,
+        constrains risk, generates manageable tasks, and keeps proof attached to every mission.
+      </p>
+      <div class="ck-action-row">
+        <a href={~p"/start"} class="ck-button-primary">Start a mission</a>
+        <div class="ck-inline-stats">
+          <span>Intent</span>
+          <span>Policy</span>
+          <span>Proof</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ck-side-stack">
+      <div class="ck-card ck-card-contrast">
+        <p class="ck-mini-label">What ships first</p>
+        <ul class="ck-mini-list">
+          <li>Mission compiler with industry-aware risk scoring</li>
+          <li>Persisted workspaces, sessions, tasks, and findings</li>
+          <li>Mission control dashboard with proof-first framing</li>
+        </ul>
+      </div>
+      <div class="ck-card">
+        <p class="ck-mini-label">Why it matters</p>
+        <p class="ck-note">
+          AI agents write code. They do not reliably manage secrets, approvals, deploy safety, PR scope,
+          or long-lived context. ControlKeel is the missing layer.
+        </p>
+      </div>
+      <div class="ck-card">
+        <p class="ck-mini-label">Ship metrics</p>
+        <p class="ck-note">
+          {Enum.at(@ship_summary.steps, 3).count} sessions reached a first governed finding.
+          Average time to first finding: {if @ship_summary.average_time_to_first_finding_seconds,
+            do: "#{Float.round(@ship_summary.average_time_to_first_finding_seconds / 60, 1)}m",
+            else: "not recorded"}.
+        </p>
+        <a href={~p"/ship"} class="ck-link">Open ship dashboard</a>
+      </div>
+      <div class="ck-card">
+        <p class="ck-mini-label">Install guide</p>
+        <p class="ck-note">
+          Follow the 5-minute path from first launch to first finding, with the exact commands used by the packaged binary and source setup.
+        </p>
+        <a href={~p"/getting-started"} class="ck-link">Open getting-started guide</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="ck-section-header">
+    <div>
+      <p class="ck-kicker">Recent missions</p>
+      <h2 class="ck-section-title">Latest control-tower runs</h2>
+    </div>
+    <div class="ck-action-row">
+      <a href={~p"/ship"} class="ck-link">View ship metrics</a>
+      <a href={~p"/start"} class="ck-link">Launch a new mission</a>
+    </div>
+  </div>
+
+  <div class="ck-session-grid">
+    <%= if @recent_sessions == [] do %>
+      <div class="ck-card ck-empty-state">
+        <p class="ck-empty-title">No missions yet.</p>
+        <p class="ck-note">
+          Create the first one and ControlKeel will generate the brief, tasks, and findings.
+        </p>
+      </div>
+    <% else %>
+      <%= for session <- @recent_sessions do %>
+        <a href={~p"/missions/#{session.id}"} class="ck-card ck-session-card">
+          <div class="ck-session-head">
+            <div>
+              <p class="ck-mini-label">{session.workspace.industry |> String.capitalize()}</p>
+              <h3>{session.title}</h3>
+            </div>
+            <span class={["ck-pill", "ck-pill-#{session.risk_tier}"]}>{session.risk_tier}</span>
+          </div>
+          <p class="ck-note">{session.objective}</p>
+          <div class="ck-metric-row">
+            <span>{Enum.count(session.findings)} findings</span>
+            <span>{Enum.count(session.tasks)} tasks</span>
+            <span>${session.budget_cents |> Kernel./(100) |> trunc()}/mo cap</span>
+          </div>
+        </a>
+      <% end %>
+    <% end %>
+  </div>
+</section>
