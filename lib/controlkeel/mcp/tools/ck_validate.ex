@@ -1,6 +1,7 @@
 defmodule ControlKeel.MCP.Tools.CkValidate do
   @moduledoc false
 
+  alias ControlKeel.AutoFix
   alias ControlKeel.Mission
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.FastPath
@@ -78,11 +79,27 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
   end
 
   defp public_result(%Scanner.Result{} = result) do
+    fix_prompts =
+      result.findings
+      |> Enum.filter(&(&1.decision == "block"))
+      |> Enum.map(fn f ->
+        fix = AutoFix.generate(f)
+        %{
+          "rule_id" => f.rule_id,
+          "supported" => fix["supported"],
+          "agent_prompt" => fix["agent_prompt"],
+          "summary" => fix["summary"],
+          "requires_human" => fix["requires_human"]
+        }
+      end)
+      |> Enum.reject(&is_nil(&1["agent_prompt"]))
+
     %{
       "allowed" => result.allowed,
       "decision" => result.decision,
       "summary" => result.summary,
       "findings" => Enum.map(result.findings, &finding_to_map/1),
+      "fix_prompts" => fix_prompts,
       "scanned_at" => result.scanned_at
     }
   end

@@ -35,6 +35,10 @@ if token = System.get_env("CONTROLKEEL_API_TOKEN") do
   config :controlkeel, :api_token, token
 end
 
+if webhook = System.get_env("CONTROLKEEL_WEBHOOK_URL") do
+  config :controlkeel, :webhook_url, webhook
+end
+
 config :controlkeel, ControlKeel.Intent,
   default_provider: System.get_env("CONTROLKEEL_INTENT_DEFAULT_PROVIDER"),
   dev_fallback: System.get_env("CONTROLKEEL_INTENT_DEV_FALLBACK", "false") == "true",

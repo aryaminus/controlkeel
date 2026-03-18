@@ -2,6 +2,7 @@ defmodule ControlKeel.AutoFix do
   @moduledoc false
 
   alias ControlKeel.Mission.Finding
+  alias ControlKeel.Scanner
 
   @supported_rule_ids ~w(
     secret.aws_access_key
@@ -11,11 +12,19 @@ defmodule ControlKeel.AutoFix do
     security.xss_unsafe_html
   )
 
-  def generate(%Finding{} = finding) do
-    location = location_hint(finding)
-    match = finding.metadata["matched_text_redacted"]
+  def generate(%Scanner.Finding{} = finding) do
+    generate_from(finding.rule_id, finding.metadata, finding.location["path"])
+  end
 
-    case finding.rule_id do
+  def generate(%Finding{} = finding) do
+    generate_from(finding.rule_id, finding.metadata, finding.metadata["path"])
+  end
+
+  defp generate_from(rule_id, metadata, path) do
+    location = path || rule_id
+    match = metadata["matched_text_redacted"]
+
+    case rule_id do
       "secret.aws_access_key" ->
         %{
           "supported" => true,
@@ -159,12 +168,9 @@ defmodule ControlKeel.AutoFix do
     end
   end
 
-  def supported?(%Finding{} = finding), do: finding.rule_id in @supported_rule_ids
+  def supported?(%Scanner.Finding{} = f), do: f.rule_id in @supported_rule_ids
+  def supported?(%Finding{} = f), do: f.rule_id in @supported_rule_ids
   def supported_rule_ids, do: @supported_rule_ids
-
-  defp location_hint(%Finding{} = finding) do
-    finding.metadata["path"] || finding.rule_id
-  end
 
   defp match_clause(nil), do: ""
   defp match_clause(match), do: " (matched snippet #{match})"

@@ -6,6 +6,7 @@ defmodule ControlKeel.Mission do
   alias Ecto.Multi
   alias ControlKeel.AutoFix
   alias ControlKeel.Intent.ExecutionBrief
+  alias ControlKeel.Notifications.Webhook
   alias ControlKeel.Repo
   alias ControlKeel.Mission.{Finding, Invocation, Planner, Session, Task, Workspace}
   alias ControlKeel.Scanner
@@ -357,6 +358,7 @@ defmodule ControlKeel.Mission do
           {:ok, persisted} ->
             persisted = Enum.reverse(persisted)
             emit_first_finding_recorded(session, persisted, opts)
+            Enum.each(persisted, &Webhook.notify(&1, session))
             {:ok, persisted}
 
           {:error, reason} ->

@@ -1,0 +1,80 @@
+[
+  {
+    "id": "gdpr.personal_data_logging",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Personal data (email, name, phone, address) should not be written to logs. Log an identifier or anonymised value instead.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|print|console\\.log|logger\\.|IO\\.puts|puts|echo).*\\b(email|full_name|phone_number|date_of_birth|home_address|ip_address|ssn|national_id)\\b"
+      ]
+    }
+  },
+  {
+    "id": "gdpr.unencrypted_pii_field",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Fields that store personal data must be encrypted at rest. Add encryption or use an encrypted field type before persisting.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(email|phone|full_name|date_of_birth|home_address|national_id|ssn|passport)\\s*,\\s*:string"
+      ]
+    }
+  },
+  {
+    "id": "gdpr.retention_missing",
+    "category": "privacy",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Personal data tables should have a retention or deletion mechanism. Ensure there is a scheduled purge or soft-delete for GDPR right-to-erasure compliance.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)create\\s+table\\s+(users|patients|customers|subscribers|contacts|members)\\b"
+      ]
+    }
+  },
+  {
+    "id": "gdpr.consent_not_recorded",
+    "category": "privacy",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "User registration or profile creation should record marketing/processing consent. Add a consent field and timestamp if this stores personal data.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(create_user|register_user|sign_up|new_account).*\\bdo\\b"
+      ]
+    }
+  },
+  {
+    "id": "gdpr.third_party_data_transfer",
+    "category": "privacy",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Sending personal data to a third-party service requires a Data Processing Agreement and explicit consent. Verify the recipient is GDPR-compliant.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(Req\\.post|HTTPoison\\.post|requests\\.post|axios\\.post|fetch\\s*\\().*\\b(email|phone|full_name|user_id|customer_id)\\b"
+      ]
+    }
+  },
+  {
+    "id": "gdpr.cookie_no_consent",
+    "category": "privacy",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Setting non-essential cookies without consent checking violates GDPR. Ensure this cookie is either strictly necessary or gated behind a consent check.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(document\\.cookie\\s*=|set_cookie|put_resp_cookie)(?!.*consent)"
+      ]
+    }
+  }
+]
