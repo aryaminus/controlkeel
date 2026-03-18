@@ -26,6 +26,7 @@ defmodule ControlKeelWeb.Router do
     live "/findings", FindingsLive, :index
     live "/ship", ShipLive, :index
     live "/missions/:id", MissionControlLive, :show
+    live "/policies", PolicyStudioLive, :index
   end
 
   scope "/api/v1", ControlKeelWeb do

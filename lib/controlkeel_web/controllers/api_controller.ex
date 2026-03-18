@@ -23,7 +23,7 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   def create_session(conn, params) do
-    attrs = Map.take(params, ~w(title objective occupation domain_pack budget_cents daily_budget_cents))
+    attrs = Map.take(params, ~w(title objective occupation domain_pack budget_cents daily_budget_cents risk_tier status spent_cents execution_brief workspace_id))
 
     case Mission.create_session(attrs) do
       {:ok, session} ->

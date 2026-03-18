@@ -21,6 +21,7 @@ defmodule ControlKeel.CLI do
   ]
   @findings_switches [severity: :string, status: :string]
   @mcp_switches [project_root: :string]
+  @watch_switches [interval: :integer]
 
   def standalone_argv do
     if Code.ensure_loaded?(Burrito.Util.Args) and function_exported?(Burrito.Util.Args, :argv, 0) do
@@ -55,6 +56,9 @@ defmodule ControlKeel.CLI do
 
       ["mcp" | rest] ->
         parse_with_switches(:mcp, rest, @mcp_switches)
+
+      ["watch" | rest] ->
+        parse_with_switches(:watch, rest, @watch_switches)
 
       ["help"] ->
         {:ok, %{command: :help, options: %{}, args: []}}
@@ -110,6 +114,8 @@ defmodule ControlKeel.CLI do
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
+      controlkeel watch [--interval N]
+                                      Stream findings and budget live (default: 2000ms)
       controlkeel mcp [--project-root /abs/path]
                                       Run the MCP server for a project
       controlkeel help                Show this help
@@ -266,6 +272,25 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(%{command: :watch, options: options}, project_root) do
+    interval = Keyword.get(options, :interval, 2_000)
+
+    case LocalProject.load(project_root) do
+      {:ok, _binding, session} ->
+        IO.puts("")
+        IO.puts("ControlKeel Watch — session ##{session.id}: #{session.title}")
+        IO.puts("  Polling every #{interval}ms  ·  Ctrl+C to exit")
+        IO.puts(String.duplicate("─", 60))
+        watch_loop(session.id, MapSet.new(), interval)
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before watching."}
+
+      {:error, reason} ->
+        {:error, "Failed to load local project: #{inspect(reason)}"}
+    end
+  end
+
   def run_command(%{command: :mcp, options: options}, project_root) do
     root = Path.expand(options[:project_root] || project_root)
 
@@ -289,6 +314,52 @@ defmodule ControlKeel.CLI do
           {:error, "MCP server stopped: #{inspect(reason)}"}
       end
     end)
+  end
+
+  defp watch_loop(session_id, seen, interval) do
+    findings = Mission.list_session_findings(session_id)
+    session = Mission.get_session(session_id)
+
+    new_findings = Enum.reject(findings, fn f -> MapSet.member?(seen, f.id) end)
+    updated_seen = Enum.reduce(new_findings, seen, fn f, acc -> MapSet.put(acc, f.id) end)
+
+    Enum.each(new_findings, fn f ->
+      severity_badge =
+        case f.severity do
+          "critical" -> "[CRITICAL]"
+          "high" -> "[HIGH]    "
+          "medium" -> "[MEDIUM]  "
+          _ -> "[LOW]     "
+        end
+
+      status =
+        case f.status do
+          "blocked" -> "BLOCKED"
+          "approved" -> "approved"
+          "rejected" -> "rejected"
+          "escalated" -> "ESCALATED"
+          _ -> "open"
+        end
+
+      IO.puts("")
+      IO.puts("  #{severity_badge} #{f.rule_id}  (#{status})")
+      IO.puts("  #{f.plain_message || f.title}")
+    end)
+
+    if session do
+      spent = session.spent_cents || 0
+      budget = session.budget_cents || 0
+      rolling = Budget.rolling_24h_spend_cents(session.id)
+      pct = if budget > 0, do: round(spent / budget * 100), else: 0
+      filled = round(pct / 5)
+      bar = "[" <> String.duplicate("█", filled) <> String.duplicate("░", 20 - filled) <> "]"
+      IO.puts("")
+      IO.puts("  Budget  #{bar}  #{format_money(spent)}/#{format_money(budget)} (#{pct}%)  · rolling 24h: #{format_money(rolling)}")
+      IO.puts(String.duplicate("─", 60))
+    end
+
+    Process.sleep(interval)
+    watch_loop(session_id, updated_seen, interval)
   end
 
   defp parse_with_switches(command, argv, switches) do

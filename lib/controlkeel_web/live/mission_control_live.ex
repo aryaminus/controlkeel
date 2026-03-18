@@ -79,6 +79,34 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   @impl true
+  def handle_event("approve_finding", %{"id" => id}, socket) do
+    with {:ok, finding_id} <- parse_id(id),
+         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
+         {:ok, _updated} <- Mission.approve_finding(finding) do
+      case Mission.get_session_context(socket.assigns.session.id) do
+        nil -> {:noreply, socket}
+        session -> {:noreply, socket |> put_flash(:info, "Finding approved.") |> assign_session(session)}
+      end
+    else
+      _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
+    end
+  end
+
+  @impl true
+  def handle_event("reject_finding", %{"id" => id}, socket) do
+    with {:ok, finding_id} <- parse_id(id),
+         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
+         {:ok, _updated} <- Mission.reject_finding(finding) do
+      case Mission.get_session_context(socket.assigns.session.id) do
+        nil -> {:noreply, socket}
+        session -> {:noreply, socket |> put_flash(:info, "Finding rejected.") |> assign_session(session)}
+      end
+    else
+      _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
@@ -101,15 +129,30 @@ defmodule ControlKeelWeb.MissionControlLive do
           <strong>{@agent_label}</strong>
         </div>
         <div class="ck-card ck-stat-card">
-          <p class="ck-mini-label">Active findings</p>
-          <strong>{@active_findings}</strong>
+          <p class="ck-mini-label">Needs review</p>
+          <strong>{@active_findings} finding{if @active_findings != 1, do: "s"}</strong>
         </div>
         <div class="ck-card ck-stat-card">
-          <p class="ck-mini-label">Active tasks</p>
-          <strong>{@active_tasks}</strong>
+          <p class="ck-mini-label">Compliance score</p>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <svg viewBox="0 0 36 36" width="48" height="48" style="flex-shrink: 0; transform: rotate(-90deg);">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" stroke-width="3.8" />
+              <circle
+                cx="18"
+                cy="18"
+                r="15.9"
+                fill="none"
+                stroke={donut_color(@compliance_score)}
+                stroke-width="3.8"
+                stroke-dasharray={"#{@compliance_score} #{100 - @compliance_score}"}
+                stroke-linecap="round"
+              />
+            </svg>
+            <strong>{@compliance_score}%</strong>
+          </div>
         </div>
         <div class="ck-card ck-stat-card">
-          <p class="ck-mini-label">Budget</p>
+          <p class="ck-mini-label">Budget spent</p>
           <strong>
             {format_currency(@session.spent_cents)} / {format_currency(@session.budget_cents)}
           </strong>
@@ -213,6 +256,11 @@ defmodule ControlKeelWeb.MissionControlLive do
                     <strong>{task.title}</strong>
                   </div>
                   <p class="ck-note">{task.validation_gate}</p>
+                  <%= if task.status == "in_progress" and @active_findings > 0 do %>
+                    <p class="ck-note" style="color: var(--ck-color-warn, #d97706); margin-top: 0.25rem;">
+                      {@active_findings} unresolved finding{if @active_findings != 1, do: "s"} — review before marking done
+                    </p>
+                  <% end %>
                 </div>
                 <span class="ck-pill ck-pill-neutral">{task.status}</span>
               </li>
@@ -245,33 +293,57 @@ defmodule ControlKeelWeb.MissionControlLive do
 
       <div class="ck-card">
         <p class="ck-mini-label">Findings feed</p>
-        <div class="ck-finding-list">
-          <%= for finding <- @session.findings do %>
-            <article class="ck-finding-item">
-              <div class="ck-finding-head">
-                <h3>{finding.title}</h3>
-                <span class={["ck-pill", "ck-pill-#{finding.severity}"]}>{finding.severity}</span>
-              </div>
-              <p class="ck-note">{finding.plain_message}</p>
-              <div class="ck-metric-row">
-                <span>{finding.category}</span>
-                <span>{finding.rule_id}</span>
-                <span>{finding.status}</span>
-              </div>
-              <div class="ck-action-row">
-                <button type="button" class="ck-link" phx-click="view_fix" phx-value-id={finding.id}>
-                  View fix
-                </button>
-                <.link
-                  navigate={~p"/findings?#{%{"session_id" => @session.id, "q" => finding.rule_id}}"}
-                  class="ck-link"
-                >
-                  Open in browser
-                </.link>
-              </div>
-            </article>
-          <% end %>
-        </div>
+        <%= if @session.findings == [] do %>
+          <p class="ck-note">No findings yet. ControlKeel is monitoring every agent action.</p>
+        <% else %>
+          <div class="ck-finding-list">
+            <%= for finding <- @session.findings do %>
+              <article class="ck-finding-item">
+                <div class="ck-finding-head">
+                  <h3>{finding.title}</h3>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span class={["ck-pill", "ck-pill-#{finding.severity}"]}>{finding.severity}</span>
+                    <span class="ck-pill ck-pill-neutral">{finding.status}</span>
+                  </div>
+                </div>
+                <p class="ck-note">{finding.plain_message}</p>
+                <div class="ck-metric-row">
+                  <span>{finding.category}</span>
+                  <span>{finding.rule_id}</span>
+                </div>
+                <div class="ck-action-row">
+                  <button type="button" class="ck-link" phx-click="view_fix" phx-value-id={finding.id}>
+                    View fix
+                  </button>
+                  <%= if finding.status in ["open", "blocked"] do %>
+                    <button
+                      type="button"
+                      class="ck-link"
+                      phx-click="approve_finding"
+                      phx-value-id={finding.id}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      class="ck-link"
+                      phx-click="reject_finding"
+                      phx-value-id={finding.id}
+                    >
+                      Reject
+                    </button>
+                  <% end %>
+                  <.link
+                    navigate={~p"/findings?#{%{"session_id" => @session.id, "q" => finding.rule_id}}"}
+                    class="ck-link"
+                  >
+                    Open in browser
+                  </.link>
+                </div>
+              </article>
+            <% end %>
+          </div>
+        <% end %>
       </div>
 
       <FindingComponents.autofix_panel
@@ -307,6 +379,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       selected_fix: maybe_regenerate_fix(selected_finding),
       active_findings: Enum.count(session.findings, &(&1.status in ["open", "blocked"])),
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
+      compliance_score: compliance_score(session.findings),
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent")),
       proxy_urls: %{
@@ -351,6 +424,18 @@ defmodule ControlKeelWeb.MissionControlLive do
       }
     )
   end
+
+  defp compliance_score([]), do: 100
+
+  defp compliance_score(findings) do
+    total = length(findings)
+    resolved = Enum.count(findings, &(&1.status in ["approved", "rejected"]))
+    round(resolved / total * 100)
+  end
+
+  defp donut_color(score) when score >= 80, do: "#22c55e"
+  defp donut_color(score) when score >= 50, do: "#f59e0b"
+  defp donut_color(_score), do: "#ef4444"
 
   defp parse_id(value) do
     case Integer.parse(to_string(value)) do

@@ -184,6 +184,23 @@ defmodule ControlKeelWeb.OnboardingLive do
                   <%= if error = field_error(@errors, "agent") do %>
                     <p class="ck-note">{error}</p>
                   <% end %>
+
+                  <label>
+                    <span class="ck-label">Daily budget (USD)</span>
+                    <span class="ck-note">ControlKeel stops agents when this limit is reached. $10/day is roughly 3 full features.</span>
+                    <input
+                      type="number"
+                      name="launch[budget]"
+                      value={@attrs["budget"]}
+                      min="0"
+                      max="500"
+                      step="5"
+                      placeholder="30"
+                    />
+                  </label>
+                  <%= if error = field_error(@errors, "budget") do %>
+                    <p class="ck-note">{error}</p>
+                  <% end %>
                 </div>
               <% 2 -> %>
                 <div class="ck-form-panel">
@@ -464,6 +481,7 @@ defmodule ControlKeelWeb.OnboardingLive do
     %{
       "occupation" => occupation,
       "agent" => "claude",
+      "budget" => "30",
       "project_name" => "",
       "idea" => "",
       "interview_answers" => %{}
