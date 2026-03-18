@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentHelm — Research & Product Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a0c; --bg2: #111114; --bg3: #1a1a1f; --bg4: #222228;
+  --tx: #e8e6e1; --tx2: #9a9890; --tx3: #6a6962;
+  --accent: #c4f042; --accent2: #a3cc2e; --accent-dim: rgba(196,240,66,0.12);
+  --red: #ff6b6b; --blue: #6bb3ff; --purple: #b47aff; --teal: #4ae8c4;
+  --coral: #ff8c6b; --pink: #ff6ba3;
+}
+body { background: var(--bg); color: var(--tx); font-family: 'Outfit', sans-serif; line-height: 1.7; overflow-x: hidden; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+/* ===== HERO ===== */
+.hero { padding: 5rem 0 3rem; text-align: center; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -120px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(196,240,66,0.06) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { font-family: 'DM Serif Display', serif; font-size: clamp(2.8rem, 6vw, 4.2rem); letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.5rem; }
+.hero h1 span { color: var(--accent); }
+.hero .subtitle { font-size: 1.15rem; color: var(--tx2); max-width: 700px; margin: 0.8rem auto 0; font-weight: 300; }
+.badge { display: inline-block; background: var(--accent-dim); color: var(--accent); padding: 0.35rem 1rem; border-radius: 100px; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1.5rem; }
+
+/* ===== NAV TABS ===== */
+.nav-tabs { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.06); margin: 0 0 3rem; overflow-x: auto; }
+.nav-tab { padding: 0.9rem 1.5rem; font-size: 0.85rem; font-weight: 500; color: var(--tx3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap; user-select: none; }
+.nav-tab:hover { color: var(--tx2); }
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.section { display: none; animation: fadeUp 0.4s ease; }
+.section.active { display: block; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== SECTION HEADERS ===== */
+h2 { font-family: 'DM Serif Display', serif; font-size: 2rem; margin-bottom: 0.5rem; }
+h3 { font-size: 1.15rem; font-weight: 600; margin: 2rem 0 0.6rem; color: var(--tx); }
+h4 { font-size: 0.95rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--tx2); text-transform: uppercase; letter-spacing: 0.05em; }
+p { color: var(--tx2); margin-bottom: 1rem; font-weight: 300; }
+p strong { color: var(--tx); font-weight: 500; }
+
+/* ===== STAT CARDS ===== */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1.5rem 0 2rem; }
+.stat-card { background: var(--bg2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1.25rem 1.5rem; }
+.stat-card .num { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--accent); line-height: 1.1; }
+.stat-card .label { font-size: 0.82rem; color: var(--tx3); margin-top: 0.3rem; }
+
+/* ===== PROBLEM CARDS ===== */
+.problem-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin: 1.5rem 0 2rem; }
+.problem-card { background: var(--bg2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; }
+.problem-card::before { content: attr(data-num); position: absolute; top: -8px; right: 12px; font-family: 'DM Serif Display', serif; font-size: 4rem; color: rgba(255,255,255,0.03); }
+.problem-card .tag { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.6rem; }
+.problem-card h3 { font-size: 1.05rem; margin: 0 0 0.5rem; }
+.problem-card p { font-size: 0.88rem; margin: 0; }
+
+/* ===== COMPETITOR TABLE ===== */
+.comp-table { width: 100%; border-collapse: collapse; margin: 1.5rem 0 2rem; font-size: 0.85rem; }
+.comp-table th { text-align: left; padding: 0.75rem 1rem; background: var(--bg3); color: var(--tx3); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.comp-table td { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--tx2); vertical-align: top; }
+.comp-table tr:hover td { background: rgba(255,255,255,0.02); }
+.comp-table .check { color: var(--accent); } .comp-table .cross { color: var(--red); opacity: 0.6; }
+
+/* ===== FEATURE BLOCKS ===== */
+.feature-block { background: var(--bg2); border: 1px solid rgba(255,255,255,0.05); border-radius: 14px; padding: 2rem; margin: 1.5rem 0; }
+.feature-block .icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 1rem; }
+.pillar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.pillar { background: var(--bg2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1.5rem; }
+.pillar .num { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--accent); margin-bottom: 0.5rem; }
+
+/* ===== DOMAIN NAMES ===== */
+.domain-card { display: flex; align-items: center; gap: 1.25rem; background: var(--bg2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1.25rem 1.5rem; margin: 0.75rem 0; }
+.domain-card.primary { border-color: var(--accent); background: rgba(196,240,66,0.04); }
+.domain-name { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 500; color: var(--tx); }
+.domain-status { font-size: 0.78rem; padding: 0.25rem 0.75rem; border-radius: 100px; font-weight: 500; }
+.domain-status.likely { background: rgba(74,232,196,0.12); color: var(--teal); }
+.domain-status.alt { background: rgba(180,122,255,0.12); color: var(--purple); }
+
+/* ===== TIMELINE ===== */
+.timeline { position: relative; padding-left: 2rem; margin: 2rem 0; }
+.timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.08); }
+.timeline-item { position: relative; margin-bottom: 2rem; }
+.timeline-item::before { content: ''; position: absolute; left: -2rem; top: 6px; width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); }
+.timeline-item .phase { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 0.25rem; }
+
+/* ===== FLOW DIAGRAM ===== */
+.flow-container { background: var(--bg2); border-radius: 14px; padding: 2rem; margin: 1.5rem 0; overflow-x: auto; }
+.flow { display: flex; align-items: center; gap: 0.5rem; min-width: max-content; }
+.flow-node { padding: 0.6rem 1.1rem; border-radius: 8px; font-size: 0.82rem; font-weight: 500; white-space: nowrap; }
+.flow-arrow { color: var(--tx3); font-size: 1.2rem; }
+
+/* ===== QUOTES ===== */
+.quote { border-left: 3px solid var(--accent); padding: 1rem 0 1rem 1.5rem; margin: 1.5rem 0; }
+.quote p { color: var(--tx); font-style: italic; font-weight: 300; font-size: 1.05rem; margin-bottom: 0.3rem; }
+.quote .src { font-size: 0.78rem; color: var(--tx3); font-style: normal; }
+
+/* ===== LIST STYLES ===== */
+.bullet-list { list-style: none; padding: 0; margin: 1rem 0; }
+.bullet-list li { padding: 0.4rem 0 0.4rem 1.5rem; position: relative; color: var(--tx2); font-size: 0.92rem; font-weight: 300; }
+.bullet-list li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+
+/* ===== CODE/MONO ===== */
+code { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; background: var(--bg3); padding: 0.15rem 0.4rem; border-radius: 4px; color: var(--teal); }
+
+/* ===== FOOTER ===== */
+.footer { text-align: center; padding: 3rem 0; color: var(--tx3); font-size: 0.82rem; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 3rem; }
+
+/* ===== BLS GRID ===== */
+.bls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin: 1rem 0 2rem; }
+.bls-chip { background: var(--bg3); border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.78rem; color: var(--tx2); text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="badge">Research & Product Blueprint — March 2026</div>
+  <h1>Agent<span>Helm</span></h1>
+  <p class="subtitle">The autonomous pre-execution intelligence layer that directs AI coding agents toward secure, production-ready, compliant software — so anyone can build like a full engineering team.</p>
+</section>
+
+<!-- NAV -->
+<div class="nav-tabs" id="tabs">
+  <div class="nav-tab active" data-tab="problem">The Problem</div>
+  <div class="nav-tab" data-tab="landscape">Landscape</div>
+  <div class="nav-tab" data-tab="research">Research</div>
+  <div class="nav-tab" data-tab="product">Product</div>
+  <div class="nav-tab" data-tab="architecture">Architecture</div>
+  <div class="nav-tab" data-tab="market">Market</div>
+  <div class="nav-tab" data-tab="naming">Naming</div>
+  <div class="nav-tab" data-tab="roadmap">Roadmap</div>
+</div>
+
+<!-- ========== SECTION: PROBLEM ========== -->
+<div class="section active" id="problem">
+  <h2>The crisis nobody is solving</h2>
+  <p>AI coding agents have democratized software creation. But they've also created a massive gap: <strong>the code ships, but nobody checked if it should.</strong> The entire engineering discipline — architecture, security review, compliance, testing, deployment strategy, cost analysis — gets skipped when a non-technical user prompts an AI to "build me an app."</p>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">45%</div><div class="label">of AI-generated code contains security vulnerabilities (Veracode 2025)</div></div>
+    <div class="stat-card"><div class="num">69</div><div class="label">vulnerabilities found across 5 major vibe coding tools in Tenzai's Dec 2025 audit</div></div>
+    <div class="stat-card"><div class="num">76%</div><div class="label">of developers believe AI code is MORE secure — misplaced confidence (Netlas)</div></div>
+    <div class="stat-card"><div class="num">$8.5B</div><div class="label">autonomous AI agent market projected for 2026 (Deloitte)</div></div>
+  </div>
+
+  <h3>The 12 critical gaps vibe coders face</h3>
+  <div class="problem-grid">
+    <div class="problem-card" data-num="01">
+      <div class="tag" style="color:var(--red)">Security</div>
+      <h3>Insecure code by default</h3>
+      <p>Hardcoded credentials, SQL injection, weak auth, insecure deserialization — AI generates code that "works" but is exploitable. CurXecute (CVE-2025-54135) let attackers execute arbitrary commands via Cursor.</p>
+    </div>
+    <div class="problem-card" data-num="02">
+      <div class="tag" style="color:var(--coral)">Compliance</div>
+      <h3>Missing regulatory depth</h3>
+      <p>GDPR, HIPAA, SOX, PCI-DSS — AI has no concept of your industry's legal requirements. A health app may log user data without encryption. A finance app may ignore rounding regulations.</p>
+    </div>
+    <div class="problem-card" data-num="03">
+      <div class="tag" style="color:var(--purple)">Architecture</div>
+      <h3>No structural planning</h3>
+      <p>Without specs, agents guess at hundreds of unstated requirements. Assignment systems without permissions, APIs without rate limiting, databases without indexing.</p>
+    </div>
+    <div class="problem-card" data-num="04">
+      <div class="tag" style="color:var(--blue)">Dependencies</div>
+      <h3>Supply chain attacks</h3>
+      <p>Agents install packages without version pinning or vulnerability scanning. Typosquatting attacks (e.g., "bitensor" vs "bittensor") inject malicious code automatically.</p>
+    </div>
+    <div class="problem-card" data-num="05">
+      <div class="tag" style="color:var(--teal)">Operations</div>
+      <h3>No deployment knowledge</h3>
+      <p>Users have zero understanding of hosting, DNS, SSL, edge costs, CDN configuration, scaling thresholds, or infrastructure-as-code. The "build" button works but production doesn't.</p>
+    </div>
+    <div class="problem-card" data-num="06">
+      <div class="tag" style="color:var(--pink)">Cost</div>
+      <h3>Hidden infrastructure costs</h3>
+      <p>Token spending spirals out of control. Cloud resources are provisioned without cost awareness. A Replit user saw their app's database deleted during AI's "optimization."</p>
+    </div>
+    <div class="problem-card" data-num="07">
+      <div class="tag" style="color:var(--red)">Review</div>
+      <h3>Unreadable PRs</h3>
+      <p>AI generates massive pull requests that no human can meaningfully review. Changes cascade across files without clear intent. Version control is an afterthought.</p>
+    </div>
+    <div class="problem-card" data-num="08">
+      <div class="tag" style="color:var(--coral)">Testing</div>
+      <h3>Zero test coverage</h3>
+      <p>Speed is prioritized over safety. SAST, DAST, penetration testing, and security scanning are completely absent from vibe coding workflows.</p>
+    </div>
+    <div class="problem-card" data-num="09">
+      <div class="tag" style="color:var(--purple)">Secrets</div>
+      <h3>API key leakage</h3>
+      <p>Keys hardcoded in source, pushed to public repos, leaked via MCP servers. Claude Code itself had CVE-2026-21852 allowing API key exfiltration through malicious repos.</p>
+    </div>
+    <div class="problem-card" data-num="10">
+      <div class="tag" style="color:var(--blue)">Drift</div>
+      <h3>Architectural drift</h3>
+      <p>Different prompts from different sessions produce inconsistent patterns. Over time, the codebase becomes a patchwork of conflicting styles, frameworks, and approaches.</p>
+    </div>
+    <div class="problem-card" data-num="11">
+      <div class="tag" style="color:var(--teal)">Context</div>
+      <h3>Context loss between sessions</h3>
+      <p>Agents forget project history, design decisions, and constraints. Every new session starts from scratch. The Cursor "code reversion bug" silently undid user changes in March 2026.</p>
+    </div>
+    <div class="problem-card" data-num="12">
+      <div class="tag" style="color:var(--pink)">Access</div>
+      <h3>CLI & tooling barrier</h3>
+      <p>Claude Code is a CLI tool. Git, npm, Docker, CI/CD — these are foreign concepts to the vibe coder. The gap between "app works in preview" and "app is production-ready" is enormous.</p>
+    </div>
+  </div>
+
+  <div class="quote">
+    <p>"The problem isn't the coding agent's coding ability, but our approach. We treat coding agents like search engines when we should be treating them more like literal-minded pair programmers."</p>
+    <div class="src">— GitHub Spec Kit team, Sept 2025</div>
+  </div>
+</div>
+
+<!-- ========== SECTION: LANDSCAPE ========== -->
+<div class="section" id="landscape">
+  <h2>Competitive landscape</h2>
+  <p>No single tool covers the full gap. The market is fragmented across <strong>code generators</strong> (which create the problem), <strong>code reviewers</strong> (which catch issues post-hoc), <strong>spec tools</strong> (which plan but don't enforce), and <strong>guardrail platforms</strong> (which protect enterprise APIs but not vibe coders).</p>
+
+  <table class="comp-table">
+    <thead>
+      <tr>
+        <th>Tool</th>
+        <th>Type</th>
+        <th>Pre-exec planning</th>
+        <th>Security validation</th>
+        <th>Agent-agnostic</th>
+        <th>Novice-friendly</th>
+        <th>Autonomous</th>
+        <th>All industries</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>GitHub Spec Kit</strong></td><td>Spec framework</td><td class="check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>SpecPilot</strong></td><td>AI dev team</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="check">~</td><td class="cross">✗</td></tr>
+      <tr><td><strong>Qodo</strong></td><td>Code review</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>CodeRabbit</strong></td><td>PR review</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>Guardrails AI</strong></td><td>LLM guardrails</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>NeMo Guardrails</strong></td><td>Dialog safety</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>Knostic Kirin</strong></td><td>Dev security</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>ChatPRD</strong></td><td>PRD generator</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>Specced</strong></td><td>Spec writer</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td><strong>CrewAI</strong></td><td>Orchestration</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td></tr>
+      <tr><td style="color:var(--accent)"><strong>AgentHelm (ours)</strong></td><td style="color:var(--accent)">Pathfinder layer</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+    </tbody>
+  </table>
+
+  <h3>The gap we fill</h3>
+  <p>Every existing solution covers 1-2 columns. <strong>Nobody covers all six.</strong> The market has code generators on one end and enterprise guardrails on the other. The missing middle — an autonomous intelligence layer that works <em>before</em> execution, across <em>any</em> agent, for <em>any</em> user, in <em>any</em> industry — is wide open.</p>
+
+  <h3>Key competitors by category</h3>
+  <h4>Spec-driven tools</h4>
+  <ul class="bullet-list">
+    <li><strong>GitHub Spec Kit</strong> — Open-source, developer-focused, requires CLI proficiency. Agent-agnostic but not autonomous. No security layer.</li>
+    <li><strong>Kiro (AWS)</strong> — Spec-to-code for AWS teams. IDE-locked, cloud-specific. Enterprise only.</li>
+    <li><strong>Augment Code</strong> — Cross-repo context engine. 70.6% SWE-bench. Enterprise pricing, no spec authoring.</li>
+  </ul>
+  <h4>Code review / guardrails</h4>
+  <ul class="bullet-list">
+    <li><strong>Qodo</strong> — PR-level analysis, pre-merge enforcement. Developer tool, post-generation.</li>
+    <li><strong>Galileo</strong> — Eval-to-guardrail pipeline. SOC 2 compliant but enterprise-only.</li>
+    <li><strong>NVIDIA NeMo</strong> — Programmable guardrails via Colang. Requires Kubernetes expertise.</li>
+  </ul>
+  <h4>PRD/planning tools</h4>
+  <ul class="bullet-list">
+    <li><strong>ChatPRD</strong> — AI product manager for docs. No code integration, no security, no enforcement.</li>
+    <li><strong>Specced</strong> — Interviews for specs. Output is markdown. No autonomous execution.</li>
+  </ul>
+</div>
+
+<!-- ========== SECTION: RESEARCH ========== -->
+<div class="section" id="research">
+  <h2>Research foundations</h2>
+  <p>Our product concept is grounded in recent academic research, industry reports, and empirical studies from 2025-2026.</p>
+
+  <h3>Key papers & findings</h3>
+  <div class="feature-block">
+    <h4 style="margin-top:0">Safiron: Foundational Guardrail for Agentic Systems (Oct 2025)</h4>
+    <p>Huang et al. propose <strong>pre-execution guardrails</strong> — intervening at the planning stage before any action is executed. Their AuraGen pipeline synthesizes risky trajectories and trains a compact guardian model (Safiron) that flags risky agent plans, assigns risk types, and generates rationales. Key insight: <strong>existing guardrails mostly operate post-execution, which is too late.</strong></p>
+  </div>
+  <div class="feature-block">
+    <h4 style="margin-top:0">Policy as Prompt: Automated Guardrail Synthesis (Sep 2025)</h4>
+    <p>A framework that translates unstructured design documents into verifiable, real-time guardrails using the "principle of least privilege." Constructs a policy tree from technical artifacts, then compiles it into lightweight prompt-based classifiers that audit agent behavior at runtime. <strong>Bridges the policy-to-practice gap.</strong></p>
+  </div>
+  <div class="feature-block">
+    <h4 style="margin-top:0">Professional Developers Don't Vibe, They Control (Dec 2025)</h4>
+    <p>Carnegie Mellon observational study of 13 professional developers. Findings: pros <strong>plan before implementing and validate all agentic outputs</strong>. Agents are suitable for well-described, straightforward tasks but not complex ones. The gap: non-professionals skip planning entirely.</p>
+  </div>
+  <div class="feature-block">
+    <h4 style="margin-top:0">Databricks Security Vibe Check (2025)</h4>
+    <p>Tested Claude 3.7 Sonnet and GPT-4o on PurpleLlama's Secure Coding Benchmark. Three prompting strategies tested: security-focused system prompt, self-reflection, and iterative review. <strong>Self-reflection was most effective at reducing insecure code.</strong> This validates our core architecture — an autonomous reflection layer.</p>
+  </div>
+  <div class="feature-block">
+    <h4 style="margin-top:0">Spec-Driven Development — Thoughtworks Analysis (Dec 2025)</h4>
+    <p>SDD separates design from implementation: <code>idea → spec → plan → tasks → code</code>. Key insight from GitHub: <strong>"We're moving from 'code is the source of truth' to 'intent is the source of truth.'"</strong> Specs are versioned Markdown that drive agent execution. But current SDD tools lack security, compliance, and novice accessibility.</p>
+  </div>
+
+  <h3>Industry signals</h3>
+  <ul class="bullet-list">
+    <li><strong>Deloitte 2026:</strong> Agent orchestration market reaching $8.5B by 2026, up to $45B by 2030 with proper governance.</li>
+    <li><strong>Gartner 2025:</strong> Over 40% of agentic AI projects may be canceled by 2027 without governance or clear ROI.</li>
+    <li><strong>CodeRabbit 2026:</strong> 2026 marks a shift from AI code generation speed to quality, governance, and guardrails.</li>
+    <li><strong>Tenzai Dec 2025:</strong> Five major vibe coding tools produced 69 total vulnerabilities across test applications. "No comprehensive solution currently exists."</li>
+    <li><strong>JetBrains 2025:</strong> 90% of developers using AI save at least an hour daily — but quality gates are missing.</li>
+  </ul>
+</div>
+
+<!-- ========== SECTION: PRODUCT ========== -->
+<div class="section" id="product">
+  <h2>The product: AgentHelm</h2>
+  <p><strong>AgentHelm is the autonomous pre-execution intelligence layer that sits between a user's intent and any AI coding agent.</strong> It transforms vague ideas into complete, secure, production-ready specifications — then continuously validates, monitors, and improves the agent's output. Think of it as the full engineering team that non-technical builders never had.</p>
+
+  <div class="flow-container">
+    <div class="flow">
+      <div class="flow-node" style="background:var(--bg4);color:var(--tx)">User's vision</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent)">AgentHelm</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="background:rgba(107,179,255,0.12);color:var(--blue)">Spec + Plan + Tasks</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="background:var(--bg4);color:var(--tx)">Any AI agent</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="background:rgba(74,232,196,0.12);color:var(--teal)">Production code</div>
+      <div class="flow-arrow">⟲</div>
+      <div class="flow-node" style="background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent)">AgentHelm validates</div>
+    </div>
+  </div>
+
+  <h3>What AgentHelm is NOT</h3>
+  <ul class="bullet-list">
+    <li>Not a code generator — it directs agents, not replaces them</li>
+    <li>Not a markdown/docs generator — it produces executable specifications with enforcement</li>
+    <li>Not a todo list — it's an autonomous system that learns, reflects, and improves</li>
+    <li>Not enterprise-only — built for the novice vibe coder first, scales to teams</li>
+  </ul>
+
+  <h3>The 7 pillars of AgentHelm</h3>
+  <div class="pillar-grid">
+    <div class="pillar">
+      <div class="num">01 — PATHFINDER</div>
+      <h3 style="margin-top:0.25rem">Intent extraction & specification</h3>
+      <p style="font-size:0.88rem">Conversational interview that transforms vague ideas ("build me an Airbnb clone") into complete technical specifications covering architecture, data models, security requirements, compliance needs, deployment strategy, and cost projections. Industry-aware: knows healthcare needs HIPAA, finance needs SOX, EU needs GDPR.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">02 — GUARDRAIL</div>
+      <h3 style="margin-top:0.25rem">Pre-execution security layer</h3>
+      <p style="font-size:0.88rem">Before any agent writes a line of code, AgentHelm generates security policies: input validation rules, auth requirements, secret management protocols, dependency allow-lists, OWASP compliance checks. Policies are compiled into enforceable guardrails that wrap the agent's execution.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">03 — ORCHESTRATOR</div>
+      <h3 style="margin-top:0.25rem">Agent-agnostic execution</h3>
+      <p style="font-size:0.88rem">Works with any coding agent: Claude Code, Codex, Cursor, Replit, Bolt, Lovable, local LLM agents, OpenCode, Kimi, or custom setups. Generates agent-specific instruction files (CLAUDE.md, .cursorrules, AGENTS.md) and task breakdowns. Plug into any workflow.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">04 — SENTINEL</div>
+      <h3 style="margin-top:0.25rem">Continuous validation loop</h3>
+      <p style="font-size:0.88rem">After each agent execution cycle, AgentHelm reviews the output: security scan, compliance check, architectural consistency, test coverage verification, dependency audit, secret leak detection. Flags issues before they hit production. Self-reflection reduces insecure code by up to 30% (Databricks).</p>
+    </div>
+    <div class="pillar">
+      <div class="num">05 — MEMORY</div>
+      <h3 style="margin-top:0.25rem">Persistent project intelligence</h3>
+      <p style="font-size:0.88rem">Maintains a knowledge graph of your project: design decisions, architectural patterns, constraint history, past vulnerabilities found, team preferences. Survives across sessions, across agents, across models. Prevents the "context loss" problem that plagues every current tool.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">06 — DEPLOYER</div>
+      <h3 style="margin-top:0.25rem">Production readiness engine</h3>
+      <p style="font-size:0.88rem">Generates deployment configurations, CI/CD pipelines, monitoring dashboards, cost estimates, scaling rules, backup strategies, and incident response plans. Handles the "last mile" that kills most vibe-coded projects: DNS, SSL, environment variables, database migrations.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">07 — LEARNER</div>
+      <h3 style="margin-top:0.25rem">Autonomous improvement system</h3>
+      <p style="font-size:0.88rem">Reinforcement learning from user feedback, agent performance metrics, and security outcomes. Gets better at predicting what your project needs. Benchmarks itself against industry standards. Simulates attack vectors. Adapts to new frameworks, new regulations, new threat models.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SECTION: ARCHITECTURE ========== -->
+<div class="section" id="architecture">
+  <h2>Technical architecture</h2>
+  <p>AgentHelm operates as a <strong>middleware intelligence layer</strong> — it doesn't replace your agent, it wraps it. This design allows it to work with any tool, any model, any workflow.</p>
+
+  <h3>Core execution flow</h3>
+  <div class="feature-block">
+    <p style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--teal);line-height:2;margin:0">
+      User intent → <span style="color:var(--accent)">AgentHelm Pathfinder</span> → Interview & extraction<br>
+      ↓<br>
+      Specification generation (arch, security, compliance, deploy, cost)<br>
+      ↓<br>
+      <span style="color:var(--accent)">AgentHelm Guardrail</span> → Security policy compilation<br>
+      ↓<br>
+      Task decomposition → Agent-specific instruction files<br>
+      ↓<br>
+      Agent execution (Claude Code / Codex / Cursor / Replit / any)<br>
+      ↓<br>
+      <span style="color:var(--accent)">AgentHelm Sentinel</span> → Validation loop (security, compliance, quality)<br>
+      ↓<br>
+      Pass? → <span style="color:var(--accent)">AgentHelm Deployer</span> → Production config<br>
+      Fail? → Remediation instructions → Agent re-executes<br>
+      ↓<br>
+      <span style="color:var(--accent)">AgentHelm Memory</span> → Updates project knowledge graph<br>
+      <span style="color:var(--accent)">AgentHelm Learner</span> → Updates improvement model
+    </p>
+  </div>
+
+  <h3>Delivery modes</h3>
+  <div class="pillar-grid">
+    <div class="pillar">
+      <div class="num">MODE 1</div>
+      <h3 style="margin-top:0.25rem">CLI companion</h3>
+      <p style="font-size:0.88rem">Runs alongside Claude Code, Codex, OpenCode. Generates CLAUDE.md, watches file changes, triggers validation on each commit. <code>helm init</code> → <code>helm watch</code> → <code>helm deploy</code></p>
+    </div>
+    <div class="pillar">
+      <div class="num">MODE 2</div>
+      <h3 style="margin-top:0.25rem">MCP server</h3>
+      <p style="font-size:0.88rem">Model Context Protocol integration. Any MCP-compatible tool (Cursor, Claude, VS Code) can connect to AgentHelm as a tool server. Agents call AgentHelm functions directly: <code>helm.validate()</code>, <code>helm.spec()</code></p>
+    </div>
+    <div class="pillar">
+      <div class="num">MODE 3</div>
+      <h3 style="margin-top:0.25rem">Web dashboard</h3>
+      <p style="font-size:0.88rem">Visual interface for non-technical users. Guided interview flow, real-time security dashboard, one-click deployment. Works with cloud tools: Bolt, Lovable, Replit, AI Studio.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">MODE 4</div>
+      <h3 style="margin-top:0.25rem">Skills / rules files</h3>
+      <p style="font-size:0.88rem">Exportable configuration files: .cursorrules, CLAUDE.md, AGENTS.md, .github/workflows. AgentHelm generates these from your spec and they work even without AgentHelm running.</p>
+    </div>
+  </div>
+
+  <h3>Model-agnostic design</h3>
+  <p>AgentHelm works across SOTA and local models:</p>
+  <ul class="bullet-list">
+    <li><strong>Cloud:</strong> Claude Opus/Sonnet, GPT-5/Codex, Gemini, Qwen, Kimi</li>
+    <li><strong>Local:</strong> Llama 4, DeepSeek, Mistral, Phi-4, any Ollama model</li>
+    <li><strong>Cloud IDEs:</strong> Bolt, Lovable, Replit, AI Studio, v0</li>
+    <li><strong>Terminal:</strong> Claude Code, Codex CLI, OpenCode, Aider, AmpCode</li>
+    <li><strong>IDEs:</strong> Cursor, Windsurf, VS Code + Copilot, JetBrains + Junie</li>
+  </ul>
+</div>
+
+<!-- ========== SECTION: MARKET ========== -->
+<div class="section" id="market">
+  <h2>Beyond software: all industries</h2>
+  <p>AgentHelm isn't just for software engineers. As AI agents proliferate across every BLS occupational category, every industry needs a "pathfinder" that ensures AI-generated work meets professional standards.</p>
+
+  <h3>Target BLS occupational categories</h3>
+  <div class="bls-grid">
+    <div class="bls-chip">Healthcare</div>
+    <div class="bls-chip">Finance & Insurance</div>
+    <div class="bls-chip">Legal</div>
+    <div class="bls-chip">Architecture & Engineering</div>
+    <div class="bls-chip">Education</div>
+    <div class="bls-chip">Management</div>
+    <div class="bls-chip">Life Sciences</div>
+    <div class="bls-chip">Media & Communication</div>
+    <div class="bls-chip">Construction</div>
+    <div class="bls-chip">Transportation</div>
+    <div class="bls-chip">Manufacturing</div>
+    <div class="bls-chip">Government</div>
+    <div class="bls-chip">Real Estate</div>
+    <div class="bls-chip">Retail & Sales</div>
+    <div class="bls-chip">Food Service</div>
+    <div class="bls-chip">Agriculture</div>
+  </div>
+
+  <h3>How AgentHelm applies across domains</h3>
+  <ul class="bullet-list">
+    <li><strong>Healthcare app:</strong> Auto-detects need for HIPAA compliance, audit logging, data encryption, consent flows, breach notification procedures.</li>
+    <li><strong>Financial tool:</strong> Enforces SOX compliance, rounding regulations, PCI-DSS for payment data, rate limiting for transaction APIs.</li>
+    <li><strong>Legal document system:</strong> Ensures document retention policies, privilege protections, chain of custody, redaction capabilities.</li>
+    <li><strong>Educational platform:</strong> COPPA compliance for minors, FERPA for student records, accessibility standards (WCAG 2.1 AA).</li>
+    <li><strong>E-commerce site:</strong> GDPR cookie consent, PCI-DSS card handling, inventory management constraints, shipping API rate limits.</li>
+    <li><strong>IoT / manufacturing:</strong> Safety-critical code patterns, real-time constraints, redundancy requirements, fail-safe defaults.</li>
+  </ul>
+
+  <h3>Market sizing</h3>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">85%</div><div class="label">of developers use AI coding tools regularly (Faros AI 2026)</div></div>
+    <div class="stat-card"><div class="num">40%+</div><div class="label">of professionals using AI in production environments (Adventureppc)</div></div>
+    <div class="stat-card"><div class="num">$35B</div><div class="label">autonomous agent market by 2030 (Deloitte)</div></div>
+    <div class="stat-card"><div class="num">33%</div><div class="label">of enterprise software will include agentic AI by 2028 (Gartner)</div></div>
+  </div>
+
+  <h3>TAM/SAM/SOM (conservative estimates)</h3>
+  <ul class="bullet-list">
+    <li><strong>TAM:</strong> $35B autonomous agent market × 15-30% orchestration/governance = $5.25-10.5B</li>
+    <li><strong>SAM:</strong> AI-assisted developers (30M+) × $20/mo avg = $7.2B annually for developer tooling</li>
+    <li><strong>SOM Year 1:</strong> 10K users × $20/mo = $2.4M ARR target</li>
+  </ul>
+</div>
+
+<!-- ========== SECTION: NAMING ========== -->
+<div class="section" id="naming">
+  <h2>Name & domain strategy</h2>
+  <p>The name needs to convey: steering/direction, control over agents, professionalism, and approachability. "Helm" is the perfect metaphor — the device used to steer a ship. You're at the helm of your AI agents.</p>
+
+  <div class="domain-card primary">
+    <div>
+      <div class="domain-name">agenthelm.ai</div>
+      <p style="margin:0.25rem 0 0;font-size:0.85rem">Primary recommendation. Clear meaning, memorable, professional.</p>
+    </div>
+    <div class="domain-status likely">Likely available</div>
+  </div>
+  <div class="domain-card">
+    <div>
+      <div class="domain-name">agenthelm.com</div>
+      <p style="margin:0.25rem 0 0;font-size:0.85rem">Backup .com registration for brand protection.</p>
+    </div>
+    <div class="domain-status likely">Likely available</div>
+  </div>
+
+  <h3>Why "AgentHelm"</h3>
+  <ul class="bullet-list">
+    <li><strong>Semantic clarity:</strong> "Agent" = AI agent. "Helm" = steering, command, control. Instantly communicable.</li>
+    <li><strong>Domain breadth:</strong> Works beyond code — any agent in any industry. Not locked to "code" or "dev."</li>
+    <li><strong>Kubernetes resonance:</strong> Tech-savvy users know "Helm" from K8s package manager — builds subconscious trust.</li>
+    <li><strong>Command metaphor:</strong> "Take the helm" = take control. Empowering for novice users.</li>
+    <li><strong>No existing competitor:</strong> No search results for "agenthelm" as a product or company.</li>
+  </ul>
+
+  <h3>Alternative names (verified no major conflicts)</h3>
+  <div class="domain-card">
+    <div><div class="domain-name">buildrail.ai</div><p style="margin:0.25rem 0 0;font-size:0.85rem">Guardrails for builders. Simple, clear.</p></div>
+    <div class="domain-status alt">Alternative</div>
+  </div>
+  <div class="domain-card">
+    <div><div class="domain-name">coderail.ai</div><p style="margin:0.25rem 0 0;font-size:0.85rem">Rails for code. Strong but code-specific.</p></div>
+    <div class="domain-status alt">Alternative</div>
+  </div>
+  <div class="domain-card">
+    <div><div class="domain-name">specforged.ai</div><p style="margin:0.25rem 0 0;font-size:0.85rem">Forging specifications. Evokes craftsmanship.</p></div>
+    <div class="domain-status alt">Alternative</div>
+  </div>
+  <div class="domain-card">
+    <div><div class="domain-name">helmspec.ai</div><p style="margin:0.25rem 0 0;font-size:0.85rem">Combines helm + spec. Technical feel.</p></div>
+    <div class="domain-status alt">Alternative</div>
+  </div>
+</div>
+
+<!-- ========== SECTION: ROADMAP ========== -->
+<div class="section" id="roadmap">
+  <h2>Execution roadmap</h2>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="phase">Phase 1 — Weeks 1-4 (MVP)</div>
+      <h3>Pathfinder CLI + Spec Engine</h3>
+      <p>Build the core: conversational intent extraction → specification generation → agent instruction file export (CLAUDE.md, .cursorrules, AGENTS.md). Target: Claude Code + Cursor users. Single-industry focus: web apps. Ship as open-source CLI.</p>
+      <p><strong>Deliverables:</strong> <code>helm init</code> command, spec template engine, security policy generator, 5 industry compliance templates (web, healthcare, finance, e-commerce, SaaS).</p>
+    </div>
+    <div class="timeline-item">
+      <div class="phase">Phase 2 — Weeks 5-8 (Sentinel)</div>
+      <h3>Validation loop + MCP server</h3>
+      <p>Add the post-execution validation layer: file watcher that triggers security scans, compliance checks, and architectural consistency reviews after each agent commit. Ship MCP server integration so any MCP-compatible tool can call AgentHelm.</p>
+      <p><strong>Deliverables:</strong> <code>helm watch</code> command, SAST integration (Semgrep), dependency scanner, MCP tool server, validation dashboard.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="phase">Phase 3 — Weeks 9-12 (Memory + Deploy)</div>
+      <h3>Persistent memory + deployment engine</h3>
+      <p>Project knowledge graph that persists across sessions. Deployment config generator: Docker, Vercel, AWS, Railway, Fly.io. Cost estimator. CI/CD pipeline generator. SSL/DNS guidance.</p>
+      <p><strong>Deliverables:</strong> Vector store for project memory, deploy config templates, cost calculator, monitoring setup generator.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="phase">Phase 4 — Weeks 13-20 (Web + Learning)</div>
+      <h3>Web dashboard + autonomous learning</h3>
+      <p>Visual interface for non-technical users. Guided interview flow. Real-time security dashboard. Feedback-driven improvement system. Benchmark suite to demonstrate AgentHelm's impact on code quality.</p>
+      <p><strong>Deliverables:</strong> Web app, user onboarding flow, learning system, public benchmark results, integration with Bolt/Lovable/Replit.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="phase">Phase 5 — Weeks 21-30 (Scale)</div>
+      <h3>All industries + team features + marketplace</h3>
+      <p>Expand compliance templates to all BLS categories. Team collaboration features. Marketplace for community-contributed spec templates, security policies, and industry packs. Enterprise tier with SSO, audit logs, custom policies.</p>
+      <p><strong>Deliverables:</strong> 50+ industry templates, team dashboard, marketplace, enterprise features, API for third-party integrations.</p>
+    </div>
+  </div>
+
+  <h3>Pricing strategy</h3>
+  <div class="pillar-grid">
+    <div class="pillar">
+      <div class="num">FREE</div>
+      <h3 style="margin-top:0.25rem">Open source CLI</h3>
+      <p style="font-size:0.88rem">Core spec engine, basic security scanning, 3 industry templates. Community-driven. Unlimited local use.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">$20/MO</div>
+      <h3 style="margin-top:0.25rem">Pro</h3>
+      <p style="font-size:0.88rem">Full validation loop, persistent memory, deployment engine, MCP server, all industry templates, web dashboard.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">$99/MO</div>
+      <h3 style="margin-top:0.25rem">Team</h3>
+      <p style="font-size:0.88rem">Up to 10 seats. Shared project memory, team policies, custom compliance templates, priority support.</p>
+    </div>
+    <div class="pillar">
+      <div class="num">CUSTOM</div>
+      <h3 style="margin-top:0.25rem">Enterprise</h3>
+      <p style="font-size:0.88rem">SSO, audit logs, on-prem deployment, custom guardrails, SLA, dedicated support. Air-gapped option.</p>
+    </div>
+  </div>
+
+  <h3>Success metrics</h3>
+  <ul class="bullet-list">
+    <li><strong>Vulnerability reduction:</strong> Measure % decrease in security flaws in AgentHelm-guided code vs. baseline (target: 60%+ reduction)</li>
+    <li><strong>First-pass success rate:</strong> % of agent-generated code that passes validation on first try (target: 80%+)</li>
+    <li><strong>Time to production:</strong> From idea to deployed app with full security/compliance (target: 4x faster than manual)</li>
+    <li><strong>User activation:</strong> % of signups that complete first full spec-to-deploy cycle (target: 40%+)</li>
+    <li><strong>NPS:</strong> Net promoter score from non-technical users (target: 50+)</li>
+  </ul>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  <div class="container">
+    AgentHelm Research Blueprint — March 2026 — Confidential<br>
+    Built for the next era of AI-assisted creation across all industries.
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>
