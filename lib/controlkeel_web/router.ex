@@ -10,6 +10,10 @@ defmodule ControlKeelWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :api do
+    plug :accepts, ["json"]
+  end
+
   pipeline :proxy_api do
   end
 
@@ -22,6 +26,19 @@ defmodule ControlKeelWeb.Router do
     live "/findings", FindingsLive, :index
     live "/ship", ShipLive, :index
     live "/missions/:id", MissionControlLive, :show
+  end
+
+  scope "/api/v1", ControlKeelWeb do
+    pipe_through :api
+
+    get "/sessions", ApiController, :list_sessions
+    post "/sessions", ApiController, :create_session
+    get "/sessions/:id", ApiController, :get_session
+    post "/sessions/:session_id/tasks", ApiController, :create_task
+    post "/validate", ApiController, :validate
+    get "/findings", ApiController, :list_findings
+    post "/findings/:id/action", ApiController, :finding_action
+    get "/budget", ApiController, :get_budget
   end
 
   scope "/proxy", ControlKeelWeb do

@@ -1,0 +1,117 @@
+[
+  {
+    "id": "software.debug_endpoint",
+    "category": "security",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "This looks like a debug or admin endpoint with no authentication guard. Remove it or add explicit auth before shipping.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)route.*(/debug|/admin|/internal|/_admin|/dev|/__dev__|/console)",
+        "(?i)(get|post|put|delete)\\s+[\"'].*(/debug|/admin|/internal)[\"']"
+      ]
+    }
+  },
+  {
+    "id": "software.cors_wildcard",
+    "category": "security",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Open CORS policy found (Access-Control-Allow-Origin: *). Restrict CORS to specific allowed origins in production.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)access-control-allow-origin[\\s:\"']+\\*",
+        "(?i)allow_origin.*\\*",
+        "(?i)cors.*origin.*\\*"
+      ]
+    }
+  },
+  {
+    "id": "software.auth_bypass_risk",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "This code appears to skip or bypass authentication checks. Every protected route needs an auth guard — no exceptions.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)skip.*auth|bypass.*auth|no.*auth.*required",
+        "(?i)auth_required.*false|is_authenticated.*false",
+        "(?i)plug.*:ensure_auth.*only.*\\[\\]"
+      ]
+    }
+  },
+  {
+    "id": "software.console_log_sensitive",
+    "category": "security",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "A console.log or IO.inspect call may be logging sensitive data. Remove debug logging before deploying.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(console\\.log|IO\\.inspect|Logger\\.debug).{0,40}(password|token|secret|key|credential|ssn|email|phone)",
+        "(?i)(console\\.log|IO\\.inspect).{0,40}(user|session|auth)"
+      ]
+    }
+  },
+  {
+    "id": "software.eval_exec_risk",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Dynamic code execution found (eval, exec, or equivalent). This allows arbitrary code to run and is almost never safe in production.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "\\beval\\s*\\(",
+        "\\bexec\\s*\\(",
+        "(?i)System\\.cmd.*\\$\\{",
+        "(?i)Code\\.eval_string"
+      ]
+    }
+  },
+  {
+    "id": "software.pr_size_large",
+    "category": "delivery",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "This change is large. Large pull requests are hard to review and risky to deploy. Ask the agent to break the work into smaller pieces.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)diff.*--stat.*[0-9]{4,}\\s+insertions"
+      ]
+    }
+  },
+  {
+    "id": "software.env_example_missing",
+    "category": "delivery",
+    "severity": "low",
+    "action": "warn",
+    "plain_message": "No .env.example or equivalent template found. Document which environment variables are required before other developers or deployments can run this.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)System\\.fetch_env!|process\\.env\\.|ENV\\["
+      ]
+    }
+  },
+  {
+    "id": "software.todo_before_ship",
+    "category": "delivery",
+    "severity": "low",
+    "action": "warn",
+    "plain_message": "TODO or FIXME comment found near code the agent changed. Review and resolve before shipping.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)#\\s*(TODO|FIXME|HACK|XXX|BUG):?\\s",
+        "(?i)//\\s*(TODO|FIXME|HACK|XXX|BUG):?\\s",
+        "(?i)/\\*\\s*(TODO|FIXME|HACK|XXX|BUG):?\\s"
+      ]
+    }
+  }
+]

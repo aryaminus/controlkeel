@@ -320,6 +320,22 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  def escalate_finding(%Finding{} = finding) do
+    metadata =
+      Map.merge(finding.metadata || %{}, %{
+        "escalated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+      })
+
+    case update_finding(finding, %{status: "escalated", metadata: metadata}) do
+      {:ok, updated} ->
+        emit_finding_event(:escalated, updated)
+        {:ok, updated}
+
+      other ->
+        other
+    end
+  end
+
   def record_runtime_findings(session_id, findings, opts \\ []) when is_list(findings) do
     case get_session(session_id) do
       nil ->

@@ -7,7 +7,7 @@ defmodule ControlKeel.Intent.ExecutionBrief do
 
   @schema_version 1
   @risk_tiers ~w(moderate high critical)
-  @domain_packs ~w(software healthcare education)
+  @domain_packs ~w(software healthcare education finance)
   @required_provider_fields ~w(
     objective
     users

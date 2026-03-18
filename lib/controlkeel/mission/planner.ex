@@ -230,6 +230,7 @@ defmodule ControlKeel.Mission.Planner do
 
   defp industry_from_domain_pack("healthcare"), do: "health"
   defp industry_from_domain_pack("education"), do: "education"
+  defp industry_from_domain_pack("finance"), do: "finance"
   defp industry_from_domain_pack(_domain_pack), do: "web"
 
   defp parse_budget_cents(text) do

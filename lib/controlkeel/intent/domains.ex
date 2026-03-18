@@ -36,6 +36,13 @@ defmodule ControlKeel.Intent.Domains do
       domain_pack: "software",
       industry: "general",
       description: "Solo builders using AI agents without an engineering team"
+    },
+    %{
+      id: "finance",
+      label: "Finance / Fintech",
+      domain_pack: "finance",
+      industry: "finance",
+      description: "Payments, accounting, reconciliation, financial operations"
     }
   ]
 
@@ -150,6 +157,45 @@ defmodule ControlKeel.Intent.Domains do
           placeholder: "WCAG support, low-cost hosting, teacher review before publish..."
         }
       ]
+    },
+    "finance" => %{
+      industry: "finance",
+      compliance: ["PCI-DSS", "SOX", "OWASP Top 10", "AML/KYC basics"],
+      stack_guidance:
+        "Prefer isolated payment flows, immutable audit trails, double-entry reconciliation, and strict access controls. Never mix payment credentials with application code.",
+      validation_language:
+        "Treat every financial record as auditable and every credential as PCI-scoped. Require explicit approval gates before any transaction-path change ships.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who handles money in this flow?",
+          prompt:
+            "Which roles or customers touch financial data, and at what point in the transaction or reporting flow?",
+          placeholder: "Finance team, customers paying invoices, accountants reconciling..."
+        },
+        %{
+          id: "data_involved",
+          label: "What financial data is involved?",
+          prompt:
+            "What payment, ledger, reconciliation, or account records are involved in the first release?",
+          placeholder: "Invoice totals, card payment intents, bank feeds, salary records, tax data..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 financial operations the first version must handle reliably and auditably.",
+          placeholder: "Invoice generation, payment capture, reconciliation report, approval workflow..."
+        },
+        %{
+          id: "constraints",
+          label: "What compliance limits apply?",
+          prompt:
+            "What constraints apply around PCI scope, data residency, approval thresholds, or audit requirements?",
+          placeholder:
+            "No card data in logs, EU data residency, CFO approval before prod, full audit trail..."
+        }
+      ]
     }
   }
 
@@ -219,6 +265,14 @@ defmodule ControlKeel.Intent.Domains do
     cond do
       String.contains?(content, ["student record", "child", "minor", "discipline"]) -> "high"
       true -> "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("finance", content) do
+    cond do
+      String.contains?(content, ["card", "pci", "payment", "transaction", "bank"]) -> "critical"
+      String.contains?(content, ["invoice", "reconciliation", "ledger", "salary"]) -> "high"
+      true -> "high"
     end
   end
 
