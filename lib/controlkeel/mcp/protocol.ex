@@ -1,7 +1,7 @@
 defmodule ControlKeel.MCP.Protocol do
   @moduledoc false
 
-  alias ControlKeel.MCP.Tools.{CkBudget, CkContext, CkFinding, CkValidate}
+  alias ControlKeel.MCP.Tools.{CkBudget, CkContext, CkFinding, CkRoute, CkValidate}
 
   @server_info %{"name" => "controlkeel", "version" => "0.1.0"}
 
@@ -45,6 +45,9 @@ defmodule ControlKeel.MCP.Protocol do
 
       %{"name" => "ck_budget", "arguments" => arguments} ->
         tool_response(id, CkBudget.call(arguments))
+
+      %{"name" => "ck_route", "arguments" => arguments} ->
+        tool_response(id, CkRoute.call(arguments))
 
       %{"name" => unknown} ->
         error_response(id, -32601, "Unknown tool: #{unknown}")
@@ -148,7 +151,40 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   defp tool_schemas do
-    [ck_validate_tool(), ck_context_tool(), ck_finding_tool(), ck_budget_tool()]
+    [ck_validate_tool(), ck_context_tool(), ck_finding_tool(), ck_budget_tool(), ck_route_tool()]
+  end
+
+  defp ck_route_tool do
+    %{
+      "name" => "ck_route",
+      "description" =>
+        "Recommend the best AI agent for a given task, considering security tier, remaining budget, and task type.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["task"],
+        "properties" => %{
+          "task" => %{
+            "type" => "string",
+            "description" => "Plain-language description of the task to be performed"
+          },
+          "risk_tier" => %{
+            "type" => "string",
+            "enum" => ["low", "medium", "high", "critical"],
+            "description" => "Security sensitivity of the task. Default: medium"
+          },
+          "budget_remaining_cents" => %{
+            "type" => ["integer", "string"],
+            "description" => "Remaining session budget in cents"
+          },
+          "allowed_agents" => %{
+            "type" => "array",
+            "items" => %{"type" => "string"},
+            "description" =>
+              "Restrict routing to these agent IDs. Omit to allow all supported agents."
+          }
+        }
+      }
+    }
   end
 
   defp tool_response(id, {:ok, result}) do

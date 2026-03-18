@@ -1,0 +1,80 @@
+[
+  {
+    "id": "marketing.email_no_unsubscribe",
+    "category": "compliance",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Marketing emails must include an unsubscribe mechanism (CAN-SPAM, GDPR Article 21). Add an unsubscribe link or header before sending bulk email.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(send_email|deliver_email|Swoosh|Mailer|sendgrid|mailchimp)(?!.*unsubscribe)"
+      ]
+    }
+  },
+  {
+    "id": "marketing.cookie_tracking_no_consent",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Setting analytics or tracking cookies without a consent check violates GDPR and ePrivacy Directive. Gate this behind a consent check or use a strictly necessary cookie.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(document\\.cookie\\s*=|put_resp_cookie|set_cookie).*(analytics|_ga|_gid|_fbp|_pixel|tracking)(?!.*consent)"
+      ]
+    }
+  },
+  {
+    "id": "marketing.data_scraping",
+    "category": "compliance",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Automated data collection from third-party websites may violate terms of service and data protection law. Verify you have permission to collect and use this data.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(scrape|crawl|spider|HTTPoison\\.get|Req\\.get|axios\\.get|requests\\.get).*\\b(linkedin|facebook|twitter|instagram|email_list|contact_list)\\b"
+      ]
+    }
+  },
+  {
+    "id": "marketing.pii_in_analytics",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Sending personally identifiable information to analytics platforms violates GDPR. Anonymise or pseudonymise this data before tracking.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(analytics|mixpanel|amplitude|segment|gtag|ga4)\\.track.*\\b(email|phone|full_name|ssn|date_of_birth)\\b"
+      ]
+    }
+  },
+  {
+    "id": "marketing.lead_data_retention",
+    "category": "compliance",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Marketing lead tables should have a defined retention policy. GDPR requires you to delete contact data when the purpose for processing expires. Add a scheduled purge.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)create\\s+table\\s+(leads|prospects|contacts|email_list|subscribers|newsletter)\\b"
+      ]
+    }
+  },
+  {
+    "id": "marketing.tracking_pixel_no_consent",
+    "category": "privacy",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Embedding third-party tracking pixels (Meta, Google) without consent violates GDPR. Ensure pixels only fire after consent is granted.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(fbq|gtag|_paq|twq|pinterest_tag|snaptr)\\s*\\("
+      ]
+    }
+  }
+]

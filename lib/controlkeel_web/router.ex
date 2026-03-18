@@ -36,11 +36,15 @@ defmodule ControlKeelWeb.Router do
     get "/sessions", ApiController, :list_sessions
     post "/sessions", ApiController, :create_session
     get "/sessions/:id", ApiController, :get_session
+    get "/sessions/:id/audit-log", ApiController, :audit_log
     post "/sessions/:session_id/tasks", ApiController, :create_task
+    post "/tasks/:id/complete", ApiController, :complete_task
     post "/validate", ApiController, :validate
     get "/findings", ApiController, :list_findings
     post "/findings/:id/action", ApiController, :finding_action
     get "/budget", ApiController, :get_budget
+    get "/proof/:task_id", ApiController, :proof_bundle
+    post "/route-agent", ApiController, :route_agent
   end
 
   scope "/proxy", ControlKeelWeb do

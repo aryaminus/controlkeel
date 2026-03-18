@@ -41,7 +41,8 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_validate",
              "ck_context",
              "ck_finding",
-             "ck_budget"
+             "ck_budget",
+             "ck_route"
            ]
   end
 

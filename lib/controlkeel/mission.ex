@@ -338,6 +338,207 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  @doc """
+  Complete a task, gating on open/blocked findings.
+
+  Returns `{:error, :unresolved_findings, findings}` if any findings on the
+  session are still in `open` or `blocked` status.
+  Returns `{:ok, task}` if the task is safe to mark done.
+  """
+  def complete_task(%Task{} = task) do
+    blocked =
+      Finding
+      |> where([f], f.session_id == ^task.session_id)
+      |> where([f], f.status in ["open", "blocked"])
+      |> Repo.all()
+
+    if blocked == [] do
+      update_task(task, %{status: "done"})
+    else
+      {:error, :unresolved_findings, blocked}
+    end
+  end
+
+  def complete_task(task_id) when is_integer(task_id) do
+    case Repo.get(Task, task_id) do
+      nil -> {:error, :not_found}
+      task -> complete_task(task)
+    end
+  end
+
+  @doc """
+  Build a structured proof bundle for a completed task.
+
+  The proof bundle is the canonical audit artifact for a task:
+  security findings, invocation summary, cost, risk score, deploy readiness,
+  and compliance attestations.
+  """
+  def proof_bundle(task_id) do
+    task = Repo.get(Task, task_id)
+
+    if is_nil(task) do
+      {:error, :not_found}
+    else
+      session = get_session(task.session_id)
+      findings = list_session_findings(task.session_id)
+      invocations = Repo.all(from(i in Invocation, where: i.task_id == ^task.id))
+
+      total_cost = Enum.sum(Enum.map(invocations, & &1.estimated_cost_cents))
+      blocked = Enum.filter(findings, &(&1.status == "blocked"))
+      open = Enum.filter(findings, &(&1.status == "open"))
+      resolved = Enum.filter(findings, &(&1.status in ["approved", "resolved"]))
+
+      risk_score = compute_risk_score(findings)
+
+      deploy_ready =
+        blocked == [] and open == [] and task.status == "done"
+
+      compliance_attestations =
+        build_compliance_attestations(session, findings)
+
+      bundle = %{
+        task_id: task.id,
+        task_title: task.title,
+        session_id: task.session_id,
+        agent: get_in(session, [Access.key(:execution_brief), "agent"]) || "unknown",
+        status: task.status,
+        duration_ms: nil,
+        cost_cents: total_cost,
+        invocation_count: length(invocations),
+        security_findings: %{
+          total: length(findings),
+          blocked: length(blocked),
+          open: length(open),
+          resolved: length(resolved),
+          details: Enum.map(findings, &finding_bundle_entry/1)
+        },
+        risk_score: risk_score,
+        deploy_ready: deploy_ready,
+        rollback_instructions:
+          "git revert HEAD  # revert changes from task #{task.id} if needed",
+        compliance_attestations: compliance_attestations,
+        validation_gate: task.validation_gate,
+        generated_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+
+      {:ok, bundle}
+    end
+  end
+
+  @doc """
+  Return a structured audit log for a session: all invocations and findings
+  in chronological order.
+  """
+  def audit_log(session_id) do
+    session = get_session(session_id)
+
+    if is_nil(session) do
+      {:error, :not_found}
+    else
+      invocations =
+        Repo.all(from(i in Invocation, where: i.session_id == ^session_id, order_by: i.inserted_at))
+
+      findings =
+        Repo.all(from(f in Finding, where: f.session_id == ^session_id, order_by: f.inserted_at))
+
+      tasks =
+        Repo.all(from(t in Task, where: t.session_id == ^session_id, order_by: t.position))
+
+      events =
+        (Enum.map(invocations, &audit_invocation_entry/1) ++
+           Enum.map(findings, &audit_finding_entry/1))
+        |> Enum.sort_by(& &1.timestamp)
+
+      {:ok,
+       %{
+         session_id: session_id,
+         session_title: session.title,
+         domain_pack: session.domain_pack,
+         risk_tier: session.risk_tier,
+         started_at: session.inserted_at,
+         tasks: Enum.map(tasks, &task_audit_entry/1),
+         events: events,
+         summary: %{
+           total_invocations: length(invocations),
+           total_findings: length(findings),
+           blocked_findings: Enum.count(findings, &(&1.status == "blocked")),
+           total_cost_cents: session.spent_cents || 0
+         }
+       }}
+    end
+  end
+
+  defp compute_risk_score(findings) do
+    weights = %{"critical" => 1.0, "high" => 0.7, "medium" => 0.4, "low" => 0.1}
+
+    raw =
+      findings
+      |> Enum.filter(&(&1.status not in ["approved", "resolved"]))
+      |> Enum.reduce(0.0, fn f, acc -> acc + Map.get(weights, f.severity, 0.0) end)
+
+    Float.round(min(raw / max(length(findings), 1), 1.0), 2)
+  end
+
+  defp build_compliance_attestations(nil, _findings), do: []
+
+  defp build_compliance_attestations(session, findings) do
+    packs = List.wrap(session.domain_pack) ++ ["baseline"]
+
+    Enum.map(packs, fn pack ->
+      pack_findings = Enum.filter(findings, &String.starts_with?(&1.rule_id, pack))
+      blocked = Enum.filter(pack_findings, &(&1.status == "blocked"))
+
+      %{
+        pack: pack,
+        status: if(blocked == [], do: "passed", else: "failed"),
+        findings_count: length(pack_findings),
+        blocked_count: length(blocked)
+      }
+    end)
+  end
+
+  defp finding_bundle_entry(f) do
+    %{
+      id: f.id,
+      rule_id: f.rule_id,
+      severity: f.severity,
+      category: f.category,
+      status: f.status,
+      plain_message: f.plain_message,
+      auto_resolved: f.auto_resolved
+    }
+  end
+
+  defp audit_invocation_entry(i) do
+    %{
+      type: "invocation",
+      timestamp: i.inserted_at,
+      source: i.source,
+      tool: i.tool,
+      provider: i.provider,
+      model: i.model,
+      decision: i.decision,
+      cost_cents: i.estimated_cost_cents,
+      tokens: i.input_tokens + i.output_tokens
+    }
+  end
+
+  defp audit_finding_entry(f) do
+    %{
+      type: "finding",
+      timestamp: f.inserted_at,
+      rule_id: f.rule_id,
+      severity: f.severity,
+      category: f.category,
+      status: f.status,
+      plain_message: f.plain_message
+    }
+  end
+
+  defp task_audit_entry(t) do
+    %{id: t.id, title: t.title, status: t.status, position: t.position}
+  end
+
   def record_runtime_findings(session_id, findings, opts \\ []) when is_list(findings) do
     case get_session(session_id) do
       nil ->

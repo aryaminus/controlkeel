@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.ApiController do
   use ControlKeelWeb, :controller
 
+  alias ControlKeel.AgentRouter
   alias ControlKeel.Budget
   alias ControlKeel.Mission
   alias ControlKeel.Scanner.FastPath
@@ -162,6 +163,93 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  # ─── Proof Bundle ─────────────────────────────────────────────────────────────
+
+  def proof_bundle(conn, %{"task_id" => task_id}) do
+    case Mission.proof_bundle(task_id) do
+      {:ok, bundle} ->
+        json(conn, %{proof: bundle})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+    end
+  end
+
+  # ─── Audit Log ────────────────────────────────────────────────────────────────
+
+  def audit_log(conn, %{"id" => session_id} = params) do
+    case Mission.audit_log(session_id) do
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+      {:ok, log} ->
+        format = Map.get(params, "format", "json")
+
+        if format == "csv" do
+          csv = audit_log_to_csv(log)
+
+          conn
+          |> put_resp_content_type("text/csv")
+          |> put_resp_header(
+            "content-disposition",
+            "attachment; filename=\"audit-log-#{session_id}.csv\""
+          )
+          |> send_resp(200, csv)
+        else
+          json(conn, %{audit_log: log})
+        end
+    end
+  end
+
+  # ─── Complete Task ─────────────────────────────────────────────────────────────
+
+  def complete_task(conn, %{"id" => task_id}) do
+    case Mission.complete_task(task_id) do
+      {:ok, task} ->
+        json(conn, %{task: task_summary(task)})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+
+      {:error, :unresolved_findings, findings} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{
+          error: "task has unresolved findings",
+          message:
+            "#{length(findings)} finding(s) must be approved or resolved before marking this task done.",
+          findings: Enum.map(findings, &finding_summary/1)
+        })
+    end
+  end
+
+  # ─── Agent Router ─────────────────────────────────────────────────────────────
+
+  def route_agent(conn, params) do
+    task_title = Map.get(params, "task", "")
+    opts = build_router_opts(params)
+
+    case AgentRouter.route(task_title, opts) do
+      {:ok, recommendation} ->
+        json(conn, %{recommendation: recommendation})
+
+      {:error, :no_suitable_agent, message} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "no_suitable_agent", message: message})
+    end
+  end
+
+  defp build_router_opts(params) do
+    []
+    |> maybe_put_opt(:risk_tier, Map.get(params, "risk_tier"))
+    |> maybe_put_opt(:budget_remaining_cents, Map.get(params, "budget_remaining_cents"))
+    |> maybe_put_opt(:allowed_agents, Map.get(params, "allowed_agents"))
+  end
+
+  defp maybe_put_opt(opts, _key, nil), do: opts
+  defp maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
   # ─── Serializers ─────────────────────────────────────────────────────────────
 
   defp session_summary(session) do
@@ -208,6 +296,44 @@ defmodule ControlKeelWeb.ApiController do
       plain_message: finding.plain_message,
       auto_fix_available: Map.get(finding, :auto_fix_available, false)
     }
+  end
+
+  defp audit_log_to_csv(%{events: events, session_id: sid, session_title: title}) do
+    header = "session_id,session_title,timestamp,type,rule_id,severity,category,status,plain_message,source,tool,provider,model,decision,cost_cents,tokens\r\n"
+
+    rows =
+      Enum.map(events, fn e ->
+        [
+          sid,
+          title,
+          e.timestamp,
+          e.type,
+          Map.get(e, :rule_id, ""),
+          Map.get(e, :severity, ""),
+          Map.get(e, :category, ""),
+          Map.get(e, :status, ""),
+          csv_escape(Map.get(e, :plain_message, "")),
+          Map.get(e, :source, ""),
+          Map.get(e, :tool, ""),
+          Map.get(e, :provider, ""),
+          Map.get(e, :model, ""),
+          Map.get(e, :decision, ""),
+          Map.get(e, :cost_cents, ""),
+          Map.get(e, :tokens, "")
+        ]
+        |> Enum.join(",")
+      end)
+
+    header <> Enum.join(rows, "\r\n")
+  end
+
+  defp csv_escape(nil), do: ""
+  defp csv_escape(str) when is_binary(str) do
+    if String.contains?(str, [",", "\"", "\n"]) do
+      "\"" <> String.replace(str, "\"", "\"\"") <> "\""
+    else
+      str
+    end
   end
 
   defp changeset_errors(changeset) do

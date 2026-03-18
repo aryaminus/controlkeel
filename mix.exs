@@ -104,6 +104,7 @@ defmodule ControlKeel.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind controlkeel", "esbuild controlkeel"],
       "assets.deploy": [
+        "compile",
         "tailwind controlkeel --minify",
         "esbuild controlkeel --minify",
         "phx.digest"

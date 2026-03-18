@@ -1,0 +1,80 @@
+[
+  {
+    "id": "hr.pii_in_employment_record",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Employment records must not store unprotected personally identifiable information. Encrypt sensitive fields like SSN, date of birth, and home address before persisting.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(ssn|social_security|date_of_birth|home_address|national_id|passport_number)\\s*,\\s*:string"
+      ]
+    }
+  },
+  {
+    "id": "hr.discriminatory_criteria",
+    "category": "compliance",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Filtering or scoring candidates by protected characteristics (age, race, gender, religion, disability) violates EEOC guidelines. Remove or replace this logic immediately.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(filter|where|score|rank|reject|exclude).*\\b(age|gender|race|ethnicity|religion|disability|pregnant|nationality|marital_status)\\b"
+      ]
+    }
+  },
+  {
+    "id": "hr.salary_data_logging",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Salary and compensation data must not be written to logs. Log an anonymised identifier instead.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|print|console\\.log|logger\\.|IO\\.puts|puts|echo).*(salary|compensation|pay_rate|wage|bonus)"
+      ]
+    }
+  },
+  {
+    "id": "hr.background_check_unencrypted",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Background check results and criminal history data must be encrypted at rest and access-logged. Add field-level encryption before storing.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(criminal_history|background_check|arrest_record|conviction)\\s*,\\s*:string"
+      ]
+    }
+  },
+  {
+    "id": "hr.employee_data_third_party",
+    "category": "privacy",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Sending employee personal data to a third-party service requires a Data Processing Agreement. Verify the recipient is compliant before transmitting.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(Req\\.post|HTTPoison\\.post|requests\\.post|axios\\.post|fetch\\s*\\().*\\b(employee_id|ssn|salary|date_of_birth|home_address)\\b"
+      ]
+    }
+  },
+  {
+    "id": "hr.retention_missing",
+    "category": "compliance",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Employment records tables should have a defined retention schedule. EEOC requires records kept for at least 1 year; ADEA for 3 years. Add a retention or archival mechanism.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)create\\s+table\\s+(employees|candidates|applicants|job_applications|personnel)\\b"
+      ]
+    }
+  }
+]

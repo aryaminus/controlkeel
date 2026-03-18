@@ -1,0 +1,80 @@
+[
+  {
+    "id": "legal.privileged_content_logging",
+    "category": "privacy",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Attorney-client privileged communications must never be written to application logs. This could destroy privilege and expose your client to liability. Remove this log statement immediately.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|print|console\\.log|logger\\.|IO\\.puts|puts|echo).*(attorney|counsel|legal_advice|privileged|client_communication|confidential_memo)"
+      ]
+    }
+  },
+  {
+    "id": "legal.pii_unencrypted",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Client personal data in legal matters must be encrypted at rest. Add field-level encryption before storing names, contact details, or case-related personal information.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(client_name|client_address|client_ssn|client_dob|case_details)\\s*,\\s*:string"
+      ]
+    }
+  },
+  {
+    "id": "legal.case_data_third_party",
+    "category": "privacy",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Sending case or client data to an external service without explicit client consent and a signed Data Processing Agreement violates professional responsibility rules. Block this transmission.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(Req\\.post|HTTPoison\\.post|requests\\.post|axios\\.post|fetch\\s*\\().*\\b(case_id|client_id|matter_id|legal_document|deposition)\\b"
+      ]
+    }
+  },
+  {
+    "id": "legal.document_retention_missing",
+    "category": "compliance",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Legal matter tables should have a defined retention policy. Most jurisdictions require client files for 5-7 years after matter close. Add a retention or archival mechanism.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)create\\s+table\\s+(matters|cases|legal_cases|client_files|case_documents)\\b"
+      ]
+    }
+  },
+  {
+    "id": "legal.conflict_check_missing",
+    "category": "compliance",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "New client or matter creation should trigger a conflict-of-interest check. Ensure this flow includes a conflict check step before engagement.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(create_client|new_matter|open_case|intake_client).*\\bdo\\b"
+      ]
+    }
+  },
+  {
+    "id": "legal.ediscovery_deletion",
+    "category": "compliance",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Deleting records during active litigation or investigation violates eDiscovery obligations and can result in sanctions. Verify there is no litigation hold before running this deletion.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(DELETE\\s+FROM|drop_table|destroy_all|hard_delete|purge).*\\b(case|matter|evidence|document|communication)\\b"
+      ]
+    }
+  }
+]

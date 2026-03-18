@@ -86,3 +86,17 @@ What remains is Phase 2:
 - Ship it → do the Burrito smoke test, tag v0.1.0, write a changelog                                                                                                                                             
   - Go deeper on security → LLM Advisory scanner            
   - Go wider → auth + multi-tenant so others can use it   
+
+ │           Item            │                        What it unlocks                         │ Complexity │
+  ├───────────────────────────┼────────────────────────────────────────────────────────────────┼────────────┤
+  │ Burrito binary smoke test │ Confirms controlkeel binary actually boots before shipping     │ Low        │
+  ├───────────────────────────┼────────────────────────────────────────────────────────────────┼────────────┤
+  │ LLM Advisory scanner      │ 3rd tier — context-aware decisions FastPath+Semgrep can't make │ High       │
+  ├───────────────────────────┼────────────────────────────────────────────────────────────────┼────────────┤
+  │ Agent Router (Layer 3)    │ Auto-select best agent by task type                            │ High       │
+  ├───────────────────────────┼────────────────────────────────────────────────────────────────┼────────────┤
+  │ Auth / multi-tenant       │ Multiple users, org sessions, API keys                         │ High       │
+  ├───────────────────────────┼────────────────────────────────────────────────────────────────┼────────────┤
+  │ Memory System (Layer 6)   │ pgvector semantic memory, episodic records, RL policy tuning   │ Very high  │
+  ├───────────────────────────┼────────────────────────────────────────────────────────────────┼────────────┤
+  │ Audit Log PDF export      │ Enterprise compliance reporting                                │ Medium     │
