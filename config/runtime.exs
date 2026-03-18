@@ -31,6 +31,10 @@ config :controlkeel, ControlKeel.Proxy,
   semgrep_bin: System.get_env("CONTROLKEEL_SEMGREP_BIN") || "semgrep",
   timeout_ms: String.to_integer(System.get_env("CONTROLKEEL_PROXY_TIMEOUT_MS", "15000"))
 
+if token = System.get_env("CONTROLKEEL_API_TOKEN") do
+  config :controlkeel, :api_token, token
+end
+
 config :controlkeel, ControlKeel.Intent,
   default_provider: System.get_env("CONTROLKEEL_INTENT_DEFAULT_PROVIDER"),
   dev_fallback: System.get_env("CONTROLKEEL_INTENT_DEV_FALLBACK", "false") == "true",

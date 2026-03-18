@@ -16,9 +16,12 @@ jobs:
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4"
-      - uses: mlugg/setup-zig@v1
-        with:
-          version: "0.15.2"
+      - name: Install Zig 0.15.2
+        run: |
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
+          tar xf zig.tar.xz
+          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
+          echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
@@ -34,9 +37,12 @@ jobs:
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4"
-      - uses: mlugg/setup-zig@v1
-        with:
-          version: "0.15.2"
+      - name: Install Zig 0.15.2
+        run: |
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-macos-aarch64-0.15.2.tar.xz
+          tar xf zig.tar.xz
+          sudo mv zig-macos-aarch64-0.15.2 /usr/local/zig
+          echo "/usr/local/zig" >> $GITHUB_PATH
       - run: brew install xz p7zip
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
@@ -52,9 +58,12 @@ jobs:
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4"
-      - uses: mlugg/setup-zig@v1
-        with:
-          version: "0.15.2"
+      - name: Install Zig 0.15.2
+        run: |
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
+          tar xf zig.tar.xz
+          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
+          echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy

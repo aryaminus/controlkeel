@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug ControlKeelWeb.Plugs.ApiAuth
   end
 
   pipeline :proxy_api do

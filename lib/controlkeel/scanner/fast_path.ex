@@ -5,7 +5,7 @@ defmodule ControlKeel.Scanner.FastPath do
   alias ControlKeel.Policy.PackLoader
   alias ControlKeel.Policy.Rule
   alias ControlKeel.Scanner
-  alias ControlKeel.Scanner.{Entropy, Patterns}
+  alias ControlKeel.Scanner.{Advisory, Entropy, Patterns, Semgrep}
 
   @type input :: map()
 
@@ -14,14 +14,28 @@ defmodule ControlKeel.Scanner.FastPath do
     baseline_rules = PackLoader.load!("baseline")
     cost_rules = PackLoader.load!("cost")
 
-    findings =
+    layer1 =
       []
       |> Kernel.++(Patterns.detect(normalized["content"], normalized, baseline_rules))
       |> Kernel.++(Entropy.detect(normalized["content"], normalized, baseline_rules))
       |> Kernel.++(budget_findings(normalized, cost_rules))
       |> uniq_findings()
 
-    build_result(findings)
+    layer2 =
+      if Semgrep.available?() and Semgrep.code_like?(normalized, force: layer1 != []) do
+        case Semgrep.scan(normalized, force: layer1 != [], timeout_ms: 5_000) do
+          {:ok, %{findings: sf}} -> sf
+          _ -> []
+        end
+      else
+        []
+      end
+
+    combined = uniq_findings(layer1 ++ layer2)
+
+    layer3 = Advisory.scan(normalized, combined)
+
+    build_result(uniq_findings(combined ++ layer3))
   end
 
   defp normalize_input(input) do
