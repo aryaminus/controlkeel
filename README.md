@@ -1,5 +1,8 @@
 # ControlKeel
 
+[![CI](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml)
+[![Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml/badge.svg)](https://github.com/aryaminus/controlkeel/releases)
+
 ControlKeel is the control plane that turns AI coding into production engineering. It sits above Claude Code, Codex, Cursor, Bolt, Replit, and other agent tools to enforce validation, budgets, findings review, and governed execution.
 
 Every piece of code an AI agent proposes is scanned before it runs. Hardcoded secrets, SQL injection, unsafe shell, HIPAA violations — blocked before they land in your repo. You see everything in a live mission dashboard and approve or reject findings from the web UI, CLI, or REST API.

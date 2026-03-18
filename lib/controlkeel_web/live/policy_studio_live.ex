@@ -77,7 +77,9 @@ defmodule ControlKeelWeb.PolicyStudioLive do
           <div class="ck-card" style="margin-bottom: 1rem;">
             <p class="ck-mini-label">Session budgets</p>
             <%= if @sessions == [] do %>
-              <p class="ck-note">No active sessions. Start a mission at <a href={~p"/start"} class="ck-link">/start</a>.</p>
+              <p class="ck-note">
+                No active sessions. Start a mission at <a href={~p"/start"} class="ck-link">/start</a>.
+              </p>
             <% else %>
               <div class="ck-finding-list">
                 <%= for session <- @sessions do %>
@@ -88,7 +90,9 @@ defmodule ControlKeelWeb.PolicyStudioLive do
                           {session.title}
                         </.link>
                       </h3>
-                      <span class={"ck-pill #{risk_pill_class(session.risk_tier)}"}>{session.risk_tier}</span>
+                      <span class={"ck-pill #{risk_pill_class(session.risk_tier)}"}>
+                        {session.risk_tier}
+                      </span>
                     </div>
                     <div class="ck-metric-row" style="margin-top: 0.5rem;">
                       <span class="ck-note">
@@ -104,7 +108,11 @@ defmodule ControlKeelWeb.PolicyStudioLive do
                     <%= if (session.budget_cents || 0) > 0 do %>
                       <% pct = budget_pct(session.spent_cents, session.budget_cents) %>
                       <div class="ck-progress-bar">
-                        <div class={"ck-progress-fill #{budget_fill_class(pct)}"} style={"width: #{pct}%"}></div>
+                        <div
+                          class={"ck-progress-fill #{budget_fill_class(pct)}"}
+                          style={"width: #{pct}%"}
+                        >
+                        </div>
                       </div>
                     <% end %>
                   </article>
@@ -192,7 +200,10 @@ defmodule ControlKeelWeb.PolicyStudioLive do
 
   defp format_cents(nil), do: "not set"
   defp format_cents(0), do: "$0"
-  defp format_cents(cents), do: "$#{div(cents, 100)}.#{rem(cents, 100) |> Integer.to_string() |> String.pad_leading(2, "0")}"
+
+  defp format_cents(cents),
+    do:
+      "$#{div(cents, 100)}.#{rem(cents, 100) |> Integer.to_string() |> String.pad_leading(2, "0")}"
 
   defp budget_pct(_spent, nil), do: 0
   defp budget_pct(_spent, 0), do: 0

@@ -85,8 +85,11 @@ defmodule ControlKeelWeb.MissionControlLive do
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.approve_finding(finding) do
       case Mission.get_session_context(socket.assigns.session.id) do
-        nil -> {:noreply, socket}
-        session -> {:noreply, socket |> put_flash(:info, "Finding approved.") |> assign_session(session)}
+        nil ->
+          {:noreply, socket}
+
+        session ->
+          {:noreply, socket |> put_flash(:info, "Finding approved.") |> assign_session(session)}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
@@ -99,8 +102,11 @@ defmodule ControlKeelWeb.MissionControlLive do
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.reject_finding(finding) do
       case Mission.get_session_context(socket.assigns.session.id) do
-        nil -> {:noreply, socket}
-        session -> {:noreply, socket |> put_flash(:info, "Finding rejected.") |> assign_session(session)}
+        nil ->
+          {:noreply, socket}
+
+        session ->
+          {:noreply, socket |> put_flash(:info, "Finding rejected.") |> assign_session(session)}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
@@ -113,14 +119,21 @@ defmodule ControlKeelWeb.MissionControlLive do
     <Layouts.flash_group flash={@flash} />
     <section class="ck-shell ck-shell-tight">
       <%= if @launched do %>
-        <div class="ck-card" style="border-left: 4px solid #22c55e; background: #f0fdf4; margin-bottom: 1.5rem;">
+        <div
+          class="ck-card"
+          style="border-left: 4px solid #22c55e; background: #f0fdf4; margin-bottom: 1.5rem;"
+        >
           <div style="display: flex; align-items: flex-start; gap: 1rem;">
             <span style="font-size: 1.5rem; line-height: 1;">✓</span>
             <div>
-              <strong style="display: block; margin-bottom: 0.25rem;">You're set — ControlKeel is governing this session</strong>
+              <strong style="display: block; margin-bottom: 0.25rem;">
+                You're set — ControlKeel is governing this session
+              </strong>
               <p class="ck-note" style="margin: 0 0 0.75rem;">
                 Attach Claude Code to start intercepting agent actions:
-                <code style="font-family: monospace; background: #dcfce7; padding: 0.1rem 0.3rem; border-radius: 3px;">mix ck.attach claude-code</code>
+                <code style="font-family: monospace; background: #dcfce7; padding: 0.1rem 0.3rem; border-radius: 3px;">
+                  mix ck.attach claude-code
+                </code>
               </p>
               <p class="ck-note" style="margin: 0;">
                 Or validate content directly via the
@@ -155,7 +168,12 @@ defmodule ControlKeelWeb.MissionControlLive do
         <div class="ck-card ck-stat-card">
           <p class="ck-mini-label">Compliance score</p>
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <svg viewBox="0 0 36 36" width="48" height="48" style="flex-shrink: 0; transform: rotate(-90deg);">
+            <svg
+              viewBox="0 0 36 36"
+              width="48"
+              height="48"
+              style="flex-shrink: 0; transform: rotate(-90deg);"
+            >
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" stroke-width="3.8" />
               <circle
                 cx="18"
@@ -277,7 +295,10 @@ defmodule ControlKeelWeb.MissionControlLive do
                   </div>
                   <p class="ck-note">{task.validation_gate}</p>
                   <%= if task.status == "in_progress" and @active_findings > 0 do %>
-                    <p class="ck-note" style="color: var(--ck-color-warn, #d97706); margin-top: 0.25rem;">
+                    <p
+                      class="ck-note"
+                      style="color: var(--ck-color-warn, #d97706); margin-top: 0.25rem;"
+                    >
                       {@active_findings} unresolved finding{if @active_findings != 1, do: "s"} — review before marking done
                     </p>
                   <% end %>

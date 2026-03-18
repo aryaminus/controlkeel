@@ -354,7 +354,11 @@ defmodule ControlKeel.CLI do
       filled = round(pct / 5)
       bar = "[" <> String.duplicate("█", filled) <> String.duplicate("░", 20 - filled) <> "]"
       IO.puts("")
-      IO.puts("  Budget  #{bar}  #{format_money(spent)}/#{format_money(budget)} (#{pct}%)  · rolling 24h: #{format_money(rolling)}")
+
+      IO.puts(
+        "  Budget  #{bar}  #{format_money(spent)}/#{format_money(budget)} (#{pct}%)  · rolling 24h: #{format_money(rolling)}"
+      )
+
       IO.puts(String.duplicate("─", 60))
     end
 

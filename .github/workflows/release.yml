@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "27.3.4"
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: "0.15.2"
+      - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
+      - run: mix deps.get
+      - run: MIX_ENV=prod mix assets.deploy
+      - run: BURRITO_TARGET=linux MIX_ENV=prod mix release
+      - name: Rename binary
+        run: mv burrito_out/controlkeel burrito_out/controlkeel-linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: controlkeel-linux
+          path: burrito_out/controlkeel-linux-x86_64
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "27.3.4"
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: "0.15.2"
+      - run: brew install xz p7zip
+      - run: mix deps.get
+      - run: MIX_ENV=prod mix assets.deploy
+      - run: BURRITO_TARGET=macos_silicon MIX_ENV=prod mix release
+      - name: Rename binary
+        run: mv burrito_out/controlkeel burrito_out/controlkeel-macos-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: controlkeel-macos
+          path: burrito_out/controlkeel-macos-arm64
+
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "27.3.4"
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: "0.15.2"
+      - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
+      - run: mix deps.get
+      - run: MIX_ENV=prod mix assets.deploy
+      - run: BURRITO_TARGET=windows MIX_ENV=prod mix release
+      - name: Rename binary
+        run: mv burrito_out/controlkeel.exe burrito_out/controlkeel-windows-x86_64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: controlkeel-windows
+          path: burrito_out/controlkeel-windows-x86_64.exe
+
+  release:
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: controlkeel-linux
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: controlkeel-macos
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: controlkeel-windows
+          path: dist
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            Download the binary for your platform below. No Erlang or Elixir required.
+
+            | Platform | Binary |
+            |----------|--------|
+            | macOS (Apple Silicon) | `controlkeel-macos-arm64` |
+            | Linux x86_64 | `controlkeel-linux-x86_64` |
+            | Windows x86_64 | `controlkeel-windows-x86_64.exe` |
+
+            ```bash
+            # macOS / Linux
+            chmod +x controlkeel-macos-arm64
+            ./controlkeel-macos-arm64
+
+            # Then in your project
+            ./controlkeel-macos-arm64 init
+            ./controlkeel-macos-arm64 attach claude-code
+            ```
+
+            ## Source
+
+            ```bash
+            mix setup && mix phx.server
+            ```
+
+            See [README](README.md) for full setup and MCP integration docs.

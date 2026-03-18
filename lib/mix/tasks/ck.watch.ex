@@ -107,6 +107,7 @@ defmodule Mix.Tasks.Ck.Watch do
     bar = budget_bar(pct)
 
     shell.info("")
+
     shell.info(
       "  Budget  #{bar}  #{format_cents(spent)}/#{format_cents(budget)} (#{pct}%)  " <>
         "· rolling 24h: #{format_cents(rolling)}"

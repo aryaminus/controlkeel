@@ -323,7 +323,8 @@ defmodule ControlKeel.Mission do
   def escalate_finding(%Finding{} = finding) do
     metadata =
       Map.merge(finding.metadata || %{}, %{
-        "escalated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+        "escalated_at" =>
+          DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
       })
 
     case update_finding(finding, %{status: "escalated", metadata: metadata}) do

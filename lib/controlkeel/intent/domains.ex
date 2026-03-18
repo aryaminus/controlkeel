@@ -178,14 +178,16 @@ defmodule ControlKeel.Intent.Domains do
           label: "What financial data is involved?",
           prompt:
             "What payment, ledger, reconciliation, or account records are involved in the first release?",
-          placeholder: "Invoice totals, card payment intents, bank feeds, salary records, tax data..."
+          placeholder:
+            "Invoice totals, card payment intents, bank feeds, salary records, tax data..."
         },
         %{
           id: "first_release",
           label: "What must the first release do?",
           prompt:
             "List the 3-5 financial operations the first version must handle reliably and auditably.",
-          placeholder: "Invoice generation, payment capture, reconciliation report, approval workflow..."
+          placeholder:
+            "Invoice generation, payment capture, reconciliation report, approval workflow..."
         },
         %{
           id: "constraints",

@@ -32,7 +32,8 @@ defmodule ControlKeelWeb.PolicyStudioLiveTest do
   end
 
   test "shows session budgets when sessions exist", %{conn: conn} do
-    session = session_fixture(%{title: "Budget Session", budget_cents: 10_000, spent_cents: 2_500})
+    session =
+      session_fixture(%{title: "Budget Session", budget_cents: 10_000, spent_cents: 2_500})
 
     {:ok, _view, html} = live(conn, ~p"/policies")
 

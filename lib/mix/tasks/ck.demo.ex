@@ -117,7 +117,11 @@ defmodule Mix.Tasks.Ck.Demo do
 
   defp run_validation(session) do
     shell = Mix.shell()
-    shell.info("\n→ Running ck_validate with content containing hardcoded secrets + SQL injection…")
+
+    shell.info(
+      "\n→ Running ck_validate with content containing hardcoded secrets + SQL injection…"
+    )
+
     shell.info("  (Simulating what Claude Code would send via MCP)")
 
     result =

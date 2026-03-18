@@ -186,7 +186,9 @@ defmodule ControlKeelWeb.OnboardingLive do
 
                   <label>
                     <span class="ck-label">Daily budget (USD)</span>
-                    <span class="ck-note">ControlKeel stops agents when this limit is reached. $10/day is roughly 3 full features.</span>
+                    <span class="ck-note">
+                      ControlKeel stops agents when this limit is reached. $10/day is roughly 3 full features.
+                    </span>
                     <input
                       type="number"
                       name="launch[budget]"
