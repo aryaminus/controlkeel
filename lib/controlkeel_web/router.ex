@@ -38,6 +38,7 @@ defmodule ControlKeelWeb.Router do
     get "/sessions/:id", ApiController, :get_session
     get "/sessions/:id/audit-log", ApiController, :audit_log
     post "/sessions/:session_id/tasks", ApiController, :create_task
+    patch "/tasks/:id", ApiController, :update_task
     post "/tasks/:id/complete", ApiController, :complete_task
     post "/validate", ApiController, :validate
     get "/findings", ApiController, :list_findings

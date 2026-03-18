@@ -1,0 +1,80 @@
+[
+  {
+    "id": "realestate.fair_housing_criteria",
+    "category": "compliance",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Filtering, scoring, or ranking properties or applicants by protected characteristics (race, religion, national origin, sex, disability, familial status) violates the Fair Housing Act. Remove this logic immediately.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(filter|where|score|rank|exclude|reject).*\\b(race|religion|national_origin|sex|gender|disability|familial_status|children|married|ethnicity)\\b"
+      ]
+    }
+  },
+  {
+    "id": "realestate.ssn_unencrypted",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Social Security Numbers collected for rental or mortgage applications must be encrypted at rest. Add field-level encryption before storing.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(ssn|social_security_number|tax_id|ein)\\s*,\\s*:string"
+      ]
+    }
+  },
+  {
+    "id": "realestate.pii_logging",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Applicant or tenant personal data (SSN, income, credit score) must not be written to logs. Log an anonymised identifier instead.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|print|console\\.log|logger\\.|IO\\.puts|puts|echo).*(ssn|credit_score|annual_income|background_check|criminal_history)"
+      ]
+    }
+  },
+  {
+    "id": "realestate.tenant_data_retention",
+    "category": "compliance",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Tenant and applicant tables should have a defined retention policy. Most US states require rental application records for 3 years after denial. Add a retention or archival mechanism.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)create\\s+table\\s+(tenants|applicants|rental_applications|lease_applications|property_inquiries)\\b"
+      ]
+    }
+  },
+  {
+    "id": "realestate.income_verification_plain",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Income verification and pay stub data must be encrypted and access-logged. Add field-level encryption before storing financial documents.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(annual_income|monthly_income|pay_stub|income_verification|bank_statement)\\s*,\\s*:string"
+      ]
+    }
+  },
+  {
+    "id": "realestate.listing_data_scraping",
+    "category": "compliance",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Automated scraping of MLS or real estate listing data may violate the MLS terms of service and the RETS/RESO data license. Verify you have an active data agreement.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(scrape|crawl|spider|HTTPoison\\.get|Req\\.get|axios\\.get|requests\\.get).*(zillow|realtor|mls|redfin|trulia|listing)"
+      ]
+    }
+  }
+]

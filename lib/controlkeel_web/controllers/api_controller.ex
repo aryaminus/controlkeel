@@ -163,6 +163,31 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  # ─── Task Update ─────────────────────────────────────────────────────────────
+
+  def update_task(conn, %{"id" => id} = params) do
+    case Mission.get_task!(id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+
+      task ->
+        attrs = Map.take(params, ~w(status title validation_gate metadata))
+
+        case Mission.update_task(task, attrs) do
+          {:ok, updated} ->
+            json(conn, %{task: task_summary(updated)})
+
+          {:error, changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "invalid attrs", details: changeset_errors(changeset)})
+        end
+    end
+  rescue
+    Ecto.NoResultsError ->
+      conn |> put_status(:not_found) |> json(%{error: "task not found"})
+  end
+
   # ─── Proof Bundle ─────────────────────────────────────────────────────────────
 
   def proof_bundle(conn, %{"task_id" => task_id}) do

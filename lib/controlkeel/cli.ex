@@ -42,8 +42,8 @@ defmodule ControlKeel.CLI do
       ["init" | rest] ->
         parse_with_switches(:init, rest, @init_switches)
 
-      ["attach", "claude-code"] ->
-        {:ok, %{command: :attach, options: %{}, args: ["claude-code"]}}
+      ["attach", agent] when agent in ["claude-code", "cursor", "windsurf"] ->
+        {:ok, %{command: :attach, options: %{}, args: [agent]}}
 
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
@@ -111,6 +111,8 @@ defmodule ControlKeel.CLI do
       controlkeel serve               Start the web app
       controlkeel init [options]      Initialize ControlKeel in the current project
       controlkeel attach claude-code  Register ControlKeel as a local Claude Code MCP server
+      controlkeel attach cursor       Register ControlKeel as a local Cursor MCP server
+      controlkeel attach windsurf     Register ControlKeel as a local Windsurf MCP server
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
@@ -181,6 +183,64 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to attach ControlKeel: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :attach, args: ["cursor"]}, project_root) do
+    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+
+    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
+         {:ok, binding} <- ProjectBinding.read(project_root),
+         {:ok, attached} <- attach_to_cursor(wrapper_path),
+         updated <- ProjectBinding.update_attached_agent(binding, "cursor", attached),
+         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+      {:ok,
+       [
+         "Attached ControlKeel to Cursor.",
+         "MCP server written to #{attached["config_path"]}.",
+         "Restart Cursor to activate."
+       ]}
+    else
+      {:error, :wrapper_missing} ->
+        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before attaching ControlKeel to Cursor."}
+
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
+      {:error, reason} ->
+        {:error, "Failed to attach ControlKeel to Cursor: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :attach, args: ["windsurf"]}, project_root) do
+    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+
+    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
+         {:ok, binding} <- ProjectBinding.read(project_root),
+         {:ok, attached} <- attach_to_windsurf(wrapper_path),
+         updated <- ProjectBinding.update_attached_agent(binding, "windsurf", attached),
+         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+      {:ok,
+       [
+         "Attached ControlKeel to Windsurf.",
+         "MCP server written to #{attached["config_path"]}.",
+         "Restart Windsurf to activate."
+       ]}
+    else
+      {:error, :wrapper_missing} ->
+        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before attaching ControlKeel to Windsurf."}
+
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
+      {:error, reason} ->
+        {:error, "Failed to attach ControlKeel to Windsurf: #{inspect(reason)}"}
     end
   end
 
@@ -400,6 +460,66 @@ defmodule ControlKeel.CLI do
         scope: attached_agent["scope"]
       }
     )
+  end
+
+  # ─── IDE MCP attachment helpers ──────────────────────────────────────────────
+
+  defp attach_to_cursor(wrapper_path) do
+    config_path = cursor_mcp_config_path()
+    write_ide_mcp_config(config_path, "controlkeel", wrapper_path, "cursor")
+  end
+
+  defp attach_to_windsurf(wrapper_path) do
+    config_path = windsurf_mcp_config_path()
+    write_ide_mcp_config(config_path, "controlkeel", wrapper_path, "windsurf")
+  end
+
+  defp cursor_mcp_config_path do
+    home = System.user_home!()
+
+    case :os.type() do
+      {:win32, _} ->
+        Path.join([System.get_env("APPDATA") || home, "Cursor", "User", "globalStorage", "cursor.mcp.json"])
+
+      {:unix, :darwin} ->
+        Path.join([home, "Library", "Application Support", "Cursor", "User", "globalStorage", "cursor.mcp.json"])
+
+      _ ->
+        Path.join([home, ".config", "Cursor", "User", "globalStorage", "cursor.mcp.json"])
+    end
+  end
+
+  defp windsurf_mcp_config_path do
+    home = System.user_home!()
+    Path.join([home, ".codeium", "windsurf", "mcp_config.json"])
+  end
+
+  defp write_ide_mcp_config(config_path, server_name, command_path, ide_key) do
+    existing =
+      case File.read(config_path) do
+        {:ok, contents} -> Jason.decode(contents) |> elem(1)
+        _ -> %{}
+      end || %{}
+
+    mcpServers = Map.get(existing, "mcpServers", %{})
+
+    updated =
+      Map.put(existing, "mcpServers", Map.put(mcpServers, server_name, %{
+        "command" => command_path,
+        "args" => []
+      }))
+
+    with :ok <- File.mkdir_p(Path.dirname(config_path)),
+         :ok <- File.write(config_path, Jason.encode!(updated, pretty: true) <> "\n") do
+      {:ok,
+       %{
+         "server_name" => server_name,
+         "ide" => ide_key,
+         "config_path" => config_path,
+         "command" => command_path,
+         "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+       }}
+    end
   end
 
   defp format_money(nil), do: "unlimited"

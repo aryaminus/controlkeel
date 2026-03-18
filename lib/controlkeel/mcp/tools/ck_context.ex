@@ -3,6 +3,9 @@ defmodule ControlKeel.MCP.Tools.CkContext do
 
   alias ControlKeel.Budget
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.{Finding, Session}
+  alias ControlKeel.Repo
+  import Ecto.Query, warn: false
 
   def call(arguments) when is_map(arguments) do
     with {:ok, session_id} <- required_integer(arguments, "session_id"),
@@ -17,7 +20,8 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "compliance_profile" => session.workspace.compliance_profile,
          "active_findings" => active_findings_summary(session.findings),
          "budget_summary" => budget_summary(session),
-         "current_task" => task_summary(task)
+         "current_task" => task_summary(task),
+         "past_patterns" => past_patterns(session)
        }}
     end
   end
@@ -82,6 +86,75 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       "validation_gate" => task.validation_gate,
       "metadata" => task.metadata
     }
+  end
+
+  # ─── Episodic memory: past patterns ─────────────────────────────────────────
+  # Pull the most frequently recurring finding categories and rule IDs from the
+  # last 10 sessions in the same domain. This gives the agent "what went wrong
+  # before" so it can proactively avoid repeat mistakes.
+
+  defp past_patterns(%Session{id: current_session_id, execution_brief: brief}) do
+    domain =
+      (brief || %{})
+      |> then(&(Map.get(&1, "domain_pack") || Map.get(&1, :domain_pack)))
+
+    if is_nil(domain) do
+      %{"available" => false}
+    else
+      past_patterns_for_domain(domain, current_session_id)
+    end
+  end
+
+  defp past_patterns_for_domain(domain, current_session_id) do
+    recent_session_ids =
+      Session
+      |> where(
+        [s],
+        fragment("json_extract(?, '$.domain_pack')", s.execution_brief) == ^domain and
+          s.id != ^current_session_id
+      )
+      |> order_by(desc: :inserted_at)
+      |> limit(10)
+      |> select([s], s.id)
+      |> Repo.all()
+
+    if recent_session_ids == [] do
+      %{"available" => false}
+    else
+      top_rules =
+        Finding
+        |> where([f], f.session_id in ^recent_session_ids)
+        |> where([f], f.status == "blocked")
+        |> group_by([f], f.rule_id)
+        |> order_by([f], desc: count(f.id))
+        |> limit(5)
+        |> select([f], %{rule_id: f.rule_id, count: count(f.id)})
+        |> Repo.all()
+
+      top_categories =
+        Finding
+        |> where([f], f.session_id in ^recent_session_ids)
+        |> group_by([f], f.category)
+        |> order_by([f], desc: count(f.id))
+        |> limit(3)
+        |> select([f], f.category)
+        |> Repo.all()
+
+      %{
+        "available" => true,
+        "domain" => domain,
+        "sessions_sampled" => length(recent_session_ids),
+        "recurring_rule_ids" => Enum.map(top_rules, &%{"rule_id" => &1.rule_id, "blocked_count" => &1.count}),
+        "top_categories" => top_categories,
+        "hint" =>
+          if top_rules != [] do
+            first = List.first(top_rules)
+            "In past #{domain} sessions, #{first.rule_id} was blocked #{first.count} time(s). Watch for it."
+          else
+            "No recurring patterns in past #{domain} sessions."
+          end
+      }
+    end
   end
 
   defp required_integer(arguments, key) do

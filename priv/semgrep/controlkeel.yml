@@ -177,3 +177,170 @@ rules:
       controlkeel_decision: warn
       controlkeel_rule_id: security.semgrep.open_redirect
       controlkeel_severity: medium
+
+  # ─── Go ──────────────────────────────────────────────────────────────────────
+
+  - id: controlkeel.go-sql-format
+    message: "Go: fmt.Sprintf used to build a SQL query string. Use parameterized queries (db.Query with ? placeholders) instead."
+    languages: [go]
+    severity: ERROR
+    pattern: |
+      fmt.Sprintf($QUERY, ...)
+    pattern-filter:
+      - metavariable-regex:
+          metavariable: $QUERY
+          regex: "(?i)(SELECT|INSERT|UPDATE|DELETE)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.go_sql_format
+      controlkeel_severity: high
+
+  - id: controlkeel.go-hardcoded-secret
+    message: "Go: hardcoded credential or API key in source. Move to environment variables or a secrets manager."
+    languages: [go]
+    severity: ERROR
+    pattern-regex: "(?i)(apiKey|api_key|secret|password|token)\\s*:?=\\s*\"[A-Za-z0-9/+]{20,}\""
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.go_hardcoded_secret
+      controlkeel_severity: critical
+
+  - id: controlkeel.go-exec-with-user-input
+    message: "Go: os/exec command built from user-controlled input risks command injection. Use exec.Command with separate arguments."
+    languages: [go]
+    severity: ERROR
+    pattern-regex: "exec\\.Command\\s*\\(\\s*(fmt\\.Sprintf|\\+)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.go_exec_injection
+      controlkeel_severity: high
+
+  # ─── Rust ────────────────────────────────────────────────────────────────────
+
+  - id: controlkeel.rust-unwrap-in-handler
+    message: "Rust: .unwrap() in a request handler will panic on None/Err, taking down the thread. Use ? or match instead."
+    languages: [rust]
+    severity: WARNING
+    pattern-regex: "\\.unwrap\\(\\)"
+    metadata:
+      controlkeel_category: hygiene
+      controlkeel_decision: warn
+      controlkeel_rule_id: hygiene.semgrep.rust_unwrap_handler
+      controlkeel_severity: medium
+
+  - id: controlkeel.rust-unsafe-block
+    message: "Rust: unsafe block detected. Ensure memory safety invariants are manually upheld and document why unsafe is required."
+    languages: [rust]
+    severity: WARNING
+    pattern-regex: "\\bunsafe\\s*\\{"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.rust_unsafe_block
+      controlkeel_severity: medium
+
+  - id: controlkeel.rust-hardcoded-secret
+    message: "Rust: hardcoded credential in source. Move to environment variables (std::env::var) or a secrets manager."
+    languages: [rust]
+    severity: ERROR
+    pattern-regex: "(?i)(api_key|secret|password|token)\\s*=\\s*\"[A-Za-z0-9/+]{20,}\""
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.rust_hardcoded_secret
+      controlkeel_severity: critical
+
+  # ─── Java / Kotlin ───────────────────────────────────────────────────────────
+
+  - id: controlkeel.java-sql-concat
+    message: "Java: SQL query built with string concatenation. Use PreparedStatement with ? placeholders to prevent SQL injection."
+    languages: [java]
+    severity: ERROR
+    pattern-regex: "(?i)(createQuery|createNativeQuery|executeQuery|prepareStatement)\\s*\\(\\s*[^)]*\\+"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.java_sql_concat
+      controlkeel_severity: high
+
+  - id: controlkeel.java-hardcoded-secret
+    message: "Java: hardcoded credential or API key. Move to environment variables or a vault (e.g. AWS Secrets Manager)."
+    languages: [java]
+    severity: ERROR
+    pattern-regex: "(?i)(apiKey|secret|password|token)\\s*=\\s*\"[A-Za-z0-9/+]{20,}\""
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.java_hardcoded_secret
+      controlkeel_severity: critical
+
+  - id: controlkeel.java-xxe
+    message: "Java: XML parser may be vulnerable to XXE (XML External Entity) attacks. Disable external entity processing."
+    languages: [java]
+    severity: ERROR
+    pattern-regex: "(?i)(DocumentBuilderFactory|SAXParserFactory|XMLInputFactory)\\.newInstance\\(\\)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.java_xxe
+      controlkeel_severity: high
+
+  # ─── Shell / Infrastructure ────────────────────────────────────────────────
+
+  - id: controlkeel.shell-no-set-e
+    message: "Shell script missing 'set -e'. Without it, errors are silently ignored and subsequent commands run on broken state."
+    languages: [bash]
+    severity: WARNING
+    pattern-regex: "^#!/(bin|usr/bin)/(bash|sh)(?!.*set -e)"
+    metadata:
+      controlkeel_category: hygiene
+      controlkeel_decision: warn
+      controlkeel_rule_id: hygiene.semgrep.shell_no_set_e
+      controlkeel_severity: low
+
+  - id: controlkeel.terraform-public-s3
+    message: "Terraform: S3 bucket may be publicly accessible. Verify 'acl' is not set to 'public-read' or 'public-read-write' unless intentional."
+    languages: [hcl]
+    severity: ERROR
+    pattern-regex: "(?i)acl\\s*=\\s*\"public-read"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.terraform_public_s3
+      controlkeel_severity: high
+
+  - id: controlkeel.dockerfile-root-user
+    message: "Dockerfile: container runs as root. Add 'USER nonroot' before CMD/ENTRYPOINT to reduce blast radius if compromised."
+    languages: [dockerfile]
+    severity: WARNING
+    pattern-regex: "(?i)^(CMD|ENTRYPOINT)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.dockerfile_root_user
+      controlkeel_severity: medium
+
+  - id: controlkeel.ruby-sql-concat
+    message: "Ruby: SQL query built with string interpolation or concatenation. Use parameterized queries (where('col = ?', val)) instead."
+    languages: [ruby]
+    severity: ERROR
+    pattern-regex: "(?i)(where|find_by_sql|execute|raw)\\s*[\\(\"'].*#\\{"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.ruby_sql_injection
+      controlkeel_severity: high
+
+  - id: controlkeel.php-eval
+    message: "PHP: eval() executes arbitrary code. This is almost always exploitable if any user input reaches it."
+    languages: [php]
+    severity: ERROR
+    pattern-regex: "\\beval\\s*\\("
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.php_eval
+      controlkeel_severity: critical

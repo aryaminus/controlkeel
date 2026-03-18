@@ -1,0 +1,80 @@
+[
+  {
+    "id": "sales.crm_pii_unencrypted",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "CRM contact fields containing personal data must be encrypted at rest. Add field-level encryption before storing phone numbers, emails, or addresses.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(phone|mobile|email|home_address|billing_address|shipping_address)\\s*,\\s*:string"
+      ]
+    }
+  },
+  {
+    "id": "sales.contact_data_third_party",
+    "category": "privacy",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Sending contact or lead data to a third-party service requires consent and a Data Processing Agreement. Verify the recipient is GDPR-compliant before transmitting.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(Req\\.post|HTTPoison\\.post|requests\\.post|axios\\.post|fetch\\s*\\().*\\b(email|phone|lead_id|contact_id|prospect)\\b"
+      ]
+    }
+  },
+  {
+    "id": "sales.revenue_data_logging",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Revenue, quota, and deal value data must not be written to application logs. This data is confidential and can expose competitive intelligence.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|print|console\\.log|logger\\.|IO\\.puts|puts|echo).*(deal_value|quota|revenue|mrr|arr|commission|pipeline_value)"
+      ]
+    }
+  },
+  {
+    "id": "sales.crm_retention_missing",
+    "category": "compliance",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "CRM tables storing contact and lead data should have a defined retention schedule. GDPR requires deleting contact data when the processing purpose expires. Add a purge mechanism.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)create\\s+table\\s+(contacts|leads|prospects|crm_contacts|opportunities|deals)\\b"
+      ]
+    }
+  },
+  {
+    "id": "sales.hardcoded_crm_key",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Hardcoded CRM API key (Salesforce, HubSpot, Pipedrive) detected. Move this to an environment variable or secrets manager immediately.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(salesforce|hubspot|pipedrive|zoho|freshsales).*api.?key\\s*[=:]\\s*[\"'][A-Za-z0-9_\\-]{16,}[\"']"
+      ]
+    }
+  },
+  {
+    "id": "sales.unsolicited_email_blast",
+    "category": "compliance",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Bulk email sending without checking opt-in consent violates CAN-SPAM and GDPR. Ensure you have explicit consent or a legitimate interest basis before sending.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(send_bulk_email|mass_email|email_blast|broadcast_email)(?!.*consent)"
+      ]
+    }
+  }
+]
