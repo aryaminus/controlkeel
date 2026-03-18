@@ -105,8 +105,7 @@ defmodule ControlKeelWeb.OnboardingLive do
       {:ok, session} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Mission compiled. ControlKeel generated the first execution path.")
-         |> push_navigate(to: ~p"/missions/#{session.id}")}
+         |> push_navigate(to: ~p"/missions/#{session.id}?launched=1")}
 
       {:error, _scope, _changeset} ->
         {:noreply,

@@ -82,3 +82,7 @@ What remains is Phase 2:
   │ Multi-tenant / auth       │ User accounts, org-level sessions                             │ High         │
   ├───────────────────────────┼───────────────────────────────────────────────────────────────┼──────────────┤                                                                                                     
   │ Burrito binary smoke test │ Verify the packaged binary actually boots                     │ Low          │
+
+- Ship it → do the Burrito smoke test, tag v0.1.0, write a changelog                                                                                                                                             
+  - Go deeper on security → LLM Advisory scanner            
+  - Go wider → auth + multi-tenant so others can use it   

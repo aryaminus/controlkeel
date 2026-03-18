@@ -1,4 +1,6 @@
 rules:
+  # ─── SQL Injection ──────────────────────────────────────────────────────────
+
   - id: controlkeel.sql-injection
     message: "Semgrep detected query construction that looks vulnerable to SQL injection."
     languages: [generic]
@@ -10,6 +12,8 @@ rules:
       controlkeel_rule_id: security.semgrep.sql_injection
       controlkeel_severity: high
 
+  # ─── XSS / Unsafe DOM ───────────────────────────────────────────────────────
+
   - id: controlkeel.xss-sink
     message: "Semgrep detected an unsafe HTML sink that can introduce XSS."
     languages: [generic]
@@ -19,6 +23,17 @@ rules:
       controlkeel_category: security
       controlkeel_decision: block
       controlkeel_rule_id: security.semgrep.xss_sink
+      controlkeel_severity: high
+
+  - id: controlkeel.dangerously-set-inner-html
+    message: "dangerouslySetInnerHTML bypasses React's XSS protection. Use sanitized output or avoid user-controlled content here."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "dangerouslySetInnerHTML"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.dangerous_inner_html
       controlkeel_severity: high
 
   - id: controlkeel.inline-script
@@ -32,6 +47,8 @@ rules:
       controlkeel_rule_id: security.semgrep.inline_script
       controlkeel_severity: medium
 
+  # ─── Hardcoded Secrets ───────────────────────────────────────────────────────
+
   - id: controlkeel.hardcoded-secret
     message: "Semgrep detected a likely hardcoded secret assignment."
     languages: [generic]
@@ -42,3 +59,121 @@ rules:
       controlkeel_decision: block
       controlkeel_rule_id: security.semgrep.hardcoded_secret
       controlkeel_severity: high
+
+  - id: controlkeel.jwt-hardcoded
+    message: "Hardcoded JWT secret detected. Use an environment variable or secrets manager."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(?i)(jwt[_-]?secret|jwt[_-]?key|signing[_-]?key)\\s*[:=]\\s*[\"'][^\"']{8,}[\"']"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.jwt_hardcoded
+      controlkeel_severity: critical
+
+  # ─── Code Execution / Injection ─────────────────────────────────────────────
+
+  - id: controlkeel.python-eval
+    message: "eval() with dynamic content can execute arbitrary code. Use ast.literal_eval() for data or avoid entirely."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(?<![a-zA-Z_])eval\\s*\\([^)]{1,200}\\)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.eval_usage
+      controlkeel_severity: high
+
+  - id: controlkeel.python-subprocess-shell
+    message: "subprocess called with shell=True and user-controlled input is a command injection risk."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(?i)subprocess\\.(run|call|Popen|check_output).{0,200}shell\\s*=\\s*True"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.subprocess_shell
+      controlkeel_severity: high
+
+  - id: controlkeel.python-os-system
+    message: "os.system() passes the command to a shell and is vulnerable to injection. Use subprocess with a list instead."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "os\\.system\\s*\\("
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.os_system
+      controlkeel_severity: medium
+
+  - id: controlkeel.python-pickle
+    message: "pickle.loads() executes arbitrary Python on deserialization. Never unpickle untrusted data."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "pickle\\.loads?\\s*\\("
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.pickle_loads
+      controlkeel_severity: critical
+
+  # ─── Shell ───────────────────────────────────────────────────────────────────
+
+  - id: controlkeel.curl-pipe-bash
+    message: "Piping curl output directly into bash executes remote code without verification. Download and inspect first."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "curl.{0,200}\\|.{0,50}(bash|sh|zsh|fish)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.curl_pipe_bash
+      controlkeel_severity: critical
+
+  - id: controlkeel.rm-rf
+    message: "rm -rf with a variable path can delete unintended files. Verify path is scoped correctly."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "rm\\s+-[a-zA-Z]*r[a-zA-Z]*f|rm\\s+-[a-zA-Z]*f[a-zA-Z]*r"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.rm_rf
+      controlkeel_severity: medium
+
+  # ─── Prototype Pollution ─────────────────────────────────────────────────────
+
+  - id: controlkeel.prototype-pollution
+    message: "Assignment to __proto__ or constructor.prototype can pollute the JavaScript object prototype."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(__proto__|constructor\\.prototype)\\s*\\["
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.prototype_pollution
+      controlkeel_severity: high
+
+  # ─── Debug / Production Hygiene ──────────────────────────────────────────────
+
+  - id: controlkeel.debug-mode-enabled
+    message: "Debug mode or verbose error output is enabled. This should not be deployed to production."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "(?i)(DEBUG\\s*=\\s*True|APP_DEBUG\\s*=\\s*true|debug:\\s*true|\"debug\":\\s*true)"
+    metadata:
+      controlkeel_category: hygiene
+      controlkeel_decision: warn
+      controlkeel_rule_id: hygiene.semgrep.debug_mode
+      controlkeel_severity: medium
+
+  - id: controlkeel.open-redirect
+    message: "Redirect target derived from user input can be used for phishing. Validate against an allowlist."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "(?i)(redirect|location)\\s*[:=].{0,80}(params|request|query|input|user)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.open_redirect
+      controlkeel_severity: medium

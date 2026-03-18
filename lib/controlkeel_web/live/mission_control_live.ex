@@ -9,7 +9,7 @@ defmodule ControlKeelWeb.MissionControlLive do
   @refresh_interval_ms 2_000
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => id} = params, _session, socket) do
     case Mission.get_session_context(id) do
       nil ->
         {:ok,
@@ -23,6 +23,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         {:ok,
          socket
          |> assign(:page_title, session.title)
+         |> assign(:launched, Map.get(params, "launched") == "1")
          |> assign(:selected_finding, nil)
          |> assign(:selected_fix, nil)
          |> assign_session(session)}
@@ -111,6 +112,25 @@ defmodule ControlKeelWeb.MissionControlLive do
     ~H"""
     <Layouts.flash_group flash={@flash} />
     <section class="ck-shell ck-shell-tight">
+      <%= if @launched do %>
+        <div class="ck-card" style="border-left: 4px solid #22c55e; background: #f0fdf4; margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: flex-start; gap: 1rem;">
+            <span style="font-size: 1.5rem; line-height: 1;">✓</span>
+            <div>
+              <strong style="display: block; margin-bottom: 0.25rem;">You're set — ControlKeel is governing this session</strong>
+              <p class="ck-note" style="margin: 0 0 0.75rem;">
+                Attach Claude Code to start intercepting agent actions:
+                <code style="font-family: monospace; background: #dcfce7; padding: 0.1rem 0.3rem; border-radius: 3px;">mix ck.attach claude-code</code>
+              </p>
+              <p class="ck-note" style="margin: 0;">
+                Or validate content directly via the
+                <a href="/policies" style="text-decoration: underline;">Policy Studio</a>
+                or REST API at <code style="font-family: monospace; background: #dcfce7; padding: 0.1rem 0.3rem; border-radius: 3px;">POST /api/v1/validate</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      <% end %>
       <div class="ck-section-header">
         <div>
           <p class="ck-kicker">Mission control</p>
