@@ -1,6 +1,8 @@
 defmodule ControlKeel.Benchmark.Metadata do
   @moduledoc false
 
+  alias ControlKeel.Intent.Domains
+
   def normalize_scenario_metadata(payload) when is_map(payload) do
     metadata =
       payload
@@ -59,17 +61,15 @@ defmodule ControlKeel.Benchmark.Metadata do
   end
 
   defp infer_domain_pack(payload, metadata) do
-    metadata["domain_pack"] ||
-      cond do
-        String.contains?(String.downcase(Map.get(payload, "incident_label", "")), "phi") ->
-          "healthcare"
+    case normalize_domain_pack(metadata["domain_pack"]) do
+      nil ->
+        payload
+        |> domain_hint_blob(metadata)
+        |> infer_domain_pack_from_text()
 
-        String.contains?(String.downcase(Map.get(payload, "name", "")), "patient") ->
-          "healthcare"
-
-        true ->
-          "software"
-      end
+      pack ->
+        pack
+    end
   end
 
   defp infer_budget_tier(payload, metadata) do
@@ -91,6 +91,55 @@ defmodule ControlKeel.Benchmark.Metadata do
 
   defp category(payload), do: String.downcase(Map.get(payload, "category", ""))
   defp path(payload), do: String.downcase(Map.get(payload, "path", ""))
+
+  defp domain_hint_blob(payload, metadata) do
+    [
+      Map.get(payload, "incident_label", ""),
+      Map.get(payload, "name", ""),
+      Map.get(payload, "path", ""),
+      Map.get(metadata, "prompt", "")
+    ]
+    |> Enum.join(" ")
+    |> String.downcase()
+  end
+
+  defp infer_domain_pack_from_text(text) do
+    cond do
+      String.contains?(text, ["patient", "medical", "phi", "insurance"]) ->
+        "healthcare"
+
+      String.contains?(text, ["student", "school", "classroom", "minor"]) ->
+        "education"
+
+      String.contains?(text, ["payment", "invoice", "bank", "ledger", "transaction"]) ->
+        "finance"
+
+      String.contains?(text, ["candidate", "resume", "employee", "salary", "hiring"]) ->
+        "hr"
+
+      String.contains?(text, ["privileged", "matter", "litigation", "contract", "ediscovery"]) ->
+        "legal"
+
+      String.contains?(text, ["consent", "subscriber", "campaign", "analytics", "tracking"]) ->
+        "marketing"
+
+      String.contains?(text, ["crm", "lead", "prospect", "pipeline", "quota", "deal"]) ->
+        "sales"
+
+      String.contains?(text, ["listing", "tenant", "mortgage", "property", "rental"]) ->
+        "realestate"
+
+      true ->
+        "software"
+    end
+  end
+
+  defp normalize_domain_pack(nil), do: nil
+
+  defp normalize_domain_pack(value) do
+    pack = Domains.normalize_pack(value, "__unsupported__")
+    if Domains.supported_pack?(pack), do: pack, else: nil
+  end
 
   defp stringify_keys(map) do
     Enum.into(map, %{}, fn

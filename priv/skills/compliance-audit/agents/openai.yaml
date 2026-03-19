@@ -1,0 +1,12 @@
+interface:
+  display_name: "Compliance Audit"
+  short_description: "CK compliance control review aligned to active policy packs and domain packs."
+  brand_color: "#1d4ed8"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

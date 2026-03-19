@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
   @moduledoc false
 
   alias ControlKeel.AutoFix
+  alias ControlKeel.Intent.Domains
   alias ControlKeel.Mission
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.FastPath
@@ -31,14 +32,16 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
 
       true ->
         with {:ok, session_id} <- normalize_optional_integer(arguments, "session_id"),
-             {:ok, task_id} <- normalize_optional_integer(arguments, "task_id") do
+             {:ok, task_id} <- normalize_optional_integer(arguments, "task_id"),
+             {:ok, domain_pack} <- normalize_optional_domain_pack(arguments) do
           {:ok,
            %{
              "content" => content,
              "path" => optional_binary(arguments, "path"),
              "kind" => kind,
              "session_id" => session_id,
-             "task_id" => task_id
+             "task_id" => task_id,
+             "domain_pack" => domain_pack
            }}
         end
     end
@@ -56,6 +59,27 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
         case Integer.parse(value) do
           {parsed, ""} -> {:ok, parsed}
           _ -> {:error, {:invalid_arguments, "`#{key}` must be an integer if provided"}}
+        end
+    end
+  end
+
+  defp normalize_optional_domain_pack(arguments) do
+    case Map.get(arguments, "domain_pack") do
+      nil ->
+        {:ok, nil}
+
+      "" ->
+        {:ok, nil}
+
+      value when is_binary(value) ->
+        pack = Domains.normalize_pack(value, "__unsupported__")
+
+        if Domains.supported_pack?(pack) do
+          {:ok, pack}
+        else
+          {:error,
+           {:invalid_arguments,
+            "`domain_pack` must be one of #{Enum.join(Domains.supported_packs(), ", ")}"}}
         end
     end
   end

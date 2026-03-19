@@ -20,7 +20,8 @@ defmodule ControlKeel.Benchmark.Subjects.ControlKeelProxy do
     result =
       Governor.benchmark_evaluate(extracted,
         path: scenario.path,
-        kind: scenario.kind
+        kind: scenario.kind,
+        domain_pack: get_in(scenario.metadata || %{}, ["domain_pack"])
       )
 
     Runner.outcome_from_scan_result(

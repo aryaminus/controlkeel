@@ -51,7 +51,12 @@ defmodule ControlKeel.Benchmark.Runner do
     metadata = Map.get(attrs, "metadata") || Map.get(attrs, :metadata) || %{}
 
     result =
-      case CkValidate.call(%{"content" => content, "path" => path, "kind" => kind}) do
+      case CkValidate.call(%{
+             "content" => content,
+             "path" => path,
+             "kind" => kind,
+             "domain_pack" => get_in(scenario.metadata || %{}, ["domain_pack"])
+           }) do
         {:ok, public_result} ->
           outcome_from_public_result("completed", public_result, duration_ms, %{
             "runner" => "manual_import"
@@ -164,7 +169,8 @@ defmodule ControlKeel.Benchmark.Runner do
             %{
               "content" => File.read!(file),
               "path" => Path.relative_to(file, output_dir),
-              "kind" => scenario.kind
+              "kind" => scenario.kind,
+              "domain_pack" => get_in(scenario.metadata || %{}, ["domain_pack"])
             }
           end)
       end
@@ -262,7 +268,8 @@ defmodule ControlKeel.Benchmark.Runner do
         %{
           "content" => stdout,
           "path" => scenario.path || "stdout.txt",
-          "kind" => scenario.kind || "text"
+          "kind" => scenario.kind || "text",
+          "domain_pack" => get_in(scenario.metadata || %{}, ["domain_pack"])
         }
       ]
     end

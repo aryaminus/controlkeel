@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.ProofBrowserLive do
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.Intent
   alias ControlKeel.Memory
   alias ControlKeel.Mission
 
@@ -113,13 +114,21 @@ defmodule ControlKeelWeb.ProofBrowserLive do
               <h3>Blocked findings</h3>
               <p class="ck-note">{@proof.blocked_findings_count}</p>
             </div>
+            <div>
+              <h3>Domain pack</h3>
+              <p class="ck-note">
+                {format_domain_pack(get_in(@proof.session.execution_brief || %{}, ["domain_pack"]))}
+              </p>
+            </div>
           </div>
 
           <p class="ck-mini-label" style="margin-top: 1.5rem;">Compliance attestations</p>
           <ul class="ck-mini-list">
             <%= for attestation <- List.wrap(@proof.bundle["compliance_attestations"]) do %>
               <li>
-                {attestation["pack"]}: {attestation["status"]} ({attestation["blocked_count"]} blocked)
+                {format_domain_pack(attestation["pack"])}: {attestation["status"]} ({attestation[
+                  "blocked_count"
+                ]} blocked)
               </li>
             <% end %>
           </ul>
@@ -340,6 +349,9 @@ defmodule ControlKeelWeb.ProofBrowserLive do
     %{entries: [], filters: %{page: 1}, total_count: 0, total_pages: 1, page: 1, page_size: 20}
   end
 
+  defp format_domain_pack(nil), do: "Unknown"
+  defp format_domain_pack(pack) when pack in ["baseline", "cost"], do: String.capitalize(pack)
+  defp format_domain_pack(pack), do: Intent.pack_label(pack)
   defp format_datetime(nil), do: "Not recorded"
   defp format_datetime(value), do: Calendar.strftime(value, "%Y-%m-%d %H:%M:%S UTC")
 end

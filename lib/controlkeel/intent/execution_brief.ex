@@ -5,9 +5,11 @@ defmodule ControlKeel.Intent.ExecutionBrief do
 
   import Ecto.Changeset
 
+  alias ControlKeel.Intent.Domains
+
   @schema_version 1
   @risk_tiers ~w(moderate high critical)
-  @domain_packs ~w(software healthcare education finance)
+  @domain_packs Domains.supported_packs()
   @required_provider_fields ~w(
     objective
     users
@@ -182,6 +184,9 @@ defmodule ControlKeel.Intent.ExecutionBrief do
 
         not is_map(value["interview_answers"]) ->
           [compiler: "must include normalized interview answers"]
+
+        not Domains.supported_pack?(Map.get(value, "domain_pack")) ->
+          [compiler: "must use a supported domain pack"]
 
         true ->
           []

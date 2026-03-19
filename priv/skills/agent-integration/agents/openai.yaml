@@ -1,0 +1,11 @@
+interface:
+  display_name: "Agent Integration"
+  short_description: "Attach and distribute ControlKeel across native and MCP-only agent clients."
+  brand_color: "#0891b2"
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"

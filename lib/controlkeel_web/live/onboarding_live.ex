@@ -133,7 +133,7 @@ defmodule ControlKeelWeb.OnboardingLive do
 
       <div class="ck-metric-row">
         <span>Step {@step} of 4</span>
-        <span>{@preflight.domain_pack} pack</span>
+        <span>{@preflight.domain_pack_label} pack</span>
         <span>{@preflight.preliminary_risk_tier} preliminary risk</span>
       </div>
 
@@ -160,7 +160,7 @@ defmodule ControlKeelWeb.OnboardingLive do
                         />
                         <div class="ck-session-head">
                           <div>
-                            <p class="ck-mini-label">{profile.domain_pack}</p>
+                            <p class="ck-mini-label">{Intent.pack_label(profile.domain_pack)}</p>
                             <h3>{profile.label}</h3>
                           </div>
                         </div>

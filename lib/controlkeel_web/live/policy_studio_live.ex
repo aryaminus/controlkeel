@@ -128,7 +128,11 @@ defmodule ControlKeelWeb.PolicyStudioLive do
               <li>SQL injection patterns (baseline pack)</li>
               <li>Open CORS wildcard headers (software pack)</li>
               <li>Dynamic code execution — eval, exec (software pack)</li>
-              <li>Auth bypass patterns (software pack)</li>
+              <li>Discriminatory candidate scoring or filtering (HR pack)</li>
+              <li>Privileged client communications written to logs (legal pack)</li>
+              <li>Tracking cookies or analytics without consent (marketing pack)</li>
+              <li>Deal value, quota, or revenue data written to logs (sales pack)</li>
+              <li>Fair Housing filtering by protected characteristics (real estate pack)</li>
               <li>Agent runs that would exceed session budget (cost pack)</li>
             </ul>
             <p class="ck-note" style="margin-top: 1rem;">

@@ -69,6 +69,9 @@ defmodule ControlKeelWeb.Router do
     delete "/memory/:id", ApiController, :archive_memory
     post "/route-agent", ApiController, :route_agent
     get "/skills", ApiController, :list_skills
+    get "/skills/targets", ApiController, :list_skill_targets
+    post "/skills/export", ApiController, :export_skills
+    post "/skills/install", ApiController, :install_skills
     get "/skills/:name", ApiController, :get_skill
   end
 

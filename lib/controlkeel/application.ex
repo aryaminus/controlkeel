@@ -15,6 +15,7 @@ defmodule ControlKeel.Application do
         [
           {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
           {Phoenix.PubSub, name: ControlKeel.PubSub},
+          ControlKeel.Skills.Activation,
           {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor},
           # Start a worker by calling: ControlKeel.Worker.start_link(arg)
           # {ControlKeel.Worker, arg},

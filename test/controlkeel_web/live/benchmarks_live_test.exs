@@ -10,6 +10,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     {:ok, view, html} = live(conn, ~p"/benchmarks")
 
     assert html =~ "Benchmark engine"
+    assert has_element?(view, "#benchmark-filters")
     assert has_element?(view, "#benchmark-runner")
     assert has_element?(view, "#benchmark-runs")
     assert has_element?(view, "#policy-train-form")
@@ -31,12 +32,21 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     assert path =~ "/benchmarks/runs/"
   end
 
+  test "index filters suites by domain pack", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/benchmarks?domain_pack=hr")
+
+    assert has_element?(view, "#benchmark-filters")
+    assert has_element?(view, "#suite-domain_expansion_v1")
+    refute has_element?(view, "#suite-vibe_failures_v1")
+  end
+
   test "show renders the persisted scenario matrix", %{conn: conn} do
     run =
       benchmark_run_fixture(%{
+        "suite" => "domain_expansion_v1",
         "subjects" => "controlkeel_validate,controlkeel_proxy",
         "baseline_subject" => "controlkeel_validate",
-        "scenario_slugs" => "hardcoded_api_key_python_webhook,client_side_auth_bypass"
+        "scenario_slugs" => "hr_discriminatory_candidate_filter,legal_privileged_memo_logging"
       })
 
     {:ok, view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
@@ -44,7 +54,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     assert html =~ "Scenario matrix"
     assert html =~ "Catch rate"
     assert has_element?(view, "#benchmark-matrix")
-    assert has_element?(view, "#scenario-hardcoded_api_key_python_webhook")
+    assert has_element?(view, "#scenario-hr_discriminatory_candidate_filter")
     assert has_element?(view, "a[href=\"/api/v1/benchmarks/runs/#{run.id}/export?format=csv\"]")
   end
 end

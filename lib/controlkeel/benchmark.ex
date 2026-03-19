@@ -14,6 +14,7 @@ defmodule ControlKeel.Benchmark do
     Suite
   }
 
+  alias ControlKeel.Intent.Domains
   alias ControlKeel.Repo
 
   @recent_runs_limit 12
@@ -21,38 +22,58 @@ defmodule ControlKeel.Benchmark do
   def list_suites(opts \\ []) do
     ensure_builtin_suites()
     include_internal = Keyword.get(opts, :include_internal, false)
+    domain_pack = normalize_domain_pack_filter(Keyword.get(opts, :domain_pack))
 
     Suite
     |> order_by([suite], asc: suite.name)
     |> preload([:scenarios])
     |> Repo.all()
     |> maybe_exclude_internal(include_internal)
+    |> maybe_filter_suites_by_domain(domain_pack)
   end
 
-  def list_recent_runs(limit \\ @recent_runs_limit) do
+  def list_recent_runs(limit) when is_integer(limit) do
+    list_recent_runs(limit: limit)
+  end
+
+  def list_recent_runs(opts) when is_list(opts) do
     ensure_builtin_suites()
+    limit = Keyword.get(opts, :limit, @recent_runs_limit)
+    domain_pack = normalize_domain_pack_filter(Keyword.get(opts, :domain_pack))
+    query_limit = if domain_pack, do: max(limit * 5, 50), else: limit
 
     Run
     |> order_by([run], desc: run.inserted_at)
-    |> limit(^limit)
+    |> limit(^query_limit)
     |> preload([:suite, results: [scenario: []]])
     |> Repo.all()
+    |> maybe_filter_runs_by_domain(domain_pack)
+    |> Enum.take(limit)
   end
 
-  def benchmark_summary(limit \\ @recent_runs_limit) do
-    runs = list_recent_runs(limit)
+  def list_recent_runs, do: list_recent_runs(limit: @recent_runs_limit)
+
+  def benchmark_summary(limit) when is_integer(limit) do
+    benchmark_summary(limit: limit)
+  end
+
+  def benchmark_summary(opts) when is_list(opts) do
+    runs = list_recent_runs(opts)
+    suites = list_suites(Keyword.take(opts, [:domain_pack]))
 
     catch_rates = Enum.map(runs, & &1.catch_rate)
     overheads = Enum.reject(Enum.map(runs, & &1.average_overhead_percent), &is_nil/1)
 
     %{
-      total_suites: length(list_suites()),
+      total_suites: length(suites),
       total_runs: length(runs),
       average_catch_rate: average(catch_rates),
       average_overhead_percent: average(overheads),
       latest_run: List.first(runs)
     }
   end
+
+  def benchmark_summary, do: benchmark_summary(limit: @recent_runs_limit)
 
   def get_suite_by_slug(slug) when is_binary(slug) do
     ensure_builtin_suite(slug)
@@ -90,6 +111,9 @@ defmodule ControlKeel.Benchmark do
 
     suite_slug = Map.get(attrs, "suite") || Map.get(attrs, :suite) || "vibe_failures_v1"
 
+    domain_pack =
+      normalize_domain_pack_filter(Map.get(attrs, "domain_pack") || Map.get(attrs, :domain_pack))
+
     scenario_slugs =
       normalize_scenario_slugs(
         Map.get(attrs, "scenario_slugs") || Map.get(attrs, :scenario_slugs)
@@ -106,12 +130,14 @@ defmodule ControlKeel.Benchmark do
       scenarios =
         suite.scenarios
         |> maybe_filter_scenarios(scenario_slugs)
+        |> maybe_filter_scenarios_by_domain(domain_pack)
         |> Enum.sort_by(& &1.position)
 
       subjects = SubjectLoader.resolve(subject_ids, project_root)
-      metadata = run_metadata(suite, subjects, project_root)
+      metadata = run_metadata(suite, subjects, project_root, domain_pack)
 
-      with {:ok, run} <-
+      with true <- scenarios != [] || {:error, :no_scenarios},
+           {:ok, run} <-
              create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata),
            result_attrs <- Runner.execute(scenarios, subjects, project_root: project_root),
            {:ok, _results} <- insert_results(run, result_attrs),
@@ -120,6 +146,7 @@ defmodule ControlKeel.Benchmark do
       end
     else
       {:error, :suite_not_found} -> {:error, :suite_not_found}
+      {:error, :no_scenarios} -> {:error, :no_scenarios}
     end
   end
 
@@ -221,6 +248,20 @@ defmodule ControlKeel.Benchmark do
     }
   end
 
+  def domain_packs_for_suite(%Suite{} = suite) do
+    suite.scenarios
+    |> Enum.map(&get_in(&1.metadata || %{}, ["domain_pack"]))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  def domain_packs_for_run(%Run{} = run) do
+    run.results
+    |> Enum.map(&get_in(&1.scenario.metadata || %{}, ["domain_pack"]))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
   defp ensure_builtin_suites do
     Enum.each(BuiltinSuites.list(), &ensure_builtin_suite/1)
   end
@@ -307,6 +348,26 @@ defmodule ControlKeel.Benchmark do
 
   defp maybe_exclude_internal(suites, true), do: suites
   defp maybe_exclude_internal(suites, false), do: Enum.reject(suites, &Metadata.suite_internal?/1)
+
+  defp maybe_filter_suites_by_domain(suites, nil), do: suites
+
+  defp maybe_filter_suites_by_domain(suites, domain_pack) do
+    Enum.filter(suites, fn suite ->
+      Enum.any?(suite.scenarios, fn scenario ->
+        get_in(scenario.metadata || %{}, ["domain_pack"]) == domain_pack
+      end)
+    end)
+  end
+
+  defp maybe_filter_runs_by_domain(runs, nil), do: runs
+
+  defp maybe_filter_runs_by_domain(runs, domain_pack) do
+    Enum.filter(runs, fn run ->
+      Enum.any?(run.results, fn result ->
+        get_in(result.scenario.metadata || %{}, ["domain_pack"]) == domain_pack
+      end)
+    end)
+  end
 
   defp insert_results(run, result_attrs) do
     Enum.reduce_while(result_attrs, {:ok, []}, fn attrs, {:ok, acc} ->
@@ -434,6 +495,14 @@ defmodule ControlKeel.Benchmark do
   defp maybe_filter_scenarios(scenarios, []), do: scenarios
   defp maybe_filter_scenarios(scenarios, slugs), do: Enum.filter(scenarios, &(&1.slug in slugs))
 
+  defp maybe_filter_scenarios_by_domain(scenarios, nil), do: scenarios
+
+  defp maybe_filter_scenarios_by_domain(scenarios, domain_pack) do
+    Enum.filter(scenarios, fn scenario ->
+      get_in(scenario.metadata || %{}, ["domain_pack"]) == domain_pack
+    end)
+  end
+
   defp normalize_scenario_slugs(nil), do: []
   defp normalize_scenario_slugs(slugs) when is_list(slugs), do: Enum.map(slugs, &to_string/1)
 
@@ -446,15 +515,23 @@ defmodule ControlKeel.Benchmark do
 
   defp normalize_scenario_slugs(_value), do: []
 
-  defp run_metadata(suite, subjects, project_root) do
+  defp run_metadata(suite, subjects, project_root, domain_pack) do
     %{
       "controlkeel_version" => controlkeel_version(),
       "suite_version" => suite.version,
+      "domain_pack_filter" => domain_pack,
       "subject_config_hash" => SubjectLoader.subject_config_hash(subjects),
       "project_root" => Path.expand(project_root),
       "subjects" =>
         Enum.map(subjects, &Map.take(&1, ["id", "label", "type", "configured", "output_mode"]))
     }
+  end
+
+  defp normalize_domain_pack_filter(nil), do: nil
+
+  defp normalize_domain_pack_filter(value) do
+    pack = Domains.normalize_pack(value, "__unsupported__")
+    if Domains.supported_pack?(pack), do: pack, else: nil
   end
 
   defp preload_run(nil), do: nil

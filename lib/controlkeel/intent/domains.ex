@@ -81,6 +81,19 @@ defmodule ControlKeel.Intent.Domains do
     }
   ]
 
+  @supported_packs @occupation_profiles |> Enum.map(& &1.domain_pack) |> Enum.uniq()
+  @pack_labels %{
+    "software" => "Software",
+    "healthcare" => "Healthcare",
+    "education" => "Education",
+    "finance" => "Finance",
+    "hr" => "HR / Recruiting",
+    "legal" => "Legal / Compliance",
+    "marketing" => "Marketing / Content",
+    "sales" => "Sales / CRM",
+    "realestate" => "Real Estate"
+  }
+
   @packs %{
     "software" => %{
       industry: "web",
@@ -524,6 +537,37 @@ defmodule ControlKeel.Intent.Domains do
 
   def occupation_profiles, do: @occupation_profiles
   def agent_options, do: @agent_options
+  def supported_packs, do: @supported_packs
+
+  def supported_pack?(value) when is_atom(value), do: supported_pack?(Atom.to_string(value))
+  def supported_pack?(value) when is_binary(value), do: value in @supported_packs
+  def supported_pack?(_value), do: false
+
+  def normalize_pack(value, default \\ "software")
+
+  def normalize_pack(value, default) when is_atom(value) do
+    normalize_pack(Atom.to_string(value), default)
+  end
+
+  def normalize_pack(value, default) when is_binary(value) do
+    pack = String.downcase(String.trim(value))
+    if supported_pack?(pack), do: pack, else: default
+  end
+
+  def normalize_pack(_value, default), do: default
+
+  def industry_for_pack(domain_pack) do
+    domain_pack
+    |> normalize_pack()
+    |> pack()
+    |> Map.fetch!(:industry)
+  end
+
+  def pack_label(domain_pack) do
+    domain_pack
+    |> normalize_pack()
+    |> then(&Map.get(@pack_labels, &1, String.capitalize(&1)))
+  end
 
   def questions_for_occupation(occupation_id) do
     occupation_id
@@ -537,7 +581,7 @@ defmodule ControlKeel.Intent.Domains do
     Enum.find(@occupation_profiles, &(&1.id == id)) || List.first(@occupation_profiles)
   end
 
-  def pack(domain_pack), do: Map.fetch!(@packs, domain_pack)
+  def pack(domain_pack), do: domain_pack |> normalize_pack() |> then(&Map.fetch!(@packs, &1))
   def packs, do: @packs
 
   def preflight_context(attrs) do
@@ -549,6 +593,7 @@ defmodule ControlKeel.Intent.Domains do
     %{
       occupation: occupation,
       domain_pack: domain_pack,
+      domain_pack_label: pack_label(domain_pack),
       industry: occupation.industry,
       preliminary_risk_tier: preliminary_risk_tier(domain_pack, content),
       compliance: pack.compliance,

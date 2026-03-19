@@ -1,0 +1,12 @@
+interface:
+  display_name: "ControlKeel Governance"
+  short_description: "Base governed workflow for CK validation, context, findings, budget, and routing."
+  brand_color: "#0f766e"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

@@ -1,0 +1,12 @@
+interface:
+  display_name: "Security Review"
+  short_description: "Structured CK security review for code, config, and release gating."
+  brand_color: "#b91c1c"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

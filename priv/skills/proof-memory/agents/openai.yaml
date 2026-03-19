@@ -1,0 +1,12 @@
+interface:
+  display_name: "Proof and Memory"
+  short_description: "Use CK proof bundles, typed memory, and resume packets."
+  brand_color: "#0f172a"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

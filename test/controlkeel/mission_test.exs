@@ -62,6 +62,48 @@ defmodule ControlKeel.MissionTest do
     assert length(session.tasks) >= 3
   end
 
+  test "create_launch_from_brief/2 preserves the domain pack for every supported domain" do
+    aliases = %{
+      "software" => "Founder / Product Builder",
+      "healthcare" => "Healthcare",
+      "education" => "Education",
+      "finance" => "Finance / Fintech",
+      "hr" => "HR / Recruiting",
+      "legal" => "Legal / Compliance",
+      "marketing" => "Marketing / Content",
+      "sales" => "Sales / CRM",
+      "realestate" => "Real Estate"
+    }
+
+    Enum.each(ControlKeel.Intent.supported_packs(), fn pack ->
+      brief =
+        execution_brief_fixture(
+          payload: %{
+            "project_name" => "#{pack}-launchpad",
+            "occupation" => Map.fetch!(aliases, pack),
+            "domain_pack" => pack
+          },
+          compiler: %{
+            "occupation" => pack,
+            "domain_pack" => pack
+          }
+        )
+
+      assert {:ok, session} =
+               Mission.create_launch_from_brief(
+                 %{
+                   "agent" => "codex",
+                   "project_root" =>
+                     "/tmp/controlkeel-#{pack}-#{System.unique_integer([:positive])}"
+                 },
+                 brief
+               )
+
+      assert session.execution_brief["domain_pack"] == pack
+      assert session.workspace.industry
+    end)
+  end
+
   test "basic CRUD keeps session association valid" do
     workspace = workspace_fixture()
 

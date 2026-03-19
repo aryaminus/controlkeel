@@ -1,6 +1,7 @@
 defmodule ControlKeel.Scanner.FastPath do
   @moduledoc false
 
+  alias ControlKeel.Intent.Domains
   alias ControlKeel.Mission
   alias ControlKeel.Policy.PackLoader
   alias ControlKeel.Policy.Rule
@@ -12,12 +13,14 @@ defmodule ControlKeel.Scanner.FastPath do
   def scan(input, _opts \\ []) when is_map(input) do
     normalized = normalize_input(input)
     baseline_rules = PackLoader.load!("baseline")
+    domain_rules = domain_rules_for(normalized)
     cost_rules = PackLoader.load!("cost")
+    runtime_rules = uniq_rules(baseline_rules ++ domain_rules)
 
     layer1 =
       []
-      |> Kernel.++(Patterns.detect(normalized["content"], normalized, baseline_rules))
-      |> Kernel.++(Entropy.detect(normalized["content"], normalized, baseline_rules))
+      |> Kernel.++(Patterns.detect(normalized["content"], normalized, runtime_rules))
+      |> Kernel.++(Entropy.detect(normalized["content"], normalized, runtime_rules))
       |> Kernel.++(budget_findings(normalized, cost_rules))
       |> uniq_findings()
 
@@ -43,9 +46,59 @@ defmodule ControlKeel.Scanner.FastPath do
       "content" => Map.get(input, "content", Map.get(input, :content, "")),
       "path" => Map.get(input, "path", Map.get(input, :path)),
       "kind" => Map.get(input, "kind", Map.get(input, :kind, "code")),
-      "session_id" => Map.get(input, "session_id", Map.get(input, :session_id)),
-      "task_id" => Map.get(input, "task_id", Map.get(input, :task_id))
+      "session_id" =>
+        normalize_optional_integer(Map.get(input, "session_id", Map.get(input, :session_id))),
+      "task_id" =>
+        normalize_optional_integer(Map.get(input, "task_id", Map.get(input, :task_id))),
+      "domain_pack" => normalize_domain_pack(input)
     }
+  end
+
+  defp domain_rules_for(%{"domain_pack" => nil}), do: []
+
+  defp domain_rules_for(%{"domain_pack" => domain_pack}) do
+    if Domains.supported_pack?(domain_pack) do
+      PackLoader.load!(domain_pack)
+    else
+      []
+    end
+  end
+
+  defp normalize_domain_pack(input) do
+    direct =
+      Map.get(input, "domain_pack") ||
+        Map.get(input, :domain_pack)
+
+    case normalize_supported_pack(direct) do
+      nil ->
+        input
+        |> Map.get("session_id", Map.get(input, :session_id))
+        |> session_domain_pack()
+
+      pack ->
+        pack
+    end
+  end
+
+  defp normalize_supported_pack(nil), do: nil
+
+  defp normalize_supported_pack(value) do
+    pack = Domains.normalize_pack(value, "__unsupported__")
+    if Domains.supported_pack?(pack), do: pack, else: nil
+  end
+
+  defp session_domain_pack(nil), do: nil
+
+  defp session_domain_pack(session_id) do
+    case Mission.get_session(session_id) do
+      nil ->
+        nil
+
+      session ->
+        (session.execution_brief || %{})
+        |> Map.get("domain_pack")
+        |> normalize_supported_pack()
+    end
   end
 
   defp budget_findings(%{"session_id" => nil}, _rules), do: []
@@ -142,6 +195,22 @@ defmodule ControlKeel.Scanner.FastPath do
        finding.metadata["budget_ratio"]}
     end)
   end
+
+  defp uniq_rules(rules) do
+    Enum.uniq_by(rules, & &1.id)
+  end
+
+  defp normalize_optional_integer(nil), do: nil
+  defp normalize_optional_integer(value) when is_integer(value), do: value
+
+  defp normalize_optional_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {parsed, ""} -> parsed
+      _ -> nil
+    end
+  end
+
+  defp normalize_optional_integer(_value), do: nil
 
   defp scanned_at do
     DateTime.utc_now()

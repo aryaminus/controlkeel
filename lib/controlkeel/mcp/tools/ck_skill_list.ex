@@ -12,8 +12,15 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
   def call(arguments) do
     project_root = Map.get(arguments, "project_root")
     format = Map.get(arguments, "format", "json")
+    target = Map.get(arguments, "target")
+    analysis = Registry.analyze(project_root)
 
-    skills = Registry.catalog(project_root)
+    skills =
+      if is_binary(target) and target != "" do
+        Enum.filter(analysis.skills, &(target in (&1.compatibility_targets || [])))
+      else
+        analysis.skills
+      end
 
     entries =
       Enum.map(skills, fn s ->
@@ -22,9 +29,14 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
           "description" => s.description,
           "scope" => s.scope,
           "allowed_tools" => s.allowed_tools,
+          "required_mcp_tools" => s.required_mcp_tools,
           "license" => s.license,
           "compatibility" => s.compatibility,
-          "path" => s.path
+          "compatibility_targets" => s.compatibility_targets,
+          "path" => s.path,
+          "source" => s.source,
+          "install_state" => s.install_state,
+          "diagnostics" => Enum.map(s.diagnostics, &diagnostic_summary/1)
         }
       end)
 
@@ -34,6 +46,8 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
       %{
         "skills" => entries,
         "total" => length(entries),
+        "trusted_project_skills" => analysis.trusted_project?,
+        "diagnostics" => Enum.map(analysis.diagnostics, &diagnostic_summary/1),
         "usage_hint" =>
           "Call ck_skill_load with a skill name to load its full instructions into your context."
       }
@@ -42,5 +56,15 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
       end)
 
     {:ok, result}
+  end
+
+  defp diagnostic_summary(diagnostic) do
+    %{
+      "level" => diagnostic.level,
+      "code" => diagnostic.code,
+      "message" => diagnostic.message,
+      "path" => diagnostic.path,
+      "skill_name" => diagnostic.skill_name
+    }
   end
 end

@@ -30,6 +30,32 @@ defmodule ControlKeel.BenchmarkTest do
     assert List.last(ordered).slug == "pickle_deserialization_rce"
   end
 
+  test "loads the public domain-expansion suite with explicit metadata" do
+    suite = benchmark_suite_fixture("domain_expansion_v1")
+
+    assert suite.slug == "domain_expansion_v1"
+    assert length(suite.scenarios) == 5
+
+    assert Enum.all?(
+             suite.scenarios,
+             &(get_in(&1.metadata || %{}, ["domain_pack"]) in [
+                 "hr",
+                 "legal",
+                 "marketing",
+                 "sales",
+                 "realestate"
+               ])
+           )
+
+    assert Benchmark.domain_packs_for_suite(suite) == [
+             "hr",
+             "legal",
+             "marketing",
+             "sales",
+             "realestate"
+           ]
+  end
+
   test "runs validate and proxy subjects without creating sessions or ship analytics" do
     session_count = Repo.aggregate(Session, :count, :id)
     analytics_count = Repo.aggregate(Event, :count, :id)
@@ -50,6 +76,27 @@ defmodule ControlKeel.BenchmarkTest do
     assert Benchmark.run_detail_metrics(run).expected_rule_hit_rate >= 0.0
     assert Repo.aggregate(Session, :count, :id) == session_count
     assert Repo.aggregate(Event, :count, :id) == analytics_count
+  end
+
+  test "filters suites and runs by domain pack" do
+    assert Enum.any?(
+             Benchmark.list_suites(domain_pack: "hr"),
+             &(&1.slug == "domain_expansion_v1")
+           )
+
+    {:ok, run} =
+      Benchmark.run_suite(%{
+        "suite" => "domain_expansion_v1",
+        "subjects" => "controlkeel_validate",
+        "baseline_subject" => "controlkeel_validate",
+        "domain_pack" => "sales"
+      })
+
+    assert run.total_scenarios == 1
+    assert Benchmark.domain_packs_for_run(run) == ["sales"]
+
+    filtered_runs = Benchmark.list_recent_runs(domain_pack: "sales")
+    assert Enum.any?(filtered_runs, &(&1.id == run.id))
   end
 
   test "runs an external shell subject and normalizes generated output", %{tmp_dir: tmp_dir} do

@@ -1,0 +1,12 @@
+interface:
+  display_name: "Policy Training"
+  short_description: "Operate CK router and budget-hint artifact training safely."
+  brand_color: "#7c2d12"
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

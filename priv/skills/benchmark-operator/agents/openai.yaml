@@ -1,0 +1,12 @@
+interface:
+  display_name: "Benchmark Operator"
+  short_description: "Operate CK benchmark suites and multi-agent matrices."
+  brand_color: "#065f46"
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

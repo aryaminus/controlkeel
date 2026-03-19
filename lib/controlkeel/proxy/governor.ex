@@ -125,7 +125,12 @@ defmodule ControlKeel.Proxy.Governor do
   end
 
   defp scan_content(content, path, kind, opts) do
-    normalized = %{"content" => content || "", "path" => path, "kind" => kind}
+    normalized = %{
+      "content" => content || "",
+      "path" => path,
+      "kind" => kind,
+      "domain_pack" => opts[:domain_pack]
+    }
 
     fast_path =
       if String.trim(content || "") == "", do: empty_result(), else: FastPath.scan(normalized)

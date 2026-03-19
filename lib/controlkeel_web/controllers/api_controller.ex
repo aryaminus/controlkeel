@@ -9,6 +9,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.PolicyTraining
   alias ControlKeel.Repo
   alias ControlKeel.Scanner.FastPath
+  alias ControlKeel.Skills
   alias ControlKeel.Skills.Registry
 
   # ─── Sessions ────────────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ defmodule ControlKeelWeb.ApiController do
   # ─── Validate ────────────────────────────────────────────────────────────────
 
   def validate(conn, params) do
-    input = Map.take(params, ~w(content path kind session_id))
+    input = Map.take(params, ~w(content path kind session_id domain_pack))
 
     result = FastPath.scan(input)
 
@@ -228,10 +229,12 @@ defmodule ControlKeelWeb.ApiController do
 
   # ─── Benchmarks ───────────────────────────────────────────────────────────────
 
-  def list_benchmarks(conn, _params) do
-    suites = Benchmark.list_suites()
-    runs = Benchmark.list_recent_runs()
-    summary = Benchmark.benchmark_summary()
+  def list_benchmarks(conn, params) do
+    domain_pack = Map.get(params, "domain_pack")
+    opts = benchmark_filter_opts(domain_pack)
+    suites = Benchmark.list_suites(opts)
+    runs = Benchmark.list_recent_runs(opts)
+    summary = Benchmark.benchmark_summary(opts)
 
     summary =
       Map.update(summary, :latest_run, nil, fn
@@ -240,6 +243,7 @@ defmodule ControlKeelWeb.ApiController do
       end)
 
     json(conn, %{
+      selected_domain_pack: domain_pack,
       summary: summary,
       suites: Enum.map(suites, &benchmark_suite_summary/1),
       runs: Enum.map(runs, &benchmark_run_summary/1)
@@ -248,7 +252,7 @@ defmodule ControlKeelWeb.ApiController do
 
   def create_benchmark_run(conn, params) do
     attrs =
-      Map.take(params, ~w(suite subjects baseline_subject scenario_slugs))
+      Map.take(params, ~w(suite subjects baseline_subject scenario_slugs domain_pack))
 
     case Benchmark.run_suite(attrs) do
       {:ok, run} ->
@@ -258,6 +262,11 @@ defmodule ControlKeelWeb.ApiController do
 
       {:error, :suite_not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "benchmark suite not found"})
+
+      {:error, :no_scenarios} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "no benchmark scenarios matched the current filters"})
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
@@ -515,7 +524,15 @@ defmodule ControlKeelWeb.ApiController do
   def list_skills(conn, params) do
     project_root = Map.get(params, "project_root")
     format = Map.get(params, "format", "json")
-    skills = Registry.catalog(project_root)
+    target = Map.get(params, "target")
+    analysis = Registry.analyze(project_root)
+
+    skills =
+      if is_binary(target) and target != "" do
+        Enum.filter(analysis.skills, &(target in (&1.compatibility_targets || [])))
+      else
+        analysis.skills
+      end
 
     entries =
       Enum.map(skills, fn s ->
@@ -524,12 +541,22 @@ defmodule ControlKeelWeb.ApiController do
           description: s.description,
           scope: s.scope,
           allowed_tools: s.allowed_tools,
+          required_mcp_tools: s.required_mcp_tools,
           license: s.license,
-          compatibility: s.compatibility
+          compatibility: s.compatibility,
+          compatibility_targets: s.compatibility_targets,
+          source: s.source,
+          install_state: s.install_state,
+          diagnostics: Enum.map(s.diagnostics, &diagnostic_summary/1)
         }
       end)
 
-    result = %{skills: entries, total: length(entries)}
+    result = %{
+      skills: entries,
+      total: length(entries),
+      trusted_project_skills: analysis.trusted_project?,
+      diagnostics: Enum.map(analysis.diagnostics, &diagnostic_summary/1)
+    }
 
     result =
       if format == "xml" do
@@ -555,11 +582,58 @@ defmodule ControlKeelWeb.ApiController do
             description: skill.description,
             scope: skill.scope,
             allowed_tools: skill.allowed_tools,
+            required_mcp_tools: skill.required_mcp_tools,
             license: skill.license,
             compatibility: skill.compatibility,
+            compatibility_targets: skill.compatibility_targets,
+            source: skill.source,
+            resources: skill.resources,
+            diagnostics: Enum.map(skill.diagnostics, &diagnostic_summary/1),
+            install_state: skill.install_state,
             body: skill.body
           }
         })
+    end
+  end
+
+  def list_skill_targets(conn, _params) do
+    json(conn, %{targets: Enum.map(Skills.targets(), &skill_target_summary/1)})
+  end
+
+  def export_skills(conn, params) do
+    target = Map.get(params, "target", "open-standard")
+    project_root = Map.get(params, "project_root", File.cwd!())
+    scope = Map.get(params, "scope")
+
+    case Skills.export(target, project_root, scope: scope) do
+      {:ok, plan} ->
+        json(conn, %{plan: skill_export_plan_summary(plan)})
+
+      {:error, :unknown_target} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def install_skills(conn, params) do
+    target = Map.get(params, "target", "open-standard")
+    project_root = Map.get(params, "project_root", File.cwd!())
+    scope = Map.get(params, "scope")
+
+    case Skills.install(target, project_root, scope: scope) do
+      {:ok, %ControlKeel.Skills.SkillExportPlan{} = plan} ->
+        json(conn, %{plan: skill_export_plan_summary(plan)})
+
+      {:ok, result} ->
+        json(conn, %{install: result})
+
+      {:error, :unknown_target} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
     end
   end
 
@@ -590,6 +664,38 @@ defmodule ControlKeelWeb.ApiController do
 
   defp maybe_put_opt(opts, _key, nil), do: opts
   defp maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp diagnostic_summary(diagnostic) do
+    %{
+      level: diagnostic.level,
+      code: diagnostic.code,
+      message: diagnostic.message,
+      path: diagnostic.path,
+      skill_name: diagnostic.skill_name
+    }
+  end
+
+  defp skill_target_summary(target) do
+    %{
+      id: target.id,
+      label: target.label,
+      description: target.description,
+      native: target.native,
+      default_scope: target.default_scope,
+      supported_scopes: target.supported_scopes
+    }
+  end
+
+  defp skill_export_plan_summary(plan) do
+    %{
+      target: plan.target,
+      output_dir: plan.output_dir,
+      scope: plan.scope,
+      writes: plan.writes,
+      instructions: plan.instructions,
+      native_available: plan.native_available
+    }
+  end
 
   # ─── Serializers ─────────────────────────────────────────────────────────────
 
@@ -674,6 +780,7 @@ defmodule ControlKeelWeb.ApiController do
       version: suite.version,
       status: suite.status,
       scenario_count: length(suite.scenarios),
+      domain_packs: Benchmark.domain_packs_for_suite(suite),
       metadata: suite.metadata
     }
   end
@@ -694,6 +801,7 @@ defmodule ControlKeelWeb.ApiController do
       catch_rate: run.catch_rate,
       block_rate: detail_metrics.block_rate,
       expected_rule_hit_rate: detail_metrics.expected_rule_hit_rate,
+      domain_packs: Benchmark.domain_packs_for_run(run),
       median_latency_ms: run.median_latency_ms,
       average_overhead_percent: run.average_overhead_percent,
       started_at: run.started_at,
@@ -716,7 +824,8 @@ defmodule ControlKeelWeb.ApiController do
               incident_label: row.scenario.incident_label,
               expected_rules: row.scenario.expected_rules,
               expected_decision: row.scenario.expected_decision,
-              split: row.scenario.split
+              split: row.scenario.split,
+              metadata: row.scenario.metadata
             },
             results:
               Enum.map(row.results, fn result ->
@@ -877,4 +986,8 @@ defmodule ControlKeelWeb.ApiController do
       _ -> {:error, :invalid_integer}
     end
   end
+
+  defp benchmark_filter_opts(nil), do: []
+  defp benchmark_filter_opts(""), do: []
+  defp benchmark_filter_opts(domain_pack), do: [domain_pack: domain_pack]
 end

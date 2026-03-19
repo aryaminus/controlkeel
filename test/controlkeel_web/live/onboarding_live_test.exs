@@ -94,4 +94,22 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
     assert error_html =~ "Describe the product in a few concrete sentences."
     refute error_html =~ "sk-secret-test"
   end
+
+  test "expanded domain occupations render and advance through onboarding", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/start")
+
+    assert has_element?(view, "input[value=\"hr\"]")
+    assert has_element?(view, "input[value=\"legal\"]")
+    assert has_element?(view, "input[value=\"marketing\"]")
+    assert has_element?(view, "input[value=\"sales\"]")
+    assert has_element?(view, "input[value=\"realestate\"]")
+
+    next_html =
+      render_submit(
+        form(view, "form", launch: %{"occupation" => "marketing", "agent" => "claude"})
+      )
+
+    assert next_html =~ "Describe the product"
+    assert next_html =~ "Marketing / Content pack"
+  end
 end

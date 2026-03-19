@@ -18,9 +18,23 @@ defmodule ControlKeel.CLITasksTest do
 
     File.rm_rf!(tmp_dir)
     File.mkdir_p!(tmp_dir)
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    home_dir = Path.join(tmp_dir, "home")
+    File.mkdir_p!(home_dir)
 
-    {:ok, tmp_dir: tmp_dir}
+    previous_home = System.get_env("HOME")
+    System.put_env("HOME", home_dir)
+
+    on_exit(fn ->
+      if previous_home do
+        System.put_env("HOME", previous_home)
+      else
+        System.delete_env("HOME")
+      end
+
+      File.rm_rf!(tmp_dir)
+    end)
+
+    {:ok, tmp_dir: tmp_dir, home_dir: home_dir}
   end
 
   test "ck.init creates project binding and is idempotent", %{tmp_dir: tmp_dir} do
@@ -60,32 +74,23 @@ defmodule ControlKeel.CLITasksTest do
     assert Repo.aggregate(Session, :count, :id) == session_count
   end
 
-  test "ck.init auto-attaches when .claude dir exists and stub is available", %{tmp_dir: tmp_dir} do
+  test "ck.init auto-attaches when .claude dir exists and stub is available", %{
+    tmp_dir: tmp_dir,
+    home_dir: home_dir
+  } do
     create_claude_stub(tmp_dir, "controlkeel")
-    claude_home = Path.join(System.user_home!(), ".claude")
+    File.mkdir_p!(Path.join(home_dir, ".claude"))
 
-    if File.dir?(claude_home) do
-      output =
-        with_env("CONTROLKEEL_CLAUDE_BIN", Path.join(tmp_dir, "claude"), fn ->
-          with_project(tmp_dir, fn ->
-            rerun_task("ck.init")
-            capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
-          end)
-        end)
-
-      assert output =~ "Initialized ControlKeel"
-      assert output =~ "Attached ControlKeel to Claude Code."
-    else
-      # CI without Claude Code — auto-attach skipped, fallback message shown
-      output =
+    output =
+      with_env("CONTROLKEEL_CLAUDE_BIN", Path.join(tmp_dir, "claude"), fn ->
         with_project(tmp_dir, fn ->
           rerun_task("ck.init")
           capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
         end)
+      end)
 
-      assert output =~ "Initialized ControlKeel"
-      assert output =~ "controlkeel attach claude-code"
-    end
+    assert output =~ "Initialized ControlKeel"
+    assert output =~ "Attached ControlKeel to Claude Code."
   end
 
   test "ck.init --no-attach skips auto-attach and shows manual hint", %{tmp_dir: tmp_dir} do
@@ -248,6 +253,32 @@ defmodule ControlKeel.CLITasksTest do
       end)
 
     assert resume_output =~ "Resumed task"
+  end
+
+  test "ck.skills delegates to the runtime skills CLI", %{tmp_dir: tmp_dir} do
+    list_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.skills")
+        capture_io(fn -> Mix.Tasks.Ck.Skills.run(["list"]) end)
+      end)
+
+    assert list_output =~ "controlkeel-governance"
+    assert list_output =~ "targets:"
+
+    export_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.skills")
+
+        capture_io(fn ->
+          Mix.Tasks.Ck.Skills.run(["export", "--target", "codex", "--project-root", tmp_dir])
+        end)
+      end)
+
+    assert export_output =~ "Exported codex bundle."
+
+    assert File.exists?(
+             Path.join(tmp_dir, "controlkeel/dist/codex/.codex/agents/controlkeel-operator.toml")
+           )
   end
 
   test "ck.benchmark delegates to the runtime benchmark CLI", %{tmp_dir: tmp_dir} do

@@ -1,0 +1,12 @@
+interface:
+  display_name: "Ship Readiness"
+  short_description: "Release gating and session-readiness checks for CK."
+  brand_color: "#4f46e5"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

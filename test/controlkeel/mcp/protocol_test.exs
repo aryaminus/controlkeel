@@ -5,8 +5,14 @@ defmodule ControlKeel.MCP.ProtocolTest do
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Invocation
   alias ControlKeel.Repo
+  alias ControlKeel.Skills.Activation
 
   import ControlKeel.MissionFixtures
+
+  setup do
+    Activation.reset()
+    :ok
+  end
 
   test "initialize succeeds" do
     response =
@@ -83,6 +89,31 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert Enum.any?(findings, &(&1["rule_id"] == "security.sql_injection"))
     assert summary =~ "Blocked"
     assert scanned_at =~ "T"
+  end
+
+  test "tools/call ck_validate accepts a direct domain pack override" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 31,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_validate",
+          "arguments" => %{
+            "content" => "def rank(candidate), do: reject(candidate.age > 50)",
+            "path" => "lib/hr/ranker.ex",
+            "kind" => "code",
+            "domain_pack" => "hr"
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "decision"]) == "block"
+
+    assert Enum.any?(
+             get_in(response, ["result", "structuredContent", "findings"]),
+             &(&1["rule_id"] == "hr.discriminatory_criteria")
+           )
   end
 
   test "tools/call ck_context returns mission context" do
@@ -227,5 +258,67 @@ defmodule ControlKeel.MCP.ProtocolTest do
            } = response
 
     assert message =~ "`content` is required"
+  end
+
+  test "tools/call ck_skill_list returns compatibility metadata and diagnostics" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 61,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_skill_list",
+          "arguments" => %{"format" => "xml", "target" => "codex"}
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "skills" => skills,
+                 "total" => total,
+                 "prompt_block" => prompt_block,
+                 "trusted_project_skills" => false
+               }
+             }
+           } = response
+
+    assert total == length(skills)
+    assert total > 0
+    assert prompt_block =~ "<available_skills>"
+
+    governance = Enum.find(skills, &(&1["name"] == "controlkeel-governance"))
+    assert "codex" in governance["compatibility_targets"]
+    assert is_list(governance["required_mcp_tools"])
+    assert is_map(governance["install_state"])
+  end
+
+  test "tools/call ck_skill_load dedupes repeated activations" do
+    first =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 62,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_skill_load",
+          "arguments" => %{"name" => "controlkeel-governance", "session_id" => 123}
+        }
+      })
+
+    second =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 63,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_skill_load",
+          "arguments" => %{"name" => "controlkeel-governance", "session_id" => 123}
+        }
+      })
+
+    assert get_in(first, ["result", "structuredContent", "activation"]) == "new"
+    assert get_in(second, ["result", "structuredContent", "activation"]) == "duplicate"
+    assert get_in(first, ["result", "structuredContent", "content"]) =~ "<skill_content"
+    assert is_list(get_in(first, ["result", "structuredContent", "resources"]))
   end
 end

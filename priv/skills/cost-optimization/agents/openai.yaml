@@ -1,0 +1,12 @@
+interface:
+  display_name: "Cost Optimization"
+  short_description: "Budget-aware CK workflow for estimates, commits, and cheaper routing."
+  brand_color: "#7c3aed"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "controlkeel"
+      description: "ControlKeel MCP server"
+

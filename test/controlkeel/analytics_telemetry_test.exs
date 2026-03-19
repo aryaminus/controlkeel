@@ -17,9 +17,23 @@ defmodule ControlKeel.AnalyticsTelemetryTest do
 
     File.rm_rf!(tmp_dir)
     File.mkdir_p!(tmp_dir)
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    home_dir = Path.join(tmp_dir, "home")
+    File.mkdir_p!(home_dir)
 
-    {:ok, tmp_dir: tmp_dir}
+    previous_home = System.get_env("HOME")
+    System.put_env("HOME", home_dir)
+
+    on_exit(fn ->
+      if previous_home do
+        System.put_env("HOME", previous_home)
+      else
+        System.delete_env("HOME")
+      end
+
+      File.rm_rf!(tmp_dir)
+    end)
+
+    {:ok, tmp_dir: tmp_dir, home_dir: home_dir}
   end
 
   test "local init records project_initialized", %{tmp_dir: tmp_dir} do
@@ -35,9 +49,10 @@ defmodule ControlKeel.AnalyticsTelemetryTest do
     end)
   end
 
-  test "claude attach records agent_attached", %{tmp_dir: tmp_dir} do
+  test "claude attach records agent_attached", %{tmp_dir: tmp_dir, home_dir: home_dir} do
     create_wrapper(tmp_dir)
     create_claude_stub(tmp_dir, "controlkeel")
+    File.mkdir_p!(Path.join(home_dir, ".claude"))
 
     with_project(tmp_dir, fn ->
       rerun_task("ck.init")

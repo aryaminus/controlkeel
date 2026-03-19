@@ -1,7 +1,7 @@
 defmodule ControlKeel.Mission.Planner do
   @moduledoc false
 
-  alias ControlKeel.Intent.ExecutionBrief
+  alias ControlKeel.Intent.{Domains, ExecutionBrief}
 
   @industry_profiles %{
     "web" => %{
@@ -320,10 +320,7 @@ defmodule ControlKeel.Mission.Planner do
     end
   end
 
-  defp industry_from_domain_pack("healthcare"), do: "health"
-  defp industry_from_domain_pack("education"), do: "education"
-  defp industry_from_domain_pack("finance"), do: "finance"
-  defp industry_from_domain_pack(_domain_pack), do: "web"
+  defp industry_from_domain_pack(domain_pack), do: Domains.industry_for_pack(domain_pack)
 
   defp parse_budget_cents(text) do
     case Regex.run(~r/(\d+)/, text) do
@@ -338,6 +335,17 @@ defmodule ControlKeel.Mission.Planner do
     cond do
       industry in ["health", "finance", "legal"] ->
         "critical"
+
+      industry in ["hr", "realestate"] ->
+        "high"
+
+      industry == "marketing" and
+          String.contains?(content, ["email list", "subscriber", "consent", "tracking", "pixel"]) ->
+        "high"
+
+      industry == "sales" and
+          String.contains?(content, ["crm", "contact", "lead", "revenue", "quota"]) ->
+        "high"
 
       String.contains?(content, [
         "patient",

@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Benchmark
+  alias ControlKeel.Intent
   alias ControlKeel.PolicyTraining
 
   @impl true
@@ -13,6 +14,8 @@ defmodule ControlKeelWeb.BenchmarksLive do
      |> assign(:matrix, %{subjects: [], scenarios: []})
      |> assign(:detail_metrics, %{})
      |> assign(:form, to_form(default_form_params(), as: :benchmark))
+     |> assign(:filter_form, to_form(%{"domain_pack" => ""}, as: :filters))
+     |> assign(:domain_pack_options, domain_pack_options())
      |> assign(:policy_form, to_form(default_policy_params(), as: :policy))
      |> refresh_dashboard_assigns()}
   end
@@ -36,6 +39,17 @@ defmodule ControlKeelWeb.BenchmarksLive do
     end
   end
 
+  def handle_params(%{"domain_pack" => domain_pack} = _params, _uri, socket) do
+    {:noreply,
+     socket
+     |> assign(:run, nil)
+     |> assign(:matrix, %{subjects: [], scenarios: []})
+     |> assign(:detail_metrics, %{})
+     |> assign(:page_title, "Benchmarks")
+     |> assign(:filter_form, to_form(%{"domain_pack" => domain_pack}, as: :filters))
+     |> refresh_dashboard_assigns(domain_pack)}
+  end
+
   def handle_params(_params, _uri, socket) do
     {:noreply,
      socket
@@ -43,6 +57,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
      |> assign(:matrix, %{subjects: [], scenarios: []})
      |> assign(:detail_metrics, %{})
      |> assign(:page_title, "Benchmarks")
+     |> assign(:filter_form, to_form(%{"domain_pack" => ""}, as: :filters))
      |> refresh_dashboard_assigns()}
   end
 
@@ -58,6 +73,10 @@ defmodule ControlKeelWeb.BenchmarksLive do
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Benchmark run failed: #{inspect(reason)}")}
     end
+  end
+
+  def handle_event("filter_domain", %{"filters" => filters}, socket) do
+    {:noreply, push_patch(socket, to: ~p"/benchmarks?#{domain_filter_params(filters)}")}
   end
 
   def handle_event("train_policy", %{"policy" => params}, socket) do
@@ -132,6 +151,12 @@ defmodule ControlKeelWeb.BenchmarksLive do
               <h3>Median latency</h3>
               <p class="ck-note">{format_latency(@run.median_latency_ms)}</p>
             </div>
+            <div>
+              <h3>Domain packs</h3>
+              <p class="ck-note">
+                {Enum.map_join(Benchmark.domain_packs_for_run(@run), ", ", &format_domain_pack/1)}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -153,6 +178,12 @@ defmodule ControlKeelWeb.BenchmarksLive do
                     <td class="align-top py-3 pr-4">
                       <strong>{row.scenario.name}</strong>
                       <p class="ck-note">{row.scenario.incident_label}</p>
+                      <p class="ck-note">
+                        {format_domain_pack(get_in(row.scenario.metadata || %{}, ["domain_pack"]))} • {get_in(
+                          row.scenario.metadata || %{},
+                          ["risk_tier"]
+                        ) || "n/a"}
+                      </p>
                     </td>
                     <%= for result <- row.results do %>
                       <td class="align-top py-3 pr-4">
@@ -216,6 +247,20 @@ defmodule ControlKeelWeb.BenchmarksLive do
           </div>
         </div>
 
+        <div class="ck-card ck-browser-filters" style="margin-top: 1.5rem;">
+          <.form for={@filter_form} id="benchmark-filters" phx-change="filter_domain">
+            <div class="ck-filter-grid">
+              <.input
+                field={@filter_form[:domain_pack]}
+                type="select"
+                label="Domain pack"
+                prompt="All domains"
+                options={@domain_pack_options}
+              />
+            </div>
+          </.form>
+        </div>
+
         <div class="ck-card ck-browser-filters">
           <.form for={@form} id="benchmark-runner" phx-submit="run">
             <div class="ck-filter-grid">
@@ -237,6 +282,13 @@ defmodule ControlKeelWeb.BenchmarksLive do
                 label="Baseline subject"
                 placeholder="controlkeel_validate"
               />
+              <.input
+                field={@form[:domain_pack]}
+                type="select"
+                label="Run only this domain"
+                prompt="All suite scenarios"
+                options={@domain_pack_options}
+              />
             </div>
             <div class="ck-action-row" style="margin-top: 1rem;">
               <button type="submit" class="ck-button-primary">Run benchmark</button>
@@ -256,7 +308,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
             <p class="ck-mini-label">Built-in suites</p>
             <div class="ck-finding-list">
               <%= for suite <- @suites do %>
-                <article class="ck-finding-item">
+                <article class="ck-finding-item" id={"suite-#{suite.slug}"}>
                   <div class="ck-finding-head">
                     <h3>{suite.name}</h3>
                     <span class="ck-pill ck-pill-neutral">v{suite.version}</span>
@@ -265,6 +317,11 @@ defmodule ControlKeelWeb.BenchmarksLive do
                   <div class="ck-metric-row">
                     <span>{length(suite.scenarios)} scenarios</span>
                     <span>{suite.status}</span>
+                  </div>
+                  <div class="ck-tag-list" style="margin-top: 0.5rem;">
+                    <%= for pack <- Benchmark.domain_packs_for_suite(suite) do %>
+                      <span class="ck-tag">{format_domain_pack(pack)}</span>
+                    <% end %>
                   </div>
                 </article>
               <% end %>
@@ -291,6 +348,9 @@ defmodule ControlKeelWeb.BenchmarksLive do
                 </:col>
                 <:col :let={run} label="Baseline">
                   {run.baseline_subject}
+                </:col>
+                <:col :let={run} label="Domains">
+                  {Enum.map_join(Benchmark.domain_packs_for_run(run), ", ", &format_domain_pack/1)}
                 </:col>
               </.table>
             </div>
@@ -431,7 +491,8 @@ defmodule ControlKeelWeb.BenchmarksLive do
     %{
       "suite" => "vibe_failures_v1",
       "subjects" => "controlkeel_validate,controlkeel_proxy",
-      "baseline_subject" => "controlkeel_validate"
+      "baseline_subject" => "controlkeel_validate",
+      "domain_pack" => ""
     }
   end
 
@@ -439,13 +500,14 @@ defmodule ControlKeelWeb.BenchmarksLive do
     %{"type" => "router"}
   end
 
-  defp refresh_dashboard_assigns(socket) do
+  defp refresh_dashboard_assigns(socket, domain_pack \\ nil) do
     active = PolicyTraining.active_artifacts_summary()
+    filter_opts = benchmark_filter_opts(domain_pack)
 
     socket
-    |> assign(:summary, Benchmark.benchmark_summary())
-    |> assign(:suites, Benchmark.list_suites())
-    |> assign(:recent_runs, Benchmark.list_recent_runs())
+    |> assign(:summary, Benchmark.benchmark_summary(filter_opts))
+    |> assign(:suites, Benchmark.list_suites(filter_opts))
+    |> assign(:recent_runs, Benchmark.list_recent_runs(filter_opts))
     |> assign(:available_subjects, Benchmark.available_subjects())
     |> assign(:recent_training_runs, PolicyTraining.list_training_runs())
     |> assign(:active_router_artifact, active["router"])
@@ -473,4 +535,21 @@ defmodule ControlKeelWeb.BenchmarksLive do
         "n/a"
     end
   end
+
+  defp benchmark_filter_opts(nil), do: []
+  defp benchmark_filter_opts(""), do: []
+  defp benchmark_filter_opts(domain_pack), do: [domain_pack: domain_pack]
+
+  defp domain_filter_params(filters) do
+    filters
+    |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+    |> Enum.into(%{})
+  end
+
+  defp domain_pack_options do
+    Enum.map(Intent.supported_packs(), &{Intent.pack_label(&1), &1})
+  end
+
+  defp format_domain_pack(nil), do: "Unknown"
+  defp format_domain_pack(domain_pack), do: Intent.pack_label(domain_pack)
 end

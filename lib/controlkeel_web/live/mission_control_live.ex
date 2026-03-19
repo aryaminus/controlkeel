@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.MissionControlLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Analytics
+  alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeel.Proxy
   alias ControlKeelWeb.FindingComponents
@@ -265,7 +266,7 @@ defmodule ControlKeelWeb.MissionControlLive do
           <div class="ck-brief-grid">
             <div>
               <h3>Domain pack</h3>
-              <p class="ck-note">{brief_value(@brief, "domain_pack")}</p>
+              <p class="ck-note">{format_domain_pack(brief_value(@brief, "domain_pack"))}</p>
             </div>
             <div>
               <h3>Occupation</h3>
@@ -650,6 +651,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp format_duration(seconds), do: "#{Float.round(seconds / 3_600, 1)}h"
   defp brief_value(map, key), do: Map.get(map, key, "Not specified")
   defp brief_list(map, key), do: List.wrap(Map.get(map, key, []))
+  defp format_domain_pack("Not specified"), do: "Not specified"
+  defp format_domain_pack(nil), do: "Not specified"
+  defp format_domain_pack(domain_pack), do: Intent.pack_label(domain_pack)
   defp maybe_regenerate_fix(nil), do: nil
   defp maybe_regenerate_fix(finding), do: Mission.auto_fix_for_finding(finding)
 

@@ -155,6 +155,73 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  describe "skills API" do
+    test "lists skills and targets with compatibility metadata", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/skills")
+      body = json_response(conn, 200)
+
+      assert body["total"] > 0
+      assert Enum.any?(body["skills"], &(&1["name"] == "controlkeel-governance"))
+
+      skill =
+        Enum.find(body["skills"], fn skill ->
+          skill["name"] == "controlkeel-governance"
+        end)
+
+      assert "codex" in skill["compatibility_targets"]
+      assert is_map(skill["install_state"])
+
+      conn = build_conn() |> get(~p"/api/v1/skills/targets")
+      targets = json_response(conn, 200)["targets"]
+      assert Enum.any?(targets, &(&1["id"] == "claude-plugin"))
+      assert Enum.any?(targets, &(&1["id"] == "copilot-plugin"))
+    end
+
+    test "gets skill detail and exports and installs bundles", %{conn: conn} do
+      tmp_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "controlkeel-skills-api-#{System.unique_integer([:positive])}"
+        )
+
+      File.rm_rf!(tmp_dir)
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_dir)
+      end)
+
+      conn = get(conn, ~p"/api/v1/skills/controlkeel-governance")
+      detail = json_response(conn, 200)["skill"]
+      assert detail["name"] == "controlkeel-governance"
+      assert is_list(detail["resources"])
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/export", %{
+          target: "claude-plugin",
+          project_root: tmp_dir,
+          scope: "export"
+        })
+
+      plan = json_response(conn, 200)["plan"]
+      assert plan["target"] == "claude-plugin"
+      assert File.exists?(Path.join(plan["output_dir"], ".claude-plugin/plugin.json"))
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/install", %{
+          target: "open-standard",
+          project_root: tmp_dir,
+          scope: "project"
+        })
+
+      install = json_response(conn, 200)["install"]
+      assert install["target"] == "open-standard"
+      assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    end
+  end
+
   describe "benchmark API" do
     test "lists suites and recent runs", %{conn: conn} do
       run = benchmark_run_fixture()
@@ -167,19 +234,30 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(body["runs"], &(&1["id"] == run.id))
     end
 
+    test "filters suites by domain pack", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/benchmarks?domain_pack=hr")
+      body = json_response(conn, 200)
+
+      assert body["selected_domain_pack"] == "hr"
+      assert Enum.any?(body["suites"], &(&1["slug"] == "domain_expansion_v1"))
+      refute Enum.any?(body["suites"], &(&1["slug"] == "vibe_failures_v1"))
+    end
+
     test "creates and fetches a benchmark run", %{conn: conn} do
       conn =
         post(conn, ~p"/api/v1/benchmarks/runs", %{
-          suite: "vibe_failures_v1",
+          suite: "domain_expansion_v1",
           subjects: "controlkeel_validate",
           baseline_subject: "controlkeel_validate",
-          scenario_slugs: "hardcoded_api_key_python_webhook"
+          domain_pack: "sales"
         })
 
       assert %{"run" => run} = json_response(conn, 201)
-      assert run["suite_slug"] == "vibe_failures_v1"
+      assert run["suite_slug"] == "domain_expansion_v1"
       assert run["subjects"] == ["controlkeel_validate"]
       assert length(run["scenarios"]) == 1
+      assert run["domain_packs"] == ["sales"]
+      assert hd(run["scenarios"])["scenario"]["metadata"]["domain_pack"] == "sales"
 
       conn = build_conn() |> get(~p"/api/v1/benchmarks/runs/#{run["id"]}")
       assert %{"run" => fetched} = json_response(conn, 200)

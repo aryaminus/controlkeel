@@ -905,6 +905,14 @@ defmodule ControlKeel.Mission do
   defp proof_summary(nil), do: nil
 
   defp proof_summary(%ProofBundle{} = proof) do
+    domain_pack =
+      proof.session_id
+      |> get_session()
+      |> case do
+        nil -> nil
+        session -> get_in(session.execution_brief || %{}, ["domain_pack"])
+      end
+
     %{
       "id" => proof.id,
       "task_id" => proof.task_id,
@@ -915,6 +923,7 @@ defmodule ControlKeel.Mission do
       "open_findings_count" => proof.open_findings_count,
       "blocked_findings_count" => proof.blocked_findings_count,
       "approved_findings_count" => proof.approved_findings_count,
+      "domain_pack" => domain_pack,
       "generated_at" => proof.generated_at
     }
   end

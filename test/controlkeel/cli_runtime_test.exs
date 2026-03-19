@@ -20,7 +20,21 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     File.rm_rf!(tmp_dir)
     File.mkdir_p!(tmp_dir)
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    home_dir = Path.join(tmp_dir, "home")
+    File.mkdir_p!(home_dir)
+
+    previous_home = System.get_env("HOME")
+    System.put_env("HOME", home_dir)
+
+    on_exit(fn ->
+      if previous_home do
+        System.put_env("HOME", previous_home)
+      else
+        System.delete_env("HOME")
+      end
+
+      File.rm_rf!(tmp_dir)
+    end)
 
     {:ok, tmp_dir: tmp_dir}
   end
@@ -162,7 +176,7 @@ defmodule ControlKeel.CLIRuntimeTest do
       }
     ])
 
-    assert {:ok, list} = CLI.parse(["benchmark", "list"])
+    assert {:ok, list} = CLI.parse(["benchmark", "list", "--domain-pack", "hr"])
 
     list_output =
       capture_io(fn ->
@@ -171,19 +185,21 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert list_output =~ "Benchmark suites:"
     assert list_output =~ "manual_subject"
+    assert list_output =~ "domain_expansion_v1"
+    refute list_output =~ "vibe_failures_v1"
 
     assert {:ok, run_command} =
              CLI.parse([
                "benchmark",
                "run",
                "--suite",
-               "vibe_failures_v1",
+               "domain_expansion_v1",
                "--subjects",
                "controlkeel_validate",
                "--baseline-subject",
                "controlkeel_validate",
-               "--scenario-slugs",
-               "hardcoded_api_key_python_webhook"
+               "--domain-pack",
+               "sales"
              ])
 
     run_output =
@@ -192,6 +208,7 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert run_output =~ "Benchmark run #"
+    assert run_output =~ "Domains: Sales / CRM"
 
     run = Benchmark.list_recent_runs(1) |> List.first()
     assert run

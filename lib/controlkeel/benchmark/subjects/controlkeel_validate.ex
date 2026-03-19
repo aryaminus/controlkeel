@@ -11,7 +11,8 @@ defmodule ControlKeel.Benchmark.Subjects.ControlKeelValidate do
     case CkValidate.call(%{
            "content" => scenario.content,
            "path" => scenario.path,
-           "kind" => scenario.kind
+           "kind" => scenario.kind,
+           "domain_pack" => get_in(scenario.metadata || %{}, ["domain_pack"])
          }) do
       {:ok, result} ->
         Runner.outcome_from_public_result(

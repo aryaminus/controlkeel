@@ -2,219 +2,267 @@ defmodule ControlKeel.Skills.Registry do
   @moduledoc """
   Discovers and catalogs AgentSkills from standard skill directories.
 
-  Scan order (highest precedence first — project-level overrides user-level,
-  user-level overrides built-in):
-
-    1. <project>/.agents/skills/   — project-level, cross-client standard
-    2. <project>/.claude/skills/   — project-level, Claude Code compatible
-    3. ~/.agents/skills/           — user-level, cross-client
-    4. ~/.claude/skills/           — user-level, Claude Code compatible
-    5. priv/skills/                — built-in ControlKeel governance skills
-
-  Each skill is a directory containing a SKILL.md file with YAML frontmatter
-  per the AgentSkills open format (https://agentskills.io/specification).
+  Project-level skills are only loaded when the project is trusted by ControlKeel
+  or explicitly overridden.
   """
 
-  @doc "Return the full skill catalog for a project root (or global if nil)."
-  def catalog(project_root \\ nil) do
-    project_root
-    |> skill_dirs()
-    |> Enum.flat_map(&scan_dir/1)
-    |> deduplicate_by_name()
+  alias ControlKeel.ProjectBinding
+  alias ControlKeel.Skills.Parser
+  alias ControlKeel.Skills.SkillDiagnostic
+
+  @project_skill_dirs [".agents/skills", ".claude/skills", ".github/skills"]
+
+  def catalog(project_root \\ nil, opts \\ []) do
+    analyze(project_root, opts).skills
   end
 
-  @doc "Look up a single skill entry by name."
-  def get(name, project_root \\ nil) do
-    Enum.find(catalog(project_root), &(&1.name == name))
+  def analyze(project_root \\ nil, opts \\ []) do
+    trusted_project? = project_trusted?(project_root, opts)
+
+    {skills, diagnostics} =
+      project_root
+      |> skill_dirs(trusted_project?)
+      |> Enum.reduce({[], []}, fn %{path: dir, scope: scope}, {skills, diagnostics} ->
+        {parsed, new_diagnostics} = scan_dir(dir, scope)
+        {skills ++ parsed, diagnostics ++ new_diagnostics}
+      end)
+
+    {deduped_skills, dedupe_diagnostics} = deduplicate_by_name(skills)
+
+    diagnostics =
+      diagnostics ++
+        dedupe_diagnostics ++
+        project_trust_diagnostics(project_root, trusted_project?)
+
+    %{
+      skills:
+        Enum.map(deduped_skills, &Map.put(&1, :install_state, install_state(&1, project_root))),
+      diagnostics: diagnostics,
+      trusted_project?: trusted_project?
+    }
   end
 
-  @doc """
-  Generate the <available_skills> XML block suitable for injection into
-  an agent's system prompt per the AgentSkills specification.
-  """
-  def prompt_block(project_root \\ nil) do
-    skills = catalog(project_root)
+  def diagnostics(project_root \\ nil, opts \\ []) do
+    analyze(project_root, opts).diagnostics
+  end
+
+  def get(name, project_root \\ nil, opts \\ []) do
+    Enum.find(catalog(project_root, opts), &(&1.name == name))
+  end
+
+  def names(project_root \\ nil, opts \\ []) do
+    catalog(project_root, opts) |> Enum.map(& &1.name)
+  end
+
+  def prompt_block(project_root \\ nil, opts \\ []) do
+    skills = catalog(project_root, opts)
 
     if skills == [] do
       ""
     else
       entries =
-        Enum.map(skills, fn s ->
-          "  <skill>\n    <name>#{s.name}</name>\n    <description>#{xml_escape(s.description)}</description>\n    <location>#{s.path}</location>\n  </skill>"
+        Enum.map(skills, fn skill ->
+          "  <skill>\n" <>
+            "    <name>#{skill.name}</name>\n" <>
+            "    <description>#{xml_escape(skill.description)}</description>\n" <>
+            "    <location>#{skill.path}</location>\n" <>
+            "  </skill>"
         end)
 
       "<available_skills>\n#{Enum.join(entries, "\n")}\n</available_skills>"
     end
   end
 
-  # ─── Private ──────────────────────────────────────────────────────────────────
+  def project_trusted?(nil, _opts), do: false
 
-  defp skill_dirs(nil) do
-    [
-      user_path("~/.agents/skills"),
-      user_path("~/.claude/skills"),
-      priv_skills_dir()
-    ]
-    |> Enum.filter(&File.dir?/1)
+  def project_trusted?(project_root, opts) do
+    cond do
+      Keyword.get(opts, :trust_project_skills) == true ->
+        true
+
+      System.get_env("CONTROLKEEL_TRUST_PROJECT_SKILLS") in ~w(1 true TRUE yes YES) ->
+        true
+
+      match?({:ok, _binding}, ProjectBinding.read(project_root)) ->
+        true
+
+      true ->
+        false
+    end
   end
 
-  defp skill_dirs(project_root) do
-    expanded = Path.expand(project_root)
-
-    [
-      Path.join(expanded, ".agents/skills"),
-      Path.join(expanded, ".claude/skills"),
-      user_path("~/.agents/skills"),
-      user_path("~/.claude/skills"),
-      priv_skills_dir()
-    ]
-    |> Enum.filter(&File.dir?/1)
-  end
-
-  defp scan_dir(dir) do
+  defp scan_dir(dir, scope) do
     case File.ls(dir) do
       {:ok, entries} ->
-        Enum.flat_map(entries, fn entry ->
+        entries
+        |> Enum.sort()
+        |> Enum.reduce({[], []}, fn entry, {skills, diagnostics} ->
           skill_dir = Path.join(dir, entry)
           skill_path = Path.join(skill_dir, "SKILL.md")
 
           if File.dir?(skill_dir) and File.exists?(skill_path) do
-            case parse_skill(skill_path) do
-              {:ok, skill} -> [skill]
-              _ -> []
+            case Parser.parse(skill_path, scope) do
+              {:ok, skill} ->
+                {[skill | skills], diagnostics}
+
+              {:error, %SkillDiagnostic{} = diagnostic} ->
+                {skills, [diagnostic | diagnostics]}
+
+              {:error, reason} ->
+                {skills,
+                 [
+                   %SkillDiagnostic{
+                     level: "error",
+                     code: "parse_failed",
+                     message: "Failed to parse skill: #{inspect(reason)}",
+                     path: skill_path
+                   }
+                   | diagnostics
+                 ]}
             end
           else
-            []
+            {skills, diagnostics}
           end
+        end)
+        |> then(fn {skills, diagnostics} ->
+          {Enum.reverse(skills), Enum.reverse(diagnostics)}
         end)
 
       _ ->
+        {[], []}
+    end
+  end
+
+  defp skill_dirs(nil, _trusted_project?) do
+    (user_skill_dirs() ++ [priv_skills_dir()])
+    |> Enum.filter(&File.dir?/1)
+    |> Enum.map(&dir_entry(&1, classify_scope(&1)))
+  end
+
+  defp skill_dirs(project_root, trusted_project?) do
+    root = Path.expand(project_root)
+
+    project_dirs =
+      if trusted_project? do
+        @project_skill_dirs
+        |> Enum.map(&Path.join(root, &1))
+      else
         []
-    end
+      end
+
+    (project_dirs ++ user_skill_dirs() ++ [priv_skills_dir()])
+    |> Enum.filter(&File.dir?/1)
+    |> Enum.map(&dir_entry(&1, classify_scope(&1, root)))
   end
 
-  defp parse_skill(skill_path) do
-    with {:ok, content} <- File.read(skill_path),
-         {:ok, meta, body} <- extract_frontmatter(content) do
-      name =
-        Map.get(meta, "name") ||
-          skill_path |> Path.dirname() |> Path.basename()
+  defp dir_entry(path, scope), do: %{path: path, scope: scope}
 
-      description = Map.get(meta, "description", "")
+  defp deduplicate_by_name(skills) do
+    Enum.reduce(skills, {[], MapSet.new(), []}, fn skill, {kept, seen, diagnostics} ->
+      if MapSet.member?(seen, skill.name) do
+        diagnostic = %SkillDiagnostic{
+          level: "warn",
+          code: "shadowed_skill",
+          message:
+            "A higher-precedence skill with the same name already exists. This copy was ignored.",
+          path: skill.path,
+          skill_name: skill.name
+        }
 
-      {:ok,
-       %{
-         name: name,
-         description: description,
-         path: skill_path,
-         body: body,
-         metadata: Map.get(meta, "metadata", %{}),
-         license: Map.get(meta, "license"),
-         compatibility: Map.get(meta, "compatibility"),
-         allowed_tools: parse_allowed_tools(Map.get(meta, "allowed-tools", "")),
-         scope: classify_scope(skill_path)
-       }}
-    end
+        {kept, seen, [diagnostic | diagnostics]}
+      else
+        {[skill | kept], MapSet.put(seen, skill.name), diagnostics}
+      end
+    end)
+    |> then(fn {skills, _seen, diagnostics} ->
+      {Enum.reverse(skills), Enum.reverse(diagnostics)}
+    end)
   end
 
-  defp extract_frontmatter(content) do
-    case Regex.run(~r/\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*\r?\n(.*)\z/s, content,
-           capture: :all_but_first
-         ) do
-      [yaml, body] ->
-        {:ok, parse_yaml_frontmatter(yaml), String.trim(body)}
+  defp install_state(skill, project_root) do
+    targets =
+      []
+      |> maybe_mark_exported("codex", project_root, skill)
+      |> maybe_mark_exported("claude-plugin", project_root, skill)
+      |> maybe_mark_exported("copilot-plugin", project_root, skill)
+      |> maybe_mark_exported("open-standard", project_root, skill)
 
-      _ ->
-        {:error, :no_frontmatter}
-    end
+    %{
+      "exported_targets" => targets,
+      "native_locations" => native_locations(skill, project_root)
+    }
   end
 
-  # Minimal YAML parser for the AgentSkills frontmatter subset.
-  # Handles: flat key: value pairs, metadata: sub-map, allowed-tools: space-delimited.
-  defp parse_yaml_frontmatter(yaml) do
-    lines = String.split(yaml, ~r/\r?\n/)
+  defp maybe_mark_exported(targets, _target, nil, _skill), do: targets
 
-    {result, _pending_key} =
-      Enum.reduce(lines, {%{}, nil}, fn line, {acc, pending_key} ->
-        cond do
-          # Indented sub-entry (belongs to pending block key like `metadata:`)
-          pending_key != nil and Regex.match?(~r/^[ \t]+\S/, line) ->
-            trimmed = String.trim(line)
+  defp maybe_mark_exported(targets, target, project_root, skill) do
+    export_root = Path.join(Path.expand(project_root), "controlkeel/dist/#{target}")
 
-            case String.split(trimmed, ":", parts: 2) do
-              [k, v] ->
-                sub = Map.get(acc, pending_key, %{})
-                entry = Map.put(sub, String.trim(k), unquote_value(String.trim(v)))
-                {Map.put(acc, pending_key, entry), pending_key}
+    skill_locations = [
+      Path.join(export_root, "skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".agents/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".claude/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".github/skills/#{skill.name}/SKILL.md")
+    ]
 
-              _ ->
-                {acc, pending_key}
-            end
-
-          # Top-level key with no inline value — block header
-          Regex.match?(~r/^\S[^:]*:\s*$/, line) ->
-            key = line |> String.split(":") |> List.first() |> String.trim()
-            {Map.put(acc, key, %{}), key}
-
-          # Top-level key: value
-          Regex.match?(~r/^\S[^:]*:[ \t]+/, line) ->
-            [k | rest] = String.split(line, ":", parts: 2)
-            v = rest |> Enum.join(":") |> String.trim() |> unquote_value()
-            {Map.put(acc, String.trim(k), v), nil}
-
-          true ->
-            {acc, pending_key}
-        end
-      end)
-
-    result
+    if Enum.any?(skill_locations, &File.exists?/1), do: targets ++ [target], else: targets
   end
 
-  defp unquote_value(v) do
-    cond do
-      String.starts_with?(v, "\"") and String.ends_with?(v, "\"") ->
-        String.slice(v, 1..(byte_size(v) - 2))
+  defp native_locations(skill, project_root) do
+    locations =
+      [
+        user_location(".agents/skills/#{skill.name}/SKILL.md"),
+        user_location(".claude/skills/#{skill.name}/SKILL.md"),
+        user_location(".copilot/skills/#{skill.name}/SKILL.md")
+      ] ++
+        project_locations(project_root, skill.name)
 
-      String.starts_with?(v, "'") and String.ends_with?(v, "'") ->
-        String.slice(v, 1..(byte_size(v) - 2))
-
-      true ->
-        v
-    end
+    locations
+    |> Enum.filter(&File.exists?/1)
+    |> Enum.uniq()
   end
 
-  defp parse_allowed_tools(nil), do: []
-  defp parse_allowed_tools(""), do: []
+  defp project_locations(nil, _name), do: []
 
-  defp parse_allowed_tools(tools) when is_binary(tools),
-    do: String.split(tools, ~r/\s+/, trim: true)
+  defp project_locations(project_root, name) do
+    root = Path.expand(project_root)
 
-  defp classify_scope(path) do
-    home = System.user_home!()
+    [
+      Path.join(root, ".agents/skills/#{name}/SKILL.md"),
+      Path.join(root, ".claude/skills/#{name}/SKILL.md"),
+      Path.join(root, ".github/skills/#{name}/SKILL.md")
+    ]
+  end
+
+  defp user_location(relative_path), do: Path.join(user_home(), relative_path)
+
+  defp project_trust_diagnostics(nil, _trusted?), do: []
+
+  defp project_trust_diagnostics(project_root, false) do
+    [
+      %SkillDiagnostic{
+        level: "warn",
+        code: "project_skills_untrusted",
+        message:
+          "Project-level skills were skipped because this project is not trusted by ControlKeel. Run `controlkeel init` or use an explicit trust override to load them.",
+        path: Path.expand(project_root)
+      }
+    ]
+  end
+
+  defp project_trust_diagnostics(_project_root, true), do: []
+
+  defp classify_scope(path, project_root \\ nil) do
+    home = user_home()
     priv = priv_skills_dir()
 
     cond do
       String.starts_with?(path, priv) -> "builtin"
+      project_root && String.starts_with?(path, project_root) -> "project"
       String.starts_with?(path, home) -> "user"
       true -> "project"
     end
   end
-
-  defp deduplicate_by_name(skills) do
-    # First occurrence wins (project > user > builtin per scan order)
-    skills
-    |> Enum.reduce({[], MapSet.new()}, fn skill, {acc, seen} ->
-      if MapSet.member?(seen, skill.name) do
-        {acc, seen}
-      else
-        {[skill | acc], MapSet.put(seen, skill.name)}
-      end
-    end)
-    |> elem(0)
-    |> Enum.reverse()
-  end
-
-  defp user_path(path), do: Path.expand(path)
 
   defp priv_skills_dir do
     :controlkeel
@@ -229,5 +277,13 @@ defmodule ControlKeel.Skills.Registry do
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")
     |> String.replace("\"", "&quot;")
+  end
+
+  defp user_skill_dirs do
+    Enum.map([".agents/skills", ".claude/skills", ".copilot/skills"], &Path.join(user_home(), &1))
+  end
+
+  defp user_home do
+    System.get_env("CONTROLKEEL_HOME") || System.get_env("HOME") || System.user_home!()
   end
 end

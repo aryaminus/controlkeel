@@ -1,6 +1,9 @@
 defmodule ControlKeel.MCP.Protocol do
   @moduledoc false
 
+  alias ControlKeel.Intent.Domains
+  alias ControlKeel.Skills.Registry
+
   alias ControlKeel.MCP.Tools.{
     CkBudget,
     CkContext,
@@ -90,6 +93,7 @@ defmodule ControlKeel.MCP.Protocol do
           "content" => %{"type" => "string"},
           "path" => %{"type" => "string"},
           "kind" => %{"type" => "string", "enum" => ["code", "config", "shell", "text"]},
+          "domain_pack" => %{"type" => "string", "enum" => Domains.supported_packs()},
           "session_id" => %{"type" => ["integer", "string"]},
           "task_id" => %{"type" => ["integer", "string"]}
         }
@@ -165,15 +169,19 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   defp tool_schemas do
-    [
+    base = [
       ck_validate_tool(),
       ck_context_tool(),
       ck_finding_tool(),
       ck_budget_tool(),
-      ck_route_tool(),
-      ck_skill_list_tool(),
-      ck_skill_load_tool()
+      ck_route_tool()
     ]
+
+    if Registry.names() == [] do
+      base
+    else
+      base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
+    end
   end
 
   defp ck_route_tool do
@@ -222,6 +230,11 @@ defmodule ControlKeel.MCP.Protocol do
             "type" => "string",
             "description" => "Absolute path to the project root. Omit to use global skills only."
           },
+          "target" => %{
+            "type" => "string",
+            "description" =>
+              "Optional compatibility target filter, such as codex or claude-plugin."
+          },
           "format" => %{
             "type" => "string",
             "enum" => ["json", "xml"],
@@ -234,6 +247,8 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   defp ck_skill_load_tool do
+    names = Registry.names()
+
     %{
       "name" => "ck_skill_load",
       "description" =>
@@ -246,7 +261,8 @@ defmodule ControlKeel.MCP.Protocol do
         "properties" => %{
           "name" => %{
             "type" => "string",
-            "description" => "The skill name as returned by ck_skill_list"
+            "description" => "The skill name as returned by ck_skill_list",
+            "enum" => names
           },
           "project_root" => %{
             "type" => "string",

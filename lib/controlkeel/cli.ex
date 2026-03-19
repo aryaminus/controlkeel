@@ -5,12 +5,14 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.ClaudeCLI
+  alias ControlKeel.Intent
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.PolicyTraining
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Proxy
+  alias ControlKeel.Skills
 
   @init_switches [
     industry: :string,
@@ -23,16 +25,29 @@ defmodule ControlKeel.CLI do
     project_name: :string,
     no_attach: :boolean
   ]
+  @attach_switches [
+    mcp_only: :boolean,
+    no_native: :boolean,
+    with_skills: :boolean,
+    scope: :string
+  ]
   @findings_switches [severity: :string, status: :string]
   @proofs_switches [session_id: :integer, task_id: :integer, deploy_ready: :boolean]
   @mcp_switches [project_root: :string]
   @memory_search_switches [session_id: :integer, type: :string]
+  @skills_list_switches [project_root: :string, target: :string]
+  @skills_validate_switches [project_root: :string]
+  @skills_export_switches [project_root: :string, target: :string, scope: :string]
+  @skills_install_switches [project_root: :string, target: :string, scope: :string]
+  @skills_doctor_switches [project_root: :string]
   @benchmark_run_switches [
     suite: :string,
     subjects: :string,
     baseline_subject: :string,
-    scenario_slugs: :string
+    scenario_slugs: :string,
+    domain_pack: :string
   ]
+  @benchmark_list_switches [domain_pack: :string]
   @benchmark_export_switches [format: :string]
   @policy_train_switches [type: :string]
   @watch_switches [interval: :integer]
@@ -56,7 +71,7 @@ defmodule ControlKeel.CLI do
       ["init" | rest] ->
         parse_with_switches(:init, rest, @init_switches)
 
-      ["attach", agent]
+      ["attach", agent | rest]
       when agent in [
              "claude-code",
              "cursor",
@@ -66,10 +81,12 @@ defmodule ControlKeel.CLI do
              "opencode",
              "gemini-cli",
              "codex-cli",
+             "vscode",
+             "copilot",
              "continue",
              "aider"
            ] ->
-        {:ok, %{command: :attach, options: %{}, args: [agent]}}
+        parse_attach(agent, rest)
 
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
@@ -95,8 +112,23 @@ defmodule ControlKeel.CLI do
       ["memory", "search", query | rest] ->
         parse_memory_search(query, rest)
 
-      ["benchmark", "list"] ->
-        {:ok, %{command: :benchmark_list, options: %{}, args: []}}
+      ["skills", "list" | rest] ->
+        parse_with_switches(:skills_list, rest, @skills_list_switches)
+
+      ["skills", "validate" | rest] ->
+        parse_with_switches(:skills_validate, rest, @skills_validate_switches)
+
+      ["skills", "export" | rest] ->
+        parse_with_switches(:skills_export, rest, @skills_export_switches)
+
+      ["skills", "install" | rest] ->
+        parse_with_switches(:skills_install, rest, @skills_install_switches)
+
+      ["skills", "doctor" | rest] ->
+        parse_with_switches(:skills_doctor, rest, @skills_doctor_switches)
+
+      ["benchmark", "list" | rest] ->
+        parse_with_switches(:benchmark_list, rest, @benchmark_list_switches)
 
       ["benchmark", "run" | rest] ->
         parse_with_switches(:benchmark_run, rest, @benchmark_run_switches)
@@ -182,9 +214,10 @@ defmodule ControlKeel.CLI do
       controlkeel serve               Start the web app
       controlkeel init [options]      Initialize ControlKeel in the current project
       controlkeel attach <agent>      Register ControlKeel MCP server with your coding tool
+                                      Native skills install by default unless --mcp-only
                                       Supported: claude-code, cursor, windsurf, kiro,
                                                  amp, opencode, gemini-cli, codex-cli,
-                                                 continue, aider
+                                                 vscode, copilot, continue, aider
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
@@ -193,7 +226,13 @@ defmodule ControlKeel.CLI do
       controlkeel pause <task-id>     Pause a task and capture a resume packet
       controlkeel resume <task-id>    Resume a paused or blocked task
       controlkeel memory search <q>   Search typed memory for the current session
-      controlkeel benchmark list      List built-in suites and recent runs
+      controlkeel skills list         List skills, diagnostics, and compatibility targets
+      controlkeel skills validate     Validate the catalog for the current project
+      controlkeel skills export       Export native skill/plugin bundles
+      controlkeel skills install      Install skills for a native target
+      controlkeel skills doctor       Show trust, catalog, and install health
+      controlkeel benchmark list [--domain-pack pack]
+                                      List built-in suites and recent runs
       controlkeel benchmark run [options]
                                       Run a benchmark suite and persist the matrix
       controlkeel benchmark show <id> Show a benchmark run with subject summaries
@@ -266,7 +305,7 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :attach, args: ["claude-code"]}, project_root) do
+  def run_command(%{command: :attach, args: ["claude-code"], options: options}, project_root) do
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
 
     with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
@@ -281,7 +320,7 @@ defmodule ControlKeel.CLI do
        [
          "Attached ControlKeel to Claude Code.",
          "Verified with `claude mcp get controlkeel`."
-       ]}
+       ] ++ native_attach_lines("claude-code", project_root, options)}
     else
       {:error, :wrapper_missing} ->
         {:error,
@@ -298,7 +337,7 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :attach, args: ["cursor"]}, project_root) do
+  def run_command(%{command: :attach, args: ["cursor"], options: options}, project_root) do
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
 
     with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
@@ -311,7 +350,7 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Cursor.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Cursor to activate."
-       ]}
+       ] ++ native_attach_lines("cursor", project_root, options)}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -327,7 +366,7 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :attach, args: ["windsurf"]}, project_root) do
+  def run_command(%{command: :attach, args: ["windsurf"], options: options}, project_root) do
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
 
     with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
@@ -340,7 +379,7 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Windsurf.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Windsurf to activate."
-       ]}
+       ] ++ native_attach_lines("windsurf", project_root, options)}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -356,7 +395,7 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :attach, args: [agent]}, project_root)
+  def run_command(%{command: :attach, args: [agent], options: options}, project_root)
       when agent in ["kiro", "amp", "opencode", "gemini-cli", "codex-cli"] do
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
 
@@ -387,7 +426,7 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to #{display_name[agent]}.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart #{display_name[agent]} to activate."
-       ]}
+       ] ++ native_attach_lines(agent, project_root, options)}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -403,7 +442,7 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :attach, args: ["continue"]}, project_root) do
+  def run_command(%{command: :attach, args: ["continue"], options: options}, project_root) do
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
 
     with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
@@ -417,7 +456,7 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Continue.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Continue to activate."
-       ]}
+       ] ++ native_attach_lines("continue", project_root, options)}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -433,7 +472,7 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :attach, args: ["aider"]}, project_root) do
+  def run_command(%{command: :attach, args: ["aider"], options: options}, project_root) do
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
 
     with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
@@ -445,7 +484,7 @@ defmodule ControlKeel.CLI do
        [
          "Attached ControlKeel to Aider.",
          "MCP config written to #{attached["config_path"]}."
-       ]}
+       ] ++ native_attach_lines("aider", project_root, options)}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -458,6 +497,43 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to attach ControlKeel to Aider: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :attach, args: [agent], options: options}, project_root)
+      when agent in ["vscode", "copilot"] do
+    scope = attach_scope(agent, options)
+
+    with {:ok, binding} <- ProjectBinding.read(project_root),
+         {:ok, install_result} <- Skills.install("github-repo", project_root, scope: scope),
+         attached_agent <- github_repo_attached_agent(agent, scope, install_result),
+         updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
+         {:ok, _binding} <- ProjectBinding.write(updated, project_root) do
+      lines =
+        case install_result do
+          %{destination: destination} ->
+            [
+              "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
+              "Installed project bundle at #{destination}.",
+              "Repository MCP config written under .github and .vscode."
+            ]
+
+          %ControlKeel.Skills.SkillExportPlan{} = plan ->
+            [
+              "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
+              "Output: #{plan.output_dir}"
+            ]
+        end
+
+      {:ok, lines}
+    else
+      {:error, :not_found} ->
+        {:error,
+         "Run `controlkeel init` before attaching ControlKeel to #{display_attach_agent(agent)}."}
+
+      {:error, reason} ->
+        {:error,
+         "Failed to attach ControlKeel to #{display_attach_agent(agent)}: #{inspect(reason)}"}
     end
   end
 
@@ -596,9 +672,10 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :benchmark_list}, project_root) do
-    suites = Benchmark.list_suites()
-    runs = Benchmark.list_recent_runs()
+  def run_command(%{command: :benchmark_list, options: options}, project_root) do
+    filter_opts = benchmark_filter_opts(options[:domain_pack])
+    suites = Benchmark.list_suites(filter_opts)
+    runs = Benchmark.list_recent_runs(filter_opts)
     subjects = Benchmark.available_subjects(project_root)
 
     suite_lines =
@@ -608,7 +685,9 @@ defmodule ControlKeel.CLI do
         [
           "Benchmark suites:"
           | Enum.map(suites, fn suite ->
-              "  #{suite.slug} v#{suite.version} — #{suite.name} (#{length(suite.scenarios)} scenarios)"
+              packs = Benchmark.domain_packs_for_suite(suite)
+
+              "  #{suite.slug} v#{suite.version} — #{suite.name} (#{length(suite.scenarios)} scenarios; domains: #{format_domain_packs(packs)})"
             end)
         ]
       end
@@ -643,7 +722,8 @@ defmodule ControlKeel.CLI do
       "suite" => options[:suite] || "vibe_failures_v1",
       "subjects" => options[:subjects],
       "baseline_subject" => options[:baseline_subject],
-      "scenario_slugs" => options[:scenario_slugs]
+      "scenario_slugs" => options[:scenario_slugs],
+      "domain_pack" => options[:domain_pack]
     }
 
     case Benchmark.run_suite(attrs, project_root) do
@@ -654,6 +734,7 @@ defmodule ControlKeel.CLI do
          [
            "Benchmark run ##{run.id} completed.",
            "Suite: #{run.suite.slug}",
+           "Domains: #{format_domain_packs(Benchmark.domain_packs_for_run(run))}",
            "Subjects: #{Enum.join(run.subjects, ", ")}",
            "Status: #{run.status}",
            "Catch rate: #{run.catch_rate}%",
@@ -688,6 +769,7 @@ defmodule ControlKeel.CLI do
        [
          "Benchmark run ##{run.id}",
          "Suite: #{run.suite.name} (#{run.suite.slug})",
+         "Domains: #{format_domain_packs(Benchmark.domain_packs_for_run(run))}",
          "Status: #{run.status}",
          "Baseline subject: #{run.baseline_subject}",
          "Catch rate: #{run.catch_rate}%",
@@ -978,6 +1060,141 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(%{command: :skills_list, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    analysis = Skills.analyze(root)
+    selected_target = options[:target]
+
+    skills =
+      if selected_target do
+        Enum.filter(analysis.skills, &(selected_target in (&1.compatibility_targets || [])))
+      else
+        analysis.skills
+      end
+
+    lines =
+      if skills == [] do
+        ["No skills available for the selected scope or target."]
+      else
+        Enum.flat_map(skills, fn skill ->
+          targets =
+            if skill.compatibility_targets == [],
+              do: "mcp",
+              else: Enum.join(skill.compatibility_targets, ", ")
+
+          tools =
+            if skill.required_mcp_tools == [],
+              do: "none",
+              else: Enum.join(skill.required_mcp_tools, ", ")
+
+          [
+            "#{skill.name} [#{skill.scope}]",
+            "  #{skill.description}",
+            "  targets: #{targets}",
+            "  CK tools: #{tools}"
+          ]
+        end)
+      end
+
+    diagnostic_lines =
+      if analysis.diagnostics == [] do
+        []
+      else
+        ["", "Diagnostics:"] ++
+          Enum.map(analysis.diagnostics, fn diagnostic ->
+            "  [#{diagnostic.level}] #{diagnostic.code} — #{diagnostic.message}"
+          end)
+      end
+
+    {:ok, lines ++ diagnostic_lines}
+  end
+
+  def run_command(%{command: :skills_validate, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    result = Skills.validate(root)
+
+    {:ok,
+     [
+       "Skills valid: #{if(result.valid?, do: "yes", else: "no")}",
+       "Total skills: #{result.total}",
+       "Warnings: #{result.warning_count}",
+       "Errors: #{result.error_count}"
+     ] ++
+       Enum.map(result.diagnostics, fn diagnostic ->
+         "  [#{diagnostic.level}] #{diagnostic.code} — #{diagnostic.message}"
+       end)}
+  end
+
+  def run_command(%{command: :skills_export, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    target = options[:target] || "open-standard"
+
+    case Skills.export(target, root, scope: options[:scope]) do
+      {:ok, plan} ->
+        {:ok,
+         [
+           "Exported #{plan.target} bundle.",
+           "Output: #{plan.output_dir}"
+         ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+
+      {:error, :unknown_target} ->
+        {:error, "Unknown skill export target: #{target}"}
+
+      {:error, reason} ->
+        {:error, "Failed to export skills: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :skills_install, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    target = options[:target] || "open-standard"
+
+    case Skills.install(target, root, scope: options[:scope]) do
+      {:ok, %{destination: destination} = result} ->
+        lines = [
+          "Installed #{result.target} skills.",
+          "Destination: #{destination}"
+        ]
+
+        lines =
+          if Map.has_key?(result, :agent_destination) do
+            lines ++ ["Agent destination: #{result.agent_destination}"]
+          else
+            lines
+          end
+
+        {:ok, lines}
+
+      {:ok, %ControlKeel.Skills.SkillExportPlan{} = plan} ->
+        {:ok,
+         [
+           "Prepared #{plan.target} bundle.",
+           "Output: #{plan.output_dir}"
+         ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+
+      {:error, :unknown_target} ->
+        {:error, "Unknown skill install target: #{target}"}
+
+      {:error, reason} ->
+        {:error, "Failed to install skills: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :skills_doctor, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    analysis = Skills.analyze(root)
+
+    {:ok,
+     [
+       "Project root: #{Path.expand(root)}",
+       "Trusted project skills: #{if(analysis.trusted_project?, do: "yes", else: "no")}",
+       "Catalog size: #{length(analysis.skills)}"
+     ] ++
+       Enum.map(analysis.diagnostics, fn diagnostic ->
+         "  [#{diagnostic.level}] #{diagnostic.code} — #{diagnostic.message}"
+       end)}
+  end
+
   def run_command(%{command: :watch, options: options}, project_root) do
     interval = Keyword.get(options, :interval, 2_000)
 
@@ -1087,6 +1304,21 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_attach(agent, argv) do
+    {options, remainder, invalid} = OptionParser.parse(argv, strict: @attach_switches)
+
+    cond do
+      invalid != [] ->
+        {:error, usage_text()}
+
+      remainder != [] ->
+        {:error, usage_text()}
+
+      true ->
+        {:ok, %{command: :attach, options: options, args: [agent]}}
+    end
+  end
+
   defp parse_memory_search(query, argv) do
     {options, remainder, invalid} = OptionParser.parse(argv, strict: @memory_search_switches)
 
@@ -1148,6 +1380,87 @@ defmodule ControlKeel.CLI do
     )
   end
 
+  defp native_attach_lines("claude-code", project_root, options) do
+    if native_attach_skipped?(options) do
+      []
+    else
+      case Skills.install("claude-standalone", project_root,
+             scope: attach_scope("claude-code", options)
+           ) do
+        {:ok, %{destination: destination, agent_destination: agent_destination}} ->
+          [
+            "Installed Claude native skills at #{destination}.",
+            "Installed Claude companion agent at #{agent_destination}."
+          ]
+
+        {:error, reason} ->
+          ["Native Claude skills were not installed: #{inspect(reason)}"]
+      end
+    end
+  end
+
+  defp native_attach_lines("codex-cli", project_root, options) do
+    if native_attach_skipped?(options) do
+      []
+    else
+      case Skills.install("codex", project_root, scope: attach_scope("codex-cli", options)) do
+        {:ok, %{destination: destination, agent_destination: agent_destination}} ->
+          [
+            "Installed Codex skills at #{destination}.",
+            "Installed Codex companion agent at #{agent_destination}."
+          ]
+
+        {:error, reason} ->
+          ["Native Codex skills were not installed: #{inspect(reason)}"]
+      end
+    end
+  end
+
+  defp native_attach_lines(agent, project_root, options)
+       when agent in [
+              "cursor",
+              "windsurf",
+              "kiro",
+              "amp",
+              "opencode",
+              "gemini-cli",
+              "continue",
+              "aider"
+            ] do
+    if native_attach_skipped?(options) do
+      []
+    else
+      case Skills.export("instructions-only", project_root, scope: "export") do
+        {:ok, plan} ->
+          [
+            "Prepared native instruction snippets for #{display_attach_agent(agent)}.",
+            "Instructions bundle: #{plan.output_dir}"
+          ]
+
+        {:error, reason} ->
+          ["Instruction bundle was not prepared: #{inspect(reason)}"]
+      end
+    end
+  end
+
+  defp native_attach_lines(_agent, _project_root, _options), do: []
+
+  defp native_attach_skipped?(options) do
+    Keyword.get(options, :mcp_only, false) or Keyword.get(options, :no_native, false)
+  end
+
+  defp attach_scope("claude-code", options), do: options[:scope] || "user"
+  defp attach_scope("codex-cli", options), do: options[:scope] || "user"
+  defp attach_scope(_agent, options), do: options[:scope] || "project"
+
+  defp display_attach_agent("claude-code"), do: "Claude Code"
+  defp display_attach_agent("codex-cli"), do: "Codex CLI"
+  defp display_attach_agent("gemini-cli"), do: "Gemini CLI"
+  defp display_attach_agent("opencode"), do: "OpenCode"
+  defp display_attach_agent("vscode"), do: "VS Code"
+  defp display_attach_agent("copilot"), do: "GitHub Copilot"
+  defp display_attach_agent(agent), do: agent |> String.replace("-", " ") |> String.capitalize()
+
   # ─── IDE MCP attachment helpers ──────────────────────────────────────────────
 
   defp attach_to_cursor(wrapper_path) do
@@ -1161,7 +1474,7 @@ defmodule ControlKeel.CLI do
   end
 
   defp cursor_mcp_config_path do
-    home = System.user_home!()
+    home = user_home()
 
     case :os.type() do
       {:win32, _} ->
@@ -1190,7 +1503,7 @@ defmodule ControlKeel.CLI do
   end
 
   defp windsurf_mcp_config_path do
-    home = System.user_home!()
+    home = user_home()
     Path.join([home, ".codeium", "windsurf", "mcp_config.json"])
   end
 
@@ -1230,7 +1543,7 @@ defmodule ControlKeel.CLI do
   # ── Additional IDE MCP config paths ──────────────────────────────────────────
 
   defp kiro_mcp_config_path do
-    home = System.user_home!()
+    home = user_home()
 
     case :os.type() do
       {:win32, _} ->
@@ -1242,19 +1555,19 @@ defmodule ControlKeel.CLI do
   end
 
   defp amp_mcp_config_path do
-    Path.join([System.user_home!(), ".config", "amp", "mcp.json"])
+    Path.join([user_home(), ".config", "amp", "mcp.json"])
   end
 
   defp opencode_mcp_config_path do
-    Path.join([System.user_home!(), ".config", "opencode", "config.json"])
+    Path.join([user_home(), ".config", "opencode", "config.json"])
   end
 
   defp gemini_cli_config_path do
-    Path.join([System.user_home!(), ".gemini", "settings.json"])
+    Path.join([user_home(), ".gemini", "settings.json"])
   end
 
   defp codex_cli_config_path do
-    home = System.user_home!()
+    home = user_home()
 
     case :os.type() do
       {:win32, _} ->
@@ -1266,7 +1579,7 @@ defmodule ControlKeel.CLI do
   end
 
   defp continue_config_path do
-    home = System.user_home!()
+    home = user_home()
 
     case :os.type() do
       {:win32, _} ->
@@ -1338,7 +1651,7 @@ defmodule ControlKeel.CLI do
   end
 
   defp auto_attach_claude_code(project_root) do
-    claude_dir = Path.join(System.user_home!(), ".claude")
+    claude_dir = Path.join(user_home(), ".claude")
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
 
     cond do
@@ -1351,6 +1664,8 @@ defmodule ControlKeel.CLI do
       true ->
         case ClaudeCLI.attach_local(project_root, wrapper_path) do
           {:ok, result} ->
+            _ = Skills.install("claude-standalone", project_root, scope: "user")
+
             emit_attach_succeeded(
               %{"session_id" => nil, "workspace_id" => nil},
               project_root,
@@ -1365,10 +1680,47 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp benchmark_filter_opts(nil), do: []
+  defp benchmark_filter_opts(""), do: []
+  defp benchmark_filter_opts(domain_pack), do: [domain_pack: domain_pack]
+
+  defp format_domain_packs(packs) when is_binary(packs), do: format_domain_packs([packs])
+
+  defp format_domain_packs(packs) when is_list(packs) do
+    packs
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.map(&Intent.pack_label/1)
+    |> Enum.join(", ")
+  end
+
   defp format_money(nil), do: "unlimited"
   defp format_money(cents), do: :io_lib.format("$~.2f", [cents / 100]) |> IO.iodata_to_binary()
   defp format_duration(nil), do: "not recorded"
   defp format_duration(seconds) when seconds < 60, do: "#{seconds}s"
   defp format_duration(seconds) when seconds < 3_600, do: "#{Float.round(seconds / 60, 1)}m"
   defp format_duration(seconds), do: "#{Float.round(seconds / 3_600, 1)}h"
+
+  defp user_home do
+    System.get_env("CONTROLKEEL_HOME") || System.get_env("HOME") || System.user_home!()
+  end
+
+  defp github_repo_attached_agent(agent, scope, %{destination: destination}) do
+    %{
+      "target" => "github-repo",
+      "agent" => agent,
+      "scope" => scope,
+      "destination" => destination,
+      "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+    }
+  end
+
+  defp github_repo_attached_agent(agent, scope, %ControlKeel.Skills.SkillExportPlan{} = plan) do
+    %{
+      "target" => plan.target,
+      "agent" => agent,
+      "scope" => scope,
+      "output_dir" => plan.output_dir,
+      "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+    }
+  end
 end
