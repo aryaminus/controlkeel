@@ -111,9 +111,21 @@ defmodule ControlKeel.ProjectBinding do
   defp canonical_root(project_root) do
     expanded = Path.expand(project_root)
 
-    case System.cmd("/bin/pwd", ["-P"], cd: expanded, stderr_to_stdout: true) do
-      {realpath, 0} -> String.trim(realpath)
-      {_output, _code} -> expanded
+    case :os.type() do
+      {:win32, _} ->
+        expanded
+
+      _ ->
+        case System.find_executable("pwd") do
+          nil ->
+            expanded
+
+          executable ->
+            case System.cmd(executable, ["-P"], cd: expanded, stderr_to_stdout: true) do
+              {realpath, 0} -> String.trim(realpath)
+              {_output, _code} -> expanded
+            end
+        end
     end
   end
 

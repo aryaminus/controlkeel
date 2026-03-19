@@ -393,7 +393,21 @@ defmodule ControlKeel.CLITasksTest do
   end
 
   defp canonical_root(path) do
-    {realpath, 0} = System.cmd("/bin/pwd", ["-P"], cd: path, stderr_to_stdout: true)
-    String.trim(realpath)
+    expanded = Path.expand(path)
+
+    case :os.type() do
+      {:win32, _} ->
+        expanded
+
+      _ ->
+        case System.find_executable("pwd") do
+          nil ->
+            expanded
+
+          executable ->
+            {realpath, 0} = System.cmd(executable, ["-P"], cd: expanded, stderr_to_stdout: true)
+            String.trim(realpath)
+        end
+    end
   end
 end
