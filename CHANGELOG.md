@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.3 — 2026-03-19
+
+### What's changed
+
+- Record latest green release smoke SHA
+- Fix workflow guard expressions
+- Harden release workflow triggers
+- Optimize release automation workflows
+
 ## v0.1.2 — 2026-03-19
 
 ### What's changed
