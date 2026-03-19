@@ -1,4 +1,5 @@
 name: Release Smoke
+run-name: Release Smoke (${{ github.ref_name }} @ ${{ github.sha }})
 
 on:
   push:
@@ -6,6 +7,10 @@ on:
       - main
       - "codex/**"
   pull_request:
+
+concurrency:
+  group: release-smoke-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   linux:
