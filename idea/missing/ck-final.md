@@ -100,3 +100,72 @@ What remains is Phase 2:
   │ Memory System (Layer 6)   │ pgvector semantic memory, episodic records, RL policy tuning   │ Very high  │
   ├───────────────────────────┼────────────────────────────────────────────────────────────────┼────────────┤
   │ Audit Log PDF export      │ Enterprise compliance reporting                                │ Medium     │
+
+    1. ck init requires a separate ck attach step — Plan says init auto-registers. Currently creates the project binding only; user must discover they need ck attach claude-code separately. This breaks the
+     10-minute onboarding goal.
+     2. Proof Bundle missing test_outcomes and diff_summary — The plan's proof bundle spec requires both fields. Currently only invocation_count and security_findings are returned. Data exists in DB; it just
+     isn't mapped to the spec'd shape.
+     3. Tasks missing confidence_score and rollback_boundary — Plan says each path graph node has these. The Task schema and planner don't generate them. Low-risk fix: add migration + planner generation + expose
+      in Mission Control.
+
+     Everything else flagged as "MISSING" in the audit is explicitly Phase 2 (pgvector, DAG edges, RL) per the plan's "What to NOT build in MVP" section.
+
+     ---
+     Files to Modify
+
+       What's intentionally deferred (Phase 2):                                                                                                                                                                         
+  - pgvector semantic search                                                                                                                                                                                       
+  - Task DAG edges / parallel execution                                                                                                                                                                            
+  - RL policy training inference                                                                                                                                                                                   
+  - Audit Log PDF export (Phase 3)                                                                                                                                                                                 
+  - Multi-tenant org isolation      
+
+       4. MISSION PLANNER (lib/controlkeel/mission/planner.ex)
+
+       Status: FULLY IMPLEMENTED heuristic-based planner (NOT ML-driven)
+
+       mission/planner.ex (599 lines) — Complete:
+
+       Sophistication Level: Rule-based Heuristics
+       - NOT ML-driven; purely deterministic logic
+       - Hard-coded industry profiles: 12 profiles (web, health, finance, ecommerce, education, legal, hr, marketing, sales, realestate, iot, general)
+       - Agent label map: 150+ known agents (Claude Code, Cursor, OpenAI, Anthropic, etc.)
+
+       Architecture: Builds mission context from user input:
+       attrs → industry/agent/idea/features/budget/data → risk tier → compliance → stack recommendation
+
+       Risk Tier Logic (lines 332-365) — Rule-based:
+       health/finance/legal → "critical"
+       hr/realestate → "high"
+       marketing/sales with specific keywords → "high" (conditionally)
+       payment/medical/salary keywords → "critical"
+       personal/account/auth keywords → "high"
+       default → "moderate"
+
+       Compliance Generation (lines 368-383):
+       - Base from industry profile (e.g., HIPAA for health)
+       - Adds extra rules if data mentions: email/PII, medical, payment
+
+       Stack Recommendation (lines 385-388):
+       - If critical risk: append "require human approval before deploy"
+       - Otherwise, use industry profile stack as-is
+
+       Task Generation (lines 417-461):
+       - Builds task list from features (max 5 features)
+       - Pre-populates: architecture, feature tasks, release checklist
+       - Status: "done", "in_progress", "queued"
+       - Estimated costs hardcoded: 15¢ (arch), 35¢ (features), 20¢ (release)
+       - Confidence scores: 0.9 (arch), 0.75 (feature), 0.85 (verify) adjusted by risk tier
+
+       Finding Generation (lines 488-550):
+       - 5 conditional findings based on keywords in content
+       - Budget guard (always included)
+       - Auth review, payment isolation, health data, file upload findings
+
+       Key Finding: This is RULE-BASED ONLY. No machine learning. The planner reads input, applies keyword matching, and generates deterministic outputs. Confidence scores and budgets are hardcoded
+       heuristics. This is appropriate for onboarding but lacks learned personalization.
+
+       1. No ML in Mission Planner — The planner is rule-based heuristics (keyword matching, hard-coded tiers). The learned policy lives in agent routing only.
+       2. Learned Policies are Optional — Both agent router and budget decisions gracefully fall back to heuristics if no active artifact exists. This is good for bootstrapping.
+
+ Deployment Risk │ 🟡 Low              │ Ready for staging → requires final env/security checklist
