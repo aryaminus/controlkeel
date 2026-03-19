@@ -1,360 +1,313 @@
 # ControlKeel
 
 [![CI](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml)
-[![Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml/badge.svg)](https://github.com/aryaminus/controlkeel/releases)
+[![Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml)
 
-ControlKeel is the control plane that turns AI coding into production engineering. It sits above Claude Code, Codex, Cursor, Bolt, Replit, and other agent tools to enforce validation, budgets, findings review, and governed execution.
+ControlKeel is the control plane that turns AI coding into production engineering. It governs agent work across intent compilation, task planning, routing, validation, proof generation, typed memory, benchmarks, learned policy artifacts, and cross-agent skills distribution.
 
-Every piece of code an AI agent proposes is scanned before it runs. Hardcoded secrets, SQL injection, unsafe shell, HIPAA violations — blocked before they land in your repo. You see everything in a live mission dashboard and approve or reject findings from the web UI, CLI, or REST API.
+It sits above Claude Code, Codex, Cursor, Windsurf, Continue, Aider, Copilot / VS Code, and other agent clients. It can expose MCP tools, attach native skills where supported, export plugin bundles, proxy provider traffic, and persist the evidence trail for everything it governs.
 
----
-
-## Quick Start
-
-### Packaged Binary
-
-```bash
-# 1. Start the local governance server
-controlkeel
-
-# 2. In the project you want to govern
-controlkeel init --industry health --agent claude --budget 20
-
-# 3. Register as Claude Code's local MCP server
-controlkeel attach claude-code
-
-# 4. Ask Claude Code to write something risky (hardcoded key, SQL injection)
-# ControlKeel intercepts it via MCP before execution
-
-# 5. Review findings
-controlkeel findings
-controlkeel watch   # stream live as they happen
-```
-
-### From Source
-
-```bash
-git clone <repo>
-cd controlkeel
-mix setup            # deps + database
-mix phx.server       # http://localhost:4000
-
-# In your project
-mix ck.init --industry health --agent claude --budget 20
-mix ck.attach claude-code
-mix ck.watch
-```
-
----
-
-## How It Works
-
-```
-Your AI agent (Claude Code / Codex / Cursor)
-        │  MCP call: ck_validate
-        ▼
-  ControlKeel Policy Engine
-    ├── FastPath scanner   (<5ms, Elixir patterns + entropy)
-    ├── Semgrep SAST       (language-aware AST rules)
-    └── Budget enforcement (session + daily rolling limits)
-        │
-        ├── ALLOW  → agent continues
-        ├── WARN   → agent continues, finding logged
-        └── BLOCK  → agent halted, finding surfaced in dashboard
-                          │
-                  Mission Control UI (http://localhost:4000/missions/:id)
-                          │
-                  Human reviews finding → Approve / Reject / Escalate
-```
-
-### Policy Packs
-
-Rules are organised into packs, loaded from `priv/policy_packs/`:
-
-| Pack | When active | Example rules |
-|------|-------------|---------------|
-| **Baseline — Secrets** | Always | Hardcoded API keys, AWS access keys, high-entropy tokens |
-| **Baseline — Injection** | Always | SQL injection, eval/exec, unsafe HTML |
-| **Cost** | Always | Budget overrun warnings |
-| **Software — Code hygiene** | Software projects | Debug endpoints, CORS wildcard, console.log sensitive data |
-| **Healthcare** | `industry: health` | HIPAA data logging, unencrypted PHI fields |
-| **Finance** | `industry: fintech` | PCI DSS, plaintext card numbers |
-| **Education** | `industry: edu` | FERPA, student data exposure |
-| **GDPR** | `domain_pack: gdpr` | PII logging, unencrypted PII fields, third-party data sharing without DPA |
-| **HR** | `domain_pack: hr` | Employment PII, discriminatory hiring criteria, salary data logging |
-| **Legal** | `domain_pack: legal` | Privileged content logging, e-discovery deletion, case data to third parties |
-| **Marketing** | `domain_pack: marketing` | Email without unsubscribe, cookie tracking without consent, PII in analytics |
-| **Sales** | `domain_pack: sales` | CRM PII unencrypted, revenue data logging, unsolicited email blast |
-| **Real Estate** | `domain_pack: realestate` | Fair Housing criteria filters, SSN unencrypted, tenant data retention |
-
-View all active packs and rules at [/policies](http://localhost:4000/policies).
-
----
-
-## Web UI
-
-| Route | What you see |
-|-------|-------------|
-| `/start` | Launch wizard — describe your project, set a daily budget, pick an agent |
-| `/missions/:id` | Mission Control — real-time findings feed, task progress, compliance score, approve/reject |
-| `/findings` | All findings across sessions — filter by severity, status, category |
-| `/policies` | Active policy packs, rule counts, budget limits per session |
-| `/ship` | Install-to-first-finding funnel, session performance metrics |
-
----
-
-## CLI
+## Quick start
 
 ### Packaged binary
 
 ```bash
-controlkeel                             # start governance server
-controlkeel init [options]              # initialise project
-controlkeel attach claude-code          # register MCP server with Claude Code
-controlkeel attach cursor               # register MCP server with Cursor
-controlkeel attach windsurf             # register MCP server with Windsurf
-controlkeel status                      # current session status
-controlkeel findings [--severity high]  # list findings
-controlkeel approve <finding-id>        # approve a finding
-controlkeel watch [--interval 2000]     # live stream of findings + budget
-controlkeel mcp [--project-root /path]  # run MCP server (stdio)
+# 1. Start the local app
+controlkeel
+
+# 2. Initialize a governed project
+cd /path/to/your/project
+controlkeel init
+
+# 3. Attach your preferred client
+controlkeel attach claude-code
+
+# 4. Trigger a known-bad change and inspect the result
+controlkeel findings
+controlkeel status
 ```
 
-### Source (mix tasks)
+### Source checkout
 
 ```bash
-mix ck.init [options]
+git clone <repo>
+cd controlkeel
+mix setup
+mix phx.server
+
+# In the governed project
+mix ck.init
 mix ck.attach claude-code
-mix ck.attach cursor
-mix ck.attach windsurf
-mix ck.status
-mix ck.findings [--severity high] [--status open]
-mix ck.approve 12
-mix ck.watch [--interval 2000]
-mix ck.mcp [--project-root /abs/path]
-mix ck.demo [--host http://localhost:4000]
+mix ck.findings
 ```
 
-`mix ck.init` options:
+More walkthroughs:
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--industry` | `saas` | `health`, `fintech`, `edu`, `saas`, `general` |
-| `--agent` | `claude` | `claude`, `cursor`, `codex`, `bolt`, `replit` |
-| `--idea` | — | One-line project description |
-| `--features` | — | Comma-separated feature list |
-| `--budget` | `30` | Daily AI spend limit in USD |
-| `--users` | — | Who uses this product |
-| `--data` | — | What data it handles |
-| `--project-name` | — | Custom session title |
+- [Getting started](docs/getting-started.md)
+- [Agent integrations](docs/agent-integrations.md)
+- [Demo script](docs/demo-script.md)
 
----
+## What the product includes
 
-## MCP Integration
+- Live onboarding and intent compilation at `/start`
+- Mission control, findings browser, proof browser, policy studio, ship dashboard, and benchmark matrix
+- MCP runtime with routing, validation, findings, budget, and skills tools
+- FastPath scanner, Semgrep escalation, policy packs, and governed proxy paths
+- Typed memory, immutable proof bundles, pause/resume checkpoints, and retrieval
+- Benchmark engine, policy training pipeline, and learned router / budget-hint artifacts
+- Native agent skills, plugin bundles, and MCP fallback instructions generated from `priv/skills/`
 
-ControlKeel exposes five MCP tools over stdio (JSON-RPC 2.0).
+## Supported agent connections
 
-### `ck_validate` — scan before executing
+### Native-first attachments
 
-```json
-{
-  "content": "ANTHROPIC_API_KEY = 'sk-ant-...'",
-  "path": "app/config.py",
-  "kind": "code",
-  "session_id": 1
-}
-```
+These get MCP plus a native companion install by default.
 
-Returns: `{ "allowed": false, "decision": "block", "summary": "...", "findings": [...] }`
+| Agent | Attach command | Companion output |
+|---|---|---|
+| Claude Code | `controlkeel attach claude-code` | `.claude/skills`, `.claude/agents`, optional Claude plugin bundle |
+| Codex CLI | `controlkeel attach codex-cli` | `.agents/skills`, `.codex/agents` |
+| VS Code | `controlkeel attach vscode` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
+| GitHub Copilot | `controlkeel attach copilot` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 
-### `ck_context` — fetch session risk + budget
+### MCP plus generated instruction bundles
 
-```json
-{ "session_id": 1 }
-```
+| Agent | Attach command |
+|---|---|
+| Cursor | `controlkeel attach cursor` |
+| Windsurf | `controlkeel attach windsurf` |
+| Kiro | `controlkeel attach kiro` |
+| Amp | `controlkeel attach amp` |
+| OpenCode | `controlkeel attach opencode` |
+| Gemini CLI | `controlkeel attach gemini-cli` |
+| Continue | `controlkeel attach continue` |
+| Aider | `controlkeel attach aider` |
 
-Returns: risk tier, compliance profile, open findings summary, budget remaining.
+`/skills` in the web app and [docs/agent-integrations.md](docs/agent-integrations.md) show the live compatibility matrix and export/install targets.
 
-### `ck_finding` — persist a finding and get its ruling
+Attach flags:
 
-```json
-{
-  "session_id": 1,
-  "category": "credential",
-  "severity": "critical",
-  "rule_id": "secret.aws_access_key",
-  "plain_message": "Hardcoded AWS access key detected in config.py"
-}
-```
+- `--mcp-only` disables all native companion generation
+- `--no-native` keeps the MCP registration but skips native installs
+- `--scope user|project` selects the install location when the target supports both
 
-Returns: `{ "finding_id": 42, "status": "blocked", "requires_human": true }`
+## Skills, plugins, and exports
 
-### `ck_budget` — estimate or commit cost
+Built-in skills are canonical in `priv/skills/`. The same catalog can be:
 
-```json
-{
-  "session_id": 1,
-  "mode": "commit",
-  "estimated_cost_cents": 15,
-  "provider": "anthropic",
-  "model": "claude-sonnet-4-6",
-  "input_tokens": 1200,
-  "output_tokens": 400
-}
-```
+- loaded through MCP with `ck_skill_list` and `ck_skill_load`
+- installed natively with `controlkeel skills install`
+- exported as plugin or portable bundles with `controlkeel skills export`
 
-### `ck_route` — select the best agent for a task
+Targets:
 
-```json
-{
-  "task": "Build a patient intake form",
-  "risk_tier": "critical",
-  "budget_remaining_cents": 500
-}
-```
+- `codex`
+- `claude-standalone`
+- `claude-plugin`
+- `copilot-plugin`
+- `github-repo`
+- `open-standard`
+- `instructions-only`
 
-Returns: `{ "agent": "claude-code", "agent_name": "Claude Code", "task_type": "ui", "rationale": [...], "warnings": [...] }`
-
-**Connecting manually:**
+Examples:
 
 ```bash
-mix ck.mcp --project-root /path/to/your/project
+controlkeel skills list
+controlkeel skills validate
+controlkeel skills doctor
+controlkeel skills export --target claude-plugin
+controlkeel skills export --target copilot-plugin
+controlkeel skills install --target codex --scope user
 ```
 
-Add to `~/.claude/claude_desktop_config.json`:
+Exported bundles are written under `controlkeel/dist/<target>/`.
 
-```json
-{
-  "mcpServers": {
-    "controlkeel": {
-      "command": "/path/to/your/project/controlkeel/bin/controlkeel-mcp"
-    }
-  }
-}
+## Web UI
+
+| Route | Purpose |
+|---|---|
+| `/start` | onboarding, interview, and execution brief compilation |
+| `/missions/:id` | mission control, findings, proofs, memory hits, pause/resume |
+| `/findings` | cross-session findings browser with guided auto-fix |
+| `/proofs` | immutable proof bundles and details |
+| `/benchmarks` | suite browser, run matrix, policy training surfaces |
+| `/benchmarks/policies/:id` | learned policy artifact details and promotion state |
+| `/policies` | policy packs and governance rules |
+| `/skills` | skills studio, compatibility matrix, export/install actions |
+| `/ship` | install funnel and session metrics |
+
+## CLI
+
+### Runtime binary
+
+```bash
+controlkeel
+controlkeel serve
+controlkeel init [options]
+controlkeel attach <agent>
+controlkeel status
+controlkeel findings [--severity high] [--status open]
+controlkeel approve <finding-id>
+controlkeel proofs [--session-id ...] [--task-id ...]
+controlkeel proof <task-id|proof-id>
+controlkeel pause <task-id>
+controlkeel resume <task-id>
+controlkeel memory search "query"
+controlkeel skills list|validate|export|install|doctor
+controlkeel benchmark list|run|show|import|export
+controlkeel policy list|train|show|promote|archive
+controlkeel watch
+controlkeel mcp [--project-root /abs/path]
+controlkeel help
+controlkeel version
 ```
 
----
+### Source wrappers
+
+Every runtime command also has a `mix ck.*` wrapper where it makes sense, including:
+
+- `mix ck.init`
+- `mix ck.attach`
+- `mix ck.status`
+- `mix ck.findings`
+- `mix ck.approve`
+- `mix ck.skills`
+- `mix ck.benchmark`
+- `mix ck.policy`
+- `mix ck.mcp`
+- `mix ck.demo`
+
+## MCP runtime
+
+Core MCP tools:
+
+- `ck_validate`
+- `ck_context`
+- `ck_finding`
+- `ck_budget`
+- `ck_route`
+
+Skills tools are exposed when the catalog is non-empty:
+
+- `ck_skill_list`
+- `ck_skill_load`
+
+`controlkeel attach ...` is the preferred connection path. For direct stdio usage:
+
+```bash
+controlkeel mcp --project-root /absolute/path/to/project
+```
 
 ## REST API
 
-All endpoints return JSON. No authentication in local mode.
+All endpoints return JSON.
 
-```
-GET    /api/v1/sessions                        list sessions
-POST   /api/v1/sessions                        create session
-GET    /api/v1/sessions/:id                    session detail (includes tasks + findings)
-GET    /api/v1/sessions/:id/audit-log          audit log JSON or CSV (?format=csv)
-POST   /api/v1/sessions/:session_id/tasks      create task
-PATCH  /api/v1/tasks/:id                       update task (status, title, validation_gate)
-POST   /api/v1/tasks/:id/complete              mark task done (blocked if open findings exist)
-GET    /api/v1/proof/:task_id                  proof bundle: findings, risk score, compliance attestations
-POST   /api/v1/validate                        validate content (same as ck_validate)
-GET    /api/v1/findings                        list findings (filters: session_id, severity, status)
-POST   /api/v1/findings/:id/action             approve | reject | escalate
-GET    /api/v1/budget                          global or per-session budget summary
-POST   /api/v1/route-agent                     select best agent for a task (same as ck_route)
-```
+### Sessions, tasks, proofs, memory
 
-Example — validate content:
+- `GET /api/v1/sessions`
+- `POST /api/v1/sessions`
+- `GET /api/v1/sessions/:id`
+- `GET /api/v1/sessions/:id/audit-log`
+- `POST /api/v1/sessions/:session_id/tasks`
+- `PATCH /api/v1/tasks/:id`
+- `POST /api/v1/tasks/:id/complete`
+- `POST /api/v1/tasks/:id/pause`
+- `POST /api/v1/tasks/:id/resume`
+- `GET /api/v1/proofs`
+- `GET /api/v1/proofs/:id`
+- `GET /api/v1/proof/:task_id`
+- `GET /api/v1/memory/search`
+- `DELETE /api/v1/memory/:id`
 
-```bash
-curl -s http://localhost:4000/api/v1/validate \
-  -H "Content-Type: application/json" \
-  -d '{"content": "api_key = \"AKIAIOSFODNN7EXAMPLE\"", "kind": "code"}' | jq .
-```
+### Validation, budgets, routing, findings
 
-```json
-{
-  "allowed": false,
-  "decision": "block",
-  "summary": "1 critical finding",
-  "findings": [
-    {
-      "rule_id": "secret.aws_access_key",
-      "severity": "critical",
-      "plain_message": "AWS access key detected. Rotate immediately."
-    }
-  ]
-}
-```
+- `POST /api/v1/validate`
+- `GET /api/v1/findings`
+- `POST /api/v1/findings/:id/action`
+- `GET /api/v1/budget`
+- `POST /api/v1/route-agent`
 
----
+### Skills
+
+- `GET /api/v1/skills`
+- `GET /api/v1/skills/:name`
+- `GET /api/v1/skills/targets`
+- `POST /api/v1/skills/export`
+- `POST /api/v1/skills/install`
+
+### Benchmarks and policy training
+
+- `GET /api/v1/benchmarks`
+- `POST /api/v1/benchmarks/runs`
+- `GET /api/v1/benchmarks/runs/:id`
+- `POST /api/v1/benchmarks/runs/:id/import`
+- `GET /api/v1/benchmarks/runs/:id/export`
+- `GET /api/v1/policies`
+- `POST /api/v1/policies/train`
+- `GET /api/v1/policies/:id`
+- `POST /api/v1/policies/:id/promote`
+- `POST /api/v1/policies/:id/archive`
 
 ## Configuration
 
-Set via environment variables (read at runtime):
+Selected runtime environment variables:
 
 ```bash
 # Server
 PORT=4000
 PHX_HOST=localhost
 
-# LLM providers (used for intent compilation in onboarding)
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
+# Provider keys
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
 OPENROUTER_API_KEY=...
 OLLAMA_HOST=http://localhost:11434
 
-# Scanner
-CONTROLKEEL_SEMGREP_BIN=semgrep         # path to semgrep binary (optional, enables SAST)
-
-# HTTP proxy (optional — govern OpenAI/Anthropic calls via proxy)
+# Scanner / proxy
+CONTROLKEEL_SEMGREP_BIN=semgrep
 CONTROLKEEL_PROXY_OPENAI_UPSTREAM=https://api.openai.com
 CONTROLKEEL_PROXY_ANTHROPIC_UPSTREAM=https://api.anthropic.com
 
 # Intent compiler
-CONTROLKEEL_INTENT_DEFAULT_PROVIDER=anthropic  # or openai, openrouter, ollama
+CONTROLKEEL_INTENT_DEFAULT_PROVIDER=anthropic
 CONTROLKEEL_INTENT_ANTHROPIC_MODEL=claude-sonnet-4-6
+CONTROLKEEL_INTENT_OPENAI_MODEL=gpt-5.4
+
+# Memory / embeddings
+CONTROLKEEL_MEMORY_STORE=auto
+CONTROLKEEL_EMBEDDINGS_PROVIDER=ollama
+CONTROLKEEL_EMBEDDINGS_MODEL=nomic-embed-text
+
+# Policy training
+CONTROLKEEL_POLICY_TRAINING_PYTHON=python3
+CONTROLKEEL_POLICY_TRAINING_TMP_DIR=/tmp
 ```
 
-For local development, none of these are required. The scanner works without an LLM; onboarding falls back to heuristic compilation.
-
----
-
-## Demo
-
-Run the built-in demo to see the full detection loop without any setup:
-
-```bash
-mix ck.demo
-```
-
-Runs 10 real-world vibe coding failure scenarios through the scanner: hardcoded secrets, SQL injection, client-side auth bypass, unencrypted PHI, `eval()` with user input, open redirect, Supabase public bucket, PII to Segment, `DEBUG=True` in production, and `pickle.loads` deserialization RCE. Prints catch rate, blocked count, and dashboard URLs.
-
----
+Packaged local mode also auto-derives `DATABASE_PATH` and `SECRET_KEY_BASE` when they are unset.
 
 ## Development
 
 ```bash
-mix setup         # install deps, create + migrate DB
-mix phx.server    # start with live reload
-mix test          # 159 tests, 0 failures
-mix precommit     # compile (warnings-as-errors) + format + test
+mix setup
+mix phx.server
+mix test
+mix precommit
 ```
 
-Database is SQLite (no external services needed).
-
----
+The app is Phoenix + Ecto on SQLite by default. Use the built-in `Req` client for HTTP work.
 
 ## Packaging
 
-Single-binary builds via [Burrito](https://github.com/burrito-elixir/burrito):
+Single-binary builds use Burrito:
 
 ```bash
 MIX_ENV=prod mix assets.deploy
 MIX_ENV=prod mix release
 
-# Target-specific
+BURRITO_TARGET=macos MIX_ENV=prod mix release
 BURRITO_TARGET=macos_silicon MIX_ENV=prod mix release
-BURRITO_TARGET=linux         MIX_ENV=prod mix release
-BURRITO_TARGET=windows       MIX_ENV=prod mix release
+BURRITO_TARGET=linux MIX_ENV=prod mix release
+BURRITO_TARGET=windows MIX_ENV=prod mix release
 ```
 
-Output: `burrito_out/controlkeel` (or `.exe` on Windows). No Erlang runtime required on the target machine.
-
----
-
-## Guides
-
-- [Getting started](docs/getting-started.md)
-- [Demo script](docs/demo-script.md)
+Outputs land in `burrito_out/`.

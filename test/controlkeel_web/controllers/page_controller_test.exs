@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.PageControllerTest do
     assert body =~ "View benchmark matrix"
     assert body =~ "View ship metrics"
     assert body =~ "Open getting-started guide"
+    assert body =~ "Open skills studio"
   end
 
   test "GET /getting-started renders the install guide", %{conn: conn} do
@@ -20,5 +21,6 @@ defmodule ControlKeelWeb.PageControllerTest do
 
     assert body =~ "Go from install to first finding in five minutes"
     assert body =~ "controlkeel init"
+    assert body =~ "controlkeel attach codex-cli"
   end
 end

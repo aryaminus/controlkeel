@@ -1,6 +1,7 @@
 defmodule ControlKeel.Skills do
   @moduledoc false
 
+  alias ControlKeel.AgentIntegration
   alias ControlKeel.Skills.Exporter
   alias ControlKeel.Skills.Installer
   alias ControlKeel.Skills.Registry
@@ -25,6 +26,7 @@ defmodule ControlKeel.Skills do
   end
 
   def targets, do: SkillTarget.catalog()
+  def agent_integrations, do: AgentIntegration.catalog()
 
   def export(target, project_root \\ File.cwd!(), opts \\ []) do
     Exporter.export(target, project_root, opts)

@@ -26,7 +26,7 @@ jobs:
       - run: MIX_ENV=prod mix assets.deploy
       - run: BURRITO_TARGET=linux MIX_ENV=prod mix release
       - run: chmod +x scripts/release_smoke.sh
-      - run: scripts/release_smoke.sh "$(find burrito_out -maxdepth 1 -type f | head -n 1)"
+      - run: scripts/release_smoke.sh "burrito_out/controlkeel_linux"
 
   macos:
     runs-on: macos-latest
@@ -36,8 +36,10 @@ jobs:
         include:
           - target: macos
             artifact_name: controlkeel-macos-intel
+            source_name: controlkeel_macos
           - target: macos_silicon
             artifact_name: controlkeel-macos-arm64
+            source_name: controlkeel_macos_silicon
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
@@ -54,7 +56,7 @@ jobs:
       - run: MIX_ENV=prod mix assets.deploy
       - run: BURRITO_TARGET=${{ matrix.target }} MIX_ENV=prod mix release
       - run: chmod +x scripts/release_smoke.sh
-      - run: scripts/release_smoke.sh "$(find burrito_out -maxdepth 1 -type f | head -n 1)"
+      - run: scripts/release_smoke.sh "burrito_out/${{ matrix.source_name }}"
 
   windows-build:
     runs-on: ubuntu-latest
@@ -73,7 +75,7 @@ jobs:
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
       - run: BURRITO_TARGET=windows MIX_ENV=prod mix release
-      - run: mv burrito_out/controlkeel.exe burrito_out/controlkeel-windows-x86_64.exe
+      - run: mv burrito_out/controlkeel_windows.exe burrito_out/controlkeel-windows-x86_64.exe
       - uses: actions/upload-artifact@v4
         with:
           name: controlkeel-windows

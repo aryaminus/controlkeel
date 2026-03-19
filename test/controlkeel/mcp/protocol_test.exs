@@ -4,6 +4,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
   alias ControlKeel.MCP.Protocol
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Invocation
+  alias ControlKeel.ProjectBinding
   alias ControlKeel.Repo
   alias ControlKeel.Skills.Activation
 
@@ -52,6 +53,57 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_skill_list",
              "ck_skill_load"
            ]
+  end
+
+  test "tools/list constrains ck_skill_load names to the bound project catalog" do
+    tmp_dir =
+      Path.join(System.tmp_dir!(), "controlkeel-protocol-#{System.unique_integer([:positive])}")
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(Path.join(tmp_dir, ".agents/skills/project-skill"))
+
+    File.write!(
+      Path.join(tmp_dir, ".agents/skills/project-skill/SKILL.md"),
+      """
+      ---
+      name: project-skill
+      description: Project local operator skill.
+      ---
+
+      # Project skill
+      """
+    )
+
+    {:ok, _binding} =
+      ProjectBinding.write(
+        %{
+          "workspace_id" => 1,
+          "session_id" => 1,
+          "agent" => "claude",
+          "attached_agents" => %{}
+        },
+        tmp_dir
+      )
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    response =
+      File.cd!(tmp_dir, fn ->
+        Protocol.handle_request(%{
+          "jsonrpc" => "2.0",
+          "id" => 32,
+          "method" => "tools/list"
+        })
+      end)
+
+    tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_skill_load"))
+
+    assert "project-skill" in get_in(tool, ["inputSchema", "properties", "name", "enum"])
   end
 
   test "tools/call ck_validate returns normalized validation output" do

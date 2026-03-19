@@ -172,9 +172,21 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert is_map(skill["install_state"])
 
       conn = build_conn() |> get(~p"/api/v1/skills/targets")
-      targets = json_response(conn, 200)["targets"]
+      response = json_response(conn, 200)
+      targets = response["targets"]
+      agents = response["agents"]
+
       assert Enum.any?(targets, &(&1["id"] == "claude-plugin"))
       assert Enum.any?(targets, &(&1["id"] == "copilot-plugin"))
+      assert Enum.any?(agents, &(&1["id"] == "claude-code"))
+      assert Enum.any?(agents, &(&1["id"] == "cursor"))
+
+      claude =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "claude-code"
+        end)
+
+      assert claude["preferred_target"] == "claude-standalone"
     end
 
     test "gets skill detail and exports and installs bundles", %{conn: conn} do

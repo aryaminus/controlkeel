@@ -597,7 +597,10 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   def list_skill_targets(conn, _params) do
-    json(conn, %{targets: Enum.map(Skills.targets(), &skill_target_summary/1)})
+    json(conn, %{
+      targets: Enum.map(Skills.targets(), &skill_target_summary/1),
+      agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1)
+    })
   end
 
   def export_skills(conn, params) do
@@ -683,6 +686,21 @@ defmodule ControlKeelWeb.ApiController do
       native: target.native,
       default_scope: target.default_scope,
       supported_scopes: target.supported_scopes
+    }
+  end
+
+  defp agent_integration_summary(integration) do
+    %{
+      id: integration.id,
+      label: integration.label,
+      category: integration.category,
+      description: integration.description,
+      attach_command: integration.attach_command,
+      config_location: integration.config_location,
+      companion_delivery: integration.companion_delivery,
+      preferred_target: integration.preferred_target,
+      default_scope: integration.default_scope,
+      export_targets: integration.export_targets
     }
   end
 

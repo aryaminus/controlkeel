@@ -1,6 +1,7 @@
 defmodule ControlKeel.CLI do
   @moduledoc false
 
+  alias ControlKeel.AgentIntegration
   alias ControlKeel.Analytics
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
@@ -71,22 +72,12 @@ defmodule ControlKeel.CLI do
       ["init" | rest] ->
         parse_with_switches(:init, rest, @init_switches)
 
-      ["attach", agent | rest]
-      when agent in [
-             "claude-code",
-             "cursor",
-             "windsurf",
-             "kiro",
-             "amp",
-             "opencode",
-             "gemini-cli",
-             "codex-cli",
-             "vscode",
-             "copilot",
-             "continue",
-             "aider"
-           ] ->
-        parse_attach(agent, rest)
+      ["attach", agent | rest] ->
+        if agent in AgentIntegration.ids() do
+          parse_attach(agent, rest)
+        else
+          {:error, usage_text()}
+        end
 
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
@@ -215,9 +206,9 @@ defmodule ControlKeel.CLI do
       controlkeel init [options]      Initialize ControlKeel in the current project
       controlkeel attach <agent>      Register ControlKeel MCP server with your coding tool
                                       Native skills install by default unless --mcp-only
-                                      Supported: claude-code, cursor, windsurf, kiro,
-                                                 amp, opencode, gemini-cli, codex-cli,
-                                                 vscode, copilot, continue, aider
+                                      Flags: --mcp-only, --no-native, --with-skills,
+                                             --scope user|project
+                                      Supported: #{supported_attach_agents_text()}
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
@@ -1183,12 +1174,27 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :skills_doctor, options: options}, project_root) do
     root = options[:project_root] || project_root
     analysis = Skills.analyze(root)
+    integrations = Skills.agent_integrations()
+
+    native_first =
+      integrations
+      |> Enum.filter(&(&1.category in ["native-first", "repo-native"]))
+      |> Enum.map(& &1.label)
+      |> Enum.join(", ")
+
+    mcp_fallback =
+      integrations
+      |> Enum.filter(&(&1.category == "mcp-plus-instructions"))
+      |> Enum.map(& &1.label)
+      |> Enum.join(", ")
 
     {:ok,
      [
        "Project root: #{Path.expand(root)}",
        "Trusted project skills: #{if(analysis.trusted_project?, do: "yes", else: "no")}",
-       "Catalog size: #{length(analysis.skills)}"
+       "Catalog size: #{length(analysis.skills)}",
+       "Native-first agents: #{native_first}",
+       "MCP + instructions agents: #{mcp_fallback}"
      ] ++
        Enum.map(analysis.diagnostics, fn diagnostic ->
          "  [#{diagnostic.level}] #{diagnostic.code} — #{diagnostic.message}"
@@ -1453,13 +1459,7 @@ defmodule ControlKeel.CLI do
   defp attach_scope("codex-cli", options), do: options[:scope] || "user"
   defp attach_scope(_agent, options), do: options[:scope] || "project"
 
-  defp display_attach_agent("claude-code"), do: "Claude Code"
-  defp display_attach_agent("codex-cli"), do: "Codex CLI"
-  defp display_attach_agent("gemini-cli"), do: "Gemini CLI"
-  defp display_attach_agent("opencode"), do: "OpenCode"
-  defp display_attach_agent("vscode"), do: "VS Code"
-  defp display_attach_agent("copilot"), do: "GitHub Copilot"
-  defp display_attach_agent(agent), do: agent |> String.replace("-", " ") |> String.capitalize()
+  defp display_attach_agent(agent), do: AgentIntegration.label(agent)
 
   # ─── IDE MCP attachment helpers ──────────────────────────────────────────────
 
@@ -1722,5 +1722,11 @@ defmodule ControlKeel.CLI do
       "output_dir" => plan.output_dir,
       "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
     }
+  end
+
+  defp supported_attach_agents_text do
+    Skills.agent_integrations()
+    |> Enum.map(& &1.id)
+    |> Enum.join(", ")
   end
 end

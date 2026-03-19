@@ -177,7 +177,7 @@ defmodule ControlKeel.MCP.Protocol do
       ck_route_tool()
     ]
 
-    if Registry.names() == [] do
+    if current_skill_names() == [] do
       base
     else
       base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
@@ -247,7 +247,7 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   defp ck_skill_load_tool do
-    names = Registry.names()
+    names = current_skill_names()
 
     %{
       "name" => "ck_skill_load",
@@ -274,6 +274,10 @@ defmodule ControlKeel.MCP.Protocol do
         }
       }
     }
+  end
+
+  defp current_skill_names do
+    Registry.names(File.cwd!(), trust_project_skills: true)
   end
 
   defp tool_response(id, {:ok, result}) do

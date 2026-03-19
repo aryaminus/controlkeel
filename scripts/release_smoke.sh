@@ -11,6 +11,7 @@ TMP_DIR=$(mktemp -d)
 PORT=4081
 DB_PATH="$TMP_DIR/controlkeel.db"
 SECRET_KEY_BASE="controlkeel-release-smoke-secret"
+SERVER_LOG="$TMP_DIR/server.log"
 
 cleanup() {
   if [ -n "${SERVER_PID:-}" ]; then
@@ -21,13 +22,32 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-"$BINARY" help >/dev/null
-"$BINARY" version >/dev/null
+run_command() {
+  python3 - "$@" <<'PY'
+import subprocess
+import sys
 
-(
-  cd "$TMP_DIR"
-  DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" "$BINARY" init >/dev/null
-)
+argv = sys.argv[1:]
+completed = subprocess.run(argv, capture_output=True, timeout=30, check=True)
+sys.stdout.buffer.write(completed.stdout)
+sys.stderr.buffer.write(completed.stderr)
+PY
+}
+
+run_command "$BINARY" help >/dev/null
+run_command "$BINARY" version >/dev/null
+
+python3 - "$BINARY" "$TMP_DIR" "$DB_PATH" "$SECRET_KEY_BASE" <<'PY'
+import os
+import subprocess
+import sys
+
+binary, tmp_dir, db_path, secret = sys.argv[1:5]
+env = os.environ.copy()
+env["DATABASE_PATH"] = db_path
+env["SECRET_KEY_BASE"] = secret
+subprocess.run([binary, "init"], cwd=tmp_dir, env=env, timeout=60, check=True, capture_output=True)
+PY
 
 test -f "$TMP_DIR/controlkeel/project.json"
 test -f "$TMP_DIR/controlkeel/bin/controlkeel-mcp"
@@ -53,11 +73,11 @@ if "Content-Length:" not in stdout or "\"result\"" not in stdout:
     raise SystemExit("mcp initialize smoke check failed")
 PY
 
-DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" serve &
+DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" serve >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 for _ in $(seq 1 20); do
-  if curl -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
+  if curl --connect-timeout 1 --max-time 2 -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
     exit 0
   fi
 
@@ -65,4 +85,8 @@ for _ in $(seq 1 20); do
 done
 
 echo "server smoke check failed" >&2
+if [ -f "$SERVER_LOG" ]; then
+  echo "--- server log ---" >&2
+  cat "$SERVER_LOG" >&2
+fi
 exit 1

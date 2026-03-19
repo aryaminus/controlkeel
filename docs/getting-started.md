@@ -39,7 +39,7 @@ This writes:
 - `controlkeel/bin/controlkeel-mcp`
 - `/controlkeel` in `.gitignore`
 
-## 3. Attach Claude Code
+## 3. Attach an agent
 
 ```bash
 controlkeel attach claude-code
@@ -51,7 +51,19 @@ Source wrapper:
 mix ck.attach claude-code
 ```
 
-ControlKeel registers a local MCP server using the generated project-local wrapper so Claude Code can call back into the governed runtime.
+ControlKeel registers a local MCP server using the generated project-local wrapper so the attached client can call back into the governed runtime.
+
+Other supported attach commands:
+
+- `controlkeel attach codex-cli`
+- `controlkeel attach vscode`
+- `controlkeel attach copilot`
+- `controlkeel attach cursor`
+- `controlkeel attach windsurf`
+- `controlkeel attach continue`
+- `controlkeel attach aider`
+
+For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) or open `/skills` in the local app.
 
 ## 4. Trigger a first finding
 
@@ -78,6 +90,7 @@ Or open the local app and check:
 
 - `/missions/:id` for the governed session
 - `/findings` for the cross-session findings browser
+- `/skills` for native skills, plugins, and export targets
 - `/ship` for install-to-first-finding metrics
 
 ## Notes

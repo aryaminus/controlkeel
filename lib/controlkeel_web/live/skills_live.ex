@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.SkillsLive do
      |> assign(:page_title, "Skills Studio")
      |> assign(:selected, nil)
      |> assign(:last_result, nil)
+     |> assign(:agent_integrations, Skills.agent_integrations())
      |> assign(:target_options, target_options())
      |> assign(:scope_options, [{"Export", "export"}, {"User", "user"}, {"Project", "project"}])
      |> assign_analysis(project_root)
@@ -37,6 +38,13 @@ defmodule ControlKeelWeb.SkillsLive do
 
   def handle_event("update_action_form", %{"skill_action" => params}, socket) do
     {:noreply, assign(socket, :action_form, action_form(params))}
+  end
+
+  def handle_event("copy_command", %{"command" => command}, socket) do
+    {:noreply,
+     socket
+     |> push_event("copy-to-clipboard", %{text: command})
+     |> put_flash(:info, "Copied command to clipboard.")}
   end
 
   def handle_event("export", params, socket) do
@@ -279,6 +287,58 @@ defmodule ControlKeelWeb.SkillsLive do
             </div>
 
             <div class="ck-card">
+              <p class="ck-mini-label">Available where</p>
+              <div class="ck-table-wrap">
+                <table class="min-w-full text-sm" id="skills-agent-matrix">
+                  <thead>
+                    <tr>
+                      <th class="text-left py-2 pr-4">Agent</th>
+                      <th class="text-left py-2 pr-4">Attach</th>
+                      <th class="text-left py-2 pr-4">Connection</th>
+                      <th class="text-left py-2 pr-4">Companion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for integration <- @agent_integrations do %>
+                      <tr id={"agent-#{integration.id}"}>
+                        <td class="py-2 pr-4 align-top">
+                          <strong>{integration.label}</strong>
+                          <p class="ck-note">{human_category(integration.category)}</p>
+                        </td>
+                        <td class="py-2 pr-4 align-top">
+                          <div class="flex items-start gap-2">
+                            <code>{integration.attach_command}</code>
+                            <button
+                              type="button"
+                              class="ck-link"
+                              id={"copy-agent-#{integration.id}"}
+                              phx-click="copy_command"
+                              phx-value-command={integration.attach_command}
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Scope: {integration.default_scope}
+                          </p>
+                        </td>
+                        <td class="py-2 pr-4 align-top">
+                          <p class="ck-note">{integration.config_location}</p>
+                        </td>
+                        <td class="py-2 pr-4 align-top">
+                          <p class="ck-note">{integration.companion_delivery}</p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Export targets: {format_targets(integration.export_targets)}
+                          </p>
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="ck-card">
               <%= if @selected do %>
                 <p class="ck-mini-label">{@selected.name}</p>
                 <p class="ck-note" style="margin-bottom: 0.75rem;">{@selected.description}</p>
@@ -376,4 +436,12 @@ defmodule ControlKeelWeb.SkillsLive do
   defp diagnostic_pill_class("error"), do: "ck-pill-critical"
   defp diagnostic_pill_class("warn"), do: "ck-pill-medium"
   defp diagnostic_pill_class(_), do: "ck-pill-neutral"
+
+  defp human_category("native-first"), do: "Native skills install on attach"
+  defp human_category("repo-native"), do: "Repo-native skills, agents, and plugin bundles"
+
+  defp human_category("mcp-plus-instructions"),
+    do: "MCP attach plus generated instruction snippets"
+
+  defp human_category(_), do: "Portable MCP fallback"
 end
