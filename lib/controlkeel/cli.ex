@@ -54,10 +54,15 @@ defmodule ControlKeel.CLI do
   @watch_switches [interval: :integer]
 
   def standalone_argv do
-    if Code.ensure_loaded?(Burrito.Util.Args) and function_exported?(Burrito.Util.Args, :argv, 0) do
-      Burrito.Util.Args.argv()
-    else
-      System.argv()
+    cond do
+      standalone_wrapper_runtime?() ->
+        plain_arguments()
+
+      Code.ensure_loaded?(Burrito.Util.Args) and function_exported?(Burrito.Util.Args, :argv, 0) ->
+        Burrito.Util.Args.argv()
+
+      true ->
+        System.argv()
     end
   end
 
@@ -1353,6 +1358,19 @@ defmodule ControlKeel.CLI do
       true ->
         {:ok, %{command: :benchmark_export, options: options, args: [run_id]}}
     end
+  end
+
+  defp standalone_wrapper_runtime? do
+    System.get_env("__BURRITO") not in [nil, ""]
+  end
+
+  defp plain_arguments do
+    plain_arguments_provider().()
+    |> Enum.map(&to_string/1)
+  end
+
+  defp plain_arguments_provider do
+    Application.get_env(:controlkeel, :cli_plain_arguments_provider, &:init.get_plain_arguments/0)
   end
 
   defp parse_id(value) do
