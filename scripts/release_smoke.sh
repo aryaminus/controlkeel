@@ -30,6 +30,7 @@ TMP_DIR=$(mktemp -d)
 PORT=4081
 DB_PATH="$TMP_DIR/controlkeel.db"
 SECRET_KEY_BASE="controlkeel-release-smoke-secret"
+SECRET_KEY_BASE="${SECRET_KEY_BASE}$(printf '0123456789abcdef0123456789abcdef0123456789abcdef')"
 SERVER_LOG="$TMP_DIR/server.log"
 
 cleanup() {
@@ -65,14 +66,18 @@ binary, tmp_dir, db_path, secret = sys.argv[1:5]
 env = os.environ.copy()
 env["DATABASE_PATH"] = db_path
 env["SECRET_KEY_BASE"] = secret
-subprocess.run(
+completed = subprocess.run(
     [binary, "init", "--no-attach"],
     cwd=tmp_dir,
     env=env,
     timeout=60,
-    check=True,
+    check=False,
     capture_output=True,
 )
+if completed.returncode != 0:
+    sys.stdout.buffer.write(completed.stdout)
+    sys.stderr.buffer.write(completed.stderr)
+    raise SystemExit(completed.returncode)
 PY
 
 test -f "$TMP_DIR/controlkeel/project.json"
