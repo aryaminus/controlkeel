@@ -35,19 +35,22 @@ defmodule ControlKeel.Application do
 
   defp base_children do
     [
-      ControlKeelWeb.Telemetry,
-      ControlKeel.Repo
-    ] ++ analytics_children()
+      ControlKeelWeb.Telemetry
+    ]
   end
 
   defp late_children do
     [
-      {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: ControlKeel.PubSub},
-      ControlKeel.Skills.Activation,
-      {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor},
-      ControlKeelWeb.Endpoint
-    ]
+      ControlKeel.Repo
+    ] ++
+      analytics_children() ++
+      [
+        {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: ControlKeel.PubSub},
+        ControlKeel.Skills.Activation,
+        {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor},
+        ControlKeelWeb.Endpoint
+      ]
   end
 
   defp start_late_children(supervisor) do
@@ -71,8 +74,13 @@ defmodule ControlKeel.Application do
   end
 
   defp skip_migrations?() do
-    # By default, sqlite migrations are run when using a release
-    System.get_env("RELEASE_NAME") == nil
+    not release_runtime?()
+  end
+
+  defp release_runtime? do
+    System.get_env("RELEASE_NAME") not in [nil, ""] or
+      System.get_env("RELEASE_ROOT") not in [nil, ""] or
+      System.get_env("__BURRITO") not in [nil, ""]
   end
 
   defp migration_runner do
