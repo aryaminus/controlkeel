@@ -12,12 +12,15 @@ concurrency:
   group: release-smoke-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1.20.3
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
@@ -46,8 +49,8 @@ jobs:
             artifact_name: controlkeel-macos-arm64
             source_name: controlkeel_macos_silicon
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1.20.3
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
@@ -56,7 +59,9 @@ jobs:
           chmod +x scripts/install_zig.sh
           scripts/install_zig.sh 0.15.2 >/dev/null
           echo "/usr/local/zig" >> $GITHUB_PATH
-      - run: brew install xz p7zip
+      - run: |
+          brew list xz >/dev/null 2>&1 || brew install xz
+          brew list p7zip >/dev/null 2>&1 || brew install p7zip
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
       - run: BURRITO_TARGET=${{ matrix.target }} MIX_ENV=prod mix release
@@ -66,8 +71,8 @@ jobs:
   windows-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1.20.3
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
@@ -81,7 +86,7 @@ jobs:
       - run: MIX_ENV=prod mix assets.deploy
       - run: BURRITO_TARGET=windows MIX_ENV=prod mix release
       - run: mv burrito_out/controlkeel_windows.exe burrito_out/controlkeel-windows-x86_64.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: controlkeel-windows
           path: burrito_out/controlkeel-windows-x86_64.exe
@@ -90,8 +95,8 @@ jobs:
     runs-on: windows-latest
     needs: windows-build
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
         with:
           name: controlkeel-windows
           path: burrito_out
