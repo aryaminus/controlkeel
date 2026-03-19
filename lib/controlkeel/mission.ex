@@ -453,7 +453,7 @@ defmodule ControlKeel.Mission do
        %{
          session_id: session_id,
          session_title: session.title,
-         domain_pack: session.domain_pack,
+         domain_pack: get_in(session, [Access.key(:execution_brief), "domain_pack"]),
          risk_tier: session.risk_tier,
          started_at: session.inserted_at,
          tasks: Enum.map(tasks, &task_audit_entry/1),
@@ -482,7 +482,8 @@ defmodule ControlKeel.Mission do
   defp build_compliance_attestations(nil, _findings), do: []
 
   defp build_compliance_attestations(session, findings) do
-    packs = List.wrap(session.domain_pack) ++ ["baseline"]
+    domain_pack = get_in(session, [Access.key(:execution_brief), "domain_pack"])
+    packs = List.wrap(domain_pack) ++ ["baseline"]
 
     Enum.map(packs, fn pack ->
       pack_findings = Enum.filter(findings, &String.starts_with?(&1.rule_id, pack))

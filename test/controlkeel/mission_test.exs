@@ -159,4 +159,95 @@ defmodule ControlKeel.MissionTest do
     assert task.session_id
     assert finding.session_id
   end
+
+  describe "complete_task/1" do
+    test "marks task done when no open or blocked findings exist" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "in_progress"})
+      # ensure finding is resolved so it won't block
+      _resolved = finding_fixture(%{session: session, status: "approved"})
+
+      assert {:ok, done_task} = Mission.complete_task(task)
+      assert done_task.status == "done"
+    end
+
+    test "returns error with findings list when open findings exist" do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      _open = finding_fixture(%{session: session, status: "open"})
+
+      assert {:error, :unresolved_findings, blocked} = Mission.complete_task(task)
+      assert length(blocked) >= 1
+    end
+
+    test "returns error when blocked findings exist" do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      _blocked = finding_fixture(%{session: session, status: "blocked"})
+
+      assert {:error, :unresolved_findings, _} = Mission.complete_task(task)
+    end
+
+    test "accepts integer task_id" do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      _open = finding_fixture(%{session: session, status: "open"})
+      assert {:error, :unresolved_findings, _} =
+               Mission.complete_task(task.id)
+    end
+
+    test "returns :not_found for unknown task_id" do
+      assert {:error, :not_found} = Mission.complete_task(99_999_999)
+    end
+  end
+
+  describe "proof_bundle/1" do
+    test "returns a structured bundle for a valid task" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+      assert bundle.task_id == task.id
+      assert bundle.session_id == session.id
+      assert is_map(bundle.security_findings)
+      assert is_number(bundle.security_findings.total)
+      assert is_boolean(bundle.deploy_ready)
+      assert is_list(bundle.compliance_attestations)
+      assert is_binary(bundle.generated_at)
+      assert is_binary(bundle.rollback_instructions)
+    end
+
+    test "deploy_ready is false when open findings exist" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+      _open = finding_fixture(%{session: session, status: "open"})
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+      assert bundle.deploy_ready == false
+    end
+
+    test "returns :not_found for unknown task_id" do
+      assert {:error, :not_found} = Mission.proof_bundle(99_999_999)
+    end
+  end
+
+  describe "audit_log/1" do
+    test "returns a structured audit log for a valid session" do
+      session = session_fixture()
+      _finding = finding_fixture(%{session: session})
+
+      assert {:ok, log} = Mission.audit_log(session.id)
+      assert log.session_id == session.id
+      assert is_binary(log.session_title)
+      assert is_list(log.events)
+      assert is_list(log.tasks)
+      assert is_map(log.summary)
+      assert Map.has_key?(log.summary, :total_findings)
+      assert Map.has_key?(log.summary, :total_invocations)
+    end
+
+    test "returns :not_found for unknown session_id" do
+      assert {:error, :not_found} = Mission.audit_log(99_999_999)
+    end
+  end
 end

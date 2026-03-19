@@ -46,7 +46,7 @@ jobs:
       - run: brew install xz p7zip
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
-      - run: BURRITO_TARGET=macos MIX_ENV=prod mix release
+      - run: BURRITO_TARGET=macos_silicon MIX_ENV=prod mix release
       - run: chmod +x scripts/release_smoke.sh
       - run: scripts/release_smoke.sh "$(find burrito_out -maxdepth 1 -type f | head -n 1)"
 

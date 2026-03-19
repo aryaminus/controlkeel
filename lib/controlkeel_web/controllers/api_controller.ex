@@ -229,7 +229,7 @@ defmodule ControlKeelWeb.ApiController do
   # ─── Complete Task ─────────────────────────────────────────────────────────────
 
   def complete_task(conn, %{"id" => task_id}) do
-    case Mission.complete_task(task_id) do
+    case Mission.complete_task(String.to_integer(task_id)) do
       {:ok, task} ->
         json(conn, %{task: task_summary(task)})
 

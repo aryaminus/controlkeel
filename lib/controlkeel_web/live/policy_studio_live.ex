@@ -163,6 +163,12 @@ defmodule ControlKeelWeb.PolicyStudioLive do
   defp pack_label("healthcare"), do: "Healthcare — HIPAA / PHI"
   defp pack_label("education"), do: "Education — FERPA / COPPA"
   defp pack_label("finance"), do: "Finance — PCI-DSS / SOX"
+  defp pack_label("hr"), do: "HR — EEOC / Employee PII"
+  defp pack_label("legal"), do: "Legal — Privilege / Retention"
+  defp pack_label("marketing"), do: "Marketing — Consent / CAN-SPAM"
+  defp pack_label("sales"), do: "Sales — CRM / Contact PII"
+  defp pack_label("realestate"), do: "Real Estate — Transaction / PII"
+  defp pack_label("gdpr"), do: "GDPR — EU Data Protection"
   defp pack_label(name), do: String.capitalize(name)
 
   defp pack_description("baseline"),
@@ -182,6 +188,24 @@ defmodule ControlKeelWeb.PolicyStudioLive do
 
   defp pack_description("finance"),
     do: "Active when domain pack is finance. Flags payment card data and SOX-sensitive records."
+
+  defp pack_description("hr"),
+    do: "Active when domain pack is HR. Flags employee PII, candidate data handling, and automated screening risks."
+
+  defp pack_description("legal"),
+    do: "Active when domain pack is legal. Flags attorney-client privilege risks, unencrypted document handling, and retention violations."
+
+  defp pack_description("marketing"),
+    do: "Active when domain pack is marketing. Flags missing consent mechanisms, CAN-SPAM violations, and unsecured contact lists."
+
+  defp pack_description("sales"),
+    do: "Active when domain pack is sales. Flags CRM contact PII, quota audit risks, and data portability gaps."
+
+  defp pack_description("realestate"),
+    do: "Active when domain pack is real estate. Flags client PII, unencrypted transaction docs, and Fair Housing compliance gaps."
+
+  defp pack_description("gdpr"),
+    do: "Active for EU data handling. Flags missing consent, right-to-delete gaps, and cross-border data transfer risks."
 
   defp pack_description(_), do: "Domain-specific policy rules."
 

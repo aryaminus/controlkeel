@@ -34,6 +34,26 @@ defmodule ControlKeel.Mission.Planner do
       compliance: ["Privilege handling", "Retention policy", "eDiscovery readiness"],
       stack: "Phoenix + encrypted document storage + role-aware review workflows"
     },
+    "hr" => %{
+      label: "HR / Recruiting",
+      compliance: ["EEOC", "GDPR / CCPA", "SOC 2"],
+      stack: "Phoenix + Postgres + strict role-based access and candidate PII isolation"
+    },
+    "marketing" => %{
+      label: "Marketing",
+      compliance: ["GDPR", "CAN-SPAM", "CCPA"],
+      stack: "Phoenix + LiveView + consent-first architecture with double opt-in"
+    },
+    "sales" => %{
+      label: "Sales / CRM",
+      compliance: ["GDPR / CCPA", "SOC 2", "Data portability"],
+      stack: "Phoenix + Postgres + CRM isolation with contact deletion support"
+    },
+    "realestate" => %{
+      label: "Real Estate",
+      compliance: ["Fair Housing Act", "RESPA basics", "GDPR / CCPA"],
+      stack: "Phoenix + Postgres + encrypted document storage and transaction audit trail"
+    },
     "iot" => %{
       label: "IoT / Hardware",
       compliance: ["NIST", "Safety standards", "OWASP Top 10"],
@@ -47,14 +67,86 @@ defmodule ControlKeel.Mission.Planner do
   }
 
   @agent_labels %{
-    "claude" => "Claude Code",
-    "cursor" => "Cursor",
-    "codex" => "Codex CLI",
-    "copilot" => "GitHub Copilot",
-    "windsurf" => "Windsurf",
-    "replit" => "Replit",
-    "bolt" => "Bolt / Lovable",
-    "generic" => "Generic Agent"
+    # Existing
+    "claude"     => "Claude Code",
+    "cursor"     => "Cursor",
+    "codex"      => "Codex CLI",
+    "copilot"    => "GitHub Copilot",
+    "windsurf"   => "Windsurf",
+    "replit"     => "Replit",
+    "bolt"       => "Bolt / Lovable",
+    "generic"    => "Generic Agent",
+    # Local IDEs
+    "claude-code"     => "Claude Code",
+    "kiro"            => "Kiro (Amazon)",
+    "augment"         => "Augment Code",
+    "amp"             => "Amp (Sourcegraph)",
+    # Local CLIs
+    "aider"           => "Aider",
+    "opencode"        => "OpenCode",
+    "codex-cli"       => "Codex CLI",
+    "gemini-cli"      => "Gemini CLI",
+    "antigravity"     => "Antigravity",
+    "continue"        => "Continue",
+    "ollama"          => "Ollama (local)",
+    # Cloud platforms
+    "lovable"         => "Lovable",
+    "v0"              => "v0 (Vercel)",
+    "factory"         => "Factory",
+    "devin"           => "Devin (Cognition)",
+    "ai-studio"       => "Google AI Studio",
+    "generic-cli"     => "Generic CLI",
+    # Review & spec tools
+    "coderabbit"      => "CodeRabbit",
+    "qodo"            => "Qodo",
+    "specpilot"       => "SpecPilot",
+    "chatprd"         => "ChatPRD",
+    "specced"         => "Specced",
+    # LLM providers
+    "openai"          => "OpenAI",
+    "anthropic"       => "Anthropic",
+    "gemini"          => "Google Gemini",
+    "deepseek"        => "DeepSeek",
+    "mistral"         => "Mistral AI",
+    "openrouter"      => "OpenRouter",
+    "glm"             => "Zhipu GLM",
+    "kimi"            => "Kimi (Moonshot)",
+    "qwen"            => "Qwen (Alibaba)",
+    # Frameworks
+    "crewai"          => "CrewAI",
+    "langchain"       => "LangChain",
+    "deepagents"      => "DeepAgents",
+    "nemo-guardrails" => "NeMo Guardrails",
+    "langgraph"       => "LangGraph",
+    "autogen"         => "Microsoft AutoGen",
+    "semantic-kernel" => "Semantic Kernel",
+    "dspy"            => "DSPy",
+    "haystack"        => "Haystack (deepset)",
+    "dify"            => "Dify",
+    "flowise"         => "Flowise",
+    "n8n"             => "n8n",
+    "prefect"         => "Prefect",
+    "mastra"          => "Mastra",
+    # Cloud LLM providers (enterprise auth)
+    "bedrock"         => "AWS Bedrock",
+    "vertex-ai"       => "Google Vertex AI",
+    "azure-openai"    => "Azure OpenAI",
+    "cohere"          => "Cohere",
+    "groq"            => "Groq Cloud",
+    "together"        => "Together AI",
+    "huggingface"     => "Hugging Face Inference",
+    "replicate"       => "Replicate",
+    # Managed agent platforms
+    "bedrock-agents"  => "AWS Bedrock Agents",
+    "azure-ai-agent"  => "Azure AI Agent Service",
+    "vertex-ai-agent" => "Vertex AI Agent Builder",
+    # Workflow automation
+    "zapier"          => "Zapier",
+    "make"            => "Make (Integromat)",
+    # Observability & prompt ops
+    "agentops"        => "AgentOps",
+    "vellum"          => "Vellum",
+    "promptflow"      => "Azure Prompt Flow"
   }
 
   def build(attrs) do

@@ -42,7 +42,19 @@ defmodule ControlKeel.CLI do
       ["init" | rest] ->
         parse_with_switches(:init, rest, @init_switches)
 
-      ["attach", agent] when agent in ["claude-code", "cursor", "windsurf"] ->
+      ["attach", agent]
+      when agent in [
+             "claude-code",
+             "cursor",
+             "windsurf",
+             "kiro",
+             "amp",
+             "opencode",
+             "gemini-cli",
+             "codex-cli",
+             "continue",
+             "aider"
+           ] ->
         {:ok, %{command: :attach, options: %{}, args: [agent]}}
 
       ["status"] ->
@@ -110,9 +122,10 @@ defmodule ControlKeel.CLI do
       controlkeel                     Start the web app
       controlkeel serve               Start the web app
       controlkeel init [options]      Initialize ControlKeel in the current project
-      controlkeel attach claude-code  Register ControlKeel as a local Claude Code MCP server
-      controlkeel attach cursor       Register ControlKeel as a local Cursor MCP server
-      controlkeel attach windsurf     Register ControlKeel as a local Windsurf MCP server
+      controlkeel attach <agent>      Register ControlKeel MCP server with your coding tool
+                                      Supported: claude-code, cursor, windsurf, kiro,
+                                                 amp, opencode, gemini-cli, codex-cli,
+                                                 continue, aider
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
@@ -241,6 +254,108 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to attach ControlKeel to Windsurf: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :attach, args: [agent]}, project_root)
+      when agent in ["kiro", "amp", "opencode", "gemini-cli", "codex-cli"] do
+    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+    config_path_fn = %{
+      "kiro"      => &kiro_mcp_config_path/0,
+      "amp"       => &amp_mcp_config_path/0,
+      "opencode"  => &opencode_mcp_config_path/0,
+      "gemini-cli"=> &gemini_cli_config_path/0,
+      "codex-cli" => &codex_cli_config_path/0
+    }
+    display_name = %{
+      "kiro"      => "Kiro",
+      "amp"       => "Amp",
+      "opencode"  => "OpenCode",
+      "gemini-cli"=> "Gemini CLI",
+      "codex-cli" => "Codex CLI"
+    }
+
+    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
+         {:ok, binding} <- ProjectBinding.read(project_root),
+         config_path <- config_path_fn[agent].(),
+         {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", wrapper_path, agent),
+         updated <- ProjectBinding.update_attached_agent(binding, agent, attached),
+         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+      {:ok,
+       [
+         "Attached ControlKeel to #{display_name[agent]}.",
+         "MCP server written to #{attached["config_path"]}.",
+         "Restart #{display_name[agent]} to activate."
+       ]}
+    else
+      {:error, :wrapper_missing} ->
+        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before attaching ControlKeel to #{display_name[agent]}."}
+
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
+      {:error, reason} ->
+        {:error, "Failed to attach ControlKeel to #{display_name[agent]}: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :attach, args: ["continue"]}, project_root) do
+    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+
+    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
+         {:ok, binding} <- ProjectBinding.read(project_root),
+         {:ok, attached} <- write_continue_mcp_config(continue_config_path(), "controlkeel", wrapper_path),
+         updated <- ProjectBinding.update_attached_agent(binding, "continue", attached),
+         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+      {:ok,
+       [
+         "Attached ControlKeel to Continue.",
+         "MCP server written to #{attached["config_path"]}.",
+         "Restart Continue to activate."
+       ]}
+    else
+      {:error, :wrapper_missing} ->
+        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before attaching ControlKeel to Continue."}
+
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
+      {:error, reason} ->
+        {:error, "Failed to attach ControlKeel to Continue: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :attach, args: ["aider"]}, project_root) do
+    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+
+    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
+         {:ok, binding} <- ProjectBinding.read(project_root),
+         {:ok, attached} <- attach_to_aider(wrapper_path, project_root),
+         updated <- ProjectBinding.update_attached_agent(binding, "aider", attached),
+         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+      {:ok,
+       [
+         "Attached ControlKeel to Aider.",
+         "MCP config written to #{attached["config_path"]}."
+       ]}
+    else
+      {:error, :wrapper_missing} ->
+        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before attaching ControlKeel to Aider."}
+
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
+      {:error, reason} ->
+        {:error, "Failed to attach ControlKeel to Aider: #{inspect(reason)}"}
     end
   end
 
@@ -518,6 +633,116 @@ defmodule ControlKeel.CLI do
          "config_path" => config_path,
          "command" => command_path,
          "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+       }}
+    end
+  end
+
+  # ── Additional IDE MCP config paths ──────────────────────────────────────────
+
+  defp kiro_mcp_config_path do
+    home = System.user_home!()
+
+    case :os.type() do
+      {:win32, _} ->
+        Path.join([System.get_env("APPDATA") || home, ".kiro", "settings", "mcp.json"])
+
+      _ ->
+        Path.join([home, ".kiro", "settings", "mcp.json"])
+    end
+  end
+
+  defp amp_mcp_config_path do
+    Path.join([System.user_home!(), ".config", "amp", "mcp.json"])
+  end
+
+  defp opencode_mcp_config_path do
+    Path.join([System.user_home!(), ".config", "opencode", "config.json"])
+  end
+
+  defp gemini_cli_config_path do
+    Path.join([System.user_home!(), ".gemini", "settings.json"])
+  end
+
+  defp codex_cli_config_path do
+    home = System.user_home!()
+
+    case :os.type() do
+      {:win32, _} ->
+        Path.join([System.get_env("APPDATA") || home, ".codex", "config.json"])
+
+      _ ->
+        Path.join([home, ".codex", "config.json"])
+    end
+  end
+
+  defp continue_config_path do
+    home = System.user_home!()
+
+    case :os.type() do
+      {:win32, _} ->
+        Path.join([System.get_env("APPDATA") || home, "Roaming", "Continue", "config.json"])
+
+      _ ->
+        Path.join([home, ".continue", "config.json"])
+    end
+  end
+
+  # Continue uses an array-based mcpServers format, unlike Cursor/Windsurf dict format
+  defp write_continue_mcp_config(config_path, server_name, command_path) do
+    existing =
+      case File.read(config_path) do
+        {:ok, c} -> Jason.decode(c) |> elem(1)
+        _ -> %{}
+      end || %{}
+
+    servers = Map.get(existing, "mcpServers", [])
+    filtered = Enum.reject(servers, &(Map.get(&1, "name") == server_name))
+    new_entry = %{"name" => server_name, "command" => command_path, "args" => []}
+    updated = Map.put(existing, "mcpServers", filtered ++ [new_entry])
+
+    with :ok <- File.mkdir_p(Path.dirname(config_path)),
+         :ok <- File.write(config_path, Jason.encode!(updated, pretty: true) <> "\n") do
+      {:ok,
+       %{
+         "server_name" => server_name,
+         "ide" => "continue",
+         "config_path" => config_path,
+         "command" => command_path,
+         "attached_at" =>
+           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+       }}
+    end
+  end
+
+  # Aider uses a YAML config file (.aider.conf.yml) at the project root
+  defp attach_to_aider(wrapper_path, project_root) do
+    config_path = Path.join(project_root, ".aider.conf.yml")
+
+    existing =
+      case File.read(config_path) do
+        {:ok, c} -> c
+        _ -> ""
+      end
+
+    # Remove any prior controlkeel block, then append the new one
+    cleaned =
+      Regex.replace(
+        ~r/\nmcpservers:(\n  controlkeel:[^\n]*(\n    [^\n]+)*)+/,
+        existing,
+        ""
+      )
+
+    entry = "\nmcpservers:\n  controlkeel:\n    command: #{wrapper_path}\n"
+
+    with :ok <- File.write(config_path, String.trim_trailing(cleaned) <> entry) do
+      {:ok,
+       %{
+         "server_name" => "controlkeel",
+         "ide" => "aider",
+         "config_path" => config_path,
+         "command" => wrapper_path,
+         "attached_at" =>
+           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
     end
   end

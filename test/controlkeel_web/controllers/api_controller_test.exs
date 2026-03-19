@@ -212,6 +212,130 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  # ─── Update Task ─────────────────────────────────────────────────────────────
+
+  describe "PATCH /api/v1/tasks/:id" do
+    test "updates task status", %{conn: conn} do
+      task = task_fixture()
+
+      conn = patch(conn, ~p"/api/v1/tasks/#{task.id}", %{status: "in_progress"})
+      assert %{"task" => result} = json_response(conn, 200)
+      assert result["status"] == "in_progress"
+    end
+
+    test "returns 404 for unknown task", %{conn: conn} do
+      conn = patch(conn, ~p"/api/v1/tasks/99999999", %{status: "done"})
+      assert %{"error" => "task not found"} = json_response(conn, 404)
+    end
+  end
+
+  # ─── Complete Task ────────────────────────────────────────────────────────────
+
+  describe "POST /api/v1/tasks/:id/complete" do
+    test "marks task done when no open findings exist", %{conn: conn} do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "in_progress"})
+      _resolved = finding_fixture(%{session: session, status: "approved"})
+
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/complete")
+      assert %{"task" => result} = json_response(conn, 200)
+      assert result["status"] == "done"
+    end
+
+    test "returns 422 when open findings block completion", %{conn: conn} do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      _open = finding_fixture(%{session: session, status: "open"})
+
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/complete")
+      assert %{"error" => msg} = json_response(conn, 422)
+      assert is_binary(msg)
+    end
+
+    test "returns 404 for unknown task", %{conn: conn} do
+      conn = post(conn, ~p"/api/v1/tasks/99999999/complete")
+      assert %{"error" => "task not found"} = json_response(conn, 404)
+    end
+  end
+
+  # ─── Proof Bundle ─────────────────────────────────────────────────────────────
+
+  describe "GET /api/v1/proof/:task_id" do
+    test "returns proof bundle for a task", %{conn: conn} do
+      task = task_fixture(%{status: "done"})
+
+      conn = get(conn, ~p"/api/v1/proof/#{task.id}")
+      body = json_response(conn, 200)
+      proof = body["proof"]
+      assert proof["task_id"] == task.id
+      assert Map.has_key?(proof, "deploy_ready")
+      assert Map.has_key?(proof, "security_findings")
+      assert Map.has_key?(proof, "compliance_attestations")
+    end
+
+    test "returns 404 for unknown task", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/proof/99999999")
+      assert %{"error" => "task not found"} = json_response(conn, 404)
+    end
+  end
+
+  # ─── Audit Log ────────────────────────────────────────────────────────────────
+
+  describe "GET /api/v1/sessions/:id/audit-log" do
+    test "returns JSON audit log", %{conn: conn} do
+      session = session_fixture()
+      _finding = finding_fixture(%{session: session})
+
+      conn = get(conn, ~p"/api/v1/sessions/#{session.id}/audit-log")
+      body = json_response(conn, 200)
+      log = body["audit_log"]
+      assert log["session_id"] == session.id or log["session_id"] == Integer.to_string(session.id)
+      assert Map.has_key?(log, "events")
+      assert Map.has_key?(log, "summary")
+    end
+
+    test "returns CSV audit log when format=csv", %{conn: conn} do
+      session = session_fixture()
+
+      conn = get(conn, ~p"/api/v1/sessions/#{session.id}/audit-log?format=csv")
+      assert get_resp_header(conn, "content-type") |> hd() =~ "text/csv"
+      csv = response(conn, 200)
+      assert String.starts_with?(csv, "session_id,")
+    end
+
+    test "returns 404 for unknown session", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/sessions/99999999/audit-log")
+      assert %{"error" => "session not found"} = json_response(conn, 404)
+    end
+  end
+
+  # ─── Route Agent ─────────────────────────────────────────────────────────────
+
+  describe "POST /api/v1/route-agent" do
+    test "returns agent recommendation for a task", %{conn: conn} do
+      conn = post(conn, ~p"/api/v1/route-agent", %{task: "Build a REST API endpoint"})
+      body = json_response(conn, 200)
+      rec = body["recommendation"]
+      assert Map.has_key?(rec, "agent")
+      assert Map.has_key?(rec, "agent_name")
+      assert Map.has_key?(rec, "rationale")
+      assert is_list(rec["rationale"])
+    end
+
+    test "returns error when no agent satisfies constraints", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/v1/route-agent", %{
+          task: "PHI data update",
+          risk_tier: "critical",
+          allowed_agents: ["bolt"]
+        })
+
+      body = json_response(conn, 422)
+      assert body["error"] == "no_suitable_agent"
+      assert is_binary(body["message"])
+    end
+  end
+
   # ─── Budget ──────────────────────────────────────────────────────────────────
 
   describe "GET /api/v1/budget" do

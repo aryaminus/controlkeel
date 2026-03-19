@@ -80,6 +80,12 @@ Rules are organised into packs, loaded from `priv/policy_packs/`:
 | **Healthcare** | `industry: health` | HIPAA data logging, unencrypted PHI fields |
 | **Finance** | `industry: fintech` | PCI DSS, plaintext card numbers |
 | **Education** | `industry: edu` | FERPA, student data exposure |
+| **GDPR** | `domain_pack: gdpr` | PII logging, unencrypted PII fields, third-party data sharing without DPA |
+| **HR** | `domain_pack: hr` | Employment PII, discriminatory hiring criteria, salary data logging |
+| **Legal** | `domain_pack: legal` | Privileged content logging, e-discovery deletion, case data to third parties |
+| **Marketing** | `domain_pack: marketing` | Email without unsubscribe, cookie tracking without consent, PII in analytics |
+| **Sales** | `domain_pack: sales` | CRM PII unencrypted, revenue data logging, unsolicited email blast |
+| **Real Estate** | `domain_pack: realestate` | Fair Housing criteria filters, SSN unencrypted, tenant data retention |
 
 View all active packs and rules at [/policies](http://localhost:4000/policies).
 
@@ -105,6 +111,8 @@ View all active packs and rules at [/policies](http://localhost:4000/policies).
 controlkeel                             # start governance server
 controlkeel init [options]              # initialise project
 controlkeel attach claude-code          # register MCP server with Claude Code
+controlkeel attach cursor               # register MCP server with Cursor
+controlkeel attach windsurf             # register MCP server with Windsurf
 controlkeel status                      # current session status
 controlkeel findings [--severity high]  # list findings
 controlkeel approve <finding-id>        # approve a finding
@@ -117,6 +125,8 @@ controlkeel mcp [--project-root /path]  # run MCP server (stdio)
 ```bash
 mix ck.init [options]
 mix ck.attach claude-code
+mix ck.attach cursor
+mix ck.attach windsurf
 mix ck.status
 mix ck.findings [--severity high] [--status open]
 mix ck.approve 12
@@ -142,7 +152,7 @@ mix ck.demo [--host http://localhost:4000]
 
 ## MCP Integration
 
-ControlKeel exposes four MCP tools over stdio (JSON-RPC 2.0).
+ControlKeel exposes five MCP tools over stdio (JSON-RPC 2.0).
 
 ### `ck_validate` — scan before executing
 
@@ -193,6 +203,18 @@ Returns: `{ "finding_id": 42, "status": "blocked", "requires_human": true }`
 }
 ```
 
+### `ck_route` — select the best agent for a task
+
+```json
+{
+  "task": "Build a patient intake form",
+  "risk_tier": "critical",
+  "budget_remaining_cents": 500
+}
+```
+
+Returns: `{ "agent": "claude-code", "agent_name": "Claude Code", "task_type": "ui", "rationale": [...], "warnings": [...] }`
+
 **Connecting manually:**
 
 ```bash
@@ -218,14 +240,19 @@ Add to `~/.claude/claude_desktop_config.json`:
 All endpoints return JSON. No authentication in local mode.
 
 ```
-GET  /api/v1/sessions                        list sessions
-POST /api/v1/sessions                        create session
-GET  /api/v1/sessions/:id                    session detail (includes tasks + findings)
-POST /api/v1/sessions/:session_id/tasks      create task
-POST /api/v1/validate                        validate content (same as ck_validate)
-GET  /api/v1/findings                        list findings (filters: session_id, severity, status)
-POST /api/v1/findings/:id/action             approve | reject | escalate
-GET  /api/v1/budget                          global or per-session budget summary
+GET    /api/v1/sessions                        list sessions
+POST   /api/v1/sessions                        create session
+GET    /api/v1/sessions/:id                    session detail (includes tasks + findings)
+GET    /api/v1/sessions/:id/audit-log          audit log JSON or CSV (?format=csv)
+POST   /api/v1/sessions/:session_id/tasks      create task
+PATCH  /api/v1/tasks/:id                       update task (status, title, validation_gate)
+POST   /api/v1/tasks/:id/complete              mark task done (blocked if open findings exist)
+GET    /api/v1/proof/:task_id                  proof bundle: findings, risk score, compliance attestations
+POST   /api/v1/validate                        validate content (same as ck_validate)
+GET    /api/v1/findings                        list findings (filters: session_id, severity, status)
+POST   /api/v1/findings/:id/action             approve | reject | escalate
+GET    /api/v1/budget                          global or per-session budget summary
+POST   /api/v1/route-agent                     select best agent for a task (same as ck_route)
 ```
 
 Example — validate content:
@@ -292,7 +319,7 @@ Run the built-in demo to see the full detection loop without any setup:
 mix ck.demo
 ```
 
-This creates a healthcare session, submits Python code containing a hardcoded AWS key + SQL injection, and prints all findings with URLs to review them.
+Runs 10 real-world vibe coding failure scenarios through the scanner: hardcoded secrets, SQL injection, client-side auth bypass, unencrypted PHI, `eval()` with user input, open redirect, Supabase public bucket, PII to Segment, `DEBUG=True` in production, and `pickle.loads` deserialization RCE. Prints catch rate, blocked count, and dashboard URLs.
 
 ---
 
@@ -301,7 +328,7 @@ This creates a healthcare session, submits Python code containing a hardcoded AW
 ```bash
 mix setup         # install deps, create + migrate DB
 mix phx.server    # start with live reload
-mix test          # 114 tests, 0 failures
+mix test          # 159 tests, 0 failures
 mix precommit     # compile (warnings-as-errors) + format + test
 ```
 

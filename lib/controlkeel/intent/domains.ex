@@ -43,6 +43,41 @@ defmodule ControlKeel.Intent.Domains do
       domain_pack: "finance",
       industry: "finance",
       description: "Payments, accounting, reconciliation, financial operations"
+    },
+    %{
+      id: "hr",
+      label: "HR / Recruiting",
+      domain_pack: "hr",
+      industry: "hr",
+      description: "Candidate screening, employee records, onboarding, performance workflows"
+    },
+    %{
+      id: "legal",
+      label: "Legal / Compliance",
+      domain_pack: "legal",
+      industry: "legal",
+      description: "Matter management, document review, contracts, eDiscovery workflows"
+    },
+    %{
+      id: "marketing",
+      label: "Marketing / Content",
+      domain_pack: "marketing",
+      industry: "marketing",
+      description: "Campaigns, email lists, consent flows, analytics, content operations"
+    },
+    %{
+      id: "sales",
+      label: "Sales / CRM",
+      domain_pack: "sales",
+      industry: "sales",
+      description: "Pipeline tracking, contact management, quota reporting, deal workflows"
+    },
+    %{
+      id: "realestate",
+      label: "Real Estate",
+      domain_pack: "realestate",
+      industry: "realestate",
+      description: "Listings, transactions, client intake, disclosure and compliance workflows"
     }
   ]
 
@@ -198,15 +233,277 @@ defmodule ControlKeel.Intent.Domains do
             "No card data in logs, EU data residency, CFO approval before prod, full audit trail..."
         }
       ]
+    },
+    "hr" => %{
+      industry: "hr",
+      compliance: ["EEOC", "GDPR / CCPA (employee PII)", "SOC 2"],
+      stack_guidance:
+        "Minimize employee PII storage, enforce role-based access, and treat all candidate data as privacy-scoped. Separate screening logic from final hiring decisions.",
+      validation_language:
+        "Assume all candidate and employee records contain PII. Require audit trails for screening, promotion, and termination workflows. Flag any automated decision-making on candidate data.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who uses this in the hiring or HR flow?",
+          prompt:
+            "Which HR team members, hiring managers, or candidates interact with the first version, and at what stage of the workflow?",
+          placeholder: "Recruiters screening candidates, hiring managers reviewing, employees updating profiles..."
+        },
+        %{
+          id: "data_involved",
+          label: "What employee or candidate data is involved?",
+          prompt:
+            "What personal, performance, or employment records are touched in the first release?",
+          placeholder: "Candidate CVs, interview notes, salary bands, performance reviews, employment contracts..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 HR or recruiting operations the first version must support.",
+          placeholder: "Job posting, application intake, interview scheduling, offer letter, onboarding checklist..."
+        },
+        %{
+          id: "constraints",
+          label: "What compliance or access limits apply?",
+          prompt:
+            "What constraints matter most around candidate data privacy, bias prevention, approval chains, or retention policy?",
+          placeholder: "GDPR right-to-erasure, no automated rejection, manager approval before offer, 2-year retention..."
+        }
+      ]
+    },
+    "legal" => %{
+      industry: "legal",
+      compliance: ["Attorney-client privilege", "Data retention policy", "eDiscovery readiness"],
+      stack_guidance:
+        "Encrypt all documents at rest and in transit. Implement matter-scoped access controls — no cross-matter data leakage. Never log document content; log access metadata only.",
+      validation_language:
+        "Treat all matter records and communications as potentially privileged. Require approval gates before any external integrations or document exports. Assume everything is discoverable.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who in the firm or legal team uses this?",
+          prompt:
+            "Which attorneys, paralegals, clients, or staff interact with the first version, and for which matter type?",
+          placeholder: "Associates drafting contracts, partners reviewing, clients submitting documents..."
+        },
+        %{
+          id: "data_involved",
+          label: "What legal records or documents are involved?",
+          prompt:
+            "What matter files, communications, contracts, or discovery records are in scope for the first release?",
+          placeholder: "Contract drafts, client correspondence, discovery documents, court filings, billing records..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 legal workflow steps the first version must handle safely.",
+          placeholder: "Matter intake, document upload, review workflow, client portal, billing time entry..."
+        },
+        %{
+          id: "constraints",
+          label: "What privilege or retention limits apply?",
+          prompt:
+            "What matters most around privilege protection, retention schedules, access controls, or external sharing?",
+          placeholder: "No external cloud for privileged docs, 7-year retention, client sign-off before export..."
+        }
+      ]
+    },
+    "marketing" => %{
+      industry: "marketing",
+      compliance: ["GDPR", "CAN-SPAM", "CCPA", "Brand safety basics"],
+      stack_guidance:
+        "Prefer explicit consent flows, double opt-in lists, and unsubscribe-first architecture. Isolate contact records from analytics pipelines and never cross-reference PII without documented consent.",
+      validation_language:
+        "Treat all contact records as consent-scoped. Require proof of opt-in before any send. Flag analytics that cross-reference PII without a documented legal basis.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who manages or receives this marketing?",
+          prompt:
+            "Which marketers, content editors, or recipients interact with the first version?",
+          placeholder: "Email marketers, social media managers, campaign analysts, newsletter subscribers..."
+        },
+        %{
+          id: "data_involved",
+          label: "What contact or audience data is involved?",
+          prompt:
+            "What subscriber, campaign, or analytics data is in scope for the first release?",
+          placeholder: "Email lists, open/click analytics, customer segments, ad targeting data, social handles..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 marketing operations the first version must support.",
+          placeholder: "Campaign builder, send scheduling, audience segmentation, unsubscribe handling, analytics..."
+        },
+        %{
+          id: "constraints",
+          label: "What consent or brand limits apply?",
+          prompt:
+            "What matters most around data consent, unsubscribe compliance, brand review, or channel restrictions?",
+          placeholder: "Double opt-in required, GDPR consent proof, brand review before send, no purchased lists..."
+        }
+      ]
+    },
+    "sales" => %{
+      industry: "sales",
+      compliance: ["GDPR / CCPA (CRM data)", "SOC 2", "Data portability"],
+      stack_guidance:
+        "Treat CRM records as portable and deletable from day one. Never hard-code quota logic — it belongs in config. Isolate pipeline data from billing data and keep contact sync reversible.",
+      validation_language:
+        "Assume every CRM record contains personal contact data subject to deletion requests. Require data portability from day one. Flag quota calculations that are audit-sensitive or bias-adjacent.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who manages the sales pipeline?",
+          prompt:
+            "Which sales reps, managers, or ops staff use the first version, and at which stage of the sales cycle?",
+          placeholder: "Account executives logging deals, SDRs managing leads, sales ops pulling reports..."
+        },
+        %{
+          id: "data_involved",
+          label: "What CRM or deal data is involved?",
+          prompt:
+            "What contact records, pipeline stages, activity logs, or revenue data are in scope?",
+          placeholder: "Lead profiles, deal stages, call notes, quota attainment, contract values, email history..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 sales operations the first version must support.",
+          placeholder: "Lead import, pipeline view, activity logging, quota dashboard, deal handoff..."
+        },
+        %{
+          id: "constraints",
+          label: "What data privacy or access limits apply?",
+          prompt:
+            "What matters most around contact deletion, data export, quota audit, or CRM integration security?",
+          placeholder: "GDPR delete-on-request, no PII in analytics exports, manager-only quota view, SSO required..."
+        }
+      ]
+    },
+    "realestate" => %{
+      industry: "realestate",
+      compliance: ["Fair Housing Act basics", "RESPA basics", "GDPR / CCPA (client PII)"],
+      stack_guidance:
+        "Handle property and client data with PII-first mindset. Avoid storing SSN, financial disclosures, or sensitive inspection data in unencrypted logs. Keep listing data separate from transaction records.",
+      validation_language:
+        "Treat all client property transactions as PII-adjacent. Require consent before sharing listing data with third-party portals. Flag any automated screening that could violate Fair Housing rules.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who uses this in the property transaction flow?",
+          prompt:
+            "Which agents, clients, admins, or lenders interact with the first version, and at which stage?",
+          placeholder: "Buyer's agents managing listings, clients submitting offers, transaction coordinators..."
+        },
+        %{
+          id: "data_involved",
+          label: "What property or client records are involved?",
+          prompt:
+            "What listing data, client profiles, transaction documents, or financial disclosures are in scope?",
+          placeholder: "MLS listings, buyer/seller profiles, purchase agreements, inspection reports, title docs..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 real estate workflow steps the first version must support.",
+          placeholder: "Listing intake, offer submission, document upload, transaction timeline, client portal..."
+        },
+        %{
+          id: "constraints",
+          label: "What compliance or access limits apply?",
+          prompt:
+            "What matters most around Fair Housing compliance, document encryption, MLS data rules, or client consent?",
+          placeholder: "No discriminatory screening, encrypted docs, MLS data not publicly shared, GDPR consent..."
+        }
+      ]
     }
   }
 
   @agent_options [
+    # Local IDEs (MCP attach supported)
     {"claude", "Claude Code"},
-    {"codex", "Codex CLI"},
     {"cursor", "Cursor"},
-    {"bolt", "Bolt / Lovable"},
+    {"windsurf", "Windsurf"},
+    {"kiro", "Kiro (Amazon)"},
+    {"augment", "Augment Code"},
+    {"amp", "Amp (Sourcegraph)"},
+    # Local CLIs (MCP attach supported)
+    {"aider", "Aider"},
+    {"opencode", "OpenCode"},
+    {"codex-cli", "Codex CLI"},
+    {"gemini-cli", "Gemini CLI"},
+    {"antigravity", "Antigravity"},
+    {"continue", "Continue"},
+    {"ollama", "Ollama (local)"},
+    # Cloud scaffolders / platforms
+    {"bolt", "Bolt"},
+    {"lovable", "Lovable"},
     {"replit", "Replit"},
+    {"v0", "v0 (Vercel)"},
+    {"factory", "Factory"},
+    {"devin", "Devin"},
+    {"ai-studio", "Google AI Studio"},
+    {"codex", "OpenAI Codex"},
+    # LLM providers
+    {"openai", "OpenAI"},
+    {"anthropic", "Anthropic"},
+    {"gemini", "Google Gemini"},
+    {"deepseek", "DeepSeek"},
+    {"mistral", "Mistral AI"},
+    {"openrouter", "OpenRouter"},
+    {"glm", "Zhipu GLM"},
+    {"kimi", "Kimi (Moonshot)"},
+    {"qwen", "Qwen (Alibaba)"},
+    # Cloud managed LLM (enterprise IAM auth)
+    {"bedrock", "AWS Bedrock"},
+    {"vertex-ai", "Google Vertex AI"},
+    {"azure-openai", "Azure OpenAI"},
+    {"cohere", "Cohere"},
+    # Fast / cheap inference APIs
+    {"groq", "Groq Cloud"},
+    {"together", "Together AI"},
+    {"huggingface", "Hugging Face Inference"},
+    {"replicate", "Replicate"},
+    # Code review & spec tools
+    {"copilot", "GitHub Copilot"},
+    {"coderabbit", "CodeRabbit"},
+    {"qodo", "Qodo"},
+    {"specpilot", "SpecPilot"},
+    {"chatprd", "ChatPRD"},
+    {"specced", "Specced"},
+    # Orchestration frameworks
+    {"crewai", "CrewAI"},
+    {"langchain", "LangChain"},
+    {"deepagents", "DeepAgents"},
+    {"nemo-guardrails", "NeMo Guardrails"},
+    {"langgraph", "LangGraph"},
+    {"autogen", "Microsoft AutoGen"},
+    {"semantic-kernel", "Semantic Kernel"},
+    {"dspy", "DSPy"},
+    {"haystack", "Haystack"},
+    {"dify", "Dify"},
+    {"flowise", "Flowise"},
+    {"n8n", "n8n"},
+    {"prefect", "Prefect"},
+    {"mastra", "Mastra"},
+    # Managed agent platforms
+    {"bedrock-agents", "AWS Bedrock Agents"},
+    {"azure-ai-agent", "Azure AI Agent Service"},
+    {"vertex-ai-agent", "Vertex AI Agent Builder"},
+    # Workflow automation
+    {"zapier", "Zapier"},
+    {"make", "Make (Integromat)"},
+    # Observability & prompt ops
+    {"agentops", "AgentOps"},
+    {"vellum", "Vellum"},
+    {"promptflow", "Azure Prompt Flow"},
     {"generic", "Other / custom agent"}
   ]
 
@@ -275,6 +572,56 @@ defmodule ControlKeel.Intent.Domains do
       String.contains?(content, ["card", "pci", "payment", "transaction", "bank"]) -> "critical"
       String.contains?(content, ["invoice", "reconciliation", "ledger", "salary"]) -> "high"
       true -> "high"
+    end
+  end
+
+  def preliminary_risk_tier("hr", content) do
+    cond do
+      String.contains?(content, ["salary", "termination", "performance", "discrimination"]) ->
+        "high"
+
+      String.contains?(content, ["candidate", "application", "resume", "hiring"]) ->
+        "high"
+
+      true ->
+        "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("legal", content) do
+    cond do
+      String.contains?(content, ["privilege", "discovery", "litigation", "confidential"]) ->
+        "critical"
+
+      String.contains?(content, ["contract", "matter", "client", "document"]) ->
+        "high"
+
+      true ->
+        "high"
+    end
+  end
+
+  def preliminary_risk_tier("marketing", content) do
+    cond do
+      String.contains?(content, ["pii", "gdpr", "consent", "personal data"]) -> "high"
+      String.contains?(content, ["email list", "contact", "subscriber"]) -> "moderate"
+      true -> "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("sales", content) do
+    cond do
+      String.contains?(content, ["revenue", "quota", "commission", "salary"]) -> "high"
+      String.contains?(content, ["crm", "contact", "lead", "pipeline"]) -> "moderate"
+      true -> "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("realestate", content) do
+    cond do
+      String.contains?(content, ["ssn", "financial disclosure", "tax", "mortgage"]) -> "high"
+      String.contains?(content, ["client", "transaction", "offer", "listing"]) -> "moderate"
+      true -> "moderate"
     end
   end
 
