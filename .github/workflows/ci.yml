@@ -14,7 +14,7 @@ env:
 
 jobs:
   test:
-    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}
+    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}"
     runs-on: ubuntu-latest
     env:
       MIX_ENV: test
