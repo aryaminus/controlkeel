@@ -4,6 +4,7 @@ defmodule ControlKeel.Mission.Session do
 
   alias ControlKeel.Memory.Record
   alias ControlKeel.Mission.{Finding, Invocation, ProofBundle, Task, TaskCheckpoint, Workspace}
+  alias ControlKeel.Platform.{AuditExport, TaskEdge, TaskRun}
 
   schema "sessions" do
     field :title, :string
@@ -23,6 +24,9 @@ defmodule ControlKeel.Mission.Session do
     has_many :proof_bundles, ProofBundle
     has_many :task_checkpoints, TaskCheckpoint
     has_many :memory_records, Record
+    has_many :task_edges, TaskEdge
+    has_many :task_runs, TaskRun
+    has_many :audit_exports, AuditExport
 
     timestamps(type: :utc_datetime)
   end

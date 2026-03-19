@@ -1,0 +1,31 @@
+{
+  "name": "@aryaminus/controlkeel",
+  "version": "0.1.0",
+  "description": "Bootstrap installer for the ControlKeel native CLI.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aryaminus/controlkeel.git"
+  },
+  "homepage": "https://github.com/aryaminus/controlkeel#readme",
+  "bugs": {
+    "url": "https://github.com/aryaminus/controlkeel/issues"
+  },
+  "bin": {
+    "controlkeel": "bin/controlkeel.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node lib/postinstall.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -5,17 +5,23 @@ on:
     branches: ["main", "codex/**"]
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   test:
     runs-on: ubuntu-latest
     env:
       MIX_ENV: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1.20.3
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.3.4"
+          otp-version: "27.3.4.3"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: Cache deps
         uses: actions/cache@v4
         with:
@@ -25,3 +31,8 @@ jobs:
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
       - run: mix test
+      - run: sh -n scripts/install.sh
+      - run: python3 -m py_compile scripts/bump_version.py scripts/render_release_notes.py
+      - run: node --check packages/npm/controlkeel/bin/controlkeel.js
+      - run: node --check packages/npm/controlkeel/lib/install.js
+      - run: node --check packages/npm/controlkeel/lib/postinstall.js

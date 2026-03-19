@@ -4,6 +4,7 @@ defmodule ControlKeel.Mission.Workspace do
 
   alias ControlKeel.Memory.Record
   alias ControlKeel.Mission.Session
+  alias ControlKeel.Platform.{IntegrationWebhook, ServiceAccount, WorkspacePolicySet}
 
   schema "workspaces" do
     field :name, :string
@@ -16,6 +17,9 @@ defmodule ControlKeel.Mission.Workspace do
 
     has_many :sessions, Session
     has_many :memory_records, Record
+    has_many :service_accounts, ServiceAccount
+    has_many :integration_webhooks, IntegrationWebhook
+    has_many :workspace_policy_sets, WorkspacePolicySet
 
     timestamps(type: :utc_datetime)
   end

@@ -10,6 +10,10 @@ import Config
 config :controlkeel,
   namespace: ControlKeel,
   ecto_repos: [ControlKeel.Repo],
+  cloud_ecto_repos: [ControlKeel.CloudRepo],
+  runtime_mode: :local,
+  bus: :local,
+  pdf_renderer: :chromic,
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint

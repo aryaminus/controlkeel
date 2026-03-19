@@ -43,11 +43,26 @@ defmodule ControlKeelWeb.Router do
     post "/sessions", ApiController, :create_session
     get "/sessions/:id", ApiController, :get_session
     get "/sessions/:id/audit-log", ApiController, :audit_log
+    get "/sessions/:id/graph", ApiController, :session_graph
+    post "/sessions/:id/execute", ApiController, :execute_session
+    get "/workspaces/:id/service-accounts", ApiController, :list_service_accounts
+    post "/workspaces/:id/service-accounts", ApiController, :create_service_account
+    get "/workspaces/:id/policy-sets", ApiController, :list_workspace_policy_sets
+    post "/workspaces/:id/policy-sets", ApiController, :create_policy_set
+    post "/workspaces/:id/policy-sets/:policy_set_id/apply", ApiController, :apply_policy_set
+    get "/workspaces/:id/webhooks", ApiController, :list_webhooks
+    post "/workspaces/:id/webhooks", ApiController, :create_webhook
+    post "/service-accounts/:id/rotate", ApiController, :rotate_service_account
+    post "/webhooks/:id/replay", ApiController, :replay_webhook
     post "/sessions/:session_id/tasks", ApiController, :create_task
     patch "/tasks/:id", ApiController, :update_task
     post "/tasks/:id/complete", ApiController, :complete_task
     post "/tasks/:id/pause", ApiController, :pause_task
     post "/tasks/:id/resume", ApiController, :resume_task
+    post "/tasks/:id/claim", ApiController, :claim_task
+    post "/tasks/:id/heartbeat", ApiController, :heartbeat_task
+    post "/tasks/:id/checks", ApiController, :task_checks
+    post "/tasks/:id/report", ApiController, :report_task
     post "/validate", ApiController, :validate
     get "/findings", ApiController, :list_findings
     post "/findings/:id/action", ApiController, :finding_action

@@ -2,6 +2,7 @@ defmodule ControlKeel.AgentIntegrationTest do
   use ExUnit.Case, async: true
 
   alias ControlKeel.AgentIntegration
+  alias ControlKeel.Skills.SkillTarget
 
   test "catalog exposes the supported attach matrix" do
     ids = Enum.map(AgentIntegration.catalog(), & &1.id)
@@ -25,5 +26,19 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert codex.label == "Codex CLI"
     assert codex.preferred_target == "codex"
     assert "open-standard" in codex.export_targets
+    assert "project" in codex.supported_scopes
+    assert "ck_validate" in codex.required_mcp_tools
+  end
+
+  test "every integration references valid targets and install channels" do
+    target_ids = SkillTarget.ids()
+
+    Enum.each(AgentIntegration.catalog(), fn integration ->
+      assert integration.preferred_target in target_ids
+      assert Enum.all?(integration.export_targets, &(&1 in target_ids))
+      assert integration.install_channels != []
+      assert integration.required_mcp_tools != []
+      assert integration.supported_scopes != []
+    end)
   end
 end

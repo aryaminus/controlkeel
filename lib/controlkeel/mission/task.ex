@@ -4,6 +4,7 @@ defmodule ControlKeel.Mission.Task do
 
   alias ControlKeel.Memory.Record
   alias ControlKeel.Mission.{ProofBundle, Session, TaskCheckpoint}
+  alias ControlKeel.Platform.{TaskCheckResult, TaskEdge, TaskRun}
 
   schema "tasks" do
     field :title, :string
@@ -19,6 +20,10 @@ defmodule ControlKeel.Mission.Task do
     has_many :proof_bundles, ProofBundle
     has_many :task_checkpoints, TaskCheckpoint
     has_many :memory_records, Record
+    has_many :outgoing_edges, TaskEdge, foreign_key: :from_task_id
+    has_many :incoming_edges, TaskEdge, foreign_key: :to_task_id
+    has_many :task_runs, TaskRun
+    has_many :task_check_results, TaskCheckResult
 
     timestamps(type: :utc_datetime)
   end

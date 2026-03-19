@@ -1,6 +1,8 @@
 defmodule ControlKeel.AgentIntegration do
   @moduledoc false
 
+  alias ControlKeel.Distribution
+
   defstruct [
     :id,
     :label,
@@ -11,6 +13,10 @@ defmodule ControlKeel.AgentIntegration do
     :companion_delivery,
     :preferred_target,
     :default_scope,
+    :router_agent_id,
+    supported_scopes: [],
+    required_mcp_tools: [],
+    install_channels: [],
     export_targets: []
   ]
 
@@ -26,6 +32,8 @@ defmodule ControlKeel.AgentIntegration do
         "Installs `.claude/skills` and `.claude/agents`; can also export a publishable Claude plugin bundle.",
         "claude-standalone",
         "user",
+        "claude-code",
+        ["user", "project"],
         ["claude-standalone", "claude-plugin"]
       ),
       integration(
@@ -38,6 +46,8 @@ defmodule ControlKeel.AgentIntegration do
         "Installs `.agents/skills` and `.codex/agents`; can also export a portable Codex bundle.",
         "codex",
         "user",
+        "codex-cli",
+        ["user", "project"],
         ["codex", "open-standard"]
       ),
       integration(
@@ -50,6 +60,8 @@ defmodule ControlKeel.AgentIntegration do
         "Writes `.github/skills`, `.github/agents`, and repo MCP config; can also export a Copilot / VS Code plugin bundle.",
         "github-repo",
         "project",
+        nil,
+        ["project"],
         ["github-repo", "copilot-plugin"]
       ),
       integration(
@@ -62,6 +74,8 @@ defmodule ControlKeel.AgentIntegration do
         "Writes `.github/skills`, `.github/agents`, and repo MCP config; can also export a Copilot / VS Code plugin bundle.",
         "github-repo",
         "project",
+        "copilot",
+        ["project"],
         ["github-repo", "copilot-plugin"]
       ),
       integration(
@@ -74,6 +88,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "cursor",
+        ["project"],
         ["instructions-only"]
       ),
       integration(
@@ -86,6 +102,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "windsurf",
+        ["project"],
         ["instructions-only"]
       ),
       integration(
@@ -98,6 +116,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "kiro",
+        ["project"],
         ["instructions-only"]
       ),
       integration(
@@ -110,6 +130,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "amp",
+        ["project"],
         ["instructions-only"]
       ),
       integration(
@@ -122,6 +144,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "opencode",
+        ["project"],
         ["instructions-only"]
       ),
       integration(
@@ -134,6 +158,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "gemini-cli",
+        ["project"],
         ["instructions-only"]
       ),
       integration(
@@ -146,6 +172,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "continue",
+        ["project"],
         ["instructions-only"]
       ),
       integration(
@@ -158,6 +186,8 @@ defmodule ControlKeel.AgentIntegration do
         "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
         "instructions-only",
         "project",
+        "aider",
+        ["project"],
         ["instructions-only"]
       )
     ]
@@ -182,6 +212,17 @@ defmodule ControlKeel.AgentIntegration do
     ]
   end
 
+  def install_channels(id \\ nil)
+
+  def install_channels(nil), do: Distribution.install_channels()
+
+  def install_channels(id) do
+    case get(id) do
+      %__MODULE__{install_channels: ids} -> Distribution.install_channels(ids)
+      nil -> []
+    end
+  end
+
   defp integration(
          id,
          label,
@@ -192,6 +233,8 @@ defmodule ControlKeel.AgentIntegration do
          companion_delivery,
          preferred_target,
          default_scope,
+         router_agent_id,
+         supported_scopes,
          export_targets
        ) do
     %__MODULE__{
@@ -204,6 +247,10 @@ defmodule ControlKeel.AgentIntegration do
       companion_delivery: companion_delivery,
       preferred_target: preferred_target,
       default_scope: default_scope,
+      router_agent_id: router_agent_id,
+      supported_scopes: supported_scopes,
+      required_mcp_tools: Distribution.required_mcp_tools(),
+      install_channels: Enum.map(Distribution.install_channels(), & &1.id),
       export_targets: export_targets
     }
   end

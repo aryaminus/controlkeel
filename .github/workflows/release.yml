@@ -107,50 +107,173 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1.20.3
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "27.3.4.3"
+      - run: mix deps.get
       - uses: actions/download-artifact@v8
         with:
           name: controlkeel-linux
-          path: dist
+          path: release_stage/raw/controlkeel-linux
       - uses: actions/download-artifact@v8
         with:
           name: controlkeel-macos-intel
-          path: dist
+          path: release_stage/raw/controlkeel-macos-intel
       - uses: actions/download-artifact@v8
         with:
           name: controlkeel-macos-silicon
-          path: dist
+          path: release_stage/raw/controlkeel-macos-silicon
       - uses: actions/download-artifact@v8
         with:
           name: controlkeel-windows
-          path: dist
+          path: release_stage/raw/controlkeel-windows
+      - name: Package release archives
+        run: |
+          mkdir -p dist release_stage/package/linux release_stage/package/macos-intel release_stage/package/macos-arm release_stage/package/windows
+
+          cp release_stage/raw/controlkeel-linux/controlkeel-linux-x86_64 dist/controlkeel-linux-x86_64
+          cp release_stage/raw/controlkeel-linux/controlkeel-linux-x86_64 release_stage/package/linux/controlkeel
+          tar -C release_stage/package/linux -czf dist/controlkeel-linux-x86_64.tar.gz controlkeel
+
+          cp release_stage/raw/controlkeel-macos-intel/controlkeel-macos-x86_64 dist/controlkeel-macos-x86_64
+          cp release_stage/raw/controlkeel-macos-intel/controlkeel-macos-x86_64 release_stage/package/macos-intel/controlkeel
+          tar -C release_stage/package/macos-intel -czf dist/controlkeel-macos-x86_64.tar.gz controlkeel
+
+          cp release_stage/raw/controlkeel-macos-silicon/controlkeel-macos-arm64 dist/controlkeel-macos-arm64
+          cp release_stage/raw/controlkeel-macos-silicon/controlkeel-macos-arm64 release_stage/package/macos-arm/controlkeel
+          tar -C release_stage/package/macos-arm -czf dist/controlkeel-macos-arm64.tar.gz controlkeel
+
+          cp release_stage/raw/controlkeel-windows/controlkeel-windows-x86_64.exe dist/controlkeel-windows-x86_64.exe
+          cp release_stage/raw/controlkeel-windows/controlkeel-windows-x86_64.exe release_stage/package/windows/controlkeel.exe
+          (cd release_stage/package/windows && zip -q ../../dist/controlkeel-windows-x86_64.zip controlkeel.exe)
+      - name: Export publishable bundle targets
+        run: mix run scripts/export_release_bundles.exs
+      - name: Archive bundle targets
+        run: |
+          find controlkeel/dist -mindepth 1 -maxdepth 1 -type d | while read -r target_dir; do
+            target=$(basename "$target_dir")
+            tar -C controlkeel/dist -czf "dist/controlkeel-${target}.tar.gz" "$target"
+          done
+      - name: Copy installer assets
+        run: |
+          cp scripts/install.sh dist/install.sh
+          cp scripts/install.ps1 dist/install.ps1
+      - name: Generate checksums
+        run: |
+          find dist -maxdepth 1 -type f ! -name 'controlkeel-checksums.txt' -print0 | sort -z | xargs -0 sha256sum > dist/controlkeel-checksums.txt
+      - name: Render release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 scripts/render_release_notes.py "$VERSION" > /tmp/controlkeel-release-notes.md
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
-          body: |
-            ## Install
+          body_path: /tmp/controlkeel-release-notes.md
 
-            Download the binary for your platform below. No Erlang or Elixir required.
+  publish-homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Skip without Homebrew token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
+            echo "HOMEBREW_TAP_TOKEN is not configured; skipping Homebrew publish."
+            exit 0
+          fi
+      - name: Publish Homebrew formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
+            exit 0
+          fi
 
-            | Platform | Binary |
-            |----------|--------|
-            | macOS (Intel) | `controlkeel-macos-x86_64` |
-            | macOS (Apple Silicon) | `controlkeel-macos-arm64` |
-            | Linux x86_64 | `controlkeel-linux-x86_64` |
-            | Windows x86_64 | `controlkeel-windows-x86_64.exe` |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
 
-            ```bash
-            chmod +x controlkeel-macos-arm64
-            ./controlkeel-macos-arm64
-            ./controlkeel-macos-arm64 init
-            ./controlkeel-macos-arm64 attach claude-code
-            ```
+          curl -fsSL "${BASE_URL}/controlkeel-checksums.txt" -o /tmp/controlkeel-checksums.txt
 
-            ## Source
+          MAC_INTEL_SHA=$(grep ' controlkeel-macos-x86_64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
+          MAC_ARM_SHA=$(grep ' controlkeel-macos-arm64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
+          LINUX_SHA=$(grep ' controlkeel-linux-x86_64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
 
-            ```bash
-            mix setup && mix phx.server
-            ```
+          cat > /tmp/controlkeel.rb <<EOF
+          class Controlkeel < Formula
+            desc "Control plane for governed AI coding"
+            homepage "https://github.com/${GITHUB_REPOSITORY}"
+            version "${VERSION}"
+            license "Apache-2.0"
 
-            See [README](README.md) for full setup and MCP integration docs.
+            on_macos do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/controlkeel-macos-arm64.tar.gz"
+                sha256 "${MAC_ARM_SHA}"
+              else
+                url "${BASE_URL}/controlkeel-macos-x86_64.tar.gz"
+                sha256 "${MAC_INTEL_SHA}"
+              end
+            end
+
+            on_linux do
+              url "${BASE_URL}/controlkeel-linux-x86_64.tar.gz"
+              sha256 "${LINUX_SHA}"
+            end
+
+            def install
+              bin.install "controlkeel"
+            end
+
+            test do
+              assert_match "ControlKeel", shell_output("#{bin}/controlkeel version")
+            end
+          end
+          EOF
+
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/aryaminus/homebrew-controlkeel.git" /tmp/homebrew-controlkeel
+          mkdir -p /tmp/homebrew-controlkeel/Formula
+          cp /tmp/controlkeel.rb /tmp/homebrew-controlkeel/Formula/controlkeel.rb
+          cd /tmp/homebrew-controlkeel
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/controlkeel.rb
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(release): update controlkeel ${VERSION}"
+          git push
+
+  publish-npm:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Skip without npm token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "NPM_TOKEN is not configured; skipping npm publish."
+            exit 0
+          fi
+      - name: Publish npm bootstrap package
+        working-directory: packages/npm/controlkeel
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            exit 0
+          fi
+
+          npm publish --access public

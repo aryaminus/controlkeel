@@ -2,6 +2,7 @@ defmodule ControlKeel.Skills do
   @moduledoc false
 
   alias ControlKeel.AgentIntegration
+  alias ControlKeel.Distribution
   alias ControlKeel.Skills.Exporter
   alias ControlKeel.Skills.Installer
   alias ControlKeel.Skills.Registry
@@ -27,6 +28,9 @@ defmodule ControlKeel.Skills do
 
   def targets, do: SkillTarget.catalog()
   def agent_integrations, do: AgentIntegration.catalog()
+  def release_targets, do: SkillTarget.release_targets()
+  def install_channels, do: Distribution.install_channels()
+  def current_install_channels, do: Distribution.current_install_channels()
 
   def export(target, project_root \\ File.cwd!(), opts \\ []) do
     Exporter.export(target, project_root, opts)

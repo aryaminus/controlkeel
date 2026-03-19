@@ -43,6 +43,10 @@ defmodule ControlKeel.Application do
     [
       ControlKeel.Repo
     ] ++
+      cloud_repo_children() ++
+      [
+        ControlKeel.Runtime.bus_module()
+      ] ++
       analytics_children() ++
       [
         {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
@@ -100,6 +104,14 @@ defmodule ControlKeel.Application do
   defp analytics_children do
     if Application.get_env(:controlkeel, :analytics_telemetry_handler, true) do
       [ControlKeel.Analytics.TelemetryHandler]
+    else
+      []
+    end
+  end
+
+  defp cloud_repo_children do
+    if ControlKeel.Runtime.cloud_repo_enabled?() do
+      [ControlKeel.CloudRepo]
     else
       []
     end

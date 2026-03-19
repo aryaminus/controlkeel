@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
   import ControlKeel.BenchmarkFixtures
   import ControlKeel.MissionFixtures
   import ControlKeel.PolicyTrainingFixtures
+  import ControlKeel.PlatformFixtures
 
   # ─── Sessions ────────────────────────────────────────────────────────────────
 
@@ -175,11 +176,14 @@ defmodule ControlKeelWeb.ApiControllerTest do
       response = json_response(conn, 200)
       targets = response["targets"]
       agents = response["agents"]
+      install_channels = response["installation_channels"]
 
       assert Enum.any?(targets, &(&1["id"] == "claude-plugin"))
       assert Enum.any?(targets, &(&1["id"] == "copilot-plugin"))
       assert Enum.any?(agents, &(&1["id"] == "claude-code"))
       assert Enum.any?(agents, &(&1["id"] == "cursor"))
+      assert Enum.any?(install_channels, &(&1["id"] == "homebrew"))
+      assert Enum.any?(install_channels, &(&1["id"] == "npm"))
 
       claude =
         Enum.find(agents, fn agent ->
@@ -187,6 +191,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
         end)
 
       assert claude["preferred_target"] == "claude-standalone"
+      assert "ck_validate" in claude["required_mcp_tools"]
+      assert Enum.any?(claude["install_channels"], &(&1["id"] == "homebrew"))
     end
 
     test "gets skill detail and exports and installs bundles", %{conn: conn} do
@@ -572,9 +578,167 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert String.starts_with?(csv, "session_id,")
     end
 
+    test "returns PDF audit log when format=pdf", %{conn: conn} do
+      previous_renderer = Application.get_env(:controlkeel, :pdf_renderer)
+      Application.put_env(:controlkeel, :pdf_renderer, ControlKeel.TestSupport.FakePdfRenderer)
+
+      on_exit(fn ->
+        if previous_renderer do
+          Application.put_env(:controlkeel, :pdf_renderer, previous_renderer)
+        else
+          Application.delete_env(:controlkeel, :pdf_renderer)
+        end
+      end)
+
+      session = session_fixture()
+
+      conn = get(conn, ~p"/api/v1/sessions/#{session.id}/audit-log?format=pdf")
+      assert get_resp_header(conn, "content-type") |> hd() =~ "application/pdf"
+      assert response(conn, 200) =~ "%PDF-FAKE"
+    end
+
     test "returns 404 for unknown session", %{conn: conn} do
       conn = get(conn, ~p"/api/v1/sessions/99999999/audit-log")
       assert %{"error" => "session not found"} = json_response(conn, 404)
+    end
+  end
+
+  describe "platform API" do
+    test "creates service accounts, policy sets, and webhooks for a workspace", %{conn: conn} do
+      workspace = workspace_fixture()
+
+      conn =
+        post(conn, ~p"/api/v1/workspaces/#{workspace.id}/service-accounts", %{
+          name: "CI Worker",
+          scopes: ["tasks:claim", "tasks:report"]
+        })
+
+      assert %{"service_account" => account, "token" => token} = json_response(conn, 201)
+      assert account["workspace_id"] == workspace.id
+      assert is_binary(token)
+
+      conn = build_conn() |> get(~p"/api/v1/workspaces/#{workspace.id}/service-accounts")
+      assert %{"service_accounts" => [_ | _]} = json_response(conn, 200)
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/workspaces/#{workspace.id}/policy-sets", %{
+          name: "Workspace Guard",
+          scope: "workspace",
+          rules: [
+            %{
+              id: "workspace.no_exports",
+              category: "compliance",
+              severity: "high",
+              action: "block",
+              plain_message: "Exports need approval.",
+              matcher: %{type: "literal", literal: "EXPORT_NOW"}
+            }
+          ]
+        })
+
+      assert %{"policy_set" => policy_set} = json_response(conn, 201)
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/workspaces/#{workspace.id}/policy-sets/#{policy_set["id"]}/apply", %{
+          precedence: 5
+        })
+
+      assert %{"assignment" => %{"policy_set_id" => policy_set_id}} = json_response(conn, 200)
+      assert policy_set_id == policy_set["id"]
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/workspaces/#{workspace.id}/webhooks", %{
+          name: "CI Notify",
+          url: "https://example.com/hooks/controlkeel",
+          subscribed_events: ["task.completed", "audit.exported"]
+        })
+
+      assert %{"webhook" => webhook} = json_response(conn, 201)
+      assert webhook["workspace_id"] == workspace.id
+
+      conn = build_conn() |> get(~p"/api/v1/workspaces/#{workspace.id}/webhooks")
+      assert %{"webhooks" => [%{"id" => id} | _]} = json_response(conn, 200)
+      assert id == webhook["id"]
+    end
+
+    test "service account tokens are workspace-scoped for graph and task execution endpoints", %{
+      conn: conn
+    } do
+      session = session_fixture()
+
+      _arch =
+        task_fixture(%{
+          session: session,
+          status: "done",
+          position: 1,
+          metadata: %{"track" => "architecture"}
+        })
+
+      feature =
+        task_fixture(%{
+          session: session,
+          status: "queued",
+          position: 2,
+          metadata: %{"track" => "feature"}
+        })
+
+      _release =
+        task_fixture(%{
+          session: session,
+          status: "queued",
+          position: 3,
+          metadata: %{"track" => "release"}
+        })
+
+      %{token: token} =
+        service_account_fixture(%{
+          workspace_id: session.workspace_id,
+          scopes: "tasks:read,tasks:execute,tasks:claim,tasks:report"
+        })
+
+      authed =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+
+      conn = get(authed, ~p"/api/v1/sessions/#{session.id}/graph")
+      assert %{"graph" => graph} = json_response(conn, 200)
+      assert is_list(graph["edges"])
+
+      conn = post(recycle(authed), ~p"/api/v1/sessions/#{session.id}/execute", %{})
+      assert %{"graph" => graph} = json_response(conn, 200)
+      assert feature.id in graph["ready_task_ids"]
+
+      conn =
+        post(recycle(authed), ~p"/api/v1/tasks/#{feature.id}/claim", %{external_ref: "gha-1"})
+
+      assert %{"task_run" => %{"status" => "in_progress"}} = json_response(conn, 200)
+
+      conn =
+        post(recycle(authed), ~p"/api/v1/tasks/#{feature.id}/checks", %{
+          checks: [%{check_type: "tests", status: "passed", summary: "green"}]
+        })
+
+      assert %{"checks" => [%{"check_type" => "tests"}]} = json_response(conn, 200)
+
+      conn =
+        post(recycle(authed), ~p"/api/v1/tasks/#{feature.id}/report", %{
+          status: "done",
+          output: %{artifact: "build.tar.gz"}
+        })
+
+      assert %{"task_run" => %{"status" => "done"}} = json_response(conn, 200)
+
+      other_session = session_fixture()
+
+      conn =
+        build_conn()
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> get(~p"/api/v1/sessions/#{other_session.id}/graph")
+
+      assert %{"error" => "forbidden"} = json_response(conn, 403)
     end
   end
 

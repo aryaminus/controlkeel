@@ -3,6 +3,7 @@ defmodule ControlKeel.Scanner.FastPath do
 
   alias ControlKeel.Intent.Domains
   alias ControlKeel.Mission
+  alias ControlKeel.Platform
   alias ControlKeel.Policy.PackLoader
   alias ControlKeel.Policy.Rule
   alias ControlKeel.Scanner
@@ -14,8 +15,9 @@ defmodule ControlKeel.Scanner.FastPath do
     normalized = normalize_input(input)
     baseline_rules = PackLoader.load!("baseline")
     domain_rules = domain_rules_for(normalized)
+    workspace_rules = workspace_rules_for(normalized)
     cost_rules = PackLoader.load!("cost")
-    runtime_rules = uniq_rules(baseline_rules ++ domain_rules)
+    runtime_rules = uniq_rules(baseline_rules ++ domain_rules ++ workspace_rules)
 
     layer1 =
       []
@@ -141,6 +143,12 @@ defmodule ControlKeel.Scanner.FastPath do
           end)
         end
     end
+  end
+
+  defp workspace_rules_for(%{"session_id" => nil}), do: []
+
+  defp workspace_rules_for(%{"session_id" => session_id}) do
+    Platform.session_policy_rules(session_id)
   end
 
   defp build_result([]) do

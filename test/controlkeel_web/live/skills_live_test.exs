@@ -21,6 +21,8 @@ defmodule ControlKeelWeb.SkillsLiveTest do
 
     assert html =~ "Skills Studio"
     assert has_element?(view, "#skills-project-form")
+    assert has_element?(view, "#install-channel-homebrew")
+    assert has_element?(view, "#copy-install-npm")
     assert has_element?(view, "#skills-target-matrix")
     assert has_element?(view, "#skills-agent-matrix")
     assert has_element?(view, "#skill-controlkeel-governance")

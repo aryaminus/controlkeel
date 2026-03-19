@@ -31,6 +31,34 @@ config :controlkeel, ControlKeel.Proxy,
   semgrep_bin: System.get_env("CONTROLKEEL_SEMGREP_BIN") || "semgrep",
   timeout_ms: String.to_integer(System.get_env("CONTROLKEEL_PROXY_TIMEOUT_MS", "15000"))
 
+runtime_mode =
+  case System.get_env("CONTROLKEEL_RUNTIME_MODE", "local") do
+    "cloud" -> :cloud
+    :cloud -> :cloud
+    _ -> :local
+  end
+
+bus_mode =
+  case System.get_env("CONTROLKEEL_BUS", if(runtime_mode == :cloud, do: "nats", else: "local")) do
+    "nats" -> :nats
+    :nats -> :nats
+    _ -> :local
+  end
+
+config :controlkeel,
+  runtime_mode: runtime_mode,
+  bus: bus_mode
+
+if pdf_renderer = System.get_env("CONTROLKEEL_PDF_RENDERER") do
+  renderer =
+    case pdf_renderer do
+      "chromic" -> :chromic
+      _ -> :chromic
+    end
+
+  config :controlkeel, :pdf_renderer, renderer
+end
+
 if token = System.get_env("CONTROLKEEL_API_TOKEN") do
   config :controlkeel, :api_token, token
 end
@@ -76,6 +104,23 @@ if config_env() == :prod do
   config :controlkeel, ControlKeel.Repo,
     database: database_path,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
+
+  if runtime_mode == :cloud do
+    database_url =
+      System.get_env("DATABASE_URL") ||
+        raise "DATABASE_URL is required when CONTROLKEEL_RUNTIME_MODE=cloud"
+
+    config :controlkeel, ControlKeel.CloudRepo,
+      url: database_url,
+      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+      ssl: System.get_env("ECTO_USE_SSL", "false") == "true"
+
+    if nats_url = System.get_env("CONTROLKEEL_NATS_URL") do
+      connection_settings = ControlKeel.Bus.Nats.connection_settings_from_env(nats_url)
+
+      config :controlkeel, ControlKeel.Bus.Nats, connection_settings: connection_settings
+    end
+  end
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

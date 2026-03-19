@@ -9,6 +9,22 @@ It sits above Claude Code, Codex, Cursor, Windsurf, Continue, Aider, Copilot / V
 
 ## Quick start
 
+### Install
+
+```bash
+# macOS / Linux
+brew tap aryaminus/controlkeel && brew install controlkeel
+
+# Cross-platform bootstrap
+npm i -g @aryaminus/controlkeel
+
+# Direct installers
+curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh
+irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex
+```
+
+GitHub Releases remain the canonical source for packaged binaries, checksums, and publishable plugin bundles.
+
 ### Packaged binary
 
 ```bash
@@ -121,6 +137,17 @@ controlkeel skills install --target codex --scope user
 ```
 
 Exported bundles are written under `controlkeel/dist/<target>/`.
+
+Tagged releases also publish:
+
+- platform binaries and Homebrew-friendly archives
+- `controlkeel-checksums.txt`
+- `install.sh` and `install.ps1`
+- `controlkeel-claude-plugin.tar.gz`
+- `controlkeel-copilot-plugin.tar.gz`
+- `controlkeel-codex.tar.gz`
+- `controlkeel-open-standard.tar.gz`
+- `controlkeel-instructions-only.tar.gz`
 
 ## Web UI
 

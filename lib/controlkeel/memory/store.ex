@@ -2,6 +2,7 @@ defmodule ControlKeel.Memory.Store do
   @moduledoc false
 
   alias ControlKeel.Memory.Store.{Pgvector, Sqlite}
+  alias ControlKeel.Runtime
 
   def mode do
     configured =
@@ -9,11 +10,23 @@ defmodule ControlKeel.Memory.Store do
         Application.get_env(:controlkeel, :memory_store, "auto")
 
     case configured do
-      "sqlite" -> :sqlite
-      "pgvector" -> :pgvector
-      :sqlite -> :sqlite
-      :pgvector -> :pgvector
-      _auto -> if(Pgvector.available?(), do: :pgvector, else: :sqlite)
+      "sqlite" ->
+        :sqlite
+
+      "pgvector" ->
+        :pgvector
+
+      :sqlite ->
+        :sqlite
+
+      :pgvector ->
+        :pgvector
+
+      _auto ->
+        if(Runtime.memory_store_mode() == :pgvector and Pgvector.available?(),
+          do: :pgvector,
+          else: :sqlite
+        )
     end
   end
 

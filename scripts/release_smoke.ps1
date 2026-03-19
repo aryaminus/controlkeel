@@ -108,8 +108,16 @@ Invoke-BinaryStep -Arguments @("version") | Out-Null
 
 $tmpDir = Join-Path $env:TEMP ("controlkeel-release-smoke-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmpDir | Out-Null
+$homeDir = Join-Path $tmpDir "home"
+New-Item -ItemType Directory -Path $homeDir | Out-Null
 
 try {
+  $env:HOME = $homeDir
+  $env:CONTROLKEEL_HOME = $homeDir
+  $env:APPDATA = $homeDir
+  $env:DATABASE_PATH = Join-Path $tmpDir "controlkeel.db"
+  $env:SECRET_KEY_BASE = "controlkeel-release-smoke-secret-0123456789abcdef0123456789abcdef0123456789abcdef"
+
   Invoke-BinaryStep -Arguments @("init", "--no-attach") -WorkingDirectory $tmpDir | Out-Null
 
   if (-not (Test-Path (Join-Path $tmpDir "controlkeel/project.json"))) {
@@ -121,6 +129,47 @@ try {
   }
 
   Test-McpInitialize -ProjectRoot $tmpDir
+
+  $benchmarkOutput = Invoke-BinaryStep -Arguments @(
+    "benchmark",
+    "run",
+    "--suite",
+    "vibe_failures_v1",
+    "--subjects",
+    "controlkeel_validate",
+    "--baseline-subject",
+    "controlkeel_validate",
+    "--scenario-slugs",
+    "client_side_auth_bypass"
+  ) -WorkingDirectory $tmpDir
+
+  if ($benchmarkOutput -notmatch "Benchmark run #") {
+    throw "benchmark smoke output did not include a persisted run"
+  }
+
+  Invoke-BinaryStep -Arguments @("attach", "codex-cli", "--scope", "project") -WorkingDirectory $tmpDir | Out-Null
+
+  if (-not (Test-Path (Join-Path $tmpDir ".agents/skills/controlkeel-governance/SKILL.md"))) {
+    throw "codex skills were not installed"
+  }
+
+  if (-not (Test-Path (Join-Path $tmpDir ".codex/agents/controlkeel-operator.toml"))) {
+    throw "codex companion agent missing"
+  }
+
+  if (-not (Test-Path (Join-Path $homeDir ".codex/config.json"))) {
+    throw "codex MCP config missing"
+  }
+
+  Invoke-BinaryStep -Arguments @("attach", "cursor") -WorkingDirectory $tmpDir | Out-Null
+
+  if (-not (Test-Path (Join-Path $homeDir "Cursor/User/globalStorage/cursor.mcp.json"))) {
+    throw "cursor MCP config missing"
+  }
+
+  if (-not (Test-Path (Join-Path $tmpDir "controlkeel/dist/instructions-only/AGENTS.md"))) {
+    throw "instructions-only bundle missing after MCP-only attach"
+  }
 }
 finally {
   Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue

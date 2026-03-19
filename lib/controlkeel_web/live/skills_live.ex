@@ -13,6 +13,7 @@ defmodule ControlKeelWeb.SkillsLive do
      |> assign(:selected, nil)
      |> assign(:last_result, nil)
      |> assign(:agent_integrations, Skills.agent_integrations())
+     |> assign(:install_channels, Skills.install_channels())
      |> assign(:target_options, target_options())
      |> assign(:scope_options, [{"Export", "export"}, {"User", "user"}, {"Project", "project"}])
      |> assign_analysis(project_root)
@@ -156,6 +157,33 @@ defmodule ControlKeelWeb.SkillsLive do
           </div>
         </div>
 
+        <div class="ck-card" style="margin: 1rem 0;">
+          <p class="ck-mini-label">Install ControlKeel</p>
+          <div class="ck-finding-list">
+            <%= for channel <- @install_channels do %>
+              <article class="ck-finding-item" id={"install-channel-#{channel.id}"}>
+                <div class="ck-finding-head">
+                  <h3>{channel.label}</h3>
+                  <span class="ck-pill ck-pill-neutral">{Enum.join(channel.platforms, ", ")}</span>
+                </div>
+                <p class="ck-note">{channel.description}</p>
+                <div class="flex items-start gap-2" style="margin-top: 0.5rem;">
+                  <code>{channel.command}</code>
+                  <button
+                    type="button"
+                    class="ck-link"
+                    id={"copy-install-#{channel.id}"}
+                    phx-click="copy_command"
+                    phx-value-command={channel.command}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </article>
+            <% end %>
+          </div>
+        </div>
+
         <div class="ck-grid ck-grid-dashboard">
           <div class="space-y-4">
             <div class="ck-card">
@@ -268,6 +296,7 @@ defmodule ControlKeelWeb.SkillsLive do
                       <th class="text-left py-2 pr-4">Target</th>
                       <th class="text-left py-2 pr-4">Default scope</th>
                       <th class="text-left py-2 pr-4">Native</th>
+                      <th class="text-left py-2 pr-4">Release asset</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -279,6 +308,9 @@ defmodule ControlKeelWeb.SkillsLive do
                         </td>
                         <td class="py-2 pr-4">{target.default_scope}</td>
                         <td class="py-2 pr-4">{if target.native, do: "yes", else: "fallback"}</td>
+                        <td class="py-2 pr-4">
+                          {if target.release_bundle, do: "published", else: "local only"}
+                        </td>
                       </tr>
                     <% end %>
                   </tbody>
@@ -319,16 +351,22 @@ defmodule ControlKeelWeb.SkillsLive do
                             </button>
                           </div>
                           <p class="ck-note" style="margin-top: 0.35rem;">
-                            Scope: {integration.default_scope}
+                            Scope: {Enum.join(integration.supported_scopes, ", ")}
                           </p>
                         </td>
                         <td class="py-2 pr-4 align-top">
                           <p class="ck-note">{integration.config_location}</p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Required CK tools: {format_targets(integration.required_mcp_tools)}
+                          </p>
                         </td>
                         <td class="py-2 pr-4 align-top">
                           <p class="ck-note">{integration.companion_delivery}</p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Export targets: {format_targets(integration.export_targets)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Get CK: {format_install_channels(integration.install_channels)}
                           </p>
                         </td>
                       </tr>
@@ -423,6 +461,15 @@ defmodule ControlKeelWeb.SkillsLive do
   defp format_targets([]), do: "none"
   defp format_targets(nil), do: "none"
   defp format_targets(values), do: Enum.join(values, ", ")
+
+  defp format_install_channels([]), do: "none"
+
+  defp format_install_channels(ids) do
+    ids
+    |> ControlKeel.Distribution.install_channels()
+    |> Enum.map(& &1.label)
+    |> Enum.join(", ")
+  end
 
   defp format_paths([]), do: "not installed"
   defp format_paths(nil), do: "not installed"

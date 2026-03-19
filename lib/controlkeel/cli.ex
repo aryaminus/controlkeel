@@ -6,10 +6,12 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.ClaudeCLI
+  alias ControlKeel.Distribution
   alias ControlKeel.Intent
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
   alias ControlKeel.Mission
+  alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Proxy
@@ -52,6 +54,26 @@ defmodule ControlKeel.CLI do
   @benchmark_export_switches [format: :string]
   @policy_train_switches [type: :string]
   @watch_switches [interval: :integer]
+  @audit_log_switches [format: :string]
+  @service_account_create_switches [workspace_id: :integer, name: :string, scopes: :string]
+  @service_account_list_switches [workspace_id: :integer]
+  @policy_set_create_switches [
+    name: :string,
+    scope: :string,
+    description: :string,
+    rules_file: :string
+  ]
+  @policy_set_list_switches [workspace_id: :integer]
+  @policy_set_apply_switches [precedence: :integer]
+  @webhook_create_switches [
+    workspace_id: :integer,
+    name: :string,
+    url: :string,
+    events: :string,
+    secret: :string
+  ]
+  @webhook_list_switches [workspace_id: :integer]
+  @worker_start_switches [service_account_token: :string, interval: :integer]
 
   def standalone_argv do
     cond do
@@ -98,6 +120,9 @@ defmodule ControlKeel.CLI do
 
       ["proof", id] ->
         {:ok, %{command: :proof, options: %{}, args: [id]}}
+
+      ["audit-log", session_id | rest] ->
+        parse_audit_log(session_id, rest)
 
       ["pause", task_id] ->
         {:ok, %{command: :pause, options: %{}, args: [task_id]}}
@@ -152,6 +177,45 @@ defmodule ControlKeel.CLI do
 
       ["policy", "archive", id] ->
         {:ok, %{command: :policy_archive, options: %{}, args: [id]}}
+
+      ["service-account", "create" | rest] ->
+        parse_with_switches(:service_account_create, rest, @service_account_create_switches)
+
+      ["service-account", "list" | rest] ->
+        parse_with_switches(:service_account_list, rest, @service_account_list_switches)
+
+      ["service-account", "revoke", id] ->
+        {:ok, %{command: :service_account_revoke, options: %{}, args: [id]}}
+
+      ["service-account", "rotate", id] ->
+        {:ok, %{command: :service_account_rotate, options: %{}, args: [id]}}
+
+      ["policy-set", "create" | rest] ->
+        parse_with_switches(:policy_set_create, rest, @policy_set_create_switches)
+
+      ["policy-set", "list" | rest] ->
+        parse_with_switches(:policy_set_list, rest, @policy_set_list_switches)
+
+      ["policy-set", "apply", workspace_id, policy_set_id | rest] ->
+        parse_policy_set_apply(workspace_id, policy_set_id, rest)
+
+      ["webhook", "create" | rest] ->
+        parse_with_switches(:webhook_create, rest, @webhook_create_switches)
+
+      ["webhook", "list" | rest] ->
+        parse_with_switches(:webhook_list, rest, @webhook_list_switches)
+
+      ["webhook", "replay", id] ->
+        {:ok, %{command: :webhook_replay, options: %{}, args: [id]}}
+
+      ["graph", "show", session_id] ->
+        {:ok, %{command: :graph_show, options: %{}, args: [session_id]}}
+
+      ["execute", session_id] ->
+        {:ok, %{command: :execute_session, options: %{}, args: [session_id]}}
+
+      ["worker", "start" | rest] ->
+        parse_with_switches(:worker_start, rest, @worker_start_switches)
 
       ["mcp" | rest] ->
         parse_with_switches(:mcp, rest, @mcp_switches)
@@ -219,6 +283,7 @@ defmodule ControlKeel.CLI do
       controlkeel approve <id>        Approve a finding in the current session
       controlkeel proofs [options]    List proof bundles for the current session
       controlkeel proof <id>          Show a proof bundle by proof id or task id
+      controlkeel audit-log <id>      Export a session audit log as json|csv|pdf
       controlkeel pause <task-id>     Pause a task and capture a resume packet
       controlkeel resume <task-id>    Resume a paused or blocked task
       controlkeel memory search <q>   Search typed memory for the current session
@@ -242,6 +307,16 @@ defmodule ControlKeel.CLI do
       controlkeel policy show <id>    Show a policy artifact
       controlkeel policy promote <id> Promote a policy artifact if gates pass
       controlkeel policy archive <id> Archive a policy artifact
+      controlkeel service-account create|list|revoke|rotate
+                                      Manage workspace-scoped machine credentials
+      controlkeel policy-set create|list|apply
+                                      Manage enterprise policy sets and assignments
+      controlkeel webhook create|list|replay
+                                      Manage outbound CI/CD webhooks and deliveries
+      controlkeel graph show <id>     Show the persisted task DAG for a session
+      controlkeel execute <id>        Materialize ready tasks and task runs
+      controlkeel worker start [--service-account-token TOKEN]
+                                      Poll ready work for a workspace service account
       controlkeel watch [--interval N]
                                       Stream findings and budget live (default: 2000ms)
       controlkeel mcp [--project-root /abs/path]
@@ -316,7 +391,9 @@ defmodule ControlKeel.CLI do
        [
          "Attached ControlKeel to Claude Code.",
          "Verified with `claude mcp get controlkeel`."
-       ] ++ native_attach_lines("claude-code", project_root, options)}
+       ] ++
+         native_attach_lines("claude-code", project_root, options) ++
+         attach_guidance_lines("claude-code")}
     else
       {:error, :wrapper_missing} ->
         {:error,
@@ -346,7 +423,8 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Cursor.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Cursor to activate."
-       ] ++ native_attach_lines("cursor", project_root, options)}
+       ] ++
+         native_attach_lines("cursor", project_root, options) ++ attach_guidance_lines("cursor")}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -375,7 +453,9 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Windsurf.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Windsurf to activate."
-       ] ++ native_attach_lines("windsurf", project_root, options)}
+       ] ++
+         native_attach_lines("windsurf", project_root, options) ++
+         attach_guidance_lines("windsurf")}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -422,7 +502,7 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to #{display_name[agent]}.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart #{display_name[agent]} to activate."
-       ] ++ native_attach_lines(agent, project_root, options)}
+       ] ++ native_attach_lines(agent, project_root, options) ++ attach_guidance_lines(agent)}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -452,7 +532,9 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Continue.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Continue to activate."
-       ] ++ native_attach_lines("continue", project_root, options)}
+       ] ++
+         native_attach_lines("continue", project_root, options) ++
+         attach_guidance_lines("continue")}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -480,7 +562,7 @@ defmodule ControlKeel.CLI do
        [
          "Attached ControlKeel to Aider.",
          "MCP config written to #{attached["config_path"]}."
-       ] ++ native_attach_lines("aider", project_root, options)}
+       ] ++ native_attach_lines("aider", project_root, options) ++ attach_guidance_lines("aider")}
     else
       {:error, :wrapper_missing} ->
         {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
@@ -521,7 +603,7 @@ defmodule ControlKeel.CLI do
             ]
         end
 
-      {:ok, lines}
+      {:ok, lines ++ attach_guidance_lines(agent)}
     else
       {:error, :not_found} ->
         {:error,
@@ -665,6 +747,45 @@ defmodule ControlKeel.CLI do
     else
       {:error, :invalid_id} ->
         {:error, "Proof id must be an integer."}
+    end
+  end
+
+  def run_command(%{command: :audit_log, args: [session_id], options: options}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(session_id),
+         format <- options[:format] || "json",
+         true <- format in ["json", "csv", "pdf"] || {:error, :invalid_format},
+         {:ok, %{export: export, payload: payload}} <-
+           Platform.export_audit_log(parsed_id, format) do
+      lines =
+        case format do
+          "pdf" ->
+            [
+              "Audit log exported for session ##{parsed_id}.",
+              "Format: pdf",
+              "Checksum: #{export.checksum}",
+              "Artifact: #{export.artifact_path_or_ref}"
+            ]
+
+          _ ->
+            [payload]
+        end
+
+      {:ok, lines}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Session id must be an integer."}
+
+      {:error, :invalid_format} ->
+        {:error, "Audit log format must be json, csv, or pdf."}
+
+      {:error, :renderer_unavailable} ->
+        {:error, "PDF renderer is unavailable in this runtime."}
+
+      {:error, :not_found} ->
+        {:error, "Session not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to export audit log: #{inspect(reason)}"}
     end
   end
 
@@ -962,6 +1083,288 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to archive policy artifact: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :service_account_create, options: options}, _project_root) do
+    with {:ok, workspace_id} <- require_integer_option(options[:workspace_id], "workspace-id"),
+         {:ok, name} <- require_string_option(options[:name], "name"),
+         scopes = options[:scopes] || "admin",
+         {:ok, %{service_account: account, token: token}} <-
+           Platform.create_service_account(workspace_id, %{
+             "name" => name,
+             "scopes" => scopes
+           }) do
+      {:ok,
+       [
+         "Created service account ##{account.id} for workspace ##{workspace_id}.",
+         "Name: #{account.name}",
+         "Scopes: #{Enum.join(ControlKeel.Platform.ServiceAccount.scope_list(account), ", ")}",
+         "Token: #{token}"
+       ]}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option}"}
+
+      {:error, reason} ->
+        {:error, "Failed to create service account: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :service_account_list, options: options}, _project_root) do
+    with {:ok, workspace_id} <- require_integer_option(options[:workspace_id], "workspace-id") do
+      accounts = Platform.list_service_accounts(workspace_id)
+
+      lines =
+        if accounts == [] do
+          ["No service accounts found for workspace ##{workspace_id}."]
+        else
+          [
+            "Service accounts for workspace ##{workspace_id}:"
+            | Enum.map(accounts, fn account ->
+                "  ##{account.id} #{account.name} [#{account.status}] scopes: #{Enum.join(ControlKeel.Platform.ServiceAccount.scope_list(account), ", ")}"
+              end)
+          ]
+        end
+
+      {:ok, lines}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option}"}
+    end
+  end
+
+  def run_command(%{command: :service_account_revoke, args: [id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(id),
+         {:ok, account} <- Platform.revoke_service_account(parsed_id) do
+      {:ok, ["Revoked service account ##{account.id}."]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Service account id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Service account not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to revoke service account: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :service_account_rotate, args: [id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(id),
+         {:ok, %{service_account: account, token: token}} <-
+           Platform.rotate_service_account(parsed_id) do
+      {:ok,
+       [
+         "Rotated service account ##{account.id}.",
+         "Token: #{token}"
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Service account id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Service account not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to rotate service account: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :policy_set_create, options: options}, _project_root) do
+    with {:ok, name} <- require_string_option(options[:name], "name"),
+         {:ok, rules} <- load_rules_payload(options[:rules_file]),
+         {:ok, policy_set} <-
+           Platform.create_policy_set(%{
+             "name" => name,
+             "scope" => options[:scope] || "workspace",
+             "description" => options[:description],
+             "rules" => rules
+           }) do
+      {:ok,
+       [
+         "Created policy set ##{policy_set.id}.",
+         "Name: #{policy_set.name}",
+         "Rules: #{length(ControlKeel.Platform.PolicySet.rule_entries(policy_set))}"
+       ]}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option}"}
+
+      {:error, reason} ->
+        {:error, "Failed to create policy set: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :policy_set_list, options: options}, _project_root) do
+    workspace_id = options[:workspace_id]
+    policy_sets = Platform.list_policy_sets()
+
+    assignment_lines =
+      if workspace_id do
+        ["", "Assignments:"] ++
+          Enum.map(Platform.list_workspace_policy_sets(workspace_id), fn assignment ->
+            "  workspace ##{workspace_id} -> ##{assignment.policy_set_id} #{assignment.policy_set.name} precedence #{assignment.precedence}"
+          end)
+      else
+        []
+      end
+
+    {:ok,
+     [
+       "Policy sets:"
+       | Enum.map(policy_sets, fn policy_set ->
+           "  ##{policy_set.id} #{policy_set.name} [#{policy_set.status}] #{length(ControlKeel.Platform.PolicySet.rule_entries(policy_set))} rules"
+         end)
+     ] ++ assignment_lines}
+  end
+
+  def run_command(
+        %{command: :policy_set_apply, args: [workspace_id, policy_set_id], options: options},
+        _project_root
+      ) do
+    with {:ok, parsed_workspace_id} <- parse_id(workspace_id),
+         {:ok, parsed_policy_set_id} <- parse_id(policy_set_id),
+         {:ok, assignment} <-
+           Platform.apply_policy_set(parsed_workspace_id, parsed_policy_set_id, %{
+             "precedence" => options[:precedence] || 100,
+             "enabled" => true
+           }) do
+      {:ok,
+       [
+         "Applied policy set ##{assignment.policy_set_id} to workspace ##{assignment.workspace_id}.",
+         "Precedence: #{assignment.precedence}"
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Workspace id and policy set id must be integers."}
+
+      {:error, reason} ->
+        {:error, "Failed to apply policy set: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :webhook_create, options: options}, _project_root) do
+    with {:ok, workspace_id} <- require_integer_option(options[:workspace_id], "workspace-id"),
+         {:ok, name} <- require_string_option(options[:name], "name"),
+         {:ok, url} <- require_string_option(options[:url], "url"),
+         events <- options[:events] || Enum.join(Platform.webhook_events(), ","),
+         {:ok, webhook} <-
+           Platform.create_webhook(workspace_id, %{
+             "name" => name,
+             "url" => url,
+             "secret" => options[:secret],
+             "subscribed_events" => events
+           }) do
+      {:ok,
+       [
+         "Created webhook ##{webhook.id} for workspace ##{workspace_id}.",
+         "Events: #{Enum.join(ControlKeel.Platform.IntegrationWebhook.event_list(webhook), ", ")}"
+       ]}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option}"}
+
+      {:error, reason} ->
+        {:error, "Failed to create webhook: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :webhook_list, options: options}, _project_root) do
+    with {:ok, workspace_id} <- require_integer_option(options[:workspace_id], "workspace-id") do
+      webhooks = Platform.list_webhooks(workspace_id)
+      deliveries = Platform.list_deliveries(workspace_id)
+
+      {:ok,
+       [
+         "Webhooks for workspace ##{workspace_id}:"
+         | Enum.map(webhooks, fn webhook ->
+             "  ##{webhook.id} #{webhook.name} [#{webhook.status}] #{webhook.url}"
+           end)
+       ] ++
+         ["", "Recent deliveries:"] ++
+         Enum.map(deliveries, fn delivery ->
+           "  ##{delivery.id} #{delivery.event} [#{delivery.status}] attempts #{delivery.attempts}"
+         end)}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option}"}
+    end
+  end
+
+  def run_command(%{command: :webhook_replay, args: [id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(id),
+         {:ok, delivery} <- Platform.replay_webhook(parsed_id) do
+      {:ok,
+       [
+         "Replayed webhook ##{parsed_id}.",
+         "Latest delivery status: #{delivery.status}"
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Webhook id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Webhook or delivery not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to replay webhook: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :graph_show, args: [session_id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(session_id) do
+      graph = Platform.ensure_session_graph(parsed_id)
+
+      edge_lines =
+        Enum.map(graph.edges, fn edge ->
+          "  #{edge.from_task_id} -> #{edge.to_task_id} [#{edge.dependency_type}]"
+        end)
+
+      {:ok,
+       [
+         "Task graph for session ##{parsed_id}:",
+         "Ready tasks: #{Enum.join(Enum.map(graph.ready_task_ids, &to_string/1), ", ")}",
+         "Edges:"
+         | edge_lines
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Session id must be an integer."}
+    end
+  end
+
+  def run_command(%{command: :execute_session, args: [session_id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(session_id),
+         {:ok, graph} <- Platform.execute_session(parsed_id) do
+      {:ok,
+       [
+         "Executed scheduling for session ##{parsed_id}.",
+         "Ready tasks: #{Enum.join(Enum.map(graph.ready_task_ids, &to_string/1), ", ")}",
+         "Task runs: #{length(graph.task_runs)}"
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Session id must be an integer."}
+
+      {:error, reason} ->
+        {:error, "Failed to execute session: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :worker_start, options: options}, _project_root) do
+    with {:ok, token} <-
+           require_string_option(options[:service_account_token], "service-account-token") do
+      case Platform.Worker.start(token, interval: options[:interval] || 2_000) do
+        {:error, :unauthorized} ->
+          {:error, "Invalid service account token."}
+
+        other ->
+          other
+      end
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option}"}
     end
   end
 
@@ -1345,6 +1748,16 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_audit_log(session_id, argv) do
+    case OptionParser.parse(argv, strict: @audit_log_switches) do
+      {options, [], []} ->
+        {:ok, %{command: :audit_log, options: options, args: [session_id]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
   defp parse_benchmark_export(run_id, argv) do
     {options, remainder, invalid} = OptionParser.parse(argv, strict: @benchmark_export_switches)
 
@@ -1357,6 +1770,17 @@ defmodule ControlKeel.CLI do
 
       true ->
         {:ok, %{command: :benchmark_export, options: options, args: [run_id]}}
+    end
+  end
+
+  defp parse_policy_set_apply(workspace_id, policy_set_id, argv) do
+    case OptionParser.parse(argv, strict: @policy_set_apply_switches) do
+      {options, [], []} ->
+        {:ok,
+         %{command: :policy_set_apply, options: options, args: [workspace_id, policy_set_id]}}
+
+      _ ->
+        {:error, usage_text()}
     end
   end
 
@@ -1377,6 +1801,42 @@ defmodule ControlKeel.CLI do
     case Integer.parse(to_string(value)) do
       {parsed, ""} -> {:ok, parsed}
       _ -> {:error, :invalid_id}
+    end
+  end
+
+  defp require_integer_option(nil, option), do: {:error, {:missing_option, option}}
+  defp require_integer_option(value, _option) when is_integer(value), do: {:ok, value}
+
+  defp require_integer_option(value, _option) do
+    case Integer.parse(to_string(value)) do
+      {parsed, ""} -> {:ok, parsed}
+      _ -> {:error, :invalid_id}
+    end
+  end
+
+  defp require_string_option(nil, option), do: {:error, {:missing_option, option}}
+  defp require_string_option("", option), do: {:error, {:missing_option, option}}
+  defp require_string_option(value, _option), do: {:ok, to_string(value)}
+
+  defp load_rules_payload(nil), do: {:ok, []}
+
+  defp load_rules_payload(path) do
+    with {:ok, contents} <- File.read(path),
+         {:ok, decoded} <- Jason.decode(contents) do
+      case decoded do
+        %{"entries" => _entries} = wrapped -> {:ok, wrapped}
+        entries when is_list(entries) -> {:ok, entries}
+        other -> {:error, {:invalid_rules_payload, other}}
+      end
+    else
+      {:error, :enoent} ->
+        {:error, :rules_file_not_found}
+
+      {:error, %Jason.DecodeError{} = error} ->
+        {:error, {:invalid_json, Exception.message(error)}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -1402,6 +1862,20 @@ defmodule ControlKeel.CLI do
         scope: attached_agent["scope"]
       }
     )
+  end
+
+  defp attach_guidance_lines(agent) do
+    case AgentIntegration.get(agent) do
+      nil ->
+        Distribution.current_install_lines()
+
+      integration ->
+        [
+          "Companion target: #{integration.preferred_target}.",
+          "Supported scope: #{Enum.join(integration.supported_scopes, ", ")}.",
+          "Required CK tools: #{Enum.join(integration.required_mcp_tools, ", ")}."
+        ] ++ Distribution.current_install_lines()
+    end
   end
 
   defp native_attach_lines("claude-code", project_root, options) do

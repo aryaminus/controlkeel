@@ -5,10 +5,12 @@ defmodule ControlKeel.CLIRuntimeTest do
   import ExUnit.CaptureIO
   import ControlKeel.MissionFixtures
   import ControlKeel.PolicyTrainingFixtures
+  import ControlKeel.PlatformFixtures
 
   alias ControlKeel.Analytics
   alias ControlKeel.Benchmark
   alias ControlKeel.CLI
+  alias ControlKeel.Platform
   alias ControlKeel.ProjectBinding
 
   setup do
@@ -102,6 +104,48 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert {:ok, parsed} = CLI.parse(["mcp", "--project-root", tmp_dir])
     assert parsed.command == :mcp
     assert parsed.options[:project_root] == tmp_dir
+  end
+
+  test "attach writes companion artifacts and prints install guidance", %{tmp_dir: tmp_dir} do
+    assert {:ok, init} = CLI.parse(["init", "--no-attach"])
+    assert 0 == CLI.execute(init, project_root: tmp_dir)
+
+    assert {:ok, codex_attach} = CLI.parse(["attach", "codex-cli", "--scope", "project"])
+
+    codex_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(codex_attach, project_root: tmp_dir)
+      end)
+
+    assert codex_output =~ "Companion target: codex."
+    assert codex_output =~ "@aryaminus/controlkeel"
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
+    assert File.exists?(codex_config_path())
+
+    assert {:ok, vscode_attach} = CLI.parse(["attach", "vscode"])
+
+    vscode_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(vscode_attach, project_root: tmp_dir)
+      end)
+
+    assert vscode_output =~ "Prepared ControlKeel companion files for VS Code agent mode."
+    assert vscode_output =~ "Companion target: github-repo."
+    assert File.exists?(Path.join(tmp_dir, ".github/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".github/mcp.json"))
+    assert File.exists?(Path.join(tmp_dir, ".vscode/mcp.json"))
+
+    assert {:ok, cursor_attach} = CLI.parse(["attach", "cursor"])
+
+    cursor_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(cursor_attach, project_root: tmp_dir)
+      end)
+
+    assert cursor_output =~ "Companion target: instructions-only."
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/instructions-only/AGENTS.md"))
+    assert File.exists?(cursor_config_path())
   end
 
   test "runtime proofs, pause, resume, and memory search operate on the bound session", %{
@@ -344,5 +388,164 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert archive_output =~ "Archived policy artifact"
+  end
+
+  test "runtime platform commands manage service accounts, graphs, and audit exports", %{
+    tmp_dir: tmp_dir
+  } do
+    previous_renderer = Application.get_env(:controlkeel, :pdf_renderer)
+    Application.put_env(:controlkeel, :pdf_renderer, ControlKeel.TestSupport.FakePdfRenderer)
+
+    on_exit(fn ->
+      if previous_renderer do
+        Application.put_env(:controlkeel, :pdf_renderer, previous_renderer)
+      else
+        Application.delete_env(:controlkeel, :pdf_renderer)
+      end
+    end)
+
+    workspace = workspace_fixture()
+    session = session_fixture(%{workspace: workspace})
+
+    _arch =
+      task_fixture(%{
+        session: session,
+        status: "done",
+        position: 1,
+        metadata: %{"track" => "architecture"}
+      })
+
+    _feature =
+      task_fixture(%{
+        session: session,
+        status: "queued",
+        position: 2,
+        metadata: %{"track" => "feature"}
+      })
+
+    _release =
+      task_fixture(%{
+        session: session,
+        status: "queued",
+        position: 3,
+        metadata: %{"track" => "release"}
+      })
+
+    account_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{
+                     command: :service_account_create,
+                     options: [
+                       workspace_id: workspace.id,
+                       name: "Runner",
+                       scopes: "tasks:claim,tasks:report"
+                     ],
+                     args: []
+                   },
+                   project_root: tmp_dir
+                 )
+      end)
+
+    assert account_output =~ "Created service account"
+
+    graph_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{command: :graph_show, options: %{}, args: [Integer.to_string(session.id)]},
+                   project_root: tmp_dir
+                 )
+      end)
+
+    assert graph_output =~ "Task graph for session"
+
+    execute_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{
+                     command: :execute_session,
+                     options: %{},
+                     args: [Integer.to_string(session.id)]
+                   },
+                   project_root: tmp_dir
+                 )
+      end)
+
+    assert execute_output =~ "Executed scheduling"
+
+    audit_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{
+                     command: :audit_log,
+                     options: [format: "pdf"],
+                     args: [Integer.to_string(session.id)]
+                   },
+                   project_root: tmp_dir
+                 )
+      end)
+
+    assert audit_output =~ "Artifact:"
+
+    policy_set = policy_set_fixture()
+
+    apply_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{
+                     command: :policy_set_apply,
+                     options: [precedence: 5],
+                     args: [Integer.to_string(workspace.id), Integer.to_string(policy_set.id)]
+                   },
+                   project_root: tmp_dir
+                 )
+      end)
+
+    assert apply_output =~ "Applied policy set"
+
+    assert Platform.list_workspace_policy_sets(workspace.id) != []
+  end
+
+  defp codex_config_path do
+    home = System.get_env("HOME") || System.user_home!()
+
+    case :os.type() do
+      {:win32, _} -> Path.join([System.get_env("APPDATA") || home, ".codex", "config.json"])
+      _ -> Path.join([home, ".codex", "config.json"])
+    end
+  end
+
+  defp cursor_config_path do
+    home = System.get_env("HOME") || System.user_home!()
+
+    case :os.type() do
+      {:win32, _} ->
+        Path.join([
+          System.get_env("APPDATA") || home,
+          "Cursor",
+          "User",
+          "globalStorage",
+          "cursor.mcp.json"
+        ])
+
+      {:unix, :darwin} ->
+        Path.join([
+          home,
+          "Library",
+          "Application Support",
+          "Cursor",
+          "User",
+          "globalStorage",
+          "cursor.mcp.json"
+        ])
+
+      _ ->
+        Path.join([home, ".config", "Cursor", "User", "globalStorage", "cursor.mcp.json"])
+    end
   end
 end

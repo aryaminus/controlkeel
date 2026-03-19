@@ -4,8 +4,10 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.AgentRouter
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
+  alias ControlKeel.Distribution
   alias ControlKeel.Memory
   alias ControlKeel.Mission
+  alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
   alias ControlKeel.Repo
   alias ControlKeel.Scanner.FastPath
@@ -448,26 +450,95 @@ defmodule ControlKeelWeb.ApiController do
   # ─── Audit Log ────────────────────────────────────────────────────────────────
 
   def audit_log(conn, %{"id" => session_id} = params) do
-    case Mission.audit_log(session_id) do
+    format = Map.get(params, "format", "json")
+
+    with :ok <- authorize_session_access(conn, session_id, audit_scope_for(format)) do
+      case format do
+        "pdf" ->
+          case Platform.export_audit_log(String.to_integer(session_id), "pdf") do
+            {:ok, %{payload: payload}} ->
+              conn
+              |> put_resp_content_type("application/pdf")
+              |> put_resp_header(
+                "content-disposition",
+                "attachment; filename=\"audit-log-#{session_id}.pdf\""
+              )
+              |> send_resp(200, payload)
+
+            {:error, :renderer_unavailable} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "pdf_export_unavailable"})
+
+            {:error, :not_found} ->
+              conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+            {:error, reason} ->
+              conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+          end
+
+        "csv" ->
+          case Platform.export_audit_log(String.to_integer(session_id), "csv") do
+            {:ok, %{payload: csv}} ->
+              conn
+              |> put_resp_content_type("text/csv")
+              |> put_resp_header(
+                "content-disposition",
+                "attachment; filename=\"audit-log-#{session_id}.csv\""
+              )
+              |> send_resp(200, csv)
+
+            {:error, :not_found} ->
+              conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+            {:error, reason} ->
+              conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+          end
+
+        _ ->
+          case Mission.audit_log(session_id) do
+            {:error, :not_found} ->
+              conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+            {:ok, log} ->
+              _ = Platform.export_audit_log(String.to_integer(session_id), "json")
+              json(conn, %{audit_log: log})
+          end
+      end
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "session not found"})
+    end
+  end
 
-      {:ok, log} ->
-        format = Map.get(params, "format", "json")
+  # ─── Graph / Execution ───────────────────────────────────────────────────────
 
-        if format == "csv" do
-          csv = audit_log_to_csv(log)
+  def session_graph(conn, %{"id" => session_id}) do
+    with :ok <- authorize_session_access(conn, session_id, "tasks:read") do
+      session_id = String.to_integer(session_id)
+      json(conn, %{graph: Platform.ensure_session_graph(session_id)})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
 
-          conn
-          |> put_resp_content_type("text/csv")
-          |> put_resp_header(
-            "content-disposition",
-            "attachment; filename=\"audit-log-#{session_id}.csv\""
-          )
-          |> send_resp(200, csv)
-        else
-          json(conn, %{audit_log: log})
-        end
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "session not found"})
+    end
+  end
+
+  def execute_session(conn, %{"id" => session_id} = params) do
+    with :ok <- authorize_session_access(conn, session_id, "tasks:execute") do
+      {:ok, graph} = Platform.execute_session(String.to_integer(session_id), params)
+      json(conn, %{graph: graph})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "session not found"})
     end
   end
 
@@ -516,6 +587,259 @@ defmodule ControlKeelWeb.ApiController do
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def claim_task(conn, %{"id" => task_id} = params) do
+    with :ok <- authorize_task_access(conn, task_id, "tasks:claim") do
+      case Platform.claim_task(String.to_integer(task_id), current_service_account(conn), params) do
+        {:ok, task_run} ->
+          json(conn, %{task_run: task_run_summary(task_run)})
+
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "task not found"})
+
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "task not found"})
+    end
+  end
+
+  def heartbeat_task(conn, %{"id" => task_id} = params) do
+    with :ok <- authorize_task_access(conn, task_id, "tasks:report") do
+      case Platform.heartbeat_task(
+             String.to_integer(task_id),
+             current_service_account(conn),
+             params
+           ) do
+        {:ok, task_run} ->
+          json(conn, %{task_run: task_run_summary(task_run)})
+
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "task run not found"})
+
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "task not found"})
+    end
+  end
+
+  def task_checks(conn, %{"id" => task_id, "checks" => checks}) when is_list(checks) do
+    with :ok <- authorize_task_access(conn, task_id, "tasks:report") do
+      case Platform.record_task_checks(
+             String.to_integer(task_id),
+             current_service_account(conn),
+             checks
+           ) do
+        {:ok, results} ->
+          json(conn, %{checks: Enum.map(results, &task_check_summary/1)})
+
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "task run not found"})
+
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "task not found"})
+    end
+  end
+
+  def task_checks(conn, _params) do
+    conn |> put_status(:unprocessable_entity) |> json(%{error: "checks must be a list"})
+  end
+
+  def report_task(conn, %{"id" => task_id} = params) do
+    with :ok <- authorize_task_access(conn, task_id, "tasks:report") do
+      case Platform.report_task(String.to_integer(task_id), current_service_account(conn), params) do
+        {:ok, task_run} ->
+          json(conn, %{task_run: task_run_summary(task_run)})
+
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "task run not found"})
+
+        {:error, {:unresolved_findings, findings, _task}} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{
+            error: "task has unresolved findings",
+            findings: Enum.map(findings, &finding_summary/1)
+          })
+
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "task not found"})
+    end
+  end
+
+  # ─── Platform ────────────────────────────────────────────────────────────────
+
+  def list_service_accounts(conn, %{"id" => workspace_id}) do
+    with :ok <- authorize_workspace_access(conn, workspace_id, "service_accounts:read") do
+      accounts =
+        workspace_id
+        |> String.to_integer()
+        |> Platform.list_service_accounts()
+
+      json(conn, %{service_accounts: Enum.map(accounts, &service_account_summary/1)})
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  def create_service_account(conn, %{"id" => workspace_id} = params) do
+    with :ok <- authorize_workspace_access(conn, workspace_id, "service_accounts:write") do
+      case Platform.create_service_account(String.to_integer(workspace_id), params) do
+        {:ok, %{service_account: account, token: token}} ->
+          conn
+          |> put_status(:created)
+          |> json(%{service_account: service_account_summary(account), token: token})
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "invalid service account", details: changeset_errors(changeset)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  def rotate_service_account(conn, %{"id" => id}) do
+    case Platform.get_service_account(String.to_integer(id)) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "service account not found"})
+
+      account ->
+        with :ok <-
+               authorize_workspace_for_conn(conn, account.workspace_id, "service_accounts:write") do
+          case Platform.rotate_service_account(String.to_integer(id)) do
+            {:ok, %{service_account: updated, token: token}} ->
+              json(conn, %{service_account: service_account_summary(updated), token: token})
+
+            {:error, reason} ->
+              conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+          end
+        else
+          {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+        end
+    end
+  end
+
+  def list_workspace_policy_sets(conn, %{"id" => workspace_id}) do
+    with :ok <- authorize_workspace_access(conn, workspace_id, "policy_sets:read") do
+      workspace_id = String.to_integer(workspace_id)
+
+      json(conn, %{
+        assignments:
+          Enum.map(
+            Platform.list_workspace_policy_sets(workspace_id),
+            &policy_assignment_summary/1
+          ),
+        available_policy_sets: Enum.map(Platform.list_policy_sets(), &policy_set_summary/1)
+      })
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  def create_policy_set(conn, %{"id" => workspace_id} = params) do
+    with :ok <- authorize_workspace_access(conn, workspace_id, "policy_sets:write") do
+      case Platform.create_policy_set(params) do
+        {:ok, policy_set} ->
+          conn |> put_status(:created) |> json(%{policy_set: policy_set_summary(policy_set)})
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "invalid policy set", details: changeset_errors(changeset)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  def apply_policy_set(conn, %{"id" => workspace_id, "policy_set_id" => policy_set_id} = params) do
+    with :ok <- authorize_workspace_access(conn, workspace_id, "policy_sets:write") do
+      case Platform.apply_policy_set(
+             String.to_integer(workspace_id),
+             String.to_integer(policy_set_id),
+             params
+           ) do
+        {:ok, assignment} ->
+          json(conn, %{
+            assignment: policy_assignment_summary(Repo.preload(assignment, :policy_set))
+          })
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "invalid policy assignment", details: changeset_errors(changeset)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  def list_webhooks(conn, %{"id" => workspace_id}) do
+    with :ok <- authorize_workspace_access(conn, workspace_id, "webhooks:read") do
+      webhooks =
+        workspace_id
+        |> String.to_integer()
+        |> Platform.list_webhooks()
+
+      json(conn, %{webhooks: Enum.map(webhooks, &webhook_summary/1)})
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  def create_webhook(conn, %{"id" => workspace_id} = params) do
+    with :ok <- authorize_workspace_access(conn, workspace_id, "webhooks:write") do
+      case Platform.create_webhook(String.to_integer(workspace_id), params) do
+        {:ok, webhook} ->
+          conn |> put_status(:created) |> json(%{webhook: webhook_summary(webhook)})
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "invalid webhook", details: changeset_errors(changeset)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+    end
+  end
+
+  def replay_webhook(conn, %{"id" => id}) do
+    case Platform.get_webhook(String.to_integer(id)) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "webhook not found"})
+
+      webhook ->
+        with :ok <- authorize_workspace_for_conn(conn, webhook.workspace_id, "webhooks:write") do
+          case Platform.replay_webhook(String.to_integer(id)) do
+            {:ok, delivery} ->
+              json(conn, %{delivery: delivery_summary(delivery)})
+
+            {:error, :not_found} ->
+              conn |> put_status(:not_found) |> json(%{error: "delivery not found"})
+
+            {:error, reason} ->
+              conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+          end
+        else
+          {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+        end
     end
   end
 
@@ -599,7 +923,8 @@ defmodule ControlKeelWeb.ApiController do
   def list_skill_targets(conn, _params) do
     json(conn, %{
       targets: Enum.map(Skills.targets(), &skill_target_summary/1),
-      agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1)
+      agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1),
+      installation_channels: Distribution.install_channels()
     })
   end
 
@@ -685,7 +1010,8 @@ defmodule ControlKeelWeb.ApiController do
       description: target.description,
       native: target.native,
       default_scope: target.default_scope,
-      supported_scopes: target.supported_scopes
+      supported_scopes: target.supported_scopes,
+      release_bundle: target.release_bundle
     }
   end
 
@@ -700,6 +1026,10 @@ defmodule ControlKeelWeb.ApiController do
       companion_delivery: integration.companion_delivery,
       preferred_target: integration.preferred_target,
       default_scope: integration.default_scope,
+      supported_scopes: integration.supported_scopes,
+      router_agent_id: integration.router_agent_id,
+      required_mcp_tools: integration.required_mcp_tools,
+      install_channels: ControlKeel.AgentIntegration.install_channels(integration.id),
       export_targets: integration.export_targets
     }
   end
@@ -938,44 +1268,95 @@ defmodule ControlKeelWeb.ApiController do
     }
   end
 
-  defp audit_log_to_csv(%{events: events, session_id: sid, session_title: title}) do
-    header =
-      "session_id,session_title,timestamp,type,rule_id,severity,category,status,plain_message,source,tool,provider,model,decision,cost_cents,tokens\r\n"
-
-    rows =
-      Enum.map(events, fn e ->
-        [
-          sid,
-          title,
-          e.timestamp,
-          e.type,
-          Map.get(e, :rule_id, ""),
-          Map.get(e, :severity, ""),
-          Map.get(e, :category, ""),
-          Map.get(e, :status, ""),
-          csv_escape(Map.get(e, :plain_message, "")),
-          Map.get(e, :source, ""),
-          Map.get(e, :tool, ""),
-          Map.get(e, :provider, ""),
-          Map.get(e, :model, ""),
-          Map.get(e, :decision, ""),
-          Map.get(e, :cost_cents, ""),
-          Map.get(e, :tokens, "")
-        ]
-        |> Enum.join(",")
-      end)
-
-    header <> Enum.join(rows, "\r\n")
+  defp service_account_summary(account) do
+    %{
+      id: account.id,
+      workspace_id: account.workspace_id,
+      name: account.name,
+      scopes: ControlKeel.Platform.ServiceAccount.scope_list(account),
+      status: account.status,
+      last_used_at: account.last_used_at,
+      inserted_at: account.inserted_at
+    }
   end
 
-  defp csv_escape(nil), do: ""
+  defp policy_set_summary(policy_set) do
+    %{
+      id: policy_set.id,
+      name: policy_set.name,
+      scope: policy_set.scope,
+      description: policy_set.description,
+      status: policy_set.status,
+      rules_count: length(ControlKeel.Platform.PolicySet.rule_entries(policy_set)),
+      metadata: policy_set.metadata
+    }
+  end
 
-  defp csv_escape(str) when is_binary(str) do
-    if String.contains?(str, [",", "\"", "\n"]) do
-      "\"" <> String.replace(str, "\"", "\"\"") <> "\""
-    else
-      str
-    end
+  defp policy_assignment_summary(assignment) do
+    %{
+      id: assignment.id,
+      workspace_id: assignment.workspace_id,
+      policy_set_id: assignment.policy_set_id,
+      precedence: assignment.precedence,
+      enabled: assignment.enabled,
+      policy_set: assignment.policy_set && policy_set_summary(assignment.policy_set)
+    }
+  end
+
+  defp webhook_summary(webhook) do
+    %{
+      id: webhook.id,
+      workspace_id: webhook.workspace_id,
+      name: webhook.name,
+      url: webhook.url,
+      subscribed_events: ControlKeel.Platform.IntegrationWebhook.event_list(webhook),
+      status: webhook.status,
+      inserted_at: webhook.inserted_at
+    }
+  end
+
+  defp delivery_summary(delivery) do
+    %{
+      id: delivery.id,
+      webhook_id: delivery.webhook_id,
+      workspace_id: delivery.workspace_id,
+      event: delivery.event,
+      response_code: delivery.response_code,
+      response_body: delivery.response_body,
+      attempts: delivery.attempts,
+      status: delivery.status,
+      last_attempted_at: delivery.last_attempted_at,
+      next_retry_at: delivery.next_retry_at
+    }
+  end
+
+  defp task_run_summary(run) do
+    %{
+      id: run.id,
+      task_id: run.task_id,
+      session_id: run.session_id,
+      service_account_id: run.service_account_id,
+      status: run.status,
+      execution_mode: run.execution_mode,
+      claimed_at: run.claimed_at,
+      started_at: run.started_at,
+      finished_at: run.finished_at,
+      external_ref: run.external_ref,
+      output: run.output,
+      metadata: run.metadata,
+      checks: Enum.map(run.check_results || [], &task_check_summary/1)
+    }
+  end
+
+  defp task_check_summary(check) do
+    %{
+      id: check.id,
+      task_run_id: check.task_run_id,
+      check_type: check.check_type,
+      status: check.status,
+      summary: check.summary,
+      payload: check.payload
+    }
   end
 
   defp changeset_errors(changeset) do
@@ -1008,4 +1389,62 @@ defmodule ControlKeelWeb.ApiController do
   defp benchmark_filter_opts(nil), do: []
   defp benchmark_filter_opts(""), do: []
   defp benchmark_filter_opts(domain_pack), do: [domain_pack: domain_pack]
+
+  defp current_service_account(conn) do
+    case conn.assigns[:api_auth] do
+      %{type: :service_account, service_account: service_account} -> service_account
+      _ -> nil
+    end
+  end
+
+  defp authorize_session_access(conn, session_id, scope) do
+    with {:ok, parsed_id} <- parse_integer_param(session_id),
+         %{} = session <- Mission.get_session(parsed_id) do
+      authorize_workspace_for_conn(conn, session.workspace_id, scope)
+    else
+      {:error, :invalid_integer} -> {:error, :not_found}
+      nil -> {:error, :not_found}
+    end
+  end
+
+  defp authorize_task_access(conn, task_id, scope) do
+    with {:ok, parsed_id} <- parse_integer_param(task_id),
+         %{} = task <- Mission.get_task(parsed_id),
+         %{} = session <- Mission.get_session(task.session_id) do
+      authorize_workspace_for_conn(conn, session.workspace_id, scope)
+    else
+      {:error, :invalid_integer} -> {:error, :not_found}
+      nil -> {:error, :not_found}
+    end
+  end
+
+  defp authorize_workspace_access(conn, workspace_id, scope) do
+    with {:ok, parsed_id} <- parse_integer_param(workspace_id) do
+      authorize_workspace_for_conn(conn, parsed_id, scope)
+    else
+      {:error, :invalid_integer} -> {:error, :not_found}
+    end
+  end
+
+  defp authorize_workspace_for_conn(conn, workspace_id, scope) do
+    case conn.assigns[:api_auth] do
+      %{type: :bootstrap} ->
+        :ok
+
+      %{type: :service_account, service_account: service_account} ->
+        if service_account.workspace_id == workspace_id and
+             Platform.service_account_has_scope?(service_account, scope) do
+          :ok
+        else
+          {:error, :forbidden}
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp audit_scope_for("pdf"), do: "audit:export"
+  defp audit_scope_for("csv"), do: "audit:read"
+  defp audit_scope_for(_format), do: "audit:read"
 end

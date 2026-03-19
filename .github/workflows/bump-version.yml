@@ -1,0 +1,73 @@
+name: Bump Version
+
+on:
+  workflow_run:
+    workflows: ["Release Smoke"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  bump:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      vars.CONTROLKEEL_RELEASE_AUTOTAG_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - id: release_gate
+        name: Confirm release verification gate
+        run: |
+          if grep -q 'pending' docs/release-verification.md; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Release verification is still pending; skipping auto-tag."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure Git
+        if: steps.release_gate.outputs.ready == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Ensure clean baseline
+        if: steps.release_gate.outputs.ready == 'true'
+        run: |
+          if git log -1 --pretty=%s | grep -q '^chore(release): bump version to '; then
+            echo "Latest commit is already a release bump; exiting."
+            exit 0
+          fi
+
+      - name: Bump patch version and changelog
+        if: steps.release_gate.outputs.ready == 'true'
+        run: |
+          python3 scripts/bump_version.py > /tmp/controlkeel-version.txt
+
+      - name: Commit release bump
+        if: steps.release_gate.outputs.ready == 'true'
+        run: |
+          VERSION=$(cat /tmp/controlkeel-version.txt)
+          git add mix.exs CHANGELOG.md packages/npm/controlkeel/package.json
+          git commit -m "chore(release): bump version to ${VERSION}"
+          git tag -d "v${VERSION}" || true
+          git tag "v${VERSION}"
+
+      - name: Push commit and tag
+        if: steps.release_gate.outputs.ready == 'true'
+        run: |
+          VERSION=$(cat /tmp/controlkeel-version.txt)
+          git pull --rebase origin main
+          git push origin main
+          git push origin "refs/tags/v${VERSION}" --force

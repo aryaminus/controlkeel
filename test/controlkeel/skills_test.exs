@@ -155,6 +155,7 @@ defmodule ControlKeel.SkillsTest do
            )
 
     assert File.exists?(Path.join(codex_plan.output_dir, "AGENTS.md"))
+    assert File.exists?(Path.join(codex_plan.output_dir, "CONTROLKEEL_INSTALL.md"))
 
     assert {:ok, claude_plan} = Skills.export("claude-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(claude_plan.output_dir, ".claude-plugin/plugin.json"))
@@ -166,6 +167,9 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(claude_plan.output_dir, "agents/controlkeel-operator.md"))
     assert File.exists?(Path.join(claude_plan.output_dir, ".mcp.json"))
     assert File.exists?(Path.join(claude_plan.output_dir, "settings.json"))
+
+    assert File.read!(Path.join(claude_plan.output_dir, "CONTROLKEEL_INSTALL.md")) =~
+             "@aryaminus/controlkeel"
   end
 
   test "installer writes project-scoped native bundles without nesting agent directories", %{

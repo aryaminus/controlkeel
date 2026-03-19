@@ -27,11 +27,18 @@ if [ ! -x "$BINARY" ]; then
 fi
 
 TMP_DIR=$(mktemp -d)
+HOME_DIR="$TMP_DIR/home"
 PORT=4081
 DB_PATH="$TMP_DIR/controlkeel.db"
 SECRET_KEY_BASE="controlkeel-release-smoke-secret"
 SECRET_KEY_BASE="${SECRET_KEY_BASE}$(printf '0123456789abcdef0123456789abcdef0123456789abcdef')"
 SERVER_LOG="$TMP_DIR/server.log"
+
+mkdir -p "$HOME_DIR"
+export HOME="$HOME_DIR"
+export CONTROLKEEL_HOME="$HOME_DIR"
+export DATABASE_PATH="$DB_PATH"
+export SECRET_KEY_BASE="$SECRET_KEY_BASE"
 
 cleanup() {
   if [ -n "${SERVER_PID:-}" ]; then
@@ -48,7 +55,7 @@ import subprocess
 import sys
 
 argv = sys.argv[1:]
-completed = subprocess.run(argv, capture_output=True, timeout=30, check=True)
+completed = subprocess.run(argv, capture_output=True, timeout=60, check=True)
 sys.stdout.buffer.write(completed.stdout)
 sys.stderr.buffer.write(completed.stderr)
 PY
@@ -57,19 +64,16 @@ PY
 run_command "$BINARY" help >/dev/null
 run_command "$BINARY" version >/dev/null
 
-python3 - "$BINARY" "$TMP_DIR" "$DB_PATH" "$SECRET_KEY_BASE" <<'PY'
+python3 - "$BINARY" "$TMP_DIR" <<'PY'
 import os
 import subprocess
 import sys
 
-binary, tmp_dir, db_path, secret = sys.argv[1:5]
-env = os.environ.copy()
-env["DATABASE_PATH"] = db_path
-env["SECRET_KEY_BASE"] = secret
+binary, tmp_dir = sys.argv[1:3]
 completed = subprocess.run(
     [binary, "init", "--no-attach"],
     cwd=tmp_dir,
-    env=env,
+    env=os.environ.copy(),
     timeout=60,
     check=False,
     capture_output=True,
@@ -82,6 +86,40 @@ PY
 
 test -f "$TMP_DIR/controlkeel/project.json"
 test -f "$TMP_DIR/controlkeel/bin/controlkeel-mcp"
+
+(cd "$TMP_DIR" && run_command "$BINARY" benchmark list >/dev/null)
+
+BENCH_OUTPUT=$(cd "$TMP_DIR" && \
+  run_command \
+    "$BINARY" \
+    benchmark \
+    run \
+    --suite \
+    vibe_failures_v1 \
+    --subjects \
+    controlkeel_validate \
+    --baseline-subject \
+    controlkeel_validate \
+    --scenario-slugs \
+    client_side_auth_bypass)
+
+echo "$BENCH_OUTPUT" | grep "Benchmark run #" >/dev/null
+
+(cd "$TMP_DIR" && run_command "$BINARY" attach codex-cli --scope project >/dev/null)
+test -f "$TMP_DIR/.agents/skills/controlkeel-governance/SKILL.md"
+test -f "$TMP_DIR/.codex/agents/controlkeel-operator.toml"
+test -f "$HOME_DIR/.codex/config.json"
+
+(cd "$TMP_DIR" && run_command "$BINARY" attach cursor >/dev/null)
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  CURSOR_CONFIG="$HOME_DIR/Library/Application Support/Cursor/User/globalStorage/cursor.mcp.json"
+else
+  CURSOR_CONFIG="$HOME_DIR/.config/Cursor/User/globalStorage/cursor.mcp.json"
+fi
+
+test -f "$CURSOR_CONFIG"
+test -f "$TMP_DIR/controlkeel/dist/instructions-only/AGENTS.md"
 
 python3 - "$BINARY" "$TMP_DIR" <<'PY'
 import json

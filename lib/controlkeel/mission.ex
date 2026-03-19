@@ -8,6 +8,7 @@ defmodule ControlKeel.Mission do
   alias ControlKeel.Intent.ExecutionBrief
   alias ControlKeel.Memory
   alias ControlKeel.Notifications.Webhook
+  alias ControlKeel.Platform
   alias ControlKeel.Repo
 
   alias ControlKeel.Mission.{
@@ -53,6 +54,9 @@ defmodule ControlKeel.Mission do
 
   def list_workspaces, do: Repo.all(Workspace)
   def get_workspace!(id), do: Repo.get!(Workspace, id)
+
+  def list_sessions_for_workspace(workspace_id),
+    do: Repo.all(from s in Session, where: s.workspace_id == ^workspace_id)
 
   def create_workspace(attrs) do
     %Workspace{}
@@ -116,8 +120,24 @@ defmodule ControlKeel.Mission do
     |> Finding.changeset(attrs)
     |> Repo.insert()
     |> tap(fn
-      {:ok, finding} -> record_finding_memory(:created, finding)
-      _other -> :ok
+      {:ok, finding} ->
+        record_finding_memory(:created, finding)
+
+        Platform.emit_event(
+          "finding.created",
+          %{
+            "workspace_id" => workspace_id_for_session(finding.session_id),
+            "session_id" => finding.session_id,
+            "finding_id" => finding.id,
+            "rule_id" => finding.rule_id,
+            "severity" => finding.severity,
+            "status" => finding.status
+          },
+          workspace_id: workspace_id_for_session(finding.session_id)
+        )
+
+      _other ->
+        :ok
     end)
   end
 
@@ -283,6 +303,9 @@ defmodule ControlKeel.Mission do
     |> Multi.run(:tasks, fn repo, %{session: session} ->
       insert_many(repo, Task, plan.tasks, :session_id, session.id)
     end)
+    |> Multi.run(:task_edges, fn repo, %{session: session, tasks: tasks} ->
+      insert_task_edges(repo, session.id, tasks)
+    end)
     |> Multi.run(:findings, fn repo, %{session: session} ->
       insert_many(repo, Finding, plan.findings, :session_id, session.id)
     end)
@@ -388,6 +411,7 @@ defmodule ControlKeel.Mission do
       {:ok, updated} ->
         emit_finding_event(:approved, updated)
         record_finding_memory(:approved, updated)
+        emit_platform_finding_event("finding.approved", updated)
         {:ok, updated}
 
       other ->
@@ -417,6 +441,7 @@ defmodule ControlKeel.Mission do
       {:ok, updated} ->
         emit_finding_event(:rejected, updated)
         record_finding_memory(:rejected, updated)
+        emit_platform_finding_event("finding.rejected", updated)
         {:ok, updated}
 
       other ->
@@ -474,6 +499,7 @@ defmodule ControlKeel.Mission do
           )
 
           record_proof_memory(proof)
+          Platform.persist_proof_generated(proof)
           {:ok, updated_task}
 
         {:error, _step, reason, _changes} ->
@@ -544,6 +570,7 @@ defmodule ControlKeel.Mission do
     |> case do
       {:ok, proof} ->
         record_proof_memory(proof)
+        Platform.persist_proof_generated(proof)
         {:ok, proof}
 
       {:error, reason} ->
@@ -1152,6 +1179,25 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  defp insert_task_edges(repo, session_id, tasks) do
+    tasks
+    |> Platform.TaskGraph.build_edges()
+    |> Enum.reduce_while({:ok, []}, fn attrs, {:ok, acc} ->
+      attrs = Map.put(attrs, :session_id, session_id)
+
+      case repo.insert(
+             ControlKeel.Platform.TaskEdge.changeset(%ControlKeel.Platform.TaskEdge{}, attrs)
+           ) do
+        {:ok, edge} -> {:cont, {:ok, [edge | acc]}}
+        {:error, changeset} -> {:halt, {:error, changeset}}
+      end
+    end)
+    |> case do
+      {:ok, edges} -> {:ok, Enum.reverse(edges)}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
   defp emit_mission_created(plan, %Session{} = session) do
     brief = plan.session.execution_brief || %{}
     compiler = brief["compiler"] || brief[:compiler] || %{}
@@ -1184,6 +1230,28 @@ defmodule ControlKeel.Mission do
         scanner: opts[:scanner] || "fast_path"
       }
     )
+  end
+
+  defp emit_platform_finding_event(event, finding) do
+    Platform.emit_event(
+      event,
+      %{
+        "workspace_id" => workspace_id_for_session(finding.session_id),
+        "session_id" => finding.session_id,
+        "finding_id" => finding.id,
+        "rule_id" => finding.rule_id,
+        "severity" => finding.severity,
+        "status" => finding.status
+      },
+      workspace_id: workspace_id_for_session(finding.session_id)
+    )
+  end
+
+  defp workspace_id_for_session(session_id) do
+    case get_session(session_id) do
+      nil -> nil
+      session -> session.workspace_id
+    end
   end
 
   defp emit_finding_event(action, %Finding{} = finding) do
