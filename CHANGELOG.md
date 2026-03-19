@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.4 — 2026-03-19
+
+### What's changed
+
+- Fix Homebrew release publish and add GitHub Packages
+
 ## v0.1.3 — 2026-03-19
 
 ### What's changed
