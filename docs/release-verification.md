@@ -4,7 +4,7 @@ This checklist is the manual gate before enabling automatic version bumping.
 
 ## First known-good SHA
 
-- Release Smoke green on `main`: pending
+- Release Smoke green on `main`: 41ff3c476d9033a1c7175633eb72cdc77704303b
 - Tag-triggered Release green: pending
 - GitHub release assets published correctly: pending
 
