@@ -4,9 +4,9 @@ This checklist is the manual gate before enabling automatic version bumping.
 
 ## First known-good SHA
 
-- Release Smoke green on `main`: 41ff3c476d9033a1c7175633eb72cdc77704303b
-- Tag-triggered Release green: pending
-- GitHub release assets published correctly: pending
+- Release Smoke green on `main`: 0d568a5cb14b6b409d78cd2095bfbba5b079cb68
+- Tag-triggered Release green: 494b536c20a13403f9e84970509074af5e4b4b92
+- GitHub release assets published correctly: 494b536c20a13403f9e84970509074af5e4b4b92
 
 Update this file with the first confirmed good SHA before enabling `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED`.
 
