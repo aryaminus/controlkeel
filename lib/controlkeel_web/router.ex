@@ -28,6 +28,7 @@ defmodule ControlKeelWeb.Router do
     live "/ship", ShipLive, :index
     live "/missions/:id", MissionControlLive, :show
     live "/policies", PolicyStudioLive, :index
+    live "/skills", SkillsLive, :index
   end
 
   scope "/api/v1", ControlKeelWeb do
@@ -46,6 +47,8 @@ defmodule ControlKeelWeb.Router do
     get "/budget", ApiController, :get_budget
     get "/proof/:task_id", ApiController, :proof_bundle
     post "/route-agent", ApiController, :route_agent
+    get "/skills", ApiController, :list_skills
+    get "/skills/:name", ApiController, :get_skill
   end
 
   scope "/proxy", ControlKeelWeb do

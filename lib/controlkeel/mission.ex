@@ -387,6 +387,7 @@ defmodule ControlKeel.Mission do
       blocked = Enum.filter(findings, &(&1.status == "blocked"))
       open = Enum.filter(findings, &(&1.status == "open"))
       resolved = Enum.filter(findings, &(&1.status in ["approved", "resolved"]))
+      details = Enum.map(findings, &finding_bundle_entry/1)
 
       risk_score = compute_risk_score(findings)
 
@@ -395,6 +396,15 @@ defmodule ControlKeel.Mission do
 
       compliance_attestations =
         build_compliance_attestations(session, findings)
+
+      test_outcomes = derive_test_outcomes(invocations)
+
+      diff_summary = %{
+        "agent_runs" => length(invocations),
+        "findings_total" => length(findings),
+        "auto_resolved" => Enum.count(details, & &1.auto_resolved),
+        "manual_review" => Enum.count(details, &(&1.status in ["approved", "rejected"]))
+      }
 
       bundle = %{
         task_id: task.id,
@@ -410,8 +420,10 @@ defmodule ControlKeel.Mission do
           blocked: length(blocked),
           open: length(open),
           resolved: length(resolved),
-          details: Enum.map(findings, &finding_bundle_entry/1)
+          details: details
         },
+        test_outcomes: test_outcomes,
+        diff_summary: diff_summary,
         risk_score: risk_score,
         deploy_ready: deploy_ready,
         rollback_instructions:
@@ -496,6 +508,13 @@ defmodule ControlKeel.Mission do
         blocked_count: length(blocked)
       }
     end)
+  end
+
+  defp derive_test_outcomes(invocations) do
+    outcomes = Enum.map(invocations, &get_in(&1.metadata, ["outcome"]))
+    passed = Enum.count(outcomes, &(&1 == "passed"))
+    failed = Enum.count(outcomes, &(&1 == "failed"))
+    %{"passed" => passed, "failed" => failed, "recorded" => length(invocations)}
   end
 
   defp finding_bundle_entry(f) do

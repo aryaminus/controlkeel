@@ -294,6 +294,11 @@ defmodule ControlKeelWeb.MissionControlLive do
                     <strong>{task.title}</strong>
                   </div>
                   <p class="ck-note">{task.validation_gate}</p>
+                  <%= if task.rollback_boundary do %>
+                    <p class="ck-note" style="color: var(--ck-color-muted); font-size: 0.75rem; margin-top: 0.15rem;">
+                      Rollback: {task.rollback_boundary}
+                    </p>
+                  <% end %>
                   <%= if task.status == "in_progress" and @active_findings > 0 do %>
                     <p
                       class="ck-note"
@@ -303,7 +308,14 @@ defmodule ControlKeelWeb.MissionControlLive do
                     </p>
                   <% end %>
                 </div>
-                <span class="ck-pill ck-pill-neutral">{task.status}</span>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
+                  <span class="ck-pill ck-pill-neutral">{task.status}</span>
+                  <%= if task.confidence_score do %>
+                    <span class="ck-pill ck-pill-neutral" style="font-size: 0.7rem;">
+                      {trunc(task.confidence_score * 100)}% confidence
+                    </span>
+                  <% end %>
+                </div>
               </li>
             <% end %>
           </ol>

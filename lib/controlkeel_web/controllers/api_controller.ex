@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Budget
   alias ControlKeel.Mission
   alias ControlKeel.Scanner.FastPath
+  alias ControlKeel.Skills.Registry
 
   # ─── Sessions ────────────────────────────────────────────────────────────────
 
@@ -244,6 +245,59 @@ defmodule ControlKeelWeb.ApiController do
           message:
             "#{length(findings)} finding(s) must be approved or resolved before marking this task done.",
           findings: Enum.map(findings, &finding_summary/1)
+        })
+    end
+  end
+
+  # ─── Skills ───────────────────────────────────────────────────────────────────
+
+  def list_skills(conn, params) do
+    project_root = Map.get(params, "project_root")
+    format = Map.get(params, "format", "json")
+    skills = Registry.catalog(project_root)
+
+    entries =
+      Enum.map(skills, fn s ->
+        %{
+          name: s.name,
+          description: s.description,
+          scope: s.scope,
+          allowed_tools: s.allowed_tools,
+          license: s.license,
+          compatibility: s.compatibility
+        }
+      end)
+
+    result = %{skills: entries, total: length(entries)}
+
+    result =
+      if format == "xml" do
+        Map.put(result, :prompt_block, Registry.prompt_block(project_root))
+      else
+        result
+      end
+
+    json(conn, result)
+  end
+
+  def get_skill(conn, %{"name" => name} = params) do
+    project_root = Map.get(params, "project_root")
+
+    case Registry.get(name, project_root) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "skill not found"})
+
+      skill ->
+        json(conn, %{
+          skill: %{
+            name: skill.name,
+            description: skill.description,
+            scope: skill.scope,
+            allowed_tools: skill.allowed_tools,
+            license: skill.license,
+            compatibility: skill.compatibility,
+            body: skill.body
+          }
         })
     end
   end

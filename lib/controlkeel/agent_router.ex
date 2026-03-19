@@ -39,6 +39,7 @@ defmodule ControlKeel.AgentRouter do
   # :workflow          — workflow automation / trigger-based integration
   # :observability     — agent monitoring, tracing, session replay
   # :prompt_management — prompt versioning, evaluation, deployment ops
+  # :skills            — supports AgentSkills discovery and activation via ck_skill_list/ck_skill_load
 
   @agents %{
     # ── Category A: Local IDEs ───────────────────────────────────────────────
@@ -673,6 +674,9 @@ defmodule ControlKeel.AgentRouter do
       Regex.match?(~r/\b(workflow|automate|automation|trigger|zap|integration|connector|webhook|n8n|zapier|make\.com)\b/, t) ->
         :workflow
 
+      Regex.match?(~r/\b(skill|skills|activate.?skill|load.?skill|agentskill|skill.?load|skill.?list)\b/, t) ->
+        :skill
+
       Regex.match?(~r/\b(api|endpoint|route|controller|handler|middleware|auth|database|migration|schema)\b/, t) ->
         :backend
 
@@ -703,6 +707,10 @@ defmodule ControlKeel.AgentRouter do
 
   defp capability_match?(%{capabilities: caps}, :workflow),
     do: :workflow in caps or :multi_agent in caps or :bash in caps
+
+  # Any MCP-capable agent can discover and activate AgentSkills via ck_skill_list/ck_skill_load
+  defp capability_match?(%{capabilities: caps}, :skill),
+    do: :mcp in caps or :repo_edit in caps
 
   defp capability_match?(_, _), do: true
 
@@ -743,6 +751,9 @@ defmodule ControlKeel.AgentRouter do
 
         :workflow ->
           if :workflow in agent.capabilities, do: 0.2, else: 0.0
+
+        :skill ->
+          if :mcp in agent.capabilities, do: 0.25, else: 0.0
 
         _ ->
           0.0

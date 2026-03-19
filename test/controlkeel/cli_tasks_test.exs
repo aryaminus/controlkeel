@@ -58,6 +58,46 @@ defmodule ControlKeel.CLITasksTest do
     assert Repo.aggregate(Session, :count, :id) == session_count
   end
 
+  test "ck.init auto-attaches when .claude dir exists and stub is available", %{tmp_dir: tmp_dir} do
+    create_claude_stub(tmp_dir, "controlkeel")
+    claude_home = Path.join(System.user_home!(), ".claude")
+
+    if File.dir?(claude_home) do
+      output =
+        with_env("CONTROLKEEL_CLAUDE_BIN", Path.join(tmp_dir, "claude"), fn ->
+          with_project(tmp_dir, fn ->
+            rerun_task("ck.init")
+            capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
+          end)
+        end)
+
+      assert output =~ "Initialized ControlKeel"
+      assert output =~ "Attached ControlKeel to Claude Code."
+    else
+      # CI without Claude Code — auto-attach skipped, fallback message shown
+      output =
+        with_project(tmp_dir, fn ->
+          rerun_task("ck.init")
+          capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
+        end)
+
+      assert output =~ "Initialized ControlKeel"
+      assert output =~ "controlkeel attach claude-code"
+    end
+  end
+
+  test "ck.init --no-attach skips auto-attach and shows manual hint", %{tmp_dir: tmp_dir} do
+    output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.init")
+        capture_io(fn -> Mix.Tasks.Ck.Init.run(["--no-attach"]) end)
+      end)
+
+    assert output =~ "Initialized ControlKeel"
+    assert output =~ "controlkeel attach claude-code"
+    refute output =~ "Attached ControlKeel to Claude Code."
+  end
+
   test "ck.attach claude-code shells out and updates the binding", %{tmp_dir: tmp_dir} do
     create_claude_stub(tmp_dir, "controlkeel")
 

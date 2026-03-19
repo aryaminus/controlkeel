@@ -17,7 +17,8 @@ defmodule ControlKeel.CLI do
     budget: :string,
     users: :string,
     data: :string,
-    project_name: :string
+    project_name: :string,
+    no_attach: :boolean
   ]
   @findings_switches [severity: :string, status: :string]
   @mcp_switches [project_root: :string]
@@ -144,15 +145,36 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :init, options: options}, project_root) do
     attrs = Enum.into(options, %{}, fn {key, value} -> {Atom.to_string(key), value} end)
+    no_attach = Keyword.get(options, :no_attach, false)
 
     case LocalProject.init(attrs, project_root) do
       {:ok, binding, :created} ->
-        {:ok,
-         [
-           "Initialized ControlKeel for #{binding["project_root"]}",
-           "Project binding: #{ProjectBinding.path(project_root)}",
-           "MCP wrapper: #{ProjectBinding.mcp_wrapper_path(project_root)}"
-         ]}
+        base_lines = [
+          "Initialized ControlKeel for #{binding["project_root"]}",
+          "Project binding: #{ProjectBinding.path(project_root)}",
+          "MCP wrapper: #{ProjectBinding.mcp_wrapper_path(project_root)}"
+        ]
+
+        attach_lines =
+          if no_attach do
+            ["To attach to Claude Code: controlkeel attach claude-code"]
+          else
+            case auto_attach_claude_code(project_root) do
+              {:ok, _result} ->
+                [
+                  "Attached ControlKeel to Claude Code.",
+                  "Verified with `claude mcp get controlkeel`."
+                ]
+
+              {:skip, reason} ->
+                ["To attach to Claude Code: controlkeel attach claude-code  (#{reason})"]
+
+              {:error, _reason} ->
+                ["To attach to Claude Code: controlkeel attach claude-code"]
+            end
+          end
+
+        {:ok, base_lines ++ attach_lines}
 
       {:ok, binding, :existing} ->
         {:ok,
@@ -744,6 +766,34 @@ defmodule ControlKeel.CLI do
          "attached_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
+    end
+  end
+
+  defp auto_attach_claude_code(project_root) do
+    claude_dir = Path.join(System.user_home!(), ".claude")
+    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+
+    cond do
+      not File.dir?(claude_dir) ->
+        {:skip, "claude-code not found on this system"}
+
+      not File.exists?(wrapper_path) ->
+        {:skip, "wrapper not yet written"}
+
+      true ->
+        case ClaudeCLI.attach_local(project_root, wrapper_path) do
+          {:ok, result} ->
+            emit_attach_succeeded(
+              %{"session_id" => nil, "workspace_id" => nil},
+              project_root,
+              result
+            )
+
+            {:ok, result}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 

@@ -1,7 +1,7 @@
 defmodule ControlKeel.MCP.Protocol do
   @moduledoc false
 
-  alias ControlKeel.MCP.Tools.{CkBudget, CkContext, CkFinding, CkRoute, CkValidate}
+  alias ControlKeel.MCP.Tools.{CkBudget, CkContext, CkFinding, CkRoute, CkSkillList, CkSkillLoad, CkValidate}
 
   @server_info %{"name" => "controlkeel", "version" => "0.1.0"}
 
@@ -48,6 +48,12 @@ defmodule ControlKeel.MCP.Protocol do
 
       %{"name" => "ck_route", "arguments" => arguments} ->
         tool_response(id, CkRoute.call(arguments))
+
+      %{"name" => "ck_skill_list", "arguments" => arguments} ->
+        tool_response(id, CkSkillList.call(arguments))
+
+      %{"name" => "ck_skill_load", "arguments" => arguments} ->
+        tool_response(id, CkSkillLoad.call(arguments))
 
       %{"name" => unknown} ->
         error_response(id, -32601, "Unknown tool: #{unknown}")
@@ -151,7 +157,15 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   defp tool_schemas do
-    [ck_validate_tool(), ck_context_tool(), ck_finding_tool(), ck_budget_tool(), ck_route_tool()]
+    [
+      ck_validate_tool(),
+      ck_context_tool(),
+      ck_finding_tool(),
+      ck_budget_tool(),
+      ck_route_tool(),
+      ck_skill_list_tool(),
+      ck_skill_load_tool()
+    ]
   end
 
   defp ck_route_tool do
@@ -182,6 +196,56 @@ defmodule ControlKeel.MCP.Protocol do
             "description" =>
               "Restrict routing to these agent IDs. Omit to allow all supported agents."
           }
+        }
+      }
+    }
+  end
+
+  defp ck_skill_list_tool do
+    %{
+      "name" => "ck_skill_list",
+      "description" =>
+        "List all available AgentSkills for this project. Returns names, descriptions, and scopes. " <>
+          "Call this to discover capabilities you can activate, then use ck_skill_load to load a skill's full instructions.",
+      "inputSchema" => %{
+        "type" => "object",
+        "properties" => %{
+          "project_root" => %{
+            "type" => "string",
+            "description" => "Absolute path to the project root. Omit to use global skills only."
+          },
+          "format" => %{
+            "type" => "string",
+            "enum" => ["json", "xml"],
+            "description" =>
+              "Response format. Use xml to receive an <available_skills> block for system prompt injection."
+          }
+        }
+      }
+    }
+  end
+
+  defp ck_skill_load_tool do
+    %{
+      "name" => "ck_skill_load",
+      "description" =>
+        "Load the full instructions for a named AgentSkill. Returns the SKILL.md body wrapped in " <>
+          "<skill_content> tags plus a list of bundled resource files. " <>
+          "Call after ck_skill_list to activate a specific skill.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["name"],
+        "properties" => %{
+          "name" => %{
+            "type" => "string",
+            "description" => "The skill name as returned by ck_skill_list"
+          },
+          "project_root" => %{
+            "type" => "string",
+            "description" => "Absolute path to the project root. Omit to search global skills only."
+          },
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]}
         }
       }
     }

@@ -226,6 +226,27 @@ defmodule ControlKeel.MissionTest do
       assert bundle.deploy_ready == false
     end
 
+    test "bundle includes test_outcomes and diff_summary" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+
+      assert %{"passed" => passed, "failed" => failed, "recorded" => recorded} =
+               bundle.test_outcomes
+
+      assert is_integer(passed)
+      assert is_integer(failed)
+      assert is_integer(recorded)
+
+      assert %{
+               "agent_runs" => _,
+               "findings_total" => _,
+               "auto_resolved" => _,
+               "manual_review" => _
+             } = bundle.diff_summary
+    end
+
     test "returns :not_found for unknown task_id" do
       assert {:error, :not_found} = Mission.proof_bundle(99_999_999)
     end

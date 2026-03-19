@@ -417,7 +417,9 @@ defmodule ControlKeel.Mission.Planner do
           estimated_cost_cents: 35,
           validation_gate: validation_gate(risk_tier),
           position: index,
-          metadata: %{track: "feature", stack: stack}
+          metadata: %{track: "feature", stack: stack},
+          confidence_score: task_confidence("feature", risk_tier),
+          rollback_boundary: task_rollback("feature", feature)
         }
       end)
 
@@ -428,7 +430,9 @@ defmodule ControlKeel.Mission.Planner do
         estimated_cost_cents: 15,
         validation_gate: "Decision brief approved",
         position: 1,
-        metadata: %{track: "architecture", stack: stack}
+        metadata: %{track: "architecture", stack: stack},
+        confidence_score: task_confidence("arch", risk_tier),
+        rollback_boundary: task_rollback("arch", "Lock the architecture, data model, and deploy plan")
       }
       | feature_tasks
     ] ++
@@ -439,10 +443,37 @@ defmodule ControlKeel.Mission.Planner do
           estimated_cost_cents: 20,
           validation_gate: "Tests, scans, and rollback notes complete",
           position: length(feature_tasks) + 2,
-          metadata: %{track: "release", stack: stack}
+          metadata: %{track: "release", stack: stack},
+          confidence_score: task_confidence("verify", risk_tier),
+          rollback_boundary: task_rollback("verify", "Run verification, proof bundle, and release checklist")
         }
       ]
   end
+
+  defp task_confidence(track, risk_tier) do
+    base =
+      case track do
+        "arch" -> 0.9
+        "feature" -> 0.75
+        "verify" -> 0.85
+        _ -> 0.70
+      end
+
+    case risk_tier do
+      "critical" -> Float.round(base * 0.85, 2)
+      "high" -> Float.round(base * 0.92, 2)
+      _ -> base
+    end
+  end
+
+  defp task_rollback("arch", _title),
+    do: "No rollback — architecture decisions; discuss with team before reverting."
+
+  defp task_rollback("verify", _title),
+    do: "No rollback — verification only; no code changed."
+
+  defp task_rollback(_track, title),
+    do: "git revert HEAD~1  # reverts: #{title}"
 
   defp build_findings(industry, idea, data, features, budget_cents) do
     content = Enum.join([idea, data | features], " ") |> String.downcase()

@@ -11,6 +11,8 @@ defmodule ControlKeel.Mission.Task do
     field :validation_gate, :string
     field :position, :integer
     field :metadata, :map, default: %{}
+    field :confidence_score, :float
+    field :rollback_boundary, :string
 
     belongs_to :session, Session
 
@@ -26,7 +28,9 @@ defmodule ControlKeel.Mission.Task do
       :validation_gate,
       :position,
       :metadata,
-      :session_id
+      :session_id,
+      :confidence_score,
+      :rollback_boundary
     ])
     |> validate_required([
       :title,
