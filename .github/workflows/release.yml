@@ -13,12 +13,12 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.3.4"
-      - name: Install Zig 0.14.0
+          otp-version: "27.3.4.3"
+      - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
           tar xf zig.tar.xz
-          sudo mv zig-linux-x86_64-0.14.0 /usr/local/zig
+          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
@@ -33,28 +33,38 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos
+            artifact_name: controlkeel-macos-x86_64
+            upload_name: controlkeel-macos-intel
+          - target: macos_silicon
+            artifact_name: controlkeel-macos-arm64
+            upload_name: controlkeel-macos-silicon
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.3.4"
-      - name: Install Zig 0.14.0
+          otp-version: "27.3.4.3"
+      - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.14.0/zig-macos-aarch64-0.14.0.tar.xz
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-macos-aarch64-0.15.2.tar.xz
           tar xf zig.tar.xz
-          sudo mv zig-macos-aarch64-0.14.0 /usr/local/zig
+          sudo mv zig-macos-aarch64-0.15.2 /usr/local/zig
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: brew install xz p7zip
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
-      - run: BURRITO_TARGET=macos_silicon MIX_ENV=prod mix release
+      - run: BURRITO_TARGET=${{ matrix.target }} MIX_ENV=prod mix release
       - name: Rename binary
-        run: mv burrito_out/controlkeel burrito_out/controlkeel-macos-arm64
+        run: mv burrito_out/controlkeel burrito_out/${{ matrix.artifact_name }}
       - uses: actions/upload-artifact@v4
         with:
-          name: controlkeel-macos
-          path: burrito_out/controlkeel-macos-arm64
+          name: ${{ matrix.upload_name }}
+          path: burrito_out/${{ matrix.artifact_name }}
 
   build-windows:
     runs-on: ubuntu-latest
@@ -63,12 +73,12 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.3.4"
-      - name: Install Zig 0.14.0
+          otp-version: "27.3.4.3"
+      - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
           tar xf zig.tar.xz
-          sudo mv zig-linux-x86_64-0.14.0 /usr/local/zig
+          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
@@ -94,7 +104,11 @@ jobs:
           path: dist
       - uses: actions/download-artifact@v4
         with:
-          name: controlkeel-macos
+          name: controlkeel-macos-intel
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: controlkeel-macos-silicon
           path: dist
       - uses: actions/download-artifact@v4
         with:
@@ -112,16 +126,14 @@ jobs:
 
             | Platform | Binary |
             |----------|--------|
+            | macOS (Intel) | `controlkeel-macos-x86_64` |
             | macOS (Apple Silicon) | `controlkeel-macos-arm64` |
             | Linux x86_64 | `controlkeel-linux-x86_64` |
             | Windows x86_64 | `controlkeel-windows-x86_64.exe` |
 
             ```bash
-            # macOS / Linux
             chmod +x controlkeel-macos-arm64
             ./controlkeel-macos-arm64
-
-            # Then in your project
             ./controlkeel-macos-arm64 init
             ./controlkeel-macos-arm64 attach claude-code
             ```

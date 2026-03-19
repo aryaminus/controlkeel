@@ -15,12 +15,12 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.3.4"
-      - name: Install Zig 0.14.0
+          otp-version: "27.3.4.3"
+      - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
           tar xf zig.tar.xz
-          sudo mv zig-linux-x86_64-0.14.0 /usr/local/zig
+          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
@@ -31,22 +31,30 @@ jobs:
 
   macos:
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos
+            artifact_name: controlkeel-macos-intel
+          - target: macos_silicon
+            artifact_name: controlkeel-macos-arm64
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.3.4"
-      - name: Install Zig 0.14.0
+          otp-version: "27.3.4.3"
+      - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.14.0/zig-macos-aarch64-0.14.0.tar.xz
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-macos-aarch64-0.15.2.tar.xz
           tar xf zig.tar.xz
-          sudo mv zig-macos-aarch64-0.14.0 /usr/local/zig
+          sudo mv zig-macos-aarch64-0.15.2 /usr/local/zig
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: brew install xz p7zip
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
-      - run: BURRITO_TARGET=macos_silicon MIX_ENV=prod mix release
+      - run: BURRITO_TARGET=${{ matrix.target }} MIX_ENV=prod mix release
       - run: chmod +x scripts/release_smoke.sh
       - run: scripts/release_smoke.sh "$(find burrito_out -maxdepth 1 -type f | head -n 1)"
 
@@ -57,45 +65,34 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.3.4"
-      - name: Install Zig 0.14.0
+          otp-version: "27.3.4.3"
+      - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz
+          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
           tar xf zig.tar.xz
-          sudo mv zig-linux-x86_64-0.14.0 /usr/local/zig
+          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
       - run: MIX_ENV=prod mix assets.deploy
       - run: BURRITO_TARGET=windows MIX_ENV=prod mix release
+      - run: mv burrito_out/controlkeel.exe burrito_out/controlkeel-windows-x86_64.exe
       - uses: actions/upload-artifact@v4
         with:
           name: controlkeel-windows
-          path: burrito_out/**
+          path: burrito_out/controlkeel-windows-x86_64.exe
 
   windows-smoke:
     runs-on: windows-latest
     needs: windows-build
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: controlkeel-windows
           path: burrito_out
       - name: Smoke test binary
+        timeout-minutes: 10
         shell: pwsh
         run: |
-          $binary = Get-ChildItem burrito_out -Recurse -File | Where-Object { $_.Extension -eq ".exe" } | Select-Object -First 1
-          if (-not $binary) { throw "No Windows binary found in burrito_out" }
-          & $binary.FullName help | Out-Null
-          & $binary.FullName version | Out-Null
-          $tmp = Join-Path $env:TEMP "controlkeel-release-smoke-$([guid]::NewGuid())"
-          New-Item -ItemType Directory -Path $tmp | Out-Null
-          Push-Location $tmp
-          try {
-            & $binary.FullName init | Out-Null
-            if (-not (Test-Path "controlkeel/project.json")) { throw "project binding missing" }
-            if (-not (Test-Path "controlkeel/bin/controlkeel-mcp.cmd")) { throw "mcp wrapper missing" }
-          } finally {
-            Pop-Location
-            Remove-Item -Recurse -Force $tmp
-          }
+          ./scripts/release_smoke.ps1 -BinaryPath (Resolve-Path "burrito_out/controlkeel-windows-x86_64.exe")
