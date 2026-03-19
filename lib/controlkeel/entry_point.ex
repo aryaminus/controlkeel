@@ -63,7 +63,14 @@ defmodule ControlKeel.EntryPoint do
     )
   end
 
-  defp standalone_runtime? do
-    not Code.ensure_loaded?(Mix)
+  def standalone_runtime? do
+    cond do
+      Code.ensure_loaded?(Burrito.Util) and
+          function_exported?(Burrito.Util, :running_standalone?, 0) ->
+        Burrito.Util.running_standalone?()
+
+      true ->
+        not Code.ensure_loaded?(Mix)
+    end
   end
 end
