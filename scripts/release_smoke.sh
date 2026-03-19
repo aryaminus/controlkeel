@@ -6,7 +6,26 @@ if [ "$#" -ne 1 ]; then
   exit 1
 fi
 
-BINARY=$1
+resolve_binary_path() {
+  python3 - "$1" <<'PY'
+import os
+import sys
+
+print(os.path.abspath(sys.argv[1]))
+PY
+}
+
+BINARY=$(resolve_binary_path "$1")
+
+if [ ! -f "$BINARY" ]; then
+  echo "binary not found: $BINARY" >&2
+  exit 1
+fi
+
+if [ ! -x "$BINARY" ]; then
+  chmod +x "$BINARY"
+fi
+
 TMP_DIR=$(mktemp -d)
 PORT=4081
 DB_PATH="$TMP_DIR/controlkeel.db"
