@@ -65,7 +65,14 @@ binary, tmp_dir, db_path, secret = sys.argv[1:5]
 env = os.environ.copy()
 env["DATABASE_PATH"] = db_path
 env["SECRET_KEY_BASE"] = secret
-subprocess.run([binary, "init"], cwd=tmp_dir, env=env, timeout=60, check=True, capture_output=True)
+subprocess.run(
+    [binary, "init", "--no-attach"],
+    cwd=tmp_dir,
+    env=env,
+    timeout=60,
+    check=True,
+    capture_output=True,
+)
 PY
 
 test -f "$TMP_DIR/controlkeel/project.json"

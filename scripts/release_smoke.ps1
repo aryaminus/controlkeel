@@ -110,7 +110,7 @@ $tmpDir = Join-Path $env:TEMP ("controlkeel-release-smoke-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmpDir | Out-Null
 
 try {
-  Invoke-BinaryStep -Arguments @("init") -WorkingDirectory $tmpDir | Out-Null
+  Invoke-BinaryStep -Arguments @("init", "--no-attach") -WorkingDirectory $tmpDir | Out-Null
 
   if (-not (Test-Path (Join-Path $tmpDir "controlkeel/project.json"))) {
     throw "project binding missing"
