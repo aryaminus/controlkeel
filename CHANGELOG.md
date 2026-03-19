@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.1.1 — 2026-03-19
+
+### What's changed
+
+- Implement phase 3 platform and release closure
+- Revise ControlKeel status audit to reflect closed MVP gaps and remove stale claims
+- Expand audit log details and clarify Phase 2 implementation gaps in the ControlKeel status document
+- Update release workflows for Node 24
+- Treat Burrito as release runtime for migrations
+- Cancel stale release workflow runs
+- Run release migrations before starting endpoint
+- Fix project binding path resolution on Windows
+- Fix release smoke secret and diagnostics
+- Run release CLI commands synchronously
+- Skip Claude auto-attach in release smoke
+- Resolve release smoke binary paths
+- Halt standalone release commands synchronously
+- Fix Burrito standalone argv handling
+- Fix Burrito standalone CLI detection
+- Finish agent integration surface and fix release smoke
+- Fix Zig installer in release workflows
+- Fix Burrito release packaging CI
+- feat: add ControlKeel skills and benchmarks for governance and compliance
+- feat: enhance mission and policy training features
+- feat: add skills management and governance tools
+- feat(api): update task completion logic to handle string task IDs
+- feat: Cursor/Windsurf attach, episodic memory, benchmark scenarios, 12 domain packs, 28 Semgrep rules
+- feat: agent router (Layer 3), proof bundles, audit log, HR/Legal/Marketing policy packs
+- fix: downgrade Burrito 1.5.0→1.3.0, switch Zig to 0.14.0
+
 ## v0.1.0 — 2026-03-18
 
 First public release.
