@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.2 — 2026-03-19
+
+### What's changed
+
+- Fix Windows release archive path
+
 ## v0.1.1 — 2026-03-19
 
 ### What's changed
