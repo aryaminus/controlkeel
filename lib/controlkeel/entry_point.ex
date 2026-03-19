@@ -30,26 +30,20 @@ defmodule ControlKeel.EntryPoint do
               {:ok, supervisor}
             else
               Task.start(fn ->
-                exit_code = CLI.execute(parsed)
-                System.halt(exit_code)
+                run_and_halt(parsed)
               end)
 
               {:ok, supervisor}
             end
           end
         else
-          Task.start_link(fn ->
-            exit_code = CLI.execute(parsed)
-            System.halt(exit_code)
-          end)
+          run_and_halt(parsed)
+          {:ok, self()}
         end
 
       {:error, message} ->
-        Task.start_link(fn ->
-          CLI.execute(%{command: :help, options: %{}, args: []})
-          IO.puts(:stderr, message)
-          System.halt(1)
-        end)
+        run_help_and_halt(message)
+        {:ok, self()}
     end
   end
 
@@ -65,6 +59,9 @@ defmodule ControlKeel.EntryPoint do
 
   def standalone_runtime? do
     cond do
+      System.get_env("__BURRITO") not in [nil, ""] ->
+        true
+
       Code.ensure_loaded?(Burrito.Util) and
           function_exported?(Burrito.Util, :running_standalone?, 0) ->
         Burrito.Util.running_standalone?()
@@ -72,5 +69,25 @@ defmodule ControlKeel.EntryPoint do
       true ->
         not Code.ensure_loaded?(Mix)
     end
+  end
+
+  defp run_and_halt(parsed) do
+    parsed
+    |> CLI.execute()
+    |> halt_vm()
+  end
+
+  defp run_help_and_halt(message) do
+    CLI.execute(%{command: :help, options: %{}, args: []})
+    IO.puts(:stderr, message)
+    halt_vm(1)
+  end
+
+  defp halt_vm(exit_code) do
+    halt_fun().(exit_code)
+  end
+
+  defp halt_fun do
+    Application.get_env(:controlkeel, :entry_point_halt_fun, &System.halt/1)
   end
 end
