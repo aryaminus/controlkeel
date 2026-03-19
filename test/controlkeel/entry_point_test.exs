@@ -12,6 +12,10 @@ defmodule ControlKeel.EntryPointTest do
       Application.get_env(:controlkeel, :cli_plain_arguments_provider)
 
     previous_halt_fun = Application.get_env(:controlkeel, :entry_point_halt_fun)
+    previous_execute_fun = Application.get_env(:controlkeel, :entry_point_execute_fun)
+
+    previous_application_start_fun =
+      Application.get_env(:controlkeel, :entry_point_application_start_fun)
 
     on_exit(fn ->
       if previous do
@@ -34,6 +38,22 @@ defmodule ControlKeel.EntryPointTest do
         Application.put_env(:controlkeel, :entry_point_halt_fun, previous_halt_fun)
       else
         Application.delete_env(:controlkeel, :entry_point_halt_fun)
+      end
+
+      if previous_execute_fun do
+        Application.put_env(:controlkeel, :entry_point_execute_fun, previous_execute_fun)
+      else
+        Application.delete_env(:controlkeel, :entry_point_execute_fun)
+      end
+
+      if previous_application_start_fun do
+        Application.put_env(
+          :controlkeel,
+          :entry_point_application_start_fun,
+          previous_application_start_fun
+        )
+      else
+        Application.delete_env(:controlkeel, :entry_point_application_start_fun)
       end
     end)
 
@@ -70,6 +90,36 @@ defmodule ControlKeel.EntryPointTest do
       assert {:ok, _pid} = ControlKeel.EntryPoint.start(:normal, [])
     end)
 
+    assert_receive {:halted, 0}
+  end
+
+  test "standalone app command executes and halts synchronously after app startup" do
+    parent = self()
+
+    System.put_env("__BURRITO", "1")
+
+    Application.put_env(:controlkeel, :cli_plain_arguments_provider, fn ->
+      [~c"init", ~c"--no-attach"]
+    end)
+
+    Application.put_env(:controlkeel, :entry_point_application_start_fun, fn ->
+      send(parent, :application_started)
+      {:ok, self()}
+    end)
+
+    Application.put_env(:controlkeel, :entry_point_execute_fun, fn parsed ->
+      send(parent, {:executed, parsed})
+      0
+    end)
+
+    Application.put_env(:controlkeel, :entry_point_halt_fun, fn exit_code ->
+      send(parent, {:halted, exit_code})
+      :ok
+    end)
+
+    assert {:ok, _pid} = ControlKeel.EntryPoint.start(:normal, [])
+    assert_receive :application_started
+    assert_receive {:executed, %{command: :init}}
     assert_receive {:halted, 0}
   end
 end

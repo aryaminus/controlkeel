@@ -25,14 +25,11 @@ defmodule ControlKeel.EntryPoint do
         if CLI.app_required?(parsed) do
           maybe_enable_server(parsed)
 
-          with {:ok, supervisor} <- ControlKeel.Application.start_link() do
+          with {:ok, supervisor} <- application_start_fun().() do
             if CLI.server_mode?(parsed) do
               {:ok, supervisor}
             else
-              Task.start(fn ->
-                run_and_halt(parsed)
-              end)
-
+              run_and_halt(parsed)
               {:ok, supervisor}
             end
           end
@@ -73,7 +70,7 @@ defmodule ControlKeel.EntryPoint do
 
   defp run_and_halt(parsed) do
     parsed
-    |> CLI.execute()
+    |> execute_fun().()
     |> halt_vm()
   end
 
@@ -89,5 +86,17 @@ defmodule ControlKeel.EntryPoint do
 
   defp halt_fun do
     Application.get_env(:controlkeel, :entry_point_halt_fun, &System.halt/1)
+  end
+
+  defp execute_fun do
+    Application.get_env(:controlkeel, :entry_point_execute_fun, &CLI.execute/1)
+  end
+
+  defp application_start_fun do
+    Application.get_env(
+      :controlkeel,
+      :entry_point_application_start_fun,
+      &ControlKeel.Application.start_link/0
+    )
   end
 end
