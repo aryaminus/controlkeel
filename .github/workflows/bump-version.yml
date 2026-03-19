@@ -6,6 +6,10 @@ on:
     types:
       - completed
 
+concurrency:
+  group: bump-version-main
+  cancel-in-progress: true
+
 permissions:
   contents: write
 

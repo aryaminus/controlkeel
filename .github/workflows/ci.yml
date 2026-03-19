@@ -5,17 +5,22 @@ on:
     branches: ["main", "codex/**"]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   test:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
     runs-on: ubuntu-latest
     env:
       MIX_ENV: test
     steps:
       - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1.20.3
+      - uses: erlef/setup-beam@v1.23.0
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"

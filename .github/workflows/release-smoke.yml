@@ -17,13 +17,20 @@ env:
 
 jobs:
   linux:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1.20.3
+      - uses: erlef/setup-beam@v1.23.0
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-release-smoke-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-release-smoke-
       - name: Install Zig 0.15.2
         run: |
           chmod +x scripts/install_zig.sh
@@ -37,6 +44,7 @@ jobs:
       - run: scripts/release_smoke.sh "burrito_out/controlkeel_linux"
 
   macos:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -50,10 +58,16 @@ jobs:
             source_name: controlkeel_macos_silicon
     steps:
       - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1.20.3
+      - uses: erlef/setup-beam@v1.23.0
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-release-smoke-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-release-smoke-
       - name: Install Zig 0.15.2
         run: |
           chmod +x scripts/install_zig.sh
@@ -69,13 +83,20 @@ jobs:
       - run: scripts/release_smoke.sh "burrito_out/${{ matrix.source_name }}"
 
   windows-build:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: erlef/setup-beam@v1.20.3
+      - uses: erlef/setup-beam@v1.23.0
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: ${{ runner.os }}-release-smoke-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-release-smoke-
       - name: Install Zig 0.15.2
         run: |
           chmod +x scripts/install_zig.sh
@@ -92,6 +113,7 @@ jobs:
           path: burrito_out/controlkeel-windows-x86_64.exe
 
   windows-smoke:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
     runs-on: windows-latest
     needs: windows-build
     steps:
