@@ -146,7 +146,7 @@ jobs:
 
           cp release_stage/raw/controlkeel-windows/controlkeel-windows-x86_64.exe dist/controlkeel-windows-x86_64.exe
           cp release_stage/raw/controlkeel-windows/controlkeel-windows-x86_64.exe release_stage/package/windows/controlkeel.exe
-          (cd release_stage/package/windows && zip -q ../../dist/controlkeel-windows-x86_64.zip controlkeel.exe)
+          (cd release_stage/package/windows && zip -q ../../../dist/controlkeel-windows-x86_64.zip controlkeel.exe)
       - name: Export publishable bundle targets
         run: mix run scripts/export_release_bundles.exs
       - name: Archive bundle targets
