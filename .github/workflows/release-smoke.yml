@@ -17,7 +17,7 @@ env:
 
 jobs:
   linux:
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -44,7 +44,7 @@ jobs:
       - run: scripts/release_smoke.sh "burrito_out/controlkeel_linux"
 
   macos:
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -83,7 +83,7 @@ jobs:
       - run: scripts/release_smoke.sh "burrito_out/${{ matrix.source_name }}"
 
   windows-build:
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -113,7 +113,7 @@ jobs:
           path: burrito_out/controlkeel-windows-x86_64.exe
 
   windows-smoke:
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}
     runs-on: windows-latest
     needs: windows-build
     steps:

@@ -223,7 +223,18 @@ jobs:
           VERSION="${TAG#v}"
           BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
 
-          curl -fsSL "${BASE_URL}/controlkeel-checksums.txt" -o /tmp/controlkeel-checksums.txt
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsSL "${BASE_URL}/controlkeel-checksums.txt" -o /tmp/controlkeel-checksums.txt; then
+              break
+            fi
+
+            if [ "${attempt}" -eq 6 ]; then
+              echo "Failed to fetch release checksums after ${attempt} attempts."
+              exit 1
+            fi
+
+            sleep 5
+          done
 
           MAC_INTEL_SHA=$(grep ' controlkeel-macos-x86_64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
           MAC_ARM_SHA=$(grep ' controlkeel-macos-arm64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
