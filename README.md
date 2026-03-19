@@ -15,8 +15,13 @@ It sits above Claude Code, Codex, Cursor, Windsurf, Continue, Aider, Copilot / V
 # macOS / Linux
 brew tap aryaminus/controlkeel && brew install controlkeel
 
-# Cross-platform bootstrap
+# npm bootstrap
 npm i -g @aryaminus/controlkeel
+
+# GitHub Packages npm registry
+echo "@aryaminus:registry=https://npm.pkg.github.com" >> ~/.npmrc
+echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_CLASSIC_PAT" >> ~/.npmrc
+npm i -g @aryaminus/controlkeel --registry=https://npm.pkg.github.com
 
 # Direct installers
 curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh
@@ -24,6 +29,7 @@ irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps
 ```
 
 GitHub Releases remain the canonical source for packaged binaries, checksums, and publishable plugin bundles.
+GitHub Packages is also published for the npm bootstrap installer. Local auth to `npm.pkg.github.com` requires a GitHub personal access token (classic) with package scope; the release workflow publishes there using the repository `GITHUB_TOKEN`.
 
 ### Packaged binary
 
@@ -143,6 +149,7 @@ Tagged releases also publish:
 - platform binaries and Homebrew-friendly archives
 - `controlkeel-checksums.txt`
 - `install.sh` and `install.ps1`
+- GitHub Packages npm bootstrap publication for `@aryaminus/controlkeel`
 - `controlkeel-claude-plugin.tar.gz`
 - `controlkeel-copilot-plugin.tar.gz`
 - `controlkeel-codex.tar.gz`

@@ -186,6 +186,11 @@ jobs:
       - name: Generate checksums
         run: |
           find dist -maxdepth 1 -type f ! -name 'controlkeel-checksums.txt' -print0 | sort -z | xargs -0 sha256sum > dist/controlkeel-checksums.txt
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-metadata
+          path: dist/controlkeel-checksums.txt
       - name: Render release notes
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -203,42 +208,34 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - name: Skip without Homebrew token
+      - name: Check Homebrew publish configuration
+        id: homebrew_gate
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
             echo "HOMEBREW_TAP_TOKEN is not configured; skipping Homebrew publish."
-            exit 0
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
+      - uses: actions/download-artifact@v8
+        if: steps.homebrew_gate.outputs.enabled == 'true'
+        with:
+          name: release-metadata
+          path: /tmp/release-metadata
       - name: Publish Homebrew formula
+        if: steps.homebrew_gate.outputs.enabled == 'true'
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
-            exit 0
-          fi
-
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
           BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
 
-          for attempt in 1 2 3 4 5 6; do
-            if curl -fsSL "${BASE_URL}/controlkeel-checksums.txt" -o /tmp/controlkeel-checksums.txt; then
-              break
-            fi
-
-            if [ "${attempt}" -eq 6 ]; then
-              echo "Failed to fetch release checksums after ${attempt} attempts."
-              exit 1
-            fi
-
-            sleep 5
-          done
-
-          MAC_INTEL_SHA=$(grep ' controlkeel-macos-x86_64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
-          MAC_ARM_SHA=$(grep ' controlkeel-macos-arm64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
-          LINUX_SHA=$(grep ' controlkeel-linux-x86_64.tar.gz$' /tmp/controlkeel-checksums.txt | awk '{print $1}')
+          MAC_INTEL_SHA=$(grep ' controlkeel-macos-x86_64.tar.gz$' /tmp/release-metadata/controlkeel-checksums.txt | awk '{print $1}')
+          MAC_ARM_SHA=$(grep ' controlkeel-macos-arm64.tar.gz$' /tmp/release-metadata/controlkeel-checksums.txt | awk '{print $1}')
+          LINUX_SHA=$(grep ' controlkeel-linux-x86_64.tar.gz$' /tmp/release-metadata/controlkeel-checksums.txt | awk '{print $1}')
 
           cat > /tmp/controlkeel.rb <<EOF
           class Controlkeel < Formula
@@ -312,3 +309,22 @@ jobs:
           fi
 
           npm publish --access public
+
+  publish-github-packages:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: "@aryaminus"
+      - name: Publish GitHub Packages bootstrap package
+        working-directory: packages/npm/controlkeel
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --registry=https://npm.pkg.github.com
