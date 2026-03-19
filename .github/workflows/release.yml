@@ -16,9 +16,8 @@ jobs:
           otp-version: "27.3.4.3"
       - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
-          tar xf zig.tar.xz
-          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
+          chmod +x scripts/install_zig.sh
+          scripts/install_zig.sh 0.15.2 >/dev/null
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
@@ -51,9 +50,8 @@ jobs:
           otp-version: "27.3.4.3"
       - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-macos-aarch64-0.15.2.tar.xz
-          tar xf zig.tar.xz
-          sudo mv zig-macos-aarch64-0.15.2 /usr/local/zig
+          chmod +x scripts/install_zig.sh
+          scripts/install_zig.sh 0.15.2 >/dev/null
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: brew install xz p7zip
       - run: mix deps.get
@@ -76,9 +74,8 @@ jobs:
           otp-version: "27.3.4.3"
       - name: Install Zig 0.15.2
         run: |
-          curl -sLo zig.tar.xz https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
-          tar xf zig.tar.xz
-          sudo mv zig-linux-x86_64-0.15.2 /usr/local/zig
+          chmod +x scripts/install_zig.sh
+          scripts/install_zig.sh 0.15.2 >/dev/null
           echo "/usr/local/zig" >> $GITHUB_PATH
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
