@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.5 — 2026-03-19
+
+### What's changed
+
+- Reduce GitHub Actions Node 20 warnings
+- Record green v0.1.4 release verification
+
 ## v0.1.4 — 2026-03-19
 
 ### What's changed
