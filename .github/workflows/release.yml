@@ -23,7 +23,7 @@ jobs:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: deps
           key: ${{ runner.os }}-release-${{ hashFiles('mix.lock') }}
@@ -65,7 +65,7 @@ jobs:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: deps
           key: ${{ runner.os }}-release-${{ hashFiles('mix.lock') }}
@@ -97,7 +97,7 @@ jobs:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: deps
           key: ${{ runner.os }}-release-${{ hashFiles('mix.lock') }}
@@ -130,7 +130,7 @@ jobs:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: deps
           key: ${{ runner.os }}-release-${{ hashFiles('mix.lock') }}
@@ -195,11 +195,25 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           python3 scripts/render_release_notes.py "$VERSION" > /tmp/controlkeel-release-notes.md
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          body_path: /tmp/controlkeel-release-notes.md
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/* --clobber
+            gh release edit "${TAG}" \
+              --title "${TAG}" \
+              --notes-file /tmp/controlkeel-release-notes.md \
+              --latest
+          else
+            gh release create "${TAG}" dist/* \
+              --verify-tag \
+              --title "${TAG}" \
+              --notes-file /tmp/controlkeel-release-notes.md \
+              --latest
+          fi
 
   publish-homebrew:
     needs: release
@@ -287,7 +301,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -318,7 +332,7 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://npm.pkg.github.com
