@@ -1,0 +1,582 @@
+defmodule ControlKeel.Benchmark do
+  @moduledoc false
+
+  import Ecto.Query, warn: false
+
+  alias ControlKeel.Benchmark.{
+    BuiltinSuites,
+    Metadata,
+    Result,
+    Run,
+    Runner,
+    Scenario,
+    SubjectLoader,
+    Suite
+  }
+
+  alias ControlKeel.Repo
+
+  @recent_runs_limit 12
+
+  def list_suites(opts \\ []) do
+    ensure_builtin_suites()
+    include_internal = Keyword.get(opts, :include_internal, false)
+
+    Suite
+    |> order_by([suite], asc: suite.name)
+    |> preload([:scenarios])
+    |> Repo.all()
+    |> maybe_exclude_internal(include_internal)
+  end
+
+  def list_recent_runs(limit \\ @recent_runs_limit) do
+    ensure_builtin_suites()
+
+    Run
+    |> order_by([run], desc: run.inserted_at)
+    |> limit(^limit)
+    |> preload([:suite, results: [scenario: []]])
+    |> Repo.all()
+  end
+
+  def benchmark_summary(limit \\ @recent_runs_limit) do
+    runs = list_recent_runs(limit)
+
+    catch_rates = Enum.map(runs, & &1.catch_rate)
+    overheads = Enum.reject(Enum.map(runs, & &1.average_overhead_percent), &is_nil/1)
+
+    %{
+      total_suites: length(list_suites()),
+      total_runs: length(runs),
+      average_catch_rate: average(catch_rates),
+      average_overhead_percent: average(overheads),
+      latest_run: List.first(runs)
+    }
+  end
+
+  def get_suite_by_slug(slug) when is_binary(slug) do
+    ensure_builtin_suite(slug)
+
+    Suite
+    |> Repo.get_by(slug: slug)
+    |> Repo.preload(:scenarios)
+  end
+
+  def get_run(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {parsed, ""} -> get_run(parsed)
+      _error -> nil
+    end
+  end
+
+  def get_run(id) when is_integer(id) do
+    Run
+    |> Repo.get(id)
+    |> preload_run()
+  end
+
+  def get_run!(id) when is_integer(id) do
+    Run
+    |> Repo.get!(id)
+    |> preload_run()
+  end
+
+  def available_subjects(project_root \\ File.cwd!()) do
+    SubjectLoader.builtin_subjects() ++ SubjectLoader.external_subjects(project_root)
+  end
+
+  def run_suite(attrs, project_root \\ File.cwd!()) when is_map(attrs) do
+    ensure_builtin_suites()
+
+    suite_slug = Map.get(attrs, "suite") || Map.get(attrs, :suite) || "vibe_failures_v1"
+
+    scenario_slugs =
+      normalize_scenario_slugs(
+        Map.get(attrs, "scenario_slugs") || Map.get(attrs, :scenario_slugs)
+      )
+
+    subject_ids =
+      Runner.subject_ids_from_input(Map.get(attrs, "subjects") || Map.get(attrs, :subjects))
+
+    baseline_subject =
+      Map.get(attrs, "baseline_subject") || Map.get(attrs, :baseline_subject) ||
+        List.first(subject_ids)
+
+    with %Suite{} = suite <- get_suite_by_slug(suite_slug) || {:error, :suite_not_found} do
+      scenarios =
+        suite.scenarios
+        |> maybe_filter_scenarios(scenario_slugs)
+        |> Enum.sort_by(& &1.position)
+
+      subjects = SubjectLoader.resolve(subject_ids, project_root)
+      metadata = run_metadata(suite, subjects, project_root)
+
+      with {:ok, run} <-
+             create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata),
+           result_attrs <- Runner.execute(scenarios, subjects, project_root: project_root),
+           {:ok, _results} <- insert_results(run, result_attrs),
+           {:ok, updated_run} <- recalculate_run(run.id) do
+        {:ok, updated_run}
+      end
+    else
+      {:error, :suite_not_found} -> {:error, :suite_not_found}
+    end
+  end
+
+  def import_result(run_id, subject, attrs) when is_binary(subject) do
+    with %Run{} = run <- get_run(run_id) || {:error, :not_found},
+         scenario_slug when is_binary(scenario_slug) <-
+           Map.get(attrs, "scenario_slug") || {:error, :scenario_slug_required},
+         %Result{} = result <-
+           find_result_for_import(run, subject, scenario_slug) || {:error, :result_not_found},
+         %Scenario{} = scenario <- result.scenario,
+         outcome <- Runner.import_subject_result(scenario, attrs),
+         {:ok, _updated_result} <- update_result_from_outcome(result, outcome),
+         {:ok, updated_run} <- recalculate_run(run.id) do
+      {:ok, updated_run}
+    else
+      {:error, :scenario_slug_required} -> {:error, :scenario_slug_required}
+      {:error, :not_found} -> {:error, :not_found}
+      {:error, :result_not_found} -> {:error, :result_not_found}
+      nil -> {:error, :not_found}
+    end
+  end
+
+  def export_run(run_id, format \\ "json")
+
+  def export_run(run_id, format) when is_integer(run_id) or is_binary(run_id) do
+    case get_run(run_id) do
+      nil ->
+        {:error, :not_found}
+
+      run ->
+        case format do
+          "csv" -> {:ok, export_csv(run)}
+          :csv -> {:ok, export_csv(run)}
+          _ -> {:ok, Jason.encode!(run_export(run), pretty: true)}
+        end
+    end
+  end
+
+  def list_subjects_for_run(%Run{} = run) do
+    run.subjects || []
+  end
+
+  def run_matrix(%Run{} = run) do
+    scenario_ids =
+      run.results
+      |> Enum.map(& &1.scenario_id)
+      |> MapSet.new()
+
+    results_by_key =
+      Map.new(run.results, fn result ->
+        {{result.scenario.slug, result.subject}, result}
+      end)
+
+    %{
+      subjects: run.subjects || [],
+      scenarios:
+        run.suite.scenarios
+        |> Enum.filter(&MapSet.member?(scenario_ids, &1.id))
+        |> Enum.sort_by(& &1.position)
+        |> Enum.map(fn scenario ->
+          %{
+            scenario: scenario,
+            results:
+              Enum.map(run.subjects || [], fn subject ->
+                results_by_key[{scenario.slug, subject}]
+              end)
+          }
+        end)
+    }
+  end
+
+  def run_detail_metrics(%Run{} = run) do
+    results = run.results
+
+    evaluated =
+      Enum.filter(results, fn result ->
+        result.status in ["completed", "failed", "timed_out"]
+      end)
+
+    matched_expected =
+      Enum.count(evaluated, & &1.matched_expected)
+
+    block_rate =
+      case evaluated do
+        [] -> 0.0
+        _ -> Float.round(run.blocked_count / length(evaluated) * 100, 1)
+      end
+
+    expected_rule_hit_rate =
+      case evaluated do
+        [] -> 0.0
+        _ -> Float.round(matched_expected / length(evaluated) * 100, 1)
+      end
+
+    %{
+      block_rate: block_rate,
+      expected_rule_hit_rate: expected_rule_hit_rate,
+      evaluated_results: length(evaluated)
+    }
+  end
+
+  defp ensure_builtin_suites do
+    Enum.each(BuiltinSuites.list(), &ensure_builtin_suite/1)
+  end
+
+  defp ensure_builtin_suite(slug) do
+    with {:ok, payload} <- BuiltinSuites.load(slug) do
+      Repo.transaction(fn ->
+        suite =
+          Repo.get_by(Suite, slug: slug) ||
+            %Suite{}
+
+        {:ok, suite} =
+          suite
+          |> Suite.changeset(%{
+            slug: payload["slug"],
+            name: payload["name"],
+            description: payload["description"],
+            version: payload["version"],
+            status: payload["status"] || "active",
+            metadata: payload["metadata"] || %{}
+          })
+          |> Repo.insert_or_update()
+
+        sync_scenarios(suite, payload["scenarios"] || [])
+        suite
+      end)
+    end
+  end
+
+  defp sync_scenarios(%Suite{} = suite, scenario_payloads) do
+    existing =
+      Scenario
+      |> where([scenario], scenario.suite_id == ^suite.id)
+      |> Repo.all()
+      |> Map.new(fn scenario -> {scenario.slug, scenario} end)
+
+    incoming_slugs = Enum.map(scenario_payloads, & &1["slug"])
+
+    Enum.each(scenario_payloads, fn payload ->
+      scenario =
+        existing[payload["slug"]] ||
+          %Scenario{}
+
+      scenario
+      |> Scenario.changeset(%{
+        suite_id: suite.id,
+        slug: payload["slug"],
+        name: payload["name"],
+        category: payload["category"],
+        incident_label: payload["incident_label"],
+        path: payload["path"],
+        kind: payload["kind"] || "code",
+        content: payload["content"],
+        expected_rules: payload["expected_rules"] || [],
+        expected_decision: payload["expected_decision"],
+        position: payload["position"] || 0,
+        split: payload["split"] || "public",
+        metadata: Metadata.normalize_scenario_metadata(payload)
+      })
+      |> Repo.insert_or_update!()
+    end)
+
+    Scenario
+    |> where([scenario], scenario.suite_id == ^suite.id and scenario.slug not in ^incoming_slugs)
+    |> Repo.delete_all()
+  end
+
+  defp create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata) do
+    %Run{}
+    |> Run.changeset(%{
+      suite_id: suite.id,
+      status: "running",
+      baseline_subject: baseline_subject,
+      subjects: subject_ids,
+      started_at: now(),
+      total_scenarios: length(scenarios),
+      caught_count: 0,
+      blocked_count: 0,
+      catch_rate: 0.0,
+      metadata: metadata
+    })
+    |> Repo.insert()
+  end
+
+  defp maybe_exclude_internal(suites, true), do: suites
+  defp maybe_exclude_internal(suites, false), do: Enum.reject(suites, &Metadata.suite_internal?/1)
+
+  defp insert_results(run, result_attrs) do
+    Enum.reduce_while(result_attrs, {:ok, []}, fn attrs, {:ok, acc} ->
+      attrs =
+        attrs
+        |> stringify_keys()
+        |> Map.put("run_id", run.id)
+        |> Map.put_new("payload", %{})
+        |> Map.put_new("metadata", %{})
+
+      case %Result{} |> Result.changeset(attrs) |> Repo.insert() do
+        {:ok, result} -> {:cont, {:ok, [result | acc]}}
+        {:error, changeset} -> {:halt, {:error, changeset}}
+      end
+    end)
+  end
+
+  defp recalculate_run(run_id) do
+    run = get_run(run_id)
+    overheads = calculate_overheads(run)
+
+    Enum.each(run.results, fn result ->
+      case Map.fetch(overheads, result.id) do
+        {:ok, overhead_percent} ->
+          result
+          |> Result.changeset(%{overhead_percent: overhead_percent})
+          |> Repo.update!()
+
+        :error ->
+          :ok
+      end
+    end)
+
+    refreshed = get_run!(run_id)
+    aggregates = aggregate_run(refreshed)
+
+    refreshed
+    |> Run.changeset(aggregates)
+    |> Repo.update()
+  end
+
+  defp aggregate_run(%Run{} = run) do
+    results = run.results
+
+    evaluated =
+      Enum.filter(results, fn result ->
+        result.status in ["completed", "failed", "timed_out"]
+      end)
+
+    caught_count = Enum.count(evaluated, &(&1.findings_count > 0))
+    blocked_count = Enum.count(evaluated, &(&1.decision == "block"))
+    latencies = Enum.reject(Enum.map(evaluated, & &1.latency_ms), &is_nil/1)
+    overheads = Enum.reject(Enum.map(results, & &1.overhead_percent), &is_nil/1)
+
+    %{
+      status: aggregate_status(results),
+      finished_at: now(),
+      caught_count: caught_count,
+      blocked_count: blocked_count,
+      catch_rate: percentage(caught_count, length(evaluated)),
+      median_latency_ms: median(latencies),
+      average_overhead_percent: average(overheads)
+    }
+  end
+
+  defp calculate_overheads(%Run{} = run) do
+    baseline_latencies =
+      run.results
+      |> Enum.filter(&(&1.subject == run.baseline_subject))
+      |> Map.new(fn result -> {result.scenario_id, result.latency_ms} end)
+
+    Enum.reduce(run.results, %{}, fn result, acc ->
+      overhead =
+        cond do
+          result.subject == run.baseline_subject and is_integer(result.latency_ms) ->
+            0.0
+
+          is_integer(result.latency_ms) and is_integer(baseline_latencies[result.scenario_id]) and
+              baseline_latencies[result.scenario_id] > 0 ->
+            Float.round(
+              (result.latency_ms - baseline_latencies[result.scenario_id]) /
+                baseline_latencies[result.scenario_id] * 100,
+              2
+            )
+
+          true ->
+            nil
+        end
+
+      if is_nil(overhead), do: acc, else: Map.put(acc, result.id, overhead)
+    end)
+  end
+
+  defp aggregate_status(results) do
+    statuses = Enum.map(results, & &1.status)
+
+    cond do
+      Enum.any?(statuses, &(&1 == "awaiting_import")) -> "awaiting_import"
+      Enum.any?(statuses, &(&1 == "failed")) -> "partial"
+      Enum.any?(statuses, &(&1 == "timed_out")) -> "partial"
+      true -> "completed"
+    end
+  end
+
+  defp find_result_for_import(run, subject, scenario_slug) do
+    Enum.find(run.results, fn result ->
+      result.subject == subject and result.scenario.slug == scenario_slug
+    end)
+  end
+
+  defp update_result_from_outcome(result, outcome) do
+    result
+    |> Result.changeset(%{
+      status: outcome["status"],
+      decision: outcome["decision"],
+      findings_count: outcome["findings_count"],
+      matched_expected: outcome["matched_expected"],
+      latency_ms: outcome["latency_ms"],
+      payload: outcome["payload"],
+      metadata: outcome["metadata"]
+    })
+    |> Repo.update()
+  end
+
+  defp maybe_filter_scenarios(scenarios, []), do: scenarios
+  defp maybe_filter_scenarios(scenarios, slugs), do: Enum.filter(scenarios, &(&1.slug in slugs))
+
+  defp normalize_scenario_slugs(nil), do: []
+  defp normalize_scenario_slugs(slugs) when is_list(slugs), do: Enum.map(slugs, &to_string/1)
+
+  defp normalize_scenario_slugs(slugs) when is_binary(slugs) do
+    slugs
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp normalize_scenario_slugs(_value), do: []
+
+  defp run_metadata(suite, subjects, project_root) do
+    %{
+      "controlkeel_version" => controlkeel_version(),
+      "suite_version" => suite.version,
+      "subject_config_hash" => SubjectLoader.subject_config_hash(subjects),
+      "project_root" => Path.expand(project_root),
+      "subjects" =>
+        Enum.map(subjects, &Map.take(&1, ["id", "label", "type", "configured", "output_mode"]))
+    }
+  end
+
+  defp preload_run(nil), do: nil
+
+  defp preload_run(run) do
+    Repo.preload(run,
+      suite: [scenarios: from(scenario in Scenario, order_by: scenario.position)],
+      results: [scenario: []]
+    )
+  end
+
+  defp run_export(run) do
+    detail_metrics = run_detail_metrics(run)
+
+    %{
+      run: %{
+        id: run.id,
+        status: run.status,
+        suite: %{
+          slug: run.suite.slug,
+          name: run.suite.name,
+          version: run.suite.version
+        },
+        baseline_subject: run.baseline_subject,
+        subjects: run.subjects,
+        started_at: run.started_at,
+        finished_at: run.finished_at,
+        total_scenarios: run.total_scenarios,
+        caught_count: run.caught_count,
+        blocked_count: run.blocked_count,
+        catch_rate: run.catch_rate,
+        block_rate: detail_metrics.block_rate,
+        expected_rule_hit_rate: detail_metrics.expected_rule_hit_rate,
+        median_latency_ms: run.median_latency_ms,
+        average_overhead_percent: run.average_overhead_percent,
+        metadata: run.metadata
+      },
+      results:
+        Enum.map(run.results, fn result ->
+          %{
+            id: result.id,
+            scenario_slug: result.scenario.slug,
+            scenario_name: result.scenario.name,
+            subject: result.subject,
+            subject_type: result.subject_type,
+            status: result.status,
+            decision: result.decision,
+            findings_count: result.findings_count,
+            matched_expected: result.matched_expected,
+            latency_ms: result.latency_ms,
+            overhead_percent: result.overhead_percent,
+            payload: result.payload,
+            metadata: result.metadata
+          }
+        end)
+    }
+  end
+
+  defp export_csv(run) do
+    header =
+      "run_id,suite_slug,scenario_slug,scenario_name,subject,subject_type,status,decision,findings_count,matched_expected,latency_ms,overhead_percent\r\n"
+
+    rows =
+      Enum.map_join(run.results, "", fn result ->
+        [
+          run.id,
+          run.suite.slug,
+          result.scenario.slug,
+          csv_escape(result.scenario.name),
+          result.subject,
+          result.subject_type,
+          result.status,
+          result.decision || "",
+          result.findings_count,
+          result.matched_expected,
+          result.latency_ms || "",
+          result.overhead_percent || ""
+        ]
+        |> Enum.join(",")
+        |> Kernel.<>("\r\n")
+      end)
+
+    header <> rows
+  end
+
+  defp csv_escape(nil), do: "\"\""
+
+  defp csv_escape(value) do
+    "\"" <> (value |> to_string() |> String.replace("\"", "\"\"")) <> "\""
+  end
+
+  defp percentage(_count, 0), do: 0.0
+  defp percentage(count, total), do: Float.round(count / total * 100, 1)
+
+  defp average([]), do: nil
+  defp average(values), do: Float.round(Enum.sum(values) / length(values), 1)
+
+  defp median([]), do: nil
+
+  defp median(values) do
+    sorted = Enum.sort(values)
+    length = Kernel.length(sorted)
+    midpoint = div(length, 2)
+
+    if rem(length, 2) == 1 do
+      Enum.at(sorted, midpoint)
+    else
+      div(Enum.at(sorted, midpoint - 1) + Enum.at(sorted, midpoint), 2)
+    end
+  end
+
+  defp now do
+    DateTime.utc_now() |> DateTime.truncate(:second)
+  end
+
+  defp controlkeel_version do
+    Application.spec(:controlkeel, :vsn)
+    |> Kernel.||("0.1.0")
+    |> to_string()
+  end
+
+  defp stringify_keys(map) when is_map(map) do
+    Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
+  end
+end

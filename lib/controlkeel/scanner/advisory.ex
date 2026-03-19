@@ -268,6 +268,7 @@ defmodule ControlKeel.Scanner.Advisory do
   defp normalize_resp({:error, reason}), do: {:error, reason}
 
   defp extract_text(%{"content" => [%{"text" => text} | _]}), do: {:ok, text}
+
   defp extract_text(%{"content" => content}) when is_list(content) do
     case Enum.find_value(content, fn
            %{"type" => "text", "text" => t} -> t

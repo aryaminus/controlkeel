@@ -2,8 +2,12 @@ defmodule ControlKeelWeb.ApiController do
   use ControlKeelWeb, :controller
 
   alias ControlKeel.AgentRouter
+  alias ControlKeel.Benchmark
   alias ControlKeel.Budget
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
+  alias ControlKeel.PolicyTraining
+  alias ControlKeel.Repo
   alias ControlKeel.Scanner.FastPath
   alias ControlKeel.Skills.Registry
 
@@ -201,6 +205,237 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  def list_proofs(conn, params) do
+    browser = Mission.browse_proof_bundles(params)
+
+    json(conn, %{
+      proofs: Enum.map(browser.entries, &proof_summary/1),
+      total: browser.total_count,
+      page: browser.page,
+      total_pages: browser.total_pages
+    })
+  end
+
+  def get_proof(conn, %{"id" => id}) do
+    case Mission.get_proof_bundle_with_context(String.to_integer(id)) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "proof not found"})
+
+      proof ->
+        json(conn, %{proof: proof_detail(proof)})
+    end
+  end
+
+  # ─── Benchmarks ───────────────────────────────────────────────────────────────
+
+  def list_benchmarks(conn, _params) do
+    suites = Benchmark.list_suites()
+    runs = Benchmark.list_recent_runs()
+    summary = Benchmark.benchmark_summary()
+
+    summary =
+      Map.update(summary, :latest_run, nil, fn
+        nil -> nil
+        run -> benchmark_run_summary(run)
+      end)
+
+    json(conn, %{
+      summary: summary,
+      suites: Enum.map(suites, &benchmark_suite_summary/1),
+      runs: Enum.map(runs, &benchmark_run_summary/1)
+    })
+  end
+
+  def create_benchmark_run(conn, params) do
+    attrs =
+      Map.take(params, ~w(suite subjects baseline_subject scenario_slugs))
+
+    case Benchmark.run_suite(attrs) do
+      {:ok, run} ->
+        conn
+        |> put_status(:created)
+        |> json(%{run: benchmark_run_detail(run)})
+
+      {:error, :suite_not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "benchmark suite not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def get_benchmark_run(conn, %{"id" => id}) do
+    case Benchmark.get_run(id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "benchmark run not found"})
+
+      run ->
+        json(conn, %{run: benchmark_run_detail(run)})
+    end
+  end
+
+  def import_benchmark_result(conn, %{"id" => id, "subject" => subject} = params) do
+    attrs = Map.take(params, ~w(scenario_slug content path kind duration_ms metadata))
+
+    with {:ok, run_id} <- parse_integer_param(id),
+         {:ok, run} <- Benchmark.import_result(run_id, subject, attrs) do
+      json(conn, %{run: benchmark_run_detail(run)})
+    else
+      {:error, :invalid_integer} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "invalid benchmark run id"})
+
+      {:error, :scenario_slug_required} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "scenario_slug is required"})
+
+      {:error, :result_not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "benchmark result slot not found"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "benchmark run not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def export_benchmark_run(conn, %{"id" => id} = params) do
+    format = Map.get(params, "format", "json")
+
+    with {:ok, run_id} <- parse_integer_param(id),
+         {:ok, output} <- Benchmark.export_run(run_id, format) do
+      case format do
+        "csv" ->
+          conn
+          |> put_resp_content_type("text/csv")
+          |> put_resp_header(
+            "content-disposition",
+            "attachment; filename=\"benchmark-run-#{run_id}.csv\""
+          )
+          |> send_resp(200, output)
+
+        _other ->
+          json(conn, Jason.decode!(output))
+      end
+    else
+      {:error, :invalid_integer} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "invalid benchmark run id"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "benchmark run not found"})
+    end
+  end
+
+  def list_policies(conn, params) do
+    artifacts =
+      PolicyTraining.list_artifacts(%{
+        "artifact_type" => params["type"] || params["artifact_type"],
+        "status" => params["status"],
+        "limit" => params["limit"]
+      })
+
+    json(conn, %{
+      policies: Enum.map(artifacts, &policy_artifact_summary/1),
+      active: %{
+        router: maybe_policy_artifact_summary(PolicyTraining.active_artifact("router")),
+        budget_hint: maybe_policy_artifact_summary(PolicyTraining.active_artifact("budget_hint"))
+      },
+      training_runs: Enum.map(PolicyTraining.list_training_runs(), &policy_training_run_summary/1)
+    })
+  end
+
+  def train_policy(conn, params) do
+    case PolicyTraining.start_training(%{"type" => params["type"]}) do
+      {:ok, artifact} ->
+        conn
+        |> put_status(:created)
+        |> json(%{policy: policy_artifact_detail(artifact)})
+
+      {:error, :unknown_artifact_type} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "artifact type must be `router` or `budget_hint`"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def get_policy(conn, %{"id" => id}) do
+    case PolicyTraining.get_artifact(id) do
+      nil ->
+        conn |> put_status(:not_found) |> json(%{error: "policy artifact not found"})
+
+      artifact ->
+        json(conn, %{policy: policy_artifact_detail(artifact)})
+    end
+  end
+
+  def promote_policy(conn, %{"id" => id}) do
+    case PolicyTraining.promote_artifact(id) do
+      {:ok, artifact} ->
+        json(conn, %{policy: policy_artifact_detail(artifact)})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "policy artifact not found"})
+
+      {:error, {:promotion_failed, reasons}} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "promotion gate failed", reasons: List.wrap(reasons)})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def archive_policy(conn, %{"id" => id}) do
+    case PolicyTraining.archive_artifact(id) do
+      {:ok, artifact} ->
+        json(conn, %{policy: policy_artifact_detail(Repo.preload(artifact, :training_run))})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "policy artifact not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  # ─── Memory ──────────────────────────────────────────────────────────────────
+
+  def search_memory(conn, params) do
+    query = Map.get(params, "q", "")
+
+    result =
+      Memory.search(query, %{
+        workspace_id: nil,
+        session_id: normalize_integer_param(params["session_id"]),
+        task_id: normalize_integer_param(params["task_id"]),
+        record_type: params["type"]
+      })
+
+    json(conn, %{
+      query: result.query,
+      semantic_available: result.semantic_available,
+      records: Enum.map(result.entries, &memory_hit_summary/1),
+      total: result.total_count
+    })
+  end
+
+  def archive_memory(conn, %{"id" => id}) do
+    case Memory.archive_record(String.to_integer(id)) do
+      {:ok, record} ->
+        json(conn, %{memory: %{id: record.id, archived_at: record.archived_at}})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "memory record not found"})
+    end
+  end
+
   # ─── Audit Log ────────────────────────────────────────────────────────────────
 
   def audit_log(conn, %{"id" => session_id} = params) do
@@ -246,6 +481,32 @@ defmodule ControlKeelWeb.ApiController do
             "#{length(findings)} finding(s) must be approved or resolved before marking this task done.",
           findings: Enum.map(findings, &finding_summary/1)
         })
+    end
+  end
+
+  def pause_task(conn, %{"id" => task_id}) do
+    case Mission.pause_task(String.to_integer(task_id), "api") do
+      {:ok, %{task: task, resume_packet: packet}} ->
+        json(conn, %{task: task_summary(task), resume_packet: packet})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def resume_task(conn, %{"id" => task_id}) do
+    case Mission.resume_task(String.to_integer(task_id), "api") do
+      {:ok, %{task: task, resume_packet: packet}} ->
+        json(conn, %{task: task_summary(task), resume_packet: packet})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
     end
   end
 
@@ -324,6 +585,7 @@ defmodule ControlKeelWeb.ApiController do
     |> maybe_put_opt(:risk_tier, Map.get(params, "risk_tier"))
     |> maybe_put_opt(:budget_remaining_cents, Map.get(params, "budget_remaining_cents"))
     |> maybe_put_opt(:allowed_agents, Map.get(params, "allowed_agents"))
+    |> maybe_put_opt(:domain_pack, Map.get(params, "domain_pack"))
   end
 
   defp maybe_put_opt(opts, _key, nil), do: opts
@@ -361,7 +623,8 @@ defmodule ControlKeelWeb.ApiController do
       status: task.status,
       position: task.position,
       estimated_cost_cents: task.estimated_cost_cents,
-      validation_gate: task.validation_gate
+      validation_gate: task.validation_gate,
+      latest_proof: Mission.proof_summary_for_task(task)
     }
   end
 
@@ -377,8 +640,180 @@ defmodule ControlKeelWeb.ApiController do
     }
   end
 
+  defp proof_summary(proof) do
+    %{
+      id: proof.id,
+      task_id: proof.task_id,
+      task_title: proof.task && proof.task.title,
+      session_id: proof.session_id,
+      session_title: proof.session && proof.session.title,
+      risk_tier: proof.session && proof.session.risk_tier,
+      version: proof.version,
+      status: proof.status,
+      risk_score: proof.risk_score,
+      deploy_ready: proof.deploy_ready,
+      generated_at: proof.generated_at
+    }
+  end
+
+  defp proof_detail(proof) do
+    Map.merge(proof_summary(proof), %{
+      open_findings_count: proof.open_findings_count,
+      blocked_findings_count: proof.blocked_findings_count,
+      approved_findings_count: proof.approved_findings_count,
+      bundle: proof.bundle
+    })
+  end
+
+  defp benchmark_suite_summary(suite) do
+    %{
+      id: suite.id,
+      slug: suite.slug,
+      name: suite.name,
+      description: suite.description,
+      version: suite.version,
+      status: suite.status,
+      scenario_count: length(suite.scenarios),
+      metadata: suite.metadata
+    }
+  end
+
+  defp benchmark_run_summary(run) do
+    detail_metrics = Benchmark.run_detail_metrics(run)
+
+    %{
+      id: run.id,
+      suite_slug: run.suite.slug,
+      suite_name: run.suite.name,
+      status: run.status,
+      baseline_subject: run.baseline_subject,
+      subjects: run.subjects,
+      total_scenarios: run.total_scenarios,
+      caught_count: run.caught_count,
+      blocked_count: run.blocked_count,
+      catch_rate: run.catch_rate,
+      block_rate: detail_metrics.block_rate,
+      expected_rule_hit_rate: detail_metrics.expected_rule_hit_rate,
+      median_latency_ms: run.median_latency_ms,
+      average_overhead_percent: run.average_overhead_percent,
+      started_at: run.started_at,
+      finished_at: run.finished_at
+    }
+  end
+
+  defp benchmark_run_detail(run) do
+    matrix = Benchmark.run_matrix(run)
+
+    Map.merge(benchmark_run_summary(run), %{
+      metadata: run.metadata,
+      scenarios:
+        Enum.map(matrix.scenarios, fn row ->
+          %{
+            scenario: %{
+              slug: row.scenario.slug,
+              name: row.scenario.name,
+              category: row.scenario.category,
+              incident_label: row.scenario.incident_label,
+              expected_rules: row.scenario.expected_rules,
+              expected_decision: row.scenario.expected_decision,
+              split: row.scenario.split
+            },
+            results:
+              Enum.map(row.results, fn result ->
+                %{
+                  id: result && result.id,
+                  subject: result && result.subject,
+                  subject_type: result && result.subject_type,
+                  status: result && result.status,
+                  decision: result && result.decision,
+                  findings_count: result && result.findings_count,
+                  matched_expected: result && result.matched_expected,
+                  latency_ms: result && result.latency_ms,
+                  overhead_percent: result && result.overhead_percent,
+                  payload: result && result.payload,
+                  metadata: result && result.metadata
+                }
+              end)
+          }
+        end)
+    })
+  end
+
+  defp maybe_policy_artifact_summary(nil), do: nil
+  defp maybe_policy_artifact_summary(artifact), do: policy_artifact_summary(artifact)
+
+  defp policy_training_run_summary(run) do
+    artifacts =
+      if Ecto.assoc_loaded?(run.artifacts) do
+        run.artifacts
+      else
+        []
+      end
+
+    %{
+      id: run.id,
+      artifact_type: run.artifact_type,
+      status: run.status,
+      training_scope: run.training_scope,
+      dataset_summary: run.dataset_summary,
+      training_metrics: run.training_metrics,
+      validation_metrics: run.validation_metrics,
+      held_out_metrics: run.held_out_metrics,
+      failure_reason: run.failure_reason,
+      inserted_at: run.inserted_at,
+      finished_at: run.finished_at,
+      artifact_ids: Enum.map(artifacts, & &1.id)
+    }
+  end
+
+  defp policy_artifact_summary(artifact) do
+    %{
+      id: artifact.id,
+      artifact_type: artifact.artifact_type,
+      version: artifact.version,
+      status: artifact.status,
+      model_family: artifact.model_family,
+      metrics: artifact.metrics,
+      activated_at: artifact.activated_at,
+      archived_at: artifact.archived_at,
+      training_run_id: artifact.training_run_id
+    }
+  end
+
+  defp policy_artifact_detail(artifact) do
+    Map.merge(policy_artifact_summary(artifact), %{
+      feature_spec: artifact.feature_spec,
+      artifact: artifact.artifact,
+      metadata: artifact.metadata,
+      training_run:
+        if(Ecto.assoc_loaded?(artifact.training_run),
+          do: policy_training_run_summary(artifact.training_run),
+          else: nil
+        )
+    })
+  end
+
+  defp memory_hit_summary(hit) do
+    %{
+      id: hit.id,
+      record_type: hit.record_type,
+      title: hit.title,
+      summary: hit.summary,
+      session_id: hit.session_id,
+      task_id: hit.task_id,
+      source_type: hit.source_type,
+      source_id: hit.source_id,
+      tags: hit.tags,
+      inserted_at: hit.inserted_at,
+      lexical_score: hit.lexical_score,
+      semantic_score: hit.semantic_score,
+      score: hit.score
+    }
+  end
+
   defp audit_log_to_csv(%{events: events, session_id: sid, session_title: title}) do
-    header = "session_id,session_title,timestamp,type,rule_id,severity,category,status,plain_message,source,tool,provider,model,decision,cost_cents,tokens\r\n"
+    header =
+      "session_id,session_title,timestamp,type,rule_id,severity,category,status,plain_message,source,tool,provider,model,decision,cost_cents,tokens\r\n"
 
     rows =
       Enum.map(events, fn e ->
@@ -407,6 +842,7 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   defp csv_escape(nil), do: ""
+
   defp csv_escape(str) when is_binary(str) do
     if String.contains?(str, [",", "\"", "\n"]) do
       "\"" <> String.replace(str, "\"", "\"\"") <> "\""
@@ -421,5 +857,24 @@ defmodule ControlKeelWeb.ApiController do
         String.replace(acc, "%{#{key}}", to_string(value))
       end)
     end)
+  end
+
+  defp normalize_integer_param(nil), do: nil
+  defp normalize_integer_param(value) when is_integer(value), do: value
+
+  defp normalize_integer_param(value) do
+    case Integer.parse(to_string(value)) do
+      {parsed, ""} -> parsed
+      _ -> nil
+    end
+  end
+
+  defp parse_integer_param(value) when is_integer(value), do: {:ok, value}
+
+  defp parse_integer_param(value) do
+    case Integer.parse(to_string(value)) do
+      {parsed, ""} -> {:ok, parsed}
+      _ -> {:error, :invalid_integer}
+    end
   end
 end

@@ -20,6 +20,8 @@ defmodule ControlKeel.AgentRouter do
   Observability / ops: agentops, vellum, promptflow
   """
 
+  alias ControlKeel.PolicyTraining
+
   # ── Capability key reference ─────────────────────────────────────────────────
   # :repo_edit         — can read/write repository files
   # :file_write        — general file write
@@ -611,6 +613,7 @@ defmodule ControlKeel.AgentRouter do
     task_type = Keyword.get(opts, :task_type) || infer_task_type(task_title)
     budget_remaining = Keyword.get(opts, :budget_remaining_cents)
     allowed = Keyword.get(opts, :allowed_agents, Map.keys(@agents))
+    domain_pack = Keyword.get(opts, :domain_pack, "software")
 
     candidates =
       @agents
@@ -625,9 +628,21 @@ defmodule ControlKeel.AgentRouter do
          "No agent satisfies the security tier (#{risk_tier}) and task type (#{task_type}) constraints. Consider using ollama or aider for high-sensitivity tasks."}
 
       ranked ->
-        {best_id, best_agent} = rank(ranked, task_type, risk_tier)
+        scored = rank_candidates(ranked, task_type, risk_tier, budget_remaining, domain_pack)
+        [best | rest] = scored
+        {best_id, best_agent} = {best.id, best.agent}
         rationale = build_rationale(best_id, best_agent, task_type, risk_tier)
         warnings = build_warnings(best_agent, risk_tier, budget_remaining)
+
+        :telemetry.execute(
+          [:controlkeel, :agent_router, :policy_used],
+          %{count: 1, score: best.score},
+          %{
+            agent_id: best_id,
+            policy_source: best.policy_source,
+            artifact_version: best.artifact_version
+          }
+        )
 
         {:ok,
          %{
@@ -636,7 +651,9 @@ defmodule ControlKeel.AgentRouter do
            task_type: task_type,
            rationale: rationale,
            warnings: warnings,
-           alternatives: alternative_summary(ranked, best_id)
+           alternatives: alternative_summary(rest),
+           policy_source: best.policy_source,
+           artifact_version: best.artifact_version
          }}
     end
   end
@@ -653,7 +670,10 @@ defmodule ControlKeel.AgentRouter do
     t = String.downcase(title)
 
     cond do
-      Regex.match?(~r/\b(ui|interface|component|page|form|modal|layout|design|frontend|react|vue|svelte)\b/, t) ->
+      Regex.match?(
+        ~r/\b(ui|interface|component|page|form|modal|layout|design|frontend|react|vue|svelte)\b/,
+        t
+      ) ->
         :ui
 
       Regex.match?(~r/\b(deploy|release|publish|docker|kubernetes|k8s|ci|cd|pipeline|infra)\b/, t) ->
@@ -671,13 +691,22 @@ defmodule ControlKeel.AgentRouter do
       Regex.match?(~r/\b(prd|requirement|design.?doc|rfc|proposal)\b/, t) ->
         :spec
 
-      Regex.match?(~r/\b(workflow|automate|automation|trigger|zap|integration|connector|webhook|n8n|zapier|make\.com)\b/, t) ->
+      Regex.match?(
+        ~r/\b(workflow|automate|automation|trigger|zap|integration|connector|webhook|n8n|zapier|make\.com)\b/,
+        t
+      ) ->
         :workflow
 
-      Regex.match?(~r/\b(skill|skills|activate.?skill|load.?skill|agentskill|skill.?load|skill.?list)\b/, t) ->
+      Regex.match?(
+        ~r/\b(skill|skills|activate.?skill|load.?skill|agentskill|skill.?load|skill.?list)\b/,
+        t
+      ) ->
         :skill
 
-      Regex.match?(~r/\b(api|endpoint|route|controller|handler|middleware|auth|database|migration|schema)\b/, t) ->
+      Regex.match?(
+        ~r/\b(api|endpoint|route|controller|handler|middleware|auth|database|migration|schema)\b/,
+        t
+      ) ->
         :backend
 
       true ->
@@ -721,13 +750,53 @@ defmodule ControlKeel.AgentRouter do
   defp budget_ok?(%{cost_tier: :high}, remaining) when remaining > 1000, do: true
   defp budget_ok?(_, _), do: false
 
-  defp rank(candidates, task_type, risk_tier) do
-    Enum.max_by(candidates, fn {_id, agent} ->
-      score(agent, task_type, risk_tier)
+  defp rank_candidates(candidates, task_type, risk_tier, budget_remaining, domain_pack) do
+    active_artifact = PolicyTraining.active_artifact("router")
+    budget_tier = budget_tier(budget_remaining)
+
+    Enum.map(candidates, fn {id, agent} ->
+      learned_score =
+        case active_artifact do
+          %{artifact: _artifact} = artifact ->
+            PolicyTraining.score_router_candidate(artifact, id, agent, %{
+              "task_type" => task_type,
+              "risk_tier" => risk_tier,
+              "domain_pack" => domain_pack,
+              "budget_tier" => budget_tier
+            })
+
+          _ ->
+            {:error, :no_active_artifact}
+        end
+
+      case learned_score do
+        {:ok, learned} ->
+          %{
+            id: id,
+            agent: agent,
+            score: learned.score,
+            policy_source: learned.policy_source,
+            artifact_version: learned.artifact_version
+          }
+
+        {:error, _reason} ->
+          %{
+            id: id,
+            agent: agent,
+            score: score(agent, task_type, risk_tier),
+            policy_source: "heuristic",
+            artifact_version: nil
+          }
+      end
     end)
+    |> Enum.sort_by(& &1.score, :desc)
   end
 
-  defp score(%{swe_bench_score: swe, security_tier: sec, local: local} = agent, task_type, risk_tier) do
+  defp score(
+         %{swe_bench_score: swe, security_tier: sec, local: local} = agent,
+         task_type,
+         risk_tier
+       ) do
     security_bonus =
       case {sec, risk_tier} do
         {:critical, _} -> 0.3
@@ -744,7 +813,9 @@ defmodule ControlKeel.AgentRouter do
           if :ui_prototype in agent.capabilities, do: 0.2, else: 0.0
 
         :review ->
-          if :code_review in agent.capabilities or :pr_review in agent.capabilities, do: 0.2, else: 0.0
+          if :code_review in agent.capabilities or :pr_review in agent.capabilities,
+            do: 0.2,
+            else: 0.0
 
         :spec ->
           if :spec_gen in agent.capabilities, do: 0.2, else: 0.0
@@ -775,21 +846,35 @@ defmodule ControlKeel.AgentRouter do
   defp build_warnings(agent, risk_tier, budget_remaining) do
     [
       if(!agent.local and risk_tier in ["high", "critical"],
-        do: "#{agent.name} sends data to external servers. Verify data classification before proceeding.",
+        do:
+          "#{agent.name} sends data to external servers. Verify data classification before proceeding.",
         else: nil
       ),
       if(budget_remaining && budget_remaining < 100,
-        do: "Budget is low ($#{Float.round(budget_remaining / 100, 2)} remaining). Consider switching to Ollama or Aider (free).",
+        do:
+          "Budget is low ($#{Float.round(budget_remaining / 100, 2)} remaining). Consider switching to Ollama or Aider (free).",
         else: nil
       )
     ]
     |> Enum.reject(&is_nil/1)
   end
 
-  defp alternative_summary(candidates, chosen_id) do
+  defp alternative_summary(candidates) do
     candidates
-    |> Enum.reject(fn {id, _} -> id == chosen_id end)
     |> Enum.take(2)
-    |> Enum.map(fn {id, agent} -> %{agent: id, name: agent.name} end)
+    |> Enum.map(fn candidate ->
+      %{
+        agent: candidate.id,
+        name: candidate.agent.name,
+        policy_source: candidate.policy_source,
+        artifact_version: candidate.artifact_version
+      }
+    end)
   end
+
+  defp budget_tier(nil), do: "medium"
+  defp budget_tier(remaining) when remaining <= 50, do: "free"
+  defp budget_tier(remaining) when remaining <= 200, do: "low"
+  defp budget_tier(remaining) when remaining <= 1_000, do: "medium"
+  defp budget_tier(_remaining), do: "high"
 end

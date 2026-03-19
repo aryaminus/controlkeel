@@ -2,6 +2,7 @@ defmodule ControlKeel.Mission.Workspace do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Memory.Record
   alias ControlKeel.Mission.Session
 
   schema "workspaces" do
@@ -14,6 +15,7 @@ defmodule ControlKeel.Mission.Workspace do
     field :status, :string, default: "draft"
 
     has_many :sessions, Session
+    has_many :memory_records, Record
 
     timestamps(type: :utc_datetime)
   end

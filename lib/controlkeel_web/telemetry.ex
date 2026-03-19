@@ -58,6 +58,12 @@ defmodule ControlKeelWeb.Telemetry do
       counter("controlkeel.finding.rejected.count"),
       counter("controlkeel.autofix.viewed.count"),
       counter("controlkeel.autofix.copied.count"),
+      counter("controlkeel.policy_training.started.count"),
+      counter("controlkeel.policy_training.completed.count"),
+      counter("controlkeel.policy_training.failed.count"),
+      counter("controlkeel.policy_artifact.promoted.count"),
+      counter("controlkeel.agent_router.policy_used.count"),
+      counter("controlkeel.budget.hint_used.count"),
 
       # Database Metrics
       summary("controlkeel.repo.query.total_time",

@@ -88,8 +88,9 @@ defmodule ControlKeel.MCP.ProtocolTest do
   test "tools/call ck_context returns mission context" do
     session = session_fixture(%{budget_cents: 1_500, daily_budget_cents: 500, spent_cents: 250})
     session_id = session.id
-    task_fixture(%{session: session, status: "in_progress", title: "Implement router"})
+    task = task_fixture(%{session: session, status: "in_progress", title: "Implement router"})
     finding_fixture(%{session: session, status: "blocked", category: "security"})
+    assert {:ok, _proof} = Mission.generate_proof_bundle(task.id)
 
     response =
       Protocol.handle_request(%{
@@ -115,10 +116,15 @@ defmodule ControlKeel.MCP.ProtocolTest do
                    "session_budget_cents" => 1_500,
                    "daily_budget_cents" => 500
                  },
-                 "current_task" => %{"title" => "Implement router"}
+                 "current_task" => %{"title" => "Implement router"},
+                 "proof_summary" => %{"task_id" => _},
+                 "memory_hits" => memory_hits,
+                 "resume_packet" => %{"task_id" => _}
                }
              }
            } = response
+
+    assert is_list(memory_hits)
   end
 
   test "tools/call ck_finding persists a governed finding" do

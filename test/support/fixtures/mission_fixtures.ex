@@ -2,6 +2,7 @@ defmodule ControlKeel.MissionFixtures do
   @moduledoc false
 
   alias ControlKeel.Mission
+  alias ControlKeel.Memory
 
   def workspace_fixture(attrs \\ %{}) do
     {:ok, workspace} =
@@ -82,6 +83,41 @@ defmodule ControlKeel.MissionFixtures do
       |> Mission.create_finding()
 
     finding
+  end
+
+  def proof_bundle_fixture(attrs \\ %{}) do
+    task = Map.get_lazy(attrs, :task, fn -> task_fixture(%{status: "done"}) end)
+
+    {:ok, proof} =
+      case Map.get(attrs, :generate, true) do
+        true -> Mission.generate_proof_bundle(task.id)
+        _other -> Mission.generate_proof_bundle(task.id)
+      end
+
+    proof
+  end
+
+  def memory_record_fixture(attrs \\ %{}) do
+    session = Map.get_lazy(attrs, :session, fn -> session_fixture() end)
+
+    {:ok, record} =
+      attrs
+      |> Enum.into(%{
+        workspace_id: session.workspace_id,
+        session_id: session.id,
+        record_type: "decision",
+        title: "Recorded memory",
+        summary: "A reusable note for the governed session.",
+        body: "Detailed memory body.",
+        tags: ["memory"],
+        source_type: "test",
+        source_id: "fixture",
+        metadata: %{"domain_pack" => "software"}
+      })
+      |> Map.delete(:session)
+      |> Memory.record()
+
+    record
   end
 
   defp unique_slug do

@@ -2,7 +2,8 @@ defmodule ControlKeel.Mission.Task do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias ControlKeel.Mission.Session
+  alias ControlKeel.Memory.Record
+  alias ControlKeel.Mission.{ProofBundle, Session, TaskCheckpoint}
 
   schema "tasks" do
     field :title, :string
@@ -15,6 +16,9 @@ defmodule ControlKeel.Mission.Task do
     field :rollback_boundary, :string
 
     belongs_to :session, Session
+    has_many :proof_bundles, ProofBundle
+    has_many :task_checkpoints, TaskCheckpoint
+    has_many :memory_records, Record
 
     timestamps(type: :utc_datetime)
   end

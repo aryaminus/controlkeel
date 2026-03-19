@@ -28,7 +28,8 @@ IO.puts("  ✓ Workspace: #{workspace.name} (id: #{workspace.id})")
 {:ok, session} =
   Mission.create_session(%{
     title: "Patient Intake Workflow v1",
-    objective: "Build a patient intake form, webhook handler, and staff review queue for a small clinic",
+    objective:
+      "Build a patient intake form, webhook handler, and staff review queue for a small clinic",
     risk_tier: "critical",
     status: "in_progress",
     budget_cents: 5_000,

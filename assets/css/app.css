@@ -326,6 +326,8 @@ h1, h2, h3, .ck-display {
 .ck-task-state-done { background: var(--ck-success); }
 .ck-task-state-in_progress { background: var(--ck-lime); }
 .ck-task-state-queued { background: var(--ck-warning); }
+.ck-task-state-paused { background: #8fb7ff; }
+.ck-task-state-blocked { background: var(--ck-danger); }
 
 .ck-empty-state {
   min-height: 12rem;

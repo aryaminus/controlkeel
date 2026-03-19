@@ -1,7 +1,10 @@
 defmodule ControlKeel.MissionTest do
   use ControlKeel.DataCase
 
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.ProofBundle
+  alias ControlKeel.Repo
   import ControlKeel.MissionFixtures
   import ControlKeel.IntentFixtures
 
@@ -161,7 +164,7 @@ defmodule ControlKeel.MissionTest do
   end
 
   describe "complete_task/1" do
-    test "marks task done when no open or blocked findings exist" do
+    test "marks task done and persists a proof bundle when no open or blocked findings exist" do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "in_progress"})
       # ensure finding is resolved so it won't block
@@ -169,15 +172,17 @@ defmodule ControlKeel.MissionTest do
 
       assert {:ok, done_task} = Mission.complete_task(task)
       assert done_task.status == "done"
+      assert %ProofBundle{} = Mission.latest_proof_bundle_for_task(task.id)
     end
 
-    test "returns error with findings list when open findings exist" do
+    test "returns error with findings list when open findings exist and marks task blocked" do
       session = session_fixture()
       task = task_fixture(%{session: session})
       _open = finding_fixture(%{session: session, status: "open"})
 
       assert {:error, :unresolved_findings, blocked} = Mission.complete_task(task)
       assert length(blocked) >= 1
+      assert Mission.get_task!(task.id).status == "blocked"
     end
 
     test "returns error when blocked findings exist" do
@@ -192,6 +197,7 @@ defmodule ControlKeel.MissionTest do
       session = session_fixture()
       task = task_fixture(%{session: session})
       _open = finding_fixture(%{session: session, status: "open"})
+
       assert {:error, :unresolved_findings, _} =
                Mission.complete_task(task.id)
     end
@@ -202,19 +208,20 @@ defmodule ControlKeel.MissionTest do
   end
 
   describe "proof_bundle/1" do
-    test "returns a structured bundle for a valid task" do
+    test "returns and persists a structured bundle for a valid task" do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "done"})
 
       assert {:ok, bundle} = Mission.proof_bundle(task.id)
-      assert bundle.task_id == task.id
-      assert bundle.session_id == session.id
-      assert is_map(bundle.security_findings)
-      assert is_number(bundle.security_findings.total)
-      assert is_boolean(bundle.deploy_ready)
-      assert is_list(bundle.compliance_attestations)
-      assert is_binary(bundle.generated_at)
-      assert is_binary(bundle.rollback_instructions)
+      assert bundle["task_id"] == task.id
+      assert bundle["session_id"] == session.id
+      assert is_map(bundle["security_findings"])
+      assert is_number(bundle["security_findings"]["total"])
+      assert is_boolean(bundle["deploy_ready"])
+      assert is_list(bundle["compliance_attestations"])
+      assert is_binary(bundle["generated_at"])
+      assert is_binary(bundle["rollback_instructions"])
+      assert Repo.aggregate(ProofBundle, :count, :id) == 1
     end
 
     test "deploy_ready is false when open findings exist" do
@@ -223,17 +230,17 @@ defmodule ControlKeel.MissionTest do
       _open = finding_fixture(%{session: session, status: "open"})
 
       assert {:ok, bundle} = Mission.proof_bundle(task.id)
-      assert bundle.deploy_ready == false
+      assert bundle["deploy_ready"] == false
     end
 
-    test "bundle includes test_outcomes and diff_summary" do
+    test "bundle includes test_outcomes, diff_summary, and invocation summary" do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "done"})
 
       assert {:ok, bundle} = Mission.proof_bundle(task.id)
 
       assert %{"passed" => passed, "failed" => failed, "recorded" => recorded} =
-               bundle.test_outcomes
+               bundle["test_outcomes"]
 
       assert is_integer(passed)
       assert is_integer(failed)
@@ -244,12 +251,62 @@ defmodule ControlKeel.MissionTest do
                "findings_total" => _,
                "auto_resolved" => _,
                "manual_review" => _
-             } = bundle.diff_summary
+             } = bundle["diff_summary"]
+
+      assert %{"total" => _, "cost_cents" => _} = bundle["invocation_summary"]
+    end
+
+    test "generating proof multiple times versions bundles" do
+      task = task_fixture(%{status: "done"})
+
+      assert {:ok, first} = Mission.generate_proof_bundle(task.id)
+      assert {:ok, second} = Mission.generate_proof_bundle(task.id)
+
+      assert first.version == 1
+      assert second.version == 2
     end
 
     test "returns :not_found for unknown task_id" do
       assert {:error, :not_found} = Mission.proof_bundle(99_999_999)
     end
+  end
+
+  describe "pause_task/2 and resume_task/2" do
+    test "captures checkpoints and deterministic resume packet" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      _finding =
+        finding_fixture(%{session: session, status: "blocked", metadata: %{"task_id" => task.id}})
+
+      assert {:ok, %{task: paused, checkpoint: checkpoint, resume_packet: packet}} =
+               Mission.pause_task(task, "test")
+
+      assert paused.status == "paused"
+      assert checkpoint.checkpoint_type == "pause"
+      assert packet["task_id"] == task.id
+      assert is_list(packet["unresolved_findings"])
+      assert is_list(packet["memory_hits"])
+
+      assert {:ok, %{task: resumed, checkpoint: resumed_checkpoint}} =
+               Mission.resume_task(paused, "test")
+
+      assert resumed.status == "in_progress"
+      assert resumed_checkpoint.checkpoint_type == "resume"
+    end
+  end
+
+  test "mission lifecycle writes typed memory records" do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+    finding = finding_fixture(%{session: session})
+    assert {:ok, _proof} = Mission.generate_proof_bundle(task.id)
+
+    result = Memory.search("Sample finding", session_id: session.id, top_k: 10)
+    record_types = Enum.map(result.entries, & &1.record_type)
+
+    assert "finding" in record_types
+    assert Enum.any?(result.entries, &(&1.source_id == Integer.to_string(finding.id)))
   end
 
   describe "audit_log/1" do

@@ -6,12 +6,25 @@ defmodule ControlKeel.Mission do
   alias Ecto.Multi
   alias ControlKeel.AutoFix
   alias ControlKeel.Intent.ExecutionBrief
+  alias ControlKeel.Memory
   alias ControlKeel.Notifications.Webhook
   alias ControlKeel.Repo
-  alias ControlKeel.Mission.{Finding, Invocation, Planner, Session, Task, Workspace}
+
+  alias ControlKeel.Mission.{
+    Finding,
+    Invocation,
+    Planner,
+    ProofBundle,
+    Session,
+    Task,
+    TaskCheckpoint,
+    Workspace
+  }
+
   alias ControlKeel.Scanner
 
   @findings_page_size 20
+  @proofs_page_size 20
 
   def list_sessions, do: Repo.all(Session)
   def get_session(id), do: Repo.get(Session, id)
@@ -23,6 +36,10 @@ defmodule ControlKeel.Mission do
     %Session{}
     |> Session.changeset(attrs)
     |> Repo.insert()
+    |> tap(fn
+      {:ok, session} -> record_brief_memory(session)
+      _other -> :ok
+    end)
   end
 
   def update_session(%Session{} = session, attrs) do
@@ -55,18 +72,27 @@ defmodule ControlKeel.Mission do
     do: Workspace.changeset(workspace, attrs)
 
   def list_tasks, do: Repo.all(Task)
+  def get_task(id), do: Repo.get(Task, id)
   def get_task!(id), do: Repo.get!(Task, id)
 
   def create_task(attrs) do
     %Task{}
     |> Task.changeset(attrs)
     |> Repo.insert()
+    |> tap(fn
+      {:ok, task} -> record_task_memory(:created, task)
+      _other -> :ok
+    end)
   end
 
   def update_task(%Task{} = task, attrs) do
     task
     |> Task.changeset(attrs)
     |> Repo.update()
+    |> tap(fn
+      {:ok, updated} -> record_task_memory(:updated, updated, previous_status: task.status)
+      _other -> :ok
+    end)
   end
 
   def delete_task(%Task{} = task), do: Repo.delete(task)
@@ -89,6 +115,10 @@ defmodule ControlKeel.Mission do
     %Finding{}
     |> Finding.changeset(attrs)
     |> Repo.insert()
+    |> tap(fn
+      {:ok, finding} -> record_finding_memory(:created, finding)
+      _other -> :ok
+    end)
   end
 
   def update_finding(%Finding{} = finding, attrs) do
@@ -106,6 +136,56 @@ defmodule ControlKeel.Mission do
     %Invocation{}
     |> Invocation.changeset(attrs)
     |> Repo.insert()
+  end
+
+  def list_proof_bundles do
+    Repo.all(ProofBundle)
+  end
+
+  def get_proof_bundle(id), do: Repo.get(ProofBundle, id)
+  def get_proof_bundle!(id), do: Repo.get!(ProofBundle, id)
+
+  def get_proof_bundle_with_context(id) do
+    ProofBundle
+    |> Repo.get(id)
+    |> case do
+      nil ->
+        nil
+
+      proof ->
+        Repo.preload(proof, task: [], session: :workspace)
+    end
+  end
+
+  def latest_proof_bundle_for_task(task_id) when is_integer(task_id) do
+    ProofBundle
+    |> where([proof], proof.task_id == ^task_id)
+    |> order_by([proof], desc: proof.version, desc: proof.id)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  def latest_proof_bundles_for_session(session_id) when is_integer(session_id) do
+    ProofBundle
+    |> where([proof], proof.session_id == ^session_id)
+    |> order_by([proof], asc: proof.task_id, desc: proof.version, desc: proof.id)
+    |> Repo.all()
+    |> Enum.group_by(& &1.task_id)
+    |> Enum.into(%{}, fn {task_id, [latest | _rest]} -> {task_id, latest} end)
+  end
+
+  def create_task_checkpoint(attrs) do
+    %TaskCheckpoint{}
+    |> TaskCheckpoint.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def latest_task_checkpoint(task_id) when is_integer(task_id) do
+    TaskCheckpoint
+    |> where([checkpoint], checkpoint.task_id == ^task_id)
+    |> order_by([checkpoint], desc: checkpoint.inserted_at, desc: checkpoint.id)
+    |> limit(1)
+    |> Repo.one()
   end
 
   def list_recent_sessions(limit \\ 6) do
@@ -210,7 +290,11 @@ defmodule ControlKeel.Mission do
     |> case do
       {:ok, %{session: session}} ->
         emit_mission_created(plan, session)
-        {:ok, get_session_with_details!(session.id)}
+        record_brief_memory(session)
+        loaded = get_session_with_details!(session.id)
+        Enum.each(loaded.tasks, &record_task_memory(:created, &1))
+        Enum.each(loaded.findings, &record_finding_memory(:created, &1))
+        {:ok, loaded}
 
       {:error, :workspace, changeset, _changes} ->
         {:error, :workspace, changeset}
@@ -268,6 +352,30 @@ defmodule ControlKeel.Mission do
     }
   end
 
+  def browse_proof_bundles(opts \\ %{}) do
+    filters = normalize_proof_filters(opts)
+    base_query = proof_bundles_query(filters)
+    total_count = Repo.aggregate(base_query, :count, :id)
+    total_pages = max(div(total_count + @proofs_page_size - 1, @proofs_page_size), 1)
+    page = min(filters.page, total_pages)
+
+    entries =
+      base_query
+      |> order_by([proof, _task, _session, _workspace], desc: proof.generated_at, desc: proof.id)
+      |> limit(^@proofs_page_size)
+      |> offset(^((page - 1) * @proofs_page_size))
+      |> Repo.all()
+
+    %{
+      entries: entries,
+      filters: %{filters | page: page},
+      total_count: total_count,
+      total_pages: total_pages,
+      page: page,
+      page_size: @proofs_page_size
+    }
+  end
+
   def auto_fix_for_finding(%Finding{} = finding), do: AutoFix.generate(finding)
 
   def approve_finding(%Finding{} = finding) do
@@ -279,6 +387,7 @@ defmodule ControlKeel.Mission do
     case update_finding(finding, %{status: "approved", metadata: metadata}) do
       {:ok, updated} ->
         emit_finding_event(:approved, updated)
+        record_finding_memory(:approved, updated)
         {:ok, updated}
 
       other ->
@@ -307,6 +416,7 @@ defmodule ControlKeel.Mission do
     case update_finding(finding, %{status: "rejected", metadata: metadata}) do
       {:ok, updated} ->
         emit_finding_event(:rejected, updated)
+        record_finding_memory(:rejected, updated)
         {:ok, updated}
 
       other ->
@@ -331,6 +441,7 @@ defmodule ControlKeel.Mission do
     case update_finding(finding, %{status: "escalated", metadata: metadata}) do
       {:ok, updated} ->
         emit_finding_event(:escalated, updated)
+        record_finding_memory(:escalated, updated)
         {:ok, updated}
 
       other ->
@@ -346,16 +457,31 @@ defmodule ControlKeel.Mission do
   Returns `{:ok, task}` if the task is safe to mark done.
   """
   def complete_task(%Task{} = task) do
-    blocked =
-      Finding
-      |> where([f], f.session_id == ^task.session_id)
-      |> where([f], f.status in ["open", "blocked"])
-      |> Repo.all()
+    unresolved = unresolved_findings(task.session_id)
 
-    if blocked == [] do
-      update_task(task, %{status: "done"})
+    if unresolved == [] do
+      Multi.new()
+      |> Multi.update(:task, Task.changeset(task, %{status: "done"}))
+      |> Multi.run(:proof, fn repo, %{task: updated_task} ->
+        persist_proof_bundle(repo, updated_task)
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{task: updated_task, proof: proof}} ->
+          record_task_memory(:completed, updated_task,
+            proof_id: proof.id,
+            previous_status: task.status
+          )
+
+          record_proof_memory(proof)
+          {:ok, updated_task}
+
+        {:error, _step, reason, _changes} ->
+          {:error, reason}
+      end
     else
-      {:error, :unresolved_findings, blocked}
+      _ = maybe_block_task(task)
+      {:error, :unresolved_findings, unresolved}
     end
   end
 
@@ -373,68 +499,151 @@ defmodule ControlKeel.Mission do
   security findings, invocation summary, cost, risk score, deploy readiness,
   and compliance attestations.
   """
-  def proof_bundle(task_id) do
-    task = Repo.get(Task, task_id)
+  def proof_bundle(task_id) when is_integer(task_id) do
+    case Repo.get(Task, task_id) do
+      nil ->
+        {:error, :not_found}
 
-    if is_nil(task) do
-      {:error, :not_found}
-    else
-      session = get_session(task.session_id)
-      findings = list_session_findings(task.session_id)
-      invocations = Repo.all(from(i in Invocation, where: i.task_id == ^task.id))
-
-      total_cost = Enum.sum(Enum.map(invocations, & &1.estimated_cost_cents))
-      blocked = Enum.filter(findings, &(&1.status == "blocked"))
-      open = Enum.filter(findings, &(&1.status == "open"))
-      resolved = Enum.filter(findings, &(&1.status in ["approved", "resolved"]))
-      details = Enum.map(findings, &finding_bundle_entry/1)
-
-      risk_score = compute_risk_score(findings)
-
-      deploy_ready =
-        blocked == [] and open == [] and task.status == "done"
-
-      compliance_attestations =
-        build_compliance_attestations(session, findings)
-
-      test_outcomes = derive_test_outcomes(invocations)
-
-      diff_summary = %{
-        "agent_runs" => length(invocations),
-        "findings_total" => length(findings),
-        "auto_resolved" => Enum.count(details, & &1.auto_resolved),
-        "manual_review" => Enum.count(details, &(&1.status in ["approved", "rejected"]))
-      }
-
-      bundle = %{
-        task_id: task.id,
-        task_title: task.title,
-        session_id: task.session_id,
-        agent: get_in(session, [Access.key(:execution_brief), "agent"]) || "unknown",
-        status: task.status,
-        duration_ms: nil,
-        cost_cents: total_cost,
-        invocation_count: length(invocations),
-        security_findings: %{
-          total: length(findings),
-          blocked: length(blocked),
-          open: length(open),
-          resolved: length(resolved),
-          details: details
-        },
-        test_outcomes: test_outcomes,
-        diff_summary: diff_summary,
-        risk_score: risk_score,
-        deploy_ready: deploy_ready,
-        rollback_instructions:
-          "git revert HEAD  # revert changes from task #{task.id} if needed",
-        compliance_attestations: compliance_attestations,
-        validation_gate: task.validation_gate,
-        generated_at: DateTime.utc_now() |> DateTime.to_iso8601()
-      }
-
-      {:ok, bundle}
+      task ->
+        case latest_proof_bundle_for_task(task.id) do
+          %ProofBundle{} = proof -> {:ok, proof.bundle}
+          nil -> generate_proof_bundle(task_id) |> unwrap_proof_bundle()
+        end
     end
+  end
+
+  def proof_bundle(task_id) when is_binary(task_id) do
+    case Integer.parse(task_id) do
+      {parsed, ""} -> proof_bundle(parsed)
+      _error -> {:error, :not_found}
+    end
+  end
+
+  def generate_proof_bundle(task_id) when is_integer(task_id) do
+    case Repo.get(Task, task_id) do
+      nil -> {:error, :not_found}
+      task -> generate_proof_bundle(task)
+    end
+  end
+
+  def generate_proof_bundle(task_id) when is_binary(task_id) do
+    case Integer.parse(task_id) do
+      {parsed, ""} -> generate_proof_bundle(parsed)
+      _error -> {:error, :not_found}
+    end
+  end
+
+  def generate_proof_bundle(%Task{} = task) do
+    Repo.transaction(fn ->
+      with {:ok, proof} <- persist_proof_bundle(Repo, Repo.get!(Task, task.id)) do
+        proof
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, proof} ->
+        record_proof_memory(proof)
+        {:ok, proof}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def pause_task(task_or_id, created_by \\ "system")
+
+  def pause_task(task_id, created_by) when is_integer(task_id) do
+    case Repo.get(Task, task_id) do
+      nil -> {:error, :not_found}
+      task -> pause_task(task, created_by)
+    end
+  end
+
+  def pause_task(%Task{} = task, created_by) do
+    packet = resume_packet_for_task(task)
+
+    summary =
+      "Paused #{task.title} with #{length(packet["unresolved_findings"])} unresolved finding(s)."
+
+    Multi.new()
+    |> Multi.update(:task, Task.changeset(task, %{status: "paused"}))
+    |> Multi.insert(:checkpoint, fn %{task: updated_task} ->
+      TaskCheckpoint.changeset(%TaskCheckpoint{}, %{
+        session_id: updated_task.session_id,
+        task_id: updated_task.id,
+        checkpoint_type: "pause",
+        summary: summary,
+        payload: packet,
+        created_by: created_by
+      })
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{task: updated_task, checkpoint: checkpoint}} ->
+        record_task_memory(:paused, updated_task, previous_status: task.status)
+        record_checkpoint_memory(checkpoint)
+        {:ok, %{task: updated_task, checkpoint: checkpoint, resume_packet: packet}}
+
+      {:error, _step, reason, _changes} ->
+        {:error, reason}
+    end
+  end
+
+  def resume_task(task_or_id, created_by \\ "system")
+
+  def resume_task(task_id, created_by) when is_integer(task_id) do
+    case Repo.get(Task, task_id) do
+      nil -> {:error, :not_found}
+      task -> resume_task(task, created_by)
+    end
+  end
+
+  def resume_task(%Task{} = task, created_by) do
+    packet = resume_packet_for_task(task)
+
+    summary =
+      "Resumed #{task.title} with #{length(packet["unresolved_findings"])} unresolved finding(s)."
+
+    Multi.new()
+    |> Multi.update(:task, Task.changeset(task, %{status: "in_progress"}))
+    |> Multi.insert(:checkpoint, fn %{task: updated_task} ->
+      TaskCheckpoint.changeset(%TaskCheckpoint{}, %{
+        session_id: updated_task.session_id,
+        task_id: updated_task.id,
+        checkpoint_type: "resume",
+        summary: summary,
+        payload: packet,
+        created_by: created_by
+      })
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{task: updated_task, checkpoint: checkpoint}} ->
+        record_task_memory(:resumed, updated_task, previous_status: task.status)
+        record_checkpoint_memory(checkpoint)
+        {:ok, %{task: updated_task, checkpoint: checkpoint, resume_packet: packet}}
+
+      {:error, _step, reason, _changes} ->
+        {:error, reason}
+    end
+  end
+
+  def resume_packet(task_id) when is_integer(task_id) do
+    case Repo.get(Task, task_id) do
+      nil -> {:error, :not_found}
+      task -> {:ok, resume_packet_for_task(task)}
+    end
+  end
+
+  def proof_summary_for_task(nil), do: nil
+
+  def proof_summary_for_task(%Task{id: task_id}) do
+    task_id |> latest_proof_bundle_for_task() |> proof_summary()
+  end
+
+  def proof_summary_for_task(task_id) when is_integer(task_id) do
+    task_id |> latest_proof_bundle_for_task() |> proof_summary()
   end
 
   @doc """
@@ -448,7 +657,9 @@ defmodule ControlKeel.Mission do
       {:error, :not_found}
     else
       invocations =
-        Repo.all(from(i in Invocation, where: i.session_id == ^session_id, order_by: i.inserted_at))
+        Repo.all(
+          from(i in Invocation, where: i.session_id == ^session_id, order_by: i.inserted_at)
+        )
 
       findings =
         Repo.all(from(f in Finding, where: f.session_id == ^session_id, order_by: f.inserted_at))
@@ -557,6 +768,335 @@ defmodule ControlKeel.Mission do
 
   defp task_audit_entry(t) do
     %{id: t.id, title: t.title, status: t.status, position: t.position}
+  end
+
+  defp unresolved_findings(session_id) do
+    Finding
+    |> where([finding], finding.session_id == ^session_id)
+    |> where([finding], finding.status in ["open", "blocked"])
+    |> Repo.all()
+  end
+
+  defp maybe_block_task(%Task{status: "blocked"}), do: :ok
+  defp maybe_block_task(%Task{} = task), do: update_task(task, %{status: "blocked"})
+
+  defp unwrap_proof_bundle({:ok, %ProofBundle{} = proof}), do: {:ok, proof.bundle}
+  defp unwrap_proof_bundle(other), do: other
+
+  defp persist_proof_bundle(repo, %Task{} = task) do
+    session =
+      Session
+      |> repo.get(task.session_id)
+      |> repo.preload(:workspace)
+
+    findings =
+      Finding
+      |> where([finding], finding.session_id == ^task.session_id)
+      |> order_by([finding], desc: finding.inserted_at)
+      |> repo.all()
+
+    invocations =
+      Invocation
+      |> where([invocation], invocation.task_id == ^task.id)
+      |> order_by([invocation], desc: invocation.inserted_at)
+      |> repo.all()
+
+    snapshot = build_proof_bundle_snapshot(task, session, findings, invocations)
+
+    attrs = %{
+      session_id: task.session_id,
+      task_id: task.id,
+      version: next_proof_bundle_version(repo, task.id),
+      status: task.status,
+      risk_score: snapshot["risk_score"],
+      deploy_ready: snapshot["deploy_ready"],
+      open_findings_count: get_in(snapshot, ["security_findings", "open"]) || 0,
+      blocked_findings_count: get_in(snapshot, ["security_findings", "blocked"]) || 0,
+      approved_findings_count: get_in(snapshot, ["finding_resolution_summary", "approved"]) || 0,
+      bundle: snapshot,
+      generated_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    }
+
+    %ProofBundle{}
+    |> ProofBundle.changeset(attrs)
+    |> repo.insert()
+  end
+
+  defp next_proof_bundle_version(repo, task_id) do
+    ProofBundle
+    |> where([proof], proof.task_id == ^task_id)
+    |> select([proof], max(proof.version))
+    |> repo.one()
+    |> Kernel.||(0)
+    |> Kernel.+(1)
+  end
+
+  defp build_proof_bundle_snapshot(task, session, findings, invocations) do
+    total_cost = Enum.sum(Enum.map(invocations, &(&1.estimated_cost_cents || 0)))
+    blocked = Enum.filter(findings, &(&1.status == "blocked"))
+    open = Enum.filter(findings, &(&1.status == "open"))
+    approved = Enum.filter(findings, &(&1.status == "approved"))
+    resolved = Enum.filter(findings, &(&1.status in ["approved", "resolved", "rejected"]))
+    details = Enum.map(findings, &finding_bundle_entry/1)
+    risk_score = compute_risk_score(findings)
+    deploy_ready = blocked == [] and open == [] and task.status == "done"
+    compliance_attestations = build_compliance_attestations(session, findings)
+    test_outcomes = derive_test_outcomes(invocations)
+
+    %{
+      "task_id" => task.id,
+      "task_title" => task.title,
+      "session_id" => task.session_id,
+      "agent" => get_in(session, [Access.key(:execution_brief), "agent"]) || "unknown",
+      "status" => task.status,
+      "duration_ms" => get_in(task.metadata || %{}, ["duration_ms"]),
+      "cost_cents" => total_cost,
+      "invocation_count" => length(invocations),
+      "security_findings" => %{
+        "total" => length(findings),
+        "blocked" => length(blocked),
+        "open" => length(open),
+        "resolved" => length(resolved),
+        "details" => details
+      },
+      "test_outcomes" => test_outcomes,
+      "diff_summary" => %{
+        "agent_runs" => length(invocations),
+        "findings_total" => length(findings),
+        "auto_resolved" => Enum.count(details, & &1.auto_resolved),
+        "manual_review" => Enum.count(details, &(&1.status in ["approved", "rejected"]))
+      },
+      "risk_score" => risk_score,
+      "deploy_ready" => deploy_ready,
+      "rollback_instructions" =>
+        "git revert HEAD  # revert changes from task #{task.id} if needed",
+      "compliance_attestations" => compliance_attestations,
+      "validation_gate" => task.validation_gate,
+      "invocation_summary" => build_invocation_summary(invocations, total_cost),
+      "finding_resolution_summary" => %{
+        "approved" => length(approved),
+        "resolved" => length(resolved),
+        "open" => length(open),
+        "blocked" => length(blocked)
+      },
+      "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
+
+  defp build_invocation_summary(invocations, total_cost) do
+    %{
+      "total" => length(invocations),
+      "providers" =>
+        invocations
+        |> Enum.group_by(&(&1.provider || "unknown"))
+        |> Enum.into(%{}, fn {provider, rows} -> {provider, length(rows)} end),
+      "tools" =>
+        invocations
+        |> Enum.group_by(&(&1.tool || "unknown"))
+        |> Enum.into(%{}, fn {tool, rows} -> {tool, length(rows)} end),
+      "cost_cents" => total_cost,
+      "latest_run_at" =>
+        invocations
+        |> Enum.map(& &1.inserted_at)
+        |> Enum.max_by(&DateTime.to_unix/1, fn -> nil end)
+    }
+  end
+
+  defp proof_summary(nil), do: nil
+
+  defp proof_summary(%ProofBundle{} = proof) do
+    %{
+      "id" => proof.id,
+      "task_id" => proof.task_id,
+      "version" => proof.version,
+      "status" => proof.status,
+      "risk_score" => proof.risk_score,
+      "deploy_ready" => proof.deploy_ready,
+      "open_findings_count" => proof.open_findings_count,
+      "blocked_findings_count" => proof.blocked_findings_count,
+      "approved_findings_count" => proof.approved_findings_count,
+      "generated_at" => proof.generated_at
+    }
+  end
+
+  defp resume_packet_for_task(%Task{} = task) do
+    session = get_session_context(task.session_id)
+    relevant_findings = Enum.filter(session.findings, &(&1.metadata["task_id"] in [nil, task.id]))
+    memory_hits = Memory.retrieve_for_task(session, task, findings: relevant_findings)
+    latest_proof = latest_proof_bundle_for_task(task.id)
+    latest_invocations = list_task_invocations(task.id, 5)
+
+    %{
+      "task_id" => task.id,
+      "task_title" => task.title,
+      "task_status" => task.status,
+      "validation_gate" => task.validation_gate,
+      "session_id" => task.session_id,
+      "budget_summary" => %{
+        "spent_cents" => session.spent_cents,
+        "budget_cents" => session.budget_cents,
+        "daily_budget_cents" => session.daily_budget_cents
+      },
+      "unresolved_findings" =>
+        relevant_findings
+        |> Enum.filter(&(&1.status in ["open", "blocked", "escalated"]))
+        |> Enum.map(&finding_bundle_entry/1),
+      "latest_invocations" => Enum.map(latest_invocations, &audit_invocation_entry/1),
+      "proof_summary" => proof_summary(latest_proof),
+      "memory_hits" => memory_hits.entries
+    }
+  end
+
+  def list_task_invocations(task_id, limit \\ 5) do
+    Invocation
+    |> where([invocation], invocation.task_id == ^task_id)
+    |> order_by([invocation], desc: invocation.inserted_at)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  defp record_brief_memory(%Session{workspace_id: nil}), do: :ok
+
+  defp record_brief_memory(%Session{} = session) do
+    brief = session.execution_brief || %{}
+
+    Memory.record(%{
+      workspace_id: session.workspace_id,
+      session_id: session.id,
+      record_type: "brief",
+      title: "Execution brief created",
+      summary: session.title,
+      body: brief_body(session, brief),
+      tags: [brief["domain_pack"], session.risk_tier, "brief"],
+      source_type: "session",
+      source_id: session.id,
+      metadata: %{
+        "domain_pack" => brief["domain_pack"],
+        "risk_tier" => session.risk_tier,
+        "occupation" => brief["occupation"]
+      }
+    })
+  end
+
+  defp brief_body(session, brief) do
+    [
+      session.objective,
+      brief["recommended_stack"],
+      Enum.join(List.wrap(brief["acceptance_criteria"]), "\n"),
+      Enum.join(List.wrap(brief["open_questions"]), "\n")
+    ]
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join("\n\n")
+  end
+
+  defp record_task_memory(action, %Task{} = task, extra \\ []) do
+    case get_session_with_workspace(task.session_id) do
+      nil ->
+        :ok
+
+      session ->
+        Memory.record(%{
+          workspace_id: session.workspace_id,
+          session_id: session.id,
+          task_id: task.id,
+          record_type: "task",
+          title: task_memory_title(action, task),
+          summary: "#{task.title} is now #{task.status}",
+          body: task.validation_gate || "",
+          tags: [task.status, session.risk_tier, "task"],
+          source_type: "task",
+          source_id: task.id,
+          metadata: %{
+            "action" => to_string(action),
+            "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"]),
+            "previous_status" => Keyword.get(extra, :previous_status),
+            "proof_id" => Keyword.get(extra, :proof_id)
+          }
+        })
+    end
+  end
+
+  defp task_memory_title(:created, task), do: "Task created: #{task.title}"
+  defp task_memory_title(:completed, task), do: "Task completed: #{task.title}"
+  defp task_memory_title(:paused, task), do: "Task paused: #{task.title}"
+  defp task_memory_title(:resumed, task), do: "Task resumed: #{task.title}"
+  defp task_memory_title(:updated, task), do: "Task updated: #{task.title}"
+  defp task_memory_title(_action, task), do: "Task changed: #{task.title}"
+
+  defp record_finding_memory(action, %Finding{} = finding) do
+    case get_session_with_workspace(finding.session_id) do
+      nil ->
+        :ok
+
+      session ->
+        Memory.record(%{
+          workspace_id: session.workspace_id,
+          session_id: session.id,
+          task_id: finding.metadata["task_id"],
+          record_type: "finding",
+          title: "Finding #{to_string(action)}: #{finding.title}",
+          summary: finding.plain_message,
+          body: "#{finding.rule_id} (#{finding.severity}/#{finding.status})",
+          tags: [finding.rule_id, finding.severity, finding.status, "finding"],
+          source_type: "finding",
+          source_id: finding.id,
+          metadata:
+            %{
+              "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"]),
+              "action" => to_string(action),
+              "status" => finding.status,
+              "rule_id" => finding.rule_id
+            }
+            |> Map.merge(finding.metadata || %{})
+        })
+    end
+  end
+
+  defp record_proof_memory(%ProofBundle{} = proof) do
+    proof = Repo.preload(proof, task: [], session: :workspace)
+
+    Memory.record(%{
+      workspace_id: proof.session.workspace_id,
+      session_id: proof.session_id,
+      task_id: proof.task_id,
+      record_type: "proof",
+      title: "Proof bundle v#{proof.version} for #{proof.task.title}",
+      summary: "Risk #{proof.risk_score}, deploy ready: #{proof.deploy_ready}",
+      body: Jason.encode!(proof.bundle, pretty: true),
+      tags: [proof.status, (proof.deploy_ready && "deploy-ready") || "not-ready", "proof"],
+      source_type: "proof_bundle",
+      source_id: proof.id,
+      metadata: %{
+        "domain_pack" => get_in(proof.session.execution_brief || %{}, ["domain_pack"]),
+        "version" => proof.version,
+        "risk_score" => proof.risk_score,
+        "deploy_ready" => proof.deploy_ready
+      }
+    })
+  end
+
+  defp record_checkpoint_memory(%TaskCheckpoint{} = checkpoint) do
+    session = get_session_with_workspace(checkpoint.session_id)
+    task = Repo.get(Task, checkpoint.task_id)
+
+    if session && task do
+      Memory.record(%{
+        workspace_id: session.workspace_id,
+        session_id: session.id,
+        task_id: task.id,
+        record_type: "checkpoint",
+        title: "Task #{checkpoint.checkpoint_type}: #{task.title}",
+        summary: checkpoint.summary,
+        body: Jason.encode!(checkpoint.payload, pretty: true),
+        tags: [checkpoint.checkpoint_type, "checkpoint"],
+        source_type: "task_checkpoint",
+        source_id: checkpoint.id,
+        metadata: %{
+          "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"]),
+          "created_by" => checkpoint.created_by
+        }
+      })
+    end
   end
 
   def record_runtime_findings(session_id, findings, opts \\ []) when is_list(findings) do
@@ -730,6 +1270,20 @@ defmodule ControlKeel.Mission do
     |> maybe_filter_session(filters.session_id)
   end
 
+  defp proof_bundles_query(filters) do
+    from(proof in ProofBundle,
+      join: task in assoc(proof, :task),
+      join: session in assoc(proof, :session),
+      join: workspace in assoc(session, :workspace),
+      preload: [task: task, session: {session, workspace: workspace}]
+    )
+    |> maybe_search_proofs(filters.q)
+    |> maybe_filter_proof_session(filters.session_id)
+    |> maybe_filter_proof_task(filters.task_id)
+    |> maybe_filter_proof_ready(filters.deploy_ready)
+    |> maybe_filter_proof_risk(filters.risk_tier)
+  end
+
   defp normalize_findings_filters(opts) do
     opts =
       Enum.into(opts, %{}, fn {key, value} -> {to_string(key), value} end)
@@ -740,6 +1294,20 @@ defmodule ControlKeel.Mission do
       status: normalize_filter_value(opts["status"]),
       category: normalize_filter_value(opts["category"]),
       session_id: normalize_session_filter(opts["session_id"]),
+      page: normalize_page(opts["page"])
+    }
+  end
+
+  defp normalize_proof_filters(opts) do
+    opts =
+      Enum.into(opts, %{}, fn {key, value} -> {to_string(key), value} end)
+
+    %{
+      q: normalize_filter_value(opts["q"]),
+      session_id: normalize_session_filter(opts["session_id"]),
+      task_id: normalize_session_filter(opts["task_id"]),
+      deploy_ready: normalize_boolean_filter(opts["deploy_ready"]),
+      risk_tier: normalize_filter_value(opts["risk_tier"]),
       page: normalize_page(opts["page"])
     }
   end
@@ -777,6 +1345,18 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  defp normalize_boolean_filter(nil), do: nil
+  defp normalize_boolean_filter(true), do: true
+  defp normalize_boolean_filter(false), do: false
+
+  defp normalize_boolean_filter(value) do
+    case String.downcase(to_string(value)) do
+      "true" -> true
+      "false" -> false
+      _ -> nil
+    end
+  end
+
   defp maybe_search_findings(query, nil), do: query
   defp maybe_search_findings(query, ""), do: query
 
@@ -794,6 +1374,21 @@ defmodule ControlKeel.Mission do
     )
   end
 
+  defp maybe_search_proofs(query, nil), do: query
+  defp maybe_search_proofs(query, ""), do: query
+
+  defp maybe_search_proofs(query, value) do
+    pattern = "%" <> String.downcase(value) <> "%"
+
+    from([proof, task, session, workspace] in query,
+      where:
+        like(fragment("lower(?)", task.title), ^pattern) or
+          like(fragment("lower(?)", session.title), ^pattern) or
+          like(fragment("lower(?)", workspace.name), ^pattern) or
+          like(fragment("lower(?)", proof.status), ^pattern)
+    )
+  end
+
   defp maybe_filter_finding(query, _field, nil), do: query
   defp maybe_filter_finding(query, _field, ""), do: query
 
@@ -805,6 +1400,33 @@ defmodule ControlKeel.Mission do
 
   defp maybe_filter_session(query, session_id) do
     from([f, _s, _w] in query, where: f.session_id == ^session_id)
+  end
+
+  defp maybe_filter_proof_session(query, nil), do: query
+
+  defp maybe_filter_proof_session(query, session_id) do
+    from([proof, _task, _session, _workspace] in query, where: proof.session_id == ^session_id)
+  end
+
+  defp maybe_filter_proof_task(query, nil), do: query
+
+  defp maybe_filter_proof_task(query, task_id) do
+    from([proof, _task, _session, _workspace] in query, where: proof.task_id == ^task_id)
+  end
+
+  defp maybe_filter_proof_ready(query, nil), do: query
+
+  defp maybe_filter_proof_ready(query, deploy_ready) do
+    from([proof, _task, _session, _workspace] in query,
+      where: proof.deploy_ready == ^deploy_ready
+    )
+  end
+
+  defp maybe_filter_proof_risk(query, nil), do: query
+  defp maybe_filter_proof_risk(query, ""), do: query
+
+  defp maybe_filter_proof_risk(query, risk_tier) do
+    from([_proof, _task, session, _workspace] in query, where: session.risk_tier == ^risk_tier)
   end
 
   defp maybe_put_metadata(metadata, _key, nil), do: metadata

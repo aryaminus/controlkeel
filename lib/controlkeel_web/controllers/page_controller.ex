@@ -2,10 +2,12 @@ defmodule ControlKeelWeb.PageController do
   use ControlKeelWeb, :controller
 
   alias ControlKeel.Analytics
+  alias ControlKeel.Benchmark
   alias ControlKeel.Mission
 
   def home(conn, _params) do
     render(conn, :home,
+      benchmark_summary: Benchmark.benchmark_summary(),
       recent_sessions: Mission.list_recent_sessions(),
       ship_summary: Analytics.funnel_summary()
     )

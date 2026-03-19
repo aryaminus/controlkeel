@@ -84,6 +84,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
       |> Enum.filter(&(&1.decision == "block"))
       |> Enum.map(fn f ->
         fix = AutoFix.generate(f)
+
         %{
           "rule_id" => f.rule_id,
           "supported" => fix["supported"],

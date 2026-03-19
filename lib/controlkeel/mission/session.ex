@@ -2,7 +2,8 @@ defmodule ControlKeel.Mission.Session do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias ControlKeel.Mission.{Finding, Invocation, Task, Workspace}
+  alias ControlKeel.Memory.Record
+  alias ControlKeel.Mission.{Finding, Invocation, ProofBundle, Task, TaskCheckpoint, Workspace}
 
   schema "sessions" do
     field :title, :string
@@ -19,6 +20,9 @@ defmodule ControlKeel.Mission.Session do
     has_many :tasks, Task
     has_many :findings, Finding
     has_many :invocations, Invocation
+    has_many :proof_bundles, ProofBundle
+    has_many :task_checkpoints, TaskCheckpoint
+    has_many :memory_records, Record
 
     timestamps(type: :utc_datetime)
   end

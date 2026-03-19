@@ -1,15 +1,22 @@
 defmodule ControlKeel.AgentRouterTest do
-  use ExUnit.Case, async: true
+  use ControlKeel.DataCase, async: false
 
   alias ControlKeel.AgentRouter
-
-  # All agents that have :ui_prototype capability
-  @ui_capable ["bolt", "replit", "lovable", "v0", "ai-studio"]
+  import ControlKeel.PolicyTrainingFixtures
 
   # All agents that pass critical security tier (local: true + security_tier :critical or :high)
   @critical_ok [
-    "ollama", "aider", "opencode", "nemo-guardrails",
-    "claude-code", "cursor", "windsurf", "kiro", "augment", "amp", "codex-cli"
+    "ollama",
+    "aider",
+    "opencode",
+    "nemo-guardrails",
+    "claude-code",
+    "cursor",
+    "windsurf",
+    "kiro",
+    "augment",
+    "amp",
+    "codex-cli"
   ]
 
   describe "route/2 — basic routing" do
@@ -103,7 +110,17 @@ defmodule ControlKeel.AgentRouterTest do
     end
 
     test "all cloud LLM providers excluded at critical risk" do
-      cloud_llm = ["openai", "anthropic", "gemini", "deepseek", "mistral", "openrouter", "glm", "kimi", "qwen"]
+      cloud_llm = [
+        "openai",
+        "anthropic",
+        "gemini",
+        "deepseek",
+        "mistral",
+        "openrouter",
+        "glm",
+        "kimi",
+        "qwen"
+      ]
 
       assert {:error, :no_suitable_agent, _} =
                AgentRouter.route("PHI data update",
@@ -135,8 +152,16 @@ defmodule ControlKeel.AgentRouterTest do
       assert {:ok, rec} =
                AgentRouter.route("Build feature", budget_remaining_cents: 10, risk_tier: "low")
 
-      assert rec.agent in ["ollama", "aider", "opencode", "crewai", "langchain", "deepagents",
-                            "nemo-guardrails", "continue"]
+      assert rec.agent in [
+               "ollama",
+               "aider",
+               "opencode",
+               "crewai",
+               "langchain",
+               "deepagents",
+               "nemo-guardrails",
+               "continue"
+             ]
     end
 
     test "allows all agents when budget is sufficient" do
@@ -391,7 +416,17 @@ defmodule ControlKeel.AgentRouterTest do
     test "anthropic has highest swe_bench_score among original LLM providers" do
       agents = AgentRouter.list_agents()
 
-      llm_providers = ["openai", "anthropic", "gemini", "deepseek", "mistral", "openrouter", "glm", "kimi", "qwen"]
+      llm_providers = [
+        "openai",
+        "anthropic",
+        "gemini",
+        "deepseek",
+        "mistral",
+        "openrouter",
+        "glm",
+        "kimi",
+        "qwen"
+      ]
 
       best =
         llm_providers
@@ -424,8 +459,18 @@ defmodule ControlKeel.AgentRouterTest do
     test "contains all new framework agents" do
       agents = AgentRouter.list_agents()
 
-      for id <- ["langgraph", "autogen", "semantic-kernel", "dspy", "haystack",
-                  "dify", "flowise", "n8n", "prefect", "mastra"] do
+      for id <- [
+            "langgraph",
+            "autogen",
+            "semantic-kernel",
+            "dspy",
+            "haystack",
+            "dify",
+            "flowise",
+            "n8n",
+            "prefect",
+            "mastra"
+          ] do
         assert Map.has_key?(agents, id), "missing agent: #{id}"
       end
     end
@@ -630,6 +675,79 @@ defmodule ControlKeel.AgentRouterTest do
                  risk_tier: "low",
                  allowed_agents: ["vellum"]
                )
+    end
+  end
+
+  describe "route/2 — learned policy artifacts" do
+    test "uses an active learned router artifact when available" do
+      _artifact =
+        policy_artifact_fixture(%{
+          artifact_type: "router",
+          status: "active",
+          version: 4,
+          artifact:
+            default_artifact_payload("router")
+            |> Map.put("categorical_vocab", %{
+              "task_type" => ["backend", "ui", "__unknown__"],
+              "risk_tier" => ["low", "moderate", "high", "critical", "__unknown__"],
+              "domain_pack" => ["software", "healthcare", "__unknown__"],
+              "budget_tier" => ["free", "low", "medium", "high", "__unknown__"],
+              "subject_id" => ["generic-cli", "openai", "__unknown__"],
+              "subject_type" => ["agent", "__unknown__"]
+            })
+            |> Map.put("network", %{
+              "layers" => [
+                %{
+                  "weights" => [
+                    List.duplicate(0.0, 19) ++
+                      List.duplicate(0.0, 3) ++
+                      List.duplicate(0.0, 5) ++
+                      List.duplicate(0.0, 3) ++
+                      List.duplicate(0.0, 5) ++
+                      [4.0, -4.0, 0.0] ++
+                      [0.0, 0.0]
+                  ],
+                  "biases" => [0.0],
+                  "activation" => "identity"
+                }
+              ]
+            })
+        })
+
+      assert {:ok, rec} =
+               AgentRouter.route("Build a REST endpoint",
+                 risk_tier: "low",
+                 allowed_agents: ["openai", "generic-cli"],
+                 budget_remaining_cents: 2_000
+               )
+
+      assert rec.agent == "generic-cli"
+      assert rec.policy_source == "learned"
+      assert rec.artifact_version == 4
+    end
+
+    test "falls back to heuristic routing when the active artifact cannot be scored" do
+      invalid_artifact =
+        policy_artifact_fixture(%{
+          artifact_type: "router",
+          status: "active",
+          version: 5,
+          artifact:
+            default_artifact_payload("router")
+            |> Map.put("network", %{})
+        })
+
+      assert {:ok, rec} =
+               AgentRouter.route("Build a REST endpoint",
+                 risk_tier: "low",
+                 allowed_agents: ["openai", "generic-cli"],
+                 budget_remaining_cents: 2_000
+               )
+
+      assert rec.agent == "openai"
+      assert rec.policy_source == "heuristic"
+      assert rec.artifact_version == nil
+      assert invalid_artifact.id
     end
   end
 end

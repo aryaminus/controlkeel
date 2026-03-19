@@ -190,22 +190,28 @@ defmodule ControlKeelWeb.PolicyStudioLive do
     do: "Active when domain pack is finance. Flags payment card data and SOX-sensitive records."
 
   defp pack_description("hr"),
-    do: "Active when domain pack is HR. Flags employee PII, candidate data handling, and automated screening risks."
+    do:
+      "Active when domain pack is HR. Flags employee PII, candidate data handling, and automated screening risks."
 
   defp pack_description("legal"),
-    do: "Active when domain pack is legal. Flags attorney-client privilege risks, unencrypted document handling, and retention violations."
+    do:
+      "Active when domain pack is legal. Flags attorney-client privilege risks, unencrypted document handling, and retention violations."
 
   defp pack_description("marketing"),
-    do: "Active when domain pack is marketing. Flags missing consent mechanisms, CAN-SPAM violations, and unsecured contact lists."
+    do:
+      "Active when domain pack is marketing. Flags missing consent mechanisms, CAN-SPAM violations, and unsecured contact lists."
 
   defp pack_description("sales"),
-    do: "Active when domain pack is sales. Flags CRM contact PII, quota audit risks, and data portability gaps."
+    do:
+      "Active when domain pack is sales. Flags CRM contact PII, quota audit risks, and data portability gaps."
 
   defp pack_description("realestate"),
-    do: "Active when domain pack is real estate. Flags client PII, unencrypted transaction docs, and Fair Housing compliance gaps."
+    do:
+      "Active when domain pack is real estate. Flags client PII, unencrypted transaction docs, and Fair Housing compliance gaps."
 
   defp pack_description("gdpr"),
-    do: "Active for EU data handling. Flags missing consent, right-to-delete gaps, and cross-border data transfer risks."
+    do:
+      "Active for EU data handling. Flags missing consent, right-to-delete gaps, and cross-border data transfer risks."
 
   defp pack_description(_), do: "Domain-specific policy rules."
 

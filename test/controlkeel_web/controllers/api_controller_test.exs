@@ -1,7 +1,9 @@
 defmodule ControlKeelWeb.ApiControllerTest do
   use ControlKeelWeb.ConnCase
 
+  import ControlKeel.BenchmarkFixtures
   import ControlKeel.MissionFixtures
+  import ControlKeel.PolicyTrainingFixtures
 
   # ─── Sessions ────────────────────────────────────────────────────────────────
 
@@ -153,6 +155,136 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  describe "benchmark API" do
+    test "lists suites and recent runs", %{conn: conn} do
+      run = benchmark_run_fixture()
+
+      conn = get(conn, ~p"/api/v1/benchmarks")
+      body = json_response(conn, 200)
+
+      assert body["summary"]["total_suites"] >= 1
+      assert Enum.any?(body["suites"], &(&1["slug"] == "vibe_failures_v1"))
+      assert Enum.any?(body["runs"], &(&1["id"] == run.id))
+    end
+
+    test "creates and fetches a benchmark run", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/v1/benchmarks/runs", %{
+          suite: "vibe_failures_v1",
+          subjects: "controlkeel_validate",
+          baseline_subject: "controlkeel_validate",
+          scenario_slugs: "hardcoded_api_key_python_webhook"
+        })
+
+      assert %{"run" => run} = json_response(conn, 201)
+      assert run["suite_slug"] == "vibe_failures_v1"
+      assert run["subjects"] == ["controlkeel_validate"]
+      assert length(run["scenarios"]) == 1
+
+      conn = build_conn() |> get(~p"/api/v1/benchmarks/runs/#{run["id"]}")
+      assert %{"run" => fetched} = json_response(conn, 200)
+      assert fetched["id"] == run["id"]
+      assert length(fetched["scenarios"]) == 1
+    end
+
+    test "imports a manual subject result and exports csv", %{conn: conn} do
+      tmp_dir = benchmark_tmp_dir()
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_dir)
+      end)
+
+      write_benchmark_subjects!(tmp_dir, [
+        %{
+          "id" => "manual_subject",
+          "label" => "Manual Subject",
+          "type" => "manual_import"
+        }
+      ])
+
+      {:ok, run} =
+        ControlKeel.Benchmark.run_suite(
+          %{
+            "suite" => "vibe_failures_v1",
+            "subjects" => "manual_subject",
+            "baseline_subject" => "manual_subject",
+            "scenario_slugs" => "hardcoded_api_key_python_webhook"
+          },
+          tmp_dir
+        )
+
+      conn =
+        post(conn, ~p"/api/v1/benchmarks/runs/#{run.id}/import", %{
+          subject: "manual_subject",
+          scenario_slug: "hardcoded_api_key_python_webhook",
+          content: "OPENAI_KEY = \"AKIAIOSFODNN7EXAMPLE\"",
+          path: "app/intake_handler.py",
+          kind: "code",
+          duration_ms: 12
+        })
+
+      assert %{"run" => updated_run} = json_response(conn, 200)
+
+      scenario_row =
+        Enum.find(updated_run["scenarios"], fn row ->
+          row["scenario"]["slug"] == "hardcoded_api_key_python_webhook"
+        end)
+
+      [result] = scenario_row["results"]
+
+      assert result["status"] == "completed"
+      assert result["decision"] == "block"
+      assert result["matched_expected"] == true
+
+      conn = build_conn() |> get(~p"/api/v1/benchmarks/runs/#{run.id}/export?format=csv")
+      assert response(conn, 200) =~ "run_id,suite_slug,scenario_slug"
+    end
+  end
+
+  describe "policy API" do
+    test "lists and fetches policy artifacts", %{conn: conn} do
+      artifact = policy_artifact_fixture(%{artifact_type: "router", status: "active"})
+
+      conn = get(conn, ~p"/api/v1/policies")
+      body = json_response(conn, 200)
+
+      assert Enum.any?(body["policies"], &(&1["id"] == artifact.id))
+      assert body["active"]["router"]["id"] == artifact.id
+
+      conn = build_conn() |> get(~p"/api/v1/policies/#{artifact.id}")
+      assert %{"policy" => fetched} = json_response(conn, 200)
+      assert fetched["id"] == artifact.id
+      assert fetched["artifact_type"] == "router"
+    end
+
+    test "trains, promotes, and archives a policy artifact", %{conn: conn} do
+      benchmark_run_fixture(%{
+        "suite" => "vibe_failures_v1",
+        "subjects" => "controlkeel_validate",
+        "baseline_subject" => "controlkeel_validate",
+        "scenario_slugs" => "hardcoded_api_key_python_webhook"
+      })
+
+      conn = post(conn, ~p"/api/v1/policies/train", %{type: "router"})
+      assert %{"policy" => policy} = json_response(conn, 201)
+      assert policy["artifact_type"] == "router"
+
+      promotable =
+        policy_artifact_fixture(%{
+          artifact_type: "budget_hint",
+          metrics: %{"gates" => %{"eligible" => true, "reasons" => []}}
+        })
+
+      conn = build_conn() |> post(~p"/api/v1/policies/#{promotable.id}/promote", %{})
+      assert %{"policy" => promoted} = json_response(conn, 200)
+      assert promoted["status"] == "active"
+
+      conn = build_conn() |> post(~p"/api/v1/policies/#{promotable.id}/archive", %{})
+      assert %{"policy" => archived} = json_response(conn, 200)
+      assert archived["status"] == "archived"
+    end
+  end
+
   describe "POST /api/v1/findings/:id/action" do
     test "approves a finding", %{conn: conn} do
       finding = finding_fixture()
@@ -240,6 +372,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       conn = post(conn, ~p"/api/v1/tasks/#{task.id}/complete")
       assert %{"task" => result} = json_response(conn, 200)
       assert result["status"] == "done"
+      assert result["latest_proof"]["task_id"] == task.id
     end
 
     test "returns 422 when open findings block completion", %{conn: conn} do
@@ -276,6 +409,52 @@ defmodule ControlKeelWeb.ApiControllerTest do
     test "returns 404 for unknown task", %{conn: conn} do
       conn = get(conn, ~p"/api/v1/proof/99999999")
       assert %{"error" => "task not found"} = json_response(conn, 404)
+    end
+  end
+
+  describe "GET /api/v1/proofs and /api/v1/proofs/:id" do
+    test "lists persisted proof bundles and fetches one by id", %{conn: conn} do
+      proof = proof_bundle_fixture()
+
+      conn = get(conn, ~p"/api/v1/proofs")
+      body = json_response(conn, 200)
+      assert Enum.any?(body["proofs"], &(&1["id"] == proof.id))
+
+      conn = get(recycle(conn), ~p"/api/v1/proofs/#{proof.id}")
+      detail = json_response(conn, 200)["proof"]
+      assert detail["id"] == proof.id
+      assert Map.has_key?(detail, "bundle")
+    end
+  end
+
+  describe "POST /api/v1/tasks/:id/pause and /resume" do
+    test "pauses and resumes a task with a resume packet", %{conn: conn} do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      conn = post(conn, ~p"/api/v1/tasks/#{task.id}/pause")
+      body = json_response(conn, 200)
+      assert body["task"]["status"] == "paused"
+      assert Map.has_key?(body["resume_packet"], "memory_hits")
+
+      conn = post(recycle(conn), ~p"/api/v1/tasks/#{task.id}/resume")
+      body = json_response(conn, 200)
+      assert body["task"]["status"] == "in_progress"
+    end
+  end
+
+  describe "GET /api/v1/memory/search and DELETE /api/v1/memory/:id" do
+    test "searches and archives memory records", %{conn: conn} do
+      session = session_fixture()
+      record = memory_record_fixture(%{session: session, title: "Reusable memory note"})
+
+      conn = get(conn, ~p"/api/v1/memory/search?q=Reusable&session_id=#{session.id}")
+      body = json_response(conn, 200)
+      assert Enum.any?(body["records"], &(&1["id"] == record.id))
+
+      conn = delete(recycle(conn), ~p"/api/v1/memory/#{record.id}")
+      assert %{"memory" => %{"id" => id}} = json_response(conn, 200)
+      assert id == record.id
     end
   end
 
@@ -362,5 +541,17 @@ defmodule ControlKeelWeb.ApiControllerTest do
       conn = get(conn, ~p"/api/v1/budget?session_id=99999999")
       assert %{"error" => "session not found"} = json_response(conn, 404)
     end
+  end
+
+  defp benchmark_tmp_dir do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-api-benchmark-#{System.unique_integer([:positive])}"
+      )
+
+    File.rm_rf!(path)
+    File.mkdir_p!(path)
+    path
   end
 end

@@ -97,4 +97,22 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
     assert_push_event(view, "copy-to-clipboard", %{text: _text})
   end
+
+  test "mission control supports proof generation and pause/resume controls", %{conn: conn} do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "in_progress"})
+
+    {:ok, view, _html} = live(conn, ~p"/missions/#{session.id}")
+
+    render_click(element(view, "#current-task-generate-proof-#{task.id}"))
+    assert render(view) =~ "Proof bundle generated."
+    assert Mission.latest_proof_bundle_for_task(task.id)
+
+    render_click(element(view, "#current-task-pause-#{task.id}"))
+    assert Mission.get_task!(task.id).status == "paused"
+    assert render(view) =~ "Resume packet"
+
+    render_click(element(view, "#current-task-resume-#{task.id}"))
+    assert Mission.get_task!(task.id).status == "in_progress"
+  end
 end

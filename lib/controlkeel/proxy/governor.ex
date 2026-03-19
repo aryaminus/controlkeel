@@ -7,6 +7,17 @@ defmodule ControlKeel.Proxy.Governor do
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.{FastPath, Semgrep}
 
+  def benchmark_evaluate(extracted, opts \\ []) when is_map(extracted) do
+    scan = scan_content(extracted.text || "", opts[:path], opts[:kind] || "text", opts)
+
+    %{
+      decision: scan.decision,
+      allowed: scan.decision != "block",
+      summary: scan.summary,
+      findings: scan.findings
+    }
+  end
+
   def preflight(%Session{} = session, provider, tool, extracted, opts \\ []) do
     budget =
       Budget.estimate_proxy(%{

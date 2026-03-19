@@ -17,7 +17,9 @@ defmodule ControlKeel.MCP.Tools.CkSkillLoad do
 
     case Registry.get(name, project_root) do
       nil ->
-        {:error, {:invalid_arguments, "Skill '#{name}' not found. Call ck_skill_list to see available skills."}}
+        {:error,
+         {:invalid_arguments,
+          "Skill '#{name}' not found. Call ck_skill_list to see available skills."}}
 
       skill ->
         resources = discover_resources(skill.path)
@@ -30,7 +32,8 @@ defmodule ControlKeel.MCP.Tools.CkSkillLoad do
             "\n<skill_resources>\n#{Enum.join(entries, "\n")}\n</skill_resources>"
           end
 
-        content = "<skill_content name=\"#{skill.name}\">\n#{skill.body}#{resources_block}\n</skill_content>"
+        content =
+          "<skill_content name=\"#{skill.name}\">\n#{skill.body}#{resources_block}\n</skill_content>"
 
         {:ok,
          %{

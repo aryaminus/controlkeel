@@ -163,7 +163,8 @@ defmodule ControlKeel.AutoFix do
         %{
           "supported" => true,
           "fix_kind" => "pii_anonymisation",
-          "summary" => "Replace the logged personal data with an anonymised identifier (user ID or hash).",
+          "summary" =>
+            "Replace the logged personal data with an anonymised identifier (user ID or hash).",
           "why" =>
             "Logging personal data (email, name, phone) creates a GDPR audit liability and expands the blast radius of a log breach.",
           "steps" => [
@@ -187,7 +188,8 @@ defmodule ControlKeel.AutoFix do
         %{
           "supported" => true,
           "fix_kind" => "encrypted_field",
-          "summary" => "Encrypt PII fields at rest using Cloak or an equivalent encrypted field type.",
+          "summary" =>
+            "Encrypt PII fields at rest using Cloak or an equivalent encrypted field type.",
           "why" =>
             "Unencrypted PII fields expose personal data if the database is accessed directly or backups are stolen.",
           "steps" => [
@@ -258,7 +260,8 @@ defmodule ControlKeel.AutoFix do
         %{
           "supported" => true,
           "fix_kind" => "criteria_removal",
-          "summary" => "Remove the discriminatory filter criterion and replace with objective, job-related criteria.",
+          "summary" =>
+            "Remove the discriminatory filter criterion and replace with objective, job-related criteria.",
           "why" =>
             "Filtering candidates by protected characteristics (age, gender, race, religion) is illegal in most jurisdictions and creates legal liability.",
           "steps" => [
@@ -281,7 +284,8 @@ defmodule ControlKeel.AutoFix do
         %{
           "supported" => true,
           "fix_kind" => "log_removal",
-          "summary" => "Remove the log statement — no automated replacement is safe for privileged content.",
+          "summary" =>
+            "Remove the log statement — no automated replacement is safe for privileged content.",
           "why" =>
             "Logging attorney-client privileged content or work-product may destroy privilege and create discovery liability.",
           "steps" => [
@@ -319,7 +323,8 @@ defmodule ControlKeel.AutoFix do
             Replace with objective property criteria (price, size, location radius). Add a comment noting the compliance requirement.
             """
             |> String.trim(),
-          "example" => "# removed: neighborhood_demographic_filter — use zip_code radius search instead",
+          "example" =>
+            "# removed: neighborhood_demographic_filter — use zip_code radius search instead",
           "requires_human" => true
         }
 
@@ -343,7 +348,8 @@ defmodule ControlKeel.AutoFix do
             Never log, transmit, or persist raw card data.
             """
             |> String.trim(),
-          "example" => "card_token = Stripe.create_token(card_element)  # raw PAN never touches server",
+          "example" =>
+            "card_token = Stripe.create_token(card_element)  # raw PAN never touches server",
           "requires_human" => true
         }
 
@@ -351,7 +357,8 @@ defmodule ControlKeel.AutoFix do
         %{
           "supported" => true,
           "fix_kind" => "unsubscribe_addition",
-          "summary" => "Add a mandatory unsubscribe link or List-Unsubscribe header to the email.",
+          "summary" =>
+            "Add a mandatory unsubscribe link or List-Unsubscribe header to the email.",
           "why" =>
             "CAN-SPAM, CASL, and GDPR all require commercial emails to carry a clear unsubscribe mechanism. Omission is a compliance violation.",
           "steps" => [
@@ -366,7 +373,8 @@ defmodule ControlKeel.AutoFix do
             The link should point to a preference-centre endpoint that records the opt-out. Ensure processing within 10 business days.
             """
             |> String.trim(),
-          "example" => ~S(headers: %{"List-Unsubscribe" => "<https://example.com/unsubscribe?token=#{token}>"}),
+          "example" =>
+            ~S(headers: %{"List-Unsubscribe" => "<https://example.com/unsubscribe?token=#{token}>"}),
           "requires_human" => false
         }
 

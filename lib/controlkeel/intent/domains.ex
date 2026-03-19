@@ -247,28 +247,31 @@ defmodule ControlKeel.Intent.Domains do
           label: "Who uses this in the hiring or HR flow?",
           prompt:
             "Which HR team members, hiring managers, or candidates interact with the first version, and at what stage of the workflow?",
-          placeholder: "Recruiters screening candidates, hiring managers reviewing, employees updating profiles..."
+          placeholder:
+            "Recruiters screening candidates, hiring managers reviewing, employees updating profiles..."
         },
         %{
           id: "data_involved",
           label: "What employee or candidate data is involved?",
           prompt:
             "What personal, performance, or employment records are touched in the first release?",
-          placeholder: "Candidate CVs, interview notes, salary bands, performance reviews, employment contracts..."
+          placeholder:
+            "Candidate CVs, interview notes, salary bands, performance reviews, employment contracts..."
         },
         %{
           id: "first_release",
           label: "What must the first release do?",
-          prompt:
-            "List the 3-5 HR or recruiting operations the first version must support.",
-          placeholder: "Job posting, application intake, interview scheduling, offer letter, onboarding checklist..."
+          prompt: "List the 3-5 HR or recruiting operations the first version must support.",
+          placeholder:
+            "Job posting, application intake, interview scheduling, offer letter, onboarding checklist..."
         },
         %{
           id: "constraints",
           label: "What compliance or access limits apply?",
           prompt:
             "What constraints matter most around candidate data privacy, bias prevention, approval chains, or retention policy?",
-          placeholder: "GDPR right-to-erasure, no automated rejection, manager approval before offer, 2-year retention..."
+          placeholder:
+            "GDPR right-to-erasure, no automated rejection, manager approval before offer, 2-year retention..."
         }
       ]
     },
@@ -285,28 +288,31 @@ defmodule ControlKeel.Intent.Domains do
           label: "Who in the firm or legal team uses this?",
           prompt:
             "Which attorneys, paralegals, clients, or staff interact with the first version, and for which matter type?",
-          placeholder: "Associates drafting contracts, partners reviewing, clients submitting documents..."
+          placeholder:
+            "Associates drafting contracts, partners reviewing, clients submitting documents..."
         },
         %{
           id: "data_involved",
           label: "What legal records or documents are involved?",
           prompt:
             "What matter files, communications, contracts, or discovery records are in scope for the first release?",
-          placeholder: "Contract drafts, client correspondence, discovery documents, court filings, billing records..."
+          placeholder:
+            "Contract drafts, client correspondence, discovery documents, court filings, billing records..."
         },
         %{
           id: "first_release",
           label: "What must the first release do?",
-          prompt:
-            "List the 3-5 legal workflow steps the first version must handle safely.",
-          placeholder: "Matter intake, document upload, review workflow, client portal, billing time entry..."
+          prompt: "List the 3-5 legal workflow steps the first version must handle safely.",
+          placeholder:
+            "Matter intake, document upload, review workflow, client portal, billing time entry..."
         },
         %{
           id: "constraints",
           label: "What privilege or retention limits apply?",
           prompt:
             "What matters most around privilege protection, retention schedules, access controls, or external sharing?",
-          placeholder: "No external cloud for privileged docs, 7-year retention, client sign-off before export..."
+          placeholder:
+            "No external cloud for privileged docs, 7-year retention, client sign-off before export..."
         }
       ]
     },
@@ -323,28 +329,31 @@ defmodule ControlKeel.Intent.Domains do
           label: "Who manages or receives this marketing?",
           prompt:
             "Which marketers, content editors, or recipients interact with the first version?",
-          placeholder: "Email marketers, social media managers, campaign analysts, newsletter subscribers..."
+          placeholder:
+            "Email marketers, social media managers, campaign analysts, newsletter subscribers..."
         },
         %{
           id: "data_involved",
           label: "What contact or audience data is involved?",
           prompt:
             "What subscriber, campaign, or analytics data is in scope for the first release?",
-          placeholder: "Email lists, open/click analytics, customer segments, ad targeting data, social handles..."
+          placeholder:
+            "Email lists, open/click analytics, customer segments, ad targeting data, social handles..."
         },
         %{
           id: "first_release",
           label: "What must the first release do?",
-          prompt:
-            "List the 3-5 marketing operations the first version must support.",
-          placeholder: "Campaign builder, send scheduling, audience segmentation, unsubscribe handling, analytics..."
+          prompt: "List the 3-5 marketing operations the first version must support.",
+          placeholder:
+            "Campaign builder, send scheduling, audience segmentation, unsubscribe handling, analytics..."
         },
         %{
           id: "constraints",
           label: "What consent or brand limits apply?",
           prompt:
             "What matters most around data consent, unsubscribe compliance, brand review, or channel restrictions?",
-          placeholder: "Double opt-in required, GDPR consent proof, brand review before send, no purchased lists..."
+          placeholder:
+            "Double opt-in required, GDPR consent proof, brand review before send, no purchased lists..."
         }
       ]
     },
@@ -361,28 +370,31 @@ defmodule ControlKeel.Intent.Domains do
           label: "Who manages the sales pipeline?",
           prompt:
             "Which sales reps, managers, or ops staff use the first version, and at which stage of the sales cycle?",
-          placeholder: "Account executives logging deals, SDRs managing leads, sales ops pulling reports..."
+          placeholder:
+            "Account executives logging deals, SDRs managing leads, sales ops pulling reports..."
         },
         %{
           id: "data_involved",
           label: "What CRM or deal data is involved?",
           prompt:
             "What contact records, pipeline stages, activity logs, or revenue data are in scope?",
-          placeholder: "Lead profiles, deal stages, call notes, quota attainment, contract values, email history..."
+          placeholder:
+            "Lead profiles, deal stages, call notes, quota attainment, contract values, email history..."
         },
         %{
           id: "first_release",
           label: "What must the first release do?",
-          prompt:
-            "List the 3-5 sales operations the first version must support.",
-          placeholder: "Lead import, pipeline view, activity logging, quota dashboard, deal handoff..."
+          prompt: "List the 3-5 sales operations the first version must support.",
+          placeholder:
+            "Lead import, pipeline view, activity logging, quota dashboard, deal handoff..."
         },
         %{
           id: "constraints",
           label: "What data privacy or access limits apply?",
           prompt:
             "What matters most around contact deletion, data export, quota audit, or CRM integration security?",
-          placeholder: "GDPR delete-on-request, no PII in analytics exports, manager-only quota view, SSO required..."
+          placeholder:
+            "GDPR delete-on-request, no PII in analytics exports, manager-only quota view, SSO required..."
         }
       ]
     },
@@ -399,28 +411,31 @@ defmodule ControlKeel.Intent.Domains do
           label: "Who uses this in the property transaction flow?",
           prompt:
             "Which agents, clients, admins, or lenders interact with the first version, and at which stage?",
-          placeholder: "Buyer's agents managing listings, clients submitting offers, transaction coordinators..."
+          placeholder:
+            "Buyer's agents managing listings, clients submitting offers, transaction coordinators..."
         },
         %{
           id: "data_involved",
           label: "What property or client records are involved?",
           prompt:
             "What listing data, client profiles, transaction documents, or financial disclosures are in scope?",
-          placeholder: "MLS listings, buyer/seller profiles, purchase agreements, inspection reports, title docs..."
+          placeholder:
+            "MLS listings, buyer/seller profiles, purchase agreements, inspection reports, title docs..."
         },
         %{
           id: "first_release",
           label: "What must the first release do?",
-          prompt:
-            "List the 3-5 real estate workflow steps the first version must support.",
-          placeholder: "Listing intake, offer submission, document upload, transaction timeline, client portal..."
+          prompt: "List the 3-5 real estate workflow steps the first version must support.",
+          placeholder:
+            "Listing intake, offer submission, document upload, transaction timeline, client portal..."
         },
         %{
           id: "constraints",
           label: "What compliance or access limits apply?",
           prompt:
             "What matters most around Fair Housing compliance, document encryption, MLS data rules, or client consent?",
-          placeholder: "No discriminatory screening, encrypted docs, MLS data not publicly shared, GDPR consent..."
+          placeholder:
+            "No discriminatory screening, encrypted docs, MLS data not publicly shared, GDPR consent..."
         }
       ]
     }

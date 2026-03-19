@@ -1,7 +1,15 @@
 defmodule ControlKeel.MCP.Protocol do
   @moduledoc false
 
-  alias ControlKeel.MCP.Tools.{CkBudget, CkContext, CkFinding, CkRoute, CkSkillList, CkSkillLoad, CkValidate}
+  alias ControlKeel.MCP.Tools.{
+    CkBudget,
+    CkContext,
+    CkFinding,
+    CkRoute,
+    CkSkillList,
+    CkSkillLoad,
+    CkValidate
+  }
 
   @server_info %{"name" => "controlkeel", "version" => "0.1.0"}
 
@@ -242,7 +250,8 @@ defmodule ControlKeel.MCP.Protocol do
           },
           "project_root" => %{
             "type" => "string",
-            "description" => "Absolute path to the project root. Omit to search global skills only."
+            "description" =>
+              "Absolute path to the project root. Omit to search global skills only."
           },
           "session_id" => %{"type" => ["integer", "string"]},
           "task_id" => %{"type" => ["integer", "string"]}

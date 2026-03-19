@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   @moduledoc false
 
   alias ControlKeel.Budget
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Mission.{Finding, Session}
   alias ControlKeel.Repo
@@ -21,7 +22,10 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "active_findings" => active_findings_summary(session.findings),
          "budget_summary" => budget_summary(session),
          "current_task" => task_summary(task),
-         "past_patterns" => past_patterns(session)
+         "past_patterns" => past_patterns(session),
+         "proof_summary" => Mission.proof_summary_for_task(task),
+         "memory_hits" => memory_hits(session, task),
+         "resume_packet" => resume_packet(task)
        }}
     end
   end
@@ -88,6 +92,23 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     }
   end
 
+  defp memory_hits(_session, nil), do: []
+
+  defp memory_hits(session, task) do
+    session
+    |> Memory.retrieve_for_task(task, findings: session.findings, top_k: 5)
+    |> Map.get(:entries, [])
+  end
+
+  defp resume_packet(nil), do: nil
+
+  defp resume_packet(task) do
+    case Mission.resume_packet(task.id) do
+      {:ok, packet} -> packet
+      _error -> nil
+    end
+  end
+
   # ─── Episodic memory: past patterns ─────────────────────────────────────────
   # Pull the most frequently recurring finding categories and rule IDs from the
   # last 10 sessions in the same domain. This gives the agent "what went wrong
@@ -144,11 +165,13 @@ defmodule ControlKeel.MCP.Tools.CkContext do
         "available" => true,
         "domain" => domain,
         "sessions_sampled" => length(recent_session_ids),
-        "recurring_rule_ids" => Enum.map(top_rules, &%{"rule_id" => &1.rule_id, "blocked_count" => &1.count}),
+        "recurring_rule_ids" =>
+          Enum.map(top_rules, &%{"rule_id" => &1.rule_id, "blocked_count" => &1.count}),
         "top_categories" => top_categories,
         "hint" =>
           if top_rules != [] do
             first = List.first(top_rules)
+
             "In past #{domain} sessions, #{first.rule_id} was blocked #{first.count} time(s). Watch for it."
           else
             "No recurring patterns in past #{domain} sessions."

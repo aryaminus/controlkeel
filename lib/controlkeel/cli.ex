@@ -2,10 +2,13 @@ defmodule ControlKeel.CLI do
   @moduledoc false
 
   alias ControlKeel.Analytics
+  alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.ClaudeCLI
   alias ControlKeel.LocalProject
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
+  alias ControlKeel.PolicyTraining
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Proxy
 
@@ -21,7 +24,17 @@ defmodule ControlKeel.CLI do
     no_attach: :boolean
   ]
   @findings_switches [severity: :string, status: :string]
+  @proofs_switches [session_id: :integer, task_id: :integer, deploy_ready: :boolean]
   @mcp_switches [project_root: :string]
+  @memory_search_switches [session_id: :integer, type: :string]
+  @benchmark_run_switches [
+    suite: :string,
+    subjects: :string,
+    baseline_subject: :string,
+    scenario_slugs: :string
+  ]
+  @benchmark_export_switches [format: :string]
+  @policy_train_switches [type: :string]
   @watch_switches [interval: :integer]
 
   def standalone_argv do
@@ -66,6 +79,51 @@ defmodule ControlKeel.CLI do
 
       ["approve", finding_id] ->
         {:ok, %{command: :approve, options: %{}, args: [finding_id]}}
+
+      ["proofs" | rest] ->
+        parse_with_switches(:proofs, rest, @proofs_switches)
+
+      ["proof", id] ->
+        {:ok, %{command: :proof, options: %{}, args: [id]}}
+
+      ["pause", task_id] ->
+        {:ok, %{command: :pause, options: %{}, args: [task_id]}}
+
+      ["resume", task_id] ->
+        {:ok, %{command: :resume, options: %{}, args: [task_id]}}
+
+      ["memory", "search", query | rest] ->
+        parse_memory_search(query, rest)
+
+      ["benchmark", "list"] ->
+        {:ok, %{command: :benchmark_list, options: %{}, args: []}}
+
+      ["benchmark", "run" | rest] ->
+        parse_with_switches(:benchmark_run, rest, @benchmark_run_switches)
+
+      ["benchmark", "show", id] ->
+        {:ok, %{command: :benchmark_show, options: %{}, args: [id]}}
+
+      ["benchmark", "import", run_id, subject, file_path] ->
+        {:ok, %{command: :benchmark_import, options: %{}, args: [run_id, subject, file_path]}}
+
+      ["benchmark", "export", run_id | rest] ->
+        parse_benchmark_export(run_id, rest)
+
+      ["policy", "list"] ->
+        {:ok, %{command: :policy_list, options: %{}, args: []}}
+
+      ["policy", "train" | rest] ->
+        parse_with_switches(:policy_train, rest, @policy_train_switches)
+
+      ["policy", "show", id] ->
+        {:ok, %{command: :policy_show, options: %{}, args: [id]}}
+
+      ["policy", "promote", id] ->
+        {:ok, %{command: :policy_promote, options: %{}, args: [id]}}
+
+      ["policy", "archive", id] ->
+        {:ok, %{command: :policy_archive, options: %{}, args: [id]}}
 
       ["mcp" | rest] ->
         parse_with_switches(:mcp, rest, @mcp_switches)
@@ -130,6 +188,25 @@ defmodule ControlKeel.CLI do
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
+      controlkeel proofs [options]    List proof bundles for the current session
+      controlkeel proof <id>          Show a proof bundle by proof id or task id
+      controlkeel pause <task-id>     Pause a task and capture a resume packet
+      controlkeel resume <task-id>    Resume a paused or blocked task
+      controlkeel memory search <q>   Search typed memory for the current session
+      controlkeel benchmark list      List built-in suites and recent runs
+      controlkeel benchmark run [options]
+                                      Run a benchmark suite and persist the matrix
+      controlkeel benchmark show <id> Show a benchmark run with subject summaries
+      controlkeel benchmark import <run-id> <subject> <json-file>
+                                      Import manual benchmark output for a subject
+      controlkeel benchmark export <run-id> [--format json|csv]
+                                      Export a benchmark run
+      controlkeel policy list         List recent policy artifacts and training runs
+      controlkeel policy train --type router|budget_hint
+                                      Train a new policy artifact
+      controlkeel policy show <id>    Show a policy artifact
+      controlkeel policy promote <id> Promote a policy artifact if gates pass
+      controlkeel policy archive <id> Archive a policy artifact
       controlkeel watch [--interval N]
                                       Stream findings and budget live (default: 2000ms)
       controlkeel mcp [--project-root /abs/path]
@@ -282,18 +359,20 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :attach, args: [agent]}, project_root)
       when agent in ["kiro", "amp", "opencode", "gemini-cli", "codex-cli"] do
     wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+
     config_path_fn = %{
-      "kiro"      => &kiro_mcp_config_path/0,
-      "amp"       => &amp_mcp_config_path/0,
-      "opencode"  => &opencode_mcp_config_path/0,
-      "gemini-cli"=> &gemini_cli_config_path/0,
+      "kiro" => &kiro_mcp_config_path/0,
+      "amp" => &amp_mcp_config_path/0,
+      "opencode" => &opencode_mcp_config_path/0,
+      "gemini-cli" => &gemini_cli_config_path/0,
       "codex-cli" => &codex_cli_config_path/0
     }
+
     display_name = %{
-      "kiro"      => "Kiro",
-      "amp"       => "Amp",
-      "opencode"  => "OpenCode",
-      "gemini-cli"=> "Gemini CLI",
+      "kiro" => "Kiro",
+      "amp" => "Amp",
+      "opencode" => "OpenCode",
+      "gemini-cli" => "Gemini CLI",
       "codex-cli" => "Codex CLI"
     }
 
@@ -329,7 +408,8 @@ defmodule ControlKeel.CLI do
 
     with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
          {:ok, binding} <- ProjectBinding.read(project_root),
-         {:ok, attached} <- write_continue_mcp_config(continue_config_path(), "controlkeel", wrapper_path),
+         {:ok, attached} <-
+           write_continue_mcp_config(continue_config_path(), "controlkeel", wrapper_path),
          updated <- ProjectBinding.update_attached_agent(binding, "continue", attached),
          {:ok, _} <- ProjectBinding.write(updated, project_root) do
       {:ok,
@@ -469,6 +549,435 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(%{command: :proofs, options: options}, project_root) do
+    case LocalProject.load(project_root) do
+      {:ok, _binding, session} ->
+        browser =
+          Mission.browse_proof_bundles(%{
+            session_id: options[:session_id] || session.id,
+            task_id: options[:task_id],
+            deploy_ready: options[:deploy_ready]
+          })
+
+        if browser.entries == [] do
+          {:ok, ["No proof bundles matched the current filters."]}
+        else
+          {:ok,
+           Enum.map(browser.entries, fn proof ->
+             deploy = if proof.deploy_ready, do: "deploy-ready", else: "review-required"
+
+             "##{proof.id} v#{proof.version} [#{proof.status}] #{proof.task.title} (risk #{proof.risk_score}, #{deploy})"
+           end)}
+        end
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before listing proofs."}
+
+      {:error, reason} ->
+        {:error, "Failed to load local project: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :proof, args: [id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(id) do
+      cond do
+        proof = Mission.get_proof_bundle(parsed_id) ->
+          {:ok, [Jason.encode!(proof.bundle, pretty: true)]}
+
+        true ->
+          case Mission.proof_bundle(parsed_id) do
+            {:ok, bundle} -> {:ok, [Jason.encode!(bundle, pretty: true)]}
+            {:error, :not_found} -> {:error, "Proof bundle or task was not found."}
+          end
+      end
+    else
+      {:error, :invalid_id} ->
+        {:error, "Proof id must be an integer."}
+    end
+  end
+
+  def run_command(%{command: :benchmark_list}, project_root) do
+    suites = Benchmark.list_suites()
+    runs = Benchmark.list_recent_runs()
+    subjects = Benchmark.available_subjects(project_root)
+
+    suite_lines =
+      if suites == [] do
+        ["No benchmark suites are available."]
+      else
+        [
+          "Benchmark suites:"
+          | Enum.map(suites, fn suite ->
+              "  #{suite.slug} v#{suite.version} — #{suite.name} (#{length(suite.scenarios)} scenarios)"
+            end)
+        ]
+      end
+
+    subject_lines =
+      [
+        "",
+        "Available subjects:"
+        | Enum.map(subjects, fn subject ->
+            "  #{subject["id"]} [#{subject["type"]}] #{subject["label"]}"
+          end)
+      ]
+
+    run_lines =
+      if runs == [] do
+        ["", "No benchmark runs recorded yet."]
+      else
+        [
+          "",
+          "Recent runs:"
+          | Enum.map(runs, fn run ->
+              "  ##{run.id} #{run.suite.slug} [#{run.status}] catch #{run.catch_rate}% baseline #{run.baseline_subject}"
+            end)
+        ]
+      end
+
+    {:ok, suite_lines ++ subject_lines ++ run_lines}
+  end
+
+  def run_command(%{command: :benchmark_run, options: options}, project_root) do
+    attrs = %{
+      "suite" => options[:suite] || "vibe_failures_v1",
+      "subjects" => options[:subjects],
+      "baseline_subject" => options[:baseline_subject],
+      "scenario_slugs" => options[:scenario_slugs]
+    }
+
+    case Benchmark.run_suite(attrs, project_root) do
+      {:ok, run} ->
+        detail = Benchmark.run_detail_metrics(run)
+
+        {:ok,
+         [
+           "Benchmark run ##{run.id} completed.",
+           "Suite: #{run.suite.slug}",
+           "Subjects: #{Enum.join(run.subjects, ", ")}",
+           "Status: #{run.status}",
+           "Catch rate: #{run.catch_rate}%",
+           "Block rate: #{detail.block_rate}%",
+           "Expected rule hit rate: #{detail.expected_rule_hit_rate}%",
+           "Average overhead: #{format_percent(run.average_overhead_percent)}"
+         ]}
+
+      {:error, :suite_not_found} ->
+        {:error, "Benchmark suite was not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to run benchmark: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :benchmark_show, args: [id]}, _project_root) do
+    with {:ok, run_id} <- parse_id(id),
+         %{} = run <- Benchmark.get_run(run_id) do
+      detail = Benchmark.run_detail_metrics(run)
+
+      subject_lines =
+        run.results
+        |> Enum.group_by(& &1.subject)
+        |> Enum.map(fn {subject, results} ->
+          catches = Enum.count(results, &(&1.findings_count > 0))
+          blocked = Enum.count(results, &(&1.decision == "block"))
+          "  #{subject}: #{catches} caught, #{blocked} blocked, #{length(results)} total"
+        end)
+
+      {:ok,
+       [
+         "Benchmark run ##{run.id}",
+         "Suite: #{run.suite.name} (#{run.suite.slug})",
+         "Status: #{run.status}",
+         "Baseline subject: #{run.baseline_subject}",
+         "Catch rate: #{run.catch_rate}%",
+         "Block rate: #{detail.block_rate}%",
+         "Expected rule hit rate: #{detail.expected_rule_hit_rate}%",
+         "Median latency: #{format_ms(run.median_latency_ms)}",
+         "Average overhead: #{format_percent(run.average_overhead_percent)}",
+         "Subjects:"
+         | subject_lines
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Benchmark run id must be an integer."}
+
+      nil ->
+        {:error, "Benchmark run not found."}
+    end
+  end
+
+  def run_command(
+        %{command: :benchmark_import, args: [run_id, subject, file_path]},
+        _project_root
+      ) do
+    with {:ok, parsed_id} <- parse_id(run_id),
+         {:ok, contents} <- File.read(file_path),
+         {:ok, payload} <- Jason.decode(contents),
+         {:ok, run} <- Benchmark.import_result(parsed_id, subject, payload) do
+      {:ok,
+       [
+         "Imported benchmark output for #{subject} into run ##{run.id}.",
+         "Run status: #{run.status}",
+         "Catch rate: #{run.catch_rate}%"
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Benchmark run id must be an integer."}
+
+      {:error, :enoent} ->
+        {:error, "Benchmark import file was not found."}
+
+      {:error, %Jason.DecodeError{} = error} ->
+        {:error, "Benchmark import file must be valid JSON: #{Exception.message(error)}"}
+
+      {:error, :scenario_slug_required} ->
+        {:error, "Benchmark import payload must include `scenario_slug`."}
+
+      {:error, :result_not_found} ->
+        {:error,
+         "No matching benchmark result slot exists for that run, subject, and scenario_slug."}
+
+      {:error, :not_found} ->
+        {:error, "Benchmark run was not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to import benchmark output: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :benchmark_export, args: [run_id], options: options}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(run_id),
+         {:ok, output} <- Benchmark.export_run(parsed_id, options[:format] || "json") do
+      {:ok, [output]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Benchmark run id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Benchmark run was not found."}
+    end
+  end
+
+  def run_command(%{command: :policy_list}, _project_root) do
+    artifacts = PolicyTraining.list_artifacts(%{"limit" => 10})
+    training_runs = PolicyTraining.list_training_runs()
+    active = PolicyTraining.active_artifacts_summary()
+
+    artifact_lines =
+      if artifacts == [] do
+        ["No policy artifacts recorded yet."]
+      else
+        [
+          "Policy artifacts:"
+          | Enum.map(artifacts, fn artifact ->
+              "  ##{artifact.id} #{artifact.artifact_type} v#{artifact.version} [#{artifact.status}] #{artifact.model_family}"
+            end)
+        ]
+      end
+
+    active_lines =
+      [
+        "",
+        "Active artifacts:",
+        "  router: #{format_active_artifact(active["router"])}",
+        "  budget_hint: #{format_active_artifact(active["budget_hint"])}"
+      ]
+
+    training_lines =
+      if training_runs == [] do
+        ["", "No training runs recorded yet."]
+      else
+        [
+          "",
+          "Recent training runs:"
+          | Enum.map(training_runs, fn run ->
+              "  ##{run.id} #{run.artifact_type} [#{run.status}]"
+            end)
+        ]
+      end
+
+    {:ok, artifact_lines ++ active_lines ++ training_lines}
+  end
+
+  def run_command(%{command: :policy_train, options: options}, _project_root) do
+    case PolicyTraining.start_training(%{"type" => options[:type] || "router"}) do
+      {:ok, artifact} ->
+        {:ok,
+         [
+           "Policy artifact ##{artifact.id} trained.",
+           "Type: #{artifact.artifact_type}",
+           "Version: #{artifact.version}",
+           "Model family: #{artifact.model_family}",
+           "Eligible for promotion: #{get_in(artifact.metrics, ["gates", "eligible"]) == true}"
+         ]}
+
+      {:error, :unknown_artifact_type} ->
+        {:error, "Artifact type must be `router` or `budget_hint`."}
+
+      {:error, reason} ->
+        {:error, "Failed to train policy artifact: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :policy_show, args: [id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(id),
+         %{} = artifact <- PolicyTraining.get_artifact(parsed_id) do
+      {:ok,
+       [
+         "Policy artifact ##{artifact.id}",
+         "Type: #{artifact.artifact_type}",
+         "Version: #{artifact.version}",
+         "Status: #{artifact.status}",
+         "Model family: #{artifact.model_family}",
+         "Promotion eligible: #{get_in(artifact.metrics, ["gates", "eligible"]) == true}",
+         Jason.encode!(artifact.metrics, pretty: true)
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Policy artifact id must be an integer."}
+
+      nil ->
+        {:error, "Policy artifact not found."}
+    end
+  end
+
+  def run_command(%{command: :policy_promote, args: [id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(id),
+         {:ok, artifact} <- PolicyTraining.promote_artifact(parsed_id) do
+      {:ok,
+       [
+         "Promoted policy artifact ##{artifact.id}.",
+         "Type: #{artifact.artifact_type}",
+         "Version: #{artifact.version}"
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Policy artifact id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Policy artifact not found."}
+
+      {:error, {:promotion_failed, reasons}} ->
+        {:error, "Promotion gate failed: #{Enum.join(List.wrap(reasons), "; ")}"}
+
+      {:error, reason} ->
+        {:error, "Failed to promote policy artifact: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :policy_archive, args: [id]}, _project_root) do
+    with {:ok, parsed_id} <- parse_id(id),
+         {:ok, artifact} <- PolicyTraining.archive_artifact(parsed_id) do
+      {:ok,
+       [
+         "Archived policy artifact ##{artifact.id}.",
+         "Type: #{artifact.artifact_type}",
+         "Version: #{artifact.version}"
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Policy artifact id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Policy artifact not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to archive policy artifact: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :pause, args: [task_id]}, project_root) do
+    with {:ok, _binding, session} <- LocalProject.load(project_root),
+         {:ok, parsed_id} <- parse_id(task_id),
+         task when not is_nil(task) <- Mission.get_task(parsed_id),
+         true <- task.session_id == session.id || {:error, :wrong_session},
+         {:ok, %{task: updated, resume_packet: packet}} <- Mission.pause_task(task, "cli") do
+      {:ok,
+       [
+         "Paused task ##{updated.id}: #{updated.title}",
+         Jason.encode!(packet, pretty: true)
+       ]}
+    else
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before pausing tasks."}
+
+      {:error, :wrong_session} ->
+        {:error, "That task does not belong to the current governed session."}
+
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, reason} ->
+        {:error, "Failed to pause task: #{inspect(reason)}"}
+
+      nil ->
+        {:error, "Task not found."}
+
+      _error ->
+        {:error, "Failed to pause task."}
+    end
+  end
+
+  def run_command(%{command: :resume, args: [task_id]}, project_root) do
+    with {:ok, _binding, session} <- LocalProject.load(project_root),
+         {:ok, parsed_id} <- parse_id(task_id),
+         task when not is_nil(task) <- Mission.get_task(parsed_id),
+         true <- task.session_id == session.id || {:error, :wrong_session},
+         {:ok, %{task: updated, resume_packet: packet}} <- Mission.resume_task(task, "cli") do
+      {:ok,
+       [
+         "Resumed task ##{updated.id}: #{updated.title}",
+         Jason.encode!(packet, pretty: true)
+       ]}
+    else
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before resuming tasks."}
+
+      {:error, :wrong_session} ->
+        {:error, "That task does not belong to the current governed session."}
+
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, reason} ->
+        {:error, "Failed to resume task: #{inspect(reason)}"}
+
+      nil ->
+        {:error, "Task not found."}
+
+      _error ->
+        {:error, "Failed to resume task."}
+    end
+  end
+
+  def run_command(%{command: :memory_search, args: [query], options: options}, project_root) do
+    case LocalProject.load(project_root) do
+      {:ok, _binding, session} ->
+        result =
+          Memory.search(query, %{
+            workspace_id: session.workspace_id,
+            session_id: options[:session_id] || session.id,
+            record_type: options[:type]
+          })
+
+        if result.entries == [] do
+          {:ok, ["No memory records matched the search query."]}
+        else
+          {:ok,
+           Enum.map(result.entries, fn record ->
+             "[#{record.record_type}] #{record.title} (score #{Float.round(record.score, 2)})"
+           end)}
+        end
+
+      {:error, :not_found} ->
+        {:error, "Run `controlkeel init` before searching memory."}
+
+      {:error, reason} ->
+        {:error, "Failed to load local project: #{inspect(reason)}"}
+    end
+  end
+
   def run_command(%{command: :watch, options: options}, project_root) do
     interval = Keyword.get(options, :interval, 2_000)
 
@@ -578,12 +1087,52 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_memory_search(query, argv) do
+    {options, remainder, invalid} = OptionParser.parse(argv, strict: @memory_search_switches)
+
+    cond do
+      invalid != [] ->
+        {:error, usage_text()}
+
+      remainder != [] ->
+        {:error, usage_text()}
+
+      true ->
+        {:ok, %{command: :memory_search, options: options, args: [query]}}
+    end
+  end
+
+  defp parse_benchmark_export(run_id, argv) do
+    {options, remainder, invalid} = OptionParser.parse(argv, strict: @benchmark_export_switches)
+
+    cond do
+      invalid != [] ->
+        {:error, usage_text()}
+
+      remainder != [] ->
+        {:error, usage_text()}
+
+      true ->
+        {:ok, %{command: :benchmark_export, options: options, args: [run_id]}}
+    end
+  end
+
   defp parse_id(value) do
     case Integer.parse(to_string(value)) do
       {parsed, ""} -> {:ok, parsed}
       _ -> {:error, :invalid_id}
     end
   end
+
+  defp format_percent(nil), do: "Not recorded"
+  defp format_percent(value) when is_integer(value), do: "#{value}%"
+  defp format_percent(value), do: "#{Float.round(value, 1)}%"
+
+  defp format_ms(nil), do: "Not recorded"
+  defp format_ms(value), do: "#{value}ms"
+
+  defp format_active_artifact(nil), do: "heuristic"
+  defp format_active_artifact(artifact), do: "v#{artifact.version} (##{artifact.id})"
 
   defp emit_attach_succeeded(binding, project_root, attached_agent) do
     :telemetry.execute(
@@ -616,10 +1165,24 @@ defmodule ControlKeel.CLI do
 
     case :os.type() do
       {:win32, _} ->
-        Path.join([System.get_env("APPDATA") || home, "Cursor", "User", "globalStorage", "cursor.mcp.json"])
+        Path.join([
+          System.get_env("APPDATA") || home,
+          "Cursor",
+          "User",
+          "globalStorage",
+          "cursor.mcp.json"
+        ])
 
       {:unix, :darwin} ->
-        Path.join([home, "Library", "Application Support", "Cursor", "User", "globalStorage", "cursor.mcp.json"])
+        Path.join([
+          home,
+          "Library",
+          "Application Support",
+          "Cursor",
+          "User",
+          "globalStorage",
+          "cursor.mcp.json"
+        ])
 
       _ ->
         Path.join([home, ".config", "Cursor", "User", "globalStorage", "cursor.mcp.json"])
@@ -641,10 +1204,14 @@ defmodule ControlKeel.CLI do
     mcpServers = Map.get(existing, "mcpServers", %{})
 
     updated =
-      Map.put(existing, "mcpServers", Map.put(mcpServers, server_name, %{
-        "command" => command_path,
-        "args" => []
-      }))
+      Map.put(
+        existing,
+        "mcpServers",
+        Map.put(mcpServers, server_name, %{
+          "command" => command_path,
+          "args" => []
+        })
+      )
 
     with :ok <- File.mkdir_p(Path.dirname(config_path)),
          :ok <- File.write(config_path, Jason.encode!(updated, pretty: true) <> "\n") do
@@ -654,7 +1221,8 @@ defmodule ControlKeel.CLI do
          "ide" => ide_key,
          "config_path" => config_path,
          "command" => command_path,
-         "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+         "attached_at" =>
+           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
     end
   end

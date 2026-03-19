@@ -1,11 +1,13 @@
 defmodule ControlKeel.CLITasksTest do
   use ControlKeel.DataCase
 
+  import ControlKeel.BenchmarkFixtures
   import ExUnit.CaptureIO
   import ControlKeel.MissionFixtures
 
   alias ControlKeel.Mission
   alias ControlKeel.Analytics
+  alias ControlKeel.Benchmark
   alias ControlKeel.Mission.Session
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Repo
@@ -199,6 +201,109 @@ defmodule ControlKeel.CLITasksTest do
 
     assert approve_output =~ "Approved finding ##{open_finding.id}"
     assert Mission.get_finding!(open_finding.id).status == "approved"
+  end
+
+  test "ck.proofs, ck.pause, ck.resume, and ck.memory.search operate on the bound session", %{
+    tmp_dir: tmp_dir
+  } do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "done", title: "Task with proof"})
+    _proof = proof_bundle_fixture(%{task: task})
+
+    _memory =
+      memory_record_fixture(%{session: session, task_id: task.id, title: "Session memory"})
+
+    write_binding(tmp_dir, session)
+
+    proofs_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.proofs")
+        capture_io(fn -> Mix.Tasks.Ck.Proofs.run([]) end)
+      end)
+
+    assert proofs_output =~ "Task with proof"
+
+    memory_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.memory.search")
+        capture_io(fn -> Mix.Tasks.Ck.Memory.Search.run(["Session"]) end)
+      end)
+
+    assert memory_output =~ "Session memory"
+
+    task = task_fixture(%{session: session, status: "in_progress", title: "Pauseable task"})
+
+    pause_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.pause")
+        capture_io(fn -> Mix.Tasks.Ck.Pause.run([Integer.to_string(task.id)]) end)
+      end)
+
+    assert pause_output =~ "Paused task"
+
+    resume_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.resume")
+        capture_io(fn -> Mix.Tasks.Ck.Resume.run([Integer.to_string(task.id)]) end)
+      end)
+
+    assert resume_output =~ "Resumed task"
+  end
+
+  test "ck.benchmark delegates to the runtime benchmark CLI", %{tmp_dir: tmp_dir} do
+    write_benchmark_subjects!(tmp_dir, [
+      %{
+        "id" => "manual_subject",
+        "label" => "Manual Subject",
+        "type" => "manual_import"
+      }
+    ])
+
+    list_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.benchmark")
+        capture_io(fn -> Mix.Tasks.Ck.Benchmark.run(["list"]) end)
+      end)
+
+    assert list_output =~ "Benchmark suites:"
+    assert list_output =~ "manual_subject"
+
+    run_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.benchmark")
+
+        capture_io(fn ->
+          Mix.Tasks.Ck.Benchmark.run([
+            "run",
+            "--suite",
+            "vibe_failures_v1",
+            "--subjects",
+            "controlkeel_validate",
+            "--baseline-subject",
+            "controlkeel_validate",
+            "--scenario-slugs",
+            "hardcoded_api_key_python_webhook"
+          ])
+        end)
+      end)
+
+    assert run_output =~ "Benchmark run #"
+    assert Benchmark.list_recent_runs(1) != []
+  end
+
+  test "ck.demo runs through the benchmark engine without creating sessions" do
+    session_count = Repo.aggregate(Session, :count, :id)
+
+    output =
+      capture_io(fn ->
+        rerun_task("ck.demo")
+        Mix.Tasks.Ck.Demo.run(["--host", "http://localhost:4000", "--scenario", "1"])
+      end)
+
+    assert output =~ "ControlKeel Benchmark"
+    assert output =~ "BENCHMARK RESULTS"
+    assert output =~ "/benchmarks/runs/"
+    assert Repo.aggregate(Session, :count, :id) == session_count
   end
 
   defp write_binding(tmp_dir, session) do

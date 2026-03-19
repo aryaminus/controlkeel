@@ -52,7 +52,7 @@ defmodule ControlKeel.Notifications.Webhook do
           }
         end,
       "dashboard_url" =>
-        (if session, do: "#{base_url()}/missions/#{session.id}", else: "#{base_url()}/findings"),
+        if(session, do: "#{base_url()}/missions/#{session.id}", else: "#{base_url()}/findings"),
       "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
   end

@@ -114,6 +114,42 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   @impl true
+  def handle_event("generate_proof", %{"id" => id}, socket) do
+    with {:ok, task_id} <- parse_id(id),
+         {:ok, _proof} <- Mission.generate_proof_bundle(task_id),
+         session when not is_nil(session) <-
+           Mission.get_session_context(socket.assigns.session.id) do
+      {:noreply, socket |> put_flash(:info, "Proof bundle generated.") |> assign_session(session)}
+    else
+      _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
+    end
+  end
+
+  @impl true
+  def handle_event("pause_task", %{"id" => id}, socket) do
+    with {:ok, task_id} <- parse_id(id),
+         {:ok, _result} <- Mission.pause_task(task_id, "mission_control"),
+         session when not is_nil(session) <-
+           Mission.get_session_context(socket.assigns.session.id) do
+      {:noreply, socket |> put_flash(:info, "Task paused.") |> assign_session(session)}
+    else
+      _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
+    end
+  end
+
+  @impl true
+  def handle_event("resume_task", %{"id" => id}, socket) do
+    with {:ok, task_id} <- parse_id(id),
+         {:ok, _result} <- Mission.resume_task(task_id, "mission_control"),
+         session when not is_nil(session) <-
+           Mission.get_session_context(socket.assigns.session.id) do
+      {:noreply, socket |> put_flash(:info, "Task resumed.") |> assign_session(session)}
+    else
+      _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.flash_group flash={@flash} />
@@ -194,6 +230,10 @@ defmodule ControlKeelWeb.MissionControlLive do
           <strong>
             {format_currency(@session.spent_cents)} / {format_currency(@session.budget_cents)}
           </strong>
+        </div>
+        <div class="ck-card ck-stat-card">
+          <p class="ck-mini-label">Proof bundles</p>
+          <strong>{map_size(@latest_proofs)}</strong>
         </div>
       </div>
 
@@ -280,6 +320,55 @@ defmodule ControlKeelWeb.MissionControlLive do
               <strong>{@current_task.title}</strong>
             </div>
             <p class="ck-note">{@current_task.validation_gate}</p>
+            <div class="ck-action-row" style="margin-top: 0.75rem;">
+              <button
+                id={"current-task-generate-proof-#{@current_task.id}"}
+                type="button"
+                class="ck-link"
+                phx-click="generate_proof"
+                phx-value-id={@current_task.id}
+              >
+                Generate proof
+              </button>
+              <button
+                :if={@current_task.status in ["queued", "in_progress", "blocked"]}
+                id={"current-task-pause-#{@current_task.id}"}
+                type="button"
+                class="ck-link"
+                phx-click="pause_task"
+                phx-value-id={@current_task.id}
+              >
+                Pause
+              </button>
+              <button
+                :if={@current_task.status == "paused"}
+                id={"current-task-resume-#{@current_task.id}"}
+                type="button"
+                class="ck-link"
+                phx-click="resume_task"
+                phx-value-id={@current_task.id}
+              >
+                Resume
+              </button>
+              <.link
+                :if={Map.get(@latest_proofs, @current_task.id)}
+                navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, @current_task.id).id}"}
+                class="ck-link"
+              >
+                View proof
+              </.link>
+            </div>
+            <%= if @current_proof_summary do %>
+              <div class="ck-inline-stats" style="margin-top: 0.75rem;">
+                <span>v{@current_proof_summary["version"]}</span>
+                <span>risk {@current_proof_summary["risk_score"]}</span>
+                <span>
+                  {if @current_proof_summary["deploy_ready"],
+                    do: "deploy ready",
+                    else: "review required"}
+                </span>
+              </div>
+            <% end %>
           <% else %>
             <p class="ck-note">No active task context is available yet.</p>
           <% end %>
@@ -295,7 +384,10 @@ defmodule ControlKeelWeb.MissionControlLive do
                   </div>
                   <p class="ck-note">{task.validation_gate}</p>
                   <%= if task.rollback_boundary do %>
-                    <p class="ck-note" style="color: var(--ck-color-muted); font-size: 0.75rem; margin-top: 0.15rem;">
+                    <p
+                      class="ck-note"
+                      style="color: var(--ck-color-muted); font-size: 0.75rem; margin-top: 0.15rem;"
+                    >
                       Rollback: {task.rollback_boundary}
                     </p>
                   <% end %>
@@ -315,10 +407,79 @@ defmodule ControlKeelWeb.MissionControlLive do
                       {trunc(task.confidence_score * 100)}% confidence
                     </span>
                   <% end %>
+                  <%= if Map.get(@latest_proofs, task.id) do %>
+                    <.link
+                      navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"}
+                      class="ck-link"
+                    >
+                      View proof
+                    </.link>
+                  <% end %>
+                  <button
+                    id={"task-generate-proof-#{task.id}"}
+                    type="button"
+                    class="ck-link"
+                    phx-click="generate_proof"
+                    phx-value-id={task.id}
+                  >
+                    Generate proof
+                  </button>
+                  <button
+                    :if={task.status in ["queued", "in_progress", "blocked"]}
+                    id={"task-pause-#{task.id}"}
+                    type="button"
+                    class="ck-link"
+                    phx-click="pause_task"
+                    phx-value-id={task.id}
+                  >
+                    Pause
+                  </button>
+                  <button
+                    :if={task.status == "paused"}
+                    id={"task-resume-#{task.id}"}
+                    type="button"
+                    class="ck-link"
+                    phx-click="resume_task"
+                    phx-value-id={task.id}
+                  >
+                    Resume
+                  </button>
                 </div>
               </li>
             <% end %>
           </ol>
+        </div>
+      </div>
+
+      <div class="ck-grid ck-grid-dashboard">
+        <div class="ck-card">
+          <p class="ck-mini-label">Relevant memory</p>
+          <%= if @current_memory_hits == [] do %>
+            <p class="ck-note">No matching memory has been captured for this task yet.</p>
+          <% else %>
+            <ul class="ck-mini-list">
+              <%= for hit <- @current_memory_hits do %>
+                <li>
+                  <strong>{hit.title}</strong>
+                  <p class="ck-note">{hit.summary}</p>
+                </li>
+              <% end %>
+            </ul>
+          <% end %>
+        </div>
+
+        <div class="ck-card">
+          <p class="ck-mini-label">Resume packet</p>
+          <%= if @current_resume_packet do %>
+            <div class="ck-inline-stats">
+              <span>{length(@current_resume_packet["unresolved_findings"])} unresolved</span>
+              <span>{length(@current_resume_packet["latest_invocations"])} recent runs</span>
+              <span>{length(@current_resume_packet["memory_hits"])} memory hits</span>
+            </div>
+            <pre class="ck-code-block" style="margin-top: 1rem;">{Jason.encode!(@current_resume_packet, pretty: true)}</pre>
+          <% else %>
+            <p class="ck-note">Pause a task to capture a durable resume packet.</p>
+          <% end %>
         </div>
       </div>
 
@@ -433,6 +594,10 @@ defmodule ControlKeelWeb.MissionControlLive do
       active_findings: Enum.count(session.findings, &(&1.status in ["open", "blocked"])),
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
       compliance_score: compliance_score(session.findings),
+      latest_proofs: Mission.latest_proof_bundles_for_session(session.id),
+      current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
+      current_memory_hits: current_memory_hits(session),
+      current_resume_packet: current_resume_packet(session),
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent")),
       proxy_urls: %{
@@ -447,7 +612,35 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
 
   defp current_task(tasks) do
-    Enum.find(tasks, &(&1.status == "in_progress")) || Enum.find(tasks, &(&1.status == "queued"))
+    Enum.find(tasks, &(&1.status == "in_progress")) ||
+      Enum.find(tasks, &(&1.status == "paused")) ||
+      Enum.find(tasks, &(&1.status == "blocked")) ||
+      Enum.find(tasks, &(&1.status == "queued"))
+  end
+
+  defp current_memory_hits(session) do
+    case current_task(session.tasks) do
+      nil ->
+        []
+
+      task ->
+        session
+        |> ControlKeel.Memory.retrieve_for_task(task, findings: session.findings, top_k: 5)
+        |> Map.get(:entries, [])
+    end
+  end
+
+  defp current_resume_packet(session) do
+    case current_task(session.tasks) do
+      nil ->
+        nil
+
+      task ->
+        case Mission.resume_packet(task.id) do
+          {:ok, packet} -> packet
+          _error -> nil
+        end
+    end
   end
 
   defp format_currency(cents), do: cents |> Kernel./(100) |> Float.round(2)

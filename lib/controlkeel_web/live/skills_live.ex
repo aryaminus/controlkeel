@@ -36,8 +36,14 @@ defmodule ControlKeelWeb.SkillsLive do
           <h1 class="ck-section-title">AgentSkills catalog</h1>
           <p class="ck-lead ck-lead-tight">
             Skills are folder-based capability packages that agents discover and activate on demand.
-            Each skill is a <code>SKILL.md</code> file with instructions, scripts, and resources —
-            following the open <a href="https://agentskills.io/specification" class="ck-link" target="_blank" rel="noopener">AgentSkills format</a>.
+            Each skill is a <code>SKILL.md</code>
+            file with instructions, scripts, and resources —
+            following the open <a
+              href="https://agentskills.io/specification"
+              class="ck-link"
+              target="_blank"
+              rel="noopener"
+            >AgentSkills format</a>.
           </p>
         </div>
         <a href={~p"/"} class="ck-link">Back home</a>
@@ -110,7 +116,10 @@ defmodule ControlKeelWeb.SkillsLive do
                   License: {@selected.license}
                 </p>
               <% end %>
-              <p class="ck-note" style="color: var(--ck-color-muted); font-family: monospace; font-size: 0.75rem; word-break: break-all;">
+              <p
+                class="ck-note"
+                style="color: var(--ck-color-muted); font-family: monospace; font-size: 0.75rem; word-break: break-all;"
+              >
                 {@selected.path}
               </p>
             </div>
@@ -124,9 +133,14 @@ defmodule ControlKeelWeb.SkillsLive do
               <p class="ck-mini-label">How skills work</p>
               <ul class="ck-mini-list">
                 <li>Each skill is a directory containing a <code>SKILL.md</code> file</li>
-                <li>Agents discover skills via <code>ck_skill_list</code> and activate them with <code>ck_skill_load</code></li>
+                <li>
+                  Agents discover skills via <code>ck_skill_list</code>
+                  and activate them with <code>ck_skill_load</code>
+                </li>
                 <li>Built-in skills ship with ControlKeel and apply to all agents</li>
-                <li>Add project skills in <code>.agents/skills/</code> or <code>.claude/skills/</code></li>
+                <li>
+                  Add project skills in <code>.agents/skills/</code> or <code>.claude/skills/</code>
+                </li>
                 <li>Add user-level skills in <code>~/.agents/skills/</code></li>
               </ul>
             </div>
@@ -149,18 +163,22 @@ defmodule ControlKeelWeb.SkillsLive do
               <p class="ck-note" style="margin-bottom: 0.5rem;">
                 Create a directory with a <code>SKILL.md</code> file using this structure:
               </p>
-              <pre style="font-size: 0.72rem; line-height: 1.5; background: var(--ck-color-surface, #1a1a2e); padding: 0.75rem; border-radius: 4px; margin-top: 0.25rem;">---
-name: my-skill
-description: What this skill does and when to use it.
-license: Apache-2.0
-metadata:
-  author: your-org
-  version: "1.0"
----
+              <pre
+                phx-no-curly-interpolation
+                style="font-size: 0.72rem; line-height: 1.5; background: var(--ck-color-surface, #1a1a2e); padding: 0.75rem; border-radius: 4px; margin-top: 0.25rem;"
+              >
+                ---
+                name: my-skill
+                description: What this skill does and when to use it.
+                license: Apache-2.0
+                metadata:
+                  author: your-org
+                  version: "1.0"
+                ---
 
-# My Skill
+                # My Skill
 
-Instructions for the agent go here...</pre>
+                Instructions for the agent go here...</pre>
               <p class="ck-note" style="margin-top: 0.75rem;">
                 Place the directory in <code>.agents/skills/my-skill/</code> inside your project
                 and ControlKeel will discover it automatically.

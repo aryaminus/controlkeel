@@ -5,8 +5,10 @@ defmodule ControlKeel.Budget do
 
   alias Ecto.Multi
   alias ControlKeel.Budget.Pricing
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Mission.{Invocation, Session}
+  alias ControlKeel.PolicyTraining
   alias ControlKeel.Repo
 
   @warn_threshold 0.8
@@ -45,19 +47,41 @@ defmodule ControlKeel.Budget do
       rolling_24h = rolling_24h_spend_cents(session.id)
       projected_session = (session.spent_cents || 0) + estimated_cost_cents
       projected_daily = rolling_24h + estimated_cost_cents
-      decision = decision(session, projected_session, projected_daily)
+      base_decision = decision(session, projected_session, projected_daily)
+      base_summary = summary(session, base_decision, projected_session, projected_daily)
+      active_findings_count = active_findings_count(session.id)
+
+      hint =
+        PolicyTraining.budget_hint(
+          %{"decision" => base_decision, "summary" => base_summary},
+          session,
+          Map.put(attrs, "estimated_cost_cents", estimated_cost_cents),
+          projected_session,
+          projected_daily,
+          active_findings_count
+        )
+
+      decision = hint["decision"] || base_decision
+      summary = hint["summary"] || base_summary
+
+      if decision in ["warn", "block"] do
+        record_budget_memory(session, decision, summary, estimated_cost_cents, attrs)
+      end
 
       {:ok,
        %{
          "allowed" => decision != "block",
          "decision" => decision,
-         "summary" => summary(session, decision, projected_session, projected_daily),
+         "summary" => summary,
          "estimated_cost_cents" => estimated_cost_cents,
          "projected_spend_cents" => projected_session,
          "remaining_session_cents" => remaining(projected_session, session.budget_cents),
          "rolling_24h_spend_cents" => projected_daily,
          "remaining_daily_cents" => remaining(projected_daily, session.daily_budget_cents),
-         "recorded" => false
+         "recorded" => false,
+         "hint_source" => hint["hint_source"],
+         "hint_probability" => hint["hint_probability"],
+         "artifact_version" => hint["artifact_version"]
        }}
     end
   end
@@ -220,6 +244,11 @@ defmodule ControlKeel.Budget do
   defp exceeds_limit?(value), do: value >= 1.0
   defp near_limit?(value), do: value >= @warn_threshold
 
+  defp active_findings_count(session_id) do
+    Mission.list_session_findings(session_id)
+    |> Enum.count(&(&1.status in ["open", "blocked", "escalated"]))
+  end
+
   defp proxy_token_counts(attrs) do
     input_text = Map.get(attrs, "input_text", "")
 
@@ -256,4 +285,26 @@ defmodule ControlKeel.Budget do
   end
 
   defp normalize_proxy_token_count(_value), do: 0
+
+  defp record_budget_memory(session, decision, summary, estimated_cost_cents, attrs) do
+    Memory.record(%{
+      workspace_id: session.workspace_id,
+      session_id: session.id,
+      task_id: attrs["task_id"],
+      record_type: "budget",
+      title: "Budget #{decision}: #{session.title}",
+      summary: summary,
+      body: "Estimated cost #{estimated_cost_cents} cents for #{attrs["tool"] || "ck_budget"}",
+      tags: [decision, "budget"],
+      source_type: "budget",
+      source_id: "#{session.id}:#{decision}:#{attrs["tool"] || "ck_budget"}",
+      metadata: %{
+        "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"]),
+        "decision" => decision,
+        "estimated_cost_cents" => estimated_cost_cents,
+        "tool" => attrs["tool"],
+        "source" => attrs["source"]
+      }
+    })
+  end
 end

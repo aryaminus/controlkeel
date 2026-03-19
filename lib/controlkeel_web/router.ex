@@ -25,6 +25,11 @@ defmodule ControlKeelWeb.Router do
     get "/getting-started", PageController, :getting_started
     live "/start", OnboardingLive, :new
     live "/findings", FindingsLive, :index
+    live "/benchmarks", BenchmarksLive, :index
+    live "/benchmarks/runs/:id", BenchmarksLive, :show
+    live "/benchmarks/policies/:id", BenchmarkPolicyLive, :show
+    live "/proofs", ProofBrowserLive, :index
+    live "/proofs/:id", ProofBrowserLive, :show
     live "/ship", ShipLive, :index
     live "/missions/:id", MissionControlLive, :show
     live "/policies", PolicyStudioLive, :index
@@ -41,11 +46,27 @@ defmodule ControlKeelWeb.Router do
     post "/sessions/:session_id/tasks", ApiController, :create_task
     patch "/tasks/:id", ApiController, :update_task
     post "/tasks/:id/complete", ApiController, :complete_task
+    post "/tasks/:id/pause", ApiController, :pause_task
+    post "/tasks/:id/resume", ApiController, :resume_task
     post "/validate", ApiController, :validate
     get "/findings", ApiController, :list_findings
     post "/findings/:id/action", ApiController, :finding_action
+    get "/proofs", ApiController, :list_proofs
+    get "/proofs/:id", ApiController, :get_proof
+    get "/benchmarks", ApiController, :list_benchmarks
+    post "/benchmarks/runs", ApiController, :create_benchmark_run
+    get "/benchmarks/runs/:id", ApiController, :get_benchmark_run
+    post "/benchmarks/runs/:id/import", ApiController, :import_benchmark_result
+    get "/benchmarks/runs/:id/export", ApiController, :export_benchmark_run
+    get "/policies", ApiController, :list_policies
+    post "/policies/train", ApiController, :train_policy
+    get "/policies/:id", ApiController, :get_policy
+    post "/policies/:id/promote", ApiController, :promote_policy
+    post "/policies/:id/archive", ApiController, :archive_policy
     get "/budget", ApiController, :get_budget
     get "/proof/:task_id", ApiController, :proof_bundle
+    get "/memory/search", ApiController, :search_memory
+    delete "/memory/:id", ApiController, :archive_memory
     post "/route-agent", ApiController, :route_agent
     get "/skills", ApiController, :list_skills
     get "/skills/:name", ApiController, :get_skill

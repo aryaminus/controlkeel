@@ -45,6 +45,16 @@
         <a href={~p"/ship"} class="ck-link">Open ship dashboard</a>
       </div>
       <div class="ck-card">
+        <p class="ck-mini-label">Benchmark matrix</p>
+        <p class="ck-note">
+          {@benchmark_summary.total_runs} persisted benchmark runs across {@benchmark_summary.total_suites} suites.
+          Average catch rate: {if @benchmark_summary.average_catch_rate,
+            do: "#{Float.round(@benchmark_summary.average_catch_rate, 1)}%",
+            else: "not recorded"}.
+        </p>
+        <a href={~p"/benchmarks"} class="ck-link">Open benchmarks</a>
+      </div>
+      <div class="ck-card">
         <p class="ck-mini-label">Install guide</p>
         <p class="ck-note">
           Follow the 5-minute path from first launch to first finding, with the exact commands used by the packaged binary and source setup.
@@ -60,6 +70,7 @@
       <h2 class="ck-section-title">Latest control-tower runs</h2>
     </div>
     <div class="ck-action-row">
+      <a href={~p"/benchmarks"} class="ck-link">View benchmark matrix</a>
       <a href={~p"/ship"} class="ck-link">View ship metrics</a>
       <a href={~p"/start"} class="ck-link">Launch a new mission</a>
     </div>
