@@ -22,12 +22,21 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert claude.label == "Claude Code"
     assert claude.preferred_target == "claude-standalone"
     assert "claude-plugin" in claude.export_targets
+    assert claude.auto_bootstrap
+
+    assert claude.provider_bridge == %{
+             supported: true,
+             provider: "anthropic",
+             mode: "environment"
+           }
 
     assert codex.label == "Codex CLI"
     assert codex.preferred_target == "codex"
     assert "open-standard" in codex.export_targets
     assert "project" in codex.supported_scopes
     assert "ck_validate" in codex.required_mcp_tools
+    assert codex.auto_bootstrap
+    assert codex.provider_bridge == %{supported: true, provider: "openai", mode: "environment"}
   end
 
   test "every integration references valid targets and install channels" do
@@ -39,6 +48,8 @@ defmodule ControlKeel.AgentIntegrationTest do
       assert integration.install_channels != []
       assert integration.required_mcp_tools != []
       assert integration.supported_scopes != []
+      assert is_boolean(integration.auto_bootstrap)
+      assert is_map(integration.provider_bridge)
     end)
   end
 end

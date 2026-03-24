@@ -71,7 +71,7 @@ import sys
 
 binary, tmp_dir = sys.argv[1:3]
 completed = subprocess.run(
-    [binary, "init", "--no-attach"],
+    [binary, "bootstrap"],
     cwd=tmp_dir,
     env=os.environ.copy(),
     timeout=60,

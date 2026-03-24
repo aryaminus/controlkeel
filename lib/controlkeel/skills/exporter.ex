@@ -327,7 +327,18 @@ defmodule ControlKeel.Skills.Exporter do
 
     - `controlkeel mcp --project-root #{project_root_line}`
 
-    If you already ran `controlkeel init` inside the target repository, the generated project wrapper under `controlkeel/bin/` can be used instead of the plain `controlkeel` binary.
+    ControlKeel can auto-bootstrap the governed project binding on first use. If you already ran `controlkeel init` or `controlkeel bootstrap` inside the target repository, the generated project wrapper under `controlkeel/bin/` can be used instead of the plain `controlkeel` binary.
+
+    ## Provider access
+
+    ControlKeel resolves model access in this order:
+
+    1. Agent bridge when the host client exposes one
+    2. CK provider profile or stored key
+    3. Local Ollama
+    4. Heuristic/no-LLM fallback
+
+    If no model provider is available, MCP governance, findings, proof, benchmark, and policy surfaces still work; only true LLM-backed features degrade.
 
     ## Required CK tool surface
 
@@ -438,6 +449,8 @@ defmodule ControlKeel.Skills.Exporter do
 
     Install ControlKeel:
     #{Enum.map_join(Distribution.install_channels(), "\n", fn channel -> "- #{channel.label}: `#{channel.command}`" end)}
+
+    ControlKeel auto-bootstraps project binding on first use. Provider access resolves through agent bridge, CK-owned provider profiles, local Ollama, then heuristic fallback.
     """
   end
 

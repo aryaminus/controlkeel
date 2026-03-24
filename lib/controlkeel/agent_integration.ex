@@ -14,6 +14,8 @@ defmodule ControlKeel.AgentIntegration do
     :preferred_target,
     :default_scope,
     :router_agent_id,
+    :auto_bootstrap,
+    :provider_bridge,
     supported_scopes: [],
     required_mcp_tools: [],
     install_channels: [],
@@ -33,6 +35,8 @@ defmodule ControlKeel.AgentIntegration do
         "claude-standalone",
         "user",
         "claude-code",
+        true,
+        %{supported: true, provider: "anthropic", mode: "environment"},
         ["user", "project"],
         ["claude-standalone", "claude-plugin"]
       ),
@@ -47,6 +51,8 @@ defmodule ControlKeel.AgentIntegration do
         "codex",
         "user",
         "codex-cli",
+        true,
+        %{supported: true, provider: "openai", mode: "environment"},
         ["user", "project"],
         ["codex", "open-standard"]
       ),
@@ -61,6 +67,8 @@ defmodule ControlKeel.AgentIntegration do
         "github-repo",
         "project",
         nil,
+        true,
+        %{supported: false},
         ["project"],
         ["github-repo", "copilot-plugin"]
       ),
@@ -75,6 +83,8 @@ defmodule ControlKeel.AgentIntegration do
         "github-repo",
         "project",
         "copilot",
+        true,
+        %{supported: false},
         ["project"],
         ["github-repo", "copilot-plugin"]
       ),
@@ -89,6 +99,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "cursor",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       ),
@@ -103,6 +115,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "windsurf",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       ),
@@ -117,6 +131,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "kiro",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       ),
@@ -131,6 +147,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "amp",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       ),
@@ -145,6 +163,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "opencode",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       ),
@@ -159,6 +179,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "gemini-cli",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       ),
@@ -173,6 +195,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "continue",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       ),
@@ -187,6 +211,8 @@ defmodule ControlKeel.AgentIntegration do
         "instructions-only",
         "project",
         "aider",
+        true,
+        %{supported: false},
         ["project"],
         ["instructions-only"]
       )
@@ -234,6 +260,8 @@ defmodule ControlKeel.AgentIntegration do
          preferred_target,
          default_scope,
          router_agent_id,
+         auto_bootstrap,
+         provider_bridge,
          supported_scopes,
          export_targets
        ) do
@@ -248,6 +276,8 @@ defmodule ControlKeel.AgentIntegration do
       preferred_target: preferred_target,
       default_scope: default_scope,
       router_agent_id: router_agent_id,
+      auto_bootstrap: auto_bootstrap,
+      provider_bridge: provider_bridge,
       supported_scopes: supported_scopes,
       required_mcp_tools: Distribution.required_mcp_tools(),
       install_channels: Enum.map(Distribution.install_channels(), & &1.id),

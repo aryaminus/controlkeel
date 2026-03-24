@@ -51,7 +51,9 @@ defmodule ControlKeel.CLITasksTest do
     assert Map.keys(binding) == [
              "agent",
              "attached_agents",
+             "bootstrap",
              "project_root",
+             "provider_override",
              "session_id",
              "version",
              "workspace_id"

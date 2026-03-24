@@ -1,11 +1,11 @@
 defmodule ControlKeel.ClaudeCLI do
   @moduledoc false
 
-  def attach_local(project_root, command_path, server_name \\ "controlkeel") do
+  def attach_local(project_root, command, args \\ [], server_name \\ "controlkeel") do
     config = %{
       "type" => "stdio",
-      "command" => command_path,
-      "args" => []
+      "command" => command,
+      "args" => args
     }
 
     with :ok <- ensure_available(),
@@ -14,12 +14,13 @@ defmodule ControlKeel.ClaudeCLI do
              cd: project_root
            ),
          {:ok, output} <- run(["mcp", "get", server_name], cd: project_root),
-         :ok <- verify_get_output(output, server_name, command_path) do
+         :ok <- verify_get_output(output, server_name, command) do
       {:ok,
        %{
          "server_name" => server_name,
          "scope" => "local",
-         "command" => command_path,
+         "command" => command,
+         "args" => args,
          "attached_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}

@@ -31,12 +31,55 @@ defmodule ControlKeel.LocalProject do
   def load(project_root \\ File.cwd!()) do
     root = Path.expand(project_root)
 
-    with {:ok, binding} <- ProjectBinding.read(root),
+    with {:ok, binding, _mode} <- ProjectBinding.read_effective(root),
          session when not is_nil(session) <- Mission.get_session_context(binding["session_id"]) do
       {:ok, binding, session}
     else
       nil -> {:error, :session_not_found}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def load_or_bootstrap(project_root \\ File.cwd!(), overrides \\ %{}, opts \\ []) do
+    root = Path.expand(project_root)
+
+    case load(root) do
+      {:ok, binding, session} ->
+        {:ok, binding, session, :existing}
+
+      {:error, :not_found} ->
+        bootstrap(root, overrides, opts)
+
+      {:error, :session_not_found} ->
+        bootstrap(root, overrides, opts)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def bootstrap(project_root \\ File.cwd!(), overrides \\ %{}, opts \\ []) do
+    root = Path.expand(project_root)
+    ephemeral_ok? = Keyword.get(opts, :ephemeral_ok, true)
+    bootstrap_metadata = %{"auto_bootstrapped" => true}
+    launch_attrs = default_init_attrs(root, overrides)
+
+    with {:ok, session} <- Mission.create_launch(launch_attrs) do
+      case create_binding(root, session, launch_attrs, bootstrap_metadata) do
+        {:ok, binding, mode} ->
+          {:ok, binding, Mission.get_session_context(session.id), mode}
+
+        {:error, reason}
+        when reason in [:project_write_failed, :gitignore_failed, :wrapper_failed] ->
+          if ephemeral_ok? do
+            create_ephemeral_binding(root, session, launch_attrs, bootstrap_metadata)
+          else
+            {:error, reason}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
@@ -78,6 +121,58 @@ defmodule ControlKeel.LocalProject do
       {:ok, binding, :created}
     end
   end
+
+  defp create_binding(root, session, launch_attrs, bootstrap_metadata) do
+    with :ok <- ensure_project_files(root),
+         {:ok, binding} <-
+           ProjectBinding.write(
+             %{
+               "workspace_id" => session.workspace_id,
+               "session_id" => session.id,
+               "agent" => Map.get(launch_attrs, "agent", "claude"),
+               "attached_agents" => %{},
+               "bootstrap" => Map.put(bootstrap_metadata, "mode", "project")
+             },
+             root
+           ) do
+      emit_initialized(session, root, launch_attrs)
+      {:ok, binding, :bootstrapped_project}
+    else
+      {:error, _reason} = error -> normalize_project_write_error(error)
+    end
+  end
+
+  defp create_ephemeral_binding(root, session, launch_attrs, bootstrap_metadata) do
+    with {:ok, binding} <-
+           ProjectBinding.write_ephemeral(
+             %{
+               "workspace_id" => session.workspace_id,
+               "session_id" => session.id,
+               "agent" => Map.get(launch_attrs, "agent", "claude"),
+               "attached_agents" => %{},
+               "bootstrap" => Map.put(bootstrap_metadata, "mode", "ephemeral")
+             },
+             root
+           ) do
+      emit_initialized(session, root, launch_attrs)
+      {:ok, binding, Mission.get_session_context(session.id), :bootstrapped_ephemeral}
+    end
+  end
+
+  defp ensure_project_files(root) do
+    with :ok <- ProjectBinding.ensure_gitignore(root),
+         :ok <- ProjectBinding.ensure_mcp_wrapper(root) do
+      :ok
+    else
+      {:error, _reason} = error -> error
+      error -> {:error, error}
+    end
+  end
+
+  defp normalize_project_write_error({:error, :enoent}), do: {:error, :project_write_failed}
+  defp normalize_project_write_error({:error, :eacces}), do: {:error, :project_write_failed}
+  defp normalize_project_write_error({:error, :eperm}), do: {:error, :project_write_failed}
+  defp normalize_project_write_error({:error, reason}), do: {:error, reason}
 
   defp emit_initialized(session, root, launch_attrs) do
     :telemetry.execute(

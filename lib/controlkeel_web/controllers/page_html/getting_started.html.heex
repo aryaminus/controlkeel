@@ -16,8 +16,11 @@
       <p class="ck-mini-label">Packaged binary</p>
       <ol class="ck-mini-list">
         <li>Run `controlkeel` to boot the local web app.</li>
-        <li>In your target project, run `controlkeel init`.</li>
-        <li>Run `controlkeel attach claude-code`.</li>
+        <li>In your target project, run `controlkeel attach claude-code`.</li>
+        <li>ControlKeel auto-bootstraps the governed binding on first use.</li>
+        <li>
+          Use `controlkeel bootstrap` or `controlkeel init` only if you want to do it explicitly.
+        </li>
         <li>Ask Claude Code to add a hardcoded secret or unsafe SQL query.</li>
         <li>Open mission control or run `controlkeel findings` to verify the block.</li>
       </ol>
@@ -29,9 +32,9 @@
         <li>Run `mix setup` once.</li>
         <li>Run `mix phx.server` in the ControlKeel repo.</li>
         <li>
-          In your target project, run `mix ck.init` from the same installed source environment.
+          In your target project, run `mix ck.attach claude-code` from the same installed source environment.
         </li>
-        <li>Attach Claude Code with `mix ck.attach claude-code`.</li>
+        <li>`mix ck.init` remains available when you want an explicit setup step.</li>
         <li>Use the demo snippet from `docs/demo-script.md` to trigger the first finding.</li>
       </ol>
     </div>

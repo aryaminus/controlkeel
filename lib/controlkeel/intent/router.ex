@@ -4,6 +4,7 @@ defmodule ControlKeel.Intent.Router do
   alias ControlKeel.Intent
   alias ControlKeel.Intent.{Domains, ExecutionBrief, Prompt}
   alias ControlKeel.Intent.Providers.{Anthropic, Ollama, OpenAI, OpenRouter}
+  alias ControlKeel.ProviderBroker
 
   @providers %{
     anthropic: Anthropic,
@@ -14,10 +15,10 @@ defmodule ControlKeel.Intent.Router do
 
   def compile(attrs, opts \\ []) do
     prompt = Prompt.build(attrs)
-    providers = ordered_providers(attrs, opts)
-    fallback_chain = Enum.map(providers, &Atom.to_string/1)
+    resolutions = ordered_resolutions(attrs, opts)
+    fallback_chain = Enum.map(resolutions, &"#{&1.source}:#{&1.provider}")
 
-    try_providers(providers, prompt, attrs, fallback_chain, opts)
+    try_providers(resolutions, prompt, attrs, fallback_chain, opts)
   end
 
   def provider_options do
@@ -27,12 +28,17 @@ defmodule ControlKeel.Intent.Router do
   def provider_module(provider), do: Map.fetch!(@providers, provider)
 
   def ordered_providers(attrs, opts) do
+    ordered_resolutions(attrs, opts) |> Enum.map(&String.to_atom(&1.provider))
+  end
+
+  defp ordered_resolutions(attrs, opts) do
     preflight = Domains.preflight_context(attrs)
+    project_root = Keyword.get(opts, :project_root, File.cwd!())
 
     default_order =
       case preflight.preliminary_risk_tier do
-        tier when tier in ["high", "critical"] -> [:anthropic, :openai, :openrouter, :ollama]
-        _moderate -> [:openai, :anthropic, :openrouter, :ollama]
+        tier when tier in ["high", "critical"] -> ["anthropic", "openai", "openrouter", "ollama"]
+        _moderate -> ["openai", "anthropic", "openrouter", "ollama"]
       end
 
     requested =
@@ -40,29 +46,68 @@ defmodule ControlKeel.Intent.Router do
         default_provider_override() ||
         default_order
 
-    requested
-    |> List.wrap()
-    |> Enum.map(&normalize_provider/1)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq()
-    |> then(fn providers ->
-      providers ++ Enum.reject(default_order, &(&1 in providers))
+    requested_ids =
+      requested
+      |> List.wrap()
+      |> Enum.map(&normalize_provider/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&Atom.to_string/1)
+      |> Enum.uniq()
+
+    order = requested_ids ++ Enum.reject(default_order, &(&1 in requested_ids))
+
+    order
+    |> Enum.map(fn provider ->
+      ProviderBroker.resolve_provider(provider, project_root, opts) ||
+        %{
+          source: "requested",
+          provider: provider,
+          model: nil,
+          config: %{},
+          reason: "Provider was requested but is not currently configured."
+        }
     end)
+    |> Enum.uniq_by(&{&1.source, &1.provider})
   end
 
-  defp try_providers([], _prompt, _attrs, _fallback_chain, _opts) do
-    emit_compiler_failure(:none, :no_provider_succeeded)
-    {:error, :no_provider_succeeded}
+  defp try_providers([], _prompt, attrs, fallback_chain, opts) do
+    if allow_heuristic_fallback?(opts) do
+      heuristic_brief(attrs, %{"model" => "heuristic"}, fallback_chain)
+    else
+      emit_compiler_failure(nil, :no_provider_succeeded)
+      {:error, :no_provider_succeeded}
+    end
   end
 
-  defp try_providers([provider | rest], prompt, attrs, fallback_chain, opts) do
+  defp try_providers(
+         [%{provider: "heuristic"} = resolution | _rest],
+         _prompt,
+         attrs,
+         fallback_chain,
+         opts
+       ) do
+    if allow_heuristic_fallback?(opts) do
+      heuristic_brief(attrs, %{"model" => resolution.model || "heuristic"}, fallback_chain)
+    else
+      emit_compiler_failure(nil, :no_provider_succeeded)
+      {:error, :no_provider_succeeded}
+    end
+  end
+
+  defp try_providers([resolution | rest], prompt, attrs, fallback_chain, opts) do
+    provider = String.to_atom(resolution.provider)
     module = provider_module(provider)
-    attempt_opts = Keyword.put(opts, :provider, provider)
+
+    attempt_opts =
+      opts
+      |> Keyword.put(:provider, provider)
+      |> Keyword.put(:provider_config, resolution.config)
 
     case attempt_provider(module, prompt, attempt_opts) do
       {:ok, brief_map, provider_metadata} ->
         compiler_metadata = %{
           "provider" => Atom.to_string(provider),
+          "provider_source" => resolution.source,
           "model" => provider_metadata["model"],
           "schema_version" => ExecutionBrief.schema_version(),
           "fallback_chain" => fallback_chain,
@@ -78,18 +123,13 @@ defmodule ControlKeel.Intent.Router do
 
           {:error, _changeset} ->
             if Keyword.get(opts, :validated_retry_provider) == provider do
-              emit_fallback(provider, List.first(rest), :invalid_structured_output)
-
-              if rest == [] and dev_fallback?(opts) do
-                heuristic_brief(attrs, compiler_metadata, fallback_chain)
-              else
-                try_providers(rest, prompt, attrs, fallback_chain, opts)
-              end
+              emit_fallback(provider, next_provider(rest), :invalid_structured_output)
+              try_providers(rest, prompt, attrs, fallback_chain, opts)
             else
               emit_fallback(provider, provider, :invalid_structured_output_retry)
 
               try_providers(
-                [provider | rest],
+                [resolution | rest],
                 prompt,
                 attrs,
                 fallback_chain,
@@ -99,22 +139,12 @@ defmodule ControlKeel.Intent.Router do
         end
 
       {:skip, reason} ->
-        emit_fallback(provider, List.first(rest), reason)
-
-        if rest == [] and dev_fallback?(opts) do
-          heuristic_brief(attrs, %{"model" => "heuristic"}, fallback_chain)
-        else
-          try_providers(rest, prompt, attrs, fallback_chain, opts)
-        end
+        emit_fallback(provider, next_provider(rest), reason)
+        try_providers(rest, prompt, attrs, fallback_chain, opts)
 
       {:error, reason} ->
-        emit_fallback(provider, List.first(rest), reason)
-
-        if rest == [] and dev_fallback?(opts) do
-          heuristic_brief(attrs, %{"model" => "heuristic"}, fallback_chain)
-        else
-          try_providers(rest, prompt, attrs, fallback_chain, opts)
-        end
+        emit_fallback(provider, next_provider(rest), reason)
+        try_providers(rest, prompt, attrs, fallback_chain, opts)
     end
   end
 
@@ -240,7 +270,7 @@ defmodule ControlKeel.Intent.Router do
     end
   end
 
-  defp dev_fallback?(opts) do
+  defp allow_heuristic_fallback?(opts) do
     case Keyword.get(opts, :allow_dev_fallback, :unset) do
       :unset ->
         Application.get_env(:controlkeel, Intent, [])[:dev_fallback] || test_env?()
@@ -300,7 +330,12 @@ defmodule ControlKeel.Intent.Router do
       %{count: 1},
       %{
         provider: Atom.to_string(provider),
-        next_provider: if(next_provider, do: Atom.to_string(next_provider), else: nil),
+        next_provider:
+          cond do
+            is_atom(next_provider) -> Atom.to_string(next_provider)
+            is_binary(next_provider) -> next_provider
+            true -> nil
+          end,
         reason: inspect(reason)
       }
     )
@@ -318,7 +353,10 @@ defmodule ControlKeel.Intent.Router do
     :telemetry.execute(
       [:controlkeel, :intent, :compiler, :failure],
       %{count: 1},
-      %{provider: if(provider, do: to_string(provider), else: nil), reason: inspect(reason)}
+      %{provider: if(provider, do: to_string(provider), else: "none"), reason: inspect(reason)}
     )
   end
+
+  defp next_provider([%{provider: provider} | _rest]), do: provider
+  defp next_provider(_rest), do: nil
 end

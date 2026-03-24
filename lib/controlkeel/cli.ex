@@ -13,6 +13,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Proxy
   alias ControlKeel.Skills
@@ -74,6 +75,12 @@ defmodule ControlKeel.CLI do
   ]
   @webhook_list_switches [workspace_id: :integer]
   @worker_start_switches [service_account_token: :string, interval: :integer]
+  @provider_default_switches [scope: :string, project_root: :string]
+  @provider_set_key_switches [value: :string]
+  @provider_show_switches [project_root: :string]
+  @provider_list_switches [project_root: :string]
+  @provider_doctor_switches [project_root: :string]
+  @bootstrap_switches [project_root: :string, ephemeral_ok: :boolean, agent: :string]
 
   def standalone_argv do
     cond do
@@ -217,6 +224,24 @@ defmodule ControlKeel.CLI do
       ["worker", "start" | rest] ->
         parse_with_switches(:worker_start, rest, @worker_start_switches)
 
+      ["provider", "list" | rest] ->
+        parse_with_switches(:provider_list, rest, @provider_list_switches)
+
+      ["provider", "show" | rest] ->
+        parse_with_switches(:provider_show, rest, @provider_show_switches)
+
+      ["provider", "doctor" | rest] ->
+        parse_with_switches(:provider_doctor, rest, @provider_doctor_switches)
+
+      ["provider", "default", source | rest] ->
+        parse_provider_default(source, rest)
+
+      ["provider", "set-key", provider | rest] ->
+        parse_provider_set_key(provider, rest)
+
+      ["bootstrap" | rest] ->
+        parse_with_switches(:bootstrap, rest, @bootstrap_switches)
+
       ["mcp" | rest] ->
         parse_with_switches(:mcp, rest, @mcp_switches)
 
@@ -317,6 +342,10 @@ defmodule ControlKeel.CLI do
       controlkeel execute <id>        Materialize ready tasks and task runs
       controlkeel worker start [--service-account-token TOKEN]
                                       Poll ready work for a workspace service account
+      controlkeel provider list|show|default|set-key|doctor
+                                      Inspect and configure CK provider brokerage
+      controlkeel bootstrap [--project-root /abs/path] [--ephemeral-ok]
+                                      Auto-create project or ephemeral binding on first use
       controlkeel watch [--interval N]
                                       Stream findings and budget live (default: 2000ms)
       controlkeel mcp [--project-root /abs/path]
@@ -377,14 +406,23 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["claude-code"], options: options}, project_root) do
-    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
-
-    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
-         {:ok, binding} <- ProjectBinding.read(project_root),
-         {:ok, attached_agent} <- ClaudeCLI.attach_local(project_root, wrapper_path),
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => "claude-code"}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         {:ok, attached_agent} <-
+           ClaudeCLI.attach_local(
+             project_root,
+             command_spec.command,
+             command_spec.args
+           ),
          updated_binding <-
            ProjectBinding.update_attached_agent(binding, "claude_code", attached_agent),
-         {:ok, _binding} <- ProjectBinding.write(updated_binding, project_root) do
+         {:ok, _binding} <-
+           ProjectBinding.write_effective(
+             updated_binding,
+             project_root,
+             mode: binding_write_mode(binding)
+           ) do
       emit_attach_succeeded(binding, project_root, attached_agent)
 
       {:ok,
@@ -392,16 +430,10 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Claude Code.",
          "Verified with `claude mcp get controlkeel`."
        ] ++
+         bootstrap_lines(project_root) ++
          native_attach_lines("claude-code", project_root, options) ++
          attach_guidance_lines("claude-code")}
     else
-      {:error, :wrapper_missing} ->
-        {:error,
-         "Missing `#{wrapper_path}`. Run `controlkeel init` before attaching ControlKeel to Claude Code."}
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before attaching ControlKeel to Claude Code."}
-
       {:error, message} when is_binary(message) ->
         {:error, message}
 
@@ -411,27 +443,24 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["cursor"], options: options}, project_root) do
-    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
-
-    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
-         {:ok, binding} <- ProjectBinding.read(project_root),
-         {:ok, attached} <- attach_to_cursor(wrapper_path),
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => "cursor"}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         {:ok, attached} <- attach_to_cursor(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "cursor", attached),
-         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+         {:ok, _} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
       {:ok,
        [
          "Attached ControlKeel to Cursor.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Cursor to activate."
        ] ++
+         bootstrap_lines(project_root) ++
          native_attach_lines("cursor", project_root, options) ++ attach_guidance_lines("cursor")}
     else
-      {:error, :wrapper_missing} ->
-        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before attaching ControlKeel to Cursor."}
-
       {:error, message} when is_binary(message) ->
         {:error, message}
 
@@ -441,28 +470,25 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["windsurf"], options: options}, project_root) do
-    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
-
-    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
-         {:ok, binding} <- ProjectBinding.read(project_root),
-         {:ok, attached} <- attach_to_windsurf(wrapper_path),
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => "windsurf"}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         {:ok, attached} <- attach_to_windsurf(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "windsurf", attached),
-         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+         {:ok, _} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
       {:ok,
        [
          "Attached ControlKeel to Windsurf.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Windsurf to activate."
        ] ++
+         bootstrap_lines(project_root) ++
          native_attach_lines("windsurf", project_root, options) ++
          attach_guidance_lines("windsurf")}
     else
-      {:error, :wrapper_missing} ->
-        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before attaching ControlKeel to Windsurf."}
-
       {:error, message} when is_binary(message) ->
         {:error, message}
 
@@ -473,8 +499,6 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
       when agent in ["kiro", "amp", "opencode", "gemini-cli", "codex-cli"] do
-    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
-
     config_path_fn = %{
       "kiro" => &kiro_mcp_config_path/0,
       "amp" => &amp_mcp_config_path/0,
@@ -491,25 +515,26 @@ defmodule ControlKeel.CLI do
       "codex-cli" => "Codex CLI"
     }
 
-    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
-         {:ok, binding} <- ProjectBinding.read(project_root),
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => agent}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
          config_path <- config_path_fn[agent].(),
-         {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", wrapper_path, agent),
+         {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", command_spec, agent),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached),
-         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+         {:ok, _} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
       {:ok,
        [
          "Attached ControlKeel to #{display_name[agent]}.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart #{display_name[agent]} to activate."
-       ] ++ native_attach_lines(agent, project_root, options) ++ attach_guidance_lines(agent)}
+       ] ++
+         bootstrap_lines(project_root) ++
+         native_attach_lines(agent, project_root, options) ++
+         attach_guidance_lines(agent)}
     else
-      {:error, :wrapper_missing} ->
-        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before attaching ControlKeel to #{display_name[agent]}."}
-
       {:error, message} when is_binary(message) ->
         {:error, message}
 
@@ -519,29 +544,26 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["continue"], options: options}, project_root) do
-    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
-
-    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
-         {:ok, binding} <- ProjectBinding.read(project_root),
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => "continue"}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <-
-           write_continue_mcp_config(continue_config_path(), "controlkeel", wrapper_path),
+           write_continue_mcp_config(continue_config_path(), "controlkeel", command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "continue", attached),
-         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+         {:ok, _} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
       {:ok,
        [
          "Attached ControlKeel to Continue.",
          "MCP server written to #{attached["config_path"]}.",
          "Restart Continue to activate."
        ] ++
+         bootstrap_lines(project_root) ++
          native_attach_lines("continue", project_root, options) ++
          attach_guidance_lines("continue")}
     else
-      {:error, :wrapper_missing} ->
-        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before attaching ControlKeel to Continue."}
-
       {:error, message} when is_binary(message) ->
         {:error, message}
 
@@ -551,25 +573,24 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["aider"], options: options}, project_root) do
-    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
-
-    with true <- File.exists?(wrapper_path) || {:error, :wrapper_missing},
-         {:ok, binding} <- ProjectBinding.read(project_root),
-         {:ok, attached} <- attach_to_aider(wrapper_path, project_root),
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => "aider"}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         {:ok, attached} <- attach_to_aider(command_spec, project_root),
          updated <- ProjectBinding.update_attached_agent(binding, "aider", attached),
-         {:ok, _} <- ProjectBinding.write(updated, project_root) do
+         {:ok, _} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
       {:ok,
        [
          "Attached ControlKeel to Aider.",
          "MCP config written to #{attached["config_path"]}."
-       ] ++ native_attach_lines("aider", project_root, options) ++ attach_guidance_lines("aider")}
+       ] ++
+         bootstrap_lines(project_root) ++
+         native_attach_lines("aider", project_root, options) ++
+         attach_guidance_lines("aider")}
     else
-      {:error, :wrapper_missing} ->
-        {:error, "Missing `#{wrapper_path}`. Run `controlkeel init` first."}
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before attaching ControlKeel to Aider."}
-
       {:error, message} when is_binary(message) ->
         {:error, message}
 
@@ -582,11 +603,15 @@ defmodule ControlKeel.CLI do
       when agent in ["vscode", "copilot"] do
     scope = attach_scope(agent, options)
 
-    with {:ok, binding} <- ProjectBinding.read(project_root),
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => agent}),
          {:ok, install_result} <- Skills.install("github-repo", project_root, scope: scope),
          attached_agent <- github_repo_attached_agent(agent, scope, install_result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
-         {:ok, _binding} <- ProjectBinding.write(updated, project_root) do
+         {:ok, _binding} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
       lines =
         case install_result do
           %{destination: destination} ->
@@ -594,21 +619,17 @@ defmodule ControlKeel.CLI do
               "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
               "Installed project bundle at #{destination}.",
               "Repository MCP config written under .github and .vscode."
-            ]
+            ] ++ bootstrap_lines(project_root)
 
           %ControlKeel.Skills.SkillExportPlan{} = plan ->
             [
               "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
               "Output: #{plan.output_dir}"
-            ]
+            ] ++ bootstrap_lines(project_root)
         end
 
       {:ok, lines ++ attach_guidance_lines(agent)}
     else
-      {:error, :not_found} ->
-        {:error,
-         "Run `controlkeel init` before attaching ControlKeel to #{display_attach_agent(agent)}."}
-
       {:error, reason} ->
         {:error,
          "Failed to attach ControlKeel to #{display_attach_agent(agent)}: #{inspect(reason)}"}
@@ -616,10 +637,11 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :status}, project_root) do
-    case LocalProject.load(project_root) do
-      {:ok, _binding, session} ->
+    case ensure_local_project(project_root) do
+      {:ok, _binding, session, _mode} ->
         metrics = Analytics.session_metrics(session.id) || %{}
         rolling_24h = Budget.rolling_24h_spend_cents(session.id)
+        provider_status = ProviderBroker.status(project_root)
 
         active_findings =
           Enum.count(session.findings, &(&1.status in ["open", "blocked", "escalated"]))
@@ -638,14 +660,14 @@ defmodule ControlKeel.CLI do
            "Time to first finding: #{format_duration(metrics[:time_to_first_finding_seconds])}",
            "Total findings: #{metrics[:total_findings] || 0}",
            "Blocked findings: #{metrics[:blocked_findings_total] || 0}",
+           "Bootstrap mode: #{provider_status["bootstrap"]["mode"]}",
+           "Provider source: #{provider_status["selected_source"]}",
+           "Provider: #{provider_status["selected_provider"]}",
            "OpenAI responses: #{Proxy.url(session, :openai, "/v1/responses")}",
            "OpenAI chat: #{Proxy.url(session, :openai, "/v1/chat/completions")}",
            "OpenAI realtime: #{Proxy.realtime_url(session, :openai, "/v1/realtime")}",
            "Anthropic messages: #{Proxy.url(session, :anthropic, "/v1/messages")}"
          ]}
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before checking status."}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -653,8 +675,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :findings, options: options}, project_root) do
-    case LocalProject.load(project_root) do
-      {:ok, _binding, session} ->
+    case ensure_local_project(project_root) do
+      {:ok, _binding, session, _mode} ->
         findings =
           Mission.list_session_findings(session.id, %{
             severity: options[:severity],
@@ -670,25 +692,19 @@ defmodule ControlKeel.CLI do
            end)}
         end
 
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before listing findings."}
-
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
     end
   end
 
   def run_command(%{command: :approve, args: [finding_id]}, project_root) do
-    with {:ok, _binding, session} <- LocalProject.load(project_root),
+    with {:ok, _binding, session, _mode} <- ensure_local_project(project_root),
          {:ok, parsed_id} <- parse_id(finding_id),
          finding when not is_nil(finding) <- Mission.get_finding(parsed_id),
          true <- finding.session_id == session.id || {:error, :wrong_session},
          {:ok, updated} <- Mission.approve_finding(finding) do
       {:ok, ["Approved finding ##{updated.id}: #{updated.title}"]}
     else
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before approving findings."}
-
       {:error, :wrong_session} ->
         {:error, "That finding does not belong to the current governed session."}
 
@@ -704,8 +720,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :proofs, options: options}, project_root) do
-    case LocalProject.load(project_root) do
-      {:ok, _binding, session} ->
+    case ensure_local_project(project_root) do
+      {:ok, _binding, session, _mode} ->
         browser =
           Mission.browse_proof_bundles(%{
             session_id: options[:session_id] || session.id,
@@ -723,9 +739,6 @@ defmodule ControlKeel.CLI do
              "##{proof.id} v#{proof.version} [#{proof.status}] #{proof.task.title} (risk #{proof.risk_score}, #{deploy})"
            end)}
         end
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before listing proofs."}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -1368,8 +1381,109 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(%{command: :provider_list, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    status = ProviderBroker.status(root)
+
+    {:ok,
+     [
+       "Project root: #{status["project_root"]}",
+       "Selected source: #{status["selected_source"]}",
+       "Selected provider: #{status["selected_provider"]}",
+       "Bootstrap mode: #{status["bootstrap"]["mode"]}",
+       "Profiles:"
+     ] ++
+       Enum.map(status["profiles"], fn profile ->
+         "  #{profile["provider"]}: configured=#{if(profile["configured"], do: "yes", else: "no")} env=#{if(profile["env_override"], do: "yes", else: "no")} default=#{if(profile["default"], do: "yes", else: "no")} model=#{profile["model"] || "n/a"}"
+       end)}
+  end
+
+  def run_command(%{command: :provider_show, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    status = ProviderBroker.status(root)
+
+    {:ok,
+     [
+       "Provider status for #{status["project_root"]}",
+       "Selected source: #{status["selected_source"]}",
+       "Selected provider: #{status["selected_provider"]}",
+       "Selected model: #{status["selected_model"] || "n/a"}",
+       "Reason: #{status["reason"]}",
+       "Fallback chain: #{Enum.join(status["fallback_chain"], " -> ")}"
+     ] ++
+       Enum.map(status["provider_chain"], fn resolution ->
+         "  #{resolution["source"]}: #{resolution["provider"]} (#{resolution["model"] || "default"})"
+       end)}
+  end
+
+  def run_command(%{command: :provider_doctor, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    doctor = ProviderBroker.doctor(root)
+    status = doctor["status"]
+
+    {:ok,
+     [
+       "Provider doctor for #{status["project_root"]}",
+       "Selected source: #{status["selected_source"]}",
+       "Selected provider: #{status["selected_provider"]}",
+       "Bootstrap mode: #{status["bootstrap"]["mode"]}"
+     ] ++ Enum.map(doctor["suggestions"], &"  #{&1}")}
+  end
+
+  def run_command(%{command: :provider_default, args: [source], options: options}, project_root) do
+    scope = options[:scope] || "user"
+    root = options[:project_root] || project_root
+
+    case ProviderBroker.set_default_source(source, scope: scope, project_root: root) do
+      {:ok, _config} ->
+        {:ok, ["Set default provider source to #{source} for #{scope} scope."]}
+
+      {:error, reason} ->
+        {:error, "Failed to set default provider source: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(
+        %{command: :provider_set_key, args: [provider], options: options},
+        _project_root
+      ) do
+    value = options[:value] || System.get_env("CONTROLKEEL_PROVIDER_KEY")
+
+    with {:ok, key} <- require_string_option(value, "value"),
+         {:ok, _config} <- ProviderBroker.set_key(provider, key) do
+      {:ok, ["Stored provider key for #{provider}."]}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option} or CONTROLKEEL_PROVIDER_KEY"}
+
+      {:error, reason} ->
+        {:error, "Failed to store provider key: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :bootstrap, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    overrides = %{"agent" => options[:agent] || "claude"}
+
+    case LocalProject.load_or_bootstrap(root, overrides,
+           ephemeral_ok: options[:ephemeral_ok] != false
+         ) do
+      {:ok, binding, session, mode} ->
+        {:ok,
+         [
+           "Bootstrapped ControlKeel for #{binding["project_root"]}",
+           "Session: #{session.title} (##{session.id})",
+           "Binding mode: #{mode}",
+           "Binding path: #{ProjectBinding.bootstrap_summary(root)["binding_path"]}"
+         ] ++ bootstrap_lines(root)}
+
+      {:error, reason} ->
+        {:error, "Failed to bootstrap ControlKeel: #{inspect(reason)}"}
+    end
+  end
+
   def run_command(%{command: :pause, args: [task_id]}, project_root) do
-    with {:ok, _binding, session} <- LocalProject.load(project_root),
+    with {:ok, _binding, session, _mode} <- ensure_local_project(project_root),
          {:ok, parsed_id} <- parse_id(task_id),
          task when not is_nil(task) <- Mission.get_task(parsed_id),
          true <- task.session_id == session.id || {:error, :wrong_session},
@@ -1380,9 +1494,6 @@ defmodule ControlKeel.CLI do
          Jason.encode!(packet, pretty: true)
        ]}
     else
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before pausing tasks."}
-
       {:error, :wrong_session} ->
         {:error, "That task does not belong to the current governed session."}
 
@@ -1401,7 +1512,7 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :resume, args: [task_id]}, project_root) do
-    with {:ok, _binding, session} <- LocalProject.load(project_root),
+    with {:ok, _binding, session, _mode} <- ensure_local_project(project_root),
          {:ok, parsed_id} <- parse_id(task_id),
          task when not is_nil(task) <- Mission.get_task(parsed_id),
          true <- task.session_id == session.id || {:error, :wrong_session},
@@ -1412,9 +1523,6 @@ defmodule ControlKeel.CLI do
          Jason.encode!(packet, pretty: true)
        ]}
     else
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before resuming tasks."}
-
       {:error, :wrong_session} ->
         {:error, "That task does not belong to the current governed session."}
 
@@ -1433,8 +1541,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :memory_search, args: [query], options: options}, project_root) do
-    case LocalProject.load(project_root) do
-      {:ok, _binding, session} ->
+    case ensure_local_project(project_root) do
+      {:ok, _binding, session, _mode} ->
         result =
           Memory.search(query, %{
             workspace_id: session.workspace_id,
@@ -1450,9 +1558,6 @@ defmodule ControlKeel.CLI do
              "[#{record.record_type}] #{record.title} (score #{Float.round(record.score, 2)})"
            end)}
         end
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before searching memory."}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -1583,6 +1688,7 @@ defmodule ControlKeel.CLI do
     root = options[:project_root] || project_root
     analysis = Skills.analyze(root)
     integrations = Skills.agent_integrations()
+    provider_status = ProviderBroker.status(root)
 
     native_first =
       integrations
@@ -1601,6 +1707,9 @@ defmodule ControlKeel.CLI do
        "Project root: #{Path.expand(root)}",
        "Trusted project skills: #{if(analysis.trusted_project?, do: "yes", else: "no")}",
        "Catalog size: #{length(analysis.skills)}",
+       "Provider source: #{provider_status["selected_source"]}",
+       "Provider: #{provider_status["selected_provider"]}",
+       "Bootstrap mode: #{provider_status["bootstrap"]["mode"]}",
        "Native-first agents: #{native_first}",
        "MCP + instructions agents: #{mcp_fallback}"
      ] ++
@@ -1612,16 +1721,13 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :watch, options: options}, project_root) do
     interval = Keyword.get(options, :interval, 2_000)
 
-    case LocalProject.load(project_root) do
-      {:ok, _binding, session} ->
+    case ensure_local_project(project_root) do
+      {:ok, _binding, session, _mode} ->
         IO.puts("")
         IO.puts("ControlKeel Watch — session ##{session.id}: #{session.title}")
         IO.puts("  Polling every #{interval}ms  ·  Ctrl+C to exit")
         IO.puts(String.duplicate("─", 60))
         watch_loop(session.id, MapSet.new(), interval)
-
-      {:error, :not_found} ->
-        {:error, "Run `controlkeel init` before watching."}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -1631,26 +1737,31 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :mcp, options: options}, project_root) do
     root = Path.expand(options[:project_root] || project_root)
 
-    File.cd!(root, fn ->
-      {:ok, pid} =
-        DynamicSupervisor.start_child(
-          ControlKeel.MCP.Supervisor,
-          {ControlKeel.MCP.Server, input: :stdio, output: :stdio}
-        )
+    with {:ok, _binding, _session, _mode} <- ensure_local_project(root) do
+      File.cd!(root, fn ->
+        {:ok, pid} =
+          DynamicSupervisor.start_child(
+            ControlKeel.MCP.Supervisor,
+            {ControlKeel.MCP.Server, input: :stdio, output: :stdio}
+          )
 
-      ref = Process.monitor(pid)
+        ref = Process.monitor(pid)
 
-      receive do
-        {:DOWN, ^ref, :process, _pid, :normal} ->
-          :ok
+        receive do
+          {:DOWN, ^ref, :process, _pid, :normal} ->
+            :ok
 
-        {:DOWN, ^ref, :process, _pid, :shutdown} ->
-          :ok
+          {:DOWN, ^ref, :process, _pid, :shutdown} ->
+            :ok
 
-        {:DOWN, ^ref, :process, _pid, reason} ->
-          {:error, "MCP server stopped: #{inspect(reason)}"}
-      end
-    end)
+          {:DOWN, ^ref, :process, _pid, reason} ->
+            {:error, "MCP server stopped: #{inspect(reason)}"}
+        end
+      end)
+    else
+      {:error, reason} ->
+        {:error, "Failed to bootstrap local project for MCP: #{inspect(reason)}"}
+    end
   end
 
   defp watch_loop(session_id, seen, interval) do
@@ -1784,6 +1895,26 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_provider_default(source, argv) do
+    case OptionParser.parse(argv, strict: @provider_default_switches) do
+      {options, [], []} ->
+        {:ok, %{command: :provider_default, options: options, args: [source]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
+  defp parse_provider_set_key(provider, argv) do
+    case OptionParser.parse(argv, strict: @provider_set_key_switches) do
+      {options, [], []} ->
+        {:ok, %{command: :provider_set_key, options: options, args: [provider]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
   defp standalone_wrapper_runtime? do
     System.get_env("__BURRITO") not in [nil, ""]
   end
@@ -1818,6 +1949,28 @@ defmodule ControlKeel.CLI do
   defp require_string_option("", option), do: {:error, {:missing_option, option}}
   defp require_string_option(value, _option), do: {:ok, to_string(value)}
 
+  defp ensure_local_project(project_root, overrides \\ %{}) do
+    LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: true)
+  end
+
+  defp binding_write_mode(binding) do
+    case get_in(binding, ["bootstrap", "mode"]) do
+      "ephemeral" -> :ephemeral
+      _ -> :project
+    end
+  end
+
+  defp bootstrap_lines(project_root) do
+    status = ProviderBroker.status(project_root)
+    bootstrap = status["bootstrap"]
+
+    [
+      "Bootstrap mode: #{bootstrap["mode"]}.",
+      "Provider source: #{status["selected_source"]}.",
+      "Provider: #{status["selected_provider"]}."
+    ]
+  end
+
   defp load_rules_payload(nil), do: {:ok, []}
 
   defp load_rules_payload(path) do
@@ -1849,6 +2002,8 @@ defmodule ControlKeel.CLI do
 
   defp format_active_artifact(nil), do: "heuristic"
   defp format_active_artifact(artifact), do: "v#{artifact.version} (##{artifact.id})"
+  defp format_provider_bridge(%{supported: true, provider: provider}), do: "#{provider} bridge"
+  defp format_provider_bridge(_bridge), do: "none"
 
   defp emit_attach_succeeded(binding, project_root, attached_agent) do
     :telemetry.execute(
@@ -1873,7 +2028,9 @@ defmodule ControlKeel.CLI do
         [
           "Companion target: #{integration.preferred_target}.",
           "Supported scope: #{Enum.join(integration.supported_scopes, ", ")}.",
-          "Required CK tools: #{Enum.join(integration.required_mcp_tools, ", ")}."
+          "Required CK tools: #{Enum.join(integration.required_mcp_tools, ", ")}.",
+          "Auto-bootstrap: #{if(integration.auto_bootstrap, do: "enabled", else: "disabled")}.",
+          "Provider bridge: #{format_provider_bridge(integration.provider_bridge)}."
         ] ++ Distribution.current_install_lines()
     end
   end
@@ -1955,14 +2112,14 @@ defmodule ControlKeel.CLI do
 
   # ─── IDE MCP attachment helpers ──────────────────────────────────────────────
 
-  defp attach_to_cursor(wrapper_path) do
+  defp attach_to_cursor(command_spec) do
     config_path = cursor_mcp_config_path()
-    write_ide_mcp_config(config_path, "controlkeel", wrapper_path, "cursor")
+    write_ide_mcp_config(config_path, "controlkeel", command_spec, "cursor")
   end
 
-  defp attach_to_windsurf(wrapper_path) do
+  defp attach_to_windsurf(command_spec) do
     config_path = windsurf_mcp_config_path()
-    write_ide_mcp_config(config_path, "controlkeel", wrapper_path, "windsurf")
+    write_ide_mcp_config(config_path, "controlkeel", command_spec, "windsurf")
   end
 
   defp cursor_mcp_config_path do
@@ -1999,7 +2156,10 @@ defmodule ControlKeel.CLI do
     Path.join([home, ".codeium", "windsurf", "mcp_config.json"])
   end
 
-  defp write_ide_mcp_config(config_path, server_name, command_path, ide_key) do
+  defp write_ide_mcp_config(config_path, server_name, command_spec, ide_key) do
+    command = command_spec[:command] || command_spec["command"]
+    args = command_spec[:args] || command_spec["args"] || []
+
     existing =
       case File.read(config_path) do
         {:ok, contents} -> Jason.decode(contents) |> elem(1)
@@ -2013,8 +2173,8 @@ defmodule ControlKeel.CLI do
         existing,
         "mcpServers",
         Map.put(mcpServers, server_name, %{
-          "command" => command_path,
-          "args" => []
+          "command" => command,
+          "args" => args
         })
       )
 
@@ -2025,7 +2185,8 @@ defmodule ControlKeel.CLI do
          "server_name" => server_name,
          "ide" => ide_key,
          "config_path" => config_path,
-         "command" => command_path,
+         "command" => command,
+         "args" => args,
          "attached_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
@@ -2083,7 +2244,10 @@ defmodule ControlKeel.CLI do
   end
 
   # Continue uses an array-based mcpServers format, unlike Cursor/Windsurf dict format
-  defp write_continue_mcp_config(config_path, server_name, command_path) do
+  defp write_continue_mcp_config(config_path, server_name, command_spec) do
+    command = command_spec[:command] || command_spec["command"]
+    args = command_spec[:args] || command_spec["args"] || []
+
     existing =
       case File.read(config_path) do
         {:ok, c} -> Jason.decode(c) |> elem(1)
@@ -2092,7 +2256,7 @@ defmodule ControlKeel.CLI do
 
     servers = Map.get(existing, "mcpServers", [])
     filtered = Enum.reject(servers, &(Map.get(&1, "name") == server_name))
-    new_entry = %{"name" => server_name, "command" => command_path, "args" => []}
+    new_entry = %{"name" => server_name, "command" => command, "args" => args}
     updated = Map.put(existing, "mcpServers", filtered ++ [new_entry])
 
     with :ok <- File.mkdir_p(Path.dirname(config_path)),
@@ -2102,7 +2266,8 @@ defmodule ControlKeel.CLI do
          "server_name" => server_name,
          "ide" => "continue",
          "config_path" => config_path,
-         "command" => command_path,
+         "command" => command,
+         "args" => args,
          "attached_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
@@ -2110,7 +2275,9 @@ defmodule ControlKeel.CLI do
   end
 
   # Aider uses a YAML config file (.aider.conf.yml) at the project root
-  defp attach_to_aider(wrapper_path, project_root) do
+  defp attach_to_aider(command_spec, project_root) do
+    command = command_spec[:command] || command_spec["command"]
+    args = command_spec[:args] || command_spec["args"] || []
     config_path = Path.join(project_root, ".aider.conf.yml")
 
     existing =
@@ -2127,7 +2294,13 @@ defmodule ControlKeel.CLI do
         ""
       )
 
-    entry = "\nmcpservers:\n  controlkeel:\n    command: #{wrapper_path}\n"
+    args_line =
+      case args do
+        [] -> ""
+        values -> "    args: [#{Enum.map_join(values, ", ", &~s(\"#{&1}\"))}]\n"
+      end
+
+    entry = "\nmcpservers:\n  controlkeel:\n    command: #{command}\n" <> args_line
 
     with :ok <- File.write(config_path, String.trim_trailing(cleaned) <> entry) do
       {:ok,
@@ -2135,7 +2308,8 @@ defmodule ControlKeel.CLI do
          "server_name" => "controlkeel",
          "ide" => "aider",
          "config_path" => config_path,
-         "command" => wrapper_path,
+         "command" => command,
+         "args" => args,
          "attached_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
@@ -2144,17 +2318,14 @@ defmodule ControlKeel.CLI do
 
   defp auto_attach_claude_code(project_root) do
     claude_dir = Path.join(user_home(), ".claude")
-    wrapper_path = ProjectBinding.mcp_wrapper_path(project_root)
+    command_spec = ProjectBinding.mcp_command_spec(project_root)
 
     cond do
       not File.dir?(claude_dir) ->
         {:skip, "claude-code not found on this system"}
 
-      not File.exists?(wrapper_path) ->
-        {:skip, "wrapper not yet written"}
-
       true ->
-        case ClaudeCLI.attach_local(project_root, wrapper_path) do
+        case ClaudeCLI.attach_local(project_root, command_spec.command, command_spec.args) do
           {:ok, result} ->
             _ = Skills.install("claude-standalone", project_root, scope: "user")
 

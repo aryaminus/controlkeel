@@ -83,7 +83,7 @@ defmodule ControlKeel.Skills.Registry do
       System.get_env("CONTROLKEEL_TRUST_PROJECT_SKILLS") in ~w(1 true TRUE yes YES) ->
         true
 
-      match?({:ok, _binding}, ProjectBinding.read(project_root)) ->
+      match?({:ok, _binding, _mode}, ProjectBinding.read_effective(project_root)) ->
         true
 
       true ->
@@ -244,7 +244,7 @@ defmodule ControlKeel.Skills.Registry do
         level: "warn",
         code: "project_skills_untrusted",
         message:
-          "Project-level skills were skipped because this project is not trusted by ControlKeel. Run `controlkeel init` or use an explicit trust override to load them.",
+          "Project-level skills were skipped because this project is not trusted by ControlKeel. Run `controlkeel bootstrap`, `controlkeel init`, or use an explicit trust override to load them.",
         path: Path.expand(project_root)
       }
     ]

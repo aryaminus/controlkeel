@@ -118,7 +118,7 @@ try {
   $env:DATABASE_PATH = Join-Path $tmpDir "controlkeel.db"
   $env:SECRET_KEY_BASE = "controlkeel-release-smoke-secret-0123456789abcdef0123456789abcdef0123456789abcdef"
 
-  Invoke-BinaryStep -Arguments @("init", "--no-attach") -WorkingDirectory $tmpDir | Out-Null
+  Invoke-BinaryStep -Arguments @("bootstrap") -WorkingDirectory $tmpDir | Out-Null
 
   if (-not (Test-Path (Join-Path $tmpDir "controlkeel/project.json"))) {
     throw "project binding missing"

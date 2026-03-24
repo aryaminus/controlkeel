@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.SkillsLive do
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.Skills
 
   @impl true
@@ -184,6 +185,29 @@ defmodule ControlKeelWeb.SkillsLive do
           </div>
         </div>
 
+        <div class="ck-card" style="margin: 1rem 0;" id="skills-provider-status">
+          <p class="ck-mini-label">Provider and bootstrap status</p>
+          <div class="ck-finding-list">
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Active provider</h3>
+                <span class="ck-pill ck-pill-neutral">{@provider_status["selected_source"]}</span>
+              </div>
+              <p class="ck-note">
+                Provider: {@provider_status["selected_provider"]} / {@provider_status[
+                  "selected_model"
+                ] || "default"}
+              </p>
+              <p class="ck-note" style="margin-top: 0.35rem;">
+                Bootstrap mode: {@provider_status["bootstrap"]["mode"]}
+              </p>
+              <p class="ck-note" style="margin-top: 0.35rem;">
+                Fallback chain: {Enum.join(@provider_status["fallback_chain"], ", ")}
+              </p>
+            </article>
+          </div>
+        </div>
+
         <div class="ck-grid ck-grid-dashboard">
           <div class="space-y-4">
             <div class="ck-card">
@@ -353,11 +377,17 @@ defmodule ControlKeelWeb.SkillsLive do
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Scope: {Enum.join(integration.supported_scopes, ", ")}
                           </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Auto-bootstrap: {if integration.auto_bootstrap, do: "yes", else: "no"}
+                          </p>
                         </td>
                         <td class="py-2 pr-4 align-top">
                           <p class="ck-note">{integration.config_location}</p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Required CK tools: {format_targets(integration.required_mcp_tools)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Provider bridge: {format_provider_bridge(integration.provider_bridge)}
                           </p>
                         </td>
                         <td class="py-2 pr-4 align-top">
@@ -439,6 +469,7 @@ defmodule ControlKeelWeb.SkillsLive do
 
   defp assign_analysis(socket, project_root) do
     analysis = Skills.analyze(project_root)
+    provider_status = ProviderBroker.status(project_root)
 
     socket
     |> assign(:project_root, project_root)
@@ -446,6 +477,7 @@ defmodule ControlKeelWeb.SkillsLive do
     |> assign(:diagnostics, analysis.diagnostics)
     |> assign(:targets, Skills.targets())
     |> assign(:trusted_project?, analysis.trusted_project?)
+    |> assign(:provider_status, provider_status)
   end
 
   defp project_form(project_root), do: to_form(%{"project_root" => project_root}, as: :project)
@@ -491,4 +523,7 @@ defmodule ControlKeelWeb.SkillsLive do
     do: "MCP attach plus generated instruction snippets"
 
   defp human_category(_), do: "Portable MCP fallback"
+
+  defp format_provider_bridge(%{supported: true, provider: provider}), do: "#{provider} bridge"
+  defp format_provider_bridge(_bridge), do: "none"
 end

@@ -6,8 +6,8 @@ defmodule ControlKeel.Intent.Providers.Ollama do
   alias ControlKeel.Intent
   alias ControlKeel.Intent.ExecutionBrief
 
-  def compile(prompt, _opts) do
-    config = provider_config()
+  def compile(prompt, opts) do
+    config = provider_config(opts)
 
     with {:ok, response} <- request(prompt, config),
          {:ok, payload} <- Jason.decode(response.body),
@@ -42,9 +42,18 @@ defmodule ControlKeel.Intent.Providers.Ollama do
 
   defp extract_content(_payload), do: {:error, :invalid_response}
 
-  defp provider_config do
-    Application.get_env(:controlkeel, Intent, [])[:providers][:ollama]
+  defp provider_config(opts) do
+    base =
+      normalize_opts(Application.get_env(:controlkeel, Intent, [])[:providers][:ollama] || [])
+
+    override = normalize_opts(opts[:provider_config])
+    Keyword.merge(base, override)
   end
+
+  defp normalize_opts(nil), do: []
+  defp normalize_opts(value) when is_list(value), do: value
+  defp normalize_opts(value) when is_map(value), do: Enum.into(value, [])
+  defp normalize_opts(_value), do: []
 
   defp normalize_response({:ok, %Req.Response{status: status} = response})
        when status in 200..299,

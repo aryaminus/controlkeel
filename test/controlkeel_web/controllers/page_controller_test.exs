@@ -20,7 +20,8 @@ defmodule ControlKeelWeb.PageControllerTest do
     body = html_response(conn, 200)
 
     assert body =~ "Go from install to first finding in five minutes"
-    assert body =~ "controlkeel init"
+    assert body =~ "controlkeel attach claude-code"
+    assert body =~ "controlkeel bootstrap"
     assert body =~ "controlkeel attach codex-cli"
   end
 end

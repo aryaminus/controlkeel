@@ -5,10 +5,12 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.Distribution
+  alias ControlKeel.LocalProject
   alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
   alias ControlKeel.Scanner.FastPath
   alias ControlKeel.Skills
@@ -843,6 +845,59 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  # ─── Providers and Bootstrap ────────────────────────────────────────────────
+
+  def list_providers(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    status = ProviderBroker.status(project_root)
+
+    json(conn, %{
+      project_root: status["project_root"],
+      selected_source: status["selected_source"],
+      selected_provider: status["selected_provider"],
+      profiles: status["profiles"],
+      attached_agents: status["attached_agents"]
+    })
+  end
+
+  def provider_status(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    json(conn, %{status: ProviderBroker.status(project_root)})
+  end
+
+  def set_default_provider(conn, params) do
+    source = Map.get(params, "source")
+    scope = Map.get(params, "scope", "user")
+    project_root = Map.get(params, "project_root", File.cwd!())
+
+    case ProviderBroker.set_default_source(source, scope: scope, project_root: project_root) do
+      {:ok, _config} ->
+        json(conn, %{status: ProviderBroker.status(project_root)})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def bootstrap_project(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    overrides = Map.take(params, ~w(agent))
+    ephemeral_ok? = Map.get(params, "ephemeral_ok", true)
+
+    case LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: ephemeral_ok?) do
+      {:ok, binding, session, mode} ->
+        json(conn, %{
+          binding: binding,
+          session: session_summary(session),
+          mode: mode,
+          provider_status: ProviderBroker.status(project_root)
+        })
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
   # ─── Skills ───────────────────────────────────────────────────────────────────
 
   def list_skills(conn, params) do
@@ -924,7 +979,8 @@ defmodule ControlKeelWeb.ApiController do
     json(conn, %{
       targets: Enum.map(Skills.targets(), &skill_target_summary/1),
       agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1),
-      installation_channels: Distribution.install_channels()
+      installation_channels: Distribution.install_channels(),
+      provider_status: ProviderBroker.status(File.cwd!())
     })
   end
 
@@ -1028,6 +1084,8 @@ defmodule ControlKeelWeb.ApiController do
       default_scope: integration.default_scope,
       supported_scopes: integration.supported_scopes,
       router_agent_id: integration.router_agent_id,
+      auto_bootstrap: integration.auto_bootstrap,
+      provider_bridge: integration.provider_bridge,
       required_mcp_tools: integration.required_mcp_tools,
       install_channels: ControlKeel.AgentIntegration.install_channels(integration.id),
       export_targets: integration.export_targets

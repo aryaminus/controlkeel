@@ -4,6 +4,7 @@ defmodule Mix.Tasks.Ck.Watch do
   alias ControlKeel.Budget
   alias ControlKeel.LocalProject
   alias ControlKeel.Mission
+  alias ControlKeel.ProjectBinding
 
   @shortdoc "Stream real-time findings and budget for the current governed session"
 
@@ -32,21 +33,21 @@ defmodule Mix.Tasks.Ck.Watch do
 
     project_root = File.cwd!()
 
-    case LocalProject.load(project_root) do
-      {:ok, _binding, session} ->
+    case LocalProject.load_or_bootstrap(project_root, %{}, ephemeral_ok: true) do
+      {:ok, _binding, session, _mode} ->
         shell = Mix.shell()
+        bootstrap = ProjectBinding.bootstrap_summary(project_root)
+
         shell.info("")
         shell.info("ControlKeel Watch — session ##{session.id}: #{session.title}")
         shell.info("  Polling every #{interval}ms  ·  Ctrl+C to exit")
+        shell.info("  Bootstrap mode: #{bootstrap["mode"]}")
         shell.info(String.duplicate("─", 60))
 
         watch_loop(session.id, MapSet.new(), interval, shell)
 
-      {:error, :not_found} ->
-        Mix.raise("No governed session found. Run `mix ck.init` first.")
-
       {:error, reason} ->
-        Mix.raise("Failed to load local project: #{inspect(reason)}")
+        Mix.raise("Failed to load or bootstrap local project: #{inspect(reason)}")
     end
   end
 

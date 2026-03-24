@@ -148,6 +148,57 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert File.exists?(cursor_config_path())
   end
 
+  test "bootstrap and provider commands work without manual init", %{tmp_dir: tmp_dir} do
+    assert {:ok, provider_list} = CLI.parse(["provider", "list", "--project-root", tmp_dir])
+
+    provider_list_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(provider_list, project_root: tmp_dir)
+      end)
+
+    assert provider_list_output =~ "Selected source: heuristic"
+
+    assert {:ok, set_key} =
+             CLI.parse(["provider", "set-key", "openai", "--value", "sk-cli-openai"])
+
+    assert {:ok, provider_default} =
+             CLI.parse(["provider", "default", "openai", "--project-root", tmp_dir])
+
+    assert 0 == CLI.execute(set_key, project_root: tmp_dir)
+    assert 0 == CLI.execute(provider_default, project_root: tmp_dir)
+
+    assert {:ok, provider_show} = CLI.parse(["provider", "show", "--project-root", tmp_dir])
+
+    provider_show_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(provider_show, project_root: tmp_dir)
+      end)
+
+    assert provider_show_output =~ "Selected source: user_default_profile"
+    assert provider_show_output =~ "Selected provider: openai"
+
+    assert {:ok, attach} = CLI.parse(["attach", "cursor"])
+
+    attach_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(attach, project_root: tmp_dir)
+      end)
+
+    assert attach_output =~ "Bootstrap mode: project."
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/project.json"))
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/instructions-only/AGENTS.md"))
+
+    assert {:ok, bootstrap} = CLI.parse(["bootstrap", "--project-root", tmp_dir])
+
+    bootstrap_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(bootstrap, project_root: tmp_dir)
+      end)
+
+    assert bootstrap_output =~ "Bootstrapped ControlKeel"
+    assert bootstrap_output =~ "Binding mode: existing"
+  end
+
   test "runtime proofs, pause, resume, and memory search operate on the bound session", %{
     tmp_dir: tmp_dir
   } do

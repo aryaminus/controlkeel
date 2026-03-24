@@ -742,6 +742,65 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  describe "provider and bootstrap endpoints" do
+    test "GET /api/v1/providers/status reports heuristic fallback by default", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("provider-status")
+      home_dir = Path.join(tmp_dir, "home")
+      File.mkdir_p!(home_dir)
+      restore = set_provider_home(home_dir)
+
+      on_exit(fn ->
+        restore.()
+        File.rm_rf!(tmp_dir)
+      end)
+
+      conn = get(conn, ~p"/api/v1/providers/status?project_root=#{tmp_dir}")
+      body = json_response(conn, 200)
+
+      assert body["status"]["selected_source"] == "heuristic"
+      assert body["status"]["selected_provider"] == "heuristic"
+      assert body["status"]["bootstrap"]["mode"] == "none"
+    end
+
+    test "POST /api/v1/providers/default and /bootstrap persist provider choice and auto-bootstrap",
+         %{conn: conn} do
+      tmp_dir = provider_tmp_dir("provider-bootstrap")
+      home_dir = Path.join(tmp_dir, "home")
+      project_root = Path.join(tmp_dir, "project")
+
+      File.mkdir_p!(home_dir)
+      File.mkdir_p!(project_root)
+
+      restore = set_provider_home(home_dir)
+
+      on_exit(fn ->
+        restore.()
+        File.rm_rf!(tmp_dir)
+      end)
+
+      conn =
+        post(conn, ~p"/api/v1/providers/default", %{
+          source: "openai",
+          project_root: project_root
+        })
+
+      assert %{"status" => %{"selected_source" => "heuristic"}} = json_response(conn, 200)
+
+      conn =
+        post(build_conn(), ~p"/api/v1/bootstrap", %{
+          project_root: project_root,
+          agent: "codex"
+        })
+
+      body = json_response(conn, 200)
+
+      assert body["mode"] == "bootstrapped_project"
+      assert body["binding"]["bootstrap"]["mode"] == "project"
+      assert body["provider_status"]["bootstrap"]["mode"] == "project"
+      assert File.exists?(Path.join(project_root, "controlkeel/project.json"))
+    end
+  end
+
   # ─── Route Agent ─────────────────────────────────────────────────────────────
 
   describe "POST /api/v1/route-agent" do
@@ -808,4 +867,32 @@ defmodule ControlKeelWeb.ApiControllerTest do
     File.mkdir_p!(path)
     path
   end
+
+  defp provider_tmp_dir(suffix) do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-api-#{suffix}-#{System.unique_integer([:positive])}"
+      )
+
+    File.rm_rf!(path)
+    File.mkdir_p!(path)
+    path
+  end
+
+  defp set_provider_home(home_dir) do
+    previous_home = System.get_env("HOME")
+    previous_ck_home = System.get_env("CONTROLKEEL_HOME")
+
+    System.put_env("HOME", home_dir)
+    System.put_env("CONTROLKEEL_HOME", home_dir)
+
+    fn ->
+      restore_env("HOME", previous_home)
+      restore_env("CONTROLKEEL_HOME", previous_ck_home)
+    end
+  end
+
+  defp restore_env(key, nil), do: System.delete_env(key)
+  defp restore_env(key, value), do: System.put_env(key, value)
 end

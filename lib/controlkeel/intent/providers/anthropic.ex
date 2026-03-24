@@ -6,8 +6,8 @@ defmodule ControlKeel.Intent.Providers.Anthropic do
   alias ControlKeel.Intent
   alias ControlKeel.Intent.ExecutionBrief
 
-  def compile(prompt, _opts) do
-    config = provider_config()
+  def compile(prompt, opts) do
+    config = provider_config(opts)
 
     with {:ok, api_key} <- require_api_key(config),
          {:ok, response} <- request(prompt, api_key, config),
@@ -54,9 +54,18 @@ defmodule ControlKeel.Intent.Providers.Anthropic do
 
   defp extract_tool_input(_payload), do: {:error, :invalid_response}
 
-  defp provider_config do
-    Application.get_env(:controlkeel, Intent, [])[:providers][:anthropic]
+  defp provider_config(opts) do
+    base =
+      normalize_opts(Application.get_env(:controlkeel, Intent, [])[:providers][:anthropic] || [])
+
+    override = normalize_opts(opts[:provider_config])
+    Keyword.merge(base, override)
   end
+
+  defp normalize_opts(nil), do: []
+  defp normalize_opts(value) when is_list(value), do: value
+  defp normalize_opts(value) when is_map(value), do: Enum.into(value, [])
+  defp normalize_opts(_value), do: []
 
   defp require_api_key(config) do
     case config[:api_key] do

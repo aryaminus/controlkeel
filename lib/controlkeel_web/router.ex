@@ -54,6 +54,10 @@ defmodule ControlKeelWeb.Router do
     post "/workspaces/:id/webhooks", ApiController, :create_webhook
     post "/service-accounts/:id/rotate", ApiController, :rotate_service_account
     post "/webhooks/:id/replay", ApiController, :replay_webhook
+    get "/providers", ApiController, :list_providers
+    get "/providers/status", ApiController, :provider_status
+    post "/providers/default", ApiController, :set_default_provider
+    post "/bootstrap", ApiController, :bootstrap_project
     post "/sessions/:session_id/tasks", ApiController, :create_task
     patch "/tasks/:id", ApiController, :update_task
     post "/tasks/:id/complete", ApiController, :complete_task

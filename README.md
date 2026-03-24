@@ -37,12 +37,16 @@ GitHub Packages is also published for the npm bootstrap installer. Local auth to
 # 1. Start the local app
 controlkeel
 
-# 2. Initialize a governed project
+# 2. Change into the project you want to govern
 cd /path/to/your/project
-controlkeel init
 
 # 3. Attach your preferred client
+#    ControlKeel will auto-bootstrap on first use.
 controlkeel attach claude-code
+
+# Optional explicit bootstrap / init
+controlkeel bootstrap
+controlkeel init
 
 # 4. Trigger a known-bad change and inspect the result
 controlkeel findings
@@ -58,9 +62,11 @@ mix setup
 mix phx.server
 
 # In the governed project
-mix ck.init
 mix ck.attach claude-code
 mix ck.findings
+
+# Optional explicit bootstrap / init
+mix ck.init
 ```
 
 More walkthroughs:
@@ -112,6 +118,29 @@ Attach flags:
 - `--mcp-only` disables all native companion generation
 - `--no-native` keeps the MCP registration but skips native installs
 - `--scope user|project` selects the install location when the target supports both
+
+## Provider access and no-key mode
+
+ControlKeel resolves model access in this order:
+
+1. agent bridge when the attached client exposes a compatible provider environment
+2. workspace or service-account profile
+3. user default provider profile
+4. project override
+5. local Ollama
+6. heuristic / no-LLM fallback
+
+Configure provider profiles with:
+
+```bash
+controlkeel provider list
+controlkeel provider show
+controlkeel provider set-key openai --value "$OPENAI_API_KEY"
+controlkeel provider default openai
+controlkeel provider doctor
+```
+
+If no keys and no local model are available, ControlKeel still runs governance, MCP, proofs, skills, and benchmark flows in degraded mode. Only true model-backed features fall back to heuristics or return explicit capability guidance.
 
 ## Skills, plugins, and exports
 
@@ -178,8 +207,10 @@ Tagged releases also publish:
 controlkeel
 controlkeel serve
 controlkeel init [options]
+controlkeel bootstrap [--project-root /abs/path] [--ephemeral-ok]
 controlkeel attach <agent>
 controlkeel status
+controlkeel provider list|show|default|set-key|doctor
 controlkeel findings [--severity high] [--status open]
 controlkeel approve <finding-id>
 controlkeel proofs [--session-id ...] [--task-id ...]

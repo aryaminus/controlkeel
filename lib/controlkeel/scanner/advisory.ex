@@ -7,7 +7,7 @@ defmodule ControlKeel.Scanner.Advisory do
   timeout or LLM errors — it never blocks a scan result.
   """
 
-  alias ControlKeel.Intent
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.Scanner.Finding
 
   @timeout_ms 8_000
@@ -21,11 +21,12 @@ defmodule ControlKeel.Scanner.Advisory do
   """
   def scan(input, existing_findings, opts \\ []) do
     content = input["content"] || ""
+    project_root = Keyword.get(opts, :project_root, File.cwd!())
 
     if enabled?() and String.length(content) > 30 do
       timeout = Keyword.get(opts, :timeout_ms, @timeout_ms)
 
-      case call_provider(input, existing_findings, timeout) do
+      case call_provider(input, existing_findings, timeout, project_root) do
         {:ok, findings} ->
           emit_telemetry(:ok, length(findings))
           findings
@@ -41,18 +42,19 @@ defmodule ControlKeel.Scanner.Advisory do
 
   # ─── Provider dispatch ───────────────────────────────────────────────────────
 
-  defp call_provider(input, existing_findings, timeout) do
-    providers = configured_providers()
+  defp call_provider(input, existing_findings, timeout, project_root) do
+    providers = configured_providers(project_root)
 
-    Enum.reduce_while(providers, {:error, :no_provider}, fn {name, config}, _acc ->
-      case call(name, config, input, existing_findings, timeout) do
+    Enum.reduce_while(providers, {:error, :no_provider}, fn resolution, _acc ->
+      case call(resolution, input, existing_findings, timeout) do
         {:ok, _} = ok -> {:halt, ok}
         {:error, _} -> {:cont, {:error, :all_providers_failed}}
       end
     end)
   end
 
-  defp call(:anthropic, config, input, existing_findings, timeout) do
+  defp call(%{provider: "anthropic", config: config}, input, existing_findings, timeout) do
+    config = normalize_config(config)
     prompt = build_prompt(input, existing_findings)
 
     with {:ok, api_key} <- require_key(config),
@@ -78,7 +80,8 @@ defmodule ControlKeel.Scanner.Advisory do
     end
   end
 
-  defp call(:openai, config, input, existing_findings, timeout) do
+  defp call(%{provider: "openai", config: config}, input, existing_findings, timeout) do
+    config = normalize_config(config)
     prompt = build_prompt(input, existing_findings)
 
     with {:ok, api_key} <- require_key(config),
@@ -105,6 +108,8 @@ defmodule ControlKeel.Scanner.Advisory do
       parse_findings(text, input)
     end
   end
+
+  defp call(_resolution, _input, _existing_findings, _timeout), do: {:error, :unavailable}
 
   # ─── Prompt ──────────────────────────────────────────────────────────────────
 
@@ -236,14 +241,8 @@ defmodule ControlKeel.Scanner.Advisory do
 
   # ─── Provider config ─────────────────────────────────────────────────────────
 
-  defp configured_providers do
-    providers = Application.get_env(:controlkeel, Intent, [])[:providers] || %{}
-
-    [:anthropic, :openai]
-    |> Enum.map(fn name -> {name, Map.get(providers, name)} end)
-    |> Enum.reject(fn {_name, config} ->
-      is_nil(config) or config[:api_key] in [nil, ""]
-    end)
+  defp configured_providers(project_root) do
+    ProviderBroker.advisory_chain(project_root)
   end
 
   defp enabled? do
@@ -254,9 +253,13 @@ defmodule ControlKeel.Scanner.Advisory do
       explicit == false -> false
       explicit == true -> true
       # Default: enable when a provider key is present
-      true -> configured_providers() != []
+      true -> configured_providers(File.cwd!()) != []
     end
   end
+
+  defp normalize_config(config) when is_list(config), do: config
+  defp normalize_config(config) when is_map(config), do: Enum.into(config, [])
+  defp normalize_config(_config), do: []
 
   defp require_key(%{api_key: key}) when is_binary(key) and key != "", do: {:ok, key}
   defp require_key(_), do: {:error, :skip}

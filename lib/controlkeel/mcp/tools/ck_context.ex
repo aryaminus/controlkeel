@@ -5,6 +5,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Mission.{Finding, Session}
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
   import Ecto.Query, warn: false
 
@@ -13,6 +14,8 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          {:ok, task_id} <- optional_integer(arguments, "task_id"),
          {:ok, session} <- fetch_session(session_id),
          {:ok, task} <- resolve_task(session, task_id) do
+      provider_status = ProviderBroker.status(File.cwd!())
+
       {:ok,
        %{
          "session_id" => session.id,
@@ -25,7 +28,14 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "past_patterns" => past_patterns(session),
          "proof_summary" => Mission.proof_summary_for_task(task),
          "memory_hits" => memory_hits(session, task),
-         "resume_packet" => resume_packet(task)
+         "resume_packet" => resume_packet(task),
+         "provider_status" => %{
+           "source" => provider_status["selected_source"],
+           "provider" => provider_status["selected_provider"],
+           "model" => provider_status["selected_model"],
+           "fallback_chain" => provider_status["fallback_chain"]
+         },
+         "bootstrap_status" => provider_status["bootstrap"]
        }}
     end
   end

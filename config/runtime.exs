@@ -69,7 +69,7 @@ end
 
 config :controlkeel, ControlKeel.Intent,
   default_provider: System.get_env("CONTROLKEEL_INTENT_DEFAULT_PROVIDER"),
-  dev_fallback: System.get_env("CONTROLKEEL_INTENT_DEV_FALLBACK", "false") == "true",
+  dev_fallback: System.get_env("CONTROLKEEL_INTENT_DEV_FALLBACK", "true") == "true",
   providers: %{
     anthropic: %{
       api_key: System.get_env("ANTHROPIC_API_KEY"),

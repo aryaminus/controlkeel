@@ -19,39 +19,56 @@ mix phx.server
 
 The web app will be available at `http://localhost:4000`.
 
-## 2. Initialize a target project
+## 2. Attach a target project
 
-Change into the project you want to govern and run:
+Change into the project you want to govern and attach an agent:
 
 ```bash
+controlkeel attach claude-code
+```
+
+ControlKeel will auto-bootstrap the governed project binding on first use. If you want to do that step explicitly instead, run:
+
+```bash
+controlkeel bootstrap
 controlkeel init
 ```
 
 Source wrapper:
 
 ```bash
+mix ck.attach claude-code
 mix ck.init
 ```
 
-This writes:
+Bootstrap or init writes:
 
 - `controlkeel/project.json`
 - `controlkeel/bin/controlkeel-mcp`
 - `/controlkeel` in `.gitignore`
 
-## 3. Attach an agent
-
-```bash
-controlkeel attach claude-code
-```
-
-Source wrapper:
-
-```bash
-mix ck.attach claude-code
-```
-
 ControlKeel registers a local MCP server using the generated project-local wrapper so the attached client can call back into the governed runtime.
+
+## 3. Configure provider access if needed
+
+ControlKeel resolves providers in this order:
+
+1. attached agent bridge when supported
+2. workspace or service-account profile
+3. user default profile
+4. project override
+5. local Ollama
+6. heuristic fallback
+
+If you need a CK-owned provider profile:
+
+```bash
+controlkeel provider set-key openai --value "$OPENAI_API_KEY"
+controlkeel provider default openai
+controlkeel provider doctor
+```
+
+If you do not have keys and are not running a local model, ControlKeel still works for MCP, governance, proofs, skills, and benchmarks. Model-backed features degrade cleanly to heuristics.
 
 Other supported attach commands:
 

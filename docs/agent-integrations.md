@@ -22,6 +22,7 @@ The GitHub Packages npm path is for the bootstrap installer only and requires a 
 ## Native-first agents
 
 These clients get MCP plus a native companion install by default when you run `controlkeel attach ...`.
+On a clean repo, `attach` also auto-bootstraps the governed project binding by default.
 
 | Agent | Attach command | Native companion | Exportable bundles |
 |---|---|---|---|
@@ -50,6 +51,24 @@ Attach flag behavior:
 - `--mcp-only` keeps attachment to MCP only
 - `--no-native` skips native skills or bundle generation
 - `--scope user|project` applies to targets that support both install locations
+
+## Provider access
+
+ControlKeel does not assume it can use an opaque agent subscription. Provider access resolves in this order:
+
+1. supported agent bridge
+2. workspace or service-account profile
+3. user default provider profile
+4. project override
+5. local Ollama
+6. heuristic fallback
+
+Today, the documented bridge path is environment-based for supported clients:
+
+- Claude Code -> Anthropic-compatible environment
+- Codex CLI -> OpenAI-compatible environment
+
+If no bridge, CK-owned profile, or local model is available, agents can still use ControlKeel for governance, MCP tools, proofs, skills, and benchmarks without human setup. Model-backed features fall back to heuristics or return explicit capability guidance.
 
 ## Skills and plugin commands
 

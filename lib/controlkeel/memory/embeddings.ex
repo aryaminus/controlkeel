@@ -4,6 +4,7 @@ defmodule ControlKeel.Memory.Embeddings do
   alias ControlKeel.Memory.Embedding
   alias ControlKeel.Memory.Record
   alias ControlKeel.Memory.Providers.{Ollama, OpenAI, OpenRouter}
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
 
   def embed(text, opts \\ []) when is_binary(text) do
@@ -59,24 +60,36 @@ defmodule ControlKeel.Memory.Embeddings do
         override
 
       true ->
-        provider_env =
-          opts[:provider] ||
-            System.get_env("CONTROLKEEL_EMBEDDINGS_PROVIDER") ||
-            Application.get_env(:controlkeel, :memory_embeddings_provider)
+        project_root = opts[:project_root] || File.cwd!()
+        provider_env = opts[:provider] || System.get_env("CONTROLKEEL_EMBEDDINGS_PROVIDER")
 
         base =
           case provider_env do
-            nil -> configured_providers()
-            "none" -> []
-            value when is_binary(value) -> [String.to_existing_atom(value)]
-            value when is_atom(value) -> [value]
-            _value -> configured_providers()
+            nil ->
+              configured_providers(project_root)
+
+            "none" ->
+              []
+
+            value when is_binary(value) ->
+              [resolved_provider(value, project_root, opts)]
+
+            value when is_atom(value) ->
+              [resolved_provider(Atom.to_string(value), project_root, opts)]
+
+            _value ->
+              configured_providers(project_root)
           end
 
-        Enum.uniq(base)
+        base
+        |> Enum.reject(&is_nil/1)
+        |> Enum.uniq_by(fn
+          %{provider: provider} -> provider
+          other -> other
+        end)
     end
   rescue
-    ArgumentError -> configured_providers()
+    ArgumentError -> configured_providers(File.cwd!())
   end
 
   defp provider_embed({module, provider_opts}, text, _opts)
@@ -84,27 +97,29 @@ defmodule ControlKeel.Memory.Embeddings do
     apply(module, :embed, [text, provider_opts])
   end
 
+  defp provider_embed(%{provider: "ollama", config: config}, text, _opts),
+    do: Ollama.embed(text, normalize_config(config))
+
+  defp provider_embed(%{provider: "openai", config: config}, text, _opts),
+    do: OpenAI.embed(text, normalize_config(config))
+
+  defp provider_embed(%{provider: "openrouter", config: config}, text, _opts),
+    do: OpenRouter.embed(text, normalize_config(config))
+
   defp provider_embed(:ollama, text, opts), do: Ollama.embed(text, opts)
   defp provider_embed(:openai, text, opts), do: OpenAI.embed(text, opts)
   defp provider_embed(:openrouter, text, opts), do: OpenRouter.embed(text, opts)
   defp provider_embed(_provider, _text, _opts), do: {:error, :unavailable}
 
-  defp configured_providers do
-    []
-    |> maybe_add_provider(:ollama, ollama_configured?())
-    |> maybe_add_provider(:openai, present?(System.get_env("OPENAI_API_KEY")))
-    |> maybe_add_provider(:openrouter, present?(System.get_env("OPENROUTER_API_KEY")))
+  defp configured_providers(project_root) do
+    ProviderBroker.embeddings_chain(project_root)
   end
 
-  defp ollama_configured? do
-    present?(System.get_env("CONTROLKEEL_OLLAMA_BASE_URL")) or
-      present?(System.get_env("OLLAMA_HOST")) or
-      Application.get_env(:controlkeel, :memory_embeddings_provider) == :ollama
+  defp resolved_provider(provider, project_root, opts) do
+    ProviderBroker.resolve_provider(provider, project_root, opts)
   end
 
-  defp maybe_add_provider(providers, provider, true), do: providers ++ [provider]
-  defp maybe_add_provider(providers, _provider, false), do: providers
-
-  defp present?(value) when is_binary(value), do: String.trim(value) != ""
-  defp present?(_value), do: false
+  defp normalize_config(config) when is_list(config), do: config
+  defp normalize_config(config) when is_map(config), do: Enum.into(config, [])
+  defp normalize_config(_config), do: []
 end
