@@ -21,10 +21,10 @@ The web app will be available at `http://localhost:4000`.
 
 ## 2. Attach a target project
 
-Change into the project you want to govern and attach an agent:
+Change into the project you want to govern and attach an agent. If you want the fastest first-run path today, OpenCode is now a blessed target:
 
 ```bash
-controlkeel attach claude-code
+controlkeel attach opencode
 ```
 
 ControlKeel will auto-bootstrap the governed project binding on first use. If you want to do that step explicitly instead, run:
@@ -37,7 +37,7 @@ controlkeel init
 Source wrapper:
 
 ```bash
-mix ck.attach claude-code
+mix ck.attach opencode
 mix ck.init
 ```
 
@@ -48,6 +48,11 @@ Bootstrap or init writes:
 - `/controlkeel` in `.gitignore`
 
 ControlKeel registers a local MCP server using the generated project-local wrapper so the attached client can call back into the governed runtime.
+
+Important setup rule:
+
+- agent install scope can be user/global for some clients
+- governed project binding stays project-local by design so each repo keeps its own proofs, policy context, and MCP wrapper
 
 ## 3. Configure provider access if needed
 
@@ -60,6 +65,13 @@ ControlKeel resolves providers in this order:
 5. local Ollama
 6. heuristic fallback
 
+You do not always need a separate ControlKeel API key. ControlKeel can work in four useful modes:
+
+1. attached agent bridge when the client exposes a compatible provider environment
+2. CK-owned provider profile stored by ControlKeel
+3. local Ollama model
+4. heuristic / no-LLM mode
+
 If you need a CK-owned provider profile:
 
 ```bash
@@ -68,10 +80,18 @@ controlkeel provider default openai
 controlkeel provider doctor
 ```
 
-If you do not have keys and are not running a local model, ControlKeel still works for MCP, governance, proofs, skills, and benchmarks. Model-backed features degrade cleanly to heuristics.
+If you do not have keys and are not running a local model, ControlKeel still works for:
+
+- MCP tools and governed attachments
+- governance and findings
+- proof bundles and audit trail
+- skills and benchmark flows
+
+In that mode, model-backed features such as advisory review and intent compilation either degrade to heuristics or return explicit capability guidance.
 
 Other supported attach commands:
 
+- `controlkeel attach claude-code`
 - `controlkeel attach codex-cli`
 - `controlkeel attach vscode`
 - `controlkeel attach copilot`
@@ -82,9 +102,26 @@ Other supported attach commands:
 
 For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) or open `/skills` in the local app.
 
+## 3a. OpenCode quick path
+
+For OpenCode specifically:
+
+```bash
+controlkeel attach opencode
+controlkeel status
+```
+
+This writes the MCP configuration into the OpenCode config location and also generates the portable instruction bundle ControlKeel uses for MCP-plus-instructions targets.
+
+OpenCode does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options are:
+
+- keep using heuristic mode for governance-only flows
+- add a CK-owned provider profile
+- point ControlKeel at a local Ollama model
+
 ## 4. Trigger a first finding
 
-Use the sample in [demo-script.md](demo-script.md) or ask Claude Code to add one of these failure patterns:
+Use the sample in [demo-script.md](demo-script.md) or ask OpenCode to add one of these failure patterns:
 
 - a hardcoded API key or credential
 - SQL assembled with string concatenation

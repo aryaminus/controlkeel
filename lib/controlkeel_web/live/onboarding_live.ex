@@ -3,11 +3,13 @@ defmodule ControlKeelWeb.OnboardingLive do
 
   alias ControlKeel.Intent
   alias ControlKeel.Mission
+  alias ControlKeel.ProviderBroker
 
   @impl true
   def mount(_params, _session, socket) do
     occupation = default_occupation()
     attrs = default_attrs(occupation)
+    provider_status = ProviderBroker.status()
 
     {:ok,
      socket
@@ -18,6 +20,7 @@ defmodule ControlKeelWeb.OnboardingLive do
      |> assign(:attrs, attrs)
      |> assign(:interview_questions, Intent.interview_questions(occupation))
      |> assign(:preflight, Intent.preflight_context(attrs))
+     |> assign(:provider_status, provider_status)
      |> assign(:errors, %{})
      |> assign(:compile_error, nil)
      |> assign(:compiled_brief, nil)
@@ -279,6 +282,10 @@ defmodule ControlKeelWeb.OnboardingLive do
                           {compiler["provider"]} / {compiler["model"]}
                         </p>
                       </div>
+                      <div>
+                        <h3>Provider mode</h3>
+                        <p class="ck-note">{provider_mode_label(@provider_status)}</p>
+                      </div>
                     </div>
 
                     <div class="ck-grid ck-grid-dashboard">
@@ -350,6 +357,70 @@ defmodule ControlKeelWeb.OnboardingLive do
             <div>
               <h3>Stack guidance</h3>
               <p class="ck-note">{@preflight.stack_guidance}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="ck-card">
+          <p class="ck-mini-label">Provider and autonomy status</p>
+          <div class="ck-brief-grid">
+            <div>
+              <h3>Current mode</h3>
+              <p class="ck-note">{provider_mode_label(@provider_status)}</p>
+            </div>
+            <div>
+              <h3>Current provider</h3>
+              <p class="ck-note">{provider_name(@provider_status)}</p>
+            </div>
+            <div>
+              <h3>Setup scope</h3>
+              <p class="ck-note">{setup_scope_copy(@provider_status)}</p>
+            </div>
+            <div>
+              <h3>Attached agents</h3>
+              <p class="ck-note">{attached_agents_copy(@provider_status)}</p>
+            </div>
+          </div>
+
+          <p class="ck-note" style="margin-top: 1rem;">
+            {provider_guidance(@provider_status)}
+          </p>
+
+          <div class="ck-grid ck-grid-dashboard" style="margin-top: 1rem;">
+            <div class="ck-card">
+              <p class="ck-mini-label">Always available</p>
+              <ul class="ck-mini-list">
+                <%= for item <- always_available_capabilities() do %>
+                  <li>{item}</li>
+                <% end %>
+              </ul>
+            </div>
+            <div class="ck-card">
+              <p class="ck-mini-label">Model-backed features</p>
+              <ul class="ck-mini-list">
+                <%= for item <- model_backed_capabilities(@provider_status) do %>
+                  <li>{item}</li>
+                <% end %>
+              </ul>
+            </div>
+          </div>
+
+          <div class="ck-grid ck-grid-dashboard" style="margin-top: 1rem;">
+            <div class="ck-card">
+              <p class="ck-mini-label">Resolution order</p>
+              <ol class="ck-mini-list">
+                <%= for item <- provider_resolution_steps() do %>
+                  <li>{item}</li>
+                <% end %>
+              </ol>
+            </div>
+            <div class="ck-card">
+              <p class="ck-mini-label">Autonomy defaults</p>
+              <ul class="ck-mini-list">
+                <%= for item <- autonomy_defaults() do %>
+                  <li>{item}</li>
+                <% end %>
+              </ul>
             </div>
           </div>
         </div>
@@ -503,7 +574,130 @@ defmodule ControlKeelWeb.OnboardingLive do
   defp field_error(errors, key), do: Map.get(errors, key)
 
   defp compile_error_message(reason) do
-    "ControlKeel could not compile the execution brief yet (#{format_reason(reason)}). Configure an intent provider or retry."
+    "ControlKeel could not compile the execution brief yet (#{format_reason(reason)}). If you do not have a bridge, API key, or local Ollama model, ControlKeel still runs in heuristic mode for governance, proofs, skills, and benchmarks."
+  end
+
+  defp provider_mode_label(%{
+         "selected_source" => "agent_bridge",
+         "selected_provider" => provider
+       }) do
+    "Bridge via attached agent (#{provider})"
+  end
+
+  defp provider_mode_label(%{
+         "selected_source" => "workspace_profile",
+         "selected_provider" => provider
+       }) do
+    "Workspace-managed provider (#{provider})"
+  end
+
+  defp provider_mode_label(%{
+         "selected_source" => "user_default_profile",
+         "selected_provider" => provider
+       }) do
+    "ControlKeel user profile (#{provider})"
+  end
+
+  defp provider_mode_label(%{
+         "selected_source" => "project_override",
+         "selected_provider" => provider
+       }) do
+    "Project override (#{provider})"
+  end
+
+  defp provider_mode_label(%{"selected_source" => "ollama", "selected_model" => model}) do
+    "Local Ollama (#{model || "default model"})"
+  end
+
+  defp provider_mode_label(_status), do: "Heuristic / no-LLM fallback"
+
+  defp provider_name(%{"selected_provider" => provider}) when provider in [nil, "heuristic"],
+    do: "No provider selected"
+
+  defp provider_name(%{"selected_provider" => provider, "selected_model" => model}) do
+    if blank?(model), do: provider, else: "#{provider} / #{model}"
+  end
+
+  defp setup_scope_copy(%{"binding_mode" => mode}) when mode in ["project", "ephemeral"] do
+    "Governance stays project-local. Some agent installs can still be user-scoped."
+  end
+
+  defp setup_scope_copy(_status) do
+    "Use user scope for reusable agent installs. Use project bootstrap for governed repos."
+  end
+
+  defp attached_agents_copy(%{"attached_agents" => []}), do: "None yet"
+
+  defp attached_agents_copy(%{"attached_agents" => agents}) when is_list(agents) do
+    agents
+    |> Enum.map_join(", ", fn agent ->
+      Map.get(agent, "label") || Map.get(agent, "id") || "Unknown"
+    end)
+  end
+
+  defp attached_agents_copy(_status), do: "None yet"
+
+  defp provider_guidance(%{"selected_source" => "agent_bridge"}) do
+    "ControlKeel is borrowing model access from an attached agent bridge, so you usually do not need to enter a separate API key for guided compilation and advisory features."
+  end
+
+  defp provider_guidance(%{"selected_source" => source})
+       when source in ["workspace_profile", "user_default_profile", "project_override"] do
+    "ControlKeel has its own provider profile available. Guided compilation and advisory features can run directly from the configured model source."
+  end
+
+  defp provider_guidance(%{"selected_source" => "ollama"}) do
+    "ControlKeel is using a local Ollama model. This keeps setup local-first and avoids hosted API keys, but model quality depends on the local model you run."
+  end
+
+  defp provider_guidance(_status) do
+    "No bridge, API key, or local model is configured right now. ControlKeel still governs agent work, captures proofs, runs MCP tools, and benchmarks outcomes in heuristic mode."
+  end
+
+  defp always_available_capabilities do
+    [
+      "Governance and policy validation on agent actions",
+      "Findings, proof bundles, and mission audit trail",
+      "MCP tools, skills, and agent attachments",
+      "Benchmark runs and policy artifact management"
+    ]
+  end
+
+  defp model_backed_capabilities(%{"selected_provider" => provider})
+       when provider in [nil, "heuristic"] do
+    [
+      "Execution brief compilation falls back to heuristics or may ask for a provider",
+      "Advisory scanner only runs when a provider is available",
+      "Model-backed guidance is limited until a bridge, key, or Ollama model is configured"
+    ]
+  end
+
+  defp model_backed_capabilities(_status) do
+    [
+      "Execution brief compilation can use the configured model path",
+      "Advisory scanner can add model-backed review on top of pattern scanning",
+      "Provider-backed guidance can run without asking for another setup step"
+    ]
+  end
+
+  defp provider_resolution_steps do
+    [
+      "Attached agent bridge when supported",
+      "Workspace or service-account profile",
+      "ControlKeel user default profile",
+      "Project override",
+      "Local Ollama",
+      "Heuristic fallback"
+    ]
+  end
+
+  defp autonomy_defaults do
+    [
+      "Low-risk guidance continues automatically with warnings when needed",
+      "Medium-risk findings stay visible and route the operator toward a fix",
+      "Destructive or high-risk actions should be blocked or explicitly reviewed",
+      "Governed repos keep the policy trail even when model features degrade"
+    ]
   end
 
   defp format_reason(%Ecto.Changeset{}), do: "schema validation failed"

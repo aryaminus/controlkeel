@@ -1,0 +1,19 @@
+{
+  "subjects": [
+    {
+      "id": "opencode_manual",
+      "label": "OpenCode Manual Import",
+      "type": "manual_import"
+    },
+    {
+      "id": "opencode_shell",
+      "label": "OpenCode Shell Wrapper",
+      "type": "shell",
+      "command": "./scripts/opencode-benchmark.sh",
+      "args": [],
+      "working_dir": ".",
+      "timeout_ms": 120000,
+      "output_mode": "stdout"
+    }
+  ]
+}

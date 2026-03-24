@@ -247,6 +247,41 @@ defmodule ControlKeelWeb.BenchmarksLive do
           </div>
         </div>
 
+        <div class="ck-grid ck-grid-dashboard" style="margin-top: 1.5rem;">
+          <div class="ck-card">
+            <p class="ck-mini-label">Blessed external path</p>
+            <h3 style="margin: 0 0 0.5rem;">OpenCode vs ControlKeel</h3>
+            <p class="ck-note">
+              The recommended first external comparison path is OpenCode. Start with a manual import
+              subject for the quickest reproducible run, then swap to a shell-based wrapper if you
+              want fully scripted replay.
+            </p>
+            <ul class="ck-mini-list" style="margin-top: 0.75rem;">
+              <li>
+                Create `controlkeel/benchmark_subjects.json` from `docs/examples/opencode-benchmark-subjects.json`.
+              </li>
+              <li>
+                Run the suite once with `opencode_manual` to create awaiting-import placeholders.
+              </li>
+              <li>
+                Import captured OpenCode output or replace the subject with a scripted shell command later.
+              </li>
+            </ul>
+          </div>
+          <div class="ck-card">
+            <p class="ck-mini-label">Available subjects</p>
+            <div class="ck-tag-list">
+              <%= for subject <- @available_subjects do %>
+                <span class="ck-tag">{subject_label(subject)}</span>
+              <% end %>
+            </div>
+            <p class="ck-note" style="margin-top: 0.75rem;">
+              Built-ins are always present. External subjects appear when the current project has a
+              `controlkeel/benchmark_subjects.json` file.
+            </p>
+          </div>
+        </div>
+
         <div class="ck-card ck-browser-filters" style="margin-top: 1.5rem;">
           <.form for={@filter_form} id="benchmark-filters" phx-change="filter_domain">
             <div class="ck-filter-grid">
@@ -274,7 +309,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
                 field={@form[:subjects]}
                 type="text"
                 label="Subjects"
-                placeholder="controlkeel_validate,controlkeel_proxy"
+                placeholder="controlkeel_validate,opencode_manual"
               />
               <.input
                 field={@form[:baseline_subject]}
@@ -300,6 +335,10 @@ defmodule ControlKeelWeb.BenchmarksLive do
               ", ",
               & &1["id"]
             )}
+          </p>
+          <p class="ck-note" style="margin-top: 0.5rem;">
+            For a reproducible external comparison, start with `controlkeel_validate,opencode_manual`
+            and import the OpenCode output after the placeholder run finishes.
           </p>
         </div>
 
@@ -490,7 +529,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
   defp default_form_params do
     %{
       "suite" => "vibe_failures_v1",
-      "subjects" => "controlkeel_validate,controlkeel_proxy",
+      "subjects" => "controlkeel_validate,opencode_manual",
       "baseline_subject" => "controlkeel_validate",
       "domain_pack" => ""
     }
@@ -517,6 +556,19 @@ defmodule ControlKeelWeb.BenchmarksLive do
   defp format_percent(nil), do: "Not recorded"
   defp format_percent(value) when is_integer(value), do: "#{value}%"
   defp format_percent(value), do: "#{Float.round(value, 1)}%"
+
+  defp subject_label(subject) do
+    label = subject["label"] || subject["id"] || "Unknown subject"
+
+    suffix =
+      cond do
+        subject["configured"] == false -> " (needs config)"
+        subject["type"] in ["manual_import", "shell"] -> " (external)"
+        true -> ""
+      end
+
+    label <> suffix
+  end
 
   defp format_latency(nil), do: "n/a"
   defp format_latency(value), do: "#{value}ms"

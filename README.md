@@ -5,7 +5,7 @@
 
 ControlKeel is the control plane that turns AI coding into production engineering. It governs agent work across intent compilation, task planning, routing, validation, proof generation, typed memory, benchmarks, learned policy artifacts, and cross-agent skills distribution.
 
-It sits above Claude Code, Codex, Cursor, Windsurf, Continue, Aider, Copilot / VS Code, and other agent clients. It can expose MCP tools, attach native skills where supported, export plugin bundles, proxy provider traffic, and persist the evidence trail for everything it governs.
+It sits above Claude Code, Codex, OpenCode, Cursor, Windsurf, Continue, Aider, Copilot / VS Code, and other agent clients. It can expose MCP tools, attach native skills where supported, export plugin bundles, proxy provider traffic, and persist the evidence trail for everything it governs.
 
 ## Quick start
 
@@ -42,7 +42,8 @@ cd /path/to/your/project
 
 # 3. Attach your preferred client
 #    ControlKeel will auto-bootstrap on first use.
-controlkeel attach claude-code
+#    OpenCode is the fastest MCP-plus-instructions path.
+controlkeel attach opencode
 
 # Optional explicit bootstrap / init
 controlkeel bootstrap
@@ -62,7 +63,7 @@ mix setup
 mix phx.server
 
 # In the governed project
-mix ck.attach claude-code
+mix ck.attach opencode
 mix ck.findings
 
 # Optional explicit bootstrap / init
@@ -73,6 +74,7 @@ More walkthroughs:
 
 - [Getting started](docs/getting-started.md)
 - [Agent integrations](docs/agent-integrations.md)
+- [Benchmarks](docs/benchmarks.md)
 - [Demo script](docs/demo-script.md)
 
 ## What the product includes
@@ -87,29 +89,42 @@ More walkthroughs:
 
 ## Supported agent connections
 
-### Native-first attachments
+### Provider-bridge supported
+
+These have the strongest zero-setup provider story today because ControlKeel can borrow a compatible provider environment from the attached client.
+
+| Agent | Attach command | Bridge | Companion output |
+|---|---|---|---|
+| Claude Code | `controlkeel attach claude-code` | Anthropic-compatible env | `.claude/skills`, `.claude/agents`, optional Claude plugin bundle |
+| Codex CLI | `controlkeel attach codex-cli` | OpenAI-compatible env | `.agents/skills`, `.codex/agents` |
+
+### Native-first and repo-native attachments
 
 These get MCP plus a native companion install by default.
 
 | Agent | Attach command | Companion output |
 |---|---|---|
-| Claude Code | `controlkeel attach claude-code` | `.claude/skills`, `.claude/agents`, optional Claude plugin bundle |
-| Codex CLI | `controlkeel attach codex-cli` | `.agents/skills`, `.codex/agents` |
 | VS Code | `controlkeel attach vscode` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 | GitHub Copilot | `controlkeel attach copilot` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 
 ### MCP plus generated instruction bundles
 
+OpenCode is the recommended quick-start path in this category.
+
 | Agent | Attach command |
 |---|---|
+| OpenCode | `controlkeel attach opencode` |
 | Cursor | `controlkeel attach cursor` |
 | Windsurf | `controlkeel attach windsurf` |
 | Kiro | `controlkeel attach kiro` |
 | Amp | `controlkeel attach amp` |
-| OpenCode | `controlkeel attach opencode` |
 | Gemini CLI | `controlkeel attach gemini-cli` |
 | Continue | `controlkeel attach continue` |
 | Aider | `controlkeel attach aider` |
+
+### Proxy-compatible clients
+
+ControlKeel's governed proxy currently exposes OpenAI-style and Anthropic-style paths. That makes it a good fit for tools that can point at those APIs directly, but it is not the same thing as a native bridge or first-class attach target.
 
 `/skills` in the web app and [docs/agent-integrations.md](docs/agent-integrations.md) show the live compatibility matrix and export/install targets.
 
@@ -141,6 +156,13 @@ controlkeel provider doctor
 ```
 
 If no keys and no local model are available, ControlKeel still runs governance, MCP, proofs, skills, and benchmark flows in degraded mode. Only true model-backed features fall back to heuristics or return explicit capability guidance.
+
+Practical setup guidance:
+
+- If you use Claude Code or Codex CLI, try the attached bridge path first.
+- If you use OpenCode or another MCP-plus-instructions client, the next best path is a CK-owned provider profile or local Ollama.
+- Governed bindings remain project-local even when the agent install itself supports user scope.
+- Heuristic mode is still useful for validation, findings, proofs, benchmarks, and skills when no model access is available.
 
 ## Skills, plugins, and exports
 

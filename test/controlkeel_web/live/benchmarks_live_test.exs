@@ -10,6 +10,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     {:ok, view, html} = live(conn, ~p"/benchmarks")
 
     assert html =~ "Benchmark engine"
+    assert html =~ "OpenCode vs ControlKeel"
     assert has_element?(view, "#benchmark-filters")
     assert has_element?(view, "#benchmark-runner")
     assert has_element?(view, "#benchmark-runs")
@@ -30,6 +31,36 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
 
     {path, _flash} = assert_redirect(view)
     assert path =~ "/benchmarks/runs/"
+  end
+
+  test "index surfaces configured external subjects", %{conn: conn} do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-benchmarks-live-#{System.unique_integer([:positive])}"
+      )
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+    write_benchmark_subjects!(tmp_dir, [
+      %{
+        "id" => "opencode_manual",
+        "label" => "OpenCode Manual Import",
+        "type" => "manual_import"
+      }
+    ])
+
+    original_cwd = File.cwd!()
+    File.cd!(tmp_dir)
+
+    on_exit(fn -> File.cd!(original_cwd) end)
+
+    {:ok, _view, html} = live(conn, ~p"/benchmarks")
+
+    assert html =~ "OpenCode Manual Import (external)"
   end
 
   test "index filters suites by domain pack", %{conn: conn} do

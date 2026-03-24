@@ -220,6 +220,33 @@ defmodule ControlKeel.BenchmarkTest do
     assert imported.matched_expected
   end
 
+  test "available subjects include external OpenCode benchmark subjects", %{tmp_dir: tmp_dir} do
+    write_benchmark_subjects!(tmp_dir, [
+      %{
+        "id" => "opencode_manual",
+        "label" => "OpenCode Manual Import",
+        "type" => "manual_import"
+      },
+      %{
+        "id" => "opencode_shell",
+        "label" => "OpenCode Shell Wrapper",
+        "type" => "shell",
+        "command" => "./scripts/opencode-benchmark.sh",
+        "args" => [],
+        "timeout_ms" => 120_000,
+        "output_mode" => "stdout"
+      }
+    ])
+
+    subject_ids =
+      Benchmark.available_subjects(tmp_dir)
+      |> Enum.map(& &1["id"])
+
+    assert "controlkeel_validate" in subject_ids
+    assert "opencode_manual" in subject_ids
+    assert "opencode_shell" in subject_ids
+  end
+
   test "exports benchmark runs as json and csv" do
     run =
       benchmark_run_fixture(%{

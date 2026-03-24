@@ -95,6 +95,45 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
     refute error_html =~ "sk-secret-test"
   end
 
+  test "review step explains heuristic mode and provider status without leaking secrets", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = live(conn, ~p"/start")
+
+    render_submit(form(view, "form", launch: %{"occupation" => "founder", "agent" => "claude"}))
+
+    render_submit(
+      form(view, "form",
+        launch: %{
+          "project_name" => "Ops Console",
+          "idea" =>
+            "Build an internal ops console with approvals, audit notes, and delivery tracking."
+        }
+      )
+    )
+
+    review_html =
+      render_submit(
+        form(view, "form",
+          launch: %{
+            "interview_answers" => %{
+              "who_uses_it" => "Operators and engineering leads",
+              "data_involved" => "Internal ticket metadata, release notes, and approval history",
+              "first_release" => "Dashboard, approvals, searchable notes",
+              "constraints" => "Local-first setup, no API key required for first run"
+            }
+          }
+        )
+      )
+
+    assert review_html =~ "Provider and autonomy status"
+    assert review_html =~ "Heuristic / no-LLM fallback"
+    assert review_html =~ "Always available"
+    assert review_html =~ "Model-backed features"
+    assert review_html =~ "Autonomy defaults"
+    refute review_html =~ "sk-secret-test"
+  end
+
   test "expanded domain occupations render and advance through onboarding", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/start")
 

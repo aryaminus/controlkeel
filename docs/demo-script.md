@@ -14,12 +14,12 @@ controlkeel
 
 ```bash
 controlkeel init --project-name "Demo app" --idea "Build a small governed demo app"
-controlkeel attach claude-code
+controlkeel attach opencode
 ```
 
 ## Trigger a finding
 
-Ask Claude Code to add the following snippet from [`docs/examples/unsafe-query.js`](examples/unsafe-query.js) into a route or helper:
+Ask OpenCode to add the following snippet from [`docs/examples/unsafe-query.js`](examples/unsafe-query.js) into a route or helper:
 
 ```javascript
 export function lookupUser(params) {
@@ -59,4 +59,16 @@ Browser:
 
 ## Alternate demo
 
-If you want a secrets-first demo instead, ask Claude Code to hardcode a fake API key directly in a config file and verify that ControlKeel flags the secret before it lands.
+If you want a secrets-first demo instead, ask OpenCode to hardcode a fake API key directly in a config file and verify that ControlKeel flags the secret before it lands.
+
+## Reproducible external benchmark path
+
+To compare OpenCode against ControlKeel using the built-in benchmark engine:
+
+1. Copy `docs/examples/opencode-benchmark-subjects.json` to `controlkeel/benchmark_subjects.json` in the governed project.
+2. Run a benchmark with `controlkeel_validate,opencode_manual`.
+3. Let the `opencode_manual` result enter `awaiting_import` state.
+4. Capture the OpenCode-produced file or stdout for the same scenario.
+5. Import that output with `controlkeel benchmark import <run-id> opencode_manual --file <payload.json>`.
+
+That gives you a reproducible `ControlKeel vs OpenCode` comparison without requiring a custom integration layer first.

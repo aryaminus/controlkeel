@@ -167,9 +167,9 @@ defmodule ControlKeelWeb.MissionControlLive do
                 You're set — ControlKeel is governing this session
               </strong>
               <p class="ck-note" style="margin: 0 0 0.75rem;">
-                Attach Claude Code to start intercepting agent actions:
+                Attach your preferred client to start intercepting agent actions. OpenCode is the fastest MCP-plus-instructions path:
                 <code style="font-family: monospace; background: #dcfce7; padding: 0.1rem 0.3rem; border-radius: 3px;">
-                  mix ck.attach claude-code
+                  controlkeel attach opencode
                 </code>
               </p>
               <p class="ck-note" style="margin: 0;">
