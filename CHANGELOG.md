@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.7 — 2026-03-24
+
+### What's changed
+
+- feat: complete launch-ready OpenCode onboarding and benchmark flow
+
 ## v0.1.6 — 2026-03-24
 
 ### What's changed
