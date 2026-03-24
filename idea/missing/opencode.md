@@ -13,10 +13,19 @@ Tracked against this file’s P0 list. Implementation lives in-repo; re-verify a
 | P1: Autonomy policy | Done | `docs/autonomy-and-findings.md`, `README.md`, `Mission.finding_human_gate_hint/1`, onboarding + `/getting-started` |
 | P1: Path graph UX | Done | `Mission.session_task_graph/1`, `lib/controlkeel_web/live/mission_control_live.ex` (dependencies + checklist) |
 | P1: Advisory transparency | Done | `Scanner.Result.advisory`, `Advisory.advisory_status/3`, `POST /api/v1/validate`, MCP `ck_validate` |
+| Max coverage (agents / MCP / skills / check.md) | Done | `docs/support-matrix.md`, `idea/missing/check.md` (classification table) |
 
 Optional ops (not code): run a packaged-binary smoke on current release artifacts when convenient; refresh SHAs in `docs/release-verification.md` after future releases.
 
 P1 items in the long section below are addressed in-repo; deeper proxy routes or DAG editor UX would be follow-on work.
+
+---
+
+## Historical planning detail (archive)
+
+The sections below (“Recommended Scope”, “Must-Finish”, phased build plans) are **archived planning text**. The **Completion status** table at the top of this file is authoritative for what shipped. Do not treat the long narrative as open work unless you explicitly open a new ticket.
+
+**Max coverage inventory:** See [docs/support-matrix.md](../../docs/support-matrix.md) for agents, MCP tools, and bundled skills.
 
 ---
 

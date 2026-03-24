@@ -64,3 +64,33 @@ CK can automate **low-risk** paths and surface **medium** risk; **destructive / 
 ## Agent list note
 
 The list above is a **research/backlog** of names. It is **not** a completion checklist for shipping (see `idea/missing/opencode.md` “Ignore For Now” / long-tail list).
+
+## Research name classification (honest scope)
+
+Statuses: **`in_catalog`** — first-class `controlkeel attach <id>` in [`AgentIntegration.catalog/0`](../../lib/controlkeel/agent_integration.ex). **`covered_via_mcp_instructions`** — use MCP + instruction bundle path like OpenCode-class targets (often same as `mcp-plus-instructions`). **`proxy_only`** — govern only if the client can send traffic through ControlKeel’s [OpenAI/Anthropic proxy paths](../../docs/agent-integrations.md). **`not_planned_no_api`** — no stable attach hook in-repo today. **`duplicate_of`** — same as another row.
+
+Canonical table of shipped targets: [docs/support-matrix.md](../../docs/support-matrix.md).
+
+| Name / note | Status | Notes |
+|-------------|--------|--------|
+| hermes agent | not_planned_no_api | Research framework; no dedicated attach target. |
+| rlm agent | not_planned_no_api | Research framework; no dedicated attach target. |
+| gepa agent | not_planned_no_api | Research framework; no dedicated attach target. |
+| dspy agent | not_planned_no_api | Research / library; no dedicated attach target. |
+| deepagents | not_planned_no_api | Generic term; no single attach hook. |
+| openswe | not_planned_no_api | No stable MCP/config contract in this repo. |
+| Codestral | not_planned_no_api | Model/API family; use provider profile or proxy if your stack exposes compatible APIs. |
+| openclaw | not_planned_no_api | No stable attach hook in this repo. |
+| claude dispatch | duplicate_of | Use **`claude-code`** (`in_catalog`). |
+| opencode | in_catalog | `opencode` |
+| amp | in_catalog | `amp` |
+| slate | not_planned_no_api | No stable attach hook in this repo. |
+| cursor agent | duplicate_of | Use **`cursor`** (`in_catalog`). |
+| droid | not_planned_no_api | No stable attach hook in this repo. |
+| forge | not_planned_no_api | Ambiguous product name; no dedicated attach target. |
+| t3code anything to pull for connections? | not_planned_no_api | No stable attach hook in this repo. |
+| khadgi-sujan / retune | not_planned_no_api | External projects; not tracked as attach targets. |
+| prd | not_planned_no_api | Document type, not a client. |
+| requirement analysis | not_planned_no_api | Workflow, not a client. |
+
+**Default for any MCP-capable editor not listed:** `covered_via_mcp_instructions` — register the ControlKeel MCP server per [getting-started.md](../../docs/getting-started.md) and use the same portable instruction bundle pattern as other `mcp-plus-instructions` targets.

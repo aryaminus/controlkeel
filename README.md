@@ -74,6 +74,7 @@ More walkthroughs:
 
 - [Getting started](docs/getting-started.md)
 - [Agent integrations](docs/agent-integrations.md)
+- [Support matrix (agents, MCP, skills)](docs/support-matrix.md)
 - [Autonomy and findings](docs/autonomy-and-findings.md)
 - [Benchmarks](docs/benchmarks.md)
 - [Demo script](docs/demo-script.md)

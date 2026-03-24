@@ -102,7 +102,7 @@ Other supported attach commands:
 - `controlkeel attach continue`
 - `controlkeel attach aider`
 
-For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) or open `/skills` in the local app.
+For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) and the canonical [support-matrix.md](support-matrix.md), or open `/skills` in the local app.
 
 ## 3a. OpenCode quick path
 

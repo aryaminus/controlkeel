@@ -2,6 +2,8 @@
 
 This is the current ControlKeel distribution and attachment matrix.
 
+**Canonical inventory:** [support-matrix.md](support-matrix.md) lists every `AgentIntegration.catalog/0` row, all MCP runtime tools, and `priv/skills/` bundles in one place. Use it when aligning docs with code.
+
 ## Install ControlKeel
 
 ControlKeel itself is distributed through GitHub Releases, with convenience install channels layered on top:
