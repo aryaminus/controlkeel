@@ -1,0 +1,98 @@
+[
+  {
+    "id": "phoenix.deprecated_live_navigation",
+    "category": "framework",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Deprecated LiveView navigation API detected. Use <.link navigate/patch> and push_navigate/push_patch instead.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "\\blive_redirect\\b",
+        "\\blive_patch\\b"
+      ]
+    }
+  },
+  {
+    "id": "phoenix.heex_changeset_access",
+    "category": "framework",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Template is accessing a changeset directly. Drive forms via to_form/2 and @form[:field] in HEEx.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "@changeset\\[",
+        "<\\.form\\s+for=\\{@changeset\\}"
+      ]
+    }
+  },
+  {
+    "id": "phoenix.inline_script_in_heex",
+    "category": "security",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Inline script tag in HEEx detected. Use Phoenix.LiveView.ColocatedHook or external hooks in assets/js.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)<script(?!\\s*:type=\\{Phoenix\\.LiveView\\.ColocatedHook\\})"
+      ]
+    }
+  },
+  {
+    "id": "phoenix.raw_html_risk",
+    "category": "security",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Potential unsafe raw HTML rendering detected. Prefer escaped output or trusted sanitized content paths.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "\\braw\\(",
+        "dangerouslySetInnerHTML",
+        "\\binnerHTML\\s*="
+      ]
+    }
+  },
+  {
+    "id": "phoenix.mass_assignment_user_id",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Potential mass-assignment of ownership fields detected. Do not cast user_id/account_id from params.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)cast\\([^\\)]*:\\s*(user_id|account_id|workspace_id)"
+      ]
+    }
+  },
+  {
+    "id": "phoenix.unparameterized_query",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Potential SQL concatenation found. Use parameterized Ecto queries and avoid interpolated SQL.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)Repo\\.query!?\\([^\\)]*(\\#\\{|\\+)",
+        "(?i)select\\s+.+\\s+from\\s+.+(\\+|\\#\\{|\\$\\{)"
+      ]
+    }
+  },
+  {
+    "id": "phoenix.missing_precommit_gate",
+    "category": "delivery",
+    "severity": "medium",
+    "action": "escalate_to_human",
+    "plain_message": "Before merge/release, run mix precommit and resolve all issues.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)ready to merge|ship it|release now"
+      ]
+    }
+  }
+]
