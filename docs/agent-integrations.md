@@ -63,13 +63,27 @@ OpenCode notes:
 
 ControlKeel also exposes governed proxy endpoints for OpenAI-style and Anthropic-style traffic. This is useful for tools that can point directly at those APIs, but it is a different support tier from a native attach target or documented provider bridge.
 
+Treat proxy support as **API-shape compatibility**, not as proof of a full native integration. Third-party web IDEs (Bolt, Lovable, Replit, v0, etc.) only work here if you can configure their outbound model URL to hit **your** ControlKeel base URL with the paths below—most products use their own hosted models, so test before claiming support.
+
+### Proxy: what works today
+
+Replace `{base}` with your ControlKeel server origin (for example `http://localhost:4000` in dev) and `{proxy_token}` with the session’s `proxy_token` (shown in Mission Control as full proxy URLs).
+
+| Upstream shape | HTTP method and path on ControlKeel |
+|----------------|-------------------------------------|
+| OpenAI Responses API | `POST {base}/proxy/openai/{proxy_token}/v1/responses` |
+| OpenAI Chat Completions | `POST {base}/proxy/openai/{proxy_token}/v1/chat/completions` |
+| Anthropic Messages | `POST {base}/proxy/anthropic/{proxy_token}/v1/messages` |
+| OpenAI Realtime (WebSocket) | `GET {base}/proxy/openai/{proxy_token}/v1/realtime` (scheme becomes `ws` / `wss` in Mission Control) |
+
+Mission Control lists the resolved URLs for the current mission under **Proxy** (built with `ControlKeel.Proxy.url/3`). The governor runs the same validation stack as other governed paths before forwarding to OpenAI or Anthropic upstream.
+
 Today that means:
 
 - OpenAI-style `responses` and `chat/completions`
 - Anthropic-style `messages`
 - OpenAI realtime websocket path
 
-Treat proxy support as API-shape compatibility, not as proof of a full native integration.
 
 Attach flag behavior:
 

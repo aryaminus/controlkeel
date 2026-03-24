@@ -243,6 +243,37 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  @doc """
+  Returns task graph data (nodes, edges, `ready_task_ids`) for Mission Control and APIs.
+
+  Ensures default edges exist when tasks have no edges yet (see `Platform.ensure_session_graph/1`).
+  """
+  def session_task_graph(session_id) when is_integer(session_id) do
+    Platform.ensure_session_graph(session_id)
+  end
+
+  @doc """
+  Short UI copy for the expected human gate given persisted finding severity/category.
+  """
+  def finding_human_gate_hint(%Finding{} = finding) do
+    case {finding.severity, finding.category} do
+      {"critical", _} ->
+        "Human review required before any production or high-impact action."
+
+      {"high", "security"} ->
+        "Review and approve before merge or release."
+
+      {"high", _} ->
+        "Review recommended before marking this work complete."
+
+      {"medium", _} ->
+        "Medium risk: review when convenient; fixes may be suggested automatically."
+
+      {_, _} ->
+        "Low severity: governance still records the outcome."
+    end
+  end
+
   def change_launch(attrs \\ %{}) do
     {%{},
      %{

@@ -386,6 +386,12 @@ defmodule ControlKeelWeb.OnboardingLive do
             {provider_guidance(@provider_status)}
           </p>
 
+          <p class="ck-note" style="margin-top: 0.75rem;">
+            Autonomy and findings: see
+            <code class="font-mono text-sm">docs/autonomy-and-findings.md</code>
+            in the repository for how severity maps to human review (LLM advisory requires a provider; validate responses include an advisory status).
+          </p>
+
           <div class="ck-grid ck-grid-dashboard" style="margin-top: 1rem;">
             <div class="ck-card">
               <p class="ck-mini-label">Always available</p>

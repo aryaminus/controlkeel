@@ -125,7 +125,8 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
       "summary" => result.summary,
       "findings" => Enum.map(result.findings, &finding_to_map/1),
       "fix_prompts" => fix_prompts,
-      "scanned_at" => result.scanned_at
+      "scanned_at" => result.scanned_at,
+      "advisory" => result.advisory
     }
   end
 

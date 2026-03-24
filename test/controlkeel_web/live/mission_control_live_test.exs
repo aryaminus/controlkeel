@@ -8,6 +8,46 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
   alias ControlKeel.MCP.Tools.CkValidate
   alias ControlKeel.Mission
 
+  test "mission control shows task dependencies and checklist when graph edges exist", %{
+    conn: conn
+  } do
+    session = session_fixture()
+
+    _t1 =
+      task_fixture(%{
+        session: session,
+        position: 1,
+        status: "done",
+        metadata: %{"track" => "architecture"},
+        title: "Architecture lock"
+      })
+
+    _t2 =
+      task_fixture(%{
+        session: session,
+        position: 2,
+        status: "in_progress",
+        metadata: %{"track" => "feature"},
+        title: "Feature work"
+      })
+
+    _t3 =
+      task_fixture(%{
+        session: session,
+        position: 3,
+        status: "queued",
+        metadata: %{"track" => "release"},
+        title: "Release verify"
+      })
+
+    {:ok, _view, html} = live(conn, ~p"/missions/#{session.id}")
+
+    assert html =~ "Task dependencies"
+    assert html =~ "Architecture lock"
+    assert html =~ "Task checklist"
+    assert html =~ "mission-task-checklist"
+  end
+
   test "mission control renders persisted runtime findings and proxy endpoints", %{conn: conn} do
     session = session_fixture()
     task_fixture(%{session: session})

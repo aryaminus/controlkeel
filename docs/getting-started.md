@@ -89,6 +89,8 @@ If you do not have keys and are not running a local model, ControlKeel still wor
 
 In that mode, model-backed features such as advisory review and intent compilation either degrade to heuristics or return explicit capability guidance.
 
+The LLM **advisory** layer (extra review beyond pattern matchers) only runs when a provider is available. The HTTP validate API and MCP validate tool include an **`advisory`** field describing whether advisory ran or was skipped—see [autonomy-and-findings.md](autonomy-and-findings.md) for how findings relate to human review.
+
 Other supported attach commands:
 
 - `controlkeel attach claude-code`
@@ -146,6 +148,10 @@ Or open the local app and check:
 - `/findings` for the cross-session findings browser
 - `/skills` for native skills, plugins, and export targets
 - `/ship` for install-to-first-finding metrics
+
+## Autonomy and findings
+
+How severity maps to human gates (and why full “zero human” operation is not promised) is documented in [autonomy-and-findings.md](autonomy-and-findings.md).
 
 ## Notes
 

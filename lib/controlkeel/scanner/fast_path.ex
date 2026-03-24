@@ -39,8 +39,10 @@ defmodule ControlKeel.Scanner.FastPath do
     combined = uniq_findings(layer1 ++ layer2)
 
     layer3 = Advisory.scan(normalized, combined)
+    merged = uniq_findings(combined ++ layer3)
+    advisory = Advisory.advisory_status(normalized, layer3)
 
-    build_result(uniq_findings(combined ++ layer3))
+    build_result(merged, advisory)
   end
 
   defp normalize_input(input) do
@@ -151,17 +153,20 @@ defmodule ControlKeel.Scanner.FastPath do
     Platform.session_policy_rules(session_id)
   end
 
-  defp build_result([]) do
+  defp build_result(findings, advisory)
+
+  defp build_result([], advisory) do
     %Scanner.Result{
       allowed: true,
       decision: "allow",
       summary: "No issues detected.",
       findings: [],
-      scanned_at: scanned_at()
+      scanned_at: scanned_at(),
+      advisory: advisory
     }
   end
 
-  defp build_result(findings) do
+  defp build_result(findings, advisory) do
     decision = findings |> Enum.map(& &1.decision) |> final_decision()
 
     %Scanner.Result{
@@ -169,7 +174,8 @@ defmodule ControlKeel.Scanner.FastPath do
       decision: decision,
       summary: summary_for(decision, findings),
       findings: findings,
-      scanned_at: scanned_at()
+      scanned_at: scanned_at(),
+      advisory: advisory
     }
   end
 

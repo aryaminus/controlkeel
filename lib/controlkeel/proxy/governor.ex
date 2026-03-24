@@ -267,7 +267,8 @@ defmodule ControlKeel.Proxy.Governor do
       decision: "allow",
       summary: "No issues detected.",
       findings: [],
-      scanned_at: DateTime.utc_now() |> DateTime.to_iso8601()
+      scanned_at: DateTime.utc_now() |> DateTime.to_iso8601(),
+      advisory: nil
     }
 
   defp estimated_cost({:ok, estimate}), do: estimate["estimated_cost_cents"]

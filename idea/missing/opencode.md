@@ -1,3 +1,25 @@
+## Completion status (non-Team P0)
+
+Tracked against this file’s P0 list. Implementation lives in-repo; re-verify after large refactors.
+
+| P0 theme | Status | Where to verify |
+|----------|--------|-----------------|
+| Provider + autonomy UX | Done | `lib/controlkeel_web/live/onboarding_live.ex` (`ProviderBroker.status/0`, mode labels, capability matrix, `provider_guidance`), `docs/getting-started.md`, `README.md` |
+| Benchmark story publishable | Done | `docs/benchmarks.md`, `docs/examples/opencode-benchmark-subjects.json`, `lib/controlkeel_web/live/benchmarks_live.ex` |
+| Release / ops | Documented | `docs/release-verification.md` — refresh GitHub SHAs when you cut a new release |
+| Docs / UX consistency | Done | Mission Control uses packaged CLI (`controlkeel attach opencode`); terminology aligned in docs |
+| Integration claims | Honest taxonomy | `lib/controlkeel/agent_integration.ex`, `docs/agent-integrations.md` |
+| P1: Proxy surface | Done | `docs/agent-integrations.md` (exact `/proxy/...` paths; Mission Control `proxy_urls`) |
+| P1: Autonomy policy | Done | `docs/autonomy-and-findings.md`, `README.md`, `Mission.finding_human_gate_hint/1`, onboarding + `/getting-started` |
+| P1: Path graph UX | Done | `Mission.session_task_graph/1`, `lib/controlkeel_web/live/mission_control_live.ex` (dependencies + checklist) |
+| P1: Advisory transparency | Done | `Scanner.Result.advisory`, `Advisory.advisory_status/3`, `POST /api/v1/validate`, MCP `ck_validate` |
+
+Optional ops (not code): run a packaged-binary smoke on current release artifacts when convenient; refresh SHAs in `docs/release-verification.md` after future releases.
+
+P1 items in the long section below are addressed in-repo; deeper proxy routes or DAG editor UX would be follow-on work.
+
+---
+
 Recommended Scope
 - Complete all remaining P0/P1 below.
 - Do not treat the long agent list in idea/missing/check.md as required for completion.

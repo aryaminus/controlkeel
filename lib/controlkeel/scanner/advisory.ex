@@ -40,6 +40,37 @@ defmodule ControlKeel.Scanner.Advisory do
     end
   end
 
+  @doc """
+  Summarizes advisory participation for API responses (FastPath / validate).
+
+  `layer3_findings` is the list returned by `scan/3` for this input.
+  """
+  def advisory_status(input, layer3_findings, project_root \\ File.cwd!()) do
+    content = input["content"] || ""
+    config = Application.get_env(:controlkeel, :advisory, [])
+    explicit = Keyword.get(config, :enabled)
+
+    cond do
+      explicit == false ->
+        %{status: "disabled", detail: "Advisory disabled via application config."}
+
+      String.length(content) <= 30 ->
+        %{status: "skipped_short_content", detail: "Content shorter than advisory minimum."}
+
+      ProviderBroker.advisory_chain(project_root) == [] ->
+        %{
+          status: "skipped_no_provider",
+          detail: "No LLM provider configured; pattern scanners completed."
+        }
+
+      layer3_findings != [] ->
+        %{status: "ran", extra_findings: length(layer3_findings)}
+
+      true ->
+        %{status: "ran_empty", detail: "Advisory ran; no additional issues reported."}
+    end
+  end
+
   # ─── Provider dispatch ───────────────────────────────────────────────────────
 
   defp call_provider(input, existing_findings, timeout, project_root) do

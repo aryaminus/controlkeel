@@ -9,7 +9,7 @@ This file replaces the earlier stale MVP audit. The previous version listed seve
 - The original MVP checklist is materially complete.
 - The repo is already beyond MVP: proof bundles, typed memory, benchmark engine, policy training artifacts, expanded domain packs, and native skills/plugin distribution are present.
 - The true remaining roadmap work is the later Team/Platform branch and the infrastructure branch.
-- Burrito packaging is implemented. Release smoke verification is still an ops checklist item until the latest CI run is confirmed green after the recent workflow/runtime fixes.
+- Burrito packaging is implemented. Release Smoke and tag-triggered Release were verified green as of 2026-03-24 (see [docs/release-verification.md](../../docs/release-verification.md) for SHAs: smoke on `main` `7dd9967…`, release `v0.1.7` `c8ac694…`).
 
 ## MVP Gaps That Are Closed
 
@@ -70,8 +70,9 @@ These are the real unfinished roadmap branches after the current repo state, not
 
 ### Launch / Ops Checklist
 
-- Confirm the latest Burrito release and release-smoke workflows are green after the recent packaging/runtime fixes.
-- Tag the release and write changelog/release notes once release verification is stable.
+- **CI:** Keep [Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml) on `main` and [Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml) on tags green; refresh [docs/release-verification.md](../../docs/release-verification.md) when SHAs change.
+- **Local smoke (optional):** With a packaged binary from GitHub Releases, run `controlkeel`, `controlkeel attach opencode`, `controlkeel findings`, `controlkeel status` and align docs if behavior drifts.
+- **Ship:** Tag releases and changelog/release notes per your release process when ready for the next version.
 
 ## Default Interpretation Going Forward
 

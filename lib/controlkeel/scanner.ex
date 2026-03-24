@@ -24,6 +24,6 @@ defmodule ControlKeel.Scanner do
 
   defmodule Result do
     @enforce_keys [:allowed, :decision, :summary, :findings, :scanned_at]
-    defstruct [:allowed, :decision, :summary, :findings, :scanned_at]
+    defstruct [:allowed, :decision, :summary, :findings, :scanned_at, :advisory]
   end
 end

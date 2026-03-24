@@ -4,9 +4,11 @@ This checklist is the manual gate before enabling automatic version bumping.
 
 ## First known-good SHA
 
-- Release Smoke green on `main`: a134760386bd745dd79a4d678031b7199f6d934f
-- Tag-triggered Release green: 2ea6be1c39265a57997822ad7f37d2338f4573a0 (`v0.1.6`)
-- GitHub release assets published correctly: 2ea6be1c39265a57997822ad7f37d2338f4573a0 (`v0.1.6`)
+- Release Smoke green on `main`: `7dd9967528766eeba2d7f4cbd9a608311dd47fc5` ([workflow run](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml), 2026-03-24)
+- Tag-triggered Release green: `c8ac6945df187cf6dac1feafe5ee9db5ccba7932` (`v0.1.7`)
+- GitHub release assets published correctly: `c8ac6945df187cf6dac1feafe5ee9db5ccba7932` (`v0.1.7`)
+
+Re-verify after each release: confirm the latest successful [Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml) on `main` and the latest tag-triggered [Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml), then update the SHAs above.
 
 Update this file with the first confirmed good SHA before enabling `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED`.
 

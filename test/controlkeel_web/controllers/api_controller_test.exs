@@ -131,6 +131,16 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Map.has_key?(body, "decision")
       assert Map.has_key?(body, "summary")
       assert Map.has_key?(body, "findings")
+      assert Map.has_key?(body, "advisory")
+      assert is_map(body["advisory"])
+
+      assert body["advisory"]["status"] in [
+               "disabled",
+               "skipped_short_content",
+               "skipped_no_provider",
+               "ran",
+               "ran_empty"
+             ]
     end
   end
 

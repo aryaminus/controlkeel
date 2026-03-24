@@ -374,8 +374,41 @@ defmodule ControlKeelWeb.MissionControlLive do
             <p class="ck-note">No active task context is available yet.</p>
           <% end %>
 
-          <p class="ck-mini-label" style="margin-top: 1.5rem;">Path graph</p>
-          <ol class="ck-task-list">
+          <p class="ck-mini-label" style="margin-top: 1.5rem;">Task dependencies</p>
+          <%= if @task_graph.edges == [] do %>
+            <p class="ck-note" id="mission-task-deps-empty">
+              No dependency edges are recorded yet. When tasks include architecture, feature, and release tracks, edges appear here. The checklist below stays ordered by position.
+            </p>
+          <% else %>
+            <ul class="ck-mini-list" id="mission-task-edges" style="margin-bottom: 1rem;">
+              <%= for edge <- @task_graph.edges do %>
+                <li>
+                  {Map.get(@task_title_by_id, edge.from_task_id, "Task #{edge.from_task_id}")}
+                  <span class="ck-note"> → </span>
+                  {Map.get(@task_title_by_id, edge.to_task_id, "Task #{edge.to_task_id}")}
+                  <span
+                    class="ck-pill ck-pill-neutral"
+                    style="font-size: 0.65rem; margin-left: 0.35rem;"
+                  >
+                    {edge.dependency_type}
+                  </span>
+                </li>
+              <% end %>
+            </ul>
+            <p class="ck-mini-label">Ready (dependencies satisfied)</p>
+            <p class="ck-note" id="mission-task-ready">
+              <%= if @task_graph.ready_task_ids == [] do %>
+                No tasks are ready to advance right now.
+              <% else %>
+                {Enum.map_join(@task_graph.ready_task_ids, ", ", fn id ->
+                  Map.get(@task_title_by_id, id, "Task #{id}")
+                end)}
+              <% end %>
+            </p>
+          <% end %>
+
+          <p class="ck-mini-label" style="margin-top: 1.5rem;">Task checklist</p>
+          <ol class="ck-task-list" id="mission-task-checklist">
             <%= for task <- @session.tasks do %>
               <li class="ck-task-item">
                 <div>
@@ -522,6 +555,9 @@ defmodule ControlKeelWeb.MissionControlLive do
                   </div>
                 </div>
                 <p class="ck-note">{finding.plain_message}</p>
+                <p class="ck-note" style="font-size: 0.8rem; color: var(--ck-color-muted, #64748b);">
+                  {Mission.finding_human_gate_hint(finding)}
+                </p>
                 <div class="ck-metric-row">
                   <span>{finding.category}</span>
                   <span>{finding.rule_id}</span>
@@ -582,6 +618,9 @@ defmodule ControlKeelWeb.MissionControlLive do
         _ -> nil
       end
 
+    task_graph = Mission.session_task_graph(session.id)
+    task_title_by_id = Map.new(task_graph.tasks, &{&1.id, &1.title})
+
     assign(socket,
       session: session,
       workspace: session.workspace,
@@ -599,6 +638,8 @@ defmodule ControlKeelWeb.MissionControlLive do
       current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
       current_memory_hits: current_memory_hits(session),
       current_resume_packet: current_resume_packet(session),
+      task_graph: task_graph,
+      task_title_by_id: task_title_by_id,
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent")),
       proxy_urls: %{

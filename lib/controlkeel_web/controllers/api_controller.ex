@@ -87,7 +87,8 @@ defmodule ControlKeelWeb.ApiController do
       allowed: result.allowed,
       decision: result.decision,
       summary: result.summary,
-      findings: Enum.map(result.findings, &finding_summary/1)
+      findings: Enum.map(result.findings, &finding_summary/1),
+      advisory: result.advisory
     })
   end
 
