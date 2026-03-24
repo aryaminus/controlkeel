@@ -12,6 +12,18 @@ Codestral
 openclaw
 claude dispatch
 
+opencode
+
+amp
+
+slate
+
+cursor agent
+
+droid
+
+forge
+
 t3code anything to pull for connections?
 
 khadgi-sujan / retune
