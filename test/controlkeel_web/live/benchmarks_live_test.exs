@@ -13,6 +13,9 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     assert html =~ "OpenCode vs ControlKeel"
     assert has_element?(view, "#benchmark-filters")
     assert has_element?(view, "#benchmark-runner")
+    assert has_element?(view, "#benchmark-preset-opencode")
+    assert has_element?(view, "#benchmark-subjects-input")
+    assert has_element?(view, "#benchmark-baseline-input")
     assert has_element?(view, "#benchmark-runs")
     assert has_element?(view, "#policy-train-form")
     assert has_element?(view, "#policy-training-runs")
@@ -31,6 +34,19 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
 
     {path, _flash} = assert_redirect(view)
     assert path =~ "/benchmarks/runs/"
+  end
+
+  test "index preset buttons fill subject fields", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+
+    view |> element("#benchmark-preset-proxy") |> render_click()
+    assert render(view) =~ "controlkeel_validate,controlkeel_proxy"
+
+    view |> element("#benchmark-preset-opencode") |> render_click()
+    assert render(view) =~ "controlkeel_validate,opencode_manual"
+
+    view |> element("#benchmark-preset-ck-only") |> render_click()
+    assert render(view) =~ "benchmark-subjects-input"
   end
 
   test "index surfaces configured external subjects", %{conn: conn} do

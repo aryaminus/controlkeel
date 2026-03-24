@@ -14,6 +14,7 @@ Tracked against this file’s P0 list. Implementation lives in-repo; re-verify a
 | P1: Path graph UX | Done | `Mission.session_task_graph/1`, `lib/controlkeel_web/live/mission_control_live.ex` (dependencies + checklist) |
 | P1: Advisory transparency | Done | `Scanner.Result.advisory`, `Advisory.advisory_status/3`, `POST /api/v1/validate`, MCP `ck_validate` |
 | Max coverage (agents / MCP / skills / check.md) | Done | `docs/support-matrix.md`, `idea/missing/check.md` (classification table) |
+| Benchmark UI presets | Done | `lib/controlkeel_web/live/benchmarks_live.ex` (quick presets, datalist), `docs/benchmarks.md` |
 
 Optional ops (not code): run a packaged-binary smoke on current release artifacts when convenient; refresh SHAs in `docs/release-verification.md` after future releases.
 

@@ -40,3 +40,6 @@ npm-debug.log
 *.db-*
 
 /controlkeel
+
+# Local Cursor / agent session exports (large; not part of the app)
+session-ses_*.md

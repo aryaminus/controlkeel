@@ -17,6 +17,10 @@ This keeps the benchmark reproducible without requiring a deep native integratio
 - `manual_import` — placeholder run first, then import captured external output
 - `shell` — scriptable subject that writes stdout or files for rescoring
 
+## Web UI quick presets
+
+On `/benchmarks`, use **Quick presets** (OpenCode comparison, ControlKeel validate only, Validate + governed proxy) to fill the subject and baseline fields, then adjust if needed. The subjects field still accepts a comma-separated list and supports browser autocomplete from **Available subjects**.
+
 ## OpenCode benchmark setup
 
 Copy the example subject file into the governed project:

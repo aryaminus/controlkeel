@@ -92,6 +92,20 @@ defmodule ControlKeelWeb.BenchmarksLive do
     end
   end
 
+  def handle_event("preset_benchmark", %{"preset" => preset}, socket) do
+    case benchmark_presets()[preset] do
+      nil ->
+        {:noreply, socket}
+
+      patch ->
+        merged =
+          socket.assigns.form.params
+          |> Map.merge(patch)
+
+        {:noreply, assign(socket, :form, to_form(merged, as: :benchmark))}
+    end
+  end
+
   @impl true
   def render(%{live_action: :show} = assigns) do
     ~H"""
@@ -297,6 +311,41 @@ defmodule ControlKeelWeb.BenchmarksLive do
         </div>
 
         <div class="ck-card ck-browser-filters">
+          <datalist id="benchmark-subject-suggestions">
+            <%= for subject <- @available_subjects do %>
+              <option value={subject["id"]}>{subject["label"] || subject["id"]}</option>
+            <% end %>
+          </datalist>
+          <p class="ck-mini-label" style="margin-bottom: 0.5rem;">Quick presets</p>
+          <div class="ck-action-row" style="margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+            <button
+              type="button"
+              class="ck-link"
+              id="benchmark-preset-opencode"
+              phx-click="preset_benchmark"
+              phx-value-preset="opencode_compare"
+            >
+              OpenCode comparison
+            </button>
+            <button
+              type="button"
+              class="ck-link"
+              id="benchmark-preset-ck-only"
+              phx-click="preset_benchmark"
+              phx-value-preset="ck_only"
+            >
+              ControlKeel validate only
+            </button>
+            <button
+              type="button"
+              class="ck-link"
+              id="benchmark-preset-proxy"
+              phx-click="preset_benchmark"
+              phx-value-preset="ck_proxy"
+            >
+              Validate + governed proxy
+            </button>
+          </div>
           <.form for={@form} id="benchmark-runner" phx-submit="run">
             <div class="ck-filter-grid">
               <.input
@@ -308,14 +357,18 @@ defmodule ControlKeelWeb.BenchmarksLive do
               <.input
                 field={@form[:subjects]}
                 type="text"
-                label="Subjects"
+                label="Subjects (comma-separated)"
                 placeholder="controlkeel_validate,opencode_manual"
+                list="benchmark-subject-suggestions"
+                id="benchmark-subjects-input"
               />
               <.input
                 field={@form[:baseline_subject]}
                 type="text"
                 label="Baseline subject"
                 placeholder="controlkeel_validate"
+                list="benchmark-subject-suggestions"
+                id="benchmark-baseline-input"
               />
               <.input
                 field={@form[:domain_pack]}
@@ -532,6 +585,23 @@ defmodule ControlKeelWeb.BenchmarksLive do
       "subjects" => "controlkeel_validate,opencode_manual",
       "baseline_subject" => "controlkeel_validate",
       "domain_pack" => ""
+    }
+  end
+
+  defp benchmark_presets do
+    %{
+      "opencode_compare" => %{
+        "subjects" => "controlkeel_validate,opencode_manual",
+        "baseline_subject" => "controlkeel_validate"
+      },
+      "ck_only" => %{
+        "subjects" => "controlkeel_validate",
+        "baseline_subject" => "controlkeel_validate"
+      },
+      "ck_proxy" => %{
+        "subjects" => "controlkeel_validate,controlkeel_proxy",
+        "baseline_subject" => "controlkeel_validate"
+      }
     }
   end
 
