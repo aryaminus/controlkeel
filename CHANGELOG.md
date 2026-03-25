@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.8 — 2026-03-25
+
+### What's changed
+
+- feat: benchmark quick presets, datalist hints, ignore session exports
+- docs: support matrix, check.md classification, opencode archive note
+- docs: include idea/missing/check.md FAQ in version control
+- feat: P1 docs, mission graph UX, validate advisory metadata, release SHAs
+- feat: update .gitignore and add opencode.md for project scope and requirements
+
 ## v0.1.7 — 2026-03-24
 
 ### What's changed
