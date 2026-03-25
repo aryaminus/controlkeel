@@ -9,7 +9,7 @@ This file replaces the earlier stale MVP audit. The previous version listed seve
 - The original MVP checklist is materially complete.
 - The repo is already beyond MVP: proof bundles, typed memory, benchmark engine, policy training artifacts, expanded domain packs, and native skills/plugin distribution are present.
 - The true remaining roadmap work is the later Team/Platform branch and the infrastructure branch.
-- Burrito packaging is implemented. Release Smoke and tag-triggered Release were verified green as of 2026-03-24 (see [docs/release-verification.md](../../docs/release-verification.md) for SHAs: smoke on `main` `7dd9967…`, release `v0.1.7` `c8ac694…`).
+- Burrito packaging is implemented. Release Smoke and tag-triggered Release were verified green as of 2026-03-25 (see [docs/release-verification.md](../../docs/release-verification.md) for SHAs: smoke on `main` `5e73158…`, release `v0.1.7` `c8ac694…`).
 
 ## MVP Gaps That Are Closed
 
@@ -28,8 +28,8 @@ This file replaces the earlier stale MVP audit. The previous version listed seve
 5. REST API tests exist.
    Evidence: controller coverage is present in `test/controlkeel_web/controllers/api_controller_test.exs`.
 
-6. Mission Control already has the path graph, compliance donut, and launch confirmation state.
-   Evidence: `lib/controlkeel_web/live/mission_control_live.ex` renders the ordered task list with status badges, validation gates, rollback boundaries, confidence scores, the compliance score donut, and the "You're set" session confirmation banner.
+6. Mission Control already surfaces task dependencies, ready tasks, the ordered task checklist, the compliance donut, and launch confirmation state.
+   Evidence: `Mission.session_task_graph/1` supplies dependency edges and ready-task ordering; `lib/controlkeel_web/live/mission_control_live.ex` renders the checklist with status badges, validation gates, rollback boundaries, confidence scores, the compliance score donut, and the "You're set" session confirmation banner.
 
 ## Additional Stale Claims Removed
 

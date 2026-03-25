@@ -4,7 +4,7 @@ This checklist is the manual gate before enabling automatic version bumping.
 
 ## First known-good SHA
 
-- Release Smoke green on `main`: `7dd9967528766eeba2d7f4cbd9a608311dd47fc5` ([workflow run](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml), 2026-03-24)
+- Release Smoke green on `main`: `5e73158d57a1c8743417cc02f251fcd1a9f4ed96` ([workflow run](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml), 2026-03-25)
 - Tag-triggered Release green: `c8ac6945df187cf6dac1feafe5ee9db5ccba7932` (`v0.1.7`)
 - GitHub release assets published correctly: `c8ac6945df187cf6dac1feafe5ee9db5ccba7932` (`v0.1.7`)
 

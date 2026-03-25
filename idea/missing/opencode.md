@@ -28,6 +28,8 @@ The sections below (“Recommended Scope”, “Must-Finish”, phased build pla
 
 **Max coverage inventory:** See [docs/support-matrix.md](../../docs/support-matrix.md) for agents, MCP tools, and bundled skills.
 
+**Superseded by the completion table above; the following is historical only.**
+
 ---
 
 Recommended Scope

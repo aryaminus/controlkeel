@@ -33,7 +33,7 @@ requirement analysis
 
 
 
-ok. now when using with any of the agents supports, does it need additional api keys to run ck? cant ck just run the agents llm to do things if needed? or doe sit have to have api keys or local llm? what if users dont have it? what if users just ask agents to do stuff? how do users even setup which provider to use? can agent have ck set globally by default or does it require them to setup always for every new repo/directory. make sure agetns can be fully uyse ck by themselves without humans having to act. 
+ok. now when using with any of the agents supports, does it need additional api keys to run ck? cant ck just run the agents llm to do things if needed? or doe sit have to have api keys or local llm? what if users dont have it? what if users just ask agents to do stuff? how do users even setup which provider to use? can agent have ck set globally by default or does it require them to setup always for every new repo/directory. make sure agetns can be fully use ck by themselves without humans having to act. 
 
 ---
 
@@ -57,7 +57,7 @@ Environment + CLI (`controlkeel` profile/attach), project binding under `control
 Attachment/bootstrap can be **user-scoped** for some targets; **governed project binding** is **project-local** by design. So: global convenience where supported, not “one toggle replaces per-project governance.”
 
 **Can agents use CK fully without humans?**  
-CK can automate **low-risk** paths and surface **medium** risk; **destructive / high-risk** actions still expect policy-appropriate gates (approve/reject, proofs), not unbounded silent autonomy. Product stance is documented in onboarding/getting-started; full “zero human” for all risk tiers is not promised.
+CK can automate **low-risk** paths and surface **medium** risk; **destructive / high-risk** actions still expect policy-appropriate gates (approve/reject, proofs), not unbounded silent autonomy. Product stance is documented in onboarding/getting-started and [docs/autonomy-and-findings.md](../../docs/autonomy-and-findings.md); full “zero human” for all risk tiers is not promised.
 
 ---
 
