@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.9 — 2026-03-27
+
+### What's changed
+
+- docs: refresh release verification and agent scope matrix
+- docs: refresh Release Smoke SHA, align ck-final Mission Control, missing/ hygiene
+
 ## v0.1.8 — 2026-03-25
 
 ### What's changed
