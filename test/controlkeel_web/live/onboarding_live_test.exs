@@ -142,6 +142,12 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
     assert has_element?(view, "input[value=\"marketing\"]")
     assert has_element?(view, "input[value=\"sales\"]")
     assert has_element?(view, "input[value=\"realestate\"]")
+    assert has_element?(view, "input[value=\"government\"]")
+    assert has_element?(view, "input[value=\"insurance\"]")
+    assert has_element?(view, "input[value=\"ecommerce\"]")
+    assert has_element?(view, "input[value=\"logistics\"]")
+    assert has_element?(view, "input[value=\"manufacturing\"]")
+    assert has_element?(view, "input[value=\"nonprofit\"]")
 
     next_html =
       render_submit(

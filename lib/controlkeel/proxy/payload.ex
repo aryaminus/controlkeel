@@ -30,6 +30,26 @@ defmodule ControlKeel.Proxy.Payload do
     }
   end
 
+  def extract_request(:openai, :completions, payload) when is_map(payload) do
+    %{
+      text: join_texts([payload["prompt"], payload["suffix"]]),
+      model: payload["model"],
+      stream?: payload["stream"] == true,
+      max_output_tokens: payload["max_tokens"] || payload["max_output_tokens"],
+      metadata: %{}
+    }
+  end
+
+  def extract_request(:openai, :embeddings, payload) when is_map(payload) do
+    %{
+      text: join_texts([payload["input"]]),
+      model: payload["model"],
+      stream?: false,
+      max_output_tokens: nil,
+      metadata: %{}
+    }
+  end
+
   def extract_request(:anthropic, :messages, payload) when is_map(payload) do
     %{
       text:
@@ -99,6 +119,22 @@ defmodule ControlKeel.Proxy.Payload do
         ]
       end)
     )
+  end
+
+  def response_text(:openai, :completions, payload) do
+    payload["choices"]
+    |> List.wrap()
+    |> Enum.map(&Map.get(&1, "text"))
+    |> join_texts()
+  end
+
+  def response_text(:openai, :embeddings, _payload), do: ""
+
+  def response_text(:openai, :models, payload) do
+    payload["data"]
+    |> List.wrap()
+    |> Enum.map(&Map.get(&1, "id"))
+    |> join_texts()
   end
 
   def response_text(:anthropic, :messages, payload) do

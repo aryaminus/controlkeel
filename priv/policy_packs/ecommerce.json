@@ -1,0 +1,30 @@
+[
+  {
+    "id": "ecommerce.payment_logging",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "E-commerce flows must never log full card numbers, CVV values, or raw checkout tokens.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|logger\\.|console\\.log|IO\\.inspect).*(card_number|cvv|cvc|checkout_token|payment_token)",
+        "(?i)(pan|card number|cvv|cvc)"
+      ]
+    }
+  },
+  {
+    "id": "ecommerce.refund_guardrail_bypass",
+    "category": "fraud",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "Automated refund or chargeback handling should preserve review thresholds, abuse controls, and audit trails.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(auto_refund|issue_refund|chargeback).*(without_review|skip_review|always_true)",
+        "(?i)(disable|bypass).*(fraud|refund review|chargeback review)"
+      ]
+    }
+  }
+]

@@ -72,7 +72,13 @@ defmodule ControlKeel.MissionTest do
       "legal" => "Legal / Compliance",
       "marketing" => "Marketing / Content",
       "sales" => "Sales / CRM",
-      "realestate" => "Real Estate"
+      "realestate" => "Real Estate",
+      "government" => "Government / Public Sector",
+      "insurance" => "Insurance / Claims",
+      "ecommerce" => "E-commerce / Retail",
+      "logistics" => "Logistics / Supply Chain",
+      "manufacturing" => "Manufacturing / Quality",
+      "nonprofit" => "Nonprofit / Grants"
     }
 
     Enum.each(ControlKeel.Intent.supported_packs(), fn pack ->

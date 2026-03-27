@@ -1,6 +1,6 @@
 ---
 name: domain-audit
-description: "Audit a session against its domain pack, especially HR, legal, marketing, sales, and real-estate constraints. Use this when domain-specific policy needs a manual pass."
+description: "Audit a session against its domain pack, especially the regulated and operations-heavy packs such as HR, legal, marketing, sales, real-estate, government, insurance, logistics, manufacturing, e-commerce, and nonprofit. Use this when domain-specific policy needs a manual pass."
 license: Apache-2.0
 compatibility:
   - codex
@@ -29,8 +29,13 @@ Use this skill when the session’s domain pack drives the real risk more than g
 - Marketing: consent, unsubscribe, analytics PII
 - Sales: CRM data, contact deletion, revenue visibility
 - Real estate: fair-housing logic, tenant PII, retention
+- Government: records retention, constituent data, approval chains
+- Insurance: claims fairness, medical-adjacent privacy, denial review
+- E-commerce: card scope, refunds, fraud controls
+- Logistics: shipment custody, dispatch safety, carrier data
+- Manufacturing: QA holds, traceability, plant safety
+- Nonprofit: donor privacy, grant restrictions, beneficiary exports
 
 ## Additional resources
 
 - [Domain review matrix](references/domain-review-matrix.md)
-

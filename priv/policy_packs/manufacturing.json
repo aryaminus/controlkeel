@@ -1,0 +1,30 @@
+[
+  {
+    "id": "manufacturing.quality_hold_bypass",
+    "category": "quality",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Manufacturing systems must not bypass QA holds or ship failed lots without a governed sign-off path.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(release|ship|approve).*(failed|rejected|hold).*(lot|batch|qa)",
+        "(?i)(skip|bypass).*(qa hold|quality hold|inspection)"
+      ]
+    }
+  },
+  {
+    "id": "manufacturing.safety_interlock_override",
+    "category": "safety",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Production or maintenance automation must not disable plant safety interlocks or bypass lockout procedures.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(disable|bypass|override).*(interlock|lockout|guard|emergency stop)",
+        "(?i)(force_run|resume_line).*(without safety|without signoff)"
+      ]
+    }
+  }
+]

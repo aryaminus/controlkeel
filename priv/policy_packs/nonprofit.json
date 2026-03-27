@@ -1,0 +1,30 @@
+[
+  {
+    "id": "nonprofit.donor_payment_logging",
+    "category": "privacy",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Fundraising systems must not log donor card, bank, or tax-receipt details in application output.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|logger\\.|console\\.log|IO\\.inspect).*(donor_card|bank_account|tax_receipt|gift_amount)",
+        "(?i)(donor|donation).*(cvv|routing_number|account_number)"
+      ]
+    }
+  },
+  {
+    "id": "nonprofit.beneficiary_sensitive_export",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Beneficiary or case-management data should not be bulk-exported to third parties without an explicit program and privacy review.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(Req\\.post|fetch\\(|axios\\.post|HTTPoison\\.post).*(beneficiary|case_note|service_record|minor)",
+        "(?i)(export|sync|bulk upload).*(beneficiary|case|shelter|counseling)"
+      ]
+    }
+  }
+]

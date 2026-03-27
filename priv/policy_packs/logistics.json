@@ -1,0 +1,30 @@
+[
+  {
+    "id": "logistics.chain_of_custody_delete",
+    "category": "compliance",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Shipment scans, manifests, and chain-of-custody events should not be deleted or purged without an explicit retention policy and review.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(DELETE\\s+FROM|destroy_all|purge|hard_delete).*(shipments|manifests|tracking_events|custody_events)",
+        "(?i)(skip|disable|bypass).*(custody|tracking history|retention)"
+      ]
+    }
+  },
+  {
+    "id": "logistics.dispatch_safety_override",
+    "category": "safety",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Dispatch or hazmat workflows must not bypass inspection or safety approval requirements.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(dispatch|route|ship).*(skip|bypass).*(inspection|safety|hazmat|weigh)",
+        "(?i)(override|force).*(delivery|shipment).*(without approval|without inspection)"
+      ]
+    }
+  }
+]

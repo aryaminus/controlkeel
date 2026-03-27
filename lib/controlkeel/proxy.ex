@@ -41,6 +41,18 @@ defmodule ControlKeel.Proxy do
     |> String.replace_prefix("https://", "wss://")
   end
 
+  def endpoint_urls(%Session{} = session) do
+    %{
+      openai_responses: url(session, :openai, "/v1/responses"),
+      openai_chat: url(session, :openai, "/v1/chat/completions"),
+      openai_completions: url(session, :openai, "/v1/completions"),
+      openai_embeddings: url(session, :openai, "/v1/embeddings"),
+      openai_models: url(session, :openai, "/v1/models"),
+      openai_realtime: realtime_url(session, :openai, "/v1/realtime"),
+      anthropic_messages: url(session, :anthropic, "/v1/messages")
+    }
+  end
+
   def websocket_upstream_url(provider, suffix, query_string \\ nil)
 
   def websocket_upstream_url(:openai, suffix, query_string) do

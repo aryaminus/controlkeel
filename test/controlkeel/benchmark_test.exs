@@ -56,6 +56,34 @@ defmodule ControlKeel.BenchmarkTest do
            ]
   end
 
+  test "loads the broader public domain-expansion suite for the new packs" do
+    suite = benchmark_suite_fixture("domain_expansion_v2")
+
+    assert suite.slug == "domain_expansion_v2"
+    assert length(suite.scenarios) == 6
+
+    assert Enum.all?(
+             suite.scenarios,
+             &(get_in(&1.metadata || %{}, ["domain_pack"]) in [
+                 "government",
+                 "insurance",
+                 "ecommerce",
+                 "logistics",
+                 "manufacturing",
+                 "nonprofit"
+               ])
+           )
+
+    assert Benchmark.domain_packs_for_suite(suite) == [
+             "government",
+             "insurance",
+             "ecommerce",
+             "logistics",
+             "manufacturing",
+             "nonprofit"
+           ]
+  end
+
   test "runs validate and proxy subjects without creating sessions or ship analytics" do
     session_count = Repo.aggregate(Session, :count, :id)
     analytics_count = Repo.aggregate(Event, :count, :id)

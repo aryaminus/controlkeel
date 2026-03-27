@@ -1,0 +1,30 @@
+[
+  {
+    "id": "insurance.claim_denial_sensitive_attribute",
+    "category": "compliance",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Insurance claim or underwriting decisions must not deny or price based on sensitive medical or protected attributes without explicit governed review.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(deny|reject|rate|premium|underwriting).*(pregnan|disabled|genetic|mental_health|cancer|hiv)",
+        "(?i)(claim|policy).*(protected_class|medical_history|preexisting_condition)"
+      ]
+    }
+  },
+  {
+    "id": "insurance.claim_logging_sensitive",
+    "category": "privacy",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Claims systems should not log diagnosis, treatment, or claimant payout details to application logs.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(log|logger\\.|console\\.log|IO\\.inspect).*(diagnosis|treatment|claim_amount|payout|adjuster_note)",
+        "(?i)(claim|policyholder).*(ssn|dob|medical_note)"
+      ]
+    }
+  }
+]

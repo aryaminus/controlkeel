@@ -105,7 +105,10 @@ defmodule ControlKeel.Benchmark.Metadata do
 
   defp infer_domain_pack_from_text(text) do
     cond do
-      String.contains?(text, ["patient", "medical", "phi", "insurance"]) ->
+      String.contains?(text, ["claim", "policyholder", "adjuster", "underwriting", "premium"]) ->
+        "insurance"
+
+      String.contains?(text, ["patient", "medical", "phi", "clinic", "diagnosis"]) ->
         "healthcare"
 
       String.contains?(text, ["student", "school", "classroom", "minor"]) ->
@@ -128,6 +131,21 @@ defmodule ControlKeel.Benchmark.Metadata do
 
       String.contains?(text, ["listing", "tenant", "mortgage", "property", "rental"]) ->
         "realestate"
+
+      String.contains?(text, ["constituent", "permit", "benefits", "public record", "caseworker"]) ->
+        "government"
+
+      String.contains?(text, ["cart", "checkout", "refund", "chargeback", "order"]) ->
+        "ecommerce"
+
+      String.contains?(text, ["shipment", "dispatch", "warehouse", "carrier", "manifest"]) ->
+        "logistics"
+
+      String.contains?(text, ["qa", "quality hold", "work order", "supplier", "production"]) ->
+        "manufacturing"
+
+      String.contains?(text, ["donor", "grant", "volunteer", "beneficiary", "fundraising"]) ->
+        "nonprofit"
 
       true ->
         "software"

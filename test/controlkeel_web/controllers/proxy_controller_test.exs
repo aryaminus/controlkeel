@@ -122,6 +122,75 @@ defmodule ControlKeelWeb.ProxyControllerTest do
     assert json_response(conn, 400)["error"]["code"] == "controlkeel_policy_violation"
   end
 
+  test "passes through openai completions requests", %{conn: conn, bypass: bypass} do
+    session = session_fixture(%{budget_cents: 5_000, daily_budget_cents: 5_000, spent_cents: 0})
+
+    Bypass.expect_once(bypass, "POST", "/v1/completions", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(
+        200,
+        Jason.encode!(%{
+          "choices" => [%{"text" => "done"}],
+          "usage" => %{"prompt_tokens" => 5, "completion_tokens" => 2}
+        })
+      )
+    end)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post(
+        "/proxy/openai/#{session.proxy_token}/v1/completions",
+        Jason.encode!(%{"model" => "gpt-5.4-mini", "prompt" => "Finish this"})
+      )
+
+    assert json_response(conn, 200)["choices"] |> hd() |> Map.fetch!("text") == "done"
+  end
+
+  test "passes through openai embeddings requests", %{conn: conn, bypass: bypass} do
+    session = session_fixture(%{budget_cents: 5_000, daily_budget_cents: 5_000, spent_cents: 0})
+
+    Bypass.expect_once(bypass, "POST", "/v1/embeddings", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(
+        200,
+        Jason.encode!(%{
+          "data" => [%{"embedding" => [0.1, 0.2], "index" => 0}],
+          "usage" => %{"prompt_tokens" => 7, "total_tokens" => 7}
+        })
+      )
+    end)
+
+    conn =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post(
+        "/proxy/openai/#{session.proxy_token}/v1/embeddings",
+        Jason.encode!(%{"model" => "text-embedding-3-large", "input" => "hello"})
+      )
+
+    assert %{"data" => [%{"index" => 0}]} = json_response(conn, 200)
+  end
+
+  test "passes through openai models requests without a JSON body", %{conn: conn, bypass: bypass} do
+    session = session_fixture(%{budget_cents: 5_000, daily_budget_cents: 5_000, spent_cents: 0})
+
+    Bypass.expect_once(bypass, "GET", "/v1/models", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(
+        200,
+        Jason.encode!(%{"data" => [%{"id" => "gpt-5.4-mini"}, %{"id" => "gpt-5.4"}]})
+      )
+    end)
+
+    conn = get(conn, "/proxy/openai/#{session.proxy_token}/v1/models")
+
+    assert Enum.map(json_response(conn, 200)["data"], & &1["id"]) == ["gpt-5.4-mini", "gpt-5.4"]
+  end
+
   test "streams SSE through and terminates with a provider-shaped error on blocked deltas", %{
     conn: conn,
     bypass: bypass

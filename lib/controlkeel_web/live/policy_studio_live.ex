@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.PolicyStudioLive do
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeel.Policy.PackLoader
 
@@ -173,7 +174,12 @@ defmodule ControlKeelWeb.PolicyStudioLive do
   defp pack_label("sales"), do: "Sales — CRM / Contact PII"
   defp pack_label("realestate"), do: "Real Estate — Transaction / PII"
   defp pack_label("gdpr"), do: "GDPR — EU Data Protection"
-  defp pack_label(name), do: String.capitalize(name)
+
+  defp pack_label(name) do
+    if name in Intent.supported_packs(),
+      do: Intent.pack_label(name),
+      else: String.capitalize(name)
+  end
 
   defp pack_description("baseline"),
     do: "Always active. Detects secrets, injection, and XSS in all agent output."
@@ -216,6 +222,16 @@ defmodule ControlKeelWeb.PolicyStudioLive do
   defp pack_description("gdpr"),
     do:
       "Active for EU data handling. Flags missing consent, right-to-delete gaps, and cross-border data transfer risks."
+
+  defp pack_description(name) when is_binary(name) do
+    if name in Intent.supported_packs() do
+      pack = Intent.Domains.pack(name)
+
+      "Active when domain pack is #{Intent.pack_label(name)}. Focus areas: #{Enum.join(pack.compliance, ", ")}."
+    else
+      "Domain-specific policy rules."
+    end
+  end
 
   defp pack_description(_), do: "Domain-specific policy rules."
 

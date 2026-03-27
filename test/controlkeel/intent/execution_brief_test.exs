@@ -18,7 +18,13 @@ defmodule ControlKeel.Intent.ExecutionBriefTest do
              "legal",
              "marketing",
              "sales",
-             "realestate"
+             "realestate",
+             "government",
+             "insurance",
+             "ecommerce",
+             "logistics",
+             "manufacturing",
+             "nonprofit"
            ]
 
     schema_packs = get_in(ExecutionBrief.provider_schema(), ["properties", "domain_pack", "enum"])

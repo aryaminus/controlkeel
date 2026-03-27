@@ -99,6 +99,9 @@ defmodule ControlKeelWeb.Router do
 
     post "/openai/:proxy_token/v1/responses", ProxyController, :openai_responses
     post "/openai/:proxy_token/v1/chat/completions", ProxyController, :openai_chat_completions
+    post "/openai/:proxy_token/v1/completions", ProxyController, :openai_completions
+    post "/openai/:proxy_token/v1/embeddings", ProxyController, :openai_embeddings
+    get "/openai/:proxy_token/v1/models", ProxyController, :openai_models
     post "/anthropic/:proxy_token/v1/messages", ProxyController, :anthropic_messages
     get "/openai/:proxy_token/v1/realtime", ProxySocketController, :openai_realtime
   end

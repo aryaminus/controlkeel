@@ -529,6 +529,18 @@ defmodule ControlKeelWeb.MissionControlLive do
             <p class="ck-note">{@proxy_urls.openai_chat}</p>
           </div>
           <div>
+            <h3>OpenAI completions</h3>
+            <p class="ck-note">{@proxy_urls.openai_completions}</p>
+          </div>
+          <div>
+            <h3>OpenAI embeddings</h3>
+            <p class="ck-note">{@proxy_urls.openai_embeddings}</p>
+          </div>
+          <div>
+            <h3>OpenAI models</h3>
+            <p class="ck-note">{@proxy_urls.openai_models}</p>
+          </div>
+          <div>
             <h3>OpenAI realtime</h3>
             <p class="ck-note">{@proxy_urls.openai_realtime}</p>
           </div>
@@ -642,12 +654,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       task_title_by_id: task_title_by_id,
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent")),
-      proxy_urls: %{
-        openai_responses: Proxy.url(session, :openai, "/v1/responses"),
-        openai_chat: Proxy.url(session, :openai, "/v1/chat/completions"),
-        openai_realtime: Proxy.realtime_url(session, :openai, "/v1/realtime"),
-        anthropic_messages: Proxy.url(session, :anthropic, "/v1/messages")
-      }
+      proxy_urls: Proxy.endpoint_urls(session)
     )
   end
 

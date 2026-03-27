@@ -45,4 +45,30 @@ defmodule ControlKeel.Scanner.FastPathTest do
     assert Enum.any?(result.findings, &(&1.rule_id == "secret.aws_access_key"))
     assert result.decision == "block"
   end
+
+  test "loads new government domain rules when the pack is selected" do
+    result =
+      FastPath.scan(%{
+        "content" => "Repo.query!(\"DELETE FROM permit_records WHERE inserted_at < NOW()\")",
+        "path" => "lib/gov/records_cleanup.ex",
+        "kind" => "code",
+        "domain_pack" => "government"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "government.records_retention_bypass"))
+    assert result.decision == "block"
+  end
+
+  test "loads new ecommerce domain rules when the pack is selected" do
+    result =
+      FastPath.scan(%{
+        "content" => ~S|Logger.info("card_number=#{order.card_number} cvv=#{order.cvv}")|,
+        "path" => "lib/shop/checkout_logger.ex",
+        "kind" => "code",
+        "domain_pack" => "ecommerce"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "ecommerce.payment_logging"))
+    assert result.decision == "block"
+  end
 end

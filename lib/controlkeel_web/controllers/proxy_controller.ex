@@ -13,6 +13,15 @@ defmodule ControlKeelWeb.ProxyController do
   def openai_chat_completions(conn, params),
     do: handle_proxy(conn, params, :openai, :chat_completions, "/v1/chat/completions")
 
+  def openai_completions(conn, params),
+    do: handle_proxy(conn, params, :openai, :completions, "/v1/completions")
+
+  def openai_embeddings(conn, params),
+    do: handle_proxy(conn, params, :openai, :embeddings, "/v1/embeddings")
+
+  def openai_models(conn, params),
+    do: handle_proxy_without_body(conn, params, :openai, :models, "/v1/models", :get)
+
   def anthropic_messages(conn, params),
     do: handle_proxy(conn, params, :anthropic, :messages, "/v1/messages")
 
@@ -39,7 +48,17 @@ defmodule ControlKeelWeb.ProxyController do
             extracted
           )
         else
-          proxy_json(conn, session, provider, tool, upstream_path, raw_body, preflight, extracted)
+          proxy_json(
+            conn,
+            session,
+            provider,
+            tool,
+            upstream_path,
+            :post,
+            raw_body,
+            preflight,
+            extracted
+          )
         end
       else
         policy_error(conn, provider, preflight.summary)
@@ -62,17 +81,70 @@ defmodule ControlKeelWeb.ProxyController do
     end
   end
 
-  defp proxy_json(conn, session, provider, tool, upstream_path, raw_body, preflight, extracted) do
+  defp handle_proxy_without_body(
+         conn,
+         %{"proxy_token" => proxy_token},
+         provider,
+         tool,
+         upstream_path,
+         method
+       ) do
+    with {:ok, session} <- fetch_proxy_session(proxy_token),
+         extracted <- Payload.extract_request(provider, tool, %{}),
+         {:ok, preflight} <-
+           Governor.preflight(session, provider, upstream_path, extracted,
+             path: conn.request_path,
+             kind: "text",
+             timeout_ms: Proxy.timeout_ms()
+           ) do
+      if preflight.allowed do
+        proxy_json(
+          conn,
+          session,
+          provider,
+          tool,
+          upstream_path,
+          method,
+          nil,
+          preflight,
+          extracted
+        )
+      else
+        policy_error(conn, provider, preflight.summary)
+      end
+    else
+      {:error, :session_not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{"error" => %{"message" => "Proxy session not found"}})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:bad_gateway)
+        |> json(%{"error" => %{"message" => inspect(reason)}})
+    end
+  end
+
+  defp proxy_json(
+         conn,
+         session,
+         provider,
+         tool,
+         upstream_path,
+         method,
+         raw_body,
+         preflight,
+         extracted
+       ) do
     started_at = System.monotonic_time(:millisecond)
 
     case Req.request(
-           method: :post,
-           url: upstream_url(provider, upstream_path),
-           headers: forwarded_headers(conn),
-           body: raw_body,
-           decode_body: false,
-           compressed: false,
-           receive_timeout: Proxy.timeout_ms()
+           request_options(
+             conn,
+             method,
+             upstream_url(provider, upstream_path),
+             raw_body
+           )
          ) do
       {:ok, %Req.Response{} = response} ->
         emit_upstream(provider, upstream_path, started_at, response.status)
@@ -135,14 +207,13 @@ defmodule ControlKeelWeb.ProxyController do
     started_at = System.monotonic_time(:millisecond)
 
     case Req.request(
-           method: :post,
-           url: upstream_url(provider, upstream_path),
-           headers: forwarded_headers(conn),
-           body: raw_body,
-           into: :self,
-           decode_body: false,
-           compressed: false,
-           receive_timeout: Proxy.timeout_ms()
+           request_options(
+             conn,
+             :post,
+             upstream_url(provider, upstream_path),
+             raw_body,
+             into: :self
+           )
          ) do
       {:ok, %Req.Response{} = response} ->
         emit_upstream(provider, upstream_path, started_at, response.status)
@@ -375,6 +446,20 @@ defmodule ControlKeelWeb.ProxyController do
         end
       end)
     end)
+  end
+
+  defp request_options(conn, method, url, raw_body, extra_opts \\ []) do
+    opts =
+      [
+        method: method,
+        url: url,
+        headers: forwarded_headers(conn),
+        decode_body: false,
+        compressed: false,
+        receive_timeout: Proxy.timeout_ms()
+      ] ++ extra_opts
+
+    if is_binary(raw_body), do: Keyword.put(opts, :body, raw_body), else: opts
   end
 
   defp upstream_url(:openai, path), do: Proxy.openai_upstream() <> path

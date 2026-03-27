@@ -67,6 +67,9 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "Sql injection"
     assert html =~ "blocked"
     assert html =~ "/proxy/openai/"
+    assert html =~ "/v1/completions"
+    assert html =~ "/v1/embeddings"
+    assert html =~ "/v1/models"
     assert html =~ "View fix"
   end
 

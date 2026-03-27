@@ -94,6 +94,9 @@ Replace `{base}` with your ControlKeel server origin (for example `http://localh
 |----------------|-------------------------------------|
 | OpenAI Responses API | `POST {base}/proxy/openai/{proxy_token}/v1/responses` |
 | OpenAI Chat Completions | `POST {base}/proxy/openai/{proxy_token}/v1/chat/completions` |
+| OpenAI Completions | `POST {base}/proxy/openai/{proxy_token}/v1/completions` |
+| OpenAI Embeddings | `POST {base}/proxy/openai/{proxy_token}/v1/embeddings` |
+| OpenAI Models | `GET {base}/proxy/openai/{proxy_token}/v1/models` |
 | Anthropic Messages | `POST {base}/proxy/anthropic/{proxy_token}/v1/messages` |
 | OpenAI Realtime (WebSocket) | `GET {base}/proxy/openai/{proxy_token}/v1/realtime` (scheme becomes `ws` / `wss` in Mission Control) |
 
@@ -101,9 +104,10 @@ Mission Control lists the resolved URLs for the current mission under **Proxy** 
 
 Today that means:
 
-- OpenAI-style `responses` and `chat/completions`
+- OpenAI-style `responses`, `chat/completions`, legacy `completions`, `embeddings`, and `models`
 - Anthropic-style `messages`
 - OpenAI realtime websocket path
+- Better compatibility with external clients that probe `/v1/models` before use or rely on `embeddings` for retrieval workflows
 
 
 Attach flag behavior:

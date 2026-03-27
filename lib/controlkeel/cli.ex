@@ -780,6 +780,9 @@ defmodule ControlKeel.CLI do
            "Auth owner: #{provider_status["selected_auth_owner"]}",
            "OpenAI responses: #{Proxy.url(session, :openai, "/v1/responses")}",
            "OpenAI chat: #{Proxy.url(session, :openai, "/v1/chat/completions")}",
+           "OpenAI completions: #{Proxy.url(session, :openai, "/v1/completions")}",
+           "OpenAI embeddings: #{Proxy.url(session, :openai, "/v1/embeddings")}",
+           "OpenAI models: #{Proxy.url(session, :openai, "/v1/models")}",
            "OpenAI realtime: #{Proxy.realtime_url(session, :openai, "/v1/realtime")}",
            "Anthropic messages: #{Proxy.url(session, :anthropic, "/v1/messages")}"
          ]}

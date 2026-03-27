@@ -78,6 +78,48 @@ defmodule ControlKeel.Intent.Domains do
       domain_pack: "realestate",
       industry: "realestate",
       description: "Listings, transactions, client intake, disclosure and compliance workflows"
+    },
+    %{
+      id: "government",
+      label: "Government / Public Sector",
+      domain_pack: "government",
+      industry: "government",
+      description: "Permits, casework, constituent services, records, and benefits workflows"
+    },
+    %{
+      id: "insurance",
+      label: "Insurance / Claims",
+      domain_pack: "insurance",
+      industry: "insurance",
+      description: "Claims intake, underwriting, servicing, and fraud review workflows"
+    },
+    %{
+      id: "ecommerce",
+      label: "E-commerce / Retail",
+      domain_pack: "ecommerce",
+      industry: "retail",
+      description: "Orders, returns, catalog ops, fulfillment, and customer support workflows"
+    },
+    %{
+      id: "logistics",
+      label: "Logistics / Supply Chain",
+      domain_pack: "logistics",
+      industry: "logistics",
+      description: "Dispatch, shipment tracking, warehouse operations, and carrier coordination"
+    },
+    %{
+      id: "manufacturing",
+      label: "Manufacturing / Quality",
+      domain_pack: "manufacturing",
+      industry: "manufacturing",
+      description: "Production planning, QA, traceability, supplier, and plant workflows"
+    },
+    %{
+      id: "nonprofit",
+      label: "Nonprofit / Grants",
+      domain_pack: "nonprofit",
+      industry: "nonprofit",
+      description: "Donor records, grant reporting, volunteer operations, and service delivery"
     }
   ]
 
@@ -91,7 +133,13 @@ defmodule ControlKeel.Intent.Domains do
     "legal" => "Legal / Compliance",
     "marketing" => "Marketing / Content",
     "sales" => "Sales / CRM",
-    "realestate" => "Real Estate"
+    "realestate" => "Real Estate",
+    "government" => "Government / Public Sector",
+    "insurance" => "Insurance / Claims",
+    "ecommerce" => "E-commerce / Retail",
+    "logistics" => "Logistics / Supply Chain",
+    "manufacturing" => "Manufacturing / Quality",
+    "nonprofit" => "Nonprofit / Grants"
   }
 
   @packs %{
@@ -451,6 +499,255 @@ defmodule ControlKeel.Intent.Domains do
             "No discriminatory screening, encrypted docs, MLS data not publicly shared, GDPR consent..."
         }
       ]
+    },
+    "government" => %{
+      industry: "government",
+      compliance: [
+        "Public records retention",
+        "Section 508 accessibility",
+        "Sensitive citizen data handling"
+      ],
+      stack_guidance:
+        "Favor auditable workflows, records retention, accessibility, and explicit approval checkpoints. Treat case files, permits, and benefits data as review-heavy and retention-bound from day one.",
+      validation_language:
+        "Assume every citizen-facing workflow is subject to records requests, retention rules, and public accountability. Flag record deletion, protected-class scoring, and unreviewed case exports aggressively.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who uses this public-sector workflow?",
+          prompt:
+            "Which caseworkers, permitting staff, citizens, or admins use the first version, and for what public service workflow?",
+          placeholder:
+            "Permit reviewers, licensing clerks, benefits staff, residents submitting requests..."
+        },
+        %{
+          id: "data_involved",
+          label: "What constituent or case data is involved?",
+          prompt:
+            "What permit, case, benefits, or resident records will the first release handle?",
+          placeholder:
+            "Permit applications, case notes, addresses, benefit eligibility records, inspection history..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 government workflow steps the first version must support safely and auditably.",
+          placeholder: "Application intake, routing, approval, record export, status updates..."
+        },
+        %{
+          id: "constraints",
+          label: "What records or accessibility limits apply?",
+          prompt:
+            "What matters most around retention schedules, accessibility, review chains, or export controls?",
+          placeholder:
+            "7-year retention, Section 508 conformance, supervisor sign-off before publish, no bulk public export..."
+        }
+      ]
+    },
+    "insurance" => %{
+      industry: "insurance",
+      compliance: ["Claims auditability", "GLBA basics", "NAIC privacy expectations"],
+      stack_guidance:
+        "Keep claims, underwriting, and servicing flows auditable and role-scoped. Separate medical or protected-condition data from broad operational logs and never automate denial logic on sensitive traits.",
+      validation_language:
+        "Treat policyholder and claimant data as privacy-scoped and dispute-sensitive. Flag denial logic based on protected or medical attributes, unencrypted claims exports, and missing review steps.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who works in the claims or policy flow?",
+          prompt:
+            "Which adjusters, underwriters, policyholders, or servicing staff use the first release?",
+          placeholder:
+            "Claims adjusters, underwriters, policyholders uploading docs, service reps..."
+        },
+        %{
+          id: "data_involved",
+          label: "What policyholder or claim data is involved?",
+          prompt:
+            "What claim, policy, payment, or medical-adjacent data is in scope for the first release?",
+          placeholder:
+            "Claim notes, policy numbers, payout amounts, diagnosis summaries, beneficiary details..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt: "List the 3-5 insurance operations the first version must support.",
+          placeholder:
+            "Claim intake, triage, document upload, reserve approval, payment tracking..."
+        },
+        %{
+          id: "constraints",
+          label: "What privacy or approval limits apply?",
+          prompt:
+            "What matters most around denial review, sensitive-attribute handling, access control, or retention?",
+          placeholder:
+            "Human sign-off before denial, no diagnosis in logs, adjuster-only claim notes, retention by policy line..."
+        }
+      ]
+    },
+    "ecommerce" => %{
+      industry: "retail",
+      compliance: ["PCI-DSS", "Consumer privacy", "Returns / fraud controls"],
+      stack_guidance:
+        "Keep checkout, refunds, and customer support flows isolated and reversible. Never log full payment credentials or session tokens, and keep catalog ops separate from payments and account recovery.",
+      validation_language:
+        "Treat carts, orders, and customer profiles as fraud-sensitive and privacy-scoped. Flag full-card logging, unsafe refund automation, and data joins that expose customer history broadly.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who uses the storefront or ops flow?",
+          prompt:
+            "Which shoppers, support staff, or operations teams use the first version, and for which commerce task?",
+          placeholder:
+            "Customers checking out, support reviewing returns, merch ops editing catalog..."
+        },
+        %{
+          id: "data_involved",
+          label: "What order or customer data is involved?",
+          prompt:
+            "What order, payment, catalog, or account data is touched in the first release?",
+          placeholder:
+            "Order totals, payment intents, shipping addresses, return reasons, loyalty profiles..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt: "List the 3-5 commerce operations the first version must support.",
+          placeholder:
+            "Catalog publish, checkout, order status, returns workflow, fraud review..."
+        },
+        %{
+          id: "constraints",
+          label: "What payments or fraud limits apply?",
+          prompt:
+            "What matters most around card scope, refund approval, privacy, or fraud review?",
+          placeholder:
+            "No PAN in logs, manager approval for refunds, delete-on-request for accounts, manual review above threshold..."
+        }
+      ]
+    },
+    "logistics" => %{
+      industry: "logistics",
+      compliance: ["Chain of custody", "Safety / dispatch review", "Vendor access control"],
+      stack_guidance:
+        "Keep shipment state, dispatch actions, and carrier data auditable and append-only where possible. Avoid deleting movement history and require review for safety or hazmat overrides.",
+      validation_language:
+        "Treat routing, custody, and delivery records as operationally critical. Flag deletion of shipment history, unsafe dispatch overrides, and excessive exposure of driver or consignee data.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who uses this logistics workflow?",
+          prompt:
+            "Which dispatchers, warehouse staff, drivers, or customers interact with the first version?",
+          placeholder:
+            "Dispatch coordinators, warehouse leads, drivers, customer support tracing shipments..."
+        },
+        %{
+          id: "data_involved",
+          label: "What shipment or carrier data is involved?",
+          prompt: "What shipment events, route data, inventory, or driver records are in scope?",
+          placeholder:
+            "Tracking scans, manifests, pickup windows, warehouse counts, driver phone numbers..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt: "List the 3-5 logistics operations the first version must support.",
+          placeholder:
+            "Dispatch, tracking updates, exception handling, warehouse receiving, proof of delivery..."
+        },
+        %{
+          id: "constraints",
+          label: "What safety or retention limits apply?",
+          prompt:
+            "What matters most around custody history, safety checks, carrier access, or deletion policy?",
+          placeholder:
+            "No deletion of scan history, supervisor approval for hazmat override, driver PII restricted..."
+        }
+      ]
+    },
+    "manufacturing" => %{
+      industry: "manufacturing",
+      compliance: ["Quality traceability", "Change control", "Plant safety review"],
+      stack_guidance:
+        "Prefer traceable work-order, QA, and supplier workflows with sign-off steps. Keep production overrides reviewable and never bypass quality holds or safety interlocks in automation.",
+      validation_language:
+        "Treat QA, recall, and plant-safety workflows as high-impact. Flag safety interlock bypasses, unsigned quality overrides, and missing lot traceability.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who works in the production flow?",
+          prompt:
+            "Which planners, operators, QA staff, or suppliers use the first version and for which workflow?",
+          placeholder:
+            "Production planners, line operators, QA inspectors, maintenance leads, supplier managers..."
+        },
+        %{
+          id: "data_involved",
+          label: "What production or quality data is involved?",
+          prompt:
+            "What work orders, lot traces, inspection results, or supplier records are in scope?",
+          placeholder:
+            "Lot IDs, QA checkpoints, equipment status, supplier batches, maintenance logs..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 manufacturing or quality operations the first version must support.",
+          placeholder:
+            "Work-order intake, QA sign-off, lot trace, maintenance requests, supplier holds..."
+        },
+        %{
+          id: "constraints",
+          label: "What safety or traceability limits apply?",
+          prompt:
+            "What matters most around change control, traceability, operator permissions, or recall readiness?",
+          placeholder:
+            "No bypassing QA hold, operator-only changes, recall traceability required, supervisor sign-off for overrides..."
+        }
+      ]
+    },
+    "nonprofit" => %{
+      industry: "nonprofit",
+      compliance: ["Donor privacy", "Grant audit trails", "Volunteer / beneficiary safeguards"],
+      stack_guidance:
+        "Treat donor, volunteer, and beneficiary records as privacy-scoped and audit-sensitive. Keep grant restrictions explicit, and separate fundraising workflows from service-delivery records.",
+      validation_language:
+        "Assume grant, donor, and beneficiary data requires minimization and review. Flag sensitive exports, donor payment logging, and grant-spend automation without restrictions or approvals.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who uses this nonprofit workflow?",
+          prompt:
+            "Which fundraisers, program staff, volunteers, donors, or beneficiaries use the first version?",
+          placeholder:
+            "Development staff, grant managers, volunteers, donor ops, case managers..."
+        },
+        %{
+          id: "data_involved",
+          label: "What donor, grant, or beneficiary data is involved?",
+          prompt: "What donation, grant, volunteer, or service-delivery records are in scope?",
+          placeholder:
+            "Donation history, grant restrictions, volunteer background data, beneficiary case notes..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt: "List the 3-5 nonprofit operations the first version must support.",
+          placeholder:
+            "Donation intake, grant tracking, volunteer scheduling, beneficiary intake, compliance reporting..."
+        },
+        %{
+          id: "constraints",
+          label: "What privacy or grant limits apply?",
+          prompt:
+            "What matters most around donor privacy, grant restrictions, beneficiary safeguards, or review requirements?",
+          placeholder:
+            "No donor card data in logs, grant approval before reallocation, beneficiary export locked down..."
+        }
+      ]
     }
   }
 
@@ -681,6 +978,69 @@ defmodule ControlKeel.Intent.Domains do
     cond do
       String.contains?(content, ["ssn", "financial disclosure", "tax", "mortgage"]) -> "high"
       String.contains?(content, ["client", "transaction", "offer", "listing"]) -> "moderate"
+      true -> "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("government", content) do
+    cond do
+      String.contains?(content, ["ssn", "benefits", "juvenile", "case file", "license"]) ->
+        "critical"
+
+      String.contains?(content, ["permit", "constituent", "inspection", "public record"]) ->
+        "high"
+
+      true ->
+        "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("insurance", content) do
+    cond do
+      String.contains?(content, ["diagnosis", "claim denial", "underwriting", "beneficiary"]) ->
+        "critical"
+
+      String.contains?(content, ["claim", "policy", "adjuster", "premium", "payout"]) ->
+        "high"
+
+      true ->
+        "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("ecommerce", content) do
+    cond do
+      String.contains?(content, ["card", "cvv", "refund", "chargeback", "checkout"]) -> "high"
+      String.contains?(content, ["order", "cart", "customer", "return", "catalog"]) -> "moderate"
+      true -> "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("logistics", content) do
+    cond do
+      String.contains?(content, ["hazmat", "customs", "driver", "chain of custody"]) -> "high"
+      String.contains?(content, ["shipment", "dispatch", "warehouse", "delivery"]) -> "moderate"
+      true -> "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("manufacturing", content) do
+    cond do
+      String.contains?(content, ["safety interlock", "recall", "lot trace", "quality hold"]) ->
+        "high"
+
+      String.contains?(content, ["work order", "supplier", "qa", "production"]) ->
+        "moderate"
+
+      true ->
+        "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("nonprofit", content) do
+    cond do
+      String.contains?(content, ["donor card", "beneficiary", "minor", "tax receipt"]) -> "high"
+      String.contains?(content, ["grant", "donor", "volunteer", "program"]) -> "moderate"
       true -> "moderate"
     end
   end

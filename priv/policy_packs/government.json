@@ -1,0 +1,30 @@
+[
+  {
+    "id": "government.records_retention_bypass",
+    "category": "compliance",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Government case, permit, or public-record history should not be deleted or purged without a formal retention and hold review.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(DELETE\\s+FROM|destroy_all|drop_table|purge|hard_delete).*(public_records|permit_records|case_files|benefit_cases)",
+        "(?i)(skip|disable|bypass).*(retention|hold|records_request|foia)"
+      ]
+    }
+  },
+  {
+    "id": "government.benefits_protected_class_scoring",
+    "category": "compliance",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Public-sector eligibility, benefits, or permit scoring must not use protected or citizenship-adjacent attributes as ranking shortcuts.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(eligibility|benefit|permit|case).*(citizenship|nationality|religion|disability|race)",
+        "(?i)(score|rank|deny|reject).*(veteran_status|immigration_status|native_language)"
+      ]
+    }
+  }
+]

@@ -54,6 +54,37 @@ defmodule ControlKeel.Mission.Planner do
       compliance: ["Fair Housing Act", "RESPA basics", "GDPR / CCPA"],
       stack: "Phoenix + Postgres + encrypted document storage and transaction audit trail"
     },
+    "government" => %{
+      label: "Government / Public Sector",
+      compliance: ["Public records retention", "Section 508", "Sensitive citizen data handling"],
+      stack: "Phoenix + Postgres + audited approval workflows with retention-aware storage"
+    },
+    "insurance" => %{
+      label: "Insurance / Claims",
+      compliance: ["GLBA basics", "Claims auditability", "Privacy review"],
+      stack: "Phoenix + Postgres + role-based claims workflows with dispute-friendly audit logs"
+    },
+    "retail" => %{
+      label: "E-commerce / Retail",
+      compliance: ["PCI-DSS", "GDPR / CCPA", "Fraud review controls"],
+      stack: "Phoenix + payment isolation + inventory-aware storefront and returns workflows"
+    },
+    "logistics" => %{
+      label: "Logistics / Supply Chain",
+      compliance: ["Chain of custody", "Dispatch safety review", "Vendor access control"],
+      stack:
+        "Phoenix + evented tracking + append-only shipment history and warehouse coordination"
+    },
+    "manufacturing" => %{
+      label: "Manufacturing / Quality",
+      compliance: ["Quality traceability", "Change control", "Plant safety review"],
+      stack: "Phoenix + Postgres + signed work-order and QA workflows with traceability"
+    },
+    "nonprofit" => %{
+      label: "Nonprofit / Grants",
+      compliance: ["Donor privacy", "Grant audit trails", "Beneficiary safeguards"],
+      stack: "Phoenix + Postgres + grant-aware reporting and privacy-scoped service workflows"
+    },
     "iot" => %{
       label: "IoT / Hardware",
       compliance: ["NIST", "Safety standards", "OWASP Top 10"],
@@ -333,10 +364,22 @@ defmodule ControlKeel.Mission.Planner do
     content = Enum.join([idea, data | features], " ") |> String.downcase()
 
     cond do
-      industry in ["health", "finance", "legal"] ->
+      industry in ["health", "finance", "legal", "government", "insurance"] ->
         "critical"
 
-      industry in ["hr", "realestate"] ->
+      industry in ["hr", "realestate", "manufacturing"] ->
+        "high"
+
+      industry == "logistics" and
+          String.contains?(content, ["shipment", "dispatch", "carrier", "warehouse", "delivery"]) ->
+        "high"
+
+      industry == "nonprofit" and
+          String.contains?(content, ["donor", "grant", "beneficiary", "volunteer"]) ->
+        "high"
+
+      industry == "retail" and
+          String.contains?(content, ["checkout", "refund", "chargeback", "cart", "order"]) ->
         "high"
 
       industry == "marketing" and

@@ -14,12 +14,7 @@ defmodule ControlKeelWeb.MissionControlController do
       brief: brief,
       active_findings: Enum.count(session.findings, &(&1.status in ["open", "blocked"])),
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
-      proxy_urls: %{
-        openai_responses: Proxy.url(session, :openai, "/v1/responses"),
-        openai_chat: Proxy.url(session, :openai, "/v1/chat/completions"),
-        openai_realtime: Proxy.realtime_url(session, :openai, "/v1/realtime"),
-        anthropic_messages: Proxy.url(session, :anthropic, "/v1/messages")
-      }
+      proxy_urls: Proxy.endpoint_urls(session)
     )
   end
 
