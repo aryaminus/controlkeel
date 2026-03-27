@@ -11,6 +11,8 @@ It is not another IDE, another coding model, a prompt marketplace, or post-hoc c
 - Ship Dashboard for governed outcome metrics
 - Benchmarks for comparative evidence
 
+The onboarding model is deliberately **occupation-first**. Users describe what kind of work they do, not which compliance framework they think applies. ControlKeel uses that answer to pick the domain pack, interview language, and governance posture behind the scenes.
+
 ## 1. Start ControlKeel
 
 Packaged binary:
@@ -106,6 +108,14 @@ If you do not have keys and are not running a local model, ControlKeel still wor
 - proof bundles and audit trail
 - skills and benchmark flows
 
+You can also understand support by **integration mechanism**, not only by client name:
+
+- **Native attach** for clients with first-class MCP config and companion installs
+- **Governed proxy** for tools that can point at OpenAI- or Anthropic-compatible endpoints
+- **Runtime export** for headless systems such as Devin and Open SWE
+- **Provider-only** for CK-owned or local backends such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints
+- **Fallback governance** for unsupported tools after bootstrap using `controlkeel watch`, `controlkeel findings`, proof flows, and `ck_validate`
+
 In that mode, model-backed features such as advisory review and intent compilation either degrade to heuristics or return explicit capability guidance.
 
 The LLM **advisory** layer (extra review beyond pattern matchers) only runs when a provider is available. The HTTP validate API and MCP validate tool include an **`advisory`** field describing whether advisory ran or was skipped—see [autonomy-and-findings.md](autonomy-and-findings.md) for how findings relate to human review.
@@ -180,3 +190,4 @@ How severity maps to human gates (and why full “zero human” operation is not
 - The generated MCP wrapper expects `controlkeel` on your `PATH` by default.
 - You can override the binary path with `CONTROLKEEL_BIN=/absolute/path/to/controlkeel`.
 - Packaged local mode creates its own database and secret key automatically when the usual env vars are not set.
+- Packaged local mode is a real product lane. Cloud/headless mode exists partially today, and broader team / enterprise platform work remains a later branch.

@@ -128,7 +128,7 @@ defmodule ControlKeelWeb.OnboardingLive do
           <p class="ck-kicker">Mission onboarding</p>
           <h1 class="ck-section-title">Compile a governed execution brief</h1>
           <p class="ck-lead ck-lead-tight">
-            ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. This flow interviews the operator, compiles the brief on the server, and seeds a production-minded mission.
+            ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. This flow interviews the operator in plain language, compiles the brief on the server, and seeds a production-minded mission.
           </p>
         </div>
         <a href={~p"/"} class="ck-link">Back home</a>
@@ -149,7 +149,7 @@ defmodule ControlKeelWeb.OnboardingLive do
                   <p class="ck-mini-label">Step 1</p>
                   <h2 class="ck-section-title">Choose the domain and primary agent</h2>
                   <p class="ck-note">
-                    This selects the domain pack, interview language, and initial compliance posture.
+                    Start with what best describes the work. ControlKeel uses that choice to set the domain pack, interview language, and initial governance posture without forcing framework acronyms first.
                   </p>
 
                   <div class="ck-session-grid">

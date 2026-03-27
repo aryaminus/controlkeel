@@ -49,6 +49,13 @@
     </div>
 
     <div class="ck-card">
+      <p class="ck-mini-label">Occupation-first onboarding</p>
+      <p class="ck-note">
+        Start from what best describes your work. ControlKeel picks the domain pack, interview language, and governance posture behind the scenes instead of asking non-experts to choose a framework first.
+      </p>
+    </div>
+
+    <div class="ck-card">
       <p class="ck-mini-label">Other supported agents</p>
       <ul class="ck-mini-list">
         <li>
@@ -76,10 +83,23 @@
     <div class="ck-card">
       <p class="ck-mini-label">Autonomy and findings</p>
       <p class="ck-note">
-        Severity maps to expected human gates; LLM advisory is optional and needs a provider. See
+        Severity maps to expected human gates, and findings stay readable in plain language. LLM advisory is optional and needs a provider. See
         <code class="font-mono text-sm">docs/autonomy-and-findings.md</code>
         in the repository.
       </p>
+    </div>
+
+    <div class="ck-card">
+      <p class="ck-mini-label">Operating modes</p>
+      <ul class="ck-mini-list">
+        <li>
+          Local packaged mode is fully shipped and useful with SQLite, Ollama, or heuristic fallback.
+        </li>
+        <li>
+          Cloud and headless operation exist partially today through runtime exports, webhooks, and service-account paths.
+        </li>
+        <li>Broader team and enterprise platform work remains a later branch.</li>
+      </ul>
     </div>
   </div>
 </section>

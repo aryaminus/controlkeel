@@ -66,6 +66,61 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  describe "GET /api/v1/domains" do
+    test "returns domain packs and occupation profiles", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/domains")
+      body = json_response(conn, 200)
+
+      assert is_list(body["domains"])
+      assert is_list(body["occupations"])
+
+      healthcare =
+        Enum.find(body["domains"], fn domain ->
+          domain["id"] == "healthcare"
+        end)
+
+      assert healthcare["label"] == "Healthcare"
+      assert "HIPAA" in healthcare["compliance"]
+      assert Enum.any?(healthcare["occupations"], &(&1["id"] == "healthcare"))
+
+      founder =
+        Enum.find(body["occupations"], fn profile ->
+          profile["id"] == "founder"
+        end)
+
+      assert founder["domain_pack"] == "software"
+      assert founder["domain_pack_label"] == "Software"
+    end
+  end
+
+  describe "GET and POST /api/v1/context" do
+    test "returns assembled context for a session", %{conn: conn} do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      conn = get(conn, ~p"/api/v1/context?session_id=#{session.id}&task_id=#{task.id}")
+      body = json_response(conn, 200)
+
+      assert body["context"]["session_id"] == session.id
+      assert body["context"]["current_task"]["id"] == task.id
+      assert Map.has_key?(body["context"], "provider_status")
+      assert Map.has_key?(body["context"], "bootstrap_status")
+
+      conn =
+        build_conn() |> post(~p"/api/v1/context", %{session_id: session.id, task_id: task.id})
+
+      post_body = json_response(conn, 200)
+
+      assert post_body["context"]["session_id"] == session.id
+      assert post_body["context"]["current_task"]["id"] == task.id
+    end
+
+    test "returns validation error when session_id is missing", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/context")
+      assert %{"error" => "`session_id` is required"} = json_response(conn, 422)
+    end
+  end
+
   # ─── Tasks ───────────────────────────────────────────────────────────────────
 
   describe "POST /api/v1/sessions/:session_id/tasks" do

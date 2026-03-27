@@ -5,8 +5,10 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.Distribution
+  alias ControlKeel.Intent
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
+  alias ControlKeel.MCP.Tools.CkContext
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
@@ -48,6 +50,66 @@ defmodule ControlKeelWeb.ApiController do
         conn
         |> put_status(:unprocessable_entity)
         |> json(%{error: "invalid session", details: changeset_errors(changeset)})
+    end
+  end
+
+  def list_domains(conn, _params) do
+    occupation_profiles = Intent.occupation_profiles()
+
+    domains =
+      Intent.supported_packs()
+      |> Enum.map(fn domain_pack ->
+        occupations =
+          Enum.filter(occupation_profiles, &(&1.domain_pack == domain_pack))
+
+        preflight =
+          Intent.preflight_context(%{
+            "occupation" => occupations |> List.first() |> Map.fetch!(:id),
+            "idea" => ""
+          })
+
+        %{
+          id: domain_pack,
+          label: Intent.pack_label(domain_pack),
+          industry: preflight.industry,
+          compliance: preflight.compliance,
+          stack_guidance: preflight.stack_guidance,
+          validation_language: preflight.validation_language,
+          occupations:
+            Enum.map(occupations, fn profile ->
+              %{
+                id: profile.id,
+                label: profile.label,
+                description: profile.description
+              }
+            end)
+        }
+      end)
+
+    occupations =
+      Enum.map(occupation_profiles, fn profile ->
+        %{
+          id: profile.id,
+          label: profile.label,
+          domain_pack: profile.domain_pack,
+          domain_pack_label: Intent.pack_label(profile.domain_pack),
+          industry: profile.industry,
+          description: profile.description
+        }
+      end)
+
+    json(conn, %{domains: domains, occupations: occupations})
+  end
+
+  def context(conn, params) do
+    context_params = Map.take(params, ~w(session_id task_id))
+
+    case CkContext.call(context_params) do
+      {:ok, payload} ->
+        json(conn, %{context: payload})
+
+      {:error, {:invalid_arguments, message}} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
     end
   end
 

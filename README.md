@@ -23,6 +23,8 @@ The live control loop is:
 - Ship Dashboard for outcome and readiness metrics
 - Benchmarks for comparative evidence across governed runs
 
+The other core differentiator is **occupation-first governance**. Users choose what best describes their work, and ControlKeel maps that to a domain pack, interview language, and compliance posture. The product is designed to talk about work and risk in plain language rather than forcing non-experts to begin with framework acronyms.
+
 ## Quick start
 
 ### Install
@@ -161,6 +163,16 @@ ControlKeel's governed proxy currently exposes OpenAI-style and Anthropic-style 
 
 `/skills` in the web app and [docs/agent-integrations.md](docs/agent-integrations.md) show the live compatibility matrix and export/install targets.
 
+### Integration modes
+
+Another useful way to understand ControlKeel support is by **mechanism**, not only by client name:
+
+- **Native attach**: MCP plus native skills, client config, and companion bundle generation
+- **Proxy-compatible**: governed OpenAI/Anthropic-style traffic for tools that can target those endpoints directly
+- **Runtime export**: headless runtime bundles for tools like Devin and Open SWE
+- **Provider-only**: CK-owned or local backend profiles such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints
+- **Fallback governance**: if a tool is unsupported, bootstrap the project and use `controlkeel watch`, `controlkeel findings`, proofs, budgets, and `ck_validate` flows after the agent has made changes
+
 ### Headless runtimes, framework adapters, and provider-only entries
 
 - Devin / Cognition: `controlkeel runtime export devin`
@@ -208,6 +220,16 @@ Practical setup guidance:
 - If you use OpenCode or another MCP-plus-instructions client, the next best path is a CK-owned provider profile or local Ollama.
 - Governed bindings remain project-local even when the agent install itself supports user scope.
 - Heuristic mode is still useful for validation, findings, proofs, benchmarks, and skills when no model access is available.
+
+## Operating modes
+
+ControlKeel has three honest operating lanes today:
+
+- **Local packaged mode**: shipped today, local defaults, SQLite-backed, and useful with either Ollama or heuristic/no-key governance paths
+- **Cloud/headless mode**: partial today, with service accounts, policy sets, webhooks, provider profiles, and a cloud/runtime abstraction already in place
+- **Team / enterprise mode**: still a later branch, tracked separately from the current shipped local and headless slices
+
+This means the local single-binary path is a real product lane, not just a developer convenience. The cloud and team stories exist, but they should be described conservatively until the broader remaining-work branches are complete.
 
 ## Skills, plugins, and exports
 

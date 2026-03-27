@@ -21,6 +21,20 @@ irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps
 Tagged releases publish the packaged binaries, checksum manifest, installer scripts, and the portable plugin bundles described below.
 The GitHub Packages npm path is for the bootstrap installer only and requires a GitHub personal access token (classic) for local installs.
 
+## Support by mechanism
+
+The typed catalog in [support-matrix.md](support-matrix.md) is the code-aligned source of truth, but product readers often want the simpler answer first: **how does ControlKeel reach the tool?**
+
+Today there are five support mechanisms:
+
+- **Native attach**: MCP plus native skills, client config, and companion installs
+- **Proxy-compatible**: governed OpenAI- or Anthropic-style traffic through ControlKeel
+- **Runtime export**: headless runtime bundles for systems such as Devin and Open SWE
+- **Provider-only**: CK-owned or local backend profiles such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints
+- **Fallback governance**: bootstrap the repo, then use `controlkeel watch`, `controlkeel findings`, proofs, budgets, and `ck_validate` after an unsupported tool makes changes
+
+This mechanism view is intentionally simpler than the typed support inventory, but it should never contradict it.
+
 ## Provider-bridge supported agents
 
 These are the strongest zero-setup paths today because ControlKeel can reuse a compatible provider environment from the attached client.
@@ -109,6 +123,20 @@ Today that means:
 - OpenAI realtime websocket path
 - Better compatibility with external clients that probe `/v1/models` before use or rely on `embeddings` for retrieval workflows
 
+## Unsupported and partially supported tools
+
+ControlKeel does not need a fictional filesystem-watcher mode to be useful with unsupported tools.
+
+The current fallback path is:
+
+1. bootstrap a governed project
+2. let the external tool make changes in the repo
+3. use `controlkeel watch` for live findings and budget state
+4. use `controlkeel findings`, proofs, and `ck_validate` for post-hoc governance
+5. use governed proxy mode when the tool can point at OpenAI- or Anthropic-compatible endpoints
+
+That keeps the support story honest: not every tool gets a first-class attach command, but unsupported tools can still participate in the governance loop.
+
 
 Attach flag behavior:
 
@@ -170,6 +198,16 @@ Practical rules:
 - agent install location can be user- or project-scoped depending on target
 - governed repo bootstrap remains project-local so each repository keeps its own proof trail and runtime wrapper
 - heuristic mode is first-class for governance, not a broken state
+
+## Operating modes
+
+The product also has three practical operating lanes today:
+
+- **Local packaged mode**: shipped today, local defaults, SQLite-backed, Ollama- or heuristic-capable, and designed to be a real end-user lane
+- **Cloud/headless mode**: partial today, with service accounts, policy sets, webhooks, and runtime abstractions already in place
+- **Team / enterprise mode**: a later branch, tracked separately from the current shipped local and headless slices
+
+This means the local single-binary path is real product surface area, not just a developer bootstrap path. Cloud and team stories should be described conservatively until the remaining roadmap branches are complete.
 
 ## Skills and plugin commands
 
