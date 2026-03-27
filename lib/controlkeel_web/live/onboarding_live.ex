@@ -128,7 +128,10 @@ defmodule ControlKeelWeb.OnboardingLive do
           <p class="ck-kicker">Mission onboarding</p>
           <h1 class="ck-section-title">Compile a governed execution brief</h1>
           <p class="ck-lead ck-lead-tight">
-            ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. This flow interviews the operator in plain language, compiles the brief on the server, and seeds a production-minded mission.
+            ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. ControlKeel turns agent output into production engineering. This flow interviews the operator in plain language, compiles the brief on the server, and seeds a production-minded mission.
+          </p>
+          <p class="ck-note">
+            Agent output is cheap. Reviewability, security, release safety, and cost control are not. This flow exists to turn a rough idea into a governed execution brief, task plan, and proof trail.
           </p>
         </div>
         <a href={~p"/"} class="ck-link">Back home</a>

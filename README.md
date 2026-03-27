@@ -3,9 +3,11 @@
 [![CI](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml)
 [![Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml)
 
-ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. It governs agent work across intent compilation, task planning, routing, validation, proof generation, typed memory, benchmarks, learned policy artifacts, and cross-agent skills distribution.
+ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. ControlKeel turns agent output into production engineering. It governs agent work across intent compilation, task planning, routing, validation, proof generation, typed memory, benchmarks, learned policy artifacts, and cross-agent skills distribution.
 
 It sits above Claude Code, Codex, Cline, OpenCode, Cursor, Windsurf, Continue, Aider, Copilot / VS Code, and other agent clients. It can expose MCP tools, attach native skills where supported, export plugin bundles, proxy provider traffic, and persist the evidence trail for everything it governs.
+
+Agent output is cheap. Reviewability, security, release safety, and cost control are not. ControlKeel exists to govern that layer, not replace the coding model underneath it.
 
 The default wedge is serious solo builders and tiny agent-heavy teams first. Team / platform expansion exists, but the product story today is still governed autonomy for builders who already have agent output and need it turned into production-ready delivery.
 
@@ -24,6 +26,20 @@ The live control loop is:
 - Benchmarks for comparative evidence across governed runs
 
 The other core differentiator is **occupation-first governance**. Users choose what best describes their work, and ControlKeel maps that to a domain pack, interview language, and compliance posture. The product is designed to talk about work and risk in plain language rather than forcing non-experts to begin with framework acronyms.
+
+## Governed delivery lifecycle
+
+ControlKeel is designed as one governed assembly line, not a collection of disconnected tools:
+
+- **Intent intake** begins at `/start`, where the operator describes the work in plain language.
+- **Execution brief** compilation turns that input into a scoped, production-minded plan.
+- **Task graph and routing** direct the work into manageable task slices and recommended agent paths.
+- **Validation and findings** apply FastPath, Semgrep, policy packs, and governed rulings before risky work passes.
+- **Proof bundles** freeze immutable delivery evidence for completed tasks.
+- **Ship Dashboard** shows stewardship evidence such as funnel speed, deploy-readiness, and risky intervention rate.
+- **Benchmarks** provide comparative evidence across governed runs and subjects.
+
+The stewardship surfaces in the product are `/ship` and `/benchmarks`. That is where ControlKeel proves that governed work is not only faster, but more reviewable and safer to ship.
 
 ## Quick start
 
@@ -304,7 +320,7 @@ controlkeel init [options]
 controlkeel bootstrap [--project-root /abs/path] [--ephemeral-ok]
 controlkeel attach <agent>
 controlkeel status
-controlkeel provider list|show|default|set-key|doctor
+controlkeel provider list|show|default|set-key|set-base-url|set-model|doctor
 controlkeel findings [--severity high] [--status open]
 controlkeel approve <finding-id>
 controlkeel proofs [--session-id ...] [--task-id ...]
@@ -361,7 +377,13 @@ controlkeel mcp --project-root /absolute/path/to/project
 
 All endpoints return JSON.
 
-### Sessions, tasks, proofs, memory
+### Intent, domains, and assembled context
+
+- `GET /api/v1/domains`
+- `GET /api/v1/context`
+- `POST /api/v1/context`
+
+### Sessions, tasks, proofs, and memory
 
 - `GET /api/v1/sessions`
 - `POST /api/v1/sessions`

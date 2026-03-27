@@ -7,7 +7,9 @@ defmodule ControlKeelWeb.ShipLiveTest do
   alias ControlKeel.Analytics
   alias ControlKeel.Mission
 
-  test "/ship renders funnel metrics, outcome proof, and recent session rows", %{conn: conn} do
+  test "/ship renders stewardship evidence, benchmark evidence, and recent session rows", %{
+    conn: conn
+  } do
     session = session_fixture(%{title: "Ship session"})
     task = task_fixture(%{session: session, status: "done"})
 
@@ -28,7 +30,10 @@ defmodule ControlKeelWeb.ShipLiveTest do
     {:ok, _view, html} = live(conn, ~p"/ship")
 
     assert html =~ "Track governed momentum and delivery evidence"
-    assert html =~ "Outcome proof"
+    assert html =~ "Proof and deploy-readiness"
+    assert html =~ "Funnel speed"
+    assert html =~ "Governance effectiveness"
+    assert html =~ "Benchmark evidence"
     assert html =~ "Proof-backed done tasks"
     assert html =~ "Task completion by agent"
     assert html =~ "Proof console loop"

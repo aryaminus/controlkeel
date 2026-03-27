@@ -2,7 +2,9 @@
 
 This is the shortest path from first install to first governed finding.
 
-ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. The default path is built for serious solo builders and tiny agent-heavy teams, not for enterprise admin workflows first.
+ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. ControlKeel turns agent output into production engineering. The default path is built for serious solo builders and tiny agent-heavy teams, not for enterprise admin workflows first.
+
+Agent output is cheap. Reviewability, security, release safety, and cost control are not. ControlKeel exists to govern that layer, not replace the coding model underneath it.
 
 It is not another IDE, another coding model, a prompt marketplace, or post-hoc code review only. The first-run path gets you into the live proof console loop quickly:
 
@@ -12,6 +14,18 @@ It is not another IDE, another coding model, a prompt marketplace, or post-hoc c
 - Benchmarks for comparative evidence
 
 The onboarding model is deliberately **occupation-first**. Users describe what kind of work they do, not which compliance framework they think applies. ControlKeel uses that answer to pick the domain pack, interview language, and governance posture behind the scenes.
+
+The governed delivery lifecycle is:
+
+- intent intake
+- execution brief
+- task graph and routing
+- validation and findings
+- proof bundles
+- ship metrics
+- benchmarks
+
+The main stewardship surfaces for that lifecycle are `/ship` and `/benchmarks`.
 
 ## 1. Start ControlKeel
 
