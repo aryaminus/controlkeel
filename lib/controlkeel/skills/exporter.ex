@@ -189,6 +189,87 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "roo-native"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, ".roo/skills")
+    write_skill_tree(skills, skill_root)
+
+    rule_path = Path.join(root, ".roo/rules/controlkeel.md")
+    File.mkdir_p!(Path.dirname(rule_path))
+    File.write!(rule_path, roo_rule_contents())
+
+    command_path = Path.join(root, ".roo/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, roo_command_contents())
+
+    guidance_path = Path.join(root, ".roo/guidance/controlkeel.md")
+    File.mkdir_p!(Path.dirname(guidance_path))
+    File.write!(guidance_path, roo_guidance_contents())
+
+    modes_path = Path.join(root, ".roomodes")
+    File.write!(modes_path, roo_modes_contents())
+
+    mcp_path = Path.join(root, ".mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("roo-code", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => rule_path, "kind" => "rules"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => guidance_path, "kind" => "guidance"},
+        %{"path" => modes_path, "kind" => "settings"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Copy `.roo/` and `.roomodes` into the repo root so Roo Code can discover ControlKeel skills and governed modes.",
+        "Merge `.mcp.json` or register the same MCP server through Roo's MCP flow if you manage MCP outside the repo."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "goose-native"}, root, project_root, _skills, opts) do
+    hints_path = Path.join(root, ".goosehints")
+    File.write!(hints_path, goose_hints_contents())
+
+    workflow_path = Path.join(root, "goose/workflow_recipes/controlkeel-review.yaml")
+    File.mkdir_p!(Path.dirname(workflow_path))
+    File.write!(workflow_path, goose_workflow_contents())
+
+    extension_path = Path.join(root, "goose/controlkeel-extension.yaml")
+    File.mkdir_p!(Path.dirname(extension_path))
+    File.write!(extension_path, goose_extension_yaml(project_root, opts))
+
+    mcp_path = Path.join(root, ".mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("goose", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => hints_path, "kind" => "instructions"},
+        %{"path" => workflow_path, "kind" => "workflow"},
+        %{"path" => extension_path, "kind" => "settings"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Keep `.goosehints` and `AGENTS.md` at the repo root so Goose loads ControlKeel context automatically.",
+        "Merge `goose/controlkeel-extension.yaml` into `~/.config/goose/config.yaml` or add the same stdio extension through `goose configure`."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "hermes-native"}, root, project_root, skills, opts) do
     skill_root = Path.join(root, ".hermes/skills")
     write_skill_tree(skills, skill_root)
@@ -756,6 +837,102 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp roo_rule_contents do
+    """
+    # ControlKeel governance for Roo Code
+
+    - Read `AGENTS.md` before large refactors, risky edits, schema changes, or release work.
+    - Prefer ControlKeel MCP tools for validation, findings, budgets, proofs, and routing.
+    - Do not bypass a blocked ControlKeel finding without an explicit human approval step.
+    """
+  end
+
+  defp roo_command_contents do
+    """
+    # ControlKeel review
+
+    1. Read `AGENTS.md`, `.roomodes`, and any Roo guidance files in the workspace.
+    2. Gather context before editing files.
+    3. Use `ck_context` and `ck_validate` before and after risky changes.
+    4. Summarize findings, risk, proof state, and benchmark impact before finishing.
+    """
+  end
+
+  defp roo_guidance_contents do
+    """
+    # ControlKeel + Roo Code
+
+    Use ControlKeel as the governance layer for risky work. Treat CK findings as the safety boundary, not optional advice.
+
+    Start with `controlkeel-governance`, then load domain skills as needed.
+    """
+  end
+
+  defp roo_modes_contents do
+    """
+    customModes:
+      - slug: controlkeel-operator
+        name: ControlKeel Operator
+        roleDefinition: >
+          You are Roo Code operating inside a ControlKeel-governed repository. Use
+          ControlKeel MCP tools for validation, findings, budgets, proofs, and routing
+          before finalizing risky work.
+        whenToUse: Use for governed code changes, validation, benchmark, or release work.
+        description: Governed Roo Code mode backed by ControlKeel MCP.
+        groups:
+          - read
+          - edit
+          - command
+          - mcp
+        source: project
+    """
+  end
+
+  defp goose_hints_contents do
+    """
+    This repository is governed by ControlKeel.
+
+    @AGENTS.md
+
+    Use ControlKeel MCP tools before risky edits, schema changes, auth changes, deployment work, or benchmark-sensitive changes.
+
+    Always run validation and findings review before marking work complete.
+    """
+  end
+
+  defp goose_workflow_contents do
+    """
+    name: controlkeel-review
+    description: Review the task through ControlKeel validation, findings, and proof surfaces before completion.
+    steps:
+      - Read AGENTS.md and .goosehints.
+      - Gather repo and task context before editing.
+      - Use ControlKeel MCP tools for validation, findings, budgets, routing, and proofs.
+      - Summarize risk, findings, and proof state before handoff.
+    """
+  end
+
+  defp goose_extension_yaml(project_root, opts) do
+    goose_extension_config(project_root, opts)
+    |> yaml_document()
+  end
+
+  defp goose_extension_config(project_root, opts) do
+    %{
+      "extensions" => %{
+        "controlkeel" => %{
+          "enabled" => true,
+          "type" => "stdio",
+          "name" => "ControlKeel",
+          "description" => "ControlKeel governance MCP server",
+          "cmd" => mcp_command(project_root, opts),
+          "args" => mcp_args(project_root, opts),
+          "timeout" => 300
+        }
+      }
+    }
+  end
+
   defp openclaw_config_snippet(project_root, opts) do
     %{
       "mcpServers" => %{
@@ -1034,6 +1211,53 @@ defmodule ControlKeel.Skills.Exporter do
     ControlKeel auto-bootstraps project binding on first use. Provider access resolves through agent bridge, CK-owned provider profiles, local Ollama, then heuristic fallback.
     """
   end
+
+  defp yaml_document(value) do
+    yaml_encode(value, 0)
+  end
+
+  defp yaml_encode(value, indent) when is_map(value) do
+    value
+    |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
+    |> Enum.map_join("", fn {key, nested} ->
+      yaml_key_value(to_string(key), nested, indent)
+    end)
+  end
+
+  defp yaml_encode(value, indent) when is_list(value) do
+    Enum.map_join(value, "", fn
+      nested when is_map(nested) ->
+        "#{String.duplicate(" ", indent)}-\n" <> yaml_encode(nested, indent + 2)
+
+      nested ->
+        "#{String.duplicate(" ", indent)}- #{yaml_scalar(nested)}\n"
+    end)
+  end
+
+  defp yaml_key_value(key, value, indent) when is_map(value) do
+    if map_size(value) == 0 do
+      "#{String.duplicate(" ", indent)}#{key}: {}\n"
+    else
+      "#{String.duplicate(" ", indent)}#{key}:\n" <> yaml_encode(value, indent + 2)
+    end
+  end
+
+  defp yaml_key_value(key, value, indent) when is_list(value) do
+    if value == [] do
+      "#{String.duplicate(" ", indent)}#{key}: []\n"
+    else
+      "#{String.duplicate(" ", indent)}#{key}:\n" <> yaml_encode(value, indent + 2)
+    end
+  end
+
+  defp yaml_key_value(key, value, indent) do
+    "#{String.duplicate(" ", indent)}#{key}: #{yaml_scalar(value)}\n"
+  end
+
+  defp yaml_scalar(value) when is_binary(value), do: Jason.encode!(value)
+  defp yaml_scalar(value) when is_boolean(value), do: if(value, do: "true", else: "false")
+  defp yaml_scalar(nil), do: "null"
+  defp yaml_scalar(value) when is_integer(value) or is_float(value), do: to_string(value)
 
   defp same_path?(left, right) do
     Path.expand(left) == Path.expand(right)

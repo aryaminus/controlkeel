@@ -50,6 +50,24 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "roo-native",
+        "Roo Code native bundle",
+        "Roo-native skills, `.roo` rules/commands/guidance, `.roomodes`, and MCP companion config.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "goose-native",
+        "Goose native bundle",
+        "Goose `.goosehints`, workflow recipe, extension config snippet, and MCP companion files.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
         "hermes-native",
         "Hermes Agent bundle",
         "Hermes-native skills, AGENTS context, and MCP companion config.",

@@ -42,6 +42,8 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 | Agent | Attach command | Native companion | Exportable bundles |
 |---|---|---|---|
 | Cline | `controlkeel attach cline` | Writes `.cline/skills`, `.clinerules`, `AGENTS.md`, and updates Cline MCP settings | `cline-native` |
+| Roo Code | `controlkeel attach roo-code` | Writes `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, `.roomodes`, `AGENTS.md`, and `.mcp.json` | `roo-native` |
+| Goose | `controlkeel attach goose` | Writes `.goosehints`, `goose/workflow_recipes`, `AGENTS.md`, and registers a Goose MCP extension in `~/.config/goose/config.yaml` | `goose-native` |
 | VS Code | `controlkeel attach vscode` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 | GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 
@@ -180,6 +182,8 @@ Export publishable bundles:
 ```bash
 controlkeel skills export --target claude-plugin
 controlkeel skills export --target cline-native
+controlkeel skills export --target roo-native
+controlkeel skills export --target goose-native
 controlkeel skills export --target copilot-plugin
 controlkeel skills export --target codex
 controlkeel skills export --target provider-profile
@@ -193,6 +197,8 @@ Install a native target without using `attach`:
 ```bash
 controlkeel skills install --target claude-standalone --scope user
 controlkeel skills install --target cline-native --scope project
+controlkeel skills install --target roo-native --scope project
+controlkeel skills install --target goose-native --scope project
 controlkeel skills install --target codex --scope user
 controlkeel skills install --target github-repo --scope project
 ```
@@ -203,6 +209,8 @@ Exported bundles are written under:
 
 - `controlkeel/dist/claude-plugin/`
 - `controlkeel/dist/cline-native/`
+- `controlkeel/dist/roo-native/`
+- `controlkeel/dist/goose-native/`
 - `controlkeel/dist/copilot-plugin/`
 - `controlkeel/dist/codex/`
 - `controlkeel/dist/devin-runtime/`
@@ -214,6 +222,8 @@ Published release bundles use the same target set, but ship as release assets:
 
 - `controlkeel-claude-plugin.tar.gz`
 - `controlkeel-cline-native.tar.gz`
+- `controlkeel-roo-native.tar.gz`
+- `controlkeel-goose-native.tar.gz`
 - `controlkeel-copilot-plugin.tar.gz`
 - `controlkeel-codex.tar.gz`
 - `controlkeel-devin-runtime.tar.gz`

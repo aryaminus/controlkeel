@@ -153,6 +153,49 @@ defmodule ControlKeel.Skills.Installer do
     end
   end
 
+  defp do_install(%SkillTarget{id: "roo-native"}, "project", project_root, skills, _opts) do
+    {:ok, plan} = Exporter.export("roo-native", project_root, scope: "project")
+
+    skill_root = Path.join(project_root, ".roo/skills")
+    roo_root = Path.join(project_root, ".roo")
+
+    copy_skills(skills, skill_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".roo"), roo_root)
+    File.cp!(Path.join(plan.output_dir, ".roomodes"), Path.join(project_root, ".roomodes"))
+    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "roo-native",
+       scope: "project",
+       destination: skill_root,
+       rules_destination: Path.join(roo_root, "rules"),
+       commands_destination: Path.join(roo_root, "commands"),
+       guidance_destination: Path.join(roo_root, "guidance")
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "goose-native"}, "project", project_root, _skills, _opts) do
+    {:ok, plan} = Exporter.export("goose-native", project_root, scope: "project")
+
+    workflow_root = Path.join(project_root, "goose/workflow_recipes")
+    File.mkdir_p!(workflow_root)
+    copy_tree_contents(Path.join(plan.output_dir, "goose"), Path.join(project_root, "goose"))
+    File.cp!(Path.join(plan.output_dir, ".goosehints"), Path.join(project_root, ".goosehints"))
+    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "goose-native",
+       scope: "project",
+       destination: Path.join(project_root, ".goosehints"),
+       workflows_destination: workflow_root,
+       agent_destination: Path.join(project_root, "goose")
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "hermes-native"}, scope, project_root, skills, _opts)
        when scope in ["user", "project"] do
     base =

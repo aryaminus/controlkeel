@@ -332,6 +332,52 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["cline-native"]
       }),
       attach_client(%{
+        id: "roo-code",
+        label: "Roo Code",
+        category: "native-first",
+        description:
+          "Installs Roo-native skills, rules, commands, guidance, and `.roomodes` companion files for governed repo work.",
+        attach_command: "controlkeel attach roo-code",
+        config_location:
+          "Roo project companions live in `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, and `.roomodes` at the repo root.",
+        companion_delivery:
+          "Installs `.roo/skills`, emits repo-native rules, commands, guidance, and a ControlKeel `.roomodes` mode.",
+        preferred_target: "roo-native",
+        default_scope: "project",
+        router_agent_id: "roo-code",
+        auth_mode: "ck_owned",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "RooCodeInc/Roo-Code",
+        upstream_docs_url: "https://docs.roocode.com",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project"],
+        export_targets: ["roo-native"]
+      }),
+      attach_client(%{
+        id: "goose",
+        label: "Goose",
+        category: "native-first",
+        description:
+          "Registers ControlKeel as a Goose MCP extension and installs project-native `.goosehints` and workflow companions.",
+        attach_command: "controlkeel attach goose",
+        config_location:
+          "Goose custom extensions live in `~/.config/goose/config.yaml`; project context lives in `.goosehints`, `AGENTS.md`, and optional `goose/workflow_recipes/` files.",
+        companion_delivery:
+          "Merges a ControlKeel Goose extension into the user Goose config and writes repo-local `.goosehints`, workflow recipe, and MCP companion files.",
+        preferred_target: "goose-native",
+        default_scope: "project",
+        router_agent_id: "goose",
+        auth_mode: "ck_owned",
+        mcp_mode: "native",
+        skills_mode: "instructions_only",
+        upstream_slug: "block/goose",
+        upstream_docs_url: "https://block.github.io/goose/docs/getting-started/using-extensions/",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project"],
+        export_targets: ["goose-native"]
+      }),
+      attach_client(%{
         id: "hermes-agent",
         label: "Hermes Agent",
         category: "native-first",

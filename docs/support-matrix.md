@@ -8,6 +8,7 @@ This document is the **single inventory** for attach targets, MCP tools, and bun
 - [`priv/skills/`](../priv/skills/) — on-disk AgentSkills bundles
 
 For install paths and proxy URLs, see [agent-integrations.md](agent-integrations.md) and [getting-started.md](getting-started.md).
+Product intent and acceptance criteria for this matrix live in [agent-support-prd.md](agent-support-prd.md) and [agent-support-requirements.md](agent-support-requirements.md).
 
 ## Typed integration catalog (`AgentIntegration.catalog/0`)
 
@@ -29,6 +30,8 @@ Attachable and runtime integrations use the **same required MCP tool set** (see 
 | `claude-code` | attach_client | `controlkeel attach claude-code` | `env_bridge` | `native` | `native` | `claude-standalone` |
 | `codex-cli` | attach_client | `controlkeel attach codex-cli` | `env_bridge` | `native` | `native` | `codex` |
 | `cline` | attach_client | `controlkeel attach cline` | `ck_owned` | `native` | `native` | `cline-native` |
+| `roo-code` | attach_client | `controlkeel attach roo-code` | `ck_owned` | `native` | `native` | `roo-native` |
+| `goose` | attach_client | `controlkeel attach goose` | `ck_owned` | `native` | `instructions_only` | `goose-native` |
 | `vscode` | attach_client | `controlkeel attach vscode` | `ck_owned` | `native` | `native` | `github-repo` |
 | `copilot` | attach_client | `controlkeel attach copilot` | `ck_owned` | `native` | `native` | `github-repo` |
 | `cursor` | attach_client | `controlkeel attach cursor` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
@@ -114,4 +117,4 @@ Export targets on each integration (e.g. `claude-plugin`, `codex`) refer to **CL
 4. Update this matrix and [agent-integrations.md](agent-integrations.md).
 5. Add or extend tests for attach behavior where feasible.
 
-Names in research lists (see [idea/missing/check.md](../idea/missing/check.md)) do **not** automatically get catalog entries—each needs the above.
+Historical research names do **not** automatically get catalog entries. A target becomes shipped support only after it has a documented config surface, a truthful `AgentIntegration` row, CLI/export coverage, docs, and tests.

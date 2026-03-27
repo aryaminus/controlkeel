@@ -119,6 +119,8 @@ These get MCP plus a native companion install by default.
 | Agent | Attach command | Companion output |
 |---|---|---|
 | Cline | `controlkeel attach cline` | `.cline/skills`, `.clinerules/`, `AGENTS.md`, plus Cline MCP config under `~/.cline/data/settings/` |
+| Roo Code | `controlkeel attach roo-code` | `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, `.roomodes`, `AGENTS.md`, `.mcp.json` |
+| Goose | `controlkeel attach goose` | `.goosehints`, `goose/workflow_recipes`, `AGENTS.md`, plus Goose MCP extension config under `~/.config/goose/config.yaml` |
 | VS Code | `controlkeel attach vscode` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 | GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 
@@ -205,6 +207,8 @@ Targets:
 - `claude-standalone`
 - `claude-plugin`
 - `cline-native`
+- `roo-native`
+- `goose-native`
 - `copilot-plugin`
 - `devin-runtime`
 - `github-repo`

@@ -559,6 +559,34 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(%{command: :attach, args: ["goose"], options: options}, project_root) do
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => "goose"}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         {:ok, attached} <- attach_to_goose(command_spec, project_root),
+         updated <- ProjectBinding.update_attached_agent(binding, "goose", attached),
+         {:ok, _} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
+      {:ok,
+       [
+         "Attached ControlKeel to Goose.",
+         "Goose extension written to #{attached["config_path"]}.",
+         "Restart Goose to activate."
+       ] ++
+         bootstrap_lines(project_root) ++
+         native_attach_lines("goose", project_root, options) ++
+         attach_guidance_lines("goose")}
+    else
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
+      {:error, reason} ->
+        {:error, "Failed to attach ControlKeel to Goose: #{inspect(reason)}"}
+    end
+  end
+
   def run_command(%{command: :attach, args: ["continue"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
            ensure_local_project(project_root, %{"agent" => "continue"}),
@@ -616,9 +644,10 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["hermes-agent", "openclaw", "droid", "forge"] do
+      when agent in ["roo-code", "hermes-agent", "openclaw", "droid", "forge"] do
     target =
       %{
+        "roo-code" => "roo-native",
         "hermes-agent" => "hermes-native",
         "openclaw" => "openclaw-native",
         "droid" => "droid-bundle",
@@ -2286,6 +2315,30 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp native_attach_lines("goose", project_root, options) do
+    if native_attach_skipped?(options) do
+      []
+    else
+      case Skills.install("goose-native", project_root, scope: "project") do
+        {:ok, %{destination: destination} = result} ->
+          [
+            "Installed Goose project hints at #{destination}."
+          ] ++
+            maybe_attach_line(
+              "Installed Goose workflow recipes",
+              Map.get(result, :workflows_destination)
+            ) ++
+            maybe_attach_line(
+              "Installed Goose companion bundle",
+              Map.get(result, :agent_destination)
+            )
+
+        {:error, reason} ->
+          ["Native Goose files were not installed: #{inspect(reason)}"]
+      end
+    end
+  end
+
   defp native_attach_lines(agent, project_root, options)
        when agent in [
               "cursor",
@@ -2537,6 +2590,111 @@ defmodule ControlKeel.CLI do
        }}
     end
   end
+
+  defp goose_config_path do
+    Path.join([user_home(), ".config", "goose", "config.yaml"])
+  end
+
+  defp attach_to_goose(command_spec, project_root) do
+    command = command_spec[:command] || command_spec["command"]
+    args = command_spec[:args] || command_spec["args"] || []
+    config_path = goose_config_path()
+
+    existing = read_yaml_file(config_path)
+
+    extension =
+      %{
+        "enabled" => true,
+        "type" => "stdio",
+        "name" => "ControlKeel",
+        "description" => "ControlKeel governance MCP server",
+        "cmd" => command,
+        "args" => args,
+        "timeout" => 300
+      }
+
+    updated =
+      Map.put(
+        existing,
+        "extensions",
+        existing
+        |> Map.get("extensions", %{})
+        |> normalize_yaml_map()
+        |> Map.put("controlkeel", extension)
+      )
+
+    with :ok <- File.mkdir_p(Path.dirname(config_path)),
+         :ok <- File.write(config_path, yaml_document(updated)) do
+      {:ok,
+       %{
+         "server_name" => "controlkeel",
+         "ide" => "goose",
+         "config_path" => config_path,
+         "project_root" => Path.expand(project_root),
+         "command" => command,
+         "args" => args,
+         "attached_at" =>
+           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+       }}
+    end
+  end
+
+  defp read_yaml_file(path) do
+    case YamlElixir.read_from_file(path) do
+      {:ok, value} when is_map(value) -> value
+      _ -> %{}
+    end
+  end
+
+  defp normalize_yaml_map(value) when is_map(value), do: value
+  defp normalize_yaml_map(_value), do: %{}
+
+  defp yaml_document(value) do
+    yaml_encode(value, 0)
+  end
+
+  defp yaml_encode(value, indent) when is_map(value) do
+    value
+    |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
+    |> Enum.map_join("", fn {key, nested} ->
+      yaml_key_value(to_string(key), nested, indent)
+    end)
+  end
+
+  defp yaml_encode(value, indent) when is_list(value) do
+    Enum.map_join(value, "", fn
+      nested when is_map(nested) ->
+        "#{String.duplicate(" ", indent)}-\n" <> yaml_encode(nested, indent + 2)
+
+      nested ->
+        "#{String.duplicate(" ", indent)}- #{yaml_scalar(nested)}\n"
+    end)
+  end
+
+  defp yaml_key_value(key, value, indent) when is_map(value) do
+    if map_size(value) == 0 do
+      "#{String.duplicate(" ", indent)}#{key}: {}\n"
+    else
+      "#{String.duplicate(" ", indent)}#{key}:\n" <> yaml_encode(value, indent + 2)
+    end
+  end
+
+  defp yaml_key_value(key, value, indent) when is_list(value) do
+    if value == [] do
+      "#{String.duplicate(" ", indent)}#{key}: []\n"
+    else
+      "#{String.duplicate(" ", indent)}#{key}:\n" <> yaml_encode(value, indent + 2)
+    end
+  end
+
+  defp yaml_key_value(key, value, indent) do
+    "#{String.duplicate(" ", indent)}#{key}: #{yaml_scalar(value)}\n"
+  end
+
+  defp yaml_scalar(value) when is_binary(value), do: Jason.encode!(value)
+  defp yaml_scalar(value) when is_boolean(value), do: if(value, do: "true", else: "false")
+  defp yaml_scalar(nil), do: "null"
+  defp yaml_scalar(value) when is_integer(value) or is_float(value), do: to_string(value)
 
   defp auto_attach_claude_code(project_root) do
     claude_dir = Path.join(user_home(), ".claude")

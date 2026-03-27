@@ -190,6 +190,21 @@ defmodule ControlKeel.SkillsTest do
              Path.join(cline_plan.output_dir, ".cline/data/settings/cline_mcp_settings.json")
            )
 
+    assert {:ok, roo_plan} = Skills.export("roo-native", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(roo_plan.output_dir, ".roo/rules/controlkeel.md"))
+    assert File.exists?(Path.join(roo_plan.output_dir, ".roo/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(roo_plan.output_dir, ".roo/guidance/controlkeel.md"))
+    assert File.exists?(Path.join(roo_plan.output_dir, ".roomodes"))
+
+    assert {:ok, goose_plan} = Skills.export("goose-native", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(goose_plan.output_dir, ".goosehints"))
+
+    assert File.exists?(
+             Path.join(goose_plan.output_dir, "goose/workflow_recipes/controlkeel-review.yaml")
+           )
+
+    assert File.exists?(Path.join(goose_plan.output_dir, "goose/controlkeel-extension.yaml"))
+
     assert File.exists?(
              Path.join(openclaw_plan.output_dir, "skills/controlkeel-governance/SKILL.md")
            )
@@ -240,5 +255,19 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".clinerules/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".clinerules/workflows/controlkeel-review.md"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+
+    assert {:ok, roo_install} = Skills.install("roo-native", tmp_dir, scope: "project")
+    assert roo_install.destination == Path.join(tmp_dir, ".roo/skills")
+    assert File.exists?(Path.join(tmp_dir, ".roo/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/rules/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/guidance/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roomodes"))
+
+    assert {:ok, goose_install} = Skills.install("goose-native", tmp_dir, scope: "project")
+    assert goose_install.destination == Path.join(tmp_dir, ".goosehints")
+    assert File.exists?(Path.join(tmp_dir, ".goosehints"))
+    assert File.exists?(Path.join(tmp_dir, "goose/workflow_recipes/controlkeel-review.yaml"))
+    assert File.exists?(Path.join(tmp_dir, "goose/controlkeel-extension.yaml"))
   end
 end

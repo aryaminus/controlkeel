@@ -173,6 +173,45 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert File.exists?(Path.join(tmp_dir, ".cline/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".clinerules/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".clinerules/workflows/controlkeel-review.md"))
+
+    assert {:ok, roo_attach} = CLI.parse(["attach", "roo-code"])
+
+    roo_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(roo_attach, project_root: tmp_dir)
+      end)
+
+    assert roo_output =~ "Prepared ControlKeel companion files for Roo Code."
+    assert roo_output =~ "Companion target: roo-native."
+    assert File.exists?(Path.join(tmp_dir, ".roo/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/rules/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/guidance/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roomodes"))
+
+    assert {:ok, goose_attach} = CLI.parse(["attach", "goose"])
+
+    goose_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(goose_attach, project_root: tmp_dir)
+      end)
+
+    assert goose_output =~ "Attached ControlKeel to Goose."
+    assert goose_output =~ "Companion target: goose-native."
+    assert goose_output =~ "Auth mode: ck_owned."
+    assert File.exists?(goose_config_path())
+    assert File.exists?(Path.join(tmp_dir, ".goosehints"))
+    assert File.exists?(Path.join(tmp_dir, "goose/workflow_recipes/controlkeel-review.yaml"))
+    assert File.exists?(Path.join(tmp_dir, "goose/controlkeel-extension.yaml"))
+
+    assert {:ok, goose_config} = YamlElixir.read_from_file(goose_config_path())
+    assert goose_config["extensions"]["controlkeel"]["type"] == "stdio"
+
+    assert goose_config["extensions"]["controlkeel"]["cmd"] == "controlkeel" or
+             String.ends_with?(
+               goose_config["extensions"]["controlkeel"]["cmd"],
+               "/controlkeel/bin/controlkeel-mcp"
+             )
   end
 
   test "bootstrap and provider commands work without manual init", %{tmp_dir: tmp_dir} do
@@ -681,5 +720,9 @@ defmodule ControlKeel.CLIRuntimeTest do
         Path.join(System.get_env("HOME") || System.user_home!(), ".cline")
 
     Path.join([base, "data", "settings", "cline_mcp_settings.json"])
+  end
+
+  defp goose_config_path do
+    Path.join([System.get_env("HOME") || System.user_home!(), ".config", "goose", "config.yaml"])
   end
 end
