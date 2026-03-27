@@ -110,6 +110,12 @@ test -f "$TMP_DIR/.agents/skills/controlkeel-governance/SKILL.md"
 test -f "$TMP_DIR/.codex/agents/controlkeel-operator.toml"
 test -f "$HOME_DIR/.codex/config.json"
 
+(cd "$TMP_DIR" && run_command "$BINARY" attach cline >/dev/null)
+test -f "$TMP_DIR/.cline/skills/controlkeel-governance/SKILL.md"
+test -f "$TMP_DIR/.clinerules/controlkeel.md"
+test -f "$TMP_DIR/.clinerules/workflows/controlkeel-review.md"
+test -f "$HOME_DIR/.cline/data/settings/cline_mcp_settings.json"
+
 (cd "$TMP_DIR" && run_command "$BINARY" attach cursor >/dev/null)
 
 if [ "$(uname -s)" = "Darwin" ]; then

@@ -28,6 +28,8 @@ defmodule ControlKeel.ProviderBroker do
       "selected_source" => selected.source,
       "selected_provider" => selected.provider,
       "selected_model" => selected.model,
+      "selected_auth_mode" => selected.auth_mode,
+      "selected_auth_owner" => selected.auth_owner,
       "reason" => selected.reason,
       "fallback_chain" => Enum.map(broker_chain, & &1.source),
       "provider_chain" => Enum.map(broker_chain, &resolution_summary/1),
@@ -111,13 +113,16 @@ defmodule ControlKeel.ProviderBroker do
         {"heuristic", "heuristic"} ->
           [
             "No model provider is currently available.",
-            "Configure a provider with `controlkeel provider set-key <provider> --value ...`, run a supported agent bridge, or start Ollama."
+            "Configure a provider with `controlkeel provider set-key <provider> --value ...`, run a supported agent bridge, or start Ollama.",
+            "CK still works in heuristic mode for governance, proof, benchmark, and MCP surfaces."
           ]
 
         {source, provider} ->
           [
             "Current provider source: #{source}.",
-            "Current provider: #{provider}."
+            "Current provider: #{provider}.",
+            "Auth mode: #{status["selected_auth_mode"]}.",
+            "Auth owner: #{status["selected_auth_owner"]}."
           ]
       end
 
@@ -151,25 +156,12 @@ defmodule ControlKeel.ProviderBroker do
     binding
     |> attached_agents(binding)
     |> Enum.find_value(fn {agent_id, _attrs} ->
-      case AgentIntegration.get(agent_id) do
-        %{provider_bridge: %{supported: true, provider: ^provider}} = integration ->
-          env_key = Map.get(@hosted_provider_envs, provider)
+      integration = AgentIntegration.get(agent_id)
+      resolution = bridge_resolution_for_integration(integration, opts)
 
-          case present_env(env_key) do
-            nil ->
-              nil
-
-            api_key ->
-              resolution(
-                "agent_bridge",
-                provider,
-                provider_config(provider, api_key, opts, :agent_bridge),
-                "Attached #{integration.label} exposed a compatible provider environment."
-              )
-          end
-
-        _ ->
-          nil
+      case resolution do
+        %{provider: ^provider} -> resolution
+        _ -> nil
       end
     end)
   end
@@ -183,13 +175,8 @@ defmodule ControlKeel.ProviderBroker do
       binding
       |> attached_agents(binding)
       |> Enum.find_value(fn {agent_id, _attrs} ->
-        case AgentIntegration.get(agent_id) do
-          %{provider_bridge: %{supported: true, provider: provider}} ->
-            agent_bridge_resolution_for(provider, binding, opts)
-
-          _ ->
-            nil
-        end
+        AgentIntegration.get(agent_id)
+        |> bridge_resolution_for_integration(opts)
       end)
     end
   end
@@ -332,17 +319,153 @@ defmodule ControlKeel.ProviderBroker do
       "heuristic",
       "heuristic",
       %{},
-      "No configured provider source was available for #{Path.expand(project_root)}."
+      "No configured provider source was available for #{Path.expand(project_root)}.",
+      "heuristic",
+      "none"
     )
   end
 
-  defp resolution(source, provider, config, reason) do
+  defp bridge_resolution_for_integration(
+         %AgentIntegration{
+           provider_bridge: %{supported: true, mode: "env_bridge", provider: provider}
+         } = integration,
+         opts
+       ) do
+    env_bridge_resolution(provider, integration, opts)
+  end
+
+  defp bridge_resolution_for_integration(
+         %AgentIntegration{id: "hermes-agent", provider_bridge: %{supported: true}} = integration,
+         opts
+       ) do
+    opts
+    |> hermes_provider_hint()
+    |> resolution_from_hint(
+      integration,
+      "Attached Hermes provider config selected a compatible provider."
+    )
+  end
+
+  defp bridge_resolution_for_integration(
+         %AgentIntegration{id: "openclaw", provider_bridge: %{supported: true}} = integration,
+         opts
+       ) do
+    opts
+    |> openclaw_provider_hint()
+    |> resolution_from_hint(
+      integration,
+      "Attached OpenClaw config selected a compatible provider."
+    )
+  end
+
+  defp bridge_resolution_for_integration(
+         %AgentIntegration{id: "droid", provider_bridge: %{supported: true}} = integration,
+         opts
+       ) do
+    opts
+    |> droid_provider_hint()
+    |> resolution_from_hint(
+      integration,
+      "Attached Factory Droid settings selected a compatible provider."
+    )
+  end
+
+  defp bridge_resolution_for_integration(
+         %AgentIntegration{id: "forge", provider_bridge: %{supported: true, mode: "acp_session"}},
+         opts
+       ) do
+    case Keyword.get(opts, :acp_session) do
+      %{provider: provider} = session ->
+        provider = normalize_provider(provider)
+        allowed_providers = Map.keys(@hosted_provider_envs)
+
+        api_key =
+          session[:api_key] ||
+            session["api_key"] ||
+            present_env(Map.get(@hosted_provider_envs, provider))
+
+        if provider in allowed_providers and present?(api_key) do
+          config =
+            provider_config(provider, api_key, opts, :agent_bridge)
+            |> maybe_put_config("base_url", session[:base_url] || session["base_url"])
+            |> maybe_put_config("model", session[:model] || session["model"])
+
+          resolution(
+            "agent_bridge",
+            provider,
+            config,
+            "Attached Forge ACP session exposed a compatible provider.",
+            "acp_session",
+            "agent"
+          )
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp bridge_resolution_for_integration(_integration, _opts), do: nil
+
+  defp env_bridge_resolution(provider, integration, opts) do
+    env_key = Map.get(@hosted_provider_envs, provider)
+
+    case present_env(env_key) do
+      nil ->
+        nil
+
+      api_key ->
+        resolution(
+          "agent_bridge",
+          provider,
+          provider_config(provider, api_key, opts, :agent_bridge),
+          "Attached #{integration.label} exposed a compatible provider environment.",
+          integration.auth_mode,
+          AgentIntegration.auth_owner(integration)
+        )
+    end
+  end
+
+  defp resolution_from_hint(nil, _integration, _reason), do: nil
+
+  defp resolution_from_hint(hint, integration, reason) do
+    provider = normalize_provider(hint["provider"] || hint[:provider])
+
+    cond do
+      provider not in Map.keys(@hosted_provider_envs) ->
+        nil
+
+      api_key =
+          hint["api_key"] || hint[:api_key] ||
+            present_env(Map.get(@hosted_provider_envs, provider)) ->
+        config =
+          provider_config(provider, api_key, [], :agent_bridge)
+          |> maybe_put_config("base_url", hint["base_url"] || hint[:base_url])
+          |> maybe_put_config("model", hint["model"] || hint[:model])
+
+        resolution(
+          "agent_bridge",
+          provider,
+          config,
+          reason,
+          integration.auth_mode,
+          AgentIntegration.auth_owner(integration)
+        )
+
+      true ->
+        nil
+    end
+  end
+
+  defp resolution(source, provider, config, reason, auth_mode \\ nil, auth_owner \\ nil) do
     %{
       source: source,
       provider: provider,
       model: config["model"] || config[:model],
       config: config,
-      reason: reason
+      reason: reason,
+      auth_mode: auth_mode || source_auth_mode(source),
+      auth_owner: auth_owner || source_auth_owner(source)
     }
   end
 
@@ -429,6 +552,11 @@ defmodule ControlKeel.ProviderBroker do
         "id" => normalize_agent_id(id),
         "label" => if(integration, do: integration.label, else: id),
         "provider_bridge_supported" => bridge_supported?(normalize_agent_id(id)),
+        "support_class" => integration && integration.support_class,
+        "auth_mode" => integration && integration.auth_mode,
+        "auth_owner" => integration && AgentIntegration.auth_owner(integration),
+        "mcp_mode" => integration && integration.mcp_mode,
+        "skills_mode" => integration && integration.skills_mode,
         "attached_at" => attrs["attached_at"] || attrs[:attached_at]
       }
     end)
@@ -441,6 +569,159 @@ defmodule ControlKeel.ProviderBroker do
     else
       _ -> nil
     end
+  end
+
+  defp hermes_provider_hint(opts) do
+    config_path =
+      Keyword.get(opts, :hermes_config_path) ||
+        Path.join(user_home(), ".hermes/config.yaml")
+
+    env_path =
+      Keyword.get(opts, :hermes_env_path) ||
+        Path.join(user_home(), ".hermes/.env")
+
+    yaml = read_yaml_hints(config_path)
+    env_map = read_env_file(env_path)
+
+    provider = normalize_provider(yaml["provider"] || yaml["model_provider"])
+    model = yaml["model"]
+    env_key = env_map["OPENROUTER_API_KEY"] && "OPENROUTER_API_KEY"
+    env_key = env_key || provider_env_key(provider)
+
+    if provider && env_key do
+      %{"provider" => provider, "model" => model, "api_key" => present_env(env_key)}
+    end
+  end
+
+  defp openclaw_provider_hint(opts) do
+    config_path =
+      Keyword.get(opts, :openclaw_config_path) ||
+        Path.join(user_home(), ".openclaw/openclaw.json")
+
+    with {:ok, contents} <- File.read(config_path),
+         {:ok, decoded} <- Jason.decode(contents) do
+      providers =
+        get_in(decoded, ["models", "providers"]) ||
+          decoded["providers"] ||
+          %{}
+
+      find_provider_hint(providers, decoded["model"])
+    else
+      _ -> nil
+    end
+  end
+
+  defp droid_provider_hint(opts) do
+    settings_path =
+      Keyword.get(opts, :droid_settings_path) ||
+        Path.join(user_home(), ".factory/settings.json")
+
+    with {:ok, contents} <- File.read(settings_path),
+         {:ok, decoded} <- Jason.decode(contents) do
+      provider =
+        normalize_provider(
+          decoded["provider"] ||
+            get_in(decoded, ["model", "provider"]) ||
+            get_in(decoded, ["llm", "provider"])
+        ) || if(present?(decoded["base_url"] || decoded["baseUrl"]), do: "openai", else: nil)
+
+      if provider do
+        %{
+          "provider" => provider,
+          "model" => decoded["model"] || get_in(decoded, ["llm", "model"]),
+          "base_url" => decoded["base_url"] || decoded["baseUrl"],
+          "api_key" => present_env(provider_env_key(provider))
+        }
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  defp find_provider_hint(providers, default_model) when is_map(providers) do
+    providers
+    |> Enum.find_value(fn {name, config} ->
+      provider =
+        normalize_provider(name) ||
+          normalize_provider(config["provider"]) ||
+          if(present?(config["baseUrl"] || config["base_url"]), do: "openai", else: nil)
+
+      env_key =
+        config["apiKeyEnv"] ||
+          config["api_key_env"] ||
+          get_in(config, ["apiKey", "env"]) ||
+          provider_env_key(provider)
+
+      if provider && present?(env_key) && present?(present_env(env_key)) do
+        %{
+          "provider" => provider,
+          "model" => config["model"] || config["defaultModel"] || default_model,
+          "base_url" => config["baseUrl"] || config["base_url"],
+          "api_key" => present_env(env_key)
+        }
+      end
+    end)
+  end
+
+  defp find_provider_hint(_providers, _default_model), do: nil
+
+  defp read_yaml_hints(path) do
+    case File.read(path) do
+      {:ok, contents} ->
+        contents
+        |> String.split("\n")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reduce(%{}, fn line, acc ->
+          case String.split(line, ":", parts: 2) do
+            [key, value] ->
+              value = value |> String.trim() |> String.trim("\"'")
+
+              if value == "" or String.starts_with?(key, "#") do
+                acc
+              else
+                Map.put(acc, String.trim(key), value)
+              end
+
+            _ ->
+              acc
+          end
+        end)
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp read_env_file(path) do
+    case File.read(path) do
+      {:ok, contents} ->
+        contents
+        |> String.split("\n")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))
+        |> Enum.reduce(%{}, fn line, acc ->
+          case String.split(line, "=", parts: 2) do
+            [key, value] ->
+              Map.put(acc, String.trim(key), String.trim(value) |> String.trim("\"'"))
+
+            _ ->
+              acc
+          end
+        end)
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp provider_env_key(nil), do: nil
+  defp provider_env_key(provider), do: Map.get(@hosted_provider_envs, provider)
+
+  defp maybe_put_config(config, _key, nil), do: config
+  defp maybe_put_config(config, key, value), do: Map.put(config, key, value)
+
+  defp user_home do
+    System.get_env("CONTROLKEEL_HOME") || System.get_env("HOME") || System.user_home!()
   end
 
   defp normalize_provider(nil), do: nil
@@ -493,9 +774,27 @@ defmodule ControlKeel.ProviderBroker do
       "source" => resolution.source,
       "provider" => resolution.provider,
       "model" => resolution.model,
-      "reason" => resolution.reason
+      "reason" => resolution.reason,
+      "auth_mode" => resolution.auth_mode,
+      "auth_owner" => resolution.auth_owner
     }
   end
+
+  defp source_auth_mode("agent_bridge"), do: "env_bridge"
+  defp source_auth_mode("workspace_profile"), do: "ck_owned"
+  defp source_auth_mode("user_default_profile"), do: "ck_owned"
+  defp source_auth_mode("project_override"), do: "ck_owned"
+  defp source_auth_mode("ollama"), do: "local"
+  defp source_auth_mode("heuristic"), do: "heuristic"
+  defp source_auth_mode(_source), do: "ck_owned"
+
+  defp source_auth_owner("agent_bridge"), do: "agent"
+  defp source_auth_owner("workspace_profile"), do: "controlkeel"
+  defp source_auth_owner("user_default_profile"), do: "controlkeel"
+  defp source_auth_owner("project_override"), do: "controlkeel"
+  defp source_auth_owner("ollama"), do: "local"
+  defp source_auth_owner("heuristic"), do: "none"
+  defp source_auth_owner(_source), do: "controlkeel"
 
   defp present_env(nil), do: nil
   defp present_env(key), do: present_value(System.get_env(key))

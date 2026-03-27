@@ -9,30 +9,52 @@ This document is the **single inventory** for attach targets, MCP tools, and bun
 
 For install paths and proxy URLs, see [agent-integrations.md](agent-integrations.md) and [getting-started.md](getting-started.md).
 
-## Attach targets (`AgentIntegration.catalog/0`)
+## Typed integration catalog (`AgentIntegration.catalog/0`)
 
-Every integration uses the **same required MCP tool set** (see below): `ck_context`, `ck_validate`, `ck_finding`, `ck_budget`, `ck_route`, and when skills are enabled, `ck_skill_list` / `ck_skill_load`.
+Every shipped integration row now declares a **support class**:
 
-| ID | Category | Attach command | Provider bridge | Default scope | Preferred export / bundle | Export targets (labels) |
-|----|----------|----------------|-----------------|---------------|---------------------------|-------------------------|
-| `claude-code` | native-first | `controlkeel attach claude-code` | Anthropic (environment) | user | `claude-standalone` | `claude-standalone`, `claude-plugin` |
-| `codex-cli` | native-first | `controlkeel attach codex-cli` | OpenAI (environment) | user | `codex` | `codex`, `open-standard` |
-| `vscode` | repo-native | `controlkeel attach vscode` | none | project | `github-repo` | `github-repo`, `copilot-plugin` |
-| `copilot` | repo-native | `controlkeel attach copilot` | none | project | `github-repo` | `github-repo`, `copilot-plugin` |
-| `cursor` | mcp-plus-instructions | `controlkeel attach cursor` | none | project | `instructions-only` | `instructions-only` |
-| `windsurf` | mcp-plus-instructions | `controlkeel attach windsurf` | none | project | `instructions-only` | `instructions-only` |
-| `kiro` | mcp-plus-instructions | `controlkeel attach kiro` | none | project | `instructions-only` | `instructions-only` |
-| `amp` | mcp-plus-instructions | `controlkeel attach amp` | none | project | `instructions-only` | `instructions-only` |
-| `opencode` | mcp-plus-instructions | `controlkeel attach opencode` | none | project | `instructions-only` | `instructions-only` |
-| `gemini-cli` | mcp-plus-instructions | `controlkeel attach gemini-cli` | none | project | `instructions-only` | `instructions-only` |
-| `continue` | mcp-plus-instructions | `controlkeel attach continue` | none | project | `instructions-only` | `instructions-only` |
-| `aider` | mcp-plus-instructions | `controlkeel attach aider` | none | project | `instructions-only` | `instructions-only` |
+- `attach_client`
+- `headless_runtime`
+- `framework_adapter`
+- `provider_only`
+- `alias`
+- `unverified`
 
-**Category meanings** (from `AgentIntegration.categories/0`):
+Only `attach_client` rows produce real `controlkeel attach <id>` commands. `headless_runtime` rows export runtime bundles, `framework_adapter` rows surface through benchmark/policy tooling, `provider_only` rows surface through CK provider flows, and `alias` rows point at a canonical shipped target.
 
-- **native-first** — MCP registration plus native skills/agents on disk by default.
-- **repo-native** — repo-scoped `.github` / `.vscode` skills and MCP config.
-- **mcp-plus-instructions** — MCP server plus portable instruction bundles under `controlkeel/dist/instructions-only`.
+Attachable and runtime integrations use the **same required MCP tool set** (see below): `ck_context`, `ck_validate`, `ck_finding`, `ck_budget`, `ck_route`, and when skills are enabled, `ck_skill_list` / `ck_skill_load`.
+
+| ID | Support class | Action | Auth mode | MCP mode | Skills mode | Preferred export / bundle |
+|----|---------------|--------|-----------|----------|-------------|---------------------------|
+| `claude-code` | attach_client | `controlkeel attach claude-code` | `env_bridge` | `native` | `native` | `claude-standalone` |
+| `codex-cli` | attach_client | `controlkeel attach codex-cli` | `env_bridge` | `native` | `native` | `codex` |
+| `cline` | attach_client | `controlkeel attach cline` | `ck_owned` | `native` | `native` | `cline-native` |
+| `vscode` | attach_client | `controlkeel attach vscode` | `ck_owned` | `native` | `native` | `github-repo` |
+| `copilot` | attach_client | `controlkeel attach copilot` | `ck_owned` | `native` | `native` | `github-repo` |
+| `cursor` | attach_client | `controlkeel attach cursor` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `windsurf` | attach_client | `controlkeel attach windsurf` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `kiro` | attach_client | `controlkeel attach kiro` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `amp` | attach_client | `controlkeel attach amp` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `opencode` | attach_client | `controlkeel attach opencode` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `continue` | attach_client | `controlkeel attach continue` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `aider` | attach_client | `controlkeel attach aider` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `hermes-agent` | attach_client | `controlkeel attach hermes-agent` | `config_reference` | `native` | `native` | `hermes-native` |
+| `openclaw` | attach_client | `controlkeel attach openclaw` | `config_reference` | `native` | `plugin_bundle` | `openclaw-native` |
+| `droid` | attach_client | `controlkeel attach droid` | `gateway_base_url` | `native` | `native` | `droid-bundle` |
+| `forge` | attach_client | `controlkeel attach forge` | `acp_session` | `export_only` | `instructions_only` | `forge-acp` |
+| `open-swe` | headless_runtime | `controlkeel runtime export open-swe` | `ck_owned` | `export_only` | `instructions_only` | `open-swe-runtime` |
+| `dspy` | framework_adapter | adapter only | `ck_owned` | `none` | `none` | `framework-adapter` |
+| `gepa` | framework_adapter | adapter only | `ck_owned` | `none` | `none` | `framework-adapter` |
+| `deepagents` | framework_adapter | adapter only | `ck_owned` | `none` | `none` | `framework-adapter` |
+| `codestral` | provider_only | provider template only | `ck_owned` | `none` | `none` | `provider-profile` |
+| `claude-dispatch` | alias | use `claude-code` | `env_bridge` | `native` | `native` | `claude-standalone` |
+| `cursor-agent` | alias | use `cursor` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
+| `copilot-cli` | alias | use `copilot` | `ck_owned` | `native` | `native` | `github-repo` |
+| `t3code` | alias | use `codex-cli` | `env_bridge` | `native` | `native` | `codex` |
+| `rlm-agent` | unverified | research only | `none` | `none` | `none` | n/a |
+| `slate` | unverified | research only | `none` | `none` | `none` | n/a |
+| `retune` | unverified | research only | `none` | `none` | `none` | n/a |
 
 The shipped `copilot` attach target is the repo-native path for GitHub Copilot, and the exported `copilot-plugin` bundle is the same companion path used for GitHub Copilot CLI and VS Code agent mode.
 

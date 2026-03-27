@@ -161,6 +161,24 @@ try {
     throw "codex MCP config missing"
   }
 
+  Invoke-BinaryStep -Arguments @("attach", "cline") -WorkingDirectory $tmpDir | Out-Null
+
+  if (-not (Test-Path (Join-Path $tmpDir ".cline/skills/controlkeel-governance/SKILL.md"))) {
+    throw "cline skills were not installed"
+  }
+
+  if (-not (Test-Path (Join-Path $tmpDir ".clinerules/controlkeel.md"))) {
+    throw "cline rules were not installed"
+  }
+
+  if (-not (Test-Path (Join-Path $tmpDir ".clinerules/workflows/controlkeel-review.md"))) {
+    throw "cline workflow was not installed"
+  }
+
+  if (-not (Test-Path (Join-Path $homeDir ".cline/data/settings/cline_mcp_settings.json"))) {
+    throw "cline MCP config missing"
+  }
+
   Invoke-BinaryStep -Arguments @("attach", "cursor") -WorkingDirectory $tmpDir | Out-Null
 
   if (-not (Test-Path (Join-Path $homeDir "Cursor/User/globalStorage/cursor.mcp.json"))) {

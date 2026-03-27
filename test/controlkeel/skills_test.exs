@@ -170,6 +170,37 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.read!(Path.join(claude_plan.output_dir, "CONTROLKEEL_INSTALL.md")) =~
              "@aryaminus/controlkeel"
+
+    assert {:ok, openclaw_plan} = Skills.export("openclaw-plugin", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(openclaw_plan.output_dir, "openclaw.plugin.json"))
+
+    assert {:ok, cline_plan} = Skills.export("cline-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(cline_plan.output_dir, ".cline/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(Path.join(cline_plan.output_dir, ".clinerules/controlkeel.md"))
+
+    assert File.exists?(
+             Path.join(cline_plan.output_dir, ".clinerules/workflows/controlkeel-review.md")
+           )
+
+    assert File.exists?(
+             Path.join(cline_plan.output_dir, ".cline/data/settings/cline_mcp_settings.json")
+           )
+
+    assert File.exists?(
+             Path.join(openclaw_plan.output_dir, "skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert {:ok, droid_plan} = Skills.export("droid-bundle", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(droid_plan.output_dir, ".factory/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(Path.join(droid_plan.output_dir, ".factory/droids/controlkeel.md"))
   end
 
   test "installer writes project-scoped native bundles without nesting agent directories", %{
@@ -186,5 +217,17 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".github/agents/controlkeel-operator.agent.md"))
     assert File.exists?(Path.join(tmp_dir, ".github/mcp.json"))
     assert File.exists?(Path.join(tmp_dir, ".vscode/mcp.json"))
+
+    assert {:ok, hermes_install} = Skills.install("hermes-native", tmp_dir, scope: "project")
+    assert hermes_install.destination == Path.join(tmp_dir, ".hermes/skills")
+    assert File.exists?(Path.join(tmp_dir, ".hermes/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".hermes/mcp.json"))
+
+    assert {:ok, cline_install} = Skills.install("cline-native", tmp_dir, scope: "project")
+    assert cline_install.destination == Path.join(tmp_dir, ".cline/skills")
+    assert File.exists?(Path.join(tmp_dir, ".cline/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".clinerules/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".clinerules/workflows/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
   end
 end

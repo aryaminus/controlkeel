@@ -93,6 +93,121 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
+  defp do_install(%SkillTarget{id: "cline-native"}, scope, project_root, skills, _opts)
+       when scope in ["user", "project"] do
+    {:ok, plan} = Exporter.export("cline-native", project_root, scope: scope)
+
+    case scope do
+      "user" ->
+        cline_root = cline_home()
+        skill_root = Path.join(cline_root, "skills")
+        rules_root = cline_documents_dir("Rules")
+        workflows_root = cline_documents_dir("Workflows")
+        config_root = Path.join([cline_root, "data", "settings"])
+
+        copy_skills(skills, skill_root)
+        File.mkdir_p!(rules_root)
+        File.mkdir_p!(workflows_root)
+        File.mkdir_p!(config_root)
+
+        File.cp!(
+          Path.join(plan.output_dir, ".clinerules/controlkeel.md"),
+          Path.join(rules_root, "controlkeel.md")
+        )
+
+        File.cp!(
+          Path.join(plan.output_dir, ".clinerules/workflows/controlkeel-review.md"),
+          Path.join(workflows_root, "controlkeel-review.md")
+        )
+
+        merge_json_file!(
+          Path.join(plan.output_dir, ".cline/data/settings/cline_mcp_settings.json"),
+          Path.join(config_root, "cline_mcp_settings.json")
+        )
+
+        {:ok,
+         %{
+           target: "cline-native",
+           scope: scope,
+           destination: skill_root,
+           agent_destination: config_root,
+           rules_destination: rules_root,
+           workflows_destination: workflows_root
+         }}
+
+      "project" ->
+        skill_root = Path.join(project_root, ".cline/skills")
+        rules_root = Path.join(project_root, ".clinerules")
+
+        copy_skills(skills, skill_root)
+        copy_tree_contents(Path.join(plan.output_dir, ".clinerules"), rules_root)
+        File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+        {:ok,
+         %{
+           target: "cline-native",
+           scope: scope,
+           destination: skill_root,
+           rules_destination: rules_root
+         }}
+    end
+  end
+
+  defp do_install(%SkillTarget{id: "hermes-native"}, scope, project_root, skills, _opts)
+       when scope in ["user", "project"] do
+    base =
+      if(scope == "user",
+        do: Path.join(user_home(), ".hermes"),
+        else: Path.join(project_root, ".hermes")
+      )
+
+    skill_root = Path.join(base, "skills")
+
+    copy_skills(skills, skill_root)
+
+    {:ok, plan} = Exporter.export("hermes-native", project_root, scope: scope)
+    copy_tree_contents(Path.join(plan.output_dir, ".hermes"), base)
+
+    if scope == "project" do
+      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    end
+
+    {:ok,
+     %{target: "hermes-native", scope: scope, destination: skill_root, agent_destination: base}}
+  end
+
+  defp do_install(%SkillTarget{id: "openclaw-native"}, scope, project_root, skills, _opts)
+       when scope in ["user", "project"] do
+    {skill_root, config_root} =
+      if scope == "user" do
+        {Path.join(user_home(), ".openclaw/skills"), Path.join(user_home(), ".openclaw")}
+      else
+        {Path.join(project_root, "skills"), Path.join(project_root, ".openclaw")}
+      end
+
+    copy_skills(skills, skill_root)
+
+    {:ok, plan} = Exporter.export("openclaw-native", project_root, scope: scope)
+    File.mkdir_p!(config_root)
+
+    File.cp!(
+      Path.join(plan.output_dir, ".openclaw/openclaw.json"),
+      Path.join(config_root, "openclaw.json")
+    )
+
+    if scope == "project" do
+      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    end
+
+    {:ok,
+     %{
+       target: "openclaw-native",
+       scope: scope,
+       destination: skill_root,
+       agent_destination: config_root
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "github-repo"}, scope, project_root, skills, _opts)
        when scope in ["project", "export"] do
     if scope == "project" do
@@ -117,16 +232,64 @@ defmodule ControlKeel.Skills.Installer do
     end
   end
 
-  defp do_install(%SkillTarget{id: "claude-plugin"}, _scope, project_root, _skills, _opts) do
-    Exporter.export("claude-plugin", project_root, scope: "export")
+  defp do_install(%SkillTarget{id: "droid-bundle"}, scope, project_root, skills, _opts)
+       when scope in ["user", "project"] do
+    base =
+      if(scope == "user",
+        do: Path.join(user_home(), ".factory"),
+        else: Path.join(project_root, ".factory")
+      )
+
+    skill_root = Path.join(base, "skills")
+
+    copy_skills(skills, skill_root)
+
+    {:ok, plan} = Exporter.export("droid-bundle", project_root, scope: scope)
+    copy_tree_contents(Path.join(plan.output_dir, ".factory"), base)
+
+    if scope == "project" do
+      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    end
+
+    {:ok,
+     %{target: "droid-bundle", scope: scope, destination: skill_root, agent_destination: base}}
   end
 
-  defp do_install(%SkillTarget{id: "copilot-plugin"}, _scope, project_root, _skills, _opts) do
-    Exporter.export("copilot-plugin", project_root, scope: "export")
+  defp do_install(%SkillTarget{id: "forge-acp"}, scope, project_root, skills, _opts)
+       when scope in ["user", "project"] do
+    skill_root =
+      if scope == "user",
+        do: Path.join(user_home(), ".agents/skills"),
+        else: Path.join(project_root, ".agents/skills")
+
+    forge_root =
+      if(scope == "user",
+        do: Path.join(user_home(), ".forge"),
+        else: Path.join(project_root, ".forge")
+      )
+
+    copy_skills(skills, skill_root)
+
+    {:ok, plan} = Exporter.export("forge-acp", project_root, scope: scope)
+    File.mkdir_p!(forge_root)
+
+    File.cp!(
+      Path.join(plan.output_dir, ".forge/controlkeel.acp.json"),
+      Path.join(forge_root, "controlkeel.acp.json")
+    )
+
+    if scope == "project" do
+      File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    end
+
+    {:ok,
+     %{target: "forge-acp", scope: scope, destination: skill_root, agent_destination: forge_root}}
   end
 
-  defp do_install(%SkillTarget{id: "instructions-only"}, _scope, project_root, _skills, _opts) do
-    Exporter.export("instructions-only", project_root, scope: "export")
+  defp do_install(%SkillTarget{id: target}, "export", project_root, _skills, _opts)
+       when is_binary(target) do
+    Exporter.export(target, project_root, scope: "export")
   end
 
   defp normalize_scope(target, scope) do
@@ -160,11 +323,43 @@ defmodule ControlKeel.Skills.Installer do
     end)
   end
 
+  defp merge_json_file!(source_path, destination_path) do
+    source =
+      source_path
+      |> File.read!()
+      |> Jason.decode!()
+
+    existing =
+      case File.read(destination_path) do
+        {:ok, contents} -> Jason.decode!(contents)
+        _ -> %{}
+      end
+
+    updated =
+      Map.merge(existing, source, fn _key, left, right ->
+        if is_map(left) and is_map(right) do
+          Map.merge(left, right)
+        else
+          right
+        end
+      end)
+
+    File.write!(destination_path, Jason.encode!(updated, pretty: true) <> "\n")
+  end
+
   defp same_path?(left, right) do
     Path.expand(left) == Path.expand(right)
   end
 
   defp user_home do
     System.get_env("CONTROLKEEL_HOME") || System.get_env("HOME") || System.user_home!()
+  end
+
+  defp cline_home do
+    System.get_env("CLINE_DIR") || Path.join(user_home(), ".cline")
+  end
+
+  defp cline_documents_dir(name) do
+    Path.join([user_home(), "Documents", "Cline", name])
   end
 end

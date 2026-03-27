@@ -146,6 +146,33 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert cursor_output =~ "Companion target: instructions-only."
     assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/instructions-only/AGENTS.md"))
     assert File.exists?(cursor_config_path())
+
+    assert {:ok, hermes_attach} = CLI.parse(["attach", "hermes-agent", "--scope", "project"])
+
+    hermes_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(hermes_attach, project_root: tmp_dir)
+      end)
+
+    assert hermes_output =~ "Prepared ControlKeel companion files for Hermes Agent."
+    assert hermes_output =~ "Auth mode: config_reference."
+    assert File.exists?(Path.join(tmp_dir, ".hermes/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".hermes/mcp.json"))
+
+    assert {:ok, cline_attach} = CLI.parse(["attach", "cline"])
+
+    cline_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(cline_attach, project_root: tmp_dir)
+      end)
+
+    assert cline_output =~ "Attached ControlKeel to Cline."
+    assert cline_output =~ "Companion target: cline-native."
+    assert cline_output =~ "Auth mode: ck_owned."
+    assert File.exists?(cline_config_path())
+    assert File.exists?(Path.join(tmp_dir, ".cline/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".clinerules/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".clinerules/workflows/controlkeel-review.md"))
   end
 
   test "bootstrap and provider commands work without manual init", %{tmp_dir: tmp_dir} do
@@ -197,6 +224,22 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert bootstrap_output =~ "Bootstrapped ControlKeel"
     assert bootstrap_output =~ "Binding mode: existing"
+  end
+
+  test "runtime export emits the Open SWE headless bundle", %{tmp_dir: tmp_dir} do
+    assert {:ok, export} = CLI.parse(["runtime", "export", "open-swe", "--project-root", tmp_dir])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(export, project_root: tmp_dir)
+      end)
+
+    assert output =~ "Prepared Open SWE runtime export."
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/open-swe-runtime/AGENTS.md"))
+
+    assert File.exists?(
+             Path.join(tmp_dir, "controlkeel/dist/open-swe-runtime/open-swe/README.md")
+           )
   end
 
   test "runtime proofs, pause, resume, and memory search operate on the bound session", %{
@@ -598,5 +641,13 @@ defmodule ControlKeel.CLIRuntimeTest do
       _ ->
         Path.join([home, ".config", "Cursor", "User", "globalStorage", "cursor.mcp.json"])
     end
+  end
+
+  defp cline_config_path do
+    base =
+      System.get_env("CLINE_DIR") ||
+        Path.join(System.get_env("HOME") || System.user_home!(), ".cline")
+
+    Path.join([base, "data", "settings", "cline_mcp_settings.json"])
   end
 end

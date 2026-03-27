@@ -113,7 +113,7 @@ defmodule ControlKeelWeb.SkillsLive do
             <p class="ck-kicker">Skills Studio</p>
             <h1 class="ck-section-title">Native skills and plugin operator console</h1>
             <p class="ck-lead ck-lead-tight">
-              ControlKeel keeps `priv/skills/` as the canonical source of truth, validates every skill package, and can export or install the same capability set for Codex, Claude Code, Copilot / VS Code, and MCP-only tools.
+              ControlKeel keeps `priv/skills/` as the canonical source of truth, validates every skill package, and can export or install the same capability set for Codex, Claude Code, Cline, Copilot / VS Code, and MCP-only tools.
             </p>
           </div>
           <a href={~p"/"} class="ck-link">Back home</a>
@@ -197,6 +197,11 @@ defmodule ControlKeelWeb.SkillsLive do
                 Provider: {@provider_status["selected_provider"]} / {@provider_status[
                   "selected_model"
                 ] || "default"}
+              </p>
+              <p class="ck-note" style="margin-top: 0.35rem;">
+                Auth: {@provider_status["selected_auth_mode"]} / {@provider_status[
+                  "selected_auth_owner"
+                ]}
               </p>
               <p class="ck-note" style="margin-top: 0.35rem;">
                 Bootstrap mode: {@provider_status["bootstrap"]["mode"]}
@@ -349,7 +354,7 @@ defmodule ControlKeelWeb.SkillsLive do
                   <thead>
                     <tr>
                       <th class="text-left py-2 pr-4">Agent</th>
-                      <th class="text-left py-2 pr-4">Attach</th>
+                      <th class="text-left py-2 pr-4">Support</th>
                       <th class="text-left py-2 pr-4">Connection</th>
                       <th class="text-left py-2 pr-4">Companion</th>
                     </tr>
@@ -359,21 +364,27 @@ defmodule ControlKeelWeb.SkillsLive do
                       <tr id={"agent-#{integration.id}"}>
                         <td class="py-2 pr-4 align-top">
                           <strong>{integration.label}</strong>
-                          <p class="ck-note">{human_category(integration.category)}</p>
+                          <p class="ck-note">{human_support_class(integration.support_class)}</p>
                         </td>
                         <td class="py-2 pr-4 align-top">
-                          <div class="flex items-start gap-2">
-                            <code>{integration.attach_command}</code>
-                            <button
-                              type="button"
-                              class="ck-link"
-                              id={"copy-agent-#{integration.id}"}
-                              phx-click="copy_command"
-                              phx-value-command={integration.attach_command}
-                            >
-                              Copy
-                            </button>
-                          </div>
+                          <%= if integration.attach_command do %>
+                            <div class="flex items-start gap-2">
+                              <code>{integration.attach_command}</code>
+                              <button
+                                type="button"
+                                class="ck-link"
+                                id={"copy-agent-#{integration.id}"}
+                                phx-click="copy_command"
+                                phx-value-command={integration.attach_command}
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          <% else %>
+                            <code>
+                              {integration.runtime_export_command || alias_action(integration)}
+                            </code>
+                          <% end %>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Scope: {Enum.join(integration.supported_scopes, ", ")}
                           </p>
@@ -387,13 +398,22 @@ defmodule ControlKeelWeb.SkillsLive do
                             Required CK tools: {format_targets(integration.required_mcp_tools)}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
+                            Auth: {integration.auth_mode} / {auth_owner(integration)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
                             Provider bridge: {format_provider_bridge(integration.provider_bridge)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            MCP / skills: {integration.mcp_mode} / {integration.skills_mode}
                           </p>
                         </td>
                         <td class="py-2 pr-4 align-top">
                           <p class="ck-note">{integration.companion_delivery}</p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Export targets: {format_targets(integration.export_targets)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Upstream: {integration.upstream_slug || "n/a"}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Get CK: {format_install_channels(integration.install_channels)}
@@ -516,14 +536,23 @@ defmodule ControlKeelWeb.SkillsLive do
   defp diagnostic_pill_class("warn"), do: "ck-pill-medium"
   defp diagnostic_pill_class(_), do: "ck-pill-neutral"
 
-  defp human_category("native-first"), do: "Native skills install on attach"
-  defp human_category("repo-native"), do: "Repo-native skills, agents, and plugin bundles"
+  defp human_support_class("attach_client"), do: "Attachable client"
+  defp human_support_class("headless_runtime"), do: "Headless runtime"
+  defp human_support_class("framework_adapter"), do: "Framework adapter"
+  defp human_support_class("provider_only"), do: "Provider-only"
+  defp human_support_class("alias"), do: "Alias"
+  defp human_support_class("unverified"), do: "Unverified"
+  defp human_support_class(_), do: "Portable integration"
 
-  defp human_category("mcp-plus-instructions"),
-    do: "MCP attach plus generated instruction snippets"
+  defp alias_action(%{alias_of: alias_of}) when is_binary(alias_of), do: "Use #{alias_of}"
+  defp alias_action(_integration), do: "reference only"
 
-  defp human_category(_), do: "Portable MCP fallback"
+  defp auth_owner(integration), do: ControlKeel.AgentIntegration.auth_owner(integration)
 
-  defp format_provider_bridge(%{supported: true, provider: provider}), do: "#{provider} bridge"
+  defp format_provider_bridge(%{supported: true, provider: provider, mode: mode}),
+    do: "#{mode}: #{provider}"
+
+  defp format_provider_bridge(%{supported: true, mode: mode}), do: mode
+  defp format_provider_bridge(%{mode: "ck_owned"}), do: "ck-owned"
   defp format_provider_bridge(_bridge), do: "none"
 end

@@ -81,6 +81,7 @@ defmodule ControlKeel.CLI do
   @provider_list_switches [project_root: :string]
   @provider_doctor_switches [project_root: :string]
   @bootstrap_switches [project_root: :string, ephemeral_ok: :boolean, agent: :string]
+  @runtime_export_switches [project_root: :string]
 
   def standalone_argv do
     cond do
@@ -107,11 +108,14 @@ defmodule ControlKeel.CLI do
         parse_with_switches(:init, rest, @init_switches)
 
       ["attach", agent | rest] ->
-        if agent in AgentIntegration.ids() do
+        if agent in AgentIntegration.attachable_ids() do
           parse_attach(agent, rest)
         else
           {:error, usage_text()}
         end
+
+      ["runtime", "export", runtime_id | rest] ->
+        parse_runtime_export(runtime_id, rest)
 
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
@@ -344,6 +348,8 @@ defmodule ControlKeel.CLI do
                                       Poll ready work for a workspace service account
       controlkeel provider list|show|default|set-key|doctor
                                       Inspect and configure CK provider brokerage
+      controlkeel runtime export <id> [--project-root /abs/path]
+                                      Export headless/runtime bundles such as Open SWE
       controlkeel bootstrap [--project-root /abs/path] [--ephemeral-ok]
                                       Auto-create project or ephemeral binding on first use
       controlkeel watch [--interval N]
@@ -498,13 +504,14 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["kiro", "amp", "opencode", "gemini-cli", "codex-cli"] do
+      when agent in ["kiro", "amp", "opencode", "gemini-cli", "codex-cli", "cline"] do
     config_path_fn = %{
       "kiro" => &kiro_mcp_config_path/0,
       "amp" => &amp_mcp_config_path/0,
       "opencode" => &opencode_mcp_config_path/0,
       "gemini-cli" => &gemini_cli_config_path/0,
-      "codex-cli" => &codex_cli_config_path/0
+      "codex-cli" => &codex_cli_config_path/0,
+      "cline" => &cline_mcp_config_path/0
     }
 
     display_name = %{
@@ -512,7 +519,8 @@ defmodule ControlKeel.CLI do
       "amp" => "Amp",
       "opencode" => "OpenCode",
       "gemini-cli" => "Gemini CLI",
-      "codex-cli" => "Codex CLI"
+      "codex-cli" => "Codex CLI",
+      "cline" => "Cline"
     }
 
     with {:ok, binding, _session, _mode} <-
@@ -600,6 +608,38 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
+      when agent in ["hermes-agent", "openclaw", "droid", "forge"] do
+    target =
+      %{
+        "hermes-agent" => "hermes-native",
+        "openclaw" => "openclaw-native",
+        "droid" => "droid-bundle",
+        "forge" => "forge-acp"
+      }[agent]
+
+    scope = attach_scope(agent, options)
+
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => agent}),
+         {:ok, result} <- attach_bundle_target(target, project_root, scope, options),
+         attached_agent <- bundled_attached_agent(agent, target, scope, result),
+         updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
+         {:ok, _binding} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
+      {:ok,
+       bundle_attach_lines(agent, result) ++
+         bootstrap_lines(project_root) ++
+         attach_guidance_lines(agent)}
+    else
+      {:error, reason} ->
+        {:error,
+         "Failed to attach ControlKeel to #{display_attach_agent(agent)}: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :attach, args: [agent], options: options}, project_root)
       when agent in ["vscode", "copilot"] do
     scope = attach_scope(agent, options)
 
@@ -636,6 +676,26 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(%{command: :runtime_export, args: ["open-swe"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    case Skills.export("open-swe-runtime", root, scope: "export") do
+      {:ok, plan} ->
+        {:ok,
+         [
+           "Prepared Open SWE runtime export.",
+           "Output: #{plan.output_dir}"
+         ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+
+      {:error, reason} ->
+        {:error, "Failed to export Open SWE runtime bundle: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :runtime_export, args: [runtime_id]}, _project_root) do
+    {:error, "Unknown runtime export target: #{runtime_id}"}
+  end
+
   def run_command(%{command: :status}, project_root) do
     case ensure_local_project(project_root) do
       {:ok, _binding, session, _mode} ->
@@ -663,6 +723,8 @@ defmodule ControlKeel.CLI do
            "Bootstrap mode: #{provider_status["bootstrap"]["mode"]}",
            "Provider source: #{provider_status["selected_source"]}",
            "Provider: #{provider_status["selected_provider"]}",
+           "Auth mode: #{provider_status["selected_auth_mode"]}",
+           "Auth owner: #{provider_status["selected_auth_owner"]}",
            "OpenAI responses: #{Proxy.url(session, :openai, "/v1/responses")}",
            "OpenAI chat: #{Proxy.url(session, :openai, "/v1/chat/completions")}",
            "OpenAI realtime: #{Proxy.realtime_url(session, :openai, "/v1/realtime")}",
@@ -1390,6 +1452,8 @@ defmodule ControlKeel.CLI do
        "Project root: #{status["project_root"]}",
        "Selected source: #{status["selected_source"]}",
        "Selected provider: #{status["selected_provider"]}",
+       "Auth mode: #{status["selected_auth_mode"]}",
+       "Auth owner: #{status["selected_auth_owner"]}",
        "Bootstrap mode: #{status["bootstrap"]["mode"]}",
        "Profiles:"
      ] ++
@@ -1408,11 +1472,13 @@ defmodule ControlKeel.CLI do
        "Selected source: #{status["selected_source"]}",
        "Selected provider: #{status["selected_provider"]}",
        "Selected model: #{status["selected_model"] || "n/a"}",
+       "Auth mode: #{status["selected_auth_mode"]}",
+       "Auth owner: #{status["selected_auth_owner"]}",
        "Reason: #{status["reason"]}",
        "Fallback chain: #{Enum.join(status["fallback_chain"], " -> ")}"
      ] ++
        Enum.map(status["provider_chain"], fn resolution ->
-         "  #{resolution["source"]}: #{resolution["provider"]} (#{resolution["model"] || "default"})"
+         "  #{resolution["source"]}: #{resolution["provider"]} (#{resolution["model"] || "default"}) [#{resolution["auth_mode"]}/#{resolution["auth_owner"]}]"
        end)}
   end
 
@@ -1426,6 +1492,8 @@ defmodule ControlKeel.CLI do
        "Provider doctor for #{status["project_root"]}",
        "Selected source: #{status["selected_source"]}",
        "Selected provider: #{status["selected_provider"]}",
+       "Auth mode: #{status["selected_auth_mode"]}",
+       "Auth owner: #{status["selected_auth_owner"]}",
        "Bootstrap mode: #{status["bootstrap"]["mode"]}"
      ] ++ Enum.map(doctor["suggestions"], &"  #{&1}")}
   end
@@ -1690,15 +1758,21 @@ defmodule ControlKeel.CLI do
     integrations = Skills.agent_integrations()
     provider_status = ProviderBroker.status(root)
 
-    native_first =
+    attach_clients =
       integrations
-      |> Enum.filter(&(&1.category in ["native-first", "repo-native"]))
+      |> Enum.filter(&(&1.support_class == "attach_client"))
       |> Enum.map(& &1.label)
       |> Enum.join(", ")
 
-    mcp_fallback =
+    runtimes =
       integrations
-      |> Enum.filter(&(&1.category == "mcp-plus-instructions"))
+      |> Enum.filter(&(&1.support_class == "headless_runtime"))
+      |> Enum.map(& &1.label)
+      |> Enum.join(", ")
+
+    frameworks =
+      integrations
+      |> Enum.filter(&(&1.support_class == "framework_adapter"))
       |> Enum.map(& &1.label)
       |> Enum.join(", ")
 
@@ -1709,9 +1783,12 @@ defmodule ControlKeel.CLI do
        "Catalog size: #{length(analysis.skills)}",
        "Provider source: #{provider_status["selected_source"]}",
        "Provider: #{provider_status["selected_provider"]}",
+       "Auth mode: #{provider_status["selected_auth_mode"]}",
+       "Auth owner: #{provider_status["selected_auth_owner"]}",
        "Bootstrap mode: #{provider_status["bootstrap"]["mode"]}",
-       "Native-first agents: #{native_first}",
-       "MCP + instructions agents: #{mcp_fallback}"
+       "Attachable clients: #{attach_clients}",
+       "Headless runtimes: #{if(runtimes == "", do: "none", else: runtimes)}",
+       "Framework adapters: #{if(frameworks == "", do: "none", else: frameworks)}"
      ] ++
        Enum.map(analysis.diagnostics, fn diagnostic ->
          "  [#{diagnostic.level}] #{diagnostic.code} — #{diagnostic.message}"
@@ -1915,6 +1992,16 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_runtime_export(runtime_id, argv) do
+    case OptionParser.parse(argv, strict: @runtime_export_switches) do
+      {options, [], []} ->
+        {:ok, %{command: :runtime_export, options: options, args: [runtime_id]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
   defp standalone_wrapper_runtime? do
     System.get_env("__BURRITO") not in [nil, ""]
   end
@@ -1967,7 +2054,9 @@ defmodule ControlKeel.CLI do
     [
       "Bootstrap mode: #{bootstrap["mode"]}.",
       "Provider source: #{status["selected_source"]}.",
-      "Provider: #{status["selected_provider"]}."
+      "Provider: #{status["selected_provider"]}.",
+      "Auth mode: #{status["selected_auth_mode"]}.",
+      "Auth owner: #{status["selected_auth_owner"]}."
     ]
   end
 
@@ -2002,7 +2091,13 @@ defmodule ControlKeel.CLI do
 
   defp format_active_artifact(nil), do: "heuristic"
   defp format_active_artifact(artifact), do: "v#{artifact.version} (##{artifact.id})"
-  defp format_provider_bridge(%{supported: true, provider: provider}), do: "#{provider} bridge"
+
+  defp format_provider_bridge(%{supported: true, provider: provider, mode: mode}),
+    do: "#{mode}: #{provider}"
+
+  defp format_provider_bridge(%{supported: true, mode: mode}), do: mode
+  defp format_provider_bridge(%{mode: "ck_owned"}), do: "ck-owned"
+  defp format_provider_bridge(%{mode: "none"}), do: "none"
   defp format_provider_bridge(_bridge), do: "none"
 
   defp emit_attach_succeeded(binding, project_root, attached_agent) do
@@ -2026,12 +2121,20 @@ defmodule ControlKeel.CLI do
 
       integration ->
         [
-          "Companion target: #{integration.preferred_target}.",
+          integration.preferred_target && "Companion target: #{integration.preferred_target}.",
+          "Support class: #{integration.support_class}.",
           "Supported scope: #{Enum.join(integration.supported_scopes, ", ")}.",
           "Required CK tools: #{Enum.join(integration.required_mcp_tools, ", ")}.",
           "Auto-bootstrap: #{if(integration.auto_bootstrap, do: "enabled", else: "disabled")}.",
-          "Provider bridge: #{format_provider_bridge(integration.provider_bridge)}."
-        ] ++ Distribution.current_install_lines()
+          "Auth mode: #{integration.auth_mode}.",
+          "Auth owner: #{AgentIntegration.auth_owner(integration)}.",
+          "MCP mode: #{integration.mcp_mode}.",
+          "Skills mode: #{integration.skills_mode}.",
+          "Provider bridge: #{format_provider_bridge(integration.provider_bridge)}.",
+          integration.upstream_docs_url && "Upstream docs: #{integration.upstream_docs_url}"
+        ]
+        |> Enum.reject(&is_nil/1)
+        |> Kernel.++(Distribution.current_install_lines())
     end
   end
 
@@ -2071,6 +2174,31 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp native_attach_lines("cline", project_root, options) do
+    if native_attach_skipped?(options) do
+      []
+    else
+      case Skills.install("cline-native", project_root, scope: attach_scope("cline", options)) do
+        {:ok, %{destination: destination} = result} ->
+          [
+            "Installed Cline skills at #{destination}."
+          ] ++
+            maybe_attach_line(
+              "Installed Cline MCP companion",
+              Map.get(result, :agent_destination)
+            ) ++
+            maybe_attach_line("Installed Cline rules", Map.get(result, :rules_destination)) ++
+            maybe_attach_line(
+              "Installed Cline workflows",
+              Map.get(result, :workflows_destination)
+            )
+
+        {:error, reason} ->
+          ["Native Cline files were not installed: #{inspect(reason)}"]
+      end
+    end
+  end
+
   defp native_attach_lines(agent, project_root, options)
        when agent in [
               "cursor",
@@ -2106,6 +2234,8 @@ defmodule ControlKeel.CLI do
 
   defp attach_scope("claude-code", options), do: options[:scope] || "user"
   defp attach_scope("codex-cli", options), do: options[:scope] || "user"
+  defp attach_scope("hermes-agent", options), do: options[:scope] || "user"
+  defp attach_scope("forge", options), do: options[:scope] || "user"
   defp attach_scope(_agent, options), do: options[:scope] || "project"
 
   defp display_attach_agent(agent), do: AgentIntegration.label(agent)
@@ -2217,6 +2347,11 @@ defmodule ControlKeel.CLI do
 
   defp gemini_cli_config_path do
     Path.join([user_home(), ".gemini", "settings.json"])
+  end
+
+  defp cline_mcp_config_path do
+    base = System.get_env("CLINE_DIR") || Path.join(user_home(), ".cline")
+    Path.join([base, "data", "settings", "cline_mcp_settings.json"])
   end
 
   defp codex_cli_config_path do
@@ -2387,8 +2522,58 @@ defmodule ControlKeel.CLI do
     }
   end
 
+  defp attach_bundle_target(target, project_root, scope, options) do
+    if native_attach_skipped?(options) do
+      Skills.export(target, project_root, scope: "export")
+    else
+      Skills.install(target, project_root, scope: scope)
+    end
+  end
+
+  defp bundled_attached_agent(agent, target, scope, %{destination: destination} = result) do
+    %{
+      "target" => target,
+      "agent" => agent,
+      "scope" => scope,
+      "destination" => destination,
+      "config_destination" => Map.get(result, :agent_destination),
+      "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+    }
+  end
+
+  defp bundled_attached_agent(agent, target, scope, %ControlKeel.Skills.SkillExportPlan{} = plan) do
+    %{
+      "target" => target,
+      "agent" => agent,
+      "scope" => scope,
+      "output_dir" => plan.output_dir,
+      "attached_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+    }
+  end
+
+  defp bundle_attach_lines(agent, %{destination: destination} = result) do
+    [
+      "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
+      "Installed bundle at #{destination}."
+    ] ++
+      if(Map.has_key?(result, :agent_destination),
+        do: ["Config destination: #{result.agent_destination}."],
+        else: []
+      )
+  end
+
+  defp bundle_attach_lines(agent, %ControlKeel.Skills.SkillExportPlan{} = plan) do
+    [
+      "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
+      "Output: #{plan.output_dir}"
+    ]
+  end
+
+  defp maybe_attach_line(_label, nil), do: []
+  defp maybe_attach_line(label, path), do: ["#{label} at #{path}."]
+
   defp supported_attach_agents_text do
-    Skills.agent_integrations()
+    AgentIntegration.attach_catalog()
     |> Enum.map(& &1.id)
     |> Enum.join(", ")
   end

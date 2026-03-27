@@ -14,6 +14,9 @@ claude dispatch
 
 copilot cli
 
+
+what about congnition, windsurf, codex app server, cline, ollama, vllm, sglang, lmstudio, fastmcp, huggingface, 
+
 opencode
 
 amp
@@ -65,33 +68,50 @@ CK can automate **low-risk** paths and surface **medium** risk; **destructive / 
 
 The list above is a **research/backlog** of names. It is **not** a completion checklist for shipping (see `idea/missing/opencode.md` “Ignore For Now” / long-tail list).
 
-## Research name classification (honest scope)
+## Research name classification (typed support)
 
-Statuses: **`in_catalog`** — first-class `controlkeel attach <id>` in [`AgentIntegration.catalog/0`](../../lib/controlkeel/agent_integration.ex). **`covered_via_mcp_instructions`** — use MCP + instruction bundle path like OpenCode-class targets (often same as `mcp-plus-instructions`). **`proxy_only`** — govern only if the client can send traffic through ControlKeel’s [OpenAI/Anthropic proxy paths](../../docs/agent-integrations.md). **`not_planned_no_api`** — no stable attach hook in-repo today. **`duplicate_of`** — same as another row.
+Support classes now replace the old catch-all `not_planned_no_api` label:
 
-Canonical table of shipped targets: [docs/support-matrix.md](../../docs/support-matrix.md).
+- **`attach_client`** — first-class `controlkeel attach <id>`
+- **`headless_runtime`** — exported runtime bundle, not a local attach command
+- **`framework_adapter`** — benchmark/policy/runtime adapter surface, not a local attach command
+- **`provider_only`** — provider/profile template, not an attachable client
+- **`alias`** — points to a canonical shipped integration
+- **`unverified`** — no canonical official upstream contract was verified
 
-| Name / note | Status | Notes |
-|-------------|--------|--------|
-| hermes agent | not_planned_no_api | Research framework; no dedicated attach target. |
-| rlm agent | not_planned_no_api | Research framework; no dedicated attach target. |
-| gepa agent | not_planned_no_api | Research framework; no dedicated attach target. |
-| dspy agent | not_planned_no_api | Research / library; no dedicated attach target. |
-| deepagents | not_planned_no_api | Generic term; no single attach hook. |
-| openswe | not_planned_no_api | No stable MCP/config contract in this repo. |
-| Codestral | not_planned_no_api | Model/API family; use provider profile or proxy if your stack exposes compatible APIs. |
-| openclaw | not_planned_no_api | No stable attach hook in this repo. |
-| claude dispatch | duplicate_of | Use **`claude-code`** (`in_catalog`). |
-| copilot cli | duplicate_of | Use **`copilot`** (`in_catalog`); the shipped `copilot-plugin` bundle covers GitHub Copilot CLI and VS Code agent mode. |
-| opencode | in_catalog | `opencode` |
-| amp | in_catalog | `amp` |
-| slate | not_planned_no_api | No stable attach hook in this repo. |
-| cursor agent | duplicate_of | Use **`cursor`** (`in_catalog`). |
-| droid | not_planned_no_api | No stable attach hook in this repo. |
-| forge | not_planned_no_api | Ambiguous product name; no dedicated attach target. |
-| t3code anything to pull for connections? | not_planned_no_api | No stable attach hook in this repo. |
-| khadgi-sujan / retune | not_planned_no_api | External projects; not tracked as attach targets. |
-| prd | not_planned_no_api | Document type, not a client. |
-| requirement analysis | not_planned_no_api | Workflow, not a client. |
+Canonical inventory: [docs/support-matrix.md](../../docs/support-matrix.md).
 
-**Default for any MCP-capable editor not listed:** `covered_via_mcp_instructions` — register the ControlKeel MCP server per [getting-started.md](../../docs/getting-started.md) and use the same portable instruction bundle pattern as other `mcp-plus-instructions` targets.
+| Name / note | Support class | Canonical id / mapping | Notes |
+|-------------|---------------|------------------------|-------|
+| hermes agent | attach_client | `hermes-agent` | Native skills + MCP companion; CK can reuse agent-owned provider config where Hermes exposes it. |
+| rlm agent | unverified | `rlm-agent` | No canonical official upstream contract verified. |
+| gepa agent | framework_adapter | `gepa` | Adapter surface for optimizer/policy-training workflows, not `attach`. |
+| dspy agent | framework_adapter | `dspy` | Adapter surface for benchmark/programming workflows, not `attach`. |
+| deepagents | framework_adapter | `deepagents` | Runtime harness adapter surface, not `attach`. |
+| openswe | headless_runtime | `open-swe` | Repo/runtime export via `controlkeel runtime export open-swe`; uses `AGENTS.md` plus webhook/CI guidance. |
+| Codestral | provider_only | `codestral` | Provider/profile template for Mistral Codestral-compatible APIs. |
+| openclaw | attach_client | `openclaw` | Native skills + plugin bundle + MCP companion config. |
+| claude dispatch | alias | `claude-dispatch -> claude-code` | Use Claude Code as the canonical shipped path. |
+| copilot cli | alias | `copilot-cli -> copilot` | Repo-native Copilot attach; `copilot-plugin` covers CLI / VS Code agent mode. |
+| opencode | attach_client | `opencode` | MCP + instructions bundle path. |
+| amp | attach_client | `amp` | MCP + instructions bundle path. |
+| slate | unverified | `slate` | No canonical official upstream contract verified. |
+| cursor agent | alias | `cursor-agent -> cursor` | Use Cursor as the canonical shipped path. |
+| droid | attach_client | `droid` | Factory Droid `.factory` bundle with skills, droids, commands, and MCP config. |
+| forge | attach_client | `forge` | ACP-first companion export with MCP fallback. |
+| t3code anything to pull for connections? | alias | `t3code -> codex-cli` | Wrapper path until a stable native contract is verified. |
+| khadgi-sujan / retune | unverified | `retune` | External project; no canonical official attach contract verified. |
+| prd | n/a | n/a | Document type, not a client. |
+| requirement analysis | n/a | n/a | Workflow artifact, not a client. |
+
+**Default for any MCP-capable editor not listed:** use the existing MCP + instruction bundle path described in [getting-started.md](../../docs/getting-started.md). That is a transport pattern, not a claim of first-class native support.
+
+## Additional current-market audit
+
+An official-doc audit of adjacent agent clients found one clear new first-class fit and two names that still need more stable upstream contracts before CK should promise native support.
+
+| Name | Current CK status | Why |
+|------|-------------------|-----|
+| Cline | shipped `attach_client` (`cline`) | Official docs expose a stable MCP config path, project/global skills directories, and `.clinerules` / workflow locations, so CK can support it truthfully. |
+| Roo Code | research only for now | Roo clearly supports MCP, but its repo-level modes/rules/config surface is still split across extension docs, repo structure, and cloud product docs. |
+| Goose | research only for now | Goose has strong MCP extension docs, but CK does not yet ship a dedicated recipe / `.goosehints` companion target, so support remains the generic MCP path instead of a fake native attach. |

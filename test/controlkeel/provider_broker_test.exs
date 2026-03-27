@@ -106,6 +106,41 @@ defmodule ControlKeel.ProviderBrokerTest do
     assert Enum.at(status["attached_agents"], 0)["provider_bridge_supported"] == true
   end
 
+  test "config-reference bridge can reuse attached Hermes provider metadata", %{
+    project_root: project_root,
+    home_dir: home_dir
+  } do
+    hermes_dir = Path.join(home_dir, ".hermes")
+    File.mkdir_p!(hermes_dir)
+    File.write!(Path.join(hermes_dir, "config.yaml"), "provider: openai\nmodel: gpt-5.4-mini\n")
+    System.put_env("OPENAI_API_KEY", "sk-hermes-openai")
+
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => 1,
+                 "session_id" => 1,
+                 "agent" => "hermes-agent",
+                 "attached_agents" => %{
+                   "hermes-agent" => %{
+                     "attached_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+                   }
+                 }
+               },
+               project_root
+             )
+
+    status = ProviderBroker.status(project_root)
+
+    assert status["selected_source"] == "agent_bridge"
+    assert status["selected_provider"] == "openai"
+    assert status["selected_auth_mode"] == "config_reference"
+
+    attached = Enum.find(status["attached_agents"], &(&1["id"] == "hermes-agent"))
+    assert attached["auth_mode"] == "config_reference"
+    assert attached["auth_owner"] == "agent"
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 end

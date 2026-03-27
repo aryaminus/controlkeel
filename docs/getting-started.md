@@ -95,6 +95,7 @@ Other supported attach commands:
 
 - `controlkeel attach claude-code`
 - `controlkeel attach codex-cli`
+- `controlkeel attach cline`
 - `controlkeel attach vscode`
 - `controlkeel attach copilot`
 - `controlkeel attach cursor`
@@ -103,6 +104,8 @@ Other supported attach commands:
 - `controlkeel attach aider`
 
 For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) and the canonical [support-matrix.md](support-matrix.md), or open `/skills` in the local app.
+
+If you use Cline, the attach flow is first-class for MCP, skills, rules, and workflows, but CK still needs its own provider profile or local Ollama for CK-internal model work because Cline's provider secrets are not exposed as a documented bridge.
 
 ## 3a. OpenCode quick path
 

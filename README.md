@@ -5,7 +5,7 @@
 
 ControlKeel is the control plane that turns AI coding into production engineering. It governs agent work across intent compilation, task planning, routing, validation, proof generation, typed memory, benchmarks, learned policy artifacts, and cross-agent skills distribution.
 
-It sits above Claude Code, Codex, OpenCode, Cursor, Windsurf, Continue, Aider, Copilot / VS Code, and other agent clients. It can expose MCP tools, attach native skills where supported, export plugin bundles, proxy provider traffic, and persist the evidence trail for everything it governs.
+It sits above Claude Code, Codex, Cline, OpenCode, Cursor, Windsurf, Continue, Aider, Copilot / VS Code, and other agent clients. It can expose MCP tools, attach native skills where supported, export plugin bundles, proxy provider traffic, and persist the evidence trail for everything it governs.
 
 ## Quick start
 
@@ -91,6 +91,14 @@ More walkthroughs:
 
 ## Supported agent connections
 
+ControlKeel now uses a **typed integration catalog**:
+
+- `attach_client` for real `controlkeel attach <id>` targets
+- `headless_runtime` for exported runtime bundles such as Open SWE
+- `framework_adapter` for benchmark / policy / runtime harness adapters
+- `provider_only` for provider/profile templates such as Codestral
+- `alias` for names that resolve to a canonical shipped target
+
 ### Provider-bridge supported
 
 These have the strongest zero-setup provider story today because ControlKeel can borrow a compatible provider environment from the attached client.
@@ -99,6 +107,10 @@ These have the strongest zero-setup provider story today because ControlKeel can
 |---|---|---|---|
 | Claude Code | `controlkeel attach claude-code` | Anthropic-compatible env | `.claude/skills`, `.claude/agents`, optional Claude plugin bundle |
 | Codex CLI | `controlkeel attach codex-cli` | OpenAI-compatible env | `.agents/skills`, `.codex/agents` |
+| Hermes Agent | `controlkeel attach hermes-agent` | Config-reference bridge from Hermes provider config | `.hermes/skills`, `.hermes/mcp.json`, `AGENTS.md` |
+| OpenClaw | `controlkeel attach openclaw` | Config-reference bridge from OpenClaw settings | `skills/`, `.openclaw/openclaw.json`, plugin bundle |
+| Factory Droid | `controlkeel attach droid` | Gateway / base-URL bridge from Factory settings | `.factory/skills`, `.factory/droids`, `.factory/commands`, `.factory/mcp.json` |
+| Forge | `controlkeel attach forge` | ACP session bridge when the client exposes one | ACP companion bundle plus MCP fallback |
 
 ### Native-first and repo-native attachments
 
@@ -106,6 +118,7 @@ These get MCP plus a native companion install by default.
 
 | Agent | Attach command | Companion output |
 |---|---|---|
+| Cline | `controlkeel attach cline` | `.cline/skills`, `.clinerules/`, `AGENTS.md`, plus Cline MCP config under `~/.cline/data/settings/` |
 | VS Code | `controlkeel attach vscode` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 | GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 
@@ -129,6 +142,13 @@ OpenCode is the recommended quick-start path in this category.
 ControlKeel's governed proxy currently exposes OpenAI-style and Anthropic-style paths. That makes it a good fit for tools that can point at those APIs directly, but it is not the same thing as a native bridge or first-class attach target.
 
 `/skills` in the web app and [docs/agent-integrations.md](docs/agent-integrations.md) show the live compatibility matrix and export/install targets.
+
+### Headless runtimes, framework adapters, and provider-only entries
+
+- Open SWE: `controlkeel runtime export open-swe`
+- DSPy, GEPA, DeepAgents: surfaced as framework adapters, not fake attach commands
+- Codestral: surfaced as a provider/profile template, not a fake attach command
+- Aliases such as `claude-dispatch`, `cursor-agent`, `copilot-cli`, and `t3code` point to their canonical shipped targets in the support matrix
 
 Attach flags:
 
@@ -162,6 +182,7 @@ If no keys and no local model are available, ControlKeel still runs governance, 
 Practical setup guidance:
 
 - If you use Claude Code or Codex CLI, try the attached bridge path first.
+- If you use Cline, its MCP + skills path is first-class, but CK still needs its own provider profile or local Ollama for CK-internal model work because Cline stores provider secrets separately.
 - If you use OpenCode or another MCP-plus-instructions client, the next best path is a CK-owned provider profile or local Ollama.
 - Governed bindings remain project-local even when the agent install itself supports user scope.
 - Heuristic mode is still useful for validation, findings, proofs, benchmarks, and skills when no model access is available.
@@ -179,6 +200,7 @@ Targets:
 - `codex`
 - `claude-standalone`
 - `claude-plugin`
+- `cline-native`
 - `copilot-plugin`
 - `github-repo`
 - `open-standard`

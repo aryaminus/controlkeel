@@ -190,8 +190,11 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert Enum.any?(targets, &(&1["id"] == "claude-plugin"))
       assert Enum.any?(targets, &(&1["id"] == "copilot-plugin"))
+      assert Enum.any?(targets, &(&1["id"] == "cline-native"))
       assert Enum.any?(agents, &(&1["id"] == "claude-code"))
+      assert Enum.any?(agents, &(&1["id"] == "cline"))
       assert Enum.any?(agents, &(&1["id"] == "cursor"))
+      assert Enum.any?(agents, &(&1["id"] == "open-swe"))
       assert Enum.any?(install_channels, &(&1["id"] == "homebrew"))
       assert Enum.any?(install_channels, &(&1["id"] == "npm"))
 
@@ -201,8 +204,26 @@ defmodule ControlKeelWeb.ApiControllerTest do
         end)
 
       assert claude["preferred_target"] == "claude-standalone"
+      assert claude["support_class"] == "attach_client"
       assert "ck_validate" in claude["required_mcp_tools"]
       assert Enum.any?(claude["install_channels"], &(&1["id"] == "homebrew"))
+
+      open_swe =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "open-swe"
+        end)
+
+      assert open_swe["support_class"] == "headless_runtime"
+      assert open_swe["runtime_export_command"] == "controlkeel runtime export open-swe"
+
+      cline =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "cline"
+        end)
+
+      assert cline["preferred_target"] == "cline-native"
+      assert cline["skills_mode"] == "native"
+      assert cline["auth_owner"] == "controlkeel"
     end
 
     test "gets skill detail and exports and installs bundles", %{conn: conn} do

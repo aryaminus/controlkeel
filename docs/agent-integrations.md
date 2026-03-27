@@ -29,6 +29,10 @@ These are the strongest zero-setup paths today because ControlKeel can reuse a c
 |---|---|---|---|---|
 | Claude Code | `controlkeel attach claude-code` | Anthropic-compatible environment | Installs `.claude/skills` and `.claude/agents` | `claude-standalone`, `claude-plugin` |
 | Codex CLI | `controlkeel attach codex-cli` | OpenAI-compatible environment | Installs `.agents/skills` and `.codex/agents` | `codex`, `open-standard` |
+| Hermes Agent | `controlkeel attach hermes-agent` | Config-reference bridge from Hermes config | Installs `.hermes/skills` and `.hermes/mcp.json` | `hermes-native` |
+| OpenClaw | `controlkeel attach openclaw` | Config-reference bridge from OpenClaw settings | Installs workspace or managed skills and emits OpenClaw config | `openclaw-native`, `openclaw-plugin` |
+| Factory Droid | `controlkeel attach droid` | Gateway/base-URL bridge from Factory settings | Installs `.factory/skills`, `.factory/droids`, `.factory/commands`, `.factory/mcp.json` | `droid-bundle` |
+| Forge | `controlkeel attach forge` | ACP session bridge when exposed by the client | ACP companion plus MCP fallback files | `forge-acp`, `instructions-only` |
 
 ## Native-first and repo-native agents
 
@@ -37,6 +41,7 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 
 | Agent | Attach command | Native companion | Exportable bundles |
 |---|---|---|---|
+| Cline | `controlkeel attach cline` | Writes `.cline/skills`, `.clinerules`, `AGENTS.md`, and updates Cline MCP settings | `cline-native` |
 | VS Code | `controlkeel attach vscode` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 | GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 
@@ -60,6 +65,18 @@ OpenCode notes:
 - writes MCP configuration into the OpenCode config location
 - exports the portable instruction bundle used by MCP-plus-instructions targets
 - does not currently expose a documented provider bridge, so the best model-backed follow-up paths are a CK-owned provider profile or local Ollama
+
+## Headless runtimes and typed non-attach surfaces
+
+These appear in the same integration catalog, but they are intentionally **not** fake `attach` commands.
+
+| Support class | Canonical ids | How ControlKeel supports them |
+|---|---|---|
+| Headless runtime | `open-swe` | `controlkeel runtime export open-swe` writes repo/runtime bundle files (`AGENTS.md`, webhook and CI guidance). |
+| Framework adapter | `dspy`, `gepa`, `deepagents` | Exposed through benchmark, policy-training, and runtime-harness adapter exports. |
+| Provider-only | `codestral` | Exposed through CK provider/profile templates and proxy-compatible docs. |
+| Alias | `claude-dispatch`, `cursor-agent`, `copilot-cli`, `t3code` | Resolve to canonical shipped targets rather than creating duplicate attach flows. |
+| Unverified | `rlm-agent`, `slate`, `retune` | Kept visible as research names, but not over-promised as shipped support. |
 
 ## Proxy-compatible clients
 
@@ -109,6 +126,10 @@ Today, the documented bridge path is environment-based for supported clients:
 - Claude Code -> Anthropic-compatible environment
 - Codex CLI -> OpenAI-compatible environment
 
+Some native-first clients are still CK-owned for provider access even when the attach flow is first-class:
+
+- Cline -> native MCP + skills + `.clinerules`, but CK does not reuse Cline's encrypted provider secrets
+
 If no bridge, CK-owned profile, or local model is available, agents can still use ControlKeel for governance, MCP tools, proofs, skills, and benchmarks without human setup. Model-backed features fall back to heuristics or return explicit capability guidance.
 
 Practical rules:
@@ -131,6 +152,7 @@ Export publishable bundles:
 
 ```bash
 controlkeel skills export --target claude-plugin
+controlkeel skills export --target cline-native
 controlkeel skills export --target copilot-plugin
 controlkeel skills export --target codex
 controlkeel skills export --target open-standard
@@ -140,6 +162,7 @@ Install a native target without using `attach`:
 
 ```bash
 controlkeel skills install --target claude-standalone --scope user
+controlkeel skills install --target cline-native --scope project
 controlkeel skills install --target codex --scope user
 controlkeel skills install --target github-repo --scope project
 ```
@@ -149,6 +172,7 @@ controlkeel skills install --target github-repo --scope project
 Exported bundles are written under:
 
 - `controlkeel/dist/claude-plugin/`
+- `controlkeel/dist/cline-native/`
 - `controlkeel/dist/copilot-plugin/`
 - `controlkeel/dist/codex/`
 - `controlkeel/dist/open-standard/`
@@ -157,6 +181,7 @@ Exported bundles are written under:
 Published release bundles use the same target set, but ship as release assets:
 
 - `controlkeel-claude-plugin.tar.gz`
+- `controlkeel-cline-native.tar.gz`
 - `controlkeel-copilot-plugin.tar.gz`
 - `controlkeel-codex.tar.gz`
 - `controlkeel-open-standard.tar.gz`
