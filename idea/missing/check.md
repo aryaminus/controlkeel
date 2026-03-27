@@ -5,12 +5,14 @@ gepa agent
 dspy agent
 
 deepagents
-openswe 
+openswe
 
 Codestral
 
 openclaw
 claude dispatch
+
+copilot cli
 
 opencode
 
@@ -31,9 +33,7 @@ khadgi-sujan / retune
 prd
 requirement analysis
 
-
-
-ok. now when using with any of the agents supports, does it need additional api keys to run ck? cant ck just run the agents llm to do things if needed? or doe sit have to have api keys or local llm? what if users dont have it? what if users just ask agents to do stuff? how do users even setup which provider to use? can agent have ck set globally by default or does it require them to setup always for every new repo/directory. make sure agetns can be fully use ck by themselves without humans having to act. 
+ok. now when using with any of the agents supports, does it need additional api keys to run ck? cant ck just run the agents llm to do things if needed? or doe sit have to have api keys or local llm? what if users dont have it? what if users just ask agents to do stuff? how do users even setup which provider to use? can agent have ck set globally by default or does it require them to setup always for every new repo/directory. make sure agetns can be fully use ck by themselves without humans having to act.
 
 ---
 
@@ -82,6 +82,7 @@ Canonical table of shipped targets: [docs/support-matrix.md](../../docs/support-
 | Codestral | not_planned_no_api | Model/API family; use provider profile or proxy if your stack exposes compatible APIs. |
 | openclaw | not_planned_no_api | No stable attach hook in this repo. |
 | claude dispatch | duplicate_of | Use **`claude-code`** (`in_catalog`). |
+| copilot cli | duplicate_of | Use **`copilot`** (`in_catalog`); the shipped `copilot-plugin` bundle covers GitHub Copilot CLI and VS Code agent mode. |
 | opencode | in_catalog | `opencode` |
 | amp | in_catalog | `amp` |
 | slate | not_planned_no_api | No stable attach hook in this repo. |

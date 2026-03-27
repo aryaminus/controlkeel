@@ -2,15 +2,15 @@
 
 This checklist is the manual gate before enabling automatic version bumping.
 
-## First known-good SHA
+## Latest known-good checkpoints
 
-- Release Smoke green on `main`: `5e73158d57a1c8743417cc02f251fcd1a9f4ed96` ([workflow run](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml), 2026-03-25)
-- Tag-triggered Release green: `c8ac6945df187cf6dac1feafe5ee9db5ccba7932` (`v0.1.7`)
-- GitHub release assets published correctly: `c8ac6945df187cf6dac1feafe5ee9db5ccba7932` (`v0.1.7`)
+- Release Smoke green on `main`: `5e73158d57a1c8743417cc02f251fcd1a9f4ed96` ([workflow run](https://github.com/aryaminus/controlkeel/actions/runs/23518768141), 2026-03-25)
+- Tag-triggered Release green: `10e3327bfe4e676bbb2271f5b9d359398be5f0a9` (`v0.1.8`, [workflow run](https://github.com/aryaminus/controlkeel/actions/runs/23518952206))
+- GitHub release assets published correctly: `10e3327bfe4e676bbb2271f5b9d359398be5f0a9` (`v0.1.8`, [GitHub Release](https://github.com/aryaminus/controlkeel/releases/tag/v0.1.8))
 
-Re-verify after each release: confirm the latest successful [Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml) on `main` and the latest tag-triggered [Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml), then update the SHAs above.
+Re-verify after each release: confirm the latest successful [Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml) on `main` and the latest tag-triggered [Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml), then refresh the checkpoints above.
 
-Update this file with the first confirmed good SHA before enabling `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED`.
+Keep this file on the latest confirmed green SHAs before relying on `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED`.
 
 ## Checklist
 

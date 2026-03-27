@@ -38,7 +38,7 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 | Agent | Attach command | Native companion | Exportable bundles |
 |---|---|---|---|
 | VS Code | `controlkeel attach vscode` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
-| GitHub Copilot | `controlkeel attach copilot` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
+| GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 
 ## MCP plus instructions agents
 

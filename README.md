@@ -107,7 +107,7 @@ These get MCP plus a native companion install by default.
 | Agent | Attach command | Companion output |
 |---|---|---|
 | VS Code | `controlkeel attach vscode` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
-| GitHub Copilot | `controlkeel attach copilot` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
+| GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` |
 
 ### MCP plus generated instruction bundles
 

@@ -9,7 +9,7 @@ This file replaces the earlier stale MVP audit. The previous version listed seve
 - The original MVP checklist is materially complete.
 - The repo is already beyond MVP: proof bundles, typed memory, benchmark engine, policy training artifacts, expanded domain packs, and native skills/plugin distribution are present.
 - The true remaining roadmap work is the later Team/Platform branch and the infrastructure branch.
-- Burrito packaging is implemented. Release Smoke and tag-triggered Release were verified green as of 2026-03-25 (see [docs/release-verification.md](../../docs/release-verification.md) for SHAs: smoke on `main` `5e73158…`, release `v0.1.7` `c8ac694…`).
+- Burrito packaging is implemented. Release Smoke and tag-triggered Release were verified green as of 2026-03-25 (see [docs/release-verification.md](../../docs/release-verification.md) for SHAs: smoke on `main` `5e73158…`, release `v0.1.8` `10e3327…`).
 
 ## MVP Gaps That Are Closed
 

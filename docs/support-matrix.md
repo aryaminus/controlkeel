@@ -2,10 +2,10 @@
 
 This document is the **single inventory** for attach targets, MCP tools, and bundled skills. It is maintained to match:
 
-- [`lib/controlkeel/agent_integration.ex`](lib/controlkeel/agent_integration.ex) — `AgentIntegration.catalog/0`
-- [`lib/controlkeel/distribution.ex`](lib/controlkeel/distribution.ex) — `required_mcp_tools/0`, install channels
-- [`lib/controlkeel/mcp/protocol.ex`](lib/controlkeel/mcp/protocol.ex) — tool schemas exposed to MCP clients
-- [`priv/skills/`](priv/skills/) — on-disk AgentSkills bundles
+- [`lib/controlkeel/agent_integration.ex`](../lib/controlkeel/agent_integration.ex) — `AgentIntegration.catalog/0`
+- [`lib/controlkeel/distribution.ex`](../lib/controlkeel/distribution.ex) — `required_mcp_tools/0`, install channels
+- [`lib/controlkeel/mcp/protocol.ex`](../lib/controlkeel/mcp/protocol.ex) — tool schemas exposed to MCP clients
+- [`priv/skills/`](../priv/skills/) — on-disk AgentSkills bundles
 
 For install paths and proxy URLs, see [agent-integrations.md](agent-integrations.md) and [getting-started.md](getting-started.md).
 
@@ -34,11 +34,13 @@ Every integration uses the **same required MCP tool set** (see below): `ck_conte
 - **repo-native** — repo-scoped `.github` / `.vscode` skills and MCP config.
 - **mcp-plus-instructions** — MCP server plus portable instruction bundles under `controlkeel/dist/instructions-only`.
 
+The shipped `copilot` attach target is the repo-native path for GitHub Copilot, and the exported `copilot-plugin` bundle is the same companion path used for GitHub Copilot CLI and VS Code agent mode.
+
 **Router agent IDs** (for `ck_route` / policy): where set in code, the integration’s `router_agent_id` matches the attach id (e.g. `opencode`, `cursor`); VS Code / Copilot use `nil` in the catalog.
 
 ## MCP runtime tools
 
-Implemented under [`lib/controlkeel/mcp/tools/`](lib/controlkeel/mcp/tools/). The MCP server advertises **five tools always**, and **adds** `ck_skill_list` and `ck_skill_load` when the runtime has a non-empty skill catalog (see `protocol.ex` `tool_schemas/0`).
+Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/). The MCP server advertises **five tools always**, and **adds** `ck_skill_list` and `ck_skill_load` when the runtime has a non-empty skill catalog (see `protocol.ex` `tool_schemas/0`).
 
 | Tool | Purpose |
 |------|---------|
@@ -54,7 +56,7 @@ Authoritative tool names in code: `ControlKeel.Distribution.required_mcp_tools/0
 
 ## Bundled skills (`priv/skills/`)
 
-These directories ship with the repo and are discovered by [`ControlKeel.Skills.Registry`](lib/controlkeel/skills/registry.ex):
+These directories ship with the repo and are discovered by [`ControlKeel.Skills.Registry`](../lib/controlkeel/skills/registry.ex):
 
 | Skill directory | Role |
 |-----------------|------|
@@ -75,8 +77,8 @@ Export targets on each integration (e.g. `claude-plugin`, `codex`) refer to **CL
 
 1. Confirm a **documented** MCP or config file location for that client.
 2. Add a new `integration(...)` entry to `AgentIntegration.catalog/0` with accurate `provider_bridge`, `supported_scopes`, and `export_targets`.
-3. Wire CLI `attach` for that id if not already present in [`lib/controlkeel/cli.ex`](lib/controlkeel/cli.ex) (or runtime attach module).
+3. Wire CLI `attach` for that id if not already present in [`lib/controlkeel/cli.ex`](../lib/controlkeel/cli.ex) (or runtime attach module).
 4. Update this matrix and [agent-integrations.md](agent-integrations.md).
 5. Add or extend tests for attach behavior where feasible.
 
-Names in research lists (see [idea/missing/check.md](idea/missing/check.md)) do **not** automatically get catalog entries—each needs the above.
+Names in research lists (see [idea/missing/check.md](../idea/missing/check.md)) do **not** automatically get catalog entries—each needs the above.
