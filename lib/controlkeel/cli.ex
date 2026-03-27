@@ -77,6 +77,8 @@ defmodule ControlKeel.CLI do
   @worker_start_switches [service_account_token: :string, interval: :integer]
   @provider_default_switches [scope: :string, project_root: :string]
   @provider_set_key_switches [value: :string]
+  @provider_set_base_url_switches [value: :string]
+  @provider_set_model_switches [value: :string]
   @provider_show_switches [project_root: :string]
   @provider_list_switches [project_root: :string]
   @provider_doctor_switches [project_root: :string]
@@ -243,6 +245,12 @@ defmodule ControlKeel.CLI do
       ["provider", "set-key", provider | rest] ->
         parse_provider_set_key(provider, rest)
 
+      ["provider", "set-base-url", provider | rest] ->
+        parse_provider_set_base_url(provider, rest)
+
+      ["provider", "set-model", provider | rest] ->
+        parse_provider_set_model(provider, rest)
+
       ["bootstrap" | rest] ->
         parse_with_switches(:bootstrap, rest, @bootstrap_switches)
 
@@ -346,7 +354,7 @@ defmodule ControlKeel.CLI do
       controlkeel execute <id>        Materialize ready tasks and task runs
       controlkeel worker start [--service-account-token TOKEN]
                                       Poll ready work for a workspace service account
-      controlkeel provider list|show|default|set-key|doctor
+      controlkeel provider list|show|default|set-key|set-base-url|set-model|doctor
                                       Inspect and configure CK provider brokerage
       controlkeel runtime export <id> [--project-root /abs/path]
                                       Export headless/runtime bundles such as Open SWE
@@ -689,6 +697,22 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to export Open SWE runtime bundle: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :runtime_export, args: ["devin"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    case Skills.export("devin-runtime", root, scope: "export") do
+      {:ok, plan} ->
+        {:ok,
+         [
+           "Prepared Devin runtime export.",
+           "Output: #{plan.output_dir}"
+         ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+
+      {:error, reason} ->
+        {:error, "Failed to export Devin runtime bundle: #{inspect(reason)}"}
     end
   end
 
@@ -1458,7 +1482,7 @@ defmodule ControlKeel.CLI do
        "Profiles:"
      ] ++
        Enum.map(status["profiles"], fn profile ->
-         "  #{profile["provider"]}: configured=#{if(profile["configured"], do: "yes", else: "no")} env=#{if(profile["env_override"], do: "yes", else: "no")} default=#{if(profile["default"], do: "yes", else: "no")} model=#{profile["model"] || "n/a"}"
+         "  #{profile["provider"]}: configured=#{if(profile["configured"], do: "yes", else: "no")} env=#{if(profile["env_override"], do: "yes", else: "no")} default=#{if(profile["default"], do: "yes", else: "no")} model=#{profile["model"] || "n/a"} base_url=#{profile["base_url"] || "default"}"
        end)}
   end
 
@@ -1472,13 +1496,14 @@ defmodule ControlKeel.CLI do
        "Selected source: #{status["selected_source"]}",
        "Selected provider: #{status["selected_provider"]}",
        "Selected model: #{status["selected_model"] || "n/a"}",
+       "Selected base URL: #{selected_base_url(status)}",
        "Auth mode: #{status["selected_auth_mode"]}",
        "Auth owner: #{status["selected_auth_owner"]}",
        "Reason: #{status["reason"]}",
        "Fallback chain: #{Enum.join(status["fallback_chain"], " -> ")}"
      ] ++
        Enum.map(status["provider_chain"], fn resolution ->
-         "  #{resolution["source"]}: #{resolution["provider"]} (#{resolution["model"] || "default"}) [#{resolution["auth_mode"]}/#{resolution["auth_owner"]}]"
+         "  #{resolution["source"]}: #{resolution["provider"]} (#{resolution["model"] || "default"}) base_url=#{resolution["base_url"] || "default"} [#{resolution["auth_mode"]}/#{resolution["auth_owner"]}]"
        end)}
   end
 
@@ -1508,6 +1533,42 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to set default provider source: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(
+        %{command: :provider_set_base_url, args: [provider], options: options},
+        _project_root
+      ) do
+    value = options[:value] || System.get_env("CONTROLKEEL_PROVIDER_BASE_URL")
+
+    with {:ok, base_url} <- require_string_option(value, "value"),
+         {:ok, _config} <- ProviderBroker.set_base_url(provider, base_url) do
+      {:ok, ["Stored base URL for #{provider}."]}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option} or CONTROLKEEL_PROVIDER_BASE_URL"}
+
+      {:error, reason} ->
+        {:error, "Failed to store provider base URL: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(
+        %{command: :provider_set_model, args: [provider], options: options},
+        _project_root
+      ) do
+    value = options[:value] || System.get_env("CONTROLKEEL_PROVIDER_MODEL")
+
+    with {:ok, model} <- require_string_option(value, "value"),
+         {:ok, _config} <- ProviderBroker.set_model(provider, model) do
+      {:ok, ["Stored model for #{provider}."]}
+    else
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option} or CONTROLKEEL_PROVIDER_MODEL"}
+
+      {:error, reason} ->
+        {:error, "Failed to store provider model: #{inspect(reason)}"}
     end
   end
 
@@ -1992,6 +2053,26 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_provider_set_base_url(provider, argv) do
+    case OptionParser.parse(argv, strict: @provider_set_base_url_switches) do
+      {options, [], []} ->
+        {:ok, %{command: :provider_set_base_url, options: options, args: [provider]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
+  defp parse_provider_set_model(provider, argv) do
+    case OptionParser.parse(argv, strict: @provider_set_model_switches) do
+      {options, [], []} ->
+        {:ok, %{command: :provider_set_model, options: options, args: [provider]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
   defp parse_runtime_export(runtime_id, argv) do
     case OptionParser.parse(argv, strict: @runtime_export_switches) do
       {options, [], []} ->
@@ -2035,6 +2116,12 @@ defmodule ControlKeel.CLI do
   defp require_string_option(nil, option), do: {:error, {:missing_option, option}}
   defp require_string_option("", option), do: {:error, {:missing_option, option}}
   defp require_string_option(value, _option), do: {:ok, to_string(value)}
+
+  defp selected_base_url(%{"provider_chain" => [resolution | _]}) do
+    resolution["base_url"] || "default"
+  end
+
+  defp selected_base_url(_status), do: "default"
 
   defp ensure_local_project(project_root, overrides \\ %{}) do
     LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: true)

@@ -443,6 +443,28 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["forge-acp", "instructions-only"]
       }),
       headless_runtime(%{
+        id: "devin",
+        label: "Devin (Cognition)",
+        category: "headless-runtime",
+        description:
+          "Headless export for Devin's hosted coding runtime using repo `AGENTS.md`, a custom MCP server recipe, and webhook guidance.",
+        runtime_export_command: "controlkeel runtime export devin",
+        config_location:
+          "Devin config lives in the Devin web app MCP marketplace and custom-MCP settings, not a local attach file.",
+        companion_delivery:
+          "Emits repo `AGENTS.md`, a Devin custom MCP config snippet, and webhook/runtime notes instead of a local attach target.",
+        preferred_target: "devin-runtime",
+        default_scope: "project",
+        auth_mode: "oauth_runtime",
+        mcp_mode: "export_only",
+        skills_mode: "instructions_only",
+        upstream_slug: "cognition/devin",
+        upstream_docs_url: "https://docs.devin.ai/work-with-devin/mcp",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["devin-runtime"]
+      }),
+      headless_runtime(%{
         id: "open-swe",
         label: "Open SWE",
         category: "headless-runtime",
@@ -521,6 +543,25 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["export"],
         export_targets: ["framework-adapter"]
       }),
+      framework_adapter(%{
+        id: "fastmcp",
+        label: "FastMCP",
+        category: "framework-adapter",
+        description:
+          "Framework/tooling surface for MCP client-server interop and sampling, not a local `attach` target.",
+        companion_delivery:
+          "Appears in runtime/export docs as a generic MCP interoperability path rather than a dedicated attach flow.",
+        preferred_target: "framework-adapter",
+        default_scope: "export",
+        auth_mode: "none",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "jlowin/fastmcp",
+        upstream_docs_url: "https://gofastmcp.com/clients/sampling",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        supported_scopes: ["export"],
+        export_targets: ["framework-adapter"]
+      }),
       provider_only(%{
         id: "codestral",
         label: "Codestral",
@@ -540,6 +581,101 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["export"],
         export_targets: ["provider-profile"]
       }),
+      provider_only(%{
+        id: "ollama-runtime",
+        label: "Ollama",
+        category: "provider-only",
+        description:
+          "Local runtime profile for Ollama's native API and OpenAI-compatible bridge, not an attachable client.",
+        companion_delivery: "Appears as a provider profile template and local-runtime guidance.",
+        preferred_target: "provider-profile",
+        default_scope: "export",
+        auth_mode: "local",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "ollama/ollama",
+        upstream_docs_url: "https://docs.ollama.com/api/openai-compatibility",
+        provider_bridge: %{supported: false, mode: "local", owner: "local"},
+        supported_scopes: ["export"],
+        export_targets: ["provider-profile"]
+      }),
+      provider_only(%{
+        id: "vllm",
+        label: "vLLM",
+        category: "provider-only",
+        description:
+          "OpenAI-compatible backend profile for vLLM deployments, configured through CK provider base URL and model settings.",
+        companion_delivery:
+          "Appears as a provider profile template for CK-owned OpenAI-compatible endpoints.",
+        preferred_target: "provider-profile",
+        default_scope: "export",
+        auth_mode: "ck_owned",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "vllm-project/vllm",
+        upstream_docs_url: "https://docs.vllm.ai/en/latest/serving/openai_compatible_server/",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["export"],
+        export_targets: ["provider-profile"]
+      }),
+      provider_only(%{
+        id: "sglang",
+        label: "SGLang",
+        category: "provider-only",
+        description:
+          "OpenAI-compatible backend profile for SGLang deployments, configured through CK provider base URL and model settings.",
+        companion_delivery:
+          "Appears as a provider profile template for CK-owned OpenAI-compatible endpoints.",
+        preferred_target: "provider-profile",
+        default_scope: "export",
+        auth_mode: "ck_owned",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "sgl-project/sglang",
+        upstream_docs_url: "https://docs.sglang.ai",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["export"],
+        export_targets: ["provider-profile"]
+      }),
+      provider_only(%{
+        id: "lmstudio",
+        label: "LM Studio",
+        category: "provider-only",
+        description:
+          "OpenAI-compatible backend profile for LM Studio local server endpoints, configured through CK provider base URL and model settings.",
+        companion_delivery:
+          "Appears as a provider profile template for CK-owned local OpenAI-compatible endpoints.",
+        preferred_target: "provider-profile",
+        default_scope: "export",
+        auth_mode: "ck_owned",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "lmstudio/lmstudio",
+        upstream_docs_url: "https://lmstudio.ai/docs/app/api/endpoints/openai",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["export"],
+        export_targets: ["provider-profile"]
+      }),
+      provider_only(%{
+        id: "huggingface",
+        label: "Hugging Face Inference Providers",
+        category: "provider-only",
+        description:
+          "OpenAI-compatible backend profile for Hugging Face chat-completion endpoints, configured through CK provider base URL and HF token settings.",
+        companion_delivery:
+          "Appears as a provider profile template for CK-owned Hugging Face endpoints.",
+        preferred_target: "provider-profile",
+        default_scope: "export",
+        auth_mode: "ck_owned",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "huggingface/inference-providers",
+        upstream_docs_url:
+          "https://huggingface.co/docs/inference-providers/tasks/chat-completion",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["export"],
+        export_targets: ["provider-profile"]
+      }),
       alias_entry(%{
         id: "claude-dispatch",
         label: "Claude Dispatch",
@@ -555,6 +691,21 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["claude-standalone", "claude-plugin"]
       }),
       alias_entry(%{
+        id: "cognition",
+        label: "Cognition / Devin",
+        category: "alias",
+        description: "Alias to the shipped Devin headless-runtime export.",
+        alias_of: "devin",
+        auth_mode: "oauth_runtime",
+        mcp_mode: "export_only",
+        skills_mode: "instructions_only",
+        upstream_slug: "cognition/devin",
+        upstream_docs_url: "https://docs.devin.ai/work-with-devin/mcp",
+        supported_scopes: ["project", "export"],
+        preferred_target: "devin-runtime",
+        export_targets: ["devin-runtime"]
+      }),
+      alias_entry(%{
         id: "cursor-agent",
         label: "Cursor agent",
         category: "alias",
@@ -566,6 +717,20 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["project"],
         preferred_target: "instructions-only",
         export_targets: ["instructions-only"]
+      }),
+      alias_entry(%{
+        id: "codex-app-server",
+        label: "Codex app / app server surface",
+        category: "alias",
+        description:
+          "Alias to the shipped Codex CLI path; ControlKeel currently supports Codex through the documented Codex CLI / shared MCP config surface.",
+        alias_of: "codex-cli",
+        auth_mode: "env_bridge",
+        upstream_slug: "openai/codex",
+        upstream_docs_url: "https://github.com/openai/codex",
+        supported_scopes: ["user", "project"],
+        preferred_target: "codex",
+        export_targets: ["codex", "open-standard"]
       }),
       alias_entry(%{
         id: "copilot-cli",
@@ -702,6 +867,7 @@ defmodule ControlKeel.AgentIntegration do
 
   def auth_owner(%__MODULE__{provider_bridge: %{owner: owner}}) when is_binary(owner), do: owner
   def auth_owner(%__MODULE__{auth_mode: "ck_owned"}), do: "controlkeel"
+  def auth_owner(%__MODULE__{auth_mode: "local"}), do: "local"
   def auth_owner(%__MODULE__{auth_mode: "none"}), do: "none"
   def auth_owner(%__MODULE__{auth_mode: "heuristic"}), do: "none"
   def auth_owner(%__MODULE__{}), do: "agent"

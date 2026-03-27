@@ -188,10 +188,24 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert {:ok, set_key} =
              CLI.parse(["provider", "set-key", "openai", "--value", "sk-cli-openai"])
 
+    assert {:ok, set_base_url} =
+             CLI.parse([
+               "provider",
+               "set-base-url",
+               "openai",
+               "--value",
+               "http://127.0.0.1:1234/v1"
+             ])
+
+    assert {:ok, set_model} =
+             CLI.parse(["provider", "set-model", "openai", "--value", "local-model"])
+
     assert {:ok, provider_default} =
              CLI.parse(["provider", "default", "openai", "--project-root", tmp_dir])
 
     assert 0 == CLI.execute(set_key, project_root: tmp_dir)
+    assert 0 == CLI.execute(set_base_url, project_root: tmp_dir)
+    assert 0 == CLI.execute(set_model, project_root: tmp_dir)
     assert 0 == CLI.execute(provider_default, project_root: tmp_dir)
 
     assert {:ok, provider_show} = CLI.parse(["provider", "show", "--project-root", tmp_dir])
@@ -203,6 +217,7 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert provider_show_output =~ "Selected source: user_default_profile"
     assert provider_show_output =~ "Selected provider: openai"
+    assert provider_show_output =~ "Selected base URL: http://127.0.0.1:1234/v1"
 
     assert {:ok, attach} = CLI.parse(["attach", "cursor"])
 
@@ -239,6 +254,23 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert File.exists?(
              Path.join(tmp_dir, "controlkeel/dist/open-swe-runtime/open-swe/README.md")
+           )
+  end
+
+  test "runtime export emits the Devin headless bundle", %{tmp_dir: tmp_dir} do
+    assert {:ok, export} = CLI.parse(["runtime", "export", "devin", "--project-root", tmp_dir])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(export, project_root: tmp_dir)
+      end)
+
+    assert output =~ "Prepared Devin runtime export."
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/devin-runtime/AGENTS.md"))
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/devin-runtime/devin/README.md"))
+
+    assert File.exists?(
+             Path.join(tmp_dir, "controlkeel/dist/devin-runtime/devin/controlkeel-mcp.json")
            )
   end
 

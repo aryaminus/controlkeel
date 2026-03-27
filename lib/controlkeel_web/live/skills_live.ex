@@ -199,6 +199,9 @@ defmodule ControlKeelWeb.SkillsLive do
                 ] || "default"}
               </p>
               <p class="ck-note" style="margin-top: 0.35rem;">
+                Base URL: {selected_base_url(@provider_status)}
+              </p>
+              <p class="ck-note" style="margin-top: 0.35rem;">
                 Auth: {@provider_status["selected_auth_mode"]} / {@provider_status[
                   "selected_auth_owner"
                 ]}
@@ -555,4 +558,10 @@ defmodule ControlKeelWeb.SkillsLive do
   defp format_provider_bridge(%{supported: true, mode: mode}), do: mode
   defp format_provider_bridge(%{mode: "ck_owned"}), do: "ck-owned"
   defp format_provider_bridge(_bridge), do: "none"
+
+  defp selected_base_url(%{"provider_chain" => [resolution | _]}) do
+    resolution["base_url"] || "default"
+  end
+
+  defp selected_base_url(_status), do: "default"
 end

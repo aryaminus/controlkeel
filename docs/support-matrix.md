@@ -43,12 +43,21 @@ Attachable and runtime integrations use the **same required MCP tool set** (see 
 | `openclaw` | attach_client | `controlkeel attach openclaw` | `config_reference` | `native` | `plugin_bundle` | `openclaw-native` |
 | `droid` | attach_client | `controlkeel attach droid` | `gateway_base_url` | `native` | `native` | `droid-bundle` |
 | `forge` | attach_client | `controlkeel attach forge` | `acp_session` | `export_only` | `instructions_only` | `forge-acp` |
+| `devin` | headless_runtime | `controlkeel runtime export devin` | `oauth_runtime` | `export_only` | `instructions_only` | `devin-runtime` |
 | `open-swe` | headless_runtime | `controlkeel runtime export open-swe` | `ck_owned` | `export_only` | `instructions_only` | `open-swe-runtime` |
 | `dspy` | framework_adapter | adapter only | `ck_owned` | `none` | `none` | `framework-adapter` |
 | `gepa` | framework_adapter | adapter only | `ck_owned` | `none` | `none` | `framework-adapter` |
 | `deepagents` | framework_adapter | adapter only | `ck_owned` | `none` | `none` | `framework-adapter` |
+| `fastmcp` | framework_adapter | adapter only | `none` | `none` | `none` | `framework-adapter` |
 | `codestral` | provider_only | provider template only | `ck_owned` | `none` | `none` | `provider-profile` |
+| `ollama-runtime` | provider_only | provider template only | `local` | `none` | `none` | `provider-profile` |
+| `vllm` | provider_only | provider template only | `ck_owned` | `none` | `none` | `provider-profile` |
+| `sglang` | provider_only | provider template only | `ck_owned` | `none` | `none` | `provider-profile` |
+| `lmstudio` | provider_only | provider template only | `ck_owned` | `none` | `none` | `provider-profile` |
+| `huggingface` | provider_only | provider template only | `ck_owned` | `none` | `none` | `provider-profile` |
 | `claude-dispatch` | alias | use `claude-code` | `env_bridge` | `native` | `native` | `claude-standalone` |
+| `cognition` | alias | use `devin` | `oauth_runtime` | `export_only` | `instructions_only` | `devin-runtime` |
+| `codex-app-server` | alias | use `codex-cli` | `env_bridge` | `native` | `native` | `codex` |
 | `cursor-agent` | alias | use `cursor` | `ck_owned` | `native` | `instructions_only` | `instructions-only` |
 | `copilot-cli` | alias | use `copilot` | `ck_owned` | `native` | `native` | `github-repo` |
 | `t3code` | alias | use `codex-cli` | `env_bridge` | `native` | `native` | `codex` |
@@ -57,6 +66,8 @@ Attachable and runtime integrations use the **same required MCP tool set** (see 
 | `retune` | unverified | research only | `none` | `none` | `none` | n/a |
 
 The shipped `copilot` attach target is the repo-native path for GitHub Copilot, and the exported `copilot-plugin` bundle is the same companion path used for GitHub Copilot CLI and VS Code agent mode.
+
+Provider-only backends such as `vllm`, `sglang`, `lmstudio`, `huggingface`, and `codestral` currently flow through the CK `openai` provider path with a custom `base_url` and `model`; they are cataloged separately so the support matrix stays honest about the backend you are really targeting.
 
 **Router agent IDs** (for `ck_route` / policy): where set in code, the integration’s `router_agent_id` matches the attach id (e.g. `opencode`, `cursor`); VS Code / Copilot use `nil` in the catalog.
 

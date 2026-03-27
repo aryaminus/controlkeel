@@ -140,6 +140,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "devin-runtime",
+        "Devin runtime export",
+        "Headless runtime export with AGENTS context, custom MCP recipe, and webhook guidance for Devin.",
+        false,
+        "export",
+        ["project", "export"],
+        true
+      ),
+      target(
         "framework-adapter",
         "Framework adapter template",
         "Adapter/export scaffold for framework-backed integrations such as DSPy, GEPA, and DeepAgents.",

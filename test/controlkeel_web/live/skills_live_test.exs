@@ -30,6 +30,8 @@ defmodule ControlKeelWeb.SkillsLiveTest do
     assert has_element?(view, "#agent-cline")
     assert has_element?(view, "#copy-agent-claude-code")
     assert has_element?(view, "#agent-open-swe")
+    assert has_element?(view, "#agent-devin")
+    assert has_element?(view, "#agent-vllm")
 
     render_click(element(view, "#skill-controlkeel-governance"))
     assert render(view) =~ "Required CK MCP tools"

@@ -485,6 +485,62 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "devin-runtime"}, root, project_root, _skills, opts) do
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("devin", project_root, opts))
+
+    readme_path = Path.join(root, "devin/README.md")
+    File.mkdir_p!(Path.dirname(readme_path))
+    File.write!(readme_path, devin_runtime_contents(project_root, opts))
+
+    config_path = Path.join(root, "devin/controlkeel-mcp.json")
+
+    File.write!(
+      config_path,
+      Jason.encode!(
+        %{
+          "transport" => "STDIO",
+          "command" => mcp_command(project_root, opts),
+          "args" => mcp_args(project_root, opts),
+          "env_variables" => %{},
+          "note" =>
+            "Use this in Devin's Add Your Own MCP flow when ControlKeel is installed in the runtime."
+        },
+        pretty: true
+      ) <> "\n"
+    )
+
+    webhook_path = Path.join(root, "devin/controlkeel-webhook.json")
+
+    File.write!(
+      webhook_path,
+      Jason.encode!(
+        %{
+          "events" => ["task.completed", "task.failed", "finding.created", "proof.generated"],
+          "note" =>
+            "Use this when wiring Devin sessions back into ControlKeel governance or external CI hooks."
+        },
+        pretty: true
+      ) <> "\n"
+    )
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => agents_path, "kind" => "instructions"},
+        %{"path" => readme_path, "kind" => "runtime"},
+        %{"path" => config_path, "kind" => "settings"},
+        %{"path" => webhook_path, "kind" => "runtime"}
+      ],
+      [
+        "Place `AGENTS.md` at the repo root so Devin can ingest ControlKeel workflow guidance.",
+        "Use the custom MCP JSON as the starting point for Devin's Add Your Own MCP flow."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "framework-adapter"}, root, project_root, _skills, opts) do
     readme_path = Path.join(root, "framework-adapters/README.md")
     File.mkdir_p!(Path.dirname(readme_path))
@@ -525,31 +581,73 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(readme_path))
     File.write!(readme_path, provider_profile_contents(project_root, opts))
 
-    codestral_path = Path.join(root, "provider-profiles/codestral.json")
+    profile_templates = [
+      {"codestral.json",
+       %{
+         "provider" => "openai",
+         "model" => "codestral-latest",
+         "base_url" => "https://api.mistral.ai/v1",
+         "note" =>
+           "Use this as a CK-owned provider profile or proxy template for Codestral-compatible APIs."
+       }},
+      {"vllm.json",
+       %{
+         "provider" => "openai",
+         "model" => "Qwen/Qwen2.5-Coder-32B-Instruct",
+         "base_url" => "http://127.0.0.1:8000",
+         "note" =>
+           "vLLM exposes an OpenAI-compatible server. Set this base URL and model, then optionally add a token if your deployment requires one."
+       }},
+      {"sglang.json",
+       %{
+         "provider" => "openai",
+         "model" => "Qwen/Qwen2.5-Coder-32B-Instruct",
+         "base_url" => "http://127.0.0.1:30000",
+         "note" =>
+           "SGLang commonly exposes an OpenAI-compatible HTTP endpoint. Adjust host, port, and model to match your deployment."
+       }},
+      {"lmstudio.json",
+       %{
+         "provider" => "openai",
+         "model" => "local-model",
+         "base_url" => "http://127.0.0.1:1234",
+         "note" =>
+           "LM Studio local server speaks an OpenAI-compatible API. ControlKeel can use it through the OpenAI provider path with a custom base URL."
+       }},
+      {"huggingface.json",
+       %{
+         "provider" => "openai",
+         "model" => "meta-llama/Llama-3.1-8B-Instruct:cerebras",
+         "base_url" => "https://router.huggingface.co",
+         "note" =>
+           "Hugging Face Inference Providers expose OpenAI-compatible chat-completion APIs and require an HF token."
+       }},
+      {"ollama.json",
+       %{
+         "provider" => "ollama",
+         "model" => "qwen2.5:7b",
+         "base_url" => "http://127.0.0.1:11434",
+         "note" =>
+           "Use the native Ollama provider path when you want local chat and embeddings without an external API key."
+       }}
+    ]
 
-    File.write!(
-      codestral_path,
-      Jason.encode!(
-        %{
-          "provider" => "openai",
-          "model" => "codestral-latest",
-          "base_url" => "https://api.mistral.ai/v1",
-          "note" =>
-            "Use this as a CK-owned provider profile or proxy template for Codestral-compatible APIs."
-        },
-        pretty: true
-      ) <> "\n"
-    )
+    writes =
+      Enum.map(profile_templates, fn {filename, payload} ->
+        path = Path.join(root, "provider-profiles/#{filename}")
+        File.write!(path, Jason.encode!(payload, pretty: true) <> "\n")
+        %{"path" => path, "kind" => "settings"}
+      end)
 
     with_common_assets(
       root,
       project_root,
       opts,
+      [%{"path" => readme_path, "kind" => "runtime"} | writes],
       [
-        %{"path" => readme_path, "kind" => "runtime"},
-        %{"path" => codestral_path, "kind" => "settings"}
-      ],
-      ["Use this template with `controlkeel provider` flows for Codestral-compatible endpoints."]
+        "Use these templates with `controlkeel provider set-key`, `set-base-url`, `set-model`, and `default` flows.",
+        "OpenAI-compatible backends such as vLLM, SGLang, LM Studio, Hugging Face, and Codestral use the CK OpenAI provider path with a custom base URL."
+      ]
     )
   end
 
@@ -738,6 +836,30 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp devin_runtime_contents(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    """
+    # Devin + ControlKeel
+
+    Use this runtime export when Devin runs as a hosted coding environment instead of a local editor attach flow.
+
+    ## Repo context
+
+    - Repo root: `#{project_root}`
+    - Keep `AGENTS.md` at the repo root so Devin can ingest ControlKeel policy and workflow context.
+
+    ## Recommended Devin setup
+
+    - Use Devin's custom MCP flow and point it at the bundled `devin/controlkeel-mcp.json`
+    - Prefer service accounts or shared runtime secrets for any OAuth-backed MCPs you add in Devin
+    - Use webhook events such as `finding.created`, `task.completed`, `task.failed`, and `proof.generated` to sync governance state into CI or issue workflows
+    """
+  end
+
   defp framework_adapter_contents(project_root, opts) do
     project_root =
       if portable_project_root?(opts),
@@ -767,8 +889,10 @@ defmodule ControlKeel.Skills.Exporter do
     This export provides CK-owned provider templates for provider/model integrations that are not local `attach` clients.
 
     - Repo root: `#{project_root}`
-    - Use with `controlkeel provider set-key ...` and `controlkeel provider default ...`
-    - Example included: Codestral / Mistral OpenAI-compatible endpoint template
+    - Use with `controlkeel provider set-key ...`, `controlkeel provider set-base-url ...`, `controlkeel provider set-model ...`, and `controlkeel provider default ...`
+    - Included templates cover Codestral, vLLM, SGLang, LM Studio, Hugging Face, and Ollama
+    - OpenAI-compatible backends flow through the CK OpenAI provider path; use a custom base URL and model, then add a token only when the backend requires one
+    - CK accepts base URLs with or without a trailing `/v1`, but the templates here omit it for consistency
     """
   end
 

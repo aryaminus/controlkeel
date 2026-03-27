@@ -115,14 +115,12 @@ defmodule ControlKeel.Scanner.Advisory do
     config = normalize_config(config)
     prompt = build_prompt(input, existing_findings)
 
-    with {:ok, api_key} <- require_key(config),
+    with {:ok, api_key} <- require_openai_key(config),
          {:ok, body} <-
            Req.post(
-             url: (config[:base_url] || "https://api.openai.com") <> "/v1/chat/completions",
-             headers: [
-               {"authorization", "Bearer #{api_key}"},
-               {"content-type", "application/json"}
-             ],
+             url:
+               endpoint_url(config[:base_url] || "https://api.openai.com", "/v1/chat/completions"),
+             headers: openai_headers(api_key),
              json: %{
                "model" => config[:model] || "gpt-4o-mini",
                "max_tokens" => 600,
@@ -292,8 +290,22 @@ defmodule ControlKeel.Scanner.Advisory do
   defp normalize_config(config) when is_map(config), do: Enum.into(config, [])
   defp normalize_config(_config), do: []
 
-  defp require_key(%{api_key: key}) when is_binary(key) and key != "", do: {:ok, key}
-  defp require_key(_), do: {:error, :skip}
+  defp require_key(config) do
+    case config[:api_key] do
+      key when is_binary(key) and key != "" -> {:ok, key}
+      _ -> {:error, :skip}
+    end
+  end
+
+  defp require_openai_key(config) do
+    case config[:api_key] do
+      key when is_binary(key) and key != "" ->
+        {:ok, key}
+
+      _ ->
+        if custom_openai_base_url?(config[:base_url]), do: {:ok, nil}, else: {:error, :skip}
+    end
+  end
 
   defp normalize_resp({:ok, %{status: status, body: body}}) when status in 200..299,
     do: {:ok, body}
@@ -319,6 +331,42 @@ defmodule ControlKeel.Scanner.Advisory do
     do: {:ok, text}
 
   defp extract_openai_text(_), do: {:error, :no_text}
+
+  defp openai_headers(api_key) when is_binary(api_key) and api_key != "" do
+    [
+      {"authorization", "Bearer #{api_key}"},
+      {"content-type", "application/json"}
+    ]
+  end
+
+  defp openai_headers(_api_key), do: [{"content-type", "application/json"}]
+
+  defp endpoint_url(base_url, path) do
+    base =
+      base_url
+      |> String.trim()
+      |> String.trim_trailing("/")
+
+    if String.ends_with?(base, "/v1") and String.starts_with?(path, "/v1/") do
+      base <> String.trim_leading(path, "/v1")
+    else
+      base <> path
+    end
+  end
+
+  defp custom_openai_base_url?(base_url) when is_binary(base_url) do
+    base_url
+    |> String.trim()
+    |> String.trim_trailing("/")
+    |> String.replace_suffix("/v1", "")
+    |> case do
+      "" -> false
+      "https://api.openai.com" -> false
+      _ -> true
+    end
+  end
+
+  defp custom_openai_base_url?(_base_url), do: false
 
   defp emit_telemetry(status, count) do
     :telemetry.execute(

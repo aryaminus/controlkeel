@@ -94,9 +94,9 @@ More walkthroughs:
 ControlKeel now uses a **typed integration catalog**:
 
 - `attach_client` for real `controlkeel attach <id>` targets
-- `headless_runtime` for exported runtime bundles such as Open SWE
+- `headless_runtime` for exported runtime bundles such as Devin and Open SWE
 - `framework_adapter` for benchmark / policy / runtime harness adapters
-- `provider_only` for provider/profile templates such as Codestral
+- `provider_only` for provider/profile templates such as Codestral, vLLM, SGLang, LM Studio, Hugging Face, and Ollama
 - `alias` for names that resolve to a canonical shipped target
 
 ### Provider-bridge supported
@@ -145,10 +145,11 @@ ControlKeel's governed proxy currently exposes OpenAI-style and Anthropic-style 
 
 ### Headless runtimes, framework adapters, and provider-only entries
 
+- Devin / Cognition: `controlkeel runtime export devin`
 - Open SWE: `controlkeel runtime export open-swe`
-- DSPy, GEPA, DeepAgents: surfaced as framework adapters, not fake attach commands
-- Codestral: surfaced as a provider/profile template, not a fake attach command
-- Aliases such as `claude-dispatch`, `cursor-agent`, `copilot-cli`, and `t3code` point to their canonical shipped targets in the support matrix
+- DSPy, GEPA, DeepAgents, FastMCP: surfaced as framework adapters or protocol/tooling entries, not fake attach commands
+- Codestral, vLLM, SGLang, LM Studio, Hugging Face, and Ollama: surfaced as provider/profile templates, not fake attach commands
+- Aliases such as `cognition`, `codex-app-server`, `claude-dispatch`, `cursor-agent`, `copilot-cli`, and `t3code` point to their canonical shipped targets in the support matrix
 
 Attach flags:
 
@@ -173,6 +174,8 @@ Configure provider profiles with:
 controlkeel provider list
 controlkeel provider show
 controlkeel provider set-key openai --value "$OPENAI_API_KEY"
+controlkeel provider set-base-url openai --value http://127.0.0.1:1234
+controlkeel provider set-model openai --value local-model
 controlkeel provider default openai
 controlkeel provider doctor
 ```
@@ -183,6 +186,7 @@ Practical setup guidance:
 
 - If you use Claude Code or Codex CLI, try the attached bridge path first.
 - If you use Cline, its MCP + skills path is first-class, but CK still needs its own provider profile or local Ollama for CK-internal model work because Cline stores provider secrets separately.
+- If you use vLLM, SGLang, LM Studio, Hugging Face, or Codestral-compatible endpoints, configure them through the CK `openai` provider with a custom `base_url` and `model`.
 - If you use OpenCode or another MCP-plus-instructions client, the next best path is a CK-owned provider profile or local Ollama.
 - Governed bindings remain project-local even when the agent install itself supports user scope.
 - Heuristic mode is still useful for validation, findings, proofs, benchmarks, and skills when no model access is available.
@@ -202,7 +206,9 @@ Targets:
 - `claude-plugin`
 - `cline-native`
 - `copilot-plugin`
+- `devin-runtime`
 - `github-repo`
+- `provider-profile`
 - `open-standard`
 - `instructions-only`
 

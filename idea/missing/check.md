@@ -93,6 +93,16 @@ Canonical inventory: [docs/support-matrix.md](../../docs/support-matrix.md).
 | openclaw | attach_client | `openclaw` | Native skills + plugin bundle + MCP companion config. |
 | claude dispatch | alias | `claude-dispatch -> claude-code` | Use Claude Code as the canonical shipped path. |
 | copilot cli | alias | `copilot-cli -> copilot` | Repo-native Copilot attach; `copilot-plugin` covers CLI / VS Code agent mode. |
+| cognition / devin | headless_runtime | `devin` | Hosted runtime export via `controlkeel runtime export devin`; use Devin's custom MCP flow instead of a fake local attach command. |
+| windsurf | attach_client | `windsurf` | Shipped MCP + instructions attach path. |
+| codex app server | alias | `codex-app-server -> codex-cli` | Covered by the shipped Codex CLI / shared Codex MCP config surface. |
+| cline | attach_client | `cline` | Shipped native MCP + skills + `.clinerules` path. |
+| ollama | provider_only | `ollama-runtime` | Local provider/runtime path; not an attach client. |
+| vllm | provider_only | `vllm` | OpenAI-compatible backend via CK `openai` provider with custom base URL + model. |
+| sglang | provider_only | `sglang` | OpenAI-compatible backend via CK `openai` provider with custom base URL + model. |
+| lmstudio | provider_only | `lmstudio` | OpenAI-compatible backend via CK `openai` provider with custom base URL + model. |
+| fastmcp | framework_adapter | `fastmcp` | MCP interoperability/tooling surface, not a dedicated attach client. |
+| huggingface | provider_only | `huggingface` | OpenAI-compatible chat-completion backend via CK `openai` provider path and HF token. |
 | opencode | attach_client | `opencode` | MCP + instructions bundle path. |
 | amp | attach_client | `amp` | MCP + instructions bundle path. |
 | slate | unverified | `slate` | No canonical official upstream contract verified. |
@@ -105,6 +115,8 @@ Canonical inventory: [docs/support-matrix.md](../../docs/support-matrix.md).
 | requirement analysis | n/a | n/a | Workflow artifact, not a client. |
 
 **Default for any MCP-capable editor not listed:** use the existing MCP + instruction bundle path described in [getting-started.md](../../docs/getting-started.md). That is a transport pattern, not a claim of first-class native support.
+
+**Default for OpenAI-compatible backends not listed separately:** use the CK `openai` provider path with `controlkeel provider set-base-url openai --value ...` and `controlkeel provider set-model openai --value ...`.
 
 ## Additional current-market audit
 

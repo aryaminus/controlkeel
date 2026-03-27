@@ -14,6 +14,9 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert "cursor" in ids
     assert "aider" in ids
     assert "cline" in ids
+    assert "devin" in ids
+    assert "vllm" in ids
+    assert "huggingface" in ids
   end
 
   test "labels and targets are available for native-first agents" do
@@ -83,5 +86,22 @@ defmodule ControlKeel.AgentIntegrationTest do
         assert integration.supported_scopes != []
       end
     end)
+  end
+
+  test "typed runtime, provider, and alias rows stay truthful" do
+    devin = AgentIntegration.get("devin")
+    codex_app = AgentIntegration.get("codex-app-server")
+    vllm = AgentIntegration.get("vllm")
+
+    assert devin.support_class == "headless_runtime"
+    assert devin.runtime_export_command == "controlkeel runtime export devin"
+    assert devin.preferred_target == "devin-runtime"
+
+    assert codex_app.support_class == "alias"
+    assert codex_app.alias_of == "codex-cli"
+
+    assert vllm.support_class == "provider_only"
+    assert vllm.preferred_target == "provider-profile"
+    assert vllm.attach_command == nil
   end
 end

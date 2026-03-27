@@ -201,6 +201,17 @@ defmodule ControlKeel.SkillsTest do
            )
 
     assert File.exists?(Path.join(droid_plan.output_dir, ".factory/droids/controlkeel.md"))
+
+    assert {:ok, provider_plan} = Skills.export("provider-profile", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(provider_plan.output_dir, "provider-profiles/vllm.json"))
+    assert File.exists?(Path.join(provider_plan.output_dir, "provider-profiles/sglang.json"))
+    assert File.exists?(Path.join(provider_plan.output_dir, "provider-profiles/lmstudio.json"))
+    assert File.exists?(Path.join(provider_plan.output_dir, "provider-profiles/huggingface.json"))
+    assert File.exists?(Path.join(provider_plan.output_dir, "provider-profiles/ollama.json"))
+
+    assert {:ok, devin_plan} = Skills.export("devin-runtime", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(devin_plan.output_dir, "devin/README.md"))
+    assert File.exists?(Path.join(devin_plan.output_dir, "devin/controlkeel-mcp.json"))
   end
 
   test "installer writes project-scoped native bundles without nesting agent directories", %{

@@ -80,6 +80,16 @@ controlkeel provider default openai
 controlkeel provider doctor
 ```
 
+If you want to use an OpenAI-compatible local or hosted backend instead of OpenAI directly:
+
+```bash
+controlkeel provider set-base-url openai --value http://127.0.0.1:1234
+controlkeel provider set-model openai --value local-model
+controlkeel provider default openai
+```
+
+This is the path for vLLM, SGLang, LM Studio, Hugging Face Inference Providers, and Codestral-compatible endpoints. CK accepts base URLs with or without a trailing `/v1`.
+
 If you do not have keys and are not running a local model, ControlKeel still works for:
 
 - MCP tools and governed attachments

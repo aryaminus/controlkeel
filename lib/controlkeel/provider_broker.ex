@@ -105,6 +105,14 @@ defmodule ControlKeel.ProviderBroker do
     ProviderConfig.put_profile(provider, %{"api_key" => value})
   end
 
+  def set_base_url(provider, value) when is_binary(value) do
+    ProviderConfig.put_profile(provider, %{"base_url" => normalize_optional_string(value)})
+  end
+
+  def set_model(provider, value) when is_binary(value) do
+    ProviderConfig.put_profile(provider, %{"model" => normalize_optional_string(value)})
+  end
+
   def doctor(project_root \\ File.cwd!(), opts \\ []) do
     status = status(project_root, opts)
 
@@ -113,7 +121,7 @@ defmodule ControlKeel.ProviderBroker do
         {"heuristic", "heuristic"} ->
           [
             "No model provider is currently available.",
-            "Configure a provider with `controlkeel provider set-key <provider> --value ...`, run a supported agent bridge, or start Ollama.",
+            "Configure a provider with `controlkeel provider set-key <provider> --value ...`, `controlkeel provider set-base-url openai --value ...`, run a supported agent bridge, or start Ollama.",
             "CK still works in heuristic mode for governance, proof, benchmark, and MCP surfaces."
           ]
 
@@ -512,11 +520,16 @@ defmodule ControlKeel.ProviderBroker do
       "env_override" => present?(present_env(env_key)),
       "default" => config["default_source"] == provider,
       "model" => profile["model"] || default_model(provider, []),
+      "base_url" => profile["base_url"],
       "source_hint" => profile_source_hint(provider, profile)
     }
   end
 
   defp profile_source_hint("ollama", _profile), do: "Local runtime"
+
+  defp profile_source_hint("openai", %{"base_url" => base_url}) when is_binary(base_url) do
+    if custom_openai_base_url?(base_url), do: "OpenAI-compatible backend", else: "Stored profile"
+  end
 
   defp profile_source_hint(_provider, profile) do
     if configured_profile?(profile), do: "Stored profile", else: "Not configured"
@@ -767,6 +780,9 @@ defmodule ControlKeel.ProviderBroker do
   defp configured_profile?(%{"base_url" => base_url, "provider" => "ollama"}),
     do: present?(base_url)
 
+  defp configured_profile?(%{"base_url" => base_url, "provider" => "openai"}),
+    do: custom_openai_base_url?(base_url)
+
   defp configured_profile?(_profile), do: false
 
   defp resolution_summary(resolution) do
@@ -774,6 +790,7 @@ defmodule ControlKeel.ProviderBroker do
       "source" => resolution.source,
       "provider" => resolution.provider,
       "model" => resolution.model,
+      "base_url" => resolution.config["base_url"] || resolution.config[:base_url],
       "reason" => resolution.reason,
       "auth_mode" => resolution.auth_mode,
       "auth_owner" => resolution.auth_owner
@@ -799,6 +816,13 @@ defmodule ControlKeel.ProviderBroker do
   defp present_env(nil), do: nil
   defp present_env(key), do: present_value(System.get_env(key))
 
+  defp normalize_optional_string(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
   defp present_value(nil), do: nil
 
   defp present_value(value) when is_binary(value) do
@@ -809,6 +833,25 @@ defmodule ControlKeel.ProviderBroker do
   defp present_value(value), do: value
 
   defp present?(value), do: not is_nil(present_value(value))
+
+  defp custom_openai_base_url?(base_url) when is_binary(base_url) do
+    base_url
+    |> normalized_openai_base_url()
+    |> case do
+      "" -> false
+      "https://api.openai.com" -> false
+      _ -> true
+    end
+  end
+
+  defp custom_openai_base_url?(_base_url), do: false
+
+  defp normalized_openai_base_url(base_url) do
+    base_url
+    |> String.trim()
+    |> String.trim_trailing("/")
+    |> String.replace_suffix("/v1", "")
+  end
 
   defp maybe_append(list, nil), do: list
   defp maybe_append(list, value), do: list ++ [value]

@@ -195,6 +195,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(agents, &(&1["id"] == "cline"))
       assert Enum.any?(agents, &(&1["id"] == "cursor"))
       assert Enum.any?(agents, &(&1["id"] == "open-swe"))
+      assert Enum.any?(agents, &(&1["id"] == "devin"))
+      assert Enum.any?(agents, &(&1["id"] == "vllm"))
       assert Enum.any?(install_channels, &(&1["id"] == "homebrew"))
       assert Enum.any?(install_channels, &(&1["id"] == "npm"))
 
@@ -215,6 +217,14 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert open_swe["support_class"] == "headless_runtime"
       assert open_swe["runtime_export_command"] == "controlkeel runtime export open-swe"
+
+      devin =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "devin"
+        end)
+
+      assert devin["support_class"] == "headless_runtime"
+      assert devin["runtime_export_command"] == "controlkeel runtime export devin"
 
       cline =
         Enum.find(agents, fn agent ->

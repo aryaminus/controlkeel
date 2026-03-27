@@ -72,10 +72,10 @@ These appear in the same integration catalog, but they are intentionally **not**
 
 | Support class | Canonical ids | How ControlKeel supports them |
 |---|---|---|
-| Headless runtime | `open-swe` | `controlkeel runtime export open-swe` writes repo/runtime bundle files (`AGENTS.md`, webhook and CI guidance). |
-| Framework adapter | `dspy`, `gepa`, `deepagents` | Exposed through benchmark, policy-training, and runtime-harness adapter exports. |
-| Provider-only | `codestral` | Exposed through CK provider/profile templates and proxy-compatible docs. |
-| Alias | `claude-dispatch`, `cursor-agent`, `copilot-cli`, `t3code` | Resolve to canonical shipped targets rather than creating duplicate attach flows. |
+| Headless runtime | `devin`, `open-swe` | `controlkeel runtime export devin` and `controlkeel runtime export open-swe` write repo/runtime bundle files (`AGENTS.md`, MCP or webhook recipes, CI guidance). |
+| Framework adapter | `dspy`, `gepa`, `deepagents`, `fastmcp` | Exposed through benchmark, policy-training, runtime-harness adapter exports, or generic MCP interoperability scaffolds. |
+| Provider-only | `codestral`, `ollama-runtime`, `vllm`, `sglang`, `lmstudio`, `huggingface` | Exposed through CK provider/profile templates and OpenAI-compatible backend guidance. |
+| Alias | `claude-dispatch`, `cognition`, `cursor-agent`, `codex-app-server`, `copilot-cli`, `t3code` | Resolve to canonical shipped targets rather than creating duplicate attach flows. |
 | Unverified | `rlm-agent`, `slate`, `retune` | Kept visible as research names, but not over-promised as shipped support. |
 
 ## Proxy-compatible clients
@@ -130,6 +130,33 @@ Some native-first clients are still CK-owned for provider access even when the a
 
 - Cline -> native MCP + skills + `.clinerules`, but CK does not reuse Cline's encrypted provider secrets
 
+OpenAI-compatible backends are supported through the CK `openai` provider path with a custom `base_url` and `model`, rather than through fake attach targets:
+
+- vLLM
+- SGLang
+- LM Studio
+- Hugging Face Inference Providers
+- Codestral / Mistral-compatible endpoints
+
+Example setup:
+
+```bash
+controlkeel provider set-base-url openai --value http://127.0.0.1:1234
+controlkeel provider set-model openai --value local-model
+controlkeel provider default openai
+```
+
+For Hugging Face or other hosted OpenAI-compatible backends that require a token:
+
+```bash
+controlkeel provider set-key openai --value "$HF_TOKEN"
+controlkeel provider set-base-url openai --value https://router.huggingface.co
+controlkeel provider set-model openai --value meta-llama/Llama-3.1-8B-Instruct:cerebras
+controlkeel provider default openai
+```
+
+CK accepts base URLs with or without a trailing `/v1`.
+
 If no bridge, CK-owned profile, or local model is available, agents can still use ControlKeel for governance, MCP tools, proofs, skills, and benchmarks without human setup. Model-backed features fall back to heuristics or return explicit capability guidance.
 
 Practical rules:
@@ -155,7 +182,10 @@ controlkeel skills export --target claude-plugin
 controlkeel skills export --target cline-native
 controlkeel skills export --target copilot-plugin
 controlkeel skills export --target codex
+controlkeel skills export --target provider-profile
 controlkeel skills export --target open-standard
+controlkeel runtime export devin
+controlkeel runtime export open-swe
 ```
 
 Install a native target without using `attach`:
@@ -175,6 +205,8 @@ Exported bundles are written under:
 - `controlkeel/dist/cline-native/`
 - `controlkeel/dist/copilot-plugin/`
 - `controlkeel/dist/codex/`
+- `controlkeel/dist/devin-runtime/`
+- `controlkeel/dist/provider-profile/`
 - `controlkeel/dist/open-standard/`
 - `controlkeel/dist/instructions-only/`
 
@@ -184,6 +216,8 @@ Published release bundles use the same target set, but ship as release assets:
 - `controlkeel-cline-native.tar.gz`
 - `controlkeel-copilot-plugin.tar.gz`
 - `controlkeel-codex.tar.gz`
+- `controlkeel-devin-runtime.tar.gz`
+- `controlkeel-provider-profile.tar.gz`
 - `controlkeel-open-standard.tar.gz`
 - `controlkeel-instructions-only.tar.gz`
 

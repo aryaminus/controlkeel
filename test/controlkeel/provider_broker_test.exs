@@ -66,6 +66,23 @@ defmodule ControlKeel.ProviderBrokerTest do
     assert "ollama" in status["fallback_chain"]
   end
 
+  test "custom OpenAI-compatible base URL counts as configured without an API key", %{
+    project_root: project_root
+  } do
+    assert {:ok, _config} = ProviderBroker.set_base_url("openai", "http://127.0.0.1:1234/v1")
+    assert {:ok, _config} = ProviderBroker.set_model("openai", "local-model")
+    assert {:ok, _config} = ProviderBroker.set_default_source("openai")
+
+    status = ProviderBroker.status(project_root)
+
+    assert status["selected_source"] == "user_default_profile"
+    assert status["selected_provider"] == "openai"
+
+    openai_profile = Enum.find(status["profiles"], &(&1["provider"] == "openai"))
+    assert openai_profile["configured"] == true
+    assert openai_profile["base_url"] == "http://127.0.0.1:1234/v1"
+  end
+
   test "environment override beats stored profile for hosted providers", %{
     project_root: project_root
   } do
