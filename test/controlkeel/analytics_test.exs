@@ -5,7 +5,8 @@ defmodule ControlKeel.AnalyticsTest do
 
   alias ControlKeel.Analytics
   alias ControlKeel.Analytics.Event
-  alias ControlKeel.Mission.{Finding, Session}
+  alias ControlKeel.Mission
+  alias ControlKeel.Mission.{Finding, ProofBundle, Session}
   alias ControlKeel.Repo
 
   test "record/1 persists analytics events" do
@@ -102,5 +103,152 @@ defmodule ControlKeel.AnalyticsTest do
 
     assert Enum.map(summary.steps, & &1.count) == [3, 2, 2, 1]
     assert Enum.map(summary.steps, & &1.conversion_percent) == [100.0, 66.7, 100.0, 50.0]
+  end
+
+  test "funnel_summary returns proof and outcome metrics backed by persisted mission data" do
+    session_a =
+      session_fixture(%{
+        title: "Claude ship session",
+        execution_brief: %{"agent" => "Claude Code"}
+      })
+
+    session_b =
+      session_fixture(%{
+        title: "Codex ship session",
+        execution_brief: %{"agent" => "Codex CLI"}
+      })
+
+    Repo.update_all(from(s in Session, where: s.id == ^session_a.id),
+      set: [inserted_at: ~U[2026-03-18 10:00:00Z]]
+    )
+
+    done_ready =
+      task_fixture(%{
+        session: session_a,
+        position: 1,
+        status: "done",
+        title: "Ready task"
+      })
+
+    _done_without_proof =
+      task_fixture(%{
+        session: session_a,
+        position: 2,
+        status: "done",
+        title: "No proof task"
+      })
+
+    queued_resume =
+      task_fixture(%{
+        session: session_a,
+        position: 3,
+        status: "queued",
+        title: "Queued resume task"
+      })
+
+    done_not_ready =
+      task_fixture(%{
+        session: session_b,
+        position: 1,
+        status: "done",
+        title: "Blocked proof task"
+      })
+
+    _queued_codex =
+      task_fixture(%{
+        session: session_b,
+        position: 2,
+        status: "queued",
+        title: "Queued codex task"
+      })
+
+    blocked_finding =
+      finding_fixture(%{
+        session: session_b,
+        severity: "high",
+        status: "blocked",
+        title: "Blocked high finding"
+      })
+
+    _approved_risky =
+      finding_fixture(%{
+        session: session_a,
+        severity: "high",
+        status: "approved",
+        title: "Approved high finding"
+      })
+
+    _escalated_finding =
+      finding_fixture(%{
+        session: session_b,
+        severity: "critical",
+        status: "escalated",
+        title: "Escalated critical finding"
+      })
+
+    {:ok, ready_proof} = Mission.generate_proof_bundle(done_ready.id)
+
+    Repo.update_all(
+      from(p in ProofBundle, where: p.id == ^ready_proof.id),
+      set: [generated_at: ~U[2026-03-18 10:20:00Z]]
+    )
+
+    {:ok, _not_ready_proof} = Mission.generate_proof_bundle(done_not_ready.id)
+
+    assert {:ok, _} =
+             Mission.create_invocation(%{
+               source: "test",
+               tool: "ck_route",
+               provider: "anthropic",
+               model: "claude-3-7-sonnet",
+               estimated_cost_cents: 120,
+               decision: "allow",
+               metadata: %{},
+               session_id: session_a.id,
+               task_id: done_ready.id
+             })
+
+    assert {:ok, _} =
+             Mission.create_task_checkpoint(%{
+               session_id: session_a.id,
+               task_id: done_ready.id,
+               checkpoint_type: "resume",
+               summary: "Resumed ready task",
+               payload: %{},
+               created_by: "test"
+             })
+
+    assert {:ok, _} =
+             Mission.create_task_checkpoint(%{
+               session_id: session_a.id,
+               task_id: queued_resume.id,
+               checkpoint_type: "resume",
+               summary: "Resumed queued task",
+               payload: %{},
+               created_by: "test"
+             })
+
+    summary = Analytics.funnel_summary(limit: 10)
+
+    assert summary.outcome_metrics.proof_backed_task_coverage_percent == 66.7
+    assert summary.outcome_metrics.deploy_ready_task_rate_percent == 50.0
+    assert summary.outcome_metrics.cost_per_deploy_ready_task_cents == 120.0
+    assert summary.outcome_metrics.resume_success_rate_percent == 50.0
+    assert summary.outcome_metrics.risky_intervention_rate_percent == 66.7
+    assert summary.outcome_metrics.average_time_to_first_deploy_ready_proof_seconds == 1_200.0
+
+    assert Enum.any?(summary.agent_outcomes, fn row ->
+             row.agent == "Claude Code" and row.completed_tasks == 2 and
+               row.total_tasks == 3 and row.deploy_ready_tasks == 1 and
+               row.completion_rate_percent == 66.7
+           end)
+
+    assert Enum.any?(summary.agent_outcomes, fn row ->
+             row.agent == "Codex CLI" and row.completed_tasks == 1 and
+               row.total_tasks == 2 and row.deploy_ready_tasks == 0 and
+               row.completion_rate_percent == 50.0
+           end)
+
+    assert blocked_finding.status == "blocked"
   end
 end

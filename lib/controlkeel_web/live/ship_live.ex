@@ -28,13 +28,17 @@ defmodule ControlKeelWeb.ShipLive do
     <section class="ck-shell ck-shell-tight">
       <div class="ck-section-header">
         <div>
-          <p class="ck-kicker">Ship dashboard</p>
-          <h1 class="ck-section-title">Track install-to-first-finding momentum</h1>
+          <p class="ck-kicker">Proof console</p>
+          <h1 class="ck-section-title">Track governed momentum and delivery evidence</h1>
           <p class="ck-lead ck-lead-tight">
-            Measure the governed funnel, spot where sessions stall, and verify that findings are arriving fast enough to matter.
+            Mission Control, proofs, ship metrics, and benchmarks form one control loop. Use this dashboard to measure funnel speed, deploy-readiness, and where governed work still stalls.
           </p>
         </div>
-        <a href={~p"/"} class="ck-link">Back home</a>
+        <div class="ck-action-row">
+          <a href={~p"/proofs"} class="ck-link">Open proof browser</a>
+          <a href={~p"/benchmarks"} class="ck-link">Open benchmarks</a>
+          <a href={~p"/"} class="ck-link">Back home</a>
+        </div>
       </div>
 
       <div class="ck-stat-grid">
@@ -58,6 +62,76 @@ defmodule ControlKeelWeb.ShipLive do
 
       <div class="ck-grid ck-grid-dashboard">
         <div class="ck-card">
+          <p class="ck-mini-label">Outcome proof</p>
+          <div class="ck-finding-list">
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Proof-backed done tasks</h3>
+                <span class="ck-pill ck-pill-neutral">
+                  {format_percent(@summary.outcome_metrics.proof_backed_task_coverage_percent)}
+                </span>
+              </div>
+              <p class="ck-note">Completed tasks with at least one immutable proof bundle.</p>
+            </article>
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Deploy-ready task rate</h3>
+                <span class="ck-pill ck-pill-neutral">
+                  {format_percent(@summary.outcome_metrics.deploy_ready_task_rate_percent)}
+                </span>
+              </div>
+              <p class="ck-note">Latest proof bundle says the completed task is ready to ship.</p>
+            </article>
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Cost / deploy-ready task</h3>
+                <span class="ck-pill ck-pill-neutral">
+                  {format_currency(@summary.outcome_metrics.cost_per_deploy_ready_task_cents)}
+                </span>
+              </div>
+              <p class="ck-note">
+                Average invocation spend attached to tasks that reached deploy-ready proof.
+              </p>
+            </article>
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Resume success</h3>
+                <span class="ck-pill ck-pill-neutral">
+                  {format_percent(@summary.outcome_metrics.resume_success_rate_percent)}
+                </span>
+              </div>
+              <p class="ck-note">
+                Tasks resumed from a checkpoint that still ended in <code class="font-mono text-xs">done</code>.
+              </p>
+            </article>
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Risky intervention rate</h3>
+                <span class="ck-pill ck-pill-neutral">
+                  {format_percent(@summary.outcome_metrics.risky_intervention_rate_percent)}
+                </span>
+              </div>
+              <p class="ck-note">
+                High and critical findings that ended blocked or escalated instead of silently passing.
+              </p>
+            </article>
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>First deploy-ready proof</h3>
+                <span class="ck-pill ck-pill-neutral">
+                  {format_duration(
+                    @summary.outcome_metrics.average_time_to_first_deploy_ready_proof_seconds
+                  )}
+                </span>
+              </div>
+              <p class="ck-note">
+                Average time from session start to the first deploy-ready proof bundle.
+              </p>
+            </article>
+          </div>
+        </div>
+
+        <div class="ck-card">
           <p class="ck-mini-label">Funnel conversion</p>
           <div class="ck-finding-list">
             <%= for step <- @summary.steps do %>
@@ -74,6 +148,41 @@ defmodule ControlKeelWeb.ShipLive do
           </div>
         </div>
 
+        <div class="ck-card">
+          <p class="ck-mini-label">Proof console loop</p>
+          <div class="ck-finding-list">
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Mission Control</h3>
+                <a href={~p"/"} class="ck-link">Open home</a>
+              </div>
+              <p class="ck-note">
+                Track live task state, approval needs, risk, and where agents are blocked.
+              </p>
+            </article>
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Proof Browser</h3>
+                <a href={~p"/proofs"} class="ck-link">Open proofs</a>
+              </div>
+              <p class="ck-note">
+                Inspect immutable evidence bundles, rollback notes, and compliance attestations.
+              </p>
+            </article>
+            <article class="ck-finding-item">
+              <div class="ck-finding-head">
+                <h3>Benchmarks</h3>
+                <a href={~p"/benchmarks"} class="ck-link">Open benchmarks</a>
+              </div>
+              <p class="ck-note">
+                Compare governed outcomes and catch rate evidence against persisted benchmark runs.
+              </p>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div class="ck-grid ck-grid-dashboard">
         <div class="ck-card">
           <p class="ck-mini-label">Recent governed sessions</p>
           <div class="ck-table-wrap">
@@ -97,6 +206,29 @@ defmodule ControlKeelWeb.ShipLive do
                   <strong>{session.total_findings}</strong>
                   <p class="ck-note">{session.blocked_findings_total} blocked</p>
                 </div>
+              </:col>
+            </.table>
+          </div>
+        </div>
+
+        <div class="ck-card">
+          <p class="ck-mini-label">Task completion by agent</p>
+          <div class="ck-table-wrap">
+            <.table id="ship-agent-outcomes" rows={@summary.agent_outcomes}>
+              <:col :let={row} label="Agent">
+                {row.agent}
+              </:col>
+              <:col :let={row} label="Completed">
+                <div>
+                  <strong>{row.completed_tasks}</strong>
+                  <p class="ck-note">{row.total_tasks} total tasks</p>
+                </div>
+              </:col>
+              <:col :let={row} label="Completion rate">
+                {format_percent(row.completion_rate_percent)}
+              </:col>
+              <:col :let={row} label="Deploy-ready">
+                {row.deploy_ready_tasks}
               </:col>
             </.table>
           </div>
@@ -126,4 +258,7 @@ defmodule ControlKeelWeb.ShipLive do
 
   defp format_percent(nil), do: "Not enough data"
   defp format_percent(value), do: "#{value}%"
+
+  defp format_currency(nil), do: "Not recorded"
+  defp format_currency(cents), do: "$#{:erlang.float_to_binary(cents / 100, decimals: 2)}"
 end

@@ -2,6 +2,15 @@
 
 This is the shortest path from first install to first governed finding.
 
+ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. The default path is built for serious solo builders and tiny agent-heavy teams, not for enterprise admin workflows first.
+
+It is not another IDE, another coding model, a prompt marketplace, or post-hoc code review only. The first-run path gets you into the live proof console loop quickly:
+
+- Mission Control for active task state and approvals
+- Proof Browser for immutable evidence bundles
+- Ship Dashboard for governed outcome metrics
+- Benchmarks for comparative evidence
+
 ## 1. Start ControlKeel
 
 Packaged binary:

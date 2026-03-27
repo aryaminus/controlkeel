@@ -3,9 +3,25 @@
 [![CI](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml)
 [![Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml)
 
-ControlKeel is the control plane that turns AI coding into production engineering. It governs agent work across intent compilation, task planning, routing, validation, proof generation, typed memory, benchmarks, learned policy artifacts, and cross-agent skills distribution.
+ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. It governs agent work across intent compilation, task planning, routing, validation, proof generation, typed memory, benchmarks, learned policy artifacts, and cross-agent skills distribution.
 
 It sits above Claude Code, Codex, Cline, OpenCode, Cursor, Windsurf, Continue, Aider, Copilot / VS Code, and other agent clients. It can expose MCP tools, attach native skills where supported, export plugin bundles, proxy provider traffic, and persist the evidence trail for everything it governs.
+
+The default wedge is serious solo builders and tiny agent-heavy teams first. Team / platform expansion exists, but the product story today is still governed autonomy for builders who already have agent output and need it turned into production-ready delivery.
+
+ControlKeel is not:
+
+- another IDE
+- another coding model
+- a prompt marketplace
+- post-hoc code review only
+
+The live control loop is:
+
+- Mission Control for active task state, approvals, and blocked work
+- Proof Browser for immutable audit artifacts and rollback guidance
+- Ship Dashboard for outcome and readiness metrics
+- Benchmarks for comparative evidence across governed runs
 
 ## Quick start
 

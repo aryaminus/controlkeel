@@ -5,8 +5,12 @@ defmodule ControlKeelWeb.PageControllerTest do
     conn = get(conn, ~p"/")
     body = html_response(conn, 200)
 
-    assert body =~ "Turn vibe coding into production engineering"
+    assert body =~ "Turn agent-generated work into production-ready delivery"
+    assert body =~ "agent-generated work into secure, scoped, validated"
+    assert body =~ "production-ready delivery"
     assert body =~ "Start a mission"
+    assert body =~ "What it is not"
+    assert body =~ "Proof console loop"
     assert body =~ "Open ship dashboard"
     assert body =~ "Open benchmarks"
     assert body =~ "View benchmark matrix"
@@ -20,6 +24,7 @@ defmodule ControlKeelWeb.PageControllerTest do
     body = html_response(conn, 200)
 
     assert body =~ "Go from install to first finding in five minutes"
+    assert body =~ "agent-generated work into secure, scoped, validated"
     assert body =~ "controlkeel attach opencode"
     assert body =~ "controlkeel bootstrap"
     assert body =~ "controlkeel attach codex-cli"

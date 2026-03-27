@@ -4,7 +4,7 @@ defmodule ControlKeel.Analytics do
   import Ecto.Query, warn: false
 
   alias ControlKeel.Analytics.Event
-  alias ControlKeel.Mission.{Finding, Session}
+  alias ControlKeel.Mission.{Finding, Invocation, ProofBundle, Session, Task, TaskCheckpoint}
   alias ControlKeel.Repo
 
   @recent_session_limit 10
@@ -59,8 +59,10 @@ defmodule ControlKeel.Analytics do
 
   def funnel_summary(opts \\ []) do
     limit = Keyword.get(opts, :limit, @aggregate_session_limit)
-    session_sets = session_event_sets()
-    recent_sessions = recent_ship_sessions(limit: limit)
+    sessions = recent_sessions(limit)
+    session_sets = session_event_sets(Enum.map(sessions, & &1.id))
+    recent_sessions = ship_session_rows(sessions)
+    {outcome_metrics, agent_outcomes} = outcome_metrics(sessions)
 
     latencies =
       recent_sessions |> Enum.map(& &1.time_to_first_finding_seconds) |> Enum.reject(&is_nil/1)
@@ -78,19 +80,30 @@ defmodule ControlKeel.Analytics do
       average_time_to_first_finding_seconds: average(latencies),
       median_time_to_first_finding_seconds: median(latencies),
       average_findings_per_session: average(findings),
-      recent_session_count: length(recent_sessions)
+      recent_session_count: length(recent_sessions),
+      outcome_metrics: outcome_metrics,
+      agent_outcomes: agent_outcomes
     }
   end
 
   def recent_ship_sessions(opts \\ []) do
     limit = Keyword.get(opts, :limit, @recent_session_limit)
 
+    limit
+    |> recent_sessions()
+    |> ship_session_rows()
+  end
+
+  defp recent_sessions(limit) do
     Session
     |> order_by(desc: :inserted_at)
     |> preload(:workspace)
     |> limit(^limit)
     |> Repo.all()
-    |> Enum.map(fn session ->
+  end
+
+  defp ship_session_rows(sessions) do
+    Enum.map(sessions, fn session ->
       metrics = session_metrics(session.id) || default_metrics(session.id)
 
       %{
@@ -213,9 +226,11 @@ defmodule ControlKeel.Analytics do
     end
   end
 
-  defp session_event_sets do
+  defp session_event_sets(session_ids) when session_ids == [] or session_ids == nil, do: %{}
+
+  defp session_event_sets(session_ids) do
     Event
-    |> where([event], not is_nil(event.session_id))
+    |> where([event], not is_nil(event.session_id) and event.session_id in ^session_ids)
     |> select([event], {event.session_id, event.event})
     |> Repo.all()
     |> Enum.group_by(fn {session_id, _event} -> session_id end, fn {_session_id, event} ->
@@ -275,6 +290,199 @@ defmodule ControlKeel.Analytics do
     max(diff, 0)
   end
 
+  defp outcome_metrics([]) do
+    {default_outcome_metrics(), []}
+  end
+
+  defp outcome_metrics(sessions) do
+    session_ids = Enum.map(sessions, & &1.id)
+    sessions_by_id = Map.new(sessions, fn session -> {session.id, session} end)
+    tasks = list_tasks_for_sessions(session_ids)
+    task_ids = Enum.map(tasks, & &1.id)
+    completed_tasks = Enum.filter(tasks, &(&1.status == "done"))
+    latest_proofs_by_task = latest_proofs_by_task(task_ids)
+
+    proof_backed_completed_tasks =
+      Enum.count(completed_tasks, &Map.has_key?(latest_proofs_by_task, &1.id))
+
+    deploy_ready_task_ids =
+      latest_proofs_by_task
+      |> Enum.filter(fn {_task_id, proof} -> proof.deploy_ready end)
+      |> Enum.map(&elem(&1, 0))
+      |> MapSet.new()
+
+    deploy_ready_completed_tasks =
+      Enum.count(completed_tasks, &MapSet.member?(deploy_ready_task_ids, &1.id))
+
+    deploy_ready_cost_cents =
+      deploy_ready_task_ids
+      |> MapSet.to_list()
+      |> list_invocations_for_tasks()
+      |> Enum.sum_by(&(&1.estimated_cost_cents || 0))
+
+    resumed_task_ids =
+      task_ids
+      |> list_resume_checkpoints()
+      |> Enum.map(& &1.task_id)
+      |> MapSet.new()
+
+    risky_findings = list_risky_findings(session_ids)
+
+    metrics = %{
+      proof_backed_task_coverage_percent:
+        percent(proof_backed_completed_tasks, length(completed_tasks)),
+      deploy_ready_task_rate_percent:
+        percent(deploy_ready_completed_tasks, proof_backed_completed_tasks),
+      cost_per_deploy_ready_task_cents:
+        average_cents(deploy_ready_cost_cents, deploy_ready_completed_tasks),
+      resume_success_rate_percent:
+        percent(
+          Enum.count(completed_tasks, &MapSet.member?(resumed_task_ids, &1.id)),
+          MapSet.size(resumed_task_ids)
+        ),
+      risky_intervention_rate_percent:
+        percent(
+          Enum.count(risky_findings, &(&1.status in ["blocked", "escalated"])),
+          length(risky_findings)
+        ),
+      average_time_to_first_deploy_ready_proof_seconds:
+        average(first_deploy_ready_proof_latencies(sessions_by_id, session_ids))
+    }
+
+    {metrics, build_agent_outcomes(tasks, sessions_by_id, deploy_ready_task_ids)}
+  end
+
+  defp list_tasks_for_sessions([]), do: []
+
+  defp list_tasks_for_sessions(session_ids) do
+    Task
+    |> where([task], task.session_id in ^session_ids)
+    |> Repo.all()
+  end
+
+  defp list_invocations_for_tasks([]), do: []
+
+  defp list_invocations_for_tasks(task_ids) do
+    Invocation
+    |> where([invocation], invocation.task_id in ^task_ids)
+    |> Repo.all()
+  end
+
+  defp list_resume_checkpoints([]), do: []
+
+  defp list_resume_checkpoints(task_ids) do
+    TaskCheckpoint
+    |> where(
+      [checkpoint],
+      checkpoint.task_id in ^task_ids and checkpoint.checkpoint_type == "resume"
+    )
+    |> Repo.all()
+  end
+
+  defp list_risky_findings([]), do: []
+
+  defp list_risky_findings(session_ids) do
+    Finding
+    |> where(
+      [finding],
+      finding.session_id in ^session_ids and finding.severity in ["high", "critical"]
+    )
+    |> Repo.all()
+  end
+
+  defp latest_proofs_by_task([]), do: %{}
+
+  defp latest_proofs_by_task(task_ids) do
+    ProofBundle
+    |> where([proof], proof.task_id in ^task_ids)
+    |> Repo.all()
+    |> Enum.reduce(%{}, fn proof, acc ->
+      Map.update(acc, proof.task_id, proof, fn existing ->
+        if newer_proof?(proof, existing), do: proof, else: existing
+      end)
+    end)
+  end
+
+  defp newer_proof?(candidate, current) do
+    compare_proof_sort_key(candidate, current) == :gt
+  end
+
+  defp compare_proof_sort_key(left, right) do
+    left_key = {left.version || 0, left.generated_at || left.inserted_at, left.id || 0}
+    right_key = {right.version || 0, right.generated_at || right.inserted_at, right.id || 0}
+
+    cond do
+      left_key > right_key -> :gt
+      left_key < right_key -> :lt
+      true -> :eq
+    end
+  end
+
+  defp first_deploy_ready_proof_latencies(sessions_by_id, session_ids) do
+    ProofBundle
+    |> where([proof], proof.session_id in ^session_ids and proof.deploy_ready == true)
+    |> Repo.all()
+    |> Enum.reduce(%{}, fn proof, acc ->
+      Map.update(acc, proof.session_id, proof.generated_at, fn current ->
+        case DateTime.compare(proof.generated_at, current) do
+          :lt -> proof.generated_at
+          _ -> current
+        end
+      end)
+    end)
+    |> Enum.map(fn {session_id, generated_at} ->
+      sessions_by_id
+      |> Map.fetch!(session_id)
+      |> Map.get(:inserted_at)
+      |> elapsed_seconds(generated_at)
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp build_agent_outcomes(tasks, sessions_by_id, deploy_ready_task_ids) do
+    tasks
+    |> Enum.group_by(fn task ->
+      sessions_by_id
+      |> Map.get(task.session_id)
+      |> session_agent()
+    end)
+    |> Enum.map(fn {agent, agent_tasks} ->
+      total = length(agent_tasks)
+      completed = Enum.count(agent_tasks, &(&1.status == "done"))
+      deploy_ready = Enum.count(agent_tasks, &MapSet.member?(deploy_ready_task_ids, &1.id))
+
+      %{
+        agent: agent,
+        total_tasks: total,
+        completed_tasks: completed,
+        deploy_ready_tasks: deploy_ready,
+        completion_rate_percent: percent(completed, total)
+      }
+    end)
+    |> Enum.sort_by(fn row ->
+      {-(row.completion_rate_percent || 0.0), -row.completed_tasks, row.agent}
+    end)
+  end
+
+  defp session_agent(nil), do: "Unknown agent"
+
+  defp session_agent(session) do
+    get_in(session.execution_brief || %{}, ["agent"]) ||
+      if(session.workspace, do: session.workspace.agent, else: nil) ||
+      "Unknown agent"
+  end
+
+  defp default_outcome_metrics do
+    %{
+      proof_backed_task_coverage_percent: nil,
+      deploy_ready_task_rate_percent: nil,
+      cost_per_deploy_ready_task_cents: nil,
+      resume_success_rate_percent: nil,
+      risky_intervention_rate_percent: nil,
+      average_time_to_first_deploy_ready_proof_seconds: nil
+    }
+  end
+
   defp average([]), do: nil
 
   defp average(values) do
@@ -297,6 +505,17 @@ defmodule ControlKeel.Analytics do
       Float.round((Enum.at(sorted, midpoint - 1) + Enum.at(sorted, midpoint)) / 2, 1)
     end
   end
+
+  defp percent(_numerator, 0), do: nil
+  defp percent(_numerator, nil), do: nil
+
+  defp percent(numerator, denominator) do
+    Float.round(numerator / denominator * 100, 1)
+  end
+
+  defp average_cents(_total_cents, 0), do: nil
+  defp average_cents(_total_cents, nil), do: nil
+  defp average_cents(total_cents, count), do: Float.round(total_cents / count, 1)
 
   defp normalize_integer(nil), do: nil
   defp normalize_integer(value) when is_integer(value), do: value

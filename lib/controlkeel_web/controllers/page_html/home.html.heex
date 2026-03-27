@@ -3,10 +3,11 @@
   <div class="ck-grid">
     <div class="ck-hero-panel">
       <p class="ck-kicker">Control tower for agent-built software</p>
-      <h1 class="ck-display">Turn vibe coding into production engineering.</h1>
+      <h1 class="ck-display">Turn agent-generated work into production-ready delivery.</h1>
       <p class="ck-lead">
-        ControlKeel sits above Claude Code, Codex, Cursor, Replit, and other agents. It compiles intent,
-        constrains risk, generates manageable tasks, and keeps proof attached to every mission.
+        ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated,
+        production-ready delivery. It sits above Claude Code, Codex, Cursor, Replit, and other agents to
+        compile intent, constrain risk, generate manageable tasks, and keep proof attached to every mission.
       </p>
       <div class="ck-action-row">
         <a href={~p"/start"} class="ck-button-primary">Start a mission</a>
@@ -20,26 +21,35 @@
 
     <div class="ck-side-stack">
       <div class="ck-card ck-card-contrast">
-        <p class="ck-mini-label">What ships first</p>
+        <p class="ck-mini-label">Proof console loop</p>
         <ul class="ck-mini-list">
-          <li>Mission compiler with industry-aware risk scoring</li>
-          <li>Persisted workspaces, sessions, tasks, and findings</li>
-          <li>Mission control dashboard with proof-first framing</li>
+          <li>Mission Control for live task state, approvals, and blocked work</li>
+          <li>Proof Browser for immutable audit artifacts and rollback guidance</li>
+          <li>Ship metrics and benchmarks for outcome evidence</li>
         </ul>
       </div>
       <div class="ck-card">
-        <p class="ck-mini-label">Why it matters</p>
+        <p class="ck-mini-label">Who it is for</p>
         <p class="ck-note">
-          AI agents write code. They do not reliably manage secrets, approvals, deploy safety, PR scope,
-          or long-lived context. ControlKeel is the missing layer.
+          Serious solo builders and tiny agent-heavy teams who already generate code but still need scoped delivery, approvals, and proof.
         </p>
+      </div>
+      <div class="ck-card">
+        <p class="ck-mini-label">What it is not</p>
+        <ul class="ck-mini-list">
+          <li>Not another IDE or coding model</li>
+          <li>Not a prompt marketplace</li>
+          <li>Not post-hoc code review only</li>
+        </ul>
       </div>
       <div class="ck-card">
         <p class="ck-mini-label">Ship metrics</p>
         <p class="ck-note">
-          {Enum.at(@ship_summary.steps, 3).count} sessions reached a first governed finding.
-          Average time to first finding: {if @ship_summary.average_time_to_first_finding_seconds,
-            do: "#{Float.round(@ship_summary.average_time_to_first_finding_seconds / 60, 1)}m",
+          Proof-backed done tasks: {if @ship_summary.outcome_metrics.proof_backed_task_coverage_percent,
+            do: "#{@ship_summary.outcome_metrics.proof_backed_task_coverage_percent}%",
+            else: "not recorded"}.
+          Deploy-ready task rate: {if @ship_summary.outcome_metrics.deploy_ready_task_rate_percent,
+            do: "#{@ship_summary.outcome_metrics.deploy_ready_task_rate_percent}%",
             else: "not recorded"}.
         </p>
         <a href={~p"/ship"} class="ck-link">Open ship dashboard</a>
@@ -57,7 +67,7 @@
       <div class="ck-card">
         <p class="ck-mini-label">Install guide</p>
         <p class="ck-note">
-          Follow the 5-minute path from first launch to first finding, with the exact commands used by the packaged binary and source setup.
+          Follow the 5-minute path from first launch to first governed finding, with the exact commands used by the packaged binary and source setup.
         </p>
         <a href={~p"/getting-started"} class="ck-link">Open getting-started guide</a>
       </div>
