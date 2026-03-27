@@ -20,6 +20,7 @@ jobs:
   bump:
     if: >
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       vars.CONTROLKEEL_RELEASE_AUTOTAG_ENABLED == 'true'
     runs-on: ubuntu-latest

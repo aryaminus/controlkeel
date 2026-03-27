@@ -12,6 +12,8 @@ Re-verify after each release: confirm the latest successful [Release Smoke](http
 
 Keep this file on the latest confirmed green SHAs before relying on `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED`.
 
+`Release Smoke` is the canonical release-candidate build for a SHA. Tag-triggered `Release` should publish the matching smoke artifact set for that same SHA instead of rebuilding binaries again.
+
 ## Checklist
 
 1. Confirm the latest [Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml) run on `main` is green for Linux, macOS Intel, macOS Apple Silicon, and Windows smoke.

@@ -5,8 +5,10 @@ on:
   push:
     branches:
       - main
-      - "codex/**"
-  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
 
 concurrency:
   group: release-smoke-${{ github.ref }}
@@ -14,10 +16,13 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  MIX_ENV: prod
 
 jobs:
-  linux:
-    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}"
+  build-unix-and-windows:
+    if: >-
+      github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -25,65 +30,114 @@ jobs:
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
-      - name: Cache deps
+      - name: Cache deps and build outputs
         uses: actions/cache@v5
         with:
-          path: deps
+          path: |
+            deps
+            _build
+            ~/.hex
+            ~/.mix
           key: ${{ runner.os }}-release-smoke-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-release-smoke-
       - name: Install Zig 0.15.2
         run: |
           chmod +x scripts/install_zig.sh
           scripts/install_zig.sh 0.15.2 >/dev/null
-          echo "/usr/local/zig" >> $GITHUB_PATH
+          echo "/usr/local/zig" >> "$GITHUB_PATH"
       - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
       - run: mix deps.get
-      - run: MIX_ENV=prod mix assets.deploy
-      - run: BURRITO_TARGET=linux MIX_ENV=prod mix release
-      - run: chmod +x scripts/release_smoke.sh
-      - run: scripts/release_smoke.sh "burrito_out/controlkeel_linux"
+      - run: mix assets.deploy
+      - name: Build and smoke Linux
+        run: |
+          BURRITO_TARGET=linux mix release
+          chmod +x scripts/release_smoke.sh
+          scripts/release_smoke.sh "burrito_out/controlkeel_linux"
 
-  macos:
-    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}"
+          mkdir -p release_stage/raw/linux release_stage/raw/windows
+          cp burrito_out/controlkeel_linux release_stage/raw/linux/controlkeel-linux-x86_64
+      - name: Build Windows binary
+        run: |
+          BURRITO_TARGET=windows mix release
+          cp burrito_out/controlkeel_windows.exe release_stage/raw/windows/controlkeel-windows-x86_64.exe
+      - uses: actions/upload-artifact@v7
+        with:
+          name: raw-linux-windows
+          path: release_stage/raw
+          retention-days: 5
+
+  build-macos:
+    if: >-
+      github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: macos
-            artifact_name: controlkeel-macos-intel
-            source_name: controlkeel_macos
-          - target: macos_silicon
-            artifact_name: controlkeel-macos-arm64
-            source_name: controlkeel_macos_silicon
     steps:
       - uses: actions/checkout@v6
       - uses: erlef/setup-beam@v1.23.0
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
-      - name: Cache deps
+      - name: Cache deps and build outputs
         uses: actions/cache@v5
         with:
-          path: deps
+          path: |
+            deps
+            _build
+            ~/.hex
+            ~/.mix
           key: ${{ runner.os }}-release-smoke-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-release-smoke-
       - name: Install Zig 0.15.2
         run: |
           chmod +x scripts/install_zig.sh
           scripts/install_zig.sh 0.15.2 >/dev/null
-          echo "/usr/local/zig" >> $GITHUB_PATH
+          echo "/usr/local/zig" >> "$GITHUB_PATH"
       - run: |
           brew list xz >/dev/null 2>&1 || brew install xz
           brew list p7zip >/dev/null 2>&1 || brew install p7zip
       - run: mix deps.get
-      - run: MIX_ENV=prod mix assets.deploy
-      - run: BURRITO_TARGET=${{ matrix.target }} MIX_ENV=prod mix release
-      - run: chmod +x scripts/release_smoke.sh
-      - run: scripts/release_smoke.sh "burrito_out/${{ matrix.source_name }}"
+      - run: mix assets.deploy
+      - name: Build and smoke macOS targets
+        run: |
+          mkdir -p release_stage/raw/macos-intel release_stage/raw/macos-arm
+          chmod +x scripts/release_smoke.sh
 
-  windows-build:
-    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}"
+          BURRITO_TARGET=macos mix release
+          scripts/release_smoke.sh "burrito_out/controlkeel_macos"
+          cp burrito_out/controlkeel_macos release_stage/raw/macos-intel/controlkeel-macos-x86_64
+
+          BURRITO_TARGET=macos_silicon mix release
+          scripts/release_smoke.sh "burrito_out/controlkeel_macos_silicon"
+          cp burrito_out/controlkeel_macos_silicon release_stage/raw/macos-arm/controlkeel-macos-arm64
+      - uses: actions/upload-artifact@v7
+        with:
+          name: raw-macos
+          path: release_stage/raw
+          retention-days: 5
+
+  windows-smoke:
+    if: >-
+      github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+    runs-on: windows-latest
+    needs: build-unix-and-windows
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: raw-linux-windows
+          path: release_stage/raw
+      - name: Smoke test Windows binary
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          ./scripts/release_smoke.ps1 -BinaryPath (Resolve-Path "release_stage/raw/windows/controlkeel-windows-x86_64.exe")
+
+  package-release-candidate:
+    if: >-
+      github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+    needs: [build-unix-and-windows, build-macos, windows-smoke]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -91,39 +145,67 @@ jobs:
         with:
           elixir-version: "1.19.5"
           otp-version: "27.3.4.3"
-      - name: Cache deps
+      - name: Cache deps and build outputs
         uses: actions/cache@v5
         with:
-          path: deps
-          key: ${{ runner.os }}-release-smoke-${{ hashFiles('mix.lock') }}
-          restore-keys: ${{ runner.os }}-release-smoke-
-      - name: Install Zig 0.15.2
-        run: |
-          chmod +x scripts/install_zig.sh
-          scripts/install_zig.sh 0.15.2 >/dev/null
-          echo "/usr/local/zig" >> $GITHUB_PATH
-      - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
+          path: |
+            deps
+            _build
+            ~/.hex
+            ~/.mix
+          key: ${{ runner.os }}-release-packaging-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-release-packaging-
       - run: mix deps.get
-      - run: MIX_ENV=prod mix assets.deploy
-      - run: BURRITO_TARGET=windows MIX_ENV=prod mix release
-      - run: mv burrito_out/controlkeel_windows.exe burrito_out/controlkeel-windows-x86_64.exe
-      - uses: actions/upload-artifact@v7
-        with:
-          name: controlkeel-windows
-          path: burrito_out/controlkeel-windows-x86_64.exe
-
-  windows-smoke:
-    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}"
-    runs-on: windows-latest
-    needs: windows-build
-    steps:
-      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
-          name: controlkeel-windows
-          path: burrito_out
-      - name: Smoke test binary
-        timeout-minutes: 10
-        shell: pwsh
+          name: raw-linux-windows
+          path: release_stage/raw
+      - uses: actions/download-artifact@v8
+        with:
+          name: raw-macos
+          path: release_stage/raw
+      - name: Package release archives
         run: |
-          ./scripts/release_smoke.ps1 -BinaryPath (Resolve-Path "burrito_out/controlkeel-windows-x86_64.exe")
+          DIST_DIR="$PWD/dist"
+
+          mkdir -p "$DIST_DIR" \
+            release_stage/package/linux \
+            release_stage/package/macos-intel \
+            release_stage/package/macos-arm \
+            release_stage/package/windows
+
+          cp release_stage/raw/linux/controlkeel-linux-x86_64 "$DIST_DIR/controlkeel-linux-x86_64"
+          cp release_stage/raw/linux/controlkeel-linux-x86_64 release_stage/package/linux/controlkeel
+          tar -C release_stage/package/linux -czf "$DIST_DIR/controlkeel-linux-x86_64.tar.gz" controlkeel
+
+          cp release_stage/raw/macos-intel/controlkeel-macos-x86_64 "$DIST_DIR/controlkeel-macos-x86_64"
+          cp release_stage/raw/macos-intel/controlkeel-macos-x86_64 release_stage/package/macos-intel/controlkeel
+          tar -C release_stage/package/macos-intel -czf "$DIST_DIR/controlkeel-macos-x86_64.tar.gz" controlkeel
+
+          cp release_stage/raw/macos-arm/controlkeel-macos-arm64 "$DIST_DIR/controlkeel-macos-arm64"
+          cp release_stage/raw/macos-arm/controlkeel-macos-arm64 release_stage/package/macos-arm/controlkeel
+          tar -C release_stage/package/macos-arm -czf "$DIST_DIR/controlkeel-macos-arm64.tar.gz" controlkeel
+
+          cp release_stage/raw/windows/controlkeel-windows-x86_64.exe "$DIST_DIR/controlkeel-windows-x86_64.exe"
+          cp release_stage/raw/windows/controlkeel-windows-x86_64.exe release_stage/package/windows/controlkeel.exe
+          (cd release_stage/package/windows && zip -q "$DIST_DIR/controlkeel-windows-x86_64.zip" controlkeel.exe)
+      - name: Export publishable bundle targets
+        run: mix run scripts/export_release_bundles.exs
+      - name: Archive bundle targets
+        run: |
+          find controlkeel/dist -mindepth 1 -maxdepth 1 -type d | while read -r target_dir; do
+            target=$(basename "$target_dir")
+            tar -C controlkeel/dist -czf "dist/controlkeel-${target}.tar.gz" "$target"
+          done
+      - name: Copy installer assets
+        run: |
+          cp scripts/install.sh dist/install.sh
+          cp scripts/install.ps1 dist/install.ps1
+      - name: Generate checksums
+        run: |
+          find dist -maxdepth 1 -type f ! -name 'controlkeel-checksums.txt' -print0 | sort -z | xargs -0 sha256sum > dist/controlkeel-checksums.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-candidate-dist-${{ github.sha }}
+          path: dist
+          retention-days: 5

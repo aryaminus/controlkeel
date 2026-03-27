@@ -2,8 +2,14 @@ name: CI
 
 on:
   push:
-    branches: ["main", "codex/**"]
+    branches: ["main"]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,7 +20,9 @@ env:
 
 jobs:
   test:
-    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}"
+    if: >-
+      github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     runs-on: ubuntu-latest
     env:
       MIX_ENV: test
@@ -30,7 +38,11 @@ jobs:
       - name: Cache deps
         uses: actions/cache@v5
         with:
-          path: deps
+          path: |
+            deps
+            _build
+            ~/.hex
+            ~/.mix
           key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-
       - run: mix deps.get
