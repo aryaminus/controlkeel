@@ -68,6 +68,36 @@ defmodule ControlKeel.Skills.Installer do
      %{target: "codex", scope: scope, destination: skill_root, agent_destination: agent_root}}
   end
 
+  defp do_install(%SkillTarget{id: "codex-plugin"}, scope, project_root, _skills, _opts)
+       when scope in ["user", "project", "export"] do
+    if scope == "export" do
+      Exporter.export("codex-plugin", project_root, scope: scope)
+    else
+      {:ok, plan} = Exporter.export("codex-plugin", project_root, scope: scope)
+      plugin_root = plugin_install_root("codex", scope, project_root)
+
+      File.rm_rf!(plugin_root)
+      File.mkdir_p!(Path.dirname(plugin_root))
+      File.cp_r!(plan.output_dir, plugin_root)
+
+      marketplace_destination = codex_marketplace_destination(scope, project_root)
+      File.mkdir_p!(Path.dirname(marketplace_destination))
+
+      File.cp!(
+        Path.join(plugin_root, ".agents/plugins/marketplace.json"),
+        marketplace_destination
+      )
+
+      {:ok,
+       %{
+         target: "codex-plugin",
+         scope: scope,
+         destination: plugin_root,
+         marketplace_destination: marketplace_destination
+       }}
+    end
+  end
+
   defp do_install(%SkillTarget{id: "claude-standalone"}, scope, project_root, skills, _opts)
        when scope in ["user", "project"] do
     base =
@@ -91,6 +121,11 @@ defmodule ControlKeel.Skills.Installer do
        destination: skill_root,
        agent_destination: agent_root
      }}
+  end
+
+  defp do_install(%SkillTarget{id: "claude-plugin"}, scope, project_root, _skills, _opts)
+       when scope in ["user", "project", "export"] do
+    install_plugin_bundle("claude-plugin", "claude", scope, project_root)
   end
 
   defp do_install(%SkillTarget{id: "cline-native"}, scope, project_root, skills, _opts)
@@ -151,6 +186,63 @@ defmodule ControlKeel.Skills.Installer do
            rules_destination: rules_root
          }}
     end
+  end
+
+  defp do_install(%SkillTarget{id: "cursor-native"}, "project", project_root, skills, _opts) do
+    {:ok, plan} = Exporter.export("cursor-native", project_root, scope: "project")
+
+    copy_skills(skills, Path.join(project_root, ".agents/skills"))
+    copy_tree_contents(Path.join(plan.output_dir, ".cursor"), Path.join(project_root, ".cursor"))
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "cursor-native",
+       scope: "project",
+       destination: Path.join(project_root, ".cursor"),
+       skill_destination: Path.join(project_root, ".agents/skills")
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "windsurf-native"}, "project", project_root, skills, _opts) do
+    {:ok, plan} = Exporter.export("windsurf-native", project_root, scope: "project")
+
+    copy_skills(skills, Path.join(project_root, ".agents/skills"))
+
+    copy_tree_contents(
+      Path.join(plan.output_dir, ".windsurf"),
+      Path.join(project_root, ".windsurf")
+    )
+
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "windsurf-native",
+       scope: "project",
+       destination: Path.join(project_root, ".windsurf"),
+       skill_destination: Path.join(project_root, ".agents/skills")
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "continue-native"}, "project", project_root, skills, _opts) do
+    {:ok, plan} = Exporter.export("continue-native", project_root, scope: "project")
+
+    copy_skills(skills, Path.join(project_root, ".continue/skills"))
+
+    copy_tree_contents(
+      Path.join(plan.output_dir, ".continue"),
+      Path.join(project_root, ".continue")
+    )
+
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "continue-native",
+       scope: "project",
+       destination: Path.join(project_root, ".continue")
+     }}
   end
 
   defp do_install(%SkillTarget{id: "roo-native"}, "project", project_root, skills, _opts) do
@@ -251,6 +343,11 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
+  defp do_install(%SkillTarget{id: "openclaw-plugin"}, scope, project_root, _skills, _opts)
+       when scope in ["user", "project", "export"] do
+    install_plugin_bundle("openclaw-plugin", "openclaw", scope, project_root)
+  end
+
   defp do_install(%SkillTarget{id: "github-repo"}, scope, project_root, skills, _opts)
        when scope in ["project", "export"] do
     if scope == "project" do
@@ -330,6 +427,11 @@ defmodule ControlKeel.Skills.Installer do
      %{target: "forge-acp", scope: scope, destination: skill_root, agent_destination: forge_root}}
   end
 
+  defp do_install(%SkillTarget{id: "copilot-plugin"}, scope, project_root, _skills, _opts)
+       when scope in ["user", "project", "export"] do
+    install_plugin_bundle("copilot-plugin", "copilot", scope, project_root)
+  end
+
   defp do_install(%SkillTarget{id: target}, "export", project_root, _skills, _opts)
        when is_binary(target) do
     Exporter.export(target, project_root, scope: "export")
@@ -396,6 +498,72 @@ defmodule ControlKeel.Skills.Installer do
 
   defp user_home do
     System.get_env("CONTROLKEEL_HOME") || System.get_env("HOME") || System.user_home!()
+  end
+
+  defp plugin_install_root("codex", "user", _project_root),
+    do: Path.join(user_home(), "plugins/controlkeel")
+
+  defp plugin_install_root("codex", "project", project_root),
+    do: Path.join(project_root, "plugins/controlkeel")
+
+  defp plugin_install_root("claude", "user", _project_root),
+    do: Path.join(user_home(), ".claude/plugins/controlkeel")
+
+  defp plugin_install_root("claude", "project", project_root),
+    do: Path.join(project_root, ".claude/plugins/controlkeel")
+
+  defp plugin_install_root("copilot", "user", _project_root),
+    do: Path.join(user_home(), ".copilot/plugins/controlkeel")
+
+  defp plugin_install_root("copilot", "project", project_root),
+    do: Path.join(project_root, ".copilot/plugins/controlkeel")
+
+  defp plugin_install_root("openclaw", "user", _project_root),
+    do: Path.join(user_home(), ".openclaw/plugins/controlkeel")
+
+  defp plugin_install_root("openclaw", "project", project_root),
+    do: Path.join(project_root, ".openclaw/plugins/controlkeel")
+
+  defp codex_marketplace_destination("user", _project_root),
+    do: Path.join(user_home(), ".agents/plugins/marketplace.json")
+
+  defp codex_marketplace_destination("project", project_root),
+    do: Path.join(project_root, ".agents/plugins/marketplace.json")
+
+  defp install_plugin_bundle(target_id, _plugin_id, "export", project_root) do
+    Exporter.export(target_id, project_root, scope: "export")
+  end
+
+  defp install_plugin_bundle(target_id, plugin_id, scope, project_root)
+       when scope in ["user", "project"] do
+    {:ok, plan} = Exporter.export(target_id, project_root, scope: scope)
+    plugin_root = plugin_install_root(plugin_id, scope, project_root)
+
+    File.rm_rf!(plugin_root)
+    File.mkdir_p!(Path.dirname(plugin_root))
+    File.cp_r!(plan.output_dir, plugin_root)
+
+    result = %{
+      target: target_id,
+      scope: scope,
+      destination: plugin_root
+    }
+
+    case plugin_id do
+      "codex" ->
+        marketplace_destination = codex_marketplace_destination(scope, project_root)
+        File.mkdir_p!(Path.dirname(marketplace_destination))
+
+        File.cp!(
+          Path.join(plugin_root, ".agents/plugins/marketplace.json"),
+          marketplace_destination
+        )
+
+        {:ok, Map.put(result, :marketplace_destination, marketplace_destination)}
+
+      _ ->
+        {:ok, result}
+    end
   end
 
   defp cline_home do

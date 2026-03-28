@@ -8,19 +8,20 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
   """
 
   alias ControlKeel.Skills.Registry
+  alias ControlKeel.Skills.TargetFamily
+  alias ControlKeel.Skills.TargetResolver
 
   def call(arguments) do
     project_root = Map.get(arguments, "project_root")
     format = Map.get(arguments, "format", "json")
-    target = Map.get(arguments, "target")
+    target = TargetResolver.resolve(project_root, Map.get(arguments, "target"))
+    target_family = TargetResolver.family(project_root, target)
     analysis = Registry.analyze(project_root)
 
     skills =
-      if is_binary(target) and target != "" do
-        Enum.filter(analysis.skills, &(target in (&1.compatibility_targets || [])))
-      else
-        analysis.skills
-      end
+      Enum.filter(analysis.skills, fn skill ->
+        compatible_target?(skill.compatibility_targets || [], target, target_family)
+      end)
 
     entries =
       Enum.map(skills, fn s ->
@@ -46,6 +47,8 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
       %{
         "skills" => entries,
         "total" => length(entries),
+        "target" => target,
+        "target_family" => target_family,
         "trusted_project_skills" => analysis.trusted_project?,
         "diagnostics" => Enum.map(analysis.diagnostics, &diagnostic_summary/1),
         "usage_hint" =>
@@ -66,5 +69,13 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
       "path" => diagnostic.path,
       "skill_name" => diagnostic.skill_name
     }
+  end
+
+  defp compatible_target?(targets, target, target_family) do
+    target in targets or
+      target_family in targets or
+      Enum.any?(targets, fn candidate ->
+        TargetFamily.family_for(candidate) == target_family
+      end)
   end
 end

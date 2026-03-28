@@ -206,7 +206,7 @@ Minimal A2A discovery and message routing are available at:
 - `/.well-known/agent.json`
 - `POST /a2a`
 
-That A2A layer only exposes the governed CK capabilities `ck_context`, `ck_validate`, `ck_finding`, `ck_budget`, and `ck_route`.
+That A2A layer only exposes the governed CK capabilities `ck_context`, `ck_validate`, `ck_finding`, `ck_budget`, `ck_route`, and `ck_delegate`.
 
 ACP registry discovery is optional. To refresh or inspect the local cache:
 

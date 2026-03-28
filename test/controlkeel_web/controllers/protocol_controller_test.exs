@@ -121,6 +121,7 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
 
       assert %{"result" => %{"tools" => tools}} = json_response(conn, 200)
       assert Enum.any?(tools, &(&1["name"] == "ck_validate"))
+      assert Enum.any?(tools, &(&1["name"] == "ck_delegate"))
     end
 
     test "returns 403 when the token lacks the tool scope", %{conn: conn} do
@@ -202,6 +203,27 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
                }
              } = json_response(conn, 200)
     end
+
+    test "requires delegate:run for ck_delegate", %{conn: conn} do
+      task = task_fixture()
+      token = hosted_token_for("mcp:access")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 8,
+          method: "tools/call",
+          params: %{
+            name: "ck_delegate",
+            arguments: %{task_id: task.id, mode: "handoff"}
+          }
+        })
+
+      assert conn.status == 403
+      assert %{"error" => %{"code" => -32001}} = json_response(conn, 403)
+    end
   end
 
   describe "A2A" do
@@ -215,6 +237,7 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
       assert agent_card == legacy_card
       assert agent_card["url"] =~ "/a2a"
       assert Enum.any?(agent_card["skills"], &(&1["id"] == "ck_validate"))
+      assert Enum.any?(agent_card["skills"], &(&1["id"] == "ck_delegate"))
     end
 
     test "dispatches message/send to a supported CK capability", %{conn: conn} do

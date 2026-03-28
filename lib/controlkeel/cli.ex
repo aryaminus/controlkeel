@@ -2,6 +2,7 @@ defmodule ControlKeel.CLI do
   @moduledoc false
 
   alias ControlKeel.ACPRegistry
+  alias ControlKeel.AgentExecution
   alias ControlKeel.AgentIntegration
   alias ControlKeel.Analytics
   alias ControlKeel.Benchmark
@@ -110,6 +111,9 @@ defmodule ControlKeel.CLI do
     project_root: :string
   ]
   @govern_install_switches [project_root: :string]
+  @plugin_switches [project_root: :string, scope: :string, mode: :string]
+  @agents_doctor_switches [project_root: :string]
+  @agent_run_switches [project_root: :string, agent: :string, mode: :string]
 
   def standalone_argv do
     cond do
@@ -156,6 +160,21 @@ defmodule ControlKeel.CLI do
 
       ["govern", "install", "github" | rest] ->
         parse_with_switches(:govern_install_github, rest, @govern_install_switches)
+
+      ["plugin", "export", plugin | rest] ->
+        parse_plugin_command(:plugin_export, plugin, rest)
+
+      ["plugin", "install", plugin | rest] ->
+        parse_plugin_command(:plugin_install, plugin, rest)
+
+      ["agents", "doctor" | rest] ->
+        parse_with_switches(:agents_doctor, rest, @agents_doctor_switches)
+
+      ["run", "task", task_id | rest] ->
+        parse_run_command(:run_task, task_id, rest)
+
+      ["run", "session", session_id | rest] ->
+        parse_run_command(:run_session, session_id, rest)
 
       ["registry", "sync", "acp"] ->
         {:ok, %{command: :registry_sync_acp, options: %{}, args: []}}
@@ -366,6 +385,15 @@ defmodule ControlKeel.CLI do
                                       Check proof-backed release readiness for a session
       controlkeel govern install github
                                       Scaffold repo-native GitHub governance workflows
+      controlkeel plugin export codex|claude|copilot|openclaw
+                                      Export a first-class plugin bundle for a supported agent
+      controlkeel plugin install codex|claude|copilot|openclaw [--scope user|project] [--mode local|hosted]
+                                      Install a plugin bundle with local and hosted MCP templates
+      controlkeel agents doctor       Show bidirectional execution and install readiness
+      controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime]
+                                      Run or hand off a governed task through a supported agent
+      controlkeel run session <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime]
+                                      Run all ready tasks for a governed session
       controlkeel registry sync acp  Refresh the cached ACP registry metadata
       controlkeel registry status acp
                                       Show ACP registry cache freshness and matches
@@ -853,6 +881,114 @@ defmodule ControlKeel.CLI do
 
       {:error, message} ->
         {:error, message}
+    end
+  end
+
+  def run_command(%{command: :plugin_export, args: [plugin], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    with {:ok, target} <- plugin_target(plugin),
+         {:ok, plan} <- Skills.export(target, root, scope: "export") do
+      {:ok,
+       [
+         "Exported #{plugin} plugin bundle.",
+         "Target: #{plan.target}",
+         "Output: #{plan.output_dir}"
+       ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+    else
+      {:error, reason} ->
+        {:error, "Failed to export plugin bundle: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :plugin_install, args: [plugin], options: options}, project_root) do
+    root = options[:project_root] || project_root
+    scope = options[:scope] || "project"
+    mode = options[:mode] || "local"
+
+    with {:ok, target} <- plugin_target(plugin),
+         {:ok, result} <- Skills.install(target, root, scope: scope) do
+      {:ok,
+       [
+         "Installed #{plugin} plugin bundle.",
+         "Target: #{target}",
+         "Scope: #{scope}",
+         "Destination: #{result.destination}",
+         "MCP mode: #{mode} (use #{plugin_mcp_hint(mode)})"
+       ] ++
+         maybe_cli_line("Marketplace", Map.get(result, :marketplace_destination))}
+    else
+      {:error, reason} ->
+        {:error, "Failed to install plugin bundle: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :agents_doctor, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    doctor = AgentExecution.doctor(root)
+
+    agent_lines =
+      Enum.map(doctor["agents"], fn agent ->
+        "  #{agent.id}: #{agent.execution_support} / #{agent.ck_runs_agent_via} attached=#{if(agent.attached, do: "yes", else: "no")} runnable=#{if(agent.runnable, do: "yes", else: "no")}"
+      end)
+
+    {:ok,
+     [
+       "Agent execution doctor",
+       "Project root: #{doctor["project_root"]}",
+       "Attached agents: #{if(doctor["attached_agents"] == [], do: "none", else: Enum.join(doctor["attached_agents"], ", "))}",
+       "Direct ready: #{length(doctor["direct_ready"])}",
+       "Handoff ready: #{length(doctor["handoff_ready"])}",
+       "Runtime ready: #{length(doctor["runtime_ready"])}",
+       "Agents:"
+       | agent_lines
+     ]}
+  end
+
+  def run_command(%{command: :run_task, args: [task_id], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    with {:ok, parsed_id} <- parse_id(task_id),
+         {:ok, result} <- AgentExecution.run_task(parsed_id, agent_run_opts(options, root)) do
+      {:ok, agent_execution_lines(result)}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, {:policy_blocked, reason}} ->
+        {:error, "Delegated execution blocked: #{reason}"}
+
+      {:error, reason} ->
+        {:error, "Failed to run task: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :run_session, args: [session_id], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    with {:ok, parsed_id} <- parse_id(session_id),
+         {:ok, result} <- AgentExecution.run_session(parsed_id, agent_run_opts(options, root)) do
+      session_lines =
+        Enum.flat_map(result["results"], fn item ->
+          [
+            "  task ##{item["task_id"]}: #{item["status"]} via #{item["agent_id"] || "unknown"} (#{item["mode"] || "unknown"})"
+          ]
+        end)
+
+      {:ok,
+       [
+         "Delegated session ##{result["session_id"]}.",
+         "Project root: #{result["project_root"]}",
+         "Task count: #{result["task_count"]}",
+         "Results:"
+         | session_lines
+       ]}
+    else
+      {:error, :invalid_id} ->
+        {:error, "Session id must be an integer."}
+
+      {:error, reason} ->
+        {:error, "Failed to run session: #{format_cli_error(reason)}"}
     end
   end
 
@@ -2257,6 +2393,30 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_plugin_command(command, plugin, argv) do
+    if plugin in ~w(codex claude copilot openclaw) do
+      case OptionParser.parse(argv, strict: @plugin_switches) do
+        {options, [], []} ->
+          {:ok, %{command: command, options: options, args: [plugin]}}
+
+        _ ->
+          {:error, usage_text()}
+      end
+    else
+      {:error, usage_text()}
+    end
+  end
+
+  defp parse_run_command(command, id, argv) do
+    case OptionParser.parse(argv, strict: @agent_run_switches) do
+      {options, [], []} ->
+        {:ok, %{command: command, options: options, args: [id]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
   defp required_option(options, key, flag) do
     case Keyword.get(options, key) do
       value when is_binary(value) and value != "" -> {:ok, value}
@@ -2315,6 +2475,45 @@ defmodule ControlKeel.CLI do
         {:error, "Provide --patch <file> or --stdin."}
     end
   end
+
+  defp plugin_target("codex"), do: {:ok, "codex-plugin"}
+  defp plugin_target("claude"), do: {:ok, "claude-plugin"}
+  defp plugin_target("copilot"), do: {:ok, "copilot-plugin"}
+  defp plugin_target("openclaw"), do: {:ok, "openclaw-plugin"}
+  defp plugin_target(_plugin), do: {:error, :unknown_plugin}
+
+  defp plugin_mcp_hint("hosted"), do: ".mcp.hosted.json"
+  defp plugin_mcp_hint(_mode), do: ".mcp.json"
+
+  defp agent_run_opts(options, project_root) do
+    []
+    |> maybe_put_cli_opt(:project_root, project_root)
+    |> maybe_put_cli_opt(:agent, options[:agent])
+    |> maybe_put_cli_opt(:mode, options[:mode])
+  end
+
+  defp maybe_put_cli_opt(opts, _key, nil), do: opts
+  defp maybe_put_cli_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp maybe_cli_line(_label, nil), do: []
+  defp maybe_cli_line(label, value), do: ["#{label}: #{value}"]
+
+  defp agent_execution_lines(result) do
+    [
+      "Delegated task ##{result["task_id"]}.",
+      "Agent: #{result["agent_id"]}",
+      "Mode: #{result["mode"]}",
+      "Status: #{result["status"]}",
+      "Run package: #{result["package_root"]}"
+    ] ++
+      maybe_cli_line("OAuth client id", result["oauth_client_id"]) ++
+      maybe_cli_line("Client secret", result["client_secret"]) ++
+      maybe_cli_line("Bundle path", result["bundle_path"])
+  end
+
+  defp format_cli_error({:invalid_arguments, reason}), do: reason
+  defp format_cli_error({:policy_blocked, reason}), do: reason
+  defp format_cli_error(reason), do: inspect(reason)
 
   defp review_lines(review, recommendation_label) do
     decision =
@@ -2651,7 +2850,23 @@ defmodule ControlKeel.CLI do
     if native_attach_skipped?(options) do
       []
     else
-      case Skills.export("instructions-only", project_root, scope: "export") do
+      target =
+        %{
+          "cursor" => "cursor-native",
+          "windsurf" => "windsurf-native",
+          "continue" => "continue-native"
+        }[agent]
+
+      case if(target,
+             do: Skills.install(target, project_root, scope: "project"),
+             else: Skills.export("instructions-only", project_root, scope: "export")
+           ) do
+        {:ok, %{destination: destination}} ->
+          [
+            "Prepared native companion files for #{display_attach_agent(agent)}.",
+            "Destination: #{destination}"
+          ]
+
         {:ok, plan} ->
           [
             "Prepared native instruction snippets for #{display_attach_agent(agent)}.",

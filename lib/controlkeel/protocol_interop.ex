@@ -13,10 +13,11 @@ defmodule ControlKeel.ProtocolInterop do
     "ck_finding" => ["mcp:access", "finding:write"],
     "ck_budget" => ["mcp:access", "budget:write"],
     "ck_route" => ["mcp:access", "route:read"],
+    "ck_delegate" => ["mcp:access", "delegate:run"],
     "ck_skill_list" => ["mcp:access", "skills:read"],
     "ck_skill_load" => ["mcp:access", "skills:read"]
   }
-  @a2a_skill_ids ~w(ck_context ck_validate ck_finding ck_budget ck_route)
+  @a2a_skill_ids ~w(ck_context ck_validate ck_finding ck_budget ck_route ck_delegate)
 
   def handle_mcp_request(request, auth_context) when is_map(request) do
     Protocol.handle_request(request,
@@ -68,7 +69,7 @@ defmodule ControlKeel.ProtocolInterop do
     %{
       "name" => "ControlKeel",
       "description" =>
-        "Hosted governance agent for ControlKeel context, validation, findings, budgets, and routing.",
+        "Hosted governance agent for ControlKeel context, validation, findings, budgets, routing, and delegated execution.",
       "protocolVersion" => "0.3.0",
       "version" => to_string(Application.spec(:controlkeel, :vsn) || "0.1.0"),
       "url" => base <> "/a2a",
@@ -248,6 +249,15 @@ defmodule ControlKeel.ProtocolInterop do
       "name" => "Agent routing",
       "description" => "Recommend the best AI agent for the current task and risk tier.",
       "tags" => ["routing", "orchestration"]
+    }
+  end
+
+  defp a2a_skill("ck_delegate") do
+    %{
+      "id" => "ck_delegate",
+      "name" => "Delegated execution",
+      "description" => "Ask ControlKeel to run or hand off a task to another governed agent.",
+      "tags" => ["delegation", "execution"]
     }
   end
 

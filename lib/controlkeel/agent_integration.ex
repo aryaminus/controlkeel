@@ -29,6 +29,10 @@ defmodule ControlKeel.AgentIntegration do
     :registry_version,
     :registry_url,
     :registry_stale,
+    :agent_uses_ck_via,
+    :ck_runs_agent_via,
+    :execution_support,
+    :autonomy_mode,
     supported_scopes: [],
     required_mcp_tools: [],
     install_channels: [],
@@ -75,7 +79,7 @@ defmodule ControlKeel.AgentIntegration do
         config_location:
           "Codex MCP config (`~/.codex/config.json` or project-scoped equivalent).",
         companion_delivery:
-          "Installs `.agents/skills` and `.codex/agents`; can also export a portable Codex bundle.",
+          "Installs `.agents/skills` and `.codex/agents`; can also export portable Codex bundles or a Codex plugin.",
         preferred_target: "codex",
         default_scope: "user",
         router_agent_id: "codex-cli",
@@ -91,7 +95,7 @@ defmodule ControlKeel.AgentIntegration do
           owner: "agent"
         },
         supported_scopes: ["user", "project"],
-        export_targets: ["codex", "open-standard"]
+        export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       attach_client(%{
         id: "vscode",
@@ -140,46 +144,46 @@ defmodule ControlKeel.AgentIntegration do
       attach_client(%{
         id: "cursor",
         label: "Cursor",
-        category: "mcp-plus-instructions",
+        category: "native-first",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches the MCP server and prepares Cursor-native rules, MCP config, and portable skill bundles for governed repo work.",
         attach_command: "controlkeel attach cursor",
         config_location: "Cursor global MCP config file.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
-        preferred_target: "instructions-only",
+          "Installs `.agents/skills`, `.cursor/rules`, and `.cursor/mcp.json`; can also export a portable native Cursor bundle.",
+        preferred_target: "cursor-native",
         default_scope: "project",
         router_agent_id: "cursor",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "cursor",
         upstream_docs_url: "https://cursor.com",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        export_targets: ["cursor-native", "instructions-only"]
       }),
       attach_client(%{
         id: "windsurf",
         label: "Windsurf",
-        category: "mcp-plus-instructions",
+        category: "native-first",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches the MCP server and prepares Windsurf-native rules, MCP config, and portable skill bundles for governed repo work.",
         attach_command: "controlkeel attach windsurf",
         config_location: "Windsurf global MCP config file.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
-        preferred_target: "instructions-only",
+          "Installs `.agents/skills`, `.windsurf/rules`, and `.windsurf/mcp.json`; can also export a portable native Windsurf bundle.",
+        preferred_target: "windsurf-native",
         default_scope: "project",
         router_agent_id: "windsurf",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "windsurf",
         upstream_docs_url: "https://windsurf.com",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        export_targets: ["windsurf-native", "instructions-only"]
       }),
       attach_client(%{
         id: "kiro",
@@ -272,24 +276,24 @@ defmodule ControlKeel.AgentIntegration do
       attach_client(%{
         id: "continue",
         label: "Continue",
-        category: "mcp-plus-instructions",
+        category: "native-first",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches the MCP server and prepares Continue-native skills, prompts, and MCP config for governed repo work.",
         attach_command: "controlkeel attach continue",
         config_location: "Continue MCP config file.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
-        preferred_target: "instructions-only",
+          "Installs `.continue/skills`, `.continue/prompts`, and `.continue/mcp.json`; can also export a portable native Continue bundle.",
+        preferred_target: "continue-native",
         default_scope: "project",
         router_agent_id: "continue",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "continuedev/continue",
         upstream_docs_url: "https://docs.continue.dev",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        export_targets: ["continue-native", "instructions-only"]
       }),
       attach_client(%{
         id: "aider",
@@ -766,8 +770,8 @@ defmodule ControlKeel.AgentIntegration do
         upstream_slug: "cursor",
         upstream_docs_url: "https://cursor.com",
         supported_scopes: ["project"],
-        preferred_target: "instructions-only",
-        export_targets: ["instructions-only"]
+        preferred_target: "cursor-native",
+        export_targets: ["cursor-native", "instructions-only"]
       }),
       alias_entry(%{
         id: "codex-app-server",
@@ -781,7 +785,7 @@ defmodule ControlKeel.AgentIntegration do
         upstream_docs_url: "https://github.com/openai/codex",
         supported_scopes: ["user", "project"],
         preferred_target: "codex",
-        export_targets: ["codex", "open-standard"]
+        export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       alias_entry(%{
         id: "copilot-cli",
@@ -809,7 +813,7 @@ defmodule ControlKeel.AgentIntegration do
         upstream_docs_url: "https://t3.chat",
         supported_scopes: ["user", "project"],
         preferred_target: "codex",
-        export_targets: ["codex", "open-standard"]
+        export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       unverified_entry(%{
         id: "rlm-agent",
@@ -897,6 +901,19 @@ defmodule ControlKeel.AgentIntegration do
 
   def categories do
     support_classes()
+  end
+
+  def execution_classes do
+    [
+      {"direct",
+       "ControlKeel can launch the agent through a documented or configured local command."},
+      {"handoff",
+       "ControlKeel prepares a governed run package and waits for the agent or operator to continue."},
+      {"runtime",
+       "ControlKeel hands work to a remote or hosted runtime rather than a local CLI."},
+      {"inbound_only",
+       "The agent can use ControlKeel, but ControlKeel does not claim an outbound run surface."}
+    ]
   end
 
   def install_channels(id \\ nil)
@@ -1012,6 +1029,10 @@ defmodule ControlKeel.AgentIntegration do
       mcp_mode: attrs[:mcp_mode] || "none",
       skills_mode: attrs[:skills_mode] || "none",
       alias_of: attrs[:alias_of],
+      agent_uses_ck_via: attrs[:agent_uses_ck_via] || default_agent_uses_ck_via(attrs),
+      ck_runs_agent_via: attrs[:ck_runs_agent_via] || default_ck_runs_agent_via(attrs),
+      execution_support: attrs[:execution_support] || default_execution_support(attrs),
+      autonomy_mode: attrs[:autonomy_mode] || "policy_gated",
       supported_scopes: attrs[:supported_scopes] || [],
       required_mcp_tools:
         if(attrs[:support_class] in ["framework_adapter", "provider_only", "unverified"],
@@ -1021,6 +1042,103 @@ defmodule ControlKeel.AgentIntegration do
       install_channels: install_channels,
       export_targets: attrs[:export_targets] || []
     }
+  end
+
+  defp default_agent_uses_ck_via(attrs) do
+    case attrs[:id] do
+      id when id in ["claude-code", "claude-dispatch"] ->
+        ["local_mcp", "plugin", "native_skills"]
+
+      id when id in ["codex-cli", "codex-app-server", "t3code"] ->
+        ["local_mcp", "plugin", "native_skills"]
+
+      id when id in ["vscode", "copilot", "copilot-cli"] ->
+        ["local_mcp", "plugin", "native_skills", "workflows", "hooks"]
+
+      id when id in ["cursor", "cursor-agent", "windsurf"] ->
+        ["local_mcp", "native_skills", "rules"]
+
+      id when id in ["cline", "continue", "roo-code"] ->
+        ["local_mcp", "native_skills", "rules", "workflows"]
+
+      "goose" ->
+        ["local_mcp", "workflows", "hooks"]
+
+      id when id in ["hermes-agent", "openclaw"] ->
+        ["local_mcp", "plugin", "native_skills"]
+
+      id when id in ["kiro", "amp", "aider", "opencode", "gemini-cli"] ->
+        ["local_mcp", "rules"]
+
+      id when id in ["forge", "devin", "open-swe"] ->
+        ["hosted_mcp", "a2a"]
+
+      _ ->
+        fallback_agent_uses_ck_via(attrs)
+    end
+  end
+
+  defp fallback_agent_uses_ck_via(%{support_class: "attach_client"}), do: ["local_mcp"]
+  defp fallback_agent_uses_ck_via(%{support_class: "headless_runtime"}), do: ["hosted_mcp"]
+  defp fallback_agent_uses_ck_via(_attrs), do: []
+
+  defp default_execution_support(attrs) do
+    case attrs[:id] do
+      id
+      when id in [
+             "claude-code",
+             "claude-dispatch",
+             "codex-cli",
+             "codex-app-server",
+             "t3code",
+             "copilot",
+             "copilot-cli",
+             "cline",
+             "continue",
+             "aider",
+             "opencode",
+             "gemini-cli"
+           ] ->
+        "direct"
+
+      id
+      when id in [
+             "cursor",
+             "cursor-agent",
+             "windsurf",
+             "vscode",
+             "roo-code",
+             "goose",
+             "kiro",
+             "amp",
+             "hermes-agent",
+             "openclaw",
+             "droid"
+           ] ->
+        "handoff"
+
+      id when id in ["devin", "open-swe", "forge", "cognition"] ->
+        "runtime"
+
+      id when id in ["framework-adapter", "provider-profile"] ->
+        "inbound_only"
+
+      _ ->
+        case attrs[:support_class] do
+          "attach_client" -> "inbound_only"
+          "headless_runtime" -> "runtime"
+          _ -> "inbound_only"
+        end
+    end
+  end
+
+  defp default_ck_runs_agent_via(attrs) do
+    case default_execution_support(attrs) do
+      "direct" -> "embedded"
+      "handoff" -> "handoff"
+      "runtime" -> "runtime"
+      _ -> "none"
+    end
   end
 
   defp normalize_id(id) do

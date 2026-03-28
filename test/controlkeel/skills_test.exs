@@ -4,6 +4,7 @@ defmodule ControlKeel.SkillsTest do
   alias ControlKeel.Skills
   alias ControlKeel.Skills.Activation
   alias ControlKeel.Skills.Parser
+  alias ControlKeel.Skills.Renderer
 
   setup do
     tmp_dir =
@@ -115,6 +116,43 @@ defmodule ControlKeel.SkillsTest do
     assert Enum.any?(trusted.skills, &(&1.name == "project-only"))
   end
 
+  test "renderer applies target-family metadata from agents yaml", %{tmp_dir: tmp_dir} do
+    skill_dir = Path.join(tmp_dir, "render-skill")
+    File.mkdir_p!(Path.join(skill_dir, "agents"))
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      """
+      ---
+      name: render-skill
+      description: Render target-aware instructions
+      compatibility:
+        - codex
+      ---
+      # Render Skill
+      """
+    )
+
+    File.write!(
+      Path.join(skill_dir, "agents/codex.yaml"),
+      """
+      frontmatter:
+        role: codex
+      instructions_prefix: Use the Codex plugin workflow.
+      instructions_suffix: Finish with ControlKeel validation.
+      """
+    )
+
+    assert {:ok, skill} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+    rendered = Renderer.render(skill, target: "codex")
+
+    assert rendered.target_family == "codex"
+    assert rendered.metadata["instructions_prefix"] == "Use the Codex plugin workflow."
+    assert rendered.content =~ "role: \"codex\""
+    assert rendered.content =~ "Use the Codex plugin workflow."
+    assert rendered.content =~ "Finish with ControlKeel validation."
+  end
+
   test "built-in skills validate cleanly and expose the full operator catalog" do
     result = Skills.validate(nil)
 
@@ -156,6 +194,16 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.exists?(Path.join(codex_plan.output_dir, "AGENTS.md"))
     assert File.exists?(Path.join(codex_plan.output_dir, "CONTROLKEEL_INSTALL.md"))
+    assert File.exists?(Path.join(codex_plan.output_dir, ".mcp.hosted.json"))
+
+    assert {:ok, codex_plugin_plan} = Skills.export("codex-plugin", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(codex_plugin_plan.output_dir, ".codex-plugin/plugin.json"))
+
+    assert File.exists?(
+             Path.join(codex_plugin_plan.output_dir, ".agents/plugins/marketplace.json")
+           )
+
+    assert File.exists?(Path.join(codex_plugin_plan.output_dir, ".mcp.hosted.json"))
 
     assert {:ok, claude_plan} = Skills.export("claude-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(claude_plan.output_dir, ".claude-plugin/plugin.json"))
@@ -166,7 +214,9 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.exists?(Path.join(claude_plan.output_dir, "agents/controlkeel-operator.md"))
     assert File.exists?(Path.join(claude_plan.output_dir, ".mcp.json"))
+    assert File.exists?(Path.join(claude_plan.output_dir, ".mcp.hosted.json"))
     assert File.exists?(Path.join(claude_plan.output_dir, "settings.json"))
+    assert File.exists?(Path.join(claude_plan.output_dir, "hooks/hooks.json"))
 
     assert File.read!(Path.join(claude_plan.output_dir, "CONTROLKEEL_INSTALL.md")) =~
              "@aryaminus/controlkeel"
@@ -208,6 +258,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(
              Path.join(openclaw_plan.output_dir, "skills/controlkeel-governance/SKILL.md")
            )
+
+    assert {:ok, copilot_plan} = Skills.export("copilot-plugin", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(copilot_plan.output_dir, "plugin.json"))
+    assert File.exists?(Path.join(copilot_plan.output_dir, "hooks.json"))
+    assert File.exists?(Path.join(copilot_plan.output_dir, ".mcp.hosted.json"))
 
     assert {:ok, droid_plan} = Skills.export("droid-bundle", tmp_dir, scope: "export")
 
@@ -269,5 +324,25 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".goosehints"))
     assert File.exists?(Path.join(tmp_dir, "goose/workflow_recipes/controlkeel-review.yaml"))
     assert File.exists?(Path.join(tmp_dir, "goose/controlkeel-extension.yaml"))
+
+    assert {:ok, cursor_install} = Skills.install("cursor-native", tmp_dir, scope: "project")
+    assert cursor_install.destination == Path.join(tmp_dir, ".cursor")
+    assert File.exists?(Path.join(tmp_dir, ".cursor/rules/controlkeel.mdc"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/mcp.json"))
+
+    assert {:ok, windsurf_install} = Skills.install("windsurf-native", tmp_dir, scope: "project")
+    assert windsurf_install.destination == Path.join(tmp_dir, ".windsurf")
+    assert File.exists?(Path.join(tmp_dir, ".windsurf/rules/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".windsurf/mcp.json"))
+
+    assert {:ok, continue_install} = Skills.install("continue-native", tmp_dir, scope: "project")
+    assert continue_install.destination == Path.join(tmp_dir, ".continue")
+    assert File.exists?(Path.join(tmp_dir, ".continue/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".continue/prompts/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".continue/mcp.json"))
+
+    assert {:ok, codex_plugin_install} = Skills.install("codex-plugin", tmp_dir, scope: "project")
+    assert File.exists?(Path.join(codex_plugin_install.destination, ".codex-plugin/plugin.json"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/plugins/marketplace.json"))
   end
 end

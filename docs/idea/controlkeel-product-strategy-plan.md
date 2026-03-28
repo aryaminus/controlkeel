@@ -117,6 +117,7 @@ The repo now has three explicit roadmap buckets:
 2. **Recent control-plane hardening**
    - `Repo Governance and Delivery Controls`
    - `Protocol Interop Hardening`
+   - `Bidirectional Agent Interop, Plugins, and Executor Layer`
 3. **Explicit non-goals for now**
    - microVM sandboxing
    - autonomous hosting / scale-to-zero
@@ -144,7 +145,15 @@ The most recent completed slices deepened ControlKeel's role above generator out
 - optional ACP registry awareness without making the registry the source of truth
 - a minimal A2A surface for context, validation, findings, budgets, and routing
 
-These two slices now represent the current boundary of the non-platform control plane.
+**Bidirectional Agent Interop, Plugins, and Executor Layer** added:
+
+- a true two-way integration matrix for how agents use CK and how CK runs them
+- first-class Codex, Claude, Copilot, and OpenClaw plugin bundle paths
+- target-aware skill rendering and native bundle promotion for Cursor, Windsurf, and Continue
+- governed agent execution through embedded, handoff, and runtime modes
+- delegation capability so agents can ask ControlKeel to run other agents without bypassing policy gates
+
+These three slices now represent the current boundary of the non-platform control plane.
 
 ## Out of Scope Here
 

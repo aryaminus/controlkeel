@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.ApiController do
   use ControlKeelWeb, :controller
 
   alias ControlKeel.ACPRegistry
+  alias ControlKeel.AgentExecution
   alias ControlKeel.AgentRouter
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
@@ -138,6 +139,57 @@ defmodule ControlKeelWeb.ApiController do
             |> put_status(:unprocessable_entity)
             |> json(%{error: "invalid task", details: changeset_errors(changeset)})
         end
+    end
+  end
+
+  def run_task(conn, %{"id" => id} = params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+
+    with {:ok, task_id} <- parse_integer_param(id),
+         {:ok, result} <-
+           AgentExecution.run_task(task_id,
+             project_root: project_root,
+             agent: Map.get(params, "agent"),
+             mode: Map.get(params, "mode")
+           ) do
+      json(conn, %{run: result})
+    else
+      {:error, {:policy_blocked, reason}} ->
+        conn |> put_status(:forbidden) |> json(%{error: "policy_blocked", message: reason})
+
+      {:error, :invalid_id} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "task id must be an integer"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def run_session(conn, %{"id" => id} = params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+
+    with {:ok, session_id} <- parse_integer_param(id),
+         {:ok, result} <-
+           AgentExecution.run_session(session_id,
+             project_root: project_root,
+             agent: Map.get(params, "agent"),
+             mode: Map.get(params, "mode")
+           ) do
+      json(conn, %{run: result})
+    else
+      {:error, :invalid_id} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "session id must be an integer"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
     end
   end
 
@@ -1146,6 +1198,12 @@ defmodule ControlKeelWeb.ApiController do
     })
   end
 
+  def list_agents(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    doctor = AgentExecution.doctor(project_root)
+    json(conn, %{agents: doctor["agents"], doctor: doctor})
+  end
+
   def export_skills(conn, params) do
     target = Map.get(params, "target", "open-standard")
     project_root = Map.get(params, "project_root", File.cwd!())
@@ -1255,6 +1313,10 @@ defmodule ControlKeelWeb.ApiController do
       mcp_mode: integration.mcp_mode,
       skills_mode: integration.skills_mode,
       alias_of: integration.alias_of,
+      agent_uses_ck_via: integration.agent_uses_ck_via,
+      ck_runs_agent_via: integration.ck_runs_agent_via,
+      execution_support: integration.execution_support,
+      autonomy_mode: integration.autonomy_mode,
       upstream_slug: integration.upstream_slug,
       upstream_docs_url: integration.upstream_docs_url,
       registry_match: integration.registry_match || false,

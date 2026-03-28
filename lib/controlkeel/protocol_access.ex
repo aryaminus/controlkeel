@@ -16,6 +16,7 @@ defmodule ControlKeel.ProtocolAccess do
     budget:write
     route:read
     skills:read
+    delegate:run
   )
 
   def protocol_scopes, do: @protocol_scopes

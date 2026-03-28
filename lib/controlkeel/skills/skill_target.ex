@@ -23,6 +23,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "codex-plugin",
+        "Codex plugin bundle",
+        "Marketplace-ready Codex plugin bundle with skills, agents, hooks, MCP, and marketplace metadata.",
+        true,
+        "export",
+        ["user", "project", "export"],
+        true
+      ),
+      target(
         "claude-standalone",
         "Claude Code",
         "Standalone Claude skills and subagents in .claude directories.",
@@ -47,6 +56,33 @@ defmodule ControlKeel.Skills.SkillTarget do
         true,
         "project",
         ["user", "project", "export"],
+        true
+      ),
+      target(
+        "cursor-native",
+        "Cursor native bundle",
+        "Cursor-native rules, project prompts, and MCP companion config.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "windsurf-native",
+        "Windsurf native bundle",
+        "Windsurf-native rules, project prompts, and MCP companion config.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "continue-native",
+        "Continue native bundle",
+        "Continue-native prompts, checks guidance, and MCP companion config.",
+        true,
+        "project",
+        ["project", "export"],
         true
       ),
       target(

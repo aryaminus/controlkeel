@@ -106,6 +106,78 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert parsed.options[:project_root] == tmp_dir
   end
 
+  test "plugin and delegated execution commands work", %{tmp_dir: tmp_dir} do
+    assert {:ok, plugin_export} =
+             CLI.parse(["plugin", "export", "codex", "--project-root", tmp_dir])
+
+    export_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(plugin_export, project_root: tmp_dir)
+      end)
+
+    assert export_output =~ "Exported codex plugin bundle."
+
+    assert File.exists?(
+             Path.join(tmp_dir, "controlkeel/dist/codex-plugin/.codex-plugin/plugin.json")
+           )
+
+    assert {:ok, plugin_install} =
+             CLI.parse([
+               "plugin",
+               "install",
+               "codex",
+               "--scope",
+               "project",
+               "--mode",
+               "hosted",
+               "--project-root",
+               tmp_dir
+             ])
+
+    install_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(plugin_install, project_root: tmp_dir)
+      end)
+
+    assert install_output =~ "Installed codex plugin bundle."
+    assert File.exists?(Path.join(tmp_dir, "plugins/controlkeel/.codex-plugin/plugin.json"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/plugins/marketplace.json"))
+
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    assert {:ok, run_task} =
+             CLI.parse([
+               "run",
+               "task",
+               Integer.to_string(task.id),
+               "--agent",
+               "cursor",
+               "--mode",
+               "handoff",
+               "--project-root",
+               tmp_dir
+             ])
+
+    run_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(run_task, project_root: tmp_dir)
+      end)
+
+    assert run_output =~ "Delegated task ##{task.id}."
+    assert run_output =~ "Status: waiting_callback"
+
+    assert {:ok, doctor} = CLI.parse(["agents", "doctor", "--project-root", tmp_dir])
+
+    doctor_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(doctor, project_root: tmp_dir)
+      end)
+
+    assert doctor_output =~ "Agent execution doctor"
+    assert doctor_output =~ "cursor: handoff / handoff"
+  end
+
   test "attach writes companion artifacts and prints install guidance", %{tmp_dir: tmp_dir} do
     assert {:ok, init} = CLI.parse(["init", "--no-attach"])
     assert 0 == CLI.execute(init, project_root: tmp_dir)
@@ -143,8 +215,9 @@ defmodule ControlKeel.CLIRuntimeTest do
         assert 0 == CLI.execute(cursor_attach, project_root: tmp_dir)
       end)
 
-    assert cursor_output =~ "Companion target: instructions-only."
-    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/instructions-only/AGENTS.md"))
+    assert cursor_output =~ "Companion target: cursor-native."
+    assert File.exists?(Path.join(tmp_dir, ".cursor/rules/controlkeel.mdc"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/mcp.json"))
     assert File.exists?(cursor_config_path())
 
     assert {:ok, hermes_attach} = CLI.parse(["attach", "hermes-agent", "--scope", "project"])
@@ -267,7 +340,8 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert attach_output =~ "Bootstrap mode: project."
     assert File.exists?(Path.join(tmp_dir, "controlkeel/project.json"))
-    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/instructions-only/AGENTS.md"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/rules/controlkeel.mdc"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/mcp.json"))
 
     assert {:ok, bootstrap} = CLI.parse(["bootstrap", "--project-root", tmp_dir])
 

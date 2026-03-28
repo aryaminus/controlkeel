@@ -37,6 +37,23 @@ Today there are five support mechanisms:
 
 This mechanism view is intentionally simpler than the typed support inventory, but it should never contradict it.
 
+## Bidirectional execution model
+
+ControlKeel now models each integration in both directions:
+
+- **How the agent uses CK**: `local_mcp`, `hosted_mcp`, `a2a`, `plugin`, `native_skills`, `rules`, `workflows`, `hooks`, or `proxy`
+- **How CK runs the agent**: `embedded`, `handoff`, `runtime`, or `none`
+- **How much autonomy is truthful**: `direct`, `handoff`, `runtime`, or `inbound_only`
+
+The practical meaning of those classes is:
+
+- **direct**: ControlKeel can launch a locally verifiable command surface and keep the run policy-gated
+- **handoff**: ControlKeel prepares a governed package, scoped credentials, and native/plugin bundle, then waits for the external client to continue
+- **runtime**: ControlKeel talks to a remote or headless runtime and tracks the governed run through the same task-run primitives
+- **inbound_only**: the agent can use ControlKeel, but CK does not currently drive that agent
+
+Human intervention is only removed where the surface is truthful. Blocked findings and explicit approval constraints still stop all modes.
+
 ## Protocol interop and discovery
 
 There are now three protocol surfaces around the catalog itself:
@@ -73,6 +90,7 @@ It advertises exactly the current governed capabilities:
 - `ck_finding`
 - `ck_budget`
 - `ck_route`
+- `ck_delegate`
 
 No second orchestration system is implied here. The A2A layer is only a thin facade over existing ControlKeel tools.
 
@@ -90,7 +108,7 @@ These are the strongest zero-setup paths today because ControlKeel can reuse a c
 | Agent | Attach command | Bridge | Native companion | Exportable bundles |
 |---|---|---|---|---|
 | Claude Code | `controlkeel attach claude-code` | Anthropic-compatible environment | Installs `.claude/skills` and `.claude/agents` | `claude-standalone`, `claude-plugin` |
-| Codex CLI | `controlkeel attach codex-cli` | OpenAI-compatible environment | Installs `.agents/skills` and `.codex/agents` | `codex`, `open-standard` |
+| Codex CLI | `controlkeel attach codex-cli` | OpenAI-compatible environment | Installs `.agents/skills` and `.codex/agents` | `codex`, `codex-plugin`, `open-standard` |
 | Hermes Agent | `controlkeel attach hermes-agent` | Config-reference bridge from Hermes config | Installs `.hermes/skills` and `.hermes/mcp.json` | `hermes-native` |
 | OpenClaw | `controlkeel attach openclaw` | Config-reference bridge from OpenClaw settings | Installs workspace or managed skills and emits OpenClaw config | `openclaw-native`, `openclaw-plugin` |
 | Factory Droid | `controlkeel attach droid` | Gateway/base-URL bridge from Factory settings | Installs `.factory/skills`, `.factory/droids`, `.factory/commands`, `.factory/mcp.json` | `droid-bundle` |
@@ -104,6 +122,9 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 | Agent | Attach command | Native companion | Exportable bundles |
 |---|---|---|---|
 | Cline | `controlkeel attach cline` | Writes `.cline/skills`, `.clinerules`, `AGENTS.md`, and updates Cline MCP settings | `cline-native` |
+| Cursor | `controlkeel attach cursor` | Writes `.agents/skills`, `.cursor/rules`, and `.cursor/mcp.json` | `cursor-native`, `instructions-only` |
+| Windsurf | `controlkeel attach windsurf` | Writes `.agents/skills`, `.windsurf/rules`, and `.windsurf/mcp.json` | `windsurf-native`, `instructions-only` |
+| Continue | `controlkeel attach continue` | Writes `.continue/prompts`, `.continue/mcp.json`, and governed guidance bundle | `continue-native`, `instructions-only` |
 | Roo Code | `controlkeel attach roo-code` | Writes `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, `.roomodes`, `AGENTS.md`, and `.mcp.json` | `roo-native` |
 | Goose | `controlkeel attach goose` | Writes `.goosehints`, `goose/workflow_recipes`, `AGENTS.md`, and registers a Goose MCP extension in `~/.config/goose/config.yaml` | `goose-native` |
 | VS Code | `controlkeel attach vscode` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
@@ -111,17 +132,14 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 
 ## MCP plus instructions agents
 
-These clients still attach through MCP, but the native companion is an instructions bundle under `controlkeel/dist/instructions-only`. OpenCode is the recommended quick-start path in this class.
+These clients still attach through MCP, but the governed companion is an instructions bundle under `controlkeel/dist/instructions-only`. OpenCode is the recommended quick-start path in this class.
 
 | Agent | Attach command |
 |---|---|
 | OpenCode | `controlkeel attach opencode` |
-| Cursor | `controlkeel attach cursor` |
-| Windsurf | `controlkeel attach windsurf` |
 | Kiro | `controlkeel attach kiro` |
 | Amp | `controlkeel attach amp` |
 | Gemini CLI | `controlkeel attach gemini-cli` |
-| Continue | `controlkeel attach continue` |
 | Aider | `controlkeel attach aider` |
 
 OpenCode notes:
@@ -143,6 +161,25 @@ These appear in the same integration catalog, but they are intentionally **not**
 | Unverified | `rlm-agent`, `slate`, `retune` | Kept visible as research names, but not over-promised as shipped support. |
 
 Headless runtimes and remote clients can combine these with the hosted protocol layer above rather than relying on repo-local stdio MCP.
+
+## Governed execution surfaces
+
+ControlKeel can now drive agents as well as serve them:
+
+- `controlkeel agents doctor`
+- `controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime]`
+- `controlkeel run session <id> [--agent auto|<id>]`
+- `GET /api/v1/agents`
+- `POST /api/v1/tasks/:id/run`
+- `POST /api/v1/sessions/:id/run`
+- `ck_delegate` over hosted MCP or A2A when the caller has `delegate:run`
+
+Execution stays policy-gated:
+
+- **direct** paths only run when a documented or locally configured command surface exists
+- **handoff** paths emit the right native/plugin bundle, scoped credentials, and task package, then wait for continuation
+- **runtime** paths create governed remote run packages and track remote refs
+- blocked findings and explicit approval constraints pause the run instead of being bypassed
 
 ## Proxy-compatible clients
 
@@ -272,8 +309,16 @@ controlkeel skills doctor
 Export publishable bundles:
 
 ```bash
+controlkeel plugin export codex
+controlkeel plugin export claude
+controlkeel plugin export copilot
+controlkeel plugin export openclaw
 controlkeel skills export --target claude-plugin
+controlkeel skills export --target codex-plugin
 controlkeel skills export --target cline-native
+controlkeel skills export --target cursor-native
+controlkeel skills export --target windsurf-native
+controlkeel skills export --target continue-native
 controlkeel skills export --target roo-native
 controlkeel skills export --target goose-native
 controlkeel skills export --target copilot-plugin
@@ -287,8 +332,14 @@ controlkeel runtime export open-swe
 Install a native target without using `attach`:
 
 ```bash
+controlkeel plugin install codex --scope project --mode hosted
+controlkeel plugin install claude --scope user --mode local
+controlkeel plugin install copilot --scope project --mode local
 controlkeel skills install --target claude-standalone --scope user
 controlkeel skills install --target cline-native --scope project
+controlkeel skills install --target cursor-native --scope project
+controlkeel skills install --target windsurf-native --scope project
+controlkeel skills install --target continue-native --scope project
 controlkeel skills install --target roo-native --scope project
 controlkeel skills install --target goose-native --scope project
 controlkeel skills install --target codex --scope user
@@ -300,10 +351,15 @@ controlkeel skills install --target github-repo --scope project
 Exported bundles are written under:
 
 - `controlkeel/dist/claude-plugin/`
+- `controlkeel/dist/codex-plugin/`
 - `controlkeel/dist/cline-native/`
+- `controlkeel/dist/cursor-native/`
+- `controlkeel/dist/windsurf-native/`
+- `controlkeel/dist/continue-native/`
 - `controlkeel/dist/roo-native/`
 - `controlkeel/dist/goose-native/`
 - `controlkeel/dist/copilot-plugin/`
+- `controlkeel/dist/openclaw-plugin/`
 - `controlkeel/dist/codex/`
 - `controlkeel/dist/devin-runtime/`
 - `controlkeel/dist/provider-profile/`
@@ -313,10 +369,15 @@ Exported bundles are written under:
 Published release bundles use the same target set, but ship as release assets:
 
 - `controlkeel-claude-plugin.tar.gz`
+- `controlkeel-codex-plugin.tar.gz`
 - `controlkeel-cline-native.tar.gz`
+- `controlkeel-cursor-native.tar.gz`
+- `controlkeel-windsurf-native.tar.gz`
+- `controlkeel-continue-native.tar.gz`
 - `controlkeel-roo-native.tar.gz`
 - `controlkeel-goose-native.tar.gz`
 - `controlkeel-copilot-plugin.tar.gz`
+- `controlkeel-openclaw-plugin.tar.gz`
 - `controlkeel-codex.tar.gz`
 - `controlkeel-devin-runtime.tar.gz`
 - `controlkeel-provider-profile.tar.gz`
@@ -332,11 +393,14 @@ Core runtime tools:
 - `ck_finding`
 - `ck_budget`
 - `ck_route`
+- `ck_delegate`
 
 Skill discovery tools are exposed when the catalog is not empty:
 
 - `ck_skill_list`
 - `ck_skill_load`
+
+Skill loading is target-aware. `ck_skill_list` and `ck_skill_load` can take `target`, and when omitted ControlKeel derives the best family from the auth context, attached agent, or executor.
 
 ## Canonical source of truth
 

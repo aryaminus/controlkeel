@@ -32,12 +32,13 @@ defmodule ControlKeel.Skills.Parser do
            skill_name: name
          }}
       else
-        {openai_metadata, openai_diagnostics} = read_openai_metadata(skill_dir, name)
+        {agent_metadata, agent_diagnostics} = read_agent_metadata(skill_dir, name)
+        openai_metadata = Map.get(agent_metadata, "openai", %{})
         resources = discover_resources(skill_dir)
 
         diagnostics =
           diagnostics
-          |> Kernel.++(openai_diagnostics)
+          |> Kernel.++(agent_diagnostics)
           |> Kernel.++(reference_diagnostics(body, skill_dir, skill_path, name))
           |> Kernel.++(compatibility_diagnostics(meta, openai_metadata, skill_path, name))
 
@@ -71,6 +72,7 @@ defmodule ControlKeel.Skills.Parser do
            resources: resources,
            diagnostics: diagnostics,
            openai: openai_metadata,
+           agent_metadata: agent_metadata,
            install_state: %{}
          }}
       end
@@ -148,43 +150,50 @@ defmodule ControlKeel.Skills.Parser do
   defp normalize_keys(list) when is_list(list), do: Enum.map(list, &normalize_keys/1)
   defp normalize_keys(value), do: value
 
-  defp read_openai_metadata(skill_dir, skill_name) do
-    path = Path.join([skill_dir, "agents", "openai.yaml"])
+  defp read_agent_metadata(skill_dir, skill_name) do
+    agents_dir = Path.join(skill_dir, "agents")
 
-    case File.read(path) do
-      {:ok, contents} ->
-        case decode_yaml(contents) do
-          {:ok, decoded} when is_map(decoded) ->
-            {normalize_keys(decoded), []}
+    case File.ls(agents_dir) do
+      {:ok, entries} ->
+        entries
+        |> Enum.filter(&String.ends_with?(&1, ".yaml"))
+        |> Enum.sort()
+        |> Enum.reduce({%{}, []}, fn entry, {metadata, diagnostics} ->
+          family = entry |> Path.rootname() |> String.downcase()
+          path = Path.join(agents_dir, entry)
 
-          {:ok, _decoded} ->
-            {%{},
-             [
-               %SkillDiagnostic{
-                 level: "warn",
-                 code: "invalid_openai_yaml",
-                 message: "agents/openai.yaml did not decode to a map and was ignored.",
-                 path: path,
-                 skill_name: skill_name
-               }
-             ]}
+          case File.read(path) do
+            {:ok, contents} ->
+              case decode_yaml(contents) do
+                {:ok, decoded} when is_map(decoded) ->
+                  {Map.put(metadata, family, normalize_keys(decoded)), diagnostics}
 
-          {:error, _reason} ->
-            {%{},
-             [
-               %SkillDiagnostic{
-                 level: "warn",
-                 code: "invalid_openai_yaml",
-                 message: "agents/openai.yaml could not be parsed and was ignored.",
-                 path: path,
-                 skill_name: skill_name
-               }
-             ]}
-        end
+                {:ok, _decoded} ->
+                  {metadata, [invalid_agent_yaml(skill_name, path, family) | diagnostics]}
+
+                {:error, _reason} ->
+                  {metadata, [invalid_agent_yaml(skill_name, path, family) | diagnostics]}
+              end
+
+            _ ->
+              {metadata, diagnostics}
+          end
+        end)
+        |> then(fn {metadata, diagnostics} -> {metadata, Enum.reverse(diagnostics)} end)
 
       _ ->
         {%{}, []}
     end
+  end
+
+  defp invalid_agent_yaml(skill_name, path, family) do
+    %SkillDiagnostic{
+      level: "warn",
+      code: "invalid_agent_yaml",
+      message: "agents/#{family}.yaml could not be parsed and was ignored.",
+      path: path,
+      skill_name: skill_name
+    }
   end
 
   defp maybe_add_name_mismatch(diagnostics, name, parent_name, skill_path) do

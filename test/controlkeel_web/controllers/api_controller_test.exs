@@ -295,6 +295,80 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  describe "agent execution API" do
+    test "lists bidirectional agent execution metadata", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/agents")
+      body = json_response(conn, 200)
+
+      assert is_list(body["agents"])
+
+      cursor =
+        Enum.find(body["agents"], fn agent ->
+          agent["id"] == "cursor"
+        end)
+
+      assert cursor["execution_support"] == "handoff"
+      assert cursor["ck_runs_agent_via"] == "handoff"
+      assert "local_mcp" in cursor["agent_uses_ck_via"]
+    end
+
+    test "runs a task through the handoff executor", %{conn: conn} do
+      tmp_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "controlkeel-agent-api-#{System.unique_integer([:positive])}"
+        )
+
+      File.rm_rf!(tmp_dir)
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+
+      conn =
+        post(conn, ~p"/api/v1/tasks/#{task.id}/run", %{
+          agent: "cursor",
+          mode: "handoff",
+          project_root: tmp_dir
+        })
+
+      body = json_response(conn, 200)
+      assert body["run"]["status"] == "waiting_callback"
+      assert body["run"]["oauth_client_id"] =~ "ck-sa-"
+      assert is_binary(body["run"]["client_secret"])
+    end
+
+    test "runs all ready tasks in a session", %{conn: conn} do
+      tmp_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "controlkeel-agent-session-api-#{System.unique_integer([:positive])}"
+        )
+
+      File.rm_rf!(tmp_dir)
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      session = session_fixture()
+      _task = task_fixture(%{session: session})
+
+      conn =
+        post(conn, ~p"/api/v1/sessions/#{session.id}/run", %{
+          agent: "cursor",
+          mode: "handoff",
+          project_root: tmp_dir
+        })
+
+      body = json_response(conn, 200)
+      assert body["run"]["session_id"] == session.id
+      assert body["run"]["task_count"] == 1
+      assert hd(body["run"]["results"])["status"] == "waiting_callback"
+    end
+  end
+
   # ─── Findings ────────────────────────────────────────────────────────────────
 
   describe "GET /api/v1/findings" do

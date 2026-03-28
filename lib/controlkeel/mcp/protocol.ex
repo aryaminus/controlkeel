@@ -7,6 +7,7 @@ defmodule ControlKeel.MCP.Protocol do
   alias ControlKeel.MCP.Tools.{
     CkBudget,
     CkContext,
+    CkDelegate,
     CkFinding,
     CkRoute,
     CkSkillList,
@@ -83,7 +84,8 @@ defmodule ControlKeel.MCP.Protocol do
       ck_context_tool(),
       ck_finding_tool(),
       ck_budget_tool(),
-      ck_route_tool()
+      ck_route_tool(),
+      ck_delegate_tool()
     ]
 
     if current_skill_names() == [] do
@@ -98,6 +100,7 @@ defmodule ControlKeel.MCP.Protocol do
   def dispatch_tool("ck_finding", arguments), do: CkFinding.call(arguments)
   def dispatch_tool("ck_budget", arguments), do: CkBudget.call(arguments)
   def dispatch_tool("ck_route", arguments), do: CkRoute.call(arguments)
+  def dispatch_tool("ck_delegate", arguments), do: CkDelegate.call(arguments)
   def dispatch_tool("ck_skill_list", arguments), do: CkSkillList.call(arguments)
   def dispatch_tool("ck_skill_load", arguments), do: CkSkillLoad.call(arguments)
 
@@ -231,6 +234,24 @@ defmodule ControlKeel.MCP.Protocol do
     }
   end
 
+  defp ck_delegate_tool do
+    %{
+      "name" => "ck_delegate",
+      "description" =>
+        "Ask ControlKeel to run or hand off a governed task or session to another supported agent.",
+      "inputSchema" => %{
+        "type" => "object",
+        "properties" => %{
+          "task_id" => %{"type" => ["integer", "string"]},
+          "session_id" => %{"type" => ["integer", "string"]},
+          "agent" => %{"type" => "string"},
+          "mode" => %{"type" => "string", "enum" => ["auto", "embedded", "handoff", "runtime"]},
+          "project_root" => %{"type" => "string"}
+        }
+      }
+    }
+  end
+
   defp ck_skill_list_tool do
     %{
       "name" => "ck_skill_list",
@@ -282,6 +303,10 @@ defmodule ControlKeel.MCP.Protocol do
             "type" => "string",
             "description" =>
               "Absolute path to the project root. Omit to search global skills only."
+          },
+          "target" => %{
+            "type" => "string",
+            "description" => "Optional render target such as codex, claude, copilot, or cursor."
           },
           "session_id" => %{"type" => ["integer", "string"]},
           "task_id" => %{"type" => ["integer", "string"]}

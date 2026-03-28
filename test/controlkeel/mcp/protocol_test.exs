@@ -51,6 +51,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_finding",
              "ck_budget",
              "ck_route",
+             "ck_delegate",
              "ck_skill_list",
              "ck_skill_load"
            ]

@@ -64,6 +64,9 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(agent_path))
     File.write!(agent_path, codex_agent_contents(project_root, skills, opts))
 
+    mcp_path = Path.join(root, ".mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
     instructions_path = Path.join(root, "AGENTS.md")
     File.write!(instructions_path, instructions_only_contents("codex", project_root, opts))
 
@@ -74,11 +77,62 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
       [
         "Copy .agents/skills into your repo or user skill folder.",
-        "Copy .codex/agents/controlkeel-operator.toml into your Codex agents directory if you want a preconfigured operator."
+        "Copy .codex/agents/controlkeel-operator.toml into your Codex agents directory if you want a preconfigured operator.",
+        "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "codex-plugin"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, "skills")
+    write_skill_tree(skills, skill_root)
+
+    agent_path = Path.join(root, "agents/controlkeel-operator.md")
+    File.mkdir_p!(Path.dirname(agent_path))
+    File.write!(agent_path, copilot_agent_contents(skills))
+
+    manifest_path = Path.join(root, ".codex-plugin/plugin.json")
+    File.mkdir_p!(Path.dirname(manifest_path))
+    File.write!(manifest_path, Jason.encode!(codex_plugin_manifest(), pretty: true) <> "\n")
+
+    hooks_path = Path.join(root, "hooks.json")
+    File.write!(hooks_path, Jason.encode!(empty_hooks_manifest(), pretty: true) <> "\n")
+
+    app_path = Path.join(root, ".app.json")
+    File.write!(app_path, Jason.encode!(codex_app_manifest(), pretty: true) <> "\n")
+
+    mcp_path = Path.join(root, ".mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    marketplace_path = Path.join(root, ".agents/plugins/marketplace.json")
+    File.mkdir_p!(Path.dirname(marketplace_path))
+
+    File.write!(
+      marketplace_path,
+      Jason.encode!(codex_marketplace_manifest(), pretty: true) <> "\n"
+    )
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => manifest_path, "kind" => "manifest"},
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => hooks_path, "kind" => "hooks"},
+        %{"path" => app_path, "kind" => "app"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => marketplace_path, "kind" => "marketplace"}
+      ],
+      [
+        "Install this bundle as a Codex plugin or add it to your repo-local Codex marketplace.",
+        "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
   end
@@ -126,6 +180,10 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(manifest_path))
     File.write!(manifest_path, Jason.encode!(claude_plugin_manifest(), pretty: true) <> "\n")
 
+    hooks_path = Path.join(root, "hooks/hooks.json")
+    File.mkdir_p!(Path.dirname(hooks_path))
+    File.write!(hooks_path, Jason.encode!(empty_hooks_manifest(), pretty: true) <> "\n")
+
     settings_path = Path.join(root, "settings.json")
 
     File.write!(
@@ -144,10 +202,14 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => manifest_path, "kind" => "manifest"},
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => settings_path, "kind" => "settings"}
       ],
-      ["Run `claude --plugin-dir #{root}` to test the plugin locally."]
+      [
+        "Run `claude --plugin-dir #{root}` to test the plugin locally.",
+        "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+      ]
     )
   end
 
@@ -185,6 +247,101 @@ defmodule ControlKeel.Skills.Exporter do
         "Copy `.cline/skills` into your project or `~/.cline/skills`.",
         "Keep `.clinerules/` in the repo so Cline loads ControlKeel rules and workflows for the governed workspace.",
         "Merge `.cline/data/settings/cline_mcp_settings.json` into Cline MCP settings (`~/.cline/data/settings/cline_mcp_settings.json` or `$CLINE_DIR/data/settings/cline_mcp_settings.json`)."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "cursor-native"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, ".agents/skills")
+    write_skill_tree(skills, skill_root)
+
+    rule_path = Path.join(root, ".cursor/rules/controlkeel.mdc")
+    File.mkdir_p!(Path.dirname(rule_path))
+    File.write!(rule_path, cursor_rule_contents())
+
+    mcp_path = Path.join(root, ".cursor/mcp.json")
+    File.mkdir_p!(Path.dirname(mcp_path))
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("cursor", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => rule_path, "kind" => "rules"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Keep `.cursor/rules` in the repo so Cursor loads ControlKeel guidance.",
+        "Use .cursor/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "windsurf-native"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, ".agents/skills")
+    write_skill_tree(skills, skill_root)
+
+    rule_path = Path.join(root, ".windsurf/rules/controlkeel.md")
+    File.mkdir_p!(Path.dirname(rule_path))
+    File.write!(rule_path, windsurf_rule_contents())
+
+    mcp_path = Path.join(root, ".windsurf/mcp.json")
+    File.mkdir_p!(Path.dirname(mcp_path))
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("windsurf", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => rule_path, "kind" => "rules"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Keep `.windsurf/rules` in the repo so Windsurf loads ControlKeel guidance.",
+        "Use .windsurf/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "continue-native"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, ".continue/skills")
+    write_skill_tree(skills, skill_root)
+
+    prompt_path = Path.join(root, ".continue/prompts/controlkeel.md")
+    File.mkdir_p!(Path.dirname(prompt_path))
+    File.write!(prompt_path, continue_prompt_contents())
+
+    config_path = Path.join(root, ".continue/mcp.json")
+    File.write!(config_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("continue", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => prompt_path, "kind" => "instructions"},
+        %{"path" => config_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Copy `.continue/skills` and `.continue/prompts/controlkeel.md` into the repo for Continue-native guidance.",
+        "Use .continue/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
   end
@@ -380,6 +537,9 @@ defmodule ControlKeel.Skills.Exporter do
     manifest_path = Path.join(root, "plugin.json")
     File.write!(manifest_path, Jason.encode!(copilot_plugin_manifest(), pretty: true) <> "\n")
 
+    hooks_path = Path.join(root, "hooks.json")
+    File.write!(hooks_path, Jason.encode!(empty_hooks_manifest(), pretty: true) <> "\n")
+
     mcp_path = Path.join(root, ".mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
 
@@ -391,10 +551,12 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => manifest_path, "kind" => "manifest"},
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => mcp_path, "kind" => "mcp"}
       ],
       [
-        "Use this bundle as a local Copilot / VS Code plugin or publish it through your plugin workflow."
+        "Use this bundle as a local Copilot / VS Code plugin or publish it through your plugin workflow.",
+        "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
   end
@@ -750,6 +912,23 @@ defmodule ControlKeel.Skills.Exporter do
   end
 
   defp with_common_assets(root, project_root, opts, writes, instructions) do
+    {writes, instructions} =
+      if Enum.any?(writes, &(&1["kind"] == "mcp")) do
+        hosted_path = Path.join(root, ".mcp.hosted.json")
+
+        File.write!(
+          hosted_path,
+          Jason.encode!(hosted_mcp_payload(opts), pretty: true) <> "\n"
+        )
+
+        {
+          writes ++ [%{"path" => hosted_path, "kind" => "mcp-hosted"}],
+          instructions ++ ["Hosted MCP template: #{hosted_path}"]
+        }
+      else
+        {writes, instructions}
+      end
+
     install_guide = Path.join(root, "CONTROLKEEL_INSTALL.md")
     File.write!(install_guide, install_guide_contents(project_root, opts))
 
@@ -763,6 +942,41 @@ defmodule ControlKeel.Skills.Exporter do
         "controlkeel" => %{
           "command" => mcp_command(project_root, opts),
           "args" => mcp_args(project_root, opts)
+        }
+      }
+    }
+  end
+
+  defp hosted_mcp_payload(opts) do
+    base_url = Keyword.get(opts, :hosted_base_url, "https://your-controlkeel.example")
+    client_id = Keyword.get(opts, :oauth_client_id, "ck-sa-<service-account-id>")
+
+    %{
+      "mcpServers" => %{
+        "controlkeel" => %{
+          "transport" => "http",
+          "url" => "#{base_url}/mcp",
+          "oauth" => %{
+            "grant_type" => "client_credentials",
+            "token_endpoint" => "#{base_url}/oauth/token",
+            "client_id" => client_id,
+            "client_secret_env" => "CONTROLKEEL_SERVICE_ACCOUNT_SECRET",
+            "resource" => "#{base_url}/mcp",
+            "scope" =>
+              Enum.join(
+                [
+                  "mcp:access",
+                  "context:read",
+                  "validate:run",
+                  "finding:write",
+                  "budget:write",
+                  "route:read",
+                  "skills:read",
+                  "delegate:run"
+                ],
+                " "
+              )
+          }
         }
       }
     }
@@ -817,6 +1031,7 @@ defmodule ControlKeel.Skills.Exporter do
     This bundle expects the ControlKeel MCP runtime to be reachable through:
 
     - `controlkeel mcp --project-root #{project_root_line}`
+    - Hosted MCP alternative: use the generated `.mcp.hosted.json` template with a workspace service account (`POST /oauth/token` + `POST /mcp`)
 
     ControlKeel can auto-bootstrap the governed project binding on first use. If you already ran `controlkeel init` or `controlkeel bootstrap` inside the target repository, the generated project wrapper under `controlkeel/bin/` can be used instead of the plain `controlkeel` binary.
 
@@ -1073,13 +1288,81 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp codex_plugin_manifest do
+    %{
+      "name" => "controlkeel",
+      "version" => @app_version,
+      "description" => "ControlKeel governance skills, agents, hooks, and MCP bridge for Codex.",
+      "author" => %{
+        "name" => "ControlKeel",
+        "url" => "https://github.com/aryaminus/controlkeel"
+      },
+      "homepage" => "https://github.com/aryaminus/controlkeel",
+      "repository" => "https://github.com/aryaminus/controlkeel",
+      "license" => "Apache-2.0",
+      "keywords" => ["governance", "security", "agent-skills", "mcp"],
+      "skills" => "./skills/",
+      "hooks" => "./hooks.json",
+      "mcpServers" => "./.mcp.json",
+      "apps" => "./.app.json",
+      "interface" => %{
+        "displayName" => "ControlKeel",
+        "shortDescription" => "Govern agent work with MCP, skills, and proofs.",
+        "longDescription" =>
+          "ControlKeel makes agent-built work secure, scoped, validated, and production-ready across MCP, proof, findings, budgets, and routing.",
+        "developerName" => "ControlKeel",
+        "category" => "Developer Tools",
+        "capabilities" => ["Write", "Interactive", "Governance"],
+        "websiteURL" => "https://github.com/aryaminus/controlkeel",
+        "privacyPolicyURL" => "https://github.com/aryaminus/controlkeel",
+        "termsOfServiceURL" => "https://github.com/aryaminus/controlkeel",
+        "defaultPrompt" => [
+          "Load ControlKeel governance and validate the current task.",
+          "Review the repo through ControlKeel before a risky change.",
+          "Use CK routing and proofs to complete this task safely."
+        ],
+        "brandColor" => "#0f766e"
+      }
+    }
+  end
+
+  defp codex_marketplace_manifest do
+    %{
+      "name" => "controlkeel-local",
+      "interface" => %{"displayName" => "ControlKeel Local"},
+      "plugins" => [
+        %{
+          "name" => "controlkeel",
+          "source" => %{"source" => "local", "path" => "./plugins/controlkeel"},
+          "policy" => %{"installation" => "AVAILABLE", "authentication" => "ON_USE"},
+          "category" => "Developer Tools"
+        }
+      ]
+    }
+  end
+
+  defp codex_app_manifest do
+    %{
+      "name" => "controlkeel",
+      "description" => "Codex plugin companion app metadata for hosted MCP and skills delivery.",
+      "protocols" => ["mcp"]
+    }
+  end
+
   defp claude_plugin_manifest do
     %{
       "name" => "controlkeel",
       "description" => "ControlKeel governance skills, subagents, and MCP bridge.",
       "version" => @app_version,
-      "author" => %{"name" => "ControlKeel"},
-      "license" => "Apache-2.0"
+      "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
+      "homepage" => "https://github.com/aryaminus/controlkeel",
+      "repository" => "https://github.com/aryaminus/controlkeel",
+      "license" => "Apache-2.0",
+      "keywords" => ["governance", "mcp", "skills", "security"],
+      "agents" => "./agents/",
+      "skills" => "./skills/",
+      "hooks" => "./hooks/hooks.json",
+      "mcpServers" => "./.mcp.json"
     }
   end
 
@@ -1088,11 +1371,19 @@ defmodule ControlKeel.Skills.Exporter do
       "name" => "controlkeel",
       "description" => "ControlKeel governance skills, agents, and MCP bridge.",
       "version" => @app_version,
+      "author" => %{"name" => "ControlKeel", "email" => "opensource@controlkeel.local"},
+      "license" => "Apache-2.0",
+      "keywords" => ["governance", "security", "skills"],
       "skills" => "skills",
       "agents" => "agents",
+      "hooks" => "hooks.json",
       "mcpServers" => ".mcp.json",
       "tags" => ["governance", "security", "skills"]
     }
+  end
+
+  defp empty_hooks_manifest do
+    %{"hooks" => %{}}
   end
 
   defp cline_rule_contents do
@@ -1123,6 +1414,35 @@ defmodule ControlKeel.Skills.Exporter do
     2. Gather repo and task context before changing files.
     3. Use ControlKeel MCP tools for validation, findings, budget, and routing when relevant.
     4. Summarize risk, findings, and proof status before completing the task.
+    """
+  end
+
+  defp cursor_rule_contents do
+    """
+    ---
+    description: Govern Cursor work with ControlKeel MCP, findings, budgets, proofs, and routing.
+    ---
+
+    Always call ControlKeel before risky edits, shell commands, auth changes, or release work.
+    Load `controlkeel-governance` first, then add domain-specific skills as needed.
+    """
+  end
+
+  defp windsurf_rule_contents do
+    """
+    # ControlKeel for Windsurf
+
+    Use ControlKeel as the governance layer for risky repository changes.
+    Prefer CK MCP tools for context, validation, findings, budgets, routing, and proof-aware completion.
+    """
+  end
+
+  defp continue_prompt_contents do
+    """
+    # ControlKeel Continue Prompt
+
+    Start with `controlkeel-governance`, use CK MCP tools before risky work, and surface blocked findings immediately.
+    Keep proofs and budget state current before marking a task complete.
     """
   end
 

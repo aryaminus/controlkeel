@@ -82,6 +82,9 @@ defmodule ControlKeelWeb.Router do
     post "/review/pr", ApiController, :review_pr
     post "/release/readiness", ApiController, :release_readiness
     post "/governance/install/github", ApiController, :install_github_governance
+    get "/agents", ApiController, :list_agents
+    post "/tasks/:id/run", ApiController, :run_task
+    post "/sessions/:id/run", ApiController, :run_session
     post "/sessions/:session_id/tasks", ApiController, :create_task
     patch "/tasks/:id", ApiController, :update_task
     post "/tasks/:id/complete", ApiController, :complete_task

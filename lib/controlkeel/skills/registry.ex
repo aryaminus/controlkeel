@@ -9,8 +9,18 @@ defmodule ControlKeel.Skills.Registry do
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Skills.Parser
   alias ControlKeel.Skills.SkillDiagnostic
+  alias ControlKeel.Skills.SkillTarget
 
-  @project_skill_dirs [".agents/skills", ".claude/skills", ".github/skills"]
+  @project_skill_dirs [
+    ".agents/skills",
+    ".claude/skills",
+    ".github/skills",
+    ".cline/skills",
+    ".roo/skills",
+    ".hermes/skills",
+    ".factory/skills",
+    "skills"
+  ]
 
   def catalog(project_root \\ nil, opts \\ []) do
     analyze(project_root, opts).skills
@@ -181,11 +191,10 @@ defmodule ControlKeel.Skills.Registry do
 
   defp install_state(skill, project_root) do
     targets =
-      []
-      |> maybe_mark_exported("codex", project_root, skill)
-      |> maybe_mark_exported("claude-plugin", project_root, skill)
-      |> maybe_mark_exported("copilot-plugin", project_root, skill)
-      |> maybe_mark_exported("open-standard", project_root, skill)
+      SkillTarget.ids()
+      |> Enum.reduce([], fn target, acc ->
+        maybe_mark_exported(acc, target, project_root, skill)
+      end)
 
     %{
       "exported_targets" => targets,
@@ -202,20 +211,19 @@ defmodule ControlKeel.Skills.Registry do
       Path.join(export_root, "skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".agents/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".claude/skills/#{skill.name}/SKILL.md"),
-      Path.join(export_root, ".github/skills/#{skill.name}/SKILL.md")
+      Path.join(export_root, ".github/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".cline/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".roo/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".hermes/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".factory/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, "skills/#{skill.name}/SKILL.md")
     ]
 
     if Enum.any?(skill_locations, &File.exists?/1), do: targets ++ [target], else: targets
   end
 
   defp native_locations(skill, project_root) do
-    locations =
-      [
-        user_location(".agents/skills/#{skill.name}/SKILL.md"),
-        user_location(".claude/skills/#{skill.name}/SKILL.md"),
-        user_location(".copilot/skills/#{skill.name}/SKILL.md")
-      ] ++
-        project_locations(project_root, skill.name)
+    locations = user_locations(skill.name) ++ project_locations(project_root, skill.name)
 
     locations
     |> Enum.filter(&File.exists?/1)
@@ -230,7 +238,25 @@ defmodule ControlKeel.Skills.Registry do
     [
       Path.join(root, ".agents/skills/#{name}/SKILL.md"),
       Path.join(root, ".claude/skills/#{name}/SKILL.md"),
-      Path.join(root, ".github/skills/#{name}/SKILL.md")
+      Path.join(root, ".github/skills/#{name}/SKILL.md"),
+      Path.join(root, ".cline/skills/#{name}/SKILL.md"),
+      Path.join(root, ".roo/skills/#{name}/SKILL.md"),
+      Path.join(root, ".hermes/skills/#{name}/SKILL.md"),
+      Path.join(root, ".factory/skills/#{name}/SKILL.md"),
+      Path.join(root, "skills/#{name}/SKILL.md")
+    ]
+  end
+
+  defp user_locations(name) do
+    [
+      user_location(".agents/skills/#{name}/SKILL.md"),
+      user_location(".claude/skills/#{name}/SKILL.md"),
+      user_location(".copilot/skills/#{name}/SKILL.md"),
+      user_location(".cline/skills/#{name}/SKILL.md"),
+      user_location(".roo/skills/#{name}/SKILL.md"),
+      user_location(".hermes/skills/#{name}/SKILL.md"),
+      user_location(".factory/skills/#{name}/SKILL.md"),
+      user_location(".openclaw/skills/#{name}/SKILL.md")
     ]
   end
 
@@ -280,7 +306,19 @@ defmodule ControlKeel.Skills.Registry do
   end
 
   defp user_skill_dirs do
-    Enum.map([".agents/skills", ".claude/skills", ".copilot/skills"], &Path.join(user_home(), &1))
+    Enum.map(
+      [
+        ".agents/skills",
+        ".claude/skills",
+        ".copilot/skills",
+        ".cline/skills",
+        ".roo/skills",
+        ".hermes/skills",
+        ".factory/skills",
+        ".openclaw/skills"
+      ],
+      &Path.join(user_home(), &1)
+    )
   end
 
   defp user_home do

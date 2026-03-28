@@ -377,9 +377,9 @@ defmodule ControlKeelWeb.SkillsLive do
                   <thead>
                     <tr>
                       <th class="text-left py-2 pr-4">Agent</th>
-                      <th class="text-left py-2 pr-4">Support</th>
-                      <th class="text-left py-2 pr-4">Connection</th>
-                      <th class="text-left py-2 pr-4">Companion</th>
+                      <th class="text-left py-2 pr-4">How agent uses CK</th>
+                      <th class="text-left py-2 pr-4">How CK runs the agent</th>
+                      <th class="text-left py-2 pr-4">Companion and policy</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -390,6 +390,9 @@ defmodule ControlKeelWeb.SkillsLive do
                           <p class="ck-note">{human_support_class(integration.support_class)}</p>
                         </td>
                         <td class="py-2 pr-4 align-top">
+                          <p class="ck-note">
+                            Uses CK via: {format_targets(integration.agent_uses_ck_via)}
+                          </p>
                           <%= if integration.attach_command do %>
                             <div class="flex items-start gap-2">
                               <code>{integration.attach_command}</code>
@@ -416,6 +419,15 @@ defmodule ControlKeelWeb.SkillsLive do
                           </p>
                         </td>
                         <td class="py-2 pr-4 align-top">
+                          <p class="ck-note">
+                            CK runs via: {integration.ck_runs_agent_via || "none"}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Execution support: {integration.execution_support || "inbound_only"}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Autonomy: {integration.autonomy_mode || "policy_gated"}
+                          </p>
                           <p class="ck-note">{integration.config_location}</p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Required CK tools: {format_targets(integration.required_mcp_tools)}
@@ -434,6 +446,9 @@ defmodule ControlKeelWeb.SkillsLive do
                           <p class="ck-note">{integration.companion_delivery}</p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Export targets: {format_targets(integration.export_targets)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Human intervention: {human_intervention_copy(integration)}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Upstream: {integration.upstream_slug || "n/a"}
@@ -596,4 +611,15 @@ defmodule ControlKeelWeb.SkillsLive do
   end
 
   defp registry_label(_integration), do: "not matched"
+
+  defp human_intervention_copy(%{execution_support: "direct"}),
+    do: "Only when findings or approvals block execution"
+
+  defp human_intervention_copy(%{execution_support: "handoff"}),
+    do: "Required to continue from the generated handoff package"
+
+  defp human_intervention_copy(%{execution_support: "runtime"}),
+    do: "Only when the remote runtime pauses or policy gates block"
+
+  defp human_intervention_copy(_integration), do: "Use ControlKeel from the agent side only"
 end
