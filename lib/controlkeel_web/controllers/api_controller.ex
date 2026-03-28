@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.ApiController do
   use ControlKeelWeb, :controller
 
+  alias ControlKeel.ACPRegistry
   alias ControlKeel.AgentRouter
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
@@ -14,6 +15,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
   alias ControlKeel.ProviderBroker
+  alias ControlKeel.ProtocolAccess
   alias ControlKeel.Repo
   alias ControlKeel.Scanner.FastPath
   alias ControlKeel.Skills
@@ -1138,6 +1140,7 @@ defmodule ControlKeelWeb.ApiController do
     json(conn, %{
       targets: Enum.map(Skills.targets(), &skill_target_summary/1),
       agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1),
+      registry_status: ACPRegistry.status(),
       installation_channels: Distribution.install_channels(),
       provider_status: ProviderBroker.status(File.cwd!())
     })
@@ -1254,6 +1257,11 @@ defmodule ControlKeelWeb.ApiController do
       alias_of: integration.alias_of,
       upstream_slug: integration.upstream_slug,
       upstream_docs_url: integration.upstream_docs_url,
+      registry_match: integration.registry_match || false,
+      registry_id: integration.registry_id,
+      registry_version: integration.registry_version,
+      registry_url: integration.registry_url,
+      registry_stale: integration.registry_stale,
       required_mcp_tools: integration.required_mcp_tools,
       install_channels: ControlKeel.AgentIntegration.install_channels(integration.id),
       export_targets: integration.export_targets
@@ -1499,6 +1507,7 @@ defmodule ControlKeelWeb.ApiController do
       id: account.id,
       workspace_id: account.workspace_id,
       name: account.name,
+      oauth_client_id: ProtocolAccess.oauth_client_id(account),
       scopes: ControlKeel.Platform.ServiceAccount.scope_list(account),
       status: account.status,
       last_used_at: account.last_used_at,

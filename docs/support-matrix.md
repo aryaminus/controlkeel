@@ -3,8 +3,11 @@
 This document is the **single inventory** for attach targets, MCP tools, and bundled skills. It is maintained to match:
 
 - [`lib/controlkeel/agent_integration.ex`](../lib/controlkeel/agent_integration.ex) — `AgentIntegration.catalog/0`
+- [`lib/controlkeel/acp_registry.ex`](../lib/controlkeel/acp_registry.ex) — ACP registry enrichment and cache status
 - [`lib/controlkeel/distribution.ex`](../lib/controlkeel/distribution.ex) — `required_mcp_tools/0`, install channels
 - [`lib/controlkeel/mcp/protocol.ex`](../lib/controlkeel/mcp/protocol.ex) — tool schemas exposed to MCP clients
+- [`lib/controlkeel/protocol_access.ex`](../lib/controlkeel/protocol_access.ex) — hosted MCP/A2A token flow and protocol scopes
+- [`lib/controlkeel/protocol_interop.ex`](../lib/controlkeel/protocol_interop.ex) — hosted MCP/A2A dispatch wrappers
 - [`priv/skills/`](../priv/skills/) — on-disk AgentSkills bundles
 
 For install paths and proxy URLs, see [agent-integrations.md](agent-integrations.md) and [getting-started.md](getting-started.md).
@@ -73,6 +76,76 @@ The shipped `copilot` attach target is the repo-native path for GitHub Copilot, 
 Provider-only backends such as `vllm`, `sglang`, `lmstudio`, `huggingface`, and `codestral` currently flow through the CK `openai` provider path with a custom `base_url` and `model`; they are cataloged separately so the support matrix stays honest about the backend you are really targeting.
 
 **Router agent IDs** (for `ck_route` / policy): where set in code, the integration’s `router_agent_id` matches the attach id (e.g. `opencode`, `cursor`); VS Code / Copilot use `nil` in the catalog.
+
+## ACP registry enrichment
+
+The typed integration catalog stays authoritative. ACP registry data is **supplemental only**.
+
+Registry support in the product currently means:
+
+- `controlkeel registry sync acp`
+- `controlkeel registry status acp`
+- `/skills` shows cache freshness and per-row registry hints
+- `GET /api/v1/skills/targets` returns optional fields:
+  - `registry_match`
+  - `registry_id`
+  - `registry_version`
+  - `registry_url`
+  - `registry_stale`
+- the same API payload includes top-level `registry_status`
+
+Registry data never creates new attach targets and never mutates shipped install behavior.
+
+## Hosted protocol interop
+
+ControlKeel now exposes both local stdio MCP and hosted interop surfaces.
+
+### Local stdio MCP
+
+- entrypoint: `controlkeel mcp --project-root /abs/path`
+- auth model: local trust
+- intended use: repo-local native attach flows
+
+### Hosted MCP
+
+- entrypoint: `POST /mcp`
+- discovery:
+  - `GET /.well-known/oauth-protected-resource/mcp`
+  - `GET /.well-known/oauth-protected-resource`
+  - `GET /.well-known/oauth-authorization-server`
+- token exchange: `POST /oauth/token`
+- auth model: short-lived bearer tokens minted from workspace service accounts
+- transport model: stateless JSON-response mode only
+
+Hosted MCP tool authorization uses these protocol scopes:
+
+| Tool | Required scopes |
+|------|-----------------|
+| `ck_context` | `mcp:access`, `context:read` |
+| `ck_validate` | `mcp:access`, `validate:run` |
+| `ck_finding` | `mcp:access`, `finding:write` |
+| `ck_budget` | `mcp:access`, `budget:write` |
+| `ck_route` | `mcp:access`, `route:read` |
+| `ck_skill_list`, `ck_skill_load` | `mcp:access`, `skills:read` |
+
+Service-account responses in the CLI and `/api/v1/workspaces/:id/service-accounts` include the derived `oauth_client_id` for this flow.
+
+### Minimal A2A
+
+- discovery:
+  - `GET /.well-known/agent-card.json`
+  - `GET /.well-known/agent.json`
+- invoke: `POST /a2a`
+- auth model: same service-account bearer flow, using `a2a:access`
+- supported method: `message/send` only
+
+Advertised A2A skills map directly to the core governed capabilities:
+
+- `ck_context`
+- `ck_validate`
+- `ck_finding`
+- `ck_budget`
+- `ck_route`
 
 ## MCP runtime tools
 

@@ -14,16 +14,21 @@ defmodule ControlKeel.MCP.Protocol do
     CkValidate
   }
 
-  @server_info %{"name" => "controlkeel", "version" => "0.1.0"}
+  @server_info %{
+    "name" => "controlkeel",
+    "version" => to_string(Application.spec(:controlkeel, :vsn) || "0.1.0")
+  }
 
-  def handle_json(payload) when is_binary(payload) do
+  def handle_json(payload, opts \\ []) when is_binary(payload) do
     case Jason.decode(payload) do
-      {:ok, request} -> handle_request(request)
+      {:ok, request} -> handle_request(request, opts)
       {:error, error} -> error_response(nil, -32700, "Parse error: #{Exception.message(error)}")
     end
   end
 
-  def handle_request(%{"jsonrpc" => "2.0", "method" => "initialize", "id" => id}) do
+  def handle_request(request, opts \\ [])
+
+  def handle_request(%{"jsonrpc" => "2.0", "method" => "initialize", "id" => id}, _opts) do
     ok_response(id, %{
       "protocolVersion" => "2025-03-26",
       "capabilities" => %{"tools" => %{"listChanged" => false}},
@@ -31,56 +36,73 @@ defmodule ControlKeel.MCP.Protocol do
     })
   end
 
-  def handle_request(%{"jsonrpc" => "2.0", "method" => "notifications/initialized"}),
+  def handle_request(%{"jsonrpc" => "2.0", "method" => "notifications/initialized"}, _opts),
     do: :no_response
 
-  def handle_request(%{"jsonrpc" => "2.0", "method" => "tools/list", "id" => id}) do
+  def handle_request(%{"jsonrpc" => "2.0", "method" => "tools/list", "id" => id}, _opts) do
     ok_response(id, %{"tools" => tool_schemas()})
   end
 
-  def handle_request(%{
-        "jsonrpc" => "2.0",
-        "method" => "tools/call",
-        "id" => id,
-        "params" => params
-      }) do
+  def handle_request(
+        %{
+          "jsonrpc" => "2.0",
+          "method" => "tools/call",
+          "id" => id,
+          "params" => params
+        },
+        opts
+      ) do
     case params do
-      %{"name" => "ck_validate", "arguments" => arguments} ->
-        tool_response(id, CkValidate.call(arguments))
+      %{"name" => name, "arguments" => arguments} ->
+        with :ok <- authorize_tool(name, arguments, opts) do
+          tool_response(id, dispatch_tool(name, arguments))
+        else
+          {:error, {:forbidden, reason}} ->
+            error_response(id, -32001, reason)
 
-      %{"name" => "ck_context", "arguments" => arguments} ->
-        tool_response(id, CkContext.call(arguments))
-
-      %{"name" => "ck_finding", "arguments" => arguments} ->
-        tool_response(id, CkFinding.call(arguments))
-
-      %{"name" => "ck_budget", "arguments" => arguments} ->
-        tool_response(id, CkBudget.call(arguments))
-
-      %{"name" => "ck_route", "arguments" => arguments} ->
-        tool_response(id, CkRoute.call(arguments))
-
-      %{"name" => "ck_skill_list", "arguments" => arguments} ->
-        tool_response(id, CkSkillList.call(arguments))
-
-      %{"name" => "ck_skill_load", "arguments" => arguments} ->
-        tool_response(id, CkSkillLoad.call(arguments))
-
-      %{"name" => unknown} ->
-        error_response(id, -32601, "Unknown tool: #{unknown}")
+          {:error, reason} ->
+            error_response(id, -32602, inspect(reason))
+        end
 
       _other ->
         error_response(id, -32602, "tools/call requires a tool name and arguments")
     end
   end
 
-  def handle_request(%{"jsonrpc" => "2.0", "method" => _method, "id" => id}) do
+  def handle_request(%{"jsonrpc" => "2.0", "method" => _method, "id" => id}, _opts) do
     error_response(id, -32601, "Method not found")
   end
 
-  def handle_request(_request) do
+  def handle_request(_request, _opts) do
     error_response(nil, -32600, "Invalid Request")
   end
+
+  def tool_schemas do
+    base = [
+      ck_validate_tool(),
+      ck_context_tool(),
+      ck_finding_tool(),
+      ck_budget_tool(),
+      ck_route_tool()
+    ]
+
+    if current_skill_names() == [] do
+      base
+    else
+      base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
+    end
+  end
+
+  def dispatch_tool("ck_validate", arguments), do: CkValidate.call(arguments)
+  def dispatch_tool("ck_context", arguments), do: CkContext.call(arguments)
+  def dispatch_tool("ck_finding", arguments), do: CkFinding.call(arguments)
+  def dispatch_tool("ck_budget", arguments), do: CkBudget.call(arguments)
+  def dispatch_tool("ck_route", arguments), do: CkRoute.call(arguments)
+  def dispatch_tool("ck_skill_list", arguments), do: CkSkillList.call(arguments)
+  def dispatch_tool("ck_skill_load", arguments), do: CkSkillLoad.call(arguments)
+
+  def dispatch_tool(unknown, _arguments),
+    do: {:error, {:invalid_arguments, "Unknown tool: #{unknown}"}}
 
   def ck_validate_tool do
     %{
@@ -168,19 +190,11 @@ defmodule ControlKeel.MCP.Protocol do
     }
   end
 
-  defp tool_schemas do
-    base = [
-      ck_validate_tool(),
-      ck_context_tool(),
-      ck_finding_tool(),
-      ck_budget_tool(),
-      ck_route_tool()
-    ]
-
-    if current_skill_names() == [] do
-      base
-    else
-      base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
+  defp authorize_tool(name, arguments, opts) do
+    case Keyword.get(opts, :authorize) do
+      nil -> :ok
+      fun when is_function(fun, 2) -> fun.(name, arguments)
+      _ -> :ok
     end
   end
 

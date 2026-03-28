@@ -687,6 +687,23 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert account_output =~ "Created service account"
+    assert account_output =~ "OAuth client id: ck-sa-"
+
+    list_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{
+                     command: :service_account_list,
+                     options: [workspace_id: workspace.id],
+                     args: []
+                   },
+                   project_root: tmp_dir
+                 )
+      end)
+
+    assert list_output =~ "Service accounts for workspace"
+    assert list_output =~ "client: ck-sa-"
 
     graph_output =
       capture_io(fn ->

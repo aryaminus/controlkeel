@@ -156,6 +156,67 @@ For the full native skills / plugin matrix, see [agent-integrations.md](agent-in
 
 If you use Cline, the attach flow is first-class for MCP, skills, rules, and workflows, but CK still needs its own provider profile or local Ollama for CK-internal model work because Cline's provider secrets are not exposed as a documented bridge.
 
+## 3b. Hosted MCP or A2A access for headless clients
+
+The repo-local default is still:
+
+- local stdio MCP through `controlkeel mcp`
+- native `controlkeel attach ...` flows for supported clients
+
+Hosted protocol access is for service-account-driven machines and remote clients.
+
+Create a service account with protocol scopes:
+
+```bash
+controlkeel service-account create --workspace-id 1 --name "ci-mcp" --scopes "mcp:access context:read validate:run"
+```
+
+The create and list commands print the derived OAuth client id, for example `ck-sa-123`.
+
+Mint a short-lived bearer token:
+
+```bash
+curl -X POST http://localhost:4000/oauth/token \
+  -H "content-type: application/x-www-form-urlencoded" \
+  --data-urlencode "grant_type=client_credentials" \
+  --data-urlencode "client_id=ck-sa-123" \
+  --data-urlencode "client_secret=YOUR_SERVICE_ACCOUNT_TOKEN" \
+  --data-urlencode "resource=mcp" \
+  --data-urlencode "scope=mcp:access context:read validate:run"
+```
+
+Then call hosted MCP:
+
+```bash
+curl -X POST http://localhost:4000/mcp \
+  -H "authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+Hosted discovery is available at:
+
+- `/.well-known/oauth-protected-resource/mcp`
+- `/.well-known/oauth-protected-resource`
+- `/.well-known/oauth-authorization-server`
+
+Minimal A2A discovery and message routing are available at:
+
+- `/.well-known/agent-card.json`
+- `/.well-known/agent.json`
+- `POST /a2a`
+
+That A2A layer only exposes the governed CK capabilities `ck_context`, `ck_validate`, `ck_finding`, `ck_budget`, and `ck_route`.
+
+ACP registry discovery is optional. To refresh or inspect the local cache:
+
+```bash
+controlkeel registry sync acp
+controlkeel registry status acp
+```
+
+The registry cache only enriches the shipped catalog in `/skills` and `GET /api/v1/skills/targets`. It never changes attach/install behavior on its own.
+
 ## 3a. OpenCode quick path
 
 For OpenCode specifically:

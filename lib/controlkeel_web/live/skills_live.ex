@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.SkillsLive do
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.ACPRegistry
   alias ControlKeel.ProviderBroker
   alias ControlKeel.Skills
 
@@ -213,6 +214,25 @@ defmodule ControlKeelWeb.SkillsLive do
                 Fallback chain: {Enum.join(@provider_status["fallback_chain"], ", ")}
               </p>
             </article>
+            <article class="ck-finding-item" id="skills-registry-status">
+              <div class="ck-finding-head">
+                <h3>ACP registry cache</h3>
+                <span class={[
+                  "ck-pill",
+                  (@registry_status["stale"] && "ck-pill-medium") || "ck-pill-neutral"
+                ]}>
+                  {if @registry_status["stale"], do: "stale", else: "fresh"}
+                </span>
+              </div>
+              <p class="ck-note">
+                Entries: {@registry_status["entry_count"]} / matched integrations: {@registry_status[
+                  "matched_integrations"
+                ]}
+              </p>
+              <p class="ck-note" style="margin-top: 0.35rem;">
+                Fetched at: {@registry_status["fetched_at"] || "never"}
+              </p>
+            </article>
           </div>
         </div>
 
@@ -419,6 +439,9 @@ defmodule ControlKeelWeb.SkillsLive do
                             Upstream: {integration.upstream_slug || "n/a"}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
+                            ACP registry: {registry_label(integration)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
                             Get CK: {format_install_channels(integration.install_channels)}
                           </p>
                         </td>
@@ -493,6 +516,7 @@ defmodule ControlKeelWeb.SkillsLive do
   defp assign_analysis(socket, project_root) do
     analysis = Skills.analyze(project_root)
     provider_status = ProviderBroker.status(project_root)
+    registry_status = ACPRegistry.status()
 
     socket
     |> assign(:project_root, project_root)
@@ -501,6 +525,7 @@ defmodule ControlKeelWeb.SkillsLive do
     |> assign(:targets, Skills.targets())
     |> assign(:trusted_project?, analysis.trusted_project?)
     |> assign(:provider_status, provider_status)
+    |> assign(:registry_status, registry_status)
   end
 
   defp project_form(project_root), do: to_form(%{"project_root" => project_root}, as: :project)
@@ -564,4 +589,11 @@ defmodule ControlKeelWeb.SkillsLive do
   end
 
   defp selected_base_url(_status), do: "default"
+
+  defp registry_label(%{registry_match: true, registry_version: version, registry_stale: stale}) do
+    suffix = if stale, do: " (stale cache)", else: ""
+    "matched #{version || "unknown"}#{suffix}"
+  end
+
+  defp registry_label(_integration), do: "not matched"
 end

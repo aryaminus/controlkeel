@@ -1,6 +1,7 @@
 defmodule ControlKeel.CLI do
   @moduledoc false
 
+  alias ControlKeel.ACPRegistry
   alias ControlKeel.AgentIntegration
   alias ControlKeel.Analytics
   alias ControlKeel.Benchmark
@@ -15,6 +16,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
   alias ControlKeel.ProviderBroker
+  alias ControlKeel.ProtocolAccess
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Proxy
   alias ControlKeel.Skills
@@ -154,6 +156,12 @@ defmodule ControlKeel.CLI do
 
       ["govern", "install", "github" | rest] ->
         parse_with_switches(:govern_install_github, rest, @govern_install_switches)
+
+      ["registry", "sync", "acp"] ->
+        {:ok, %{command: :registry_sync_acp, options: %{}, args: []}}
+
+      ["registry", "status", "acp"] ->
+        {:ok, %{command: :registry_status_acp, options: %{}, args: []}}
 
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
@@ -358,6 +366,9 @@ defmodule ControlKeel.CLI do
                                       Check proof-backed release readiness for a session
       controlkeel govern install github
                                       Scaffold repo-native GitHub governance workflows
+      controlkeel registry sync acp  Refresh the cached ACP registry metadata
+      controlkeel registry status acp
+                                      Show ACP registry cache freshness and matches
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
@@ -1326,6 +1337,7 @@ defmodule ControlKeel.CLI do
        [
          "Created service account ##{account.id} for workspace ##{workspace_id}.",
          "Name: #{account.name}",
+         "OAuth client id: #{ProtocolAccess.oauth_client_id(account)}",
          "Scopes: #{Enum.join(ControlKeel.Platform.ServiceAccount.scope_list(account), ", ")}",
          "Token: #{token}"
        ]}
@@ -1349,7 +1361,7 @@ defmodule ControlKeel.CLI do
           [
             "Service accounts for workspace ##{workspace_id}:"
             | Enum.map(accounts, fn account ->
-                "  ##{account.id} #{account.name} [#{account.status}] scopes: #{Enum.join(ControlKeel.Platform.ServiceAccount.scope_list(account), ", ")}"
+                "  ##{account.id} #{account.name} [#{account.status}] client: #{ProtocolAccess.oauth_client_id(account)} scopes: #{Enum.join(ControlKeel.Platform.ServiceAccount.scope_list(account), ", ")}"
               end)
           ]
         end
@@ -1384,6 +1396,7 @@ defmodule ControlKeel.CLI do
       {:ok,
        [
          "Rotated service account ##{account.id}.",
+         "OAuth client id: #{ProtocolAccess.oauth_client_id(account)}",
          "Token: #{token}"
        ]}
     else
@@ -1612,6 +1625,39 @@ defmodule ControlKeel.CLI do
        Enum.map(status["profiles"], fn profile ->
          "  #{profile["provider"]}: configured=#{if(profile["configured"], do: "yes", else: "no")} env=#{if(profile["env_override"], do: "yes", else: "no")} default=#{if(profile["default"], do: "yes", else: "no")} model=#{profile["model"] || "n/a"} base_url=#{profile["base_url"] || "default"}"
        end)}
+  end
+
+  def run_command(%{command: :registry_sync_acp}, _project_root) do
+    case ACPRegistry.sync() do
+      {:ok, status} ->
+        {:ok,
+         [
+           "Refreshed ACP registry cache.",
+           "Source: #{status["registry_url"]}",
+           "Fetched at: #{status["fetched_at"]}",
+           "Entries: #{status["entry_count"]}",
+           "Matched integrations: #{status["matched_integrations"]}",
+           "Cache: #{status["cache_path"]}"
+         ]}
+
+      {:error, reason} ->
+        {:error, "Failed to refresh ACP registry cache: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :registry_status_acp}, _project_root) do
+    status = ACPRegistry.status()
+
+    {:ok,
+     [
+       "ACP registry cache status:",
+       "Source: #{status["registry_url"]}",
+       "Fetched at: #{status["fetched_at"] || "never"}",
+       "Entries: #{status["entry_count"]}",
+       "Matched integrations: #{status["matched_integrations"]}",
+       "Stale: #{if(status["stale"], do: "yes", else: "no")}",
+       "Cache: #{status["cache_path"]}"
+     ]}
   end
 
   def run_command(%{command: :provider_show, options: options}, project_root) do

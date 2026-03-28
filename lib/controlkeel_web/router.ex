@@ -15,6 +15,23 @@ defmodule ControlKeelWeb.Router do
     plug ControlKeelWeb.Plugs.ApiAuth
   end
 
+  pipeline :protocol_api do
+    plug :accepts, ["json"]
+  end
+
+  pipeline :hosted_mcp do
+    plug :accepts, ["json"]
+    plug ControlKeelWeb.Plugs.ProtocolAccessAuth, resource: "mcp"
+  end
+
+  pipeline :hosted_a2a do
+    plug :accepts, ["json"]
+
+    plug ControlKeelWeb.Plugs.ProtocolAccessAuth,
+      resource: "a2a",
+      include_resource_metadata: false
+  end
+
   pipeline :proxy_api do
   end
 
@@ -111,6 +128,31 @@ defmodule ControlKeelWeb.Router do
     get "/openai/:proxy_token/v1/models", ProxyController, :openai_models
     post "/anthropic/:proxy_token/v1/messages", ProxyController, :anthropic_messages
     get "/openai/:proxy_token/v1/realtime", ProxySocketController, :openai_realtime
+  end
+
+  scope "/", ControlKeelWeb do
+    pipe_through :protocol_api
+
+    get "/.well-known/oauth-protected-resource/mcp", ProtocolController, :protected_resource_mcp
+    get "/.well-known/oauth-protected-resource", ProtocolController, :protected_resource_alias
+    get "/.well-known/oauth-authorization-server", ProtocolController, :authorization_server
+    get "/.well-known/agent-card.json", ProtocolController, :a2a_card
+    get "/.well-known/agent.json", ProtocolController, :a2a_card
+    post "/oauth/token", OAuthController, :token
+    get "/mcp", ProtocolController, :mcp_get
+    delete "/mcp", ProtocolController, :mcp_delete
+  end
+
+  scope "/", ControlKeelWeb do
+    pipe_through :hosted_mcp
+
+    post "/mcp", ProtocolController, :mcp
+  end
+
+  scope "/", ControlKeelWeb do
+    pipe_through :hosted_a2a
+
+    post "/a2a", ProtocolController, :a2a
   end
 
   if Application.compile_env(:controlkeel, :dev_routes) do

@@ -50,7 +50,7 @@ defmodule ControlKeel.Platform.ServiceAccount do
           |> List.wrap()
           |> Enum.flat_map(fn
             values when is_list(values) -> values
-            values when is_binary(values) -> String.split(values, ",", trim: true)
+            values when is_binary(values) -> String.split(values, ~r/[\s,]+/, trim: true)
             other -> [other]
           end)
           |> Enum.map(&to_string/1)

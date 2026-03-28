@@ -337,6 +337,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       response = json_response(conn, 200)
       targets = response["targets"]
       agents = response["agents"]
+      registry_status = response["registry_status"]
       install_channels = response["installation_channels"]
 
       assert Enum.any?(targets, &(&1["id"] == "claude-plugin"))
@@ -352,6 +353,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(agents, &(&1["id"] == "open-swe"))
       assert Enum.any?(agents, &(&1["id"] == "devin"))
       assert Enum.any?(agents, &(&1["id"] == "vllm"))
+      assert is_map(registry_status)
+      assert Map.has_key?(registry_status, "stale")
       assert Enum.any?(install_channels, &(&1["id"] == "homebrew"))
       assert Enum.any?(install_channels, &(&1["id"] == "npm"))
 
@@ -811,10 +814,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert %{"service_account" => account, "token" => token} = json_response(conn, 201)
       assert account["workspace_id"] == workspace.id
+      assert account["oauth_client_id"] == "ck-sa-#{account["id"]}"
       assert is_binary(token)
 
       conn = build_conn() |> get(~p"/api/v1/workspaces/#{workspace.id}/service-accounts")
-      assert %{"service_accounts" => [_ | _]} = json_response(conn, 200)
+      assert %{"service_accounts" => [listed | _]} = json_response(conn, 200)
+      assert listed["oauth_client_id"] == "ck-sa-#{listed["id"]}"
 
       conn =
         build_conn()

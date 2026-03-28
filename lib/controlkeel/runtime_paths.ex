@@ -21,6 +21,10 @@ defmodule ControlKeel.RuntimePaths do
     Path.join(cache_dir(), "bindings")
   end
 
+  def acp_registry_cache_path do
+    Path.join(cache_dir(), "acp_registry.json")
+  end
+
   def ephemeral_binding_path(project_root) do
     root = Path.expand(project_root)
 

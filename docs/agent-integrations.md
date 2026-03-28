@@ -37,6 +37,52 @@ Today there are five support mechanisms:
 
 This mechanism view is intentionally simpler than the typed support inventory, but it should never contradict it.
 
+## Protocol interop and discovery
+
+There are now three protocol surfaces around the catalog itself:
+
+- **Local stdio MCP** for repo-local trust and native attach flows
+- **Hosted MCP** for service-account-driven remote clients
+- **Minimal A2A** for agent-card discovery and thin JSON-RPC message dispatch
+
+Hosted MCP uses:
+
+- `POST /mcp`
+- `GET /.well-known/oauth-protected-resource/mcp`
+- `GET /.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-authorization-server`
+- `POST /oauth/token`
+
+Hosted access is intentionally narrow:
+
+- local stdio MCP remains unauthenticated
+- hosted MCP uses short-lived bearer tokens minted from workspace service accounts
+- service-account create/list responses expose the derived `oauth_client_id`
+- no browser OAuth flow or dynamic client registration in v1
+
+Minimal A2A uses:
+
+- `GET /.well-known/agent-card.json`
+- `GET /.well-known/agent.json`
+- `POST /a2a`
+
+It advertises exactly the current governed capabilities:
+
+- `ck_context`
+- `ck_validate`
+- `ck_finding`
+- `ck_budget`
+- `ck_route`
+
+No second orchestration system is implied here. The A2A layer is only a thin facade over existing ControlKeel tools.
+
+ACP registry support is also deliberately narrow:
+
+- `controlkeel registry sync acp`
+- `controlkeel registry status acp`
+
+The remote registry only enriches existing rows with freshness, version, and homepage metadata in `/skills` and `GET /api/v1/skills/targets`. It never creates attach targets or overrides the built-in catalog.
+
 ## Provider-bridge supported agents
 
 These are the strongest zero-setup paths today because ControlKeel can reuse a compatible provider environment from the attached client.
@@ -95,6 +141,8 @@ These appear in the same integration catalog, but they are intentionally **not**
 | Provider-only | `codestral`, `ollama-runtime`, `vllm`, `sglang`, `lmstudio`, `huggingface` | Exposed through CK provider/profile templates and OpenAI-compatible backend guidance. |
 | Alias | `claude-dispatch`, `cognition`, `cursor-agent`, `codex-app-server`, `copilot-cli`, `t3code` | Resolve to canonical shipped targets rather than creating duplicate attach flows. |
 | Unverified | `rlm-agent`, `slate`, `retune` | Kept visible as research names, but not over-promised as shipped support. |
+
+Headless runtimes and remote clients can combine these with the hosted protocol layer above rather than relying on repo-local stdio MCP.
 
 ## Proxy-compatible clients
 

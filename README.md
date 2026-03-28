@@ -29,6 +29,13 @@ The live control loop is:
 
 The other core differentiator is **occupation-first governance**. Users choose what best describes their work, and ControlKeel maps that to a domain pack, interview language, and compliance posture. The product is designed to talk about work and risk in plain language rather than forcing non-experts to begin with framework acronyms.
 
+ControlKeel also now has a narrow hosted interop layer on top of the local runtime:
+
+- local stdio MCP for repo-local trust and native attach flows
+- hosted MCP at `POST /mcp` for service-account-driven headless clients
+- a minimal A2A facade at `POST /a2a` plus well-known agent-card discovery
+- ACP registry cache enrichment for discovery freshness without making a remote registry the source of truth
+
 ## Governed delivery lifecycle
 
 ControlKeel is designed as one governed assembly line, not a collection of disconnected tools:
@@ -192,6 +199,15 @@ OpenCode is the recommended quick-start path in this category.
 ControlKeel's governed proxy currently exposes OpenAI-style and Anthropic-style paths. That makes it a good fit for tools that can point at those APIs directly, but it is not the same thing as a native bridge or first-class attach target.
 
 `/skills` in the web app and [docs/agent-integrations.md](docs/agent-integrations.md) show the live compatibility matrix and export/install targets.
+
+ACP registry freshness is optional but available:
+
+```bash
+controlkeel registry sync acp
+controlkeel registry status acp
+```
+
+The cached registry only enriches shipped integration rows with freshness and homepage/version metadata. It never creates new attach targets or overrides the built-in catalog.
 
 ### Integration modes
 
@@ -389,6 +405,83 @@ Skills tools are exposed when the catalog is non-empty:
 controlkeel mcp --project-root /absolute/path/to/project
 ```
 
+That local stdio path stays friction-light and unauthenticated by design. Hosted remote access uses the separate protocol surfaces below.
+
+## Hosted protocol interop
+
+Hosted interop is intentionally narrow. It is meant for service-account-driven remote clients and machine integrations, not as a second orchestration engine.
+
+### Hosted MCP
+
+- `POST /mcp` serves stateless JSON-response MCP for `initialize`, `tools/list`, and `tools/call`
+- `GET /mcp` and `DELETE /mcp` intentionally return `405`
+- protected-resource and auth-server discovery live at:
+  - `GET /.well-known/oauth-protected-resource/mcp`
+  - `GET /.well-known/oauth-protected-resource`
+  - `GET /.well-known/oauth-authorization-server`
+- access tokens are minted by `POST /oauth/token` using the client-credentials grant
+
+Local stdio MCP and hosted MCP are separate on purpose:
+
+- local stdio MCP trusts the local machine
+- hosted MCP requires bearer access tokens on every request
+- hosted MCP uses workspace-scoped service accounts as confidential clients
+
+### Service-account client credentials
+
+Create or list a workspace service account through the CLI or API. Both surfaces return the derived OAuth client id so callers do not need to guess it:
+
+```bash
+controlkeel service-account create --workspace-id 1 --name "ci-mcp" --scopes "mcp:access context:read validate:run"
+controlkeel service-account list --workspace-id 1
+```
+
+Then exchange that service account for a short-lived access token:
+
+```bash
+curl -X POST http://localhost:4000/oauth/token \
+  -H "content-type: application/x-www-form-urlencoded" \
+  --data-urlencode "grant_type=client_credentials" \
+  --data-urlencode "client_id=ck-sa-123" \
+  --data-urlencode "client_secret=YOUR_SERVICE_ACCOUNT_TOKEN" \
+  --data-urlencode "resource=mcp" \
+  --data-urlencode "scope=mcp:access context:read validate:run"
+```
+
+Hosted protocol scopes are explicit:
+
+- `mcp:access`
+- `a2a:access`
+- `context:read`
+- `validate:run`
+- `finding:write`
+- `budget:write`
+- `route:read`
+- `skills:read`
+
+### Minimal A2A
+
+ControlKeel also exposes a thin A2A facade:
+
+- `GET /.well-known/agent-card.json`
+- `GET /.well-known/agent.json`
+- `POST /a2a`
+
+This A2A surface is intentionally limited:
+
+- `message/send` only
+- no task store
+- no push notifications
+- no streaming session lifecycle
+
+The advertised governed skills are:
+
+- `ck_context`
+- `ck_validate`
+- `ck_finding`
+- `ck_budget`
+- `ck_route`
+
 ## REST API
 
 All endpoints return JSON.
@@ -418,6 +511,20 @@ All endpoints return JSON.
 - `GET /api/v1/memory/search`
 - `DELETE /api/v1/memory/:id`
 
+### Workspace and headless controls
+
+- `GET /api/v1/workspaces/:id/service-accounts`
+- `POST /api/v1/workspaces/:id/service-accounts`
+- `POST /api/v1/service-accounts/:id/rotate`
+- `GET /api/v1/workspaces/:id/policy-sets`
+- `POST /api/v1/workspaces/:id/policy-sets`
+- `POST /api/v1/workspaces/:id/policy-sets/:policy_set_id/apply`
+- `GET /api/v1/workspaces/:id/webhooks`
+- `POST /api/v1/workspaces/:id/webhooks`
+- `POST /api/v1/webhooks/:id/replay`
+
+Service-account responses include `oauth_client_id` so headless MCP/A2A clients can use the client-credentials flow without deriving identifiers themselves.
+
 ### Validation, budgets, routing, findings
 
 - `POST /api/v1/validate`
@@ -440,6 +547,21 @@ All endpoints return JSON.
 - `GET /api/v1/skills/targets`
 - `POST /api/v1/skills/export`
 - `POST /api/v1/skills/install`
+
+`GET /api/v1/skills/targets` includes optional ACP registry enrichment fields such as `registry_match`, `registry_version`, `registry_url`, and `registry_stale`, plus top-level `registry_status` for the cache itself.
+
+## Protocol endpoints
+
+- `POST /mcp`
+- `GET /mcp`
+- `DELETE /mcp`
+- `GET /.well-known/oauth-protected-resource/mcp`
+- `GET /.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-authorization-server`
+- `POST /oauth/token`
+- `GET /.well-known/agent-card.json`
+- `GET /.well-known/agent.json`
+- `POST /a2a`
 
 ### Benchmarks and policy training
 

@@ -14,6 +14,9 @@ config :controlkeel,
   runtime_mode: :local,
   bus: :local,
   pdf_renderer: :chromic,
+  protocol_access_token_ttl_seconds: 3_600,
+  acp_registry_url: "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json",
+  acp_registry_ttl_seconds: 86_400,
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint

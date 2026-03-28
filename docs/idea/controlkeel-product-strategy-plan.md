@@ -114,8 +114,9 @@ The repo now has three explicit roadmap buckets:
 1. **Canonical remaining work**
    - `Team / Platform`
    - `Infrastructure`
-2. **Recommended next branch**
+2. **Recent control-plane hardening**
    - `Repo Governance and Delivery Controls`
+   - `Protocol Interop Hardening`
 3. **Explicit non-goals for now**
    - microVM sandboxing
    - autonomous hosting / scale-to-zero
@@ -125,24 +126,25 @@ The repo now has three explicit roadmap buckets:
 
 The remaining-work bucket lives in `controlkeel-final-build-plan.md`. Everything else in `idea/archive/` is historical source material, not live roadmap.
 
-## Recommended Next Branch
+## Recent Control-Plane Hardening
 
-The best next branch is **Repo Governance and Delivery Controls**.
+The most recent completed slices deepened ControlKeel's role above generator output without reopening deferred platform or infrastructure work.
 
-That branch extends the current mission/findings/proofs/budget stack into repo-native controls that run before merge and before release:
+**Repo Governance and Delivery Controls** added:
 
 - diff and patch review through `controlkeel review diff` and `controlkeel review pr`
 - proof-backed release readiness through `controlkeel release-ready`
 - cheap GitHub workflow scaffolding through `controlkeel govern install github`
 - matching REST surfaces for review, readiness, and scaffold installation
 
-This is the right next step because it deepens ControlKeel’s control-plane role without reopening deferred platform or infrastructure work.
-
-After that branch, the next queued slice is **Protocol Interop Hardening**:
+**Protocol Interop Hardening** added:
 
 - hosted MCP auth aligned with current authorization guidance
+- service-account client-credentials flow for hosted MCP and A2A
 - optional ACP registry awareness without making the registry the source of truth
 - a minimal A2A surface for context, validation, findings, budgets, and routing
+
+These two slices now represent the current boundary of the non-platform control plane.
 
 ## Out of Scope Here
 
