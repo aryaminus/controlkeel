@@ -219,6 +219,82 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  describe "repo governance API" do
+    test "reviews a PR patch and persists findings for a session", %{conn: conn} do
+      session = session_fixture()
+
+      patch = """
+      diff --git a/lib/auth.ex b/lib/auth.ex
+      index 1111111..2222222 100644
+      --- a/lib/auth.ex
+      +++ b/lib/auth.ex
+      @@ -0,0 +1,1 @@
+      +api_key = "AKIAIOSFODNN7EXAMPLE"
+      """
+
+      conn =
+        post(conn, ~p"/api/v1/review/pr", %{
+          patch: patch,
+          session_id: session.id
+        })
+
+      body = json_response(conn, 200)
+      assert body["review"]["decision"] == "block"
+      assert body["review"]["blocking"] == true
+      assert length(body["review"]["persisted_finding_ids"]) > 0
+    end
+
+    test "evaluates release readiness from proof and evidence state", %{conn: conn} do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+      _proof = proof_bundle_fixture(%{task: task})
+
+      conn =
+        post(conn, ~p"/api/v1/release/readiness", %{
+          session_id: session.id
+        })
+
+      body = json_response(conn, 200)
+      assert body["release"]["status"] == "needs-review"
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/release/readiness", %{
+          session_id: session.id,
+          smoke: %{"status" => "success"},
+          provenance: %{"verified" => true}
+        })
+
+      ready_body = json_response(conn, 200)
+      assert ready_body["release"]["status"] == "ready"
+    end
+
+    test "installs github governance scaffolding", %{conn: conn} do
+      tmp_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "controlkeel-api-governance-#{System.unique_integer([:positive])}"
+        )
+
+      File.rm_rf!(tmp_dir)
+      File.mkdir_p!(tmp_dir)
+
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      conn = post(conn, ~p"/api/v1/governance/install/github", %{project_root: tmp_dir})
+      body = json_response(conn, 200)
+
+      assert body["install"]["provider"] == "github"
+      assert File.exists?(Path.join(tmp_dir, ".github/workflows/controlkeel-pr-governor.yml"))
+
+      assert File.exists?(
+               Path.join(tmp_dir, ".github/workflows/controlkeel-release-governor.yml")
+             )
+
+      assert File.exists?(Path.join(tmp_dir, ".github/workflows/scorecards.yml"))
+    end
+  end
+
   # ─── Findings ────────────────────────────────────────────────────────────────
 
   describe "GET /api/v1/findings" do

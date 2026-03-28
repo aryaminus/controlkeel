@@ -107,11 +107,50 @@ The near-term product direction is not to rebuild shipped architecture. It is to
 3. Keep “proof console” as the umbrella framing for Mission Control, Proof Browser, Ship Dashboard, and Benchmarks.
 4. Keep live metrics limited to what the current persisted data can support honestly.
 
+## Roadmap Buckets
+
+The repo now has three explicit roadmap buckets:
+
+1. **Canonical remaining work**
+   - `Team / Platform`
+   - `Infrastructure`
+2. **Recommended next branch**
+   - `Repo Governance and Delivery Controls`
+3. **Explicit non-goals for now**
+   - microVM sandboxing
+   - autonomous hosting / scale-to-zero
+   - RL / self-healing systems
+   - compliance-guarantee claims
+   - universal native support for every external tool
+
+The remaining-work bucket lives in `controlkeel-final-build-plan.md`. Everything else in `idea/archive/` is historical source material, not live roadmap.
+
+## Recommended Next Branch
+
+The best next branch is **Repo Governance and Delivery Controls**.
+
+That branch extends the current mission/findings/proofs/budget stack into repo-native controls that run before merge and before release:
+
+- diff and patch review through `controlkeel review diff` and `controlkeel review pr`
+- proof-backed release readiness through `controlkeel release-ready`
+- cheap GitHub workflow scaffolding through `controlkeel govern install github`
+- matching REST surfaces for review, readiness, and scaffold installation
+
+This is the right next step because it deepens ControlKeel’s control-plane role without reopening deferred platform or infrastructure work.
+
+After that branch, the next queued slice is **Protocol Interop Hardening**:
+
+- hosted MCP auth aligned with current authorization guidance
+- optional ACP registry awareness without making the registry the source of truth
+- a minimal A2A surface for context, validation, findings, budgets, and routing
+
 ## Out of Scope Here
 
 This strategy document does not reopen separate remaining-work branches that are already tracked elsewhere:
 
 - Team / Org Platform
 - Infrastructure
+
+It also does not reopen the deliberate non-goals listed above.
 
 Those remain in the dedicated remaining-work docs.

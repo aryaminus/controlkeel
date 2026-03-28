@@ -7,6 +7,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Budget
   alias ControlKeel.ClaudeCLI
   alias ControlKeel.Distribution
+  alias ControlKeel.Governance
   alias ControlKeel.Intent
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
@@ -84,6 +85,29 @@ defmodule ControlKeel.CLI do
   @provider_doctor_switches [project_root: :string]
   @bootstrap_switches [project_root: :string, ephemeral_ok: :boolean, agent: :string]
   @runtime_export_switches [project_root: :string]
+  @review_diff_switches [
+    base: :string,
+    head: :string,
+    session_id: :integer,
+    domain_pack: :string,
+    project_root: :string
+  ]
+  @review_pr_switches [
+    patch: :string,
+    stdin: :boolean,
+    session_id: :integer,
+    domain_pack: :string,
+    project_root: :string
+  ]
+  @release_ready_switches [
+    session_id: :integer,
+    sha: :string,
+    smoke_status: :string,
+    artifact_source: :string,
+    provenance_verified: :boolean,
+    project_root: :string
+  ]
+  @govern_install_switches [project_root: :string]
 
   def standalone_argv do
     cond do
@@ -118,6 +142,18 @@ defmodule ControlKeel.CLI do
 
       ["runtime", "export", runtime_id | rest] ->
         parse_runtime_export(runtime_id, rest)
+
+      ["review", "diff" | rest] ->
+        parse_with_switches(:review_diff, rest, @review_diff_switches)
+
+      ["review", "pr" | rest] ->
+        parse_with_switches(:review_pr, rest, @review_pr_switches)
+
+      ["release-ready" | rest] ->
+        parse_with_switches(:release_ready, rest, @release_ready_switches)
+
+      ["govern", "install", "github" | rest] ->
+        parse_with_switches(:govern_install_github, rest, @govern_install_switches)
 
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
@@ -315,6 +351,13 @@ defmodule ControlKeel.CLI do
                                       Flags: --mcp-only, --no-native, --with-skills,
                                              --scope user|project
                                       Supported: #{supported_attach_agents_text()}
+      controlkeel review diff [options]
+                                      Review a git diff between two refs before merge
+      controlkeel review pr [options] Review a PR patch from --patch <file> or --stdin
+      controlkeel release-ready [options]
+                                      Check proof-backed release readiness for a session
+      controlkeel govern install github
+                                      Scaffold repo-native GitHub governance workflows
       controlkeel status              Show current session status
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
@@ -747,6 +790,59 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :runtime_export, args: [runtime_id]}, _project_root) do
     {:error, "Unknown runtime export target: #{runtime_id}"}
+  end
+
+  def run_command(%{command: :review_diff, options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    with {:ok, base_ref} <- required_option(options, :base, "--base"),
+         {:ok, head_ref} <- required_option(options, :head, "--head"),
+         {:ok, review} <-
+           Governance.review_diff(
+             base_ref,
+             head_ref,
+             governance_opts(options, root)
+           ) do
+      {:ok, review_lines(review, "merge")}
+    end
+  end
+
+  def run_command(%{command: :review_pr, options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    with {:ok, patch} <- patch_input(options),
+         {:ok, review} <- Governance.review_patch(patch, governance_opts(options, root)) do
+      {:ok, review_lines(review, "merge")}
+    end
+  end
+
+  def run_command(%{command: :release_ready, options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    with {:ok, session_id} <- release_ready_session_id(options, root),
+         {:ok, readiness} <-
+           Governance.release_readiness(
+             release_ready_opts(options, root)
+             |> Map.put(:session_id, session_id)
+           ) do
+      {:ok, release_ready_lines(readiness)}
+    end
+  end
+
+  def run_command(%{command: :govern_install_github, options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    case Governance.install_github_scaffolding(root) do
+      {:ok, result} ->
+        {:ok,
+         [
+           "Installed ControlKeel GitHub governance scaffolding.",
+           "Project root: #{result["project_root"]}"
+         ] ++ Enum.map(result["files"], &"  #{&1}")}
+
+      {:error, message} ->
+        {:error, message}
+    end
   end
 
   def run_command(%{command: :status}, project_root) do
@@ -2113,6 +2209,159 @@ defmodule ControlKeel.CLI do
       _ ->
         {:error, usage_text()}
     end
+  end
+
+  defp required_option(options, key, flag) do
+    case Keyword.get(options, key) do
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, "#{flag} is required."}
+    end
+  end
+
+  defp governance_opts(options, project_root) do
+    [
+      session_id: options[:session_id] || binding_session_id(project_root),
+      domain_pack: options[:domain_pack],
+      project_root: project_root,
+      github: github_metadata_from_env()
+    ]
+  end
+
+  defp release_ready_session_id(options, project_root) do
+    case options[:session_id] || binding_session_id(project_root) do
+      nil ->
+        {:error,
+         "Release readiness requires --session-id or an existing project binding in the current repo."}
+
+      session_id ->
+        {:ok, session_id}
+    end
+  end
+
+  defp release_ready_opts(options, project_root) do
+    %{
+      sha: options[:sha],
+      project_root: project_root,
+      smoke: %{
+        "status" => options[:smoke_status],
+        "artifact_source" => options[:artifact_source]
+      },
+      provenance: %{
+        "verified" => Keyword.get(options, :provenance_verified, false),
+        "artifact_source" => options[:artifact_source]
+      },
+      github: github_metadata_from_env()
+    }
+  end
+
+  defp patch_input(options) do
+    cond do
+      is_binary(options[:patch]) and options[:patch] != "" ->
+        case File.read(options[:patch]) do
+          {:ok, patch} -> {:ok, patch}
+          {:error, reason} -> {:error, "Failed to read patch file: #{inspect(reason)}"}
+        end
+
+      Keyword.get(options, :stdin, false) ->
+        {:ok, IO.read(:stdio, :all)}
+
+      true ->
+        {:error, "Provide --patch <file> or --stdin."}
+    end
+  end
+
+  defp review_lines(review, recommendation_label) do
+    decision =
+      case review["decision"] do
+        "block" -> "blocked"
+        "warn" -> "needs review"
+        _ -> "allowed"
+      end
+
+    base_lines = [
+      review["summary"],
+      "#{String.capitalize(recommendation_label)} recommendation: #{decision}.",
+      "Files reviewed: #{review["files_reviewed"]}",
+      "Chunks reviewed: #{review["chunks_reviewed"]}",
+      "Added lines reviewed: #{review["added_lines_reviewed"]}",
+      "Findings: #{get_in(review, ["finding_totals", "total"]) || 0}"
+    ]
+
+    persisted_lines =
+      case review["persisted_finding_ids"] || [] do
+        [] -> []
+        ids -> ["Persisted findings: #{Enum.join(Enum.map(ids, &to_string/1), ", ")}"]
+      end
+
+    finding_lines =
+      Enum.map(review["findings"] || [], fn finding ->
+        location =
+          [finding["path"], finding["kind"]]
+          |> Enum.reject(&(&1 in [nil, ""]))
+          |> Enum.join(" / ")
+
+        severity = "#{finding["severity"]}/#{finding["decision"]}"
+
+        case location do
+          "" -> "  [#{severity}] #{finding["rule_id"]}: #{finding["plain_message"]}"
+          _ -> "  [#{severity}] #{finding["rule_id"]} @ #{location}: #{finding["plain_message"]}"
+        end
+      end)
+
+    base_lines ++ persisted_lines ++ finding_lines
+  end
+
+  defp release_ready_lines(readiness) do
+    base_lines = [
+      "Release readiness: #{readiness["status"]}",
+      readiness["summary"],
+      "Session: #{readiness["session_title"]} (##{readiness["session_id"]})"
+    ]
+
+    proof_lines =
+      case readiness["proof"] do
+        nil ->
+          ["Proof: none"]
+
+        proof ->
+          ["Proof: ##{proof["id"]} v#{proof["version"]} (deploy-ready: #{proof["deploy_ready"]})"]
+      end
+
+    findings = readiness["findings"] || %{}
+
+    evidence_lines = [
+      "Open findings: #{findings["open"] || 0}",
+      "Blocked findings: #{findings["blocked"] || 0}",
+      "Escalated findings: #{findings["escalated"] || 0}",
+      "High/critical unresolved: #{findings["high_or_critical"] || 0}",
+      "Smoke satisfied: #{get_in(readiness, ["smoke", "satisfied"]) || false}",
+      "Provenance satisfied: #{get_in(readiness, ["provenance", "satisfied"]) || false}"
+    ]
+
+    reason_lines = Enum.map(readiness["reasons"] || [], &"  - #{&1}")
+
+    base_lines ++ proof_lines ++ evidence_lines ++ reason_lines
+  end
+
+  defp binding_session_id(project_root) do
+    case ProjectBinding.read_effective(project_root) do
+      {:ok, binding, _mode} -> binding["session_id"]
+      _ -> nil
+    end
+  end
+
+  defp github_metadata_from_env do
+    %{
+      "event_name" => System.get_env("GITHUB_EVENT_NAME"),
+      "repository" => System.get_env("GITHUB_REPOSITORY"),
+      "ref" => System.get_env("GITHUB_REF"),
+      "sha" => System.get_env("GITHUB_SHA"),
+      "run_id" => System.get_env("GITHUB_RUN_ID"),
+      "base_ref" => System.get_env("GITHUB_BASE_REF"),
+      "head_ref" => System.get_env("GITHUB_HEAD_REF")
+    }
+    |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+    |> Map.new()
   end
 
   defp standalone_wrapper_runtime? do

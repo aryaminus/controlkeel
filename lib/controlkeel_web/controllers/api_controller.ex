@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.Distribution
+  alias ControlKeel.Governance
   alias ControlKeel.Intent
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
@@ -571,11 +572,11 @@ defmodule ControlKeelWeb.ApiController do
           end
       end
     else
-      {:error, :forbidden} ->
-        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
-
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
     end
   end
 
@@ -586,11 +587,11 @@ defmodule ControlKeelWeb.ApiController do
       session_id = String.to_integer(session_id)
       json(conn, %{graph: Platform.ensure_session_graph(session_id)})
     else
-      {:error, :forbidden} ->
-        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
-
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
     end
   end
 
@@ -599,11 +600,11 @@ defmodule ControlKeelWeb.ApiController do
       {:ok, graph} = Platform.execute_session(String.to_integer(session_id), params)
       json(conn, %{graph: graph})
     else
-      {:error, :forbidden} ->
-        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
-
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "session not found"})
+
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
     end
   end
 
@@ -958,6 +959,101 @@ defmodule ControlKeelWeb.ApiController do
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  # ─── Repo Governance ────────────────────────────────────────────────────────
+
+  def review_diff(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    session_id = normalize_integer_param(Map.get(params, "session_id"))
+
+    with {:ok, base_ref} <- require_param(params, "base"),
+         {:ok, head_ref} <- require_param(params, "head"),
+         :ok <- maybe_authorize_review(conn, session_id),
+         {:ok, review} <-
+           Governance.review_diff(base_ref, head_ref,
+             session_id: session_id,
+             domain_pack: Map.get(params, "domain_pack"),
+             project_root: project_root,
+             dependency_review: Map.get(params, "dependency_review"),
+             github: Map.get(params, "github")
+           ) do
+      json(conn, %{review: review})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, :missing_param, key} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "`#{key}` is required"})
+
+      {:error, message} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
+    end
+  end
+
+  def review_pr(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    session_id = normalize_integer_param(Map.get(params, "session_id"))
+
+    with {:ok, patch} <- require_param(params, "patch"),
+         :ok <- maybe_authorize_review(conn, session_id),
+         {:ok, review} <-
+           Governance.review_patch(patch,
+             session_id: session_id,
+             domain_pack: Map.get(params, "domain_pack"),
+             project_root: project_root,
+             dependency_review: Map.get(params, "dependency_review"),
+             github: Map.get(params, "github")
+           ) do
+      json(conn, %{review: review})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, :missing_param, key} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "`#{key}` is required"})
+
+      {:error, message} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
+    end
+  end
+
+  def release_readiness(conn, params) do
+    session_id = normalize_integer_param(Map.get(params, "session_id"))
+
+    with {:ok, session_id} <- ensure_integer_param(session_id, "session_id"),
+         :ok <- authorize_session_access(conn, session_id, "tasks:read"),
+         {:ok, readiness} <-
+           Governance.release_readiness(%{
+             session_id: session_id,
+             sha: Map.get(params, "sha"),
+             smoke: Map.get(params, "smoke"),
+             provenance: Map.get(params, "provenance"),
+             github: Map.get(params, "github")
+           }) do
+      json(conn, %{release: readiness})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, :missing_param, key} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "`#{key}` is required"})
+
+      {:error, message} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
+    end
+  end
+
+  def install_github_governance(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+
+    case Governance.install_github_scaffolding(project_root) do
+      {:ok, install} ->
+        json(conn, %{install: install})
+
+      {:error, message} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
     end
   end
 
@@ -1514,6 +1610,22 @@ defmodule ControlKeelWeb.ApiController do
       {parsed, ""} -> {:ok, parsed}
       _ -> {:error, :invalid_integer}
     end
+  end
+
+  defp require_param(params, key) do
+    case Map.get(params, key) do
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, :missing_param, key}
+    end
+  end
+
+  defp ensure_integer_param(nil, key), do: {:error, :missing_param, key}
+  defp ensure_integer_param(value, _key), do: {:ok, value}
+
+  defp maybe_authorize_review(_conn, nil), do: :ok
+
+  defp maybe_authorize_review(conn, session_id) do
+    authorize_session_access(conn, session_id, "tasks:execute")
   end
 
   defp benchmark_filter_opts(nil), do: []

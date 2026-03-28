@@ -61,6 +61,10 @@ defmodule ControlKeelWeb.Router do
     get "/providers/status", ApiController, :provider_status
     post "/providers/default", ApiController, :set_default_provider
     post "/bootstrap", ApiController, :bootstrap_project
+    post "/review/diff", ApiController, :review_diff
+    post "/review/pr", ApiController, :review_pr
+    post "/release/readiness", ApiController, :release_readiness
+    post "/governance/install/github", ApiController, :install_github_governance
     post "/sessions/:session_id/tasks", ApiController, :create_task
     patch "/tasks/:id", ApiController, :update_task
     post "/tasks/:id/complete", ApiController, :complete_task

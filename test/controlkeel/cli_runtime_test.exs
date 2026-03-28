@@ -313,6 +313,79 @@ defmodule ControlKeel.CLIRuntimeTest do
            )
   end
 
+  test "repo governance commands review patches, check release readiness, and scaffold github", %{
+    tmp_dir: tmp_dir
+  } do
+    session = session_fixture(%{title: "Governed CLI session"})
+    task = task_fixture(%{session: session, status: "done", title: "Release proof"})
+    _proof = proof_bundle_fixture(%{task: task})
+
+    {:ok, _binding} =
+      ProjectBinding.write(
+        %{
+          "workspace_id" => session.workspace_id,
+          "session_id" => session.id,
+          "agent" => "claude",
+          "attached_agents" => %{}
+        },
+        tmp_dir
+      )
+
+    patch_path = Path.join(tmp_dir, "review.patch")
+
+    patch = """
+    diff --git a/lib/auth.ex b/lib/auth.ex
+    index 1111111..2222222 100644
+    --- a/lib/auth.ex
+    +++ b/lib/auth.ex
+    @@ -0,0 +1,1 @@
+    +api_key = "AKIAIOSFODNN7EXAMPLE"
+    """
+
+    assert :ok == File.write(patch_path, patch)
+
+    assert {:ok, review_pr} = CLI.parse(["review", "pr", "--patch", patch_path])
+
+    review_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(review_pr, project_root: tmp_dir)
+      end)
+
+    assert review_output =~ "Merge recommendation: blocked."
+    assert review_output =~ "secret.aws_access_key"
+
+    assert {:ok, release_ready} =
+             CLI.parse([
+               "release-ready",
+               "--sha",
+               "abc123",
+               "--smoke-status",
+               "success",
+               "--artifact-source",
+               "github-actions",
+               "--provenance-verified"
+             ])
+
+    release_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(release_ready, project_root: tmp_dir)
+      end)
+
+    assert release_output =~ "Release readiness: blocked"
+
+    assert {:ok, govern_install} = CLI.parse(["govern", "install", "github"])
+
+    govern_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(govern_install, project_root: tmp_dir)
+      end)
+
+    assert govern_output =~ "Installed ControlKeel GitHub governance scaffolding."
+    assert File.exists?(Path.join(tmp_dir, ".github/workflows/controlkeel-pr-governor.yml"))
+    assert File.exists?(Path.join(tmp_dir, ".github/workflows/controlkeel-release-governor.yml"))
+    assert File.exists?(Path.join(tmp_dir, ".github/workflows/scorecards.yml"))
+  end
+
   test "runtime proofs, pause, resume, and memory search operate on the bound session", %{
     tmp_dir: tmp_dir
   } do

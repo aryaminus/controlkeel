@@ -43,6 +43,17 @@ ControlKeel is designed as one governed assembly line, not a collection of disco
 
 The stewardship surfaces in the product are `/ship` and `/benchmarks`. That is where ControlKeel proves that governed work is not only faster, but more reviewable and safer to ship.
 
+## Repo Governance
+
+ControlKeel now extends beyond runtime governance and into **repo-native delivery controls**:
+
+- `controlkeel review diff --base <ref> --head <ref>` reviews added hunks before merge
+- `controlkeel review pr --patch <file>|--stdin` reviews a prepared PR patch
+- `controlkeel release-ready --session-id <id>|--sha <sha>` checks proof-backed release readiness
+- `controlkeel govern install github` scaffolds cheap GitHub workflows for PR review, release checks, and Scorecards
+
+These surfaces reuse the same FastPath, Semgrep, findings, proofs, budgets, and deploy-readiness logic that already powers Mission Control and the governed proxy. The goal is to govern code before merge and before release, not only while an agent is actively running.
+
 ## Quick start
 
 ### Install
@@ -414,6 +425,13 @@ All endpoints return JSON.
 - `POST /api/v1/findings/:id/action`
 - `GET /api/v1/budget`
 - `POST /api/v1/route-agent`
+
+### Repo governance
+
+- `POST /api/v1/review/diff`
+- `POST /api/v1/review/pr`
+- `POST /api/v1/release/readiness`
+- `POST /api/v1/governance/install/github`
 
 ### Skills
 
