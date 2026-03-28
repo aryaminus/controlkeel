@@ -81,7 +81,7 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | Tool | Purpose |
 |------|---------|
 | `ck_validate` | Run FastPath scan (patterns, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present. |
-| `ck_context` | Session/task context: findings summary, budget, memory hits, resume packet, provider status. Requires `session_id`. |
+| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, resume packet, provider status. Requires `session_id`. |
 | `ck_finding` | Record a governed finding for a session (and optional task). |
 | `ck_budget` | Budget estimate or commit (`mode`: `estimate` \| `commit`). |
 | `ck_route` | Agent routing recommendation from `AgentRouter` (`task`, optional `risk_tier`, `budget_remaining_cents`, `allowed_agents`). |

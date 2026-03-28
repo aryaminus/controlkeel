@@ -25,6 +25,8 @@ The GitHub Packages npm path is for the bootstrap installer only and requires a 
 
 The typed catalog in [support-matrix.md](support-matrix.md) is the code-aligned source of truth, but product readers often want the simpler answer first: **how does ControlKeel reach the tool?**
 
+The same mechanism view is also the current project-rescue story. When a generator already changed the repo and there is no native attach path, ControlKeel still governs the work through bootstrap, findings, proofs, budgets, and proxy compatibility where available.
+
 Today there are five support mechanisms:
 
 - **Native attach**: MCP plus native skills, client config, and companion installs

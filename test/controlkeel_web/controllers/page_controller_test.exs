@@ -14,6 +14,7 @@ defmodule ControlKeelWeb.PageControllerTest do
     assert body =~ "Proof console loop"
     assert body =~ "Governed delivery lifecycle"
     assert body =~ "Occupation-first onboarding"
+    assert body =~ "Project rescue"
     assert body =~ "Governed autonomy"
     assert body =~ "Open ship dashboard"
     assert body =~ "Open benchmarks"
@@ -34,6 +35,7 @@ defmodule ControlKeelWeb.PageControllerTest do
     assert body =~ "controlkeel bootstrap"
     assert body =~ "controlkeel attach codex-cli"
     assert body =~ "Occupation-first onboarding"
+    assert body =~ "Project rescue"
     assert body =~ "Operating modes"
     assert body =~ "Governed delivery lifecycle"
   end

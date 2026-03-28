@@ -6,6 +6,8 @@ ControlKeel is the control tower that turns agent-generated work into secure, sc
 
 Agent output is cheap. Reviewability, security, release safety, and cost control are not. ControlKeel exists to govern that layer, not replace the coding model underneath it.
 
+That also makes ControlKeel the recovery path when another generator already touched the repo: bootstrap the project, surface the production boundary, and use findings, proofs, and governed proxy flows to get back to a reviewable state.
+
 It is not another IDE, another coding model, a prompt marketplace, or post-hoc code review only. The first-run path gets you into the live proof console loop quickly:
 
 - Mission Control for active task state and approvals
@@ -26,6 +28,8 @@ The governed delivery lifecycle is:
 - benchmarks
 
 The main stewardship surfaces for that lifecycle are `/ship` and `/benchmarks`.
+
+If you want the architecture map behind that lifecycle, read [control-plane-architecture.md](control-plane-architecture.md).
 
 ## 1. Start ControlKeel
 
@@ -129,6 +133,8 @@ You can also understand support by **integration mechanism**, not only by client
 - **Runtime export** for headless systems such as Devin and Open SWE
 - **Provider-only** for CK-owned or local backends such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints
 - **Fallback governance** for unsupported tools after bootstrap using `controlkeel watch`, `controlkeel findings`, proof flows, and `ck_validate`
+
+That fallback path is the current project-rescue story. It is honest support, not a fake claim that every external tool has native ControlKeel attachment.
 
 In that mode, model-backed features such as advisory review and intent compilation either degrade to heuristics or return explicit capability guidance.
 

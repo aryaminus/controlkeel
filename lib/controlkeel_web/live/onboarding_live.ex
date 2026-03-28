@@ -24,6 +24,7 @@ defmodule ControlKeelWeb.OnboardingLive do
      |> assign(:errors, %{})
      |> assign(:compile_error, nil)
      |> assign(:compiled_brief, nil)
+     |> assign(:compiled_boundary_summary, Intent.boundary_summary(nil))
      |> assign(:started?, false)
      |> assign_form()}
   end
@@ -132,6 +133,9 @@ defmodule ControlKeelWeb.OnboardingLive do
           </p>
           <p class="ck-note">
             Agent output is cheap. Reviewability, security, release safety, and cost control are not. This flow exists to turn a rough idea into a governed execution brief, task plan, and proof trail.
+          </p>
+          <p class="ck-note">
+            If a generator leaves you with a brittle repo or unclear launch boundary, ControlKeel acts as the rescue control plane: it compiles the brief, makes the constraints visible, and keeps proof attached to the work.
           </p>
         </div>
         <a href={~p"/"} class="ck-link">Back home</a>
@@ -301,6 +305,37 @@ defmodule ControlKeelWeb.OnboardingLive do
                         </ul>
                       </div>
                       <div class="ck-card">
+                        <p class="ck-mini-label">Production boundary</p>
+                        <div class="ck-brief-grid">
+                          <div>
+                            <h3>Risk tier</h3>
+                            <p class="ck-note">
+                              {boundary_value(@compiled_boundary_summary, "risk_tier")}
+                            </p>
+                          </div>
+                          <div>
+                            <h3>Budget note</h3>
+                            <p class="ck-note">
+                              {boundary_value(@compiled_boundary_summary, "budget_note")}
+                            </p>
+                          </div>
+                          <div>
+                            <h3>Launch window</h3>
+                            <p class="ck-note">
+                              {boundary_value(@compiled_boundary_summary, "launch_window")}
+                            </p>
+                          </div>
+                          <div>
+                            <h3>Constraints</h3>
+                            <ul class="ck-mini-list">
+                              <%= for item <- boundary_list(@compiled_boundary_summary, "constraints") do %>
+                                <li>{item}</li>
+                              <% end %>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="ck-card">
                         <p class="ck-mini-label">Open questions</p>
                         <ul class="ck-mini-list">
                           <%= for item <- brief["open_questions"] || [] do %>
@@ -368,6 +403,9 @@ defmodule ControlKeelWeb.OnboardingLive do
           <p class="ck-mini-label">Provider and autonomy status</p>
           <p class="ck-note">
             Designed for serious solo builders and tiny teams first. ControlKeel is not another IDE, coding model, or post-hoc review layer; it is the governed control loop around those tools.
+          </p>
+          <p class="ck-note" style="margin-top: 0.75rem;">
+            Unsupported tool or rescue situation? Bootstrap the project, use `controlkeel watch`, findings, proofs, and `ck_validate`, then add governed proxy only when the tool can target compatible endpoints.
           </p>
           <div class="ck-brief-grid">
             <div>
@@ -450,6 +488,7 @@ defmodule ControlKeelWeb.OnboardingLive do
          |> assign(:errors, %{})
          |> assign(:compile_error, nil)
          |> assign(:compiled_brief, brief)
+         |> assign(:compiled_boundary_summary, Intent.boundary_summary(brief))
          |> assign(:step, 4)
          |> assign_form()}
 
@@ -465,6 +504,15 @@ defmodule ControlKeelWeb.OnboardingLive do
 
   defp assign_form(socket) do
     assign(socket, :form, to_form(socket.assigns.attrs, as: :launch))
+  end
+
+  defp boundary_value(map, key), do: Map.get(map, key) || "Not specified"
+
+  defp boundary_list(map, key) do
+    case Map.get(map, key, []) do
+      [] -> ["Not specified"]
+      items -> items
+    end
   end
 
   defp validate_step(1, attrs, _questions) do

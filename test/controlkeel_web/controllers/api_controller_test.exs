@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
   use ControlKeelWeb.ConnCase
 
   import ControlKeel.BenchmarkFixtures
+  import ControlKeel.IntentFixtures
   import ControlKeel.MissionFixtures
   import ControlKeel.PolicyTrainingFixtures
   import ControlKeel.PlatformFixtures
@@ -95,7 +96,19 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
   describe "GET and POST /api/v1/context" do
     test "returns assembled context for a session", %{conn: conn} do
-      session = session_fixture()
+      session =
+        session_fixture(%{
+          execution_brief:
+            execution_brief_fixture(
+              compiler: %{
+                "interview_answers" => %{
+                  "constraints" => "Local-first deploy, approval before production"
+                }
+              }
+            )
+            |> ControlKeel.Intent.to_brief_map()
+        })
+
       task = task_fixture(%{session: session, status: "in_progress"})
 
       conn = get(conn, ~p"/api/v1/context?session_id=#{session.id}&task_id=#{task.id}")
@@ -105,6 +118,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert body["context"]["current_task"]["id"] == task.id
       assert Map.has_key?(body["context"], "provider_status")
       assert Map.has_key?(body["context"], "bootstrap_status")
+      assert body["context"]["boundary_summary"]["risk_tier"] == "critical"
+
+      assert body["context"]["boundary_summary"]["constraints"] == [
+               "Local-first deploy",
+               "approval before production"
+             ]
 
       conn =
         build_conn() |> post(~p"/api/v1/context", %{session_id: session.id, task_id: task.id})
@@ -113,6 +132,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert post_body["context"]["session_id"] == session.id
       assert post_body["context"]["current_task"]["id"] == task.id
+      assert Map.has_key?(post_body["context"], "boundary_summary")
     end
 
     test "returns validation error when session_id is missing", %{conn: conn} do

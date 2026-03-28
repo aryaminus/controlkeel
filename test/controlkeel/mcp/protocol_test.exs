@@ -8,6 +8,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
   alias ControlKeel.Repo
   alias ControlKeel.Skills.Activation
 
+  import ControlKeel.IntentFixtures
   import ControlKeel.MissionFixtures
 
   setup do
@@ -169,7 +170,18 @@ defmodule ControlKeel.MCP.ProtocolTest do
   end
 
   test "tools/call ck_context returns mission context" do
-    session = session_fixture(%{budget_cents: 1_500, daily_budget_cents: 500, spent_cents: 250})
+    session =
+      session_fixture(%{
+        budget_cents: 1_500,
+        daily_budget_cents: 500,
+        spent_cents: 250,
+        execution_brief:
+          execution_brief_fixture(
+            compiler: %{"interview_answers" => %{"constraints" => "Approval before deploy"}}
+          )
+          |> ControlKeel.Intent.to_brief_map()
+      })
+
     session_id = session.id
     task = task_fixture(%{session: session, status: "in_progress", title: "Implement router"})
     finding_fixture(%{session: session, status: "blocked", category: "security"})
@@ -198,6 +210,10 @@ defmodule ControlKeel.MCP.ProtocolTest do
                    "spent_cents" => 250,
                    "session_budget_cents" => 1_500,
                    "daily_budget_cents" => 500
+                 },
+                 "boundary_summary" => %{
+                   "risk_tier" => "critical",
+                   "constraints" => ["Approval before deploy"]
                  },
                  "current_task" => %{"title" => "Implement router"},
                  "proof_summary" => %{"task_id" => _},

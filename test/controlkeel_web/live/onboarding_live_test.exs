@@ -41,6 +41,9 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
 
     assert review_html =~ "Review the compiled brief"
     assert review_html =~ "Acceptance criteria"
+    assert review_html =~ "Production boundary"
+    assert review_html =~ "Local-first deploy"
+    assert review_html =~ "approval before production"
     assert Mission.list_sessions() == []
 
     regenerated_html = render_click(element(view, "button[phx-click=\"regenerate\"]"))
@@ -131,6 +134,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
     assert review_html =~ "Always available"
     assert review_html =~ "Model-backed features"
     assert review_html =~ "Autonomy defaults"
+    assert review_html =~ "Unsupported tool or rescue situation?"
     refute review_html =~ "sk-secret-test"
   end
 

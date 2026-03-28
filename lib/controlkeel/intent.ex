@@ -1,7 +1,7 @@
 defmodule ControlKeel.Intent do
   @moduledoc false
 
-  alias ControlKeel.Intent.{Domains, ExecutionBrief, Router}
+  alias ControlKeel.Intent.{BoundarySummary, Domains, ExecutionBrief, Router}
 
   def compile(attrs, opts \\ []) when is_map(attrs) do
     Router.compile(normalize_attrs(attrs), opts)
@@ -16,6 +16,7 @@ defmodule ControlKeel.Intent do
   def provider_options, do: Router.provider_options()
 
   def to_brief_map(%ExecutionBrief{} = brief), do: ExecutionBrief.to_map(brief)
+  def boundary_summary(brief_or_map), do: BoundarySummary.build(brief_or_map)
 
   defp normalize_attrs(attrs) do
     attrs

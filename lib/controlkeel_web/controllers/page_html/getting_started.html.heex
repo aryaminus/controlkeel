@@ -10,6 +10,9 @@
       <p class="ck-note">
         Agent output is cheap. Reviewability, security, release safety, and cost control are not. ControlKeel exists to govern that layer from the first attach.
       </p>
+      <p class="ck-note">
+        It also works as a rescue path when another generator already touched the repo: bootstrap the governed project, expose the production boundary, and use findings, proofs, and proxy flows to recover safely.
+      </p>
     </div>
     <a href={~p"/"} class="ck-link">Back home</a>
   </div>
@@ -55,6 +58,13 @@
       <p class="ck-mini-label">Occupation-first onboarding</p>
       <p class="ck-note">
         Start from what best describes your work. ControlKeel picks the domain pack, interview language, and governance posture behind the scenes instead of asking non-experts to choose a framework first.
+      </p>
+    </div>
+
+    <div class="ck-card">
+      <p class="ck-mini-label">Project rescue</p>
+      <p class="ck-note">
+        If another tool already made changes, bootstrap the repo, use `controlkeel watch`, findings, proofs, and `ck_validate`, then add governed proxy only when the tool can point at compatible OpenAI or Anthropic endpoints.
       </p>
     </div>
 

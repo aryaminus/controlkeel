@@ -314,6 +314,56 @@ defmodule ControlKeelWeb.MissionControlLive do
         </div>
 
         <div class="ck-card">
+          <p class="ck-mini-label">Production boundary</p>
+          <div class="ck-brief-grid">
+            <div>
+              <h3>Risk tier</h3>
+              <p class="ck-note">{boundary_value(@boundary_summary, "risk_tier")}</p>
+            </div>
+            <div>
+              <h3>Budget note</h3>
+              <p class="ck-note">{boundary_value(@boundary_summary, "budget_note")}</p>
+            </div>
+            <div>
+              <h3>Launch window</h3>
+              <p class="ck-note">{boundary_value(@boundary_summary, "launch_window")}</p>
+            </div>
+            <div>
+              <h3>Next step</h3>
+              <p class="ck-note">{boundary_value(@boundary_summary, "next_step")}</p>
+            </div>
+            <div>
+              <h3>Data summary</h3>
+              <p class="ck-note">{boundary_value(@boundary_summary, "data_summary")}</p>
+            </div>
+            <div>
+              <h3>Constraints</h3>
+              <ul class="ck-mini-list">
+                <%= for item <- boundary_list(@boundary_summary, "constraints") do %>
+                  <li>{item}</li>
+                <% end %>
+              </ul>
+            </div>
+            <div>
+              <h3>Compliance</h3>
+              <ul class="ck-tag-list">
+                <%= for item <- boundary_list(@boundary_summary, "compliance") do %>
+                  <li><span class="ck-tag">{item}</span></li>
+                <% end %>
+              </ul>
+            </div>
+            <div>
+              <h3>Open questions</h3>
+              <ul class="ck-mini-list">
+                <%= for item <- boundary_list(@boundary_summary, "open_questions") do %>
+                  <li>{item}</li>
+                <% end %>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="ck-card">
           <p class="ck-mini-label">Current task context</p>
           <%= if @current_task do %>
             <div class="ck-task-topline">
@@ -639,6 +689,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       session_metrics:
         Analytics.session_metrics(session.id) || default_session_metrics(session.id),
       brief: brief,
+      boundary_summary: Intent.boundary_summary(brief),
       compiler: compiler,
       current_task: current_task(session.tasks),
       selected_finding: selected_finding,
@@ -699,6 +750,15 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp format_duration(seconds), do: "#{Float.round(seconds / 3_600, 1)}h"
   defp brief_value(map, key), do: Map.get(map, key, "Not specified")
   defp brief_list(map, key), do: List.wrap(Map.get(map, key, []))
+  defp boundary_value(map, key), do: Map.get(map, key) || "Not specified"
+
+  defp boundary_list(map, key) do
+    case Map.get(map, key, []) do
+      [] -> ["Not specified"]
+      items -> items
+    end
+  end
+
   defp format_domain_pack("Not specified"), do: "Not specified"
   defp format_domain_pack(nil), do: "Not specified"
   defp format_domain_pack(domain_pack), do: Intent.pack_label(domain_pack)

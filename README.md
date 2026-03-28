@@ -9,6 +9,8 @@ It sits above Claude Code, Codex, Cline, OpenCode, Cursor, Windsurf, Continue, A
 
 Agent output is cheap. Reviewability, security, release safety, and cost control are not. ControlKeel exists to govern that layer, not replace the coding model underneath it.
 
+That is also why ControlKeel works as a project-rescue layer: when a generator leaves you with a brittle repo or an unclear launch boundary, bootstrap the governed project, make the constraints visible, and keep proof attached to the work.
+
 The default wedge is serious solo builders and tiny agent-heavy teams first. Team / platform expansion exists, but the product story today is still governed autonomy for builders who already have agent output and need it turned into production-ready delivery.
 
 ControlKeel is not:
@@ -107,6 +109,7 @@ mix ck.init
 More walkthroughs:
 
 - [Getting started](docs/getting-started.md)
+- [Control-plane architecture](docs/control-plane-architecture.md)
 - [Agent integrations](docs/agent-integrations.md)
 - [Support matrix (agents, MCP, skills)](docs/support-matrix.md)
 - [Autonomy and findings](docs/autonomy-and-findings.md)
@@ -188,6 +191,8 @@ Another useful way to understand ControlKeel support is by **mechanism**, not on
 - **Runtime export**: headless runtime bundles for tools like Devin and Open SWE
 - **Provider-only**: CK-owned or local backend profiles such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints
 - **Fallback governance**: if a tool is unsupported, bootstrap the project and use `controlkeel watch`, `controlkeel findings`, proofs, budgets, and `ck_validate` flows after the agent has made changes
+
+That fallback path is the current rescue story for browser generators and partial integrations: ControlKeel does not claim native attach everywhere, but it can still govern the repo once it is bootstrapped.
 
 ### Headless runtimes, framework adapters, and provider-only entries
 
@@ -382,6 +387,8 @@ All endpoints return JSON.
 - `GET /api/v1/domains`
 - `GET /api/v1/context`
 - `POST /api/v1/context`
+
+`/api/v1/context` returns the assembled mission context for operators and agents, including the derived production boundary summary from the execution brief.
 
 ### Sessions, tasks, proofs, and memory
 

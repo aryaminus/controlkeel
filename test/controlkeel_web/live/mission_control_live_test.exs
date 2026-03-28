@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.MissionControlLiveTest do
   use ControlKeelWeb.ConnCase, async: false
 
+  import ControlKeel.IntentFixtures
   import Phoenix.LiveViewTest
   import ControlKeel.MissionFixtures
 
@@ -71,6 +72,30 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "/v1/embeddings"
     assert html =~ "/v1/models"
     assert html =~ "View fix"
+  end
+
+  test "mission control shows the derived production boundary summary", %{conn: conn} do
+    session =
+      session_fixture(%{
+        execution_brief:
+          execution_brief_fixture(
+            compiler: %{
+              "interview_answers" => %{
+                "constraints" => "Local-first deploy, approval before production"
+              }
+            }
+          )
+          |> ControlKeel.Intent.to_brief_map()
+      })
+
+    task_fixture(%{session: session})
+
+    {:ok, _view, html} = live(conn, ~p"/missions/#{session.id}")
+
+    assert html =~ "Production boundary"
+    assert html =~ "Local-first deploy"
+    assert html =~ "approval before production"
+    assert html =~ "$40/month to start"
   end
 
   test "mission control refreshes when new findings and spend data appear", %{conn: conn} do
