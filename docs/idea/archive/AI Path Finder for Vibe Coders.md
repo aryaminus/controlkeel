@@ -35,4 +35,4 @@ The lasting value in the Pathfinder material is the product explanation:
 - It turns agent output into production engineering.
 - It is useful both for first-run governed delivery and for rescuing repos touched by unsupported tools.
 
-For the current architecture map, use [docs/control-plane-architecture.md](../docs/control-plane-architecture.md). For current remaining work, use the remaining-roadmap docs instead of this note.
+For the current architecture map, use [control-plane-architecture.md](../../control-plane-architecture.md). For current remaining work, use the remaining-roadmap docs instead of this note.

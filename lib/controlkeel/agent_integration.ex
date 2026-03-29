@@ -977,8 +977,8 @@ defmodule ControlKeel.AgentIntegration do
       attrs
       |> Map.put(:support_class, "alias")
       |> Map.put(:auto_bootstrap, false)
-      |> Map.put(:mcp_mode, "native")
-      |> Map.put(:skills_mode, "native")
+      |> Map.put_new(:mcp_mode, "native")
+      |> Map.put_new(:skills_mode, "native")
       |> Map.put_new(:provider_bridge, %{supported: false, mode: "none", owner: "none"})
       |> Map.put(:companion_delivery, "Use the canonical target named in `alias_of`.")
     )

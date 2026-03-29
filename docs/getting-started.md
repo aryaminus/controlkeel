@@ -156,6 +156,23 @@ For the full native skills / plugin matrix, see [agent-integrations.md](agent-in
 
 If you use Cline, the attach flow is first-class for MCP, skills, rules, and workflows, but CK still needs its own provider profile or local Ollama for CK-internal model work because Cline's provider secrets are not exposed as a documented bridge.
 
+## 3a. OpenCode quick path
+
+For OpenCode specifically:
+
+```bash
+controlkeel attach opencode
+controlkeel status
+```
+
+This writes the MCP configuration into the OpenCode config location and also generates the portable instruction bundle ControlKeel uses for MCP-plus-instructions targets.
+
+OpenCode does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options are:
+
+- keep using heuristic mode for governance-only flows
+- add a CK-owned provider profile
+- point ControlKeel at a local Ollama model
+
 ## 3b. Hosted MCP or A2A access for headless clients
 
 The repo-local default is still:
@@ -216,23 +233,6 @@ controlkeel registry status acp
 ```
 
 The registry cache only enriches the shipped catalog in `/skills` and `GET /api/v1/skills/targets`. It never changes attach/install behavior on its own.
-
-## 3a. OpenCode quick path
-
-For OpenCode specifically:
-
-```bash
-controlkeel attach opencode
-controlkeel status
-```
-
-This writes the MCP configuration into the OpenCode config location and also generates the portable instruction bundle ControlKeel uses for MCP-plus-instructions targets.
-
-OpenCode does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options are:
-
-- keep using heuristic mode for governance-only flows
-- add a CK-owned provider profile
-- point ControlKeel at a local Ollama model
 
 ## 4. Trigger a first finding
 

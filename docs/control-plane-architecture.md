@@ -1,6 +1,6 @@
 # ControlKeel Control-Plane Architecture
 
-This document explains the current product architecture in the language of the older Pathfinder planning material, but it stays aligned to what ControlKeel actually ships today.
+This document explains the current product architecture.
 
 ControlKeel is not the code generator. It is the control plane above generators: the layer that turns agent output into governed, reviewable, production-minded delivery.
 
