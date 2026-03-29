@@ -203,6 +203,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "cloudflare-workers-runtime",
+        "Cloudflare Workers runtime export",
+        "Governed Cloudflare Workers AI agent with D1, KV, R2, and MCP governance integration.",
+        false,
+        "export",
+        ["project", "export"],
+        true
+      ),
+      target(
         "framework-adapter",
         "Framework adapter template",
         "Adapter/export scaffold for framework-backed integrations such as DSPy, GEPA, and DeepAgents.",

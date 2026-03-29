@@ -28,6 +28,9 @@ config :controlkeel, ControlKeel.Proxy,
     System.get_env("CONTROLKEEL_PROXY_OPENAI_UPSTREAM") || "https://api.openai.com",
   anthropic_upstream:
     System.get_env("CONTROLKEEL_PROXY_ANTHROPIC_UPSTREAM") || "https://api.anthropic.com",
+  gemini_upstream:
+    System.get_env("CONTROLKEEL_PROXY_GEMINI_UPSTREAM") ||
+      "https://generativelanguage.googleapis.com",
   semgrep_bin: System.get_env("CONTROLKEEL_SEMGREP_BIN") || "semgrep",
   timeout_ms: String.to_integer(System.get_env("CONTROLKEEL_PROXY_TIMEOUT_MS", "15000"))
 

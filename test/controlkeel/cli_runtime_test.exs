@@ -889,4 +889,45 @@ defmodule ControlKeel.CLIRuntimeTest do
   defp goose_config_path do
     Path.join([System.get_env("HOME") || System.user_home!(), ".config", "goose", "config.yaml"])
   end
+
+  describe "sandbox commands" do
+    setup do
+      tmp_dir = System.tmp_dir!() |> Path.join("controlkeel-test-#{:rand.uniform(100_000)}")
+      File.rm_rf!(tmp_dir)
+      File.mkdir_p!(tmp_dir)
+      {:ok, tmp_dir: tmp_dir}
+    end
+
+    test "sandbox status shows adapter availability", %{tmp_dir: tmp_dir} do
+      output =
+        capture_io(fn ->
+          CLI.execute(%{command: :sandbox_status, options: %{}, args: []}, project_root: tmp_dir)
+        end)
+
+      assert output =~ "Execution sandbox adapters"
+      assert output =~ "local"
+      assert output =~ "docker"
+      assert output =~ "e2b"
+    end
+
+    test "sandbox config sets adapter", %{tmp_dir: tmp_dir} do
+      output =
+        capture_io(fn ->
+          CLI.execute(%{command: :sandbox_config, options: %{adapter: "docker"}, args: []},
+            project_root: tmp_dir
+          )
+        end)
+
+      assert output =~ "Execution sandbox set to: docker"
+    end
+
+    test "sandbox config rejects unknown adapter", %{tmp_dir: tmp_dir} do
+      exit_code =
+        CLI.execute(%{command: :sandbox_config, options: %{adapter: "firecracker"}, args: []},
+          project_root: tmp_dir
+        )
+
+      assert exit_code == 1
+    end
+  end
 end

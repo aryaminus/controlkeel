@@ -16,6 +16,11 @@ defmodule ControlKeel.Proxy do
     |> Keyword.get(:anthropic_upstream, "https://api.anthropic.com")
   end
 
+  def gemini_upstream do
+    Application.get_env(:controlkeel, __MODULE__, [])
+    |> Keyword.get(:gemini_upstream, "https://generativelanguage.googleapis.com")
+  end
+
   def timeout_ms do
     Application.get_env(:controlkeel, __MODULE__, [])
     |> Keyword.get(:timeout_ms, @default_timeout_ms)
@@ -34,6 +39,10 @@ defmodule ControlKeel.Proxy do
     base_url() <> "/proxy/anthropic/#{proxy_token}" <> suffix
   end
 
+  def url(%Session{proxy_token: proxy_token}, :gemini, suffix) when is_binary(suffix) do
+    base_url() <> "/proxy/gemini/#{proxy_token}" <> suffix
+  end
+
   def realtime_url(%Session{} = session, provider, suffix) do
     session
     |> url(provider, suffix)
@@ -49,7 +58,9 @@ defmodule ControlKeel.Proxy do
       openai_embeddings: url(session, :openai, "/v1/embeddings"),
       openai_models: url(session, :openai, "/v1/models"),
       openai_realtime: realtime_url(session, :openai, "/v1/realtime"),
-      anthropic_messages: url(session, :anthropic, "/v1/messages")
+      anthropic_messages: url(session, :anthropic, "/v1/messages"),
+      gemini_chat: url(session, :gemini, "/v1beta/chat/completions"),
+      gemini_models: url(session, :gemini, "/v1beta/openai/models")
     }
   end
 
@@ -65,6 +76,14 @@ defmodule ControlKeel.Proxy do
 
   def websocket_upstream_url(:anthropic, suffix, query_string) do
     anthropic_upstream()
+    |> String.replace_prefix("http://", "ws://")
+    |> String.replace_prefix("https://", "wss://")
+    |> Kernel.<>(suffix)
+    |> append_query(query_string)
+  end
+
+  def websocket_upstream_url(:gemini, suffix, query_string) do
+    gemini_upstream()
     |> String.replace_prefix("http://", "ws://")
     |> String.replace_prefix("https://", "wss://")
     |> Kernel.<>(suffix)

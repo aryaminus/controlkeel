@@ -94,4 +94,37 @@ defmodule ControlKeel.AgentExecutionTest do
     assert reason =~ "human review"
     assert Mission.get_task(task.id).status == "blocked"
   end
+
+  test "embedded execution tracks sandbox adapter in metadata", %{tmp_dir: tmp_dir} do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    script_path = Path.join(tmp_dir, "test-executor.sh")
+
+    File.write!(
+      script_path,
+      """
+      #!/bin/sh
+      cat > "$CONTROLKEEL_RESULT_PATH" <<'JSON'
+      {"status": "success", "message": "sandbox test"}
+      JSON
+      exit 0
+      """
+    )
+
+    File.chmod!(script_path, 0o755)
+
+    System.put_env("CONTROLKEEL_EXECUTOR_CODEX_CLI_CMD", script_path)
+
+    {:ok, result} =
+      AgentExecution.run_task(task.id,
+        project_root: tmp_dir,
+        agent: "codex-cli",
+        mode: "embedded",
+        sandbox: "local"
+      )
+
+    assert result["mode"] == "embedded"
+    assert result["metadata"]["execution_sandbox"] == "local"
+  end
 end

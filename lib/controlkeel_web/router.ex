@@ -130,6 +130,8 @@ defmodule ControlKeelWeb.Router do
     post "/openai/:proxy_token/v1/embeddings", ProxyController, :openai_embeddings
     get "/openai/:proxy_token/v1/models", ProxyController, :openai_models
     post "/anthropic/:proxy_token/v1/messages", ProxyController, :anthropic_messages
+    post "/gemini/:proxy_token/v1beta/chat/completions", ProxyController, :gemini_chat_completions
+    get "/gemini/:proxy_token/v1beta/openai/models", ProxyController, :gemini_models
     get "/openai/:proxy_token/v1/realtime", ProxySocketController, :openai_realtime
   end
 

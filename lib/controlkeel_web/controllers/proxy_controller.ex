@@ -25,6 +25,12 @@ defmodule ControlKeelWeb.ProxyController do
   def anthropic_messages(conn, params),
     do: handle_proxy(conn, params, :anthropic, :messages, "/v1/messages")
 
+  def gemini_chat_completions(conn, params),
+    do: handle_proxy(conn, params, :gemini, :chat_completions, "/v1beta/chat/completions")
+
+  def gemini_models(conn, params),
+    do: handle_proxy_without_body(conn, params, :gemini, :models, "/v1beta/openai/models", :get)
+
   defp handle_proxy(conn, %{"proxy_token" => proxy_token}, provider, tool, upstream_path) do
     with {:ok, session} <- fetch_proxy_session(proxy_token),
          {:ok, raw_body, decoded_body} <- decode_body(conn),
@@ -464,6 +470,7 @@ defmodule ControlKeelWeb.ProxyController do
 
   defp upstream_url(:openai, path), do: Proxy.openai_upstream() <> path
   defp upstream_url(:anthropic, path), do: Proxy.anthropic_upstream() <> path
+  defp upstream_url(:gemini, path), do: Proxy.gemini_upstream() <> path
 
   defp maybe_put_json_content_type(conn, headers) do
     has_content_type? =

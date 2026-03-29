@@ -784,6 +784,120 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(
+         %SkillTarget{id: "cloudflare-workers-runtime"},
+         root,
+         project_root,
+         _skills,
+         opts
+       ) do
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("cloudflare-workers", project_root, opts))
+
+    readme_path = Path.join(root, "cloudflare-workers/README.md")
+    File.mkdir_p!(Path.dirname(readme_path))
+    File.write!(readme_path, cloudflare_workers_runtime_contents(project_root, opts))
+
+    config_path = Path.join(root, "cloudflare-workers/wrangler.toml")
+    File.write!(config_path, cloudflare_workers_wrangler_contents(project_root, opts))
+
+    mcp_config = Path.join(root, "cloudflare-workers/controlkeel-mcp.json")
+
+    File.write!(
+      mcp_config,
+      Jason.encode!(
+        %{
+          "mcp_servers" => %{
+            "controlkeel-governance" => %{
+              "command" => "npx",
+              "args" => ["-y", "@aryaminus/controlkeel-mcp"],
+              "env" => %{}
+            }
+          }
+        },
+        pretty: true
+      ) <> "\n"
+    )
+
+    env_example_path = Path.join(root, "cloudflare-workers/.env.example")
+
+    File.write!(env_example_path, """
+    # ControlKeel Configuration
+    CK_API_URL=https://api.controlkeel.com
+    CK_API_KEY=ck_your_api_key_here
+
+    # Workers AI (optional - defaults to Workers AI)
+    # AI_PROVIDER=openai
+    # OPENAI_API_KEY=sk-...
+    """)
+
+    package_json_path = Path.join(root, "cloudflare-workers/package.json")
+
+    File.write!(package_json_path, """
+    {
+      "name": "cloudflare-workers-agent",
+      "version": "0.0.0",
+      "private": true,
+      "type": "module",
+      "scripts": {
+        "deploy": "wrangler deploy",
+        "dev": "wrangler dev"
+      },
+      "dependencies": {
+        "@cloudflare/workers-types": "^4.20241127.0",
+        "agents": "^1.0.0",
+        "zod": "^3.23.0"
+      },
+      "devDependencies": {
+        "@cloudflare/workers-plugin": "^3.0.0",
+        "wrangler": "^3.93.0",
+        "typescript": "^5.0.0"
+      }
+    }
+    """)
+
+    tsconfig_path = Path.join(root, "cloudflare-workers/tsconfig.json")
+
+    File.write!(tsconfig_path, """
+    {
+      "compilerOptions": {
+        "target": "ES2022",
+        "module": "ES2022",
+        "moduleResolution": "bundler",
+        "lib": ["ES2022"],
+        "types": ["@cloudflare/workers-types"],
+        "strict": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true
+      },
+      "include": ["src/**/*.ts"]
+    }
+    """)
+
+    agent_src = Path.join(root, "cloudflare-workers/src/agent.ts")
+    File.mkdir_p!(Path.dirname(agent_src))
+    File.write!(agent_src, cloudflare_workers_agent_contents(opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => agents_path, "kind" => "instructions"},
+        %{"path" => readme_path, "kind" => "runtime"},
+        %{"path" => config_path, "kind" => "settings"},
+        %{"path" => mcp_config, "kind" => "settings"},
+        %{"path" => agent_src, "kind" => "runtime"}
+      ],
+      [
+        "Deploy with `npm run deploy` after adding your CK API key.",
+        "The agent includes built-in governance tools via MCP."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "framework-adapter"}, root, project_root, _skills, opts) do
     readme_path = Path.join(root, "framework-adapters/README.md")
     File.mkdir_p!(Path.dirname(readme_path))
@@ -1529,6 +1643,162 @@ defmodule ControlKeel.Skills.Exporter do
     #{Enum.map_join(Distribution.install_channels(), "\n", fn channel -> "- #{channel.label}: `#{channel.command}`" end)}
 
     ControlKeel auto-bootstraps project binding on first use. Provider access resolves through agent bridge, CK-owned provider profiles, local Ollama, then heuristic fallback.
+    """
+  end
+
+  defp cloudflare_workers_runtime_contents(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    """
+    # Cloudflare Workers Agent + ControlKeel
+
+    This export provides a governed Cloudflare Workers AI agent with built-in MCP governance tools.
+
+    ## Project Context
+
+    - Repo root: `#{project_root}`
+    - Keep `AGENTS.md` at the repo root for shared governance context
+
+    ## Architecture
+
+    - **Runtime**: Cloudflare Workers (serverless)
+    - **AI**: Workers AI (default) or BYOM (bring your own model)
+    - **Storage**: D1 (SQLite), KV, R2 (file system)
+    - **Governance**: MCP server via npx
+
+    ## Setup
+
+    1. Install dependencies:
+       ```bash
+       cd cloudflare-workers
+       npm install
+       ```
+
+    2. Copy `.env.example` to `.dev.vars` and add your CK_API_KEY
+
+    3. Deploy:
+       ```bash
+       npm run deploy
+       ```
+
+    ## ControlKeel Integration
+
+    - Use `ck_context`, `ck_validate`, `ck_finding`, `ck_budget` via MCP
+    - The agent includes built-in governance tools wired to the MCP server
+    - All AI requests pass through ControlKeel policy gates
+
+    ## Available Tools
+
+    - D1 SQL: `env.DB` from Cloudflare
+    - R2: `env.BUCKET` for file storage
+    - KV: `env.KV` for key-value
+    - AI: Workers AI or custom model via BYOM
+    """
+  end
+
+  defp cloudflare_workers_wrangler_contents(_project_root, _opts) do
+    """
+    name = "controlkeel-agent"
+    main = "src/agent.ts"
+    compatibility_date = "2024-01-01"
+    compatibility_flags = ["nodejs_compat"]
+
+    [observability]
+    enabled = true
+
+    [[d1_databases]]
+    binding = "DB"
+    database_name = "controlkeel-agent"
+    database_id = "your-database-id"
+
+    [[kv_namespaces]]
+    binding = "KV"
+    id = "your-kv-namespace-id"
+
+    [[r2_buckets]]
+    binding = "BUCKET"
+    bucket_name = "controlkeel-agent"
+
+    [ai]
+    binding = "AI"
+    """
+  end
+
+  defp cloudflare_workers_agent_contents(_opts) do
+    """
+    import { Agents } from "agents";
+    import type { AssistantMessage, TextDelta } from "@cloudflare/workers-types";
+
+    export interface Env {
+      DB: D1Database;
+      KV: KVNamespace;
+      BUCKET: R2Bucket;
+      AI: Ai;
+      CK_API_KEY: string;
+    }
+
+    export default {
+      async fetch(request: Request, env: Env): Promise<Response> {
+        const url = new URL(request.url);
+
+        if (url.pathname === "/health") {
+          return new Response(JSON.stringify({ status: "ok" }), {
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        if (url.pathname === "/chat" && request.method === "POST") {
+          const { messages, sessionId } = await request.json();
+          
+          // Initialize governance context
+          const governanceResult = await this.runGovernance("context", {
+            project_root: "/",
+            task: "chat"
+          }, env);
+
+          // Run AI with governance
+          const response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+            messages,
+            governance_context: governanceResult
+          });
+
+          // Record findings if any
+          await this.runGovernance("finding", {
+            session_id: sessionId,
+            response: response.response
+          }, env);
+
+          return new Response(JSON.stringify({ 
+            response: response.response,
+            governance: governanceResult
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        return new Response("Not Found", { status: 404 });
+      },
+
+      async runGovernance(action: string, payload: any, env: Env): Promise<any> {
+        // MCP governance calls via npx
+        const mcpResult = await fetch("http://localhost:3000/mcp", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.CK_API_KEY}`
+          },
+          body: JSON.stringify({
+            action,
+            payload
+          })
+        });
+
+        return mcpResult.json();
+      }
+    } satisfies ExportedHandler<Env>;
     """
   end
 

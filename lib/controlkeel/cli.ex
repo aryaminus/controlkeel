@@ -19,7 +19,9 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.ProviderBroker
   alias ControlKeel.ProtocolAccess
   alias ControlKeel.ProjectBinding
+  alias ControlKeel.ExecutionSandbox
   alias ControlKeel.Proxy
+  alias ControlKeel.RuntimePaths
   alias ControlKeel.Skills
 
   @init_switches [
@@ -113,7 +115,7 @@ defmodule ControlKeel.CLI do
   @govern_install_switches [project_root: :string]
   @plugin_switches [project_root: :string, scope: :string, mode: :string]
   @agents_doctor_switches [project_root: :string]
-  @agent_run_switches [project_root: :string, agent: :string, mode: :string]
+  @agent_run_switches [project_root: :string, agent: :string, mode: :string, sandbox: :string]
 
   def standalone_argv do
     cond do
@@ -181,6 +183,15 @@ defmodule ControlKeel.CLI do
 
       ["registry", "status", "acp"] ->
         {:ok, %{command: :registry_status_acp, options: %{}, args: []}}
+
+      ["sandbox", "status"] ->
+        {:ok, %{command: :sandbox_status, options: %{}, args: []}}
+
+      ["sandbox", "config", adapter] ->
+        {:ok, %{command: :sandbox_config, options: %{adapter: adapter}, args: []}}
+
+      ["sandbox", "config"] ->
+        {:ok, %{command: :sandbox_status, options: %{}, args: []}}
 
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
@@ -390,10 +401,13 @@ defmodule ControlKeel.CLI do
       controlkeel plugin install codex|claude|copilot|openclaw [--scope user|project] [--mode local|hosted]
                                       Install a plugin bundle with local and hosted MCP templates
       controlkeel agents doctor       Show bidirectional execution and install readiness
-      controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime]
+      controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b]
                                       Run or hand off a governed task through a supported agent
-      controlkeel run session <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime]
+      controlkeel run session <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b]
                                       Run all ready tasks for a governed session
+      controlkeel sandbox status       Show execution sandbox adapter availability
+      controlkeel sandbox config local|docker|e2b
+                                      Set the default execution sandbox adapter
       controlkeel registry sync acp  Refresh the cached ACP registry metadata
       controlkeel registry status acp
                                       Show ACP registry cache freshness and matches
@@ -1796,6 +1810,50 @@ defmodule ControlKeel.CLI do
      ]}
   end
 
+  def run_command(%{command: :sandbox_status}, _project_root) do
+    adapters = ExecutionSandbox.supported_adapters()
+
+    current_adapter_name = ExecutionSandbox.adapter_name([])
+
+    current =
+      Map.get(
+        Enum.find(adapters, fn a -> a[:id] == current_adapter_name end) || %{},
+        :name,
+        "Unknown"
+      )
+
+    adapter_lines =
+      Enum.map(adapters, fn adapter ->
+        available = if adapter[:available], do: "available", else: "not available"
+        marker = if adapter[:id] == ExecutionSandbox.adapter_name([]), do: " (active)", else: ""
+        "  #{adapter[:name]} [#{adapter[:id]}]: #{available}#{marker}"
+      end)
+
+    {:ok,
+     [
+       "Execution sandbox adapters:",
+       "Active: #{current}"
+     ] ++ adapter_lines}
+  end
+
+  def run_command(%{command: :sandbox_config, options: %{adapter: adapter}}, _project_root) do
+    valid_adapters = Enum.map(ExecutionSandbox.supported_adapters(), & &1[:id])
+
+    if adapter in valid_adapters do
+      config_path = RuntimePaths.config_path()
+      config = read_json_config(config_path)
+      updated = Map.put(config, "execution_sandbox", adapter)
+
+      File.mkdir_p!(Path.dirname(config_path))
+      File.write!(config_path, Jason.encode!(updated, pretty: true) <> "\n")
+
+      {:ok, ["Execution sandbox set to: #{adapter}", "Config written to: #{config_path}"]}
+    else
+      {:error,
+       "Unknown sandbox adapter: #{adapter}. Valid adapters: #{Enum.join(valid_adapters, ", ")}"}
+    end
+  end
+
   def run_command(%{command: :provider_show, options: options}, project_root) do
     root = options[:project_root] || project_root
     status = ProviderBroker.status(root)
@@ -2490,10 +2548,24 @@ defmodule ControlKeel.CLI do
     |> maybe_put_cli_opt(:project_root, project_root)
     |> maybe_put_cli_opt(:agent, options[:agent])
     |> maybe_put_cli_opt(:mode, options[:mode])
+    |> maybe_put_cli_opt(:sandbox, options[:sandbox])
   end
 
   defp maybe_put_cli_opt(opts, _key, nil), do: opts
   defp maybe_put_cli_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp read_json_config(path) do
+    case File.read(path) do
+      {:ok, content} ->
+        case Jason.decode(content) do
+          {:ok, %{} = config} -> config
+          _ -> %{}
+        end
+
+      _ ->
+        %{}
+    end
+  end
 
   defp maybe_cli_line(_label, nil), do: []
   defp maybe_cli_line(label, value), do: ["#{label}: #{value}"]

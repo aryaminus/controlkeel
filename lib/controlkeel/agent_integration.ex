@@ -851,6 +851,28 @@ defmodule ControlKeel.AgentIntegration do
         provider_bridge: %{supported: false, mode: "none", owner: "none"},
         mcp_mode: "none",
         skills_mode: "none"
+      }),
+      headless_runtime(%{
+        id: "cloudflare-workers",
+        label: "Cloudflare Workers Agent",
+        category: "headless-runtime",
+        description:
+          "Governed Cloudflare Workers Agent with D1, R2, Workers AI, and MCP governance tools.",
+        runtime_export_command: "controlkeel runtime export cloudflare-workers",
+        config_location:
+          "Deploy as Cloudflare Worker with D1 database and R2 bucket for stateful agent execution.",
+        companion_delivery:
+          "Generates complete Worker project with CK governance integration, MCP tools, and deployment config.",
+        preferred_target: "cloudflare-workers-runtime",
+        default_scope: "project",
+        auth_mode: "ck_owned",
+        mcp_mode: "export_only",
+        skills_mode: "instructions_only",
+        upstream_slug: "cloudflare/workers-sdk",
+        upstream_docs_url: "https://developers.cloudflare.com/agents/",
+        provider_bridge: %{supported: true, mode: "byom", owner: "user"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["cloudflare-workers-runtime"]
       })
     ]
   end

@@ -3,6 +3,7 @@ defmodule ControlKeel.AgentExecution do
 
   alias ControlKeel.AgentIntegration
   alias ControlKeel.AgentRouter
+  alias ControlKeel.ExecutionSandbox
   alias ControlKeel.Intent
   alias ControlKeel.MCP.Tools.CkValidate
   alias ControlKeel.Mission
@@ -81,54 +82,61 @@ defmodule ControlKeel.AgentExecution do
       "agents" => agents,
       "direct_ready" => Enum.filter(agents, &(&1.execution_support == "direct" and &1.runnable)),
       "handoff_ready" => Enum.filter(agents, &(&1.execution_support == "handoff")),
-      "runtime_ready" => Enum.filter(agents, &(&1.execution_support == "runtime"))
+      "runtime_ready" => Enum.filter(agents, &(&1.execution_support == "runtime")),
+      "execution_sandbox" => ExecutionSandbox.supported_adapters()
     }
   end
 
   def run_task(task_id, opts \\ []) do
     project_root = Path.expand(Keyword.get(opts, :project_root, File.cwd!()))
+    sandbox = Keyword.get(opts, :sandbox)
+    if sandbox, do: Process.put(:ck_execution_sandbox, sandbox)
 
-    with %{} = task <- Mission.get_task(task_id),
-         %{} = session <- Mission.get_session_context(task.session_id),
-         {:ok, integration} <- resolve_integration(task, project_root, opts),
-         {:ok, execution_mode} <- resolve_execution_mode(integration, opts),
-         {:ok, package_root} <-
-           prepare_run_package(project_root, session, task, integration, execution_mode),
-         {:ok, service_account_context} <- maybe_create_service_account(session, execution_mode),
-         {:ok, service_account_context} <-
-           prepare_support_assets(
-             package_root,
-             project_root,
-             integration,
-             execution_mode,
-             service_account_context
-           ),
-         claim_metadata <-
-           base_run_metadata(integration, execution_mode, package_root, service_account_context),
-         {:ok, _task_run} <-
-           Platform.claim_task(task.id, service_account_context[:service_account], %{
-             execution_mode: task_run_execution_mode(execution_mode),
-             metadata: claim_metadata
-           }),
-         :ok <-
-           maybe_policy_gate(
-             task,
-             session,
-             service_account_context[:service_account],
-             claim_metadata
-           ) do
-      dispatch_run(
-        task,
-        session,
-        integration,
-        execution_mode,
-        package_root,
-        service_account_context
-      )
-    else
-      nil -> {:error, :not_found}
-      {:error, _reason} = error -> error
-    end
+    result =
+      with %{} = task <- Mission.get_task(task_id),
+           %{} = session <- Mission.get_session_context(task.session_id),
+           {:ok, integration} <- resolve_integration(task, project_root, opts),
+           {:ok, execution_mode} <- resolve_execution_mode(integration, opts),
+           {:ok, package_root} <-
+             prepare_run_package(project_root, session, task, integration, execution_mode),
+           {:ok, service_account_context} <- maybe_create_service_account(session, execution_mode),
+           {:ok, service_account_context} <-
+             prepare_support_assets(
+               package_root,
+               project_root,
+               integration,
+               execution_mode,
+               service_account_context
+             ),
+           claim_metadata <-
+             base_run_metadata(integration, execution_mode, package_root, service_account_context),
+           {:ok, _task_run} <-
+             Platform.claim_task(task.id, service_account_context[:service_account], %{
+               execution_mode: task_run_execution_mode(execution_mode),
+               metadata: claim_metadata
+             }),
+           :ok <-
+             maybe_policy_gate(
+               task,
+               session,
+               service_account_context[:service_account],
+               claim_metadata
+             ) do
+        dispatch_run(
+          task,
+          session,
+          integration,
+          execution_mode,
+          package_root,
+          service_account_context
+        )
+      else
+        nil -> {:error, :not_found}
+        {:error, _reason} = error -> error
+      end
+
+    Process.delete(:ck_execution_sandbox)
+    result
   end
 
   def run_session(session_id, opts \\ []) do
@@ -301,10 +309,11 @@ defmodule ControlKeel.AgentExecution do
   defp dispatch_run(task, session, integration, "embedded", package_root, service_account_context) do
     with {:ok, command, args} <- direct_command(integration.id),
          result_path = Path.join(package_root, "result.json"),
-         {output, exit_status} <-
-           System.cmd(command, args,
-             stderr_to_stdout: true,
-             env: direct_run_env(task, session, integration, package_root, result_path)
+         sandbox_opts = direct_run_env(task, session, integration, package_root, result_path),
+         {:ok, %{output: output, exit_status: exit_status}} <-
+           ExecutionSandbox.run(command, args,
+             env: sandbox_opts,
+             sandbox: Process.get(:ck_execution_sandbox)
            ) do
       payload = direct_result_payload(output, result_path)
       validation = validate_result_payload(payload, session, task)
@@ -335,7 +344,9 @@ defmodule ControlKeel.AgentExecution do
              metadata: %{
                "executor_mode" => "embedded",
                "command" => [command | args],
-               "validation" => validation
+               "validation" => validation,
+               "execution_sandbox" =>
+                 ExecutionSandbox.adapter_name(sandbox: Process.get(:ck_execution_sandbox))
              }
            }) do
         {:ok, _run} ->
@@ -348,7 +359,11 @@ defmodule ControlKeel.AgentExecution do
              "status" => status,
              "package_root" => package_root,
              "command" => [command | args],
-             "validation" => validation
+             "validation" => validation,
+             "metadata" => %{
+               "execution_sandbox" =>
+                 ExecutionSandbox.adapter_name(sandbox: Process.get(:ck_execution_sandbox))
+             }
            }}
 
         {:error, reason} ->
