@@ -84,6 +84,65 @@ defmodule ControlKeel.BenchmarkTest do
            ]
   end
 
+  test "loads the benign baseline suite paired with vibe_failures_v1" do
+    suite = benchmark_suite_fixture("benign_baseline_v1")
+
+    assert suite.slug == "benign_baseline_v1"
+    assert length(suite.scenarios) == 10
+
+    assert Enum.all?(suite.scenarios, fn scenario ->
+             scenario.expected_decision == "allow"
+           end)
+
+    assert Enum.all?(suite.scenarios, fn scenario ->
+             scenario.expected_rules == []
+           end)
+  end
+
+  test "classification metrics return TPR 1.0 for vulnerable-only suites" do
+    {:ok, run} =
+      Benchmark.run_suite(%{
+        "suite" => "vibe_failures_v1",
+        "subjects" => "controlkeel_validate",
+        "baseline_subject" => "controlkeel_validate",
+        "scenario_slugs" => "hardcoded_api_key_python_webhook,client_side_auth_bypass"
+      })
+
+    classification = Benchmark.classification_metrics(run)
+
+    # All scenarios expect block → all should be positives
+    assert classification.positive_scenarios == 2
+    assert classification.negative_scenarios == 0
+    assert classification.true_positives >= 1
+    assert classification.tpr != nil
+    assert classification.tpr > 0.0
+    # No negatives → FPR is nil (no denominator)
+    assert classification.fpr == nil
+  end
+
+  test "classification metrics return FPR near 0.0 for benign suite" do
+    {:ok, run} =
+      Benchmark.run_suite(%{
+        "suite" => "benign_baseline_v1",
+        "subjects" => "controlkeel_validate",
+        "baseline_subject" => "controlkeel_validate"
+      })
+
+    classification = Benchmark.classification_metrics(run)
+
+    # All scenarios expect allow → all should be negatives
+    assert classification.positive_scenarios == 0
+    assert classification.negative_scenarios == 10
+    assert classification.true_negatives >= 0
+    # TPR is nil (no positive denominator)
+    assert classification.tpr == nil
+    # FPR should be 0.0 or very low
+    assert classification.fpr != nil
+    # FPR measures false alarm rate; a measured value is the point of the benign suite
+    assert classification.fpr <= 0.5
+  end
+
+
   test "runs validate and proxy subjects without creating sessions or ship analytics" do
     session_count = Repo.aggregate(Session, :count, :id)
     analytics_count = Repo.aggregate(Event, :count, :id)

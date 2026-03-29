@@ -241,12 +241,59 @@ defmodule ControlKeel.Benchmark do
         _ -> Float.round(matched_expected / length(evaluated) * 100, 1)
       end
 
+    classification = classification_metrics(run)
+
     %{
       block_rate: block_rate,
       expected_rule_hit_rate: expected_rule_hit_rate,
-      evaluated_results: length(evaluated)
+      evaluated_results: length(evaluated),
+      classification: classification
     }
   end
+
+  @doc """
+  Computes OWASP-style classification metrics from run results.
+
+  Uses `expected_decision` ground truth on each scenario:
+  - Scenarios expecting "block" or "warn" are positive (should trigger findings)
+  - Scenarios expecting "allow" or nil are negative (should NOT trigger findings)
+
+  Returns TP, FP, TN, FN counts plus TPR, FPR, and Youden's J (TPR − FPR).
+  """
+  def classification_metrics(%Run{} = run) do
+    evaluated =
+      run.results
+      |> Enum.filter(&(&1.status in ["completed", "failed", "timed_out"]))
+
+    {positives, negatives} =
+      Enum.split_with(evaluated, fn result ->
+        result.scenario.expected_decision in ["block", "warn"]
+      end)
+
+    tp = Enum.count(positives, &(&1.findings_count > 0))
+    fn_count = length(positives) - tp
+    fp = Enum.count(negatives, &(&1.findings_count > 0))
+    tn = length(negatives) - fp
+
+    tpr = safe_rate(tp, tp + fn_count)
+    fpr = safe_rate(fp, fp + tn)
+    youdens_j = if is_nil(tpr) or is_nil(fpr), do: nil, else: Float.round(tpr - fpr, 3)
+
+    %{
+      true_positives: tp,
+      false_positives: fp,
+      true_negatives: tn,
+      false_negatives: fn_count,
+      tpr: tpr,
+      fpr: fpr,
+      youdens_j: youdens_j,
+      positive_scenarios: length(positives),
+      negative_scenarios: length(negatives)
+    }
+  end
+
+  defp safe_rate(_numerator, 0), do: nil
+  defp safe_rate(numerator, denominator), do: Float.round(numerator / denominator, 3)
 
   def domain_packs_for_suite(%Suite{} = suite) do
     suite.scenarios
@@ -565,6 +612,7 @@ defmodule ControlKeel.Benchmark do
         catch_rate: run.catch_rate,
         block_rate: detail_metrics.block_rate,
         expected_rule_hit_rate: detail_metrics.expected_rule_hit_rate,
+        classification: detail_metrics.classification,
         median_latency_ms: run.median_latency_ms,
         average_overhead_percent: run.average_overhead_percent,
         metadata: run.metadata
