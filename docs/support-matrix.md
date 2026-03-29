@@ -34,15 +34,15 @@ Attachable and runtime integrations use the **same required MCP tool set** (see 
 | `codex-cli` | attach_client | `controlkeel attach codex-cli` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
 | `cline` | attach_client | `controlkeel attach cline` | `local_mcp`, `native_skills`, `rules`, `workflows` | `embedded` | `direct` | `ck_owned` / `native` | `cline-native` |
 | `roo-code` | attach_client | `controlkeel attach roo-code` | `local_mcp`, `native_skills`, `rules`, `workflows` | `handoff` | `handoff` | `ck_owned` / `native` | `roo-native` |
-| `goose` | attach_client | `controlkeel attach goose` | `local_mcp`, `workflows`, `hooks` | `handoff` | `handoff` | `ck_owned` / `instructions_only` | `goose-native` |
+| `goose` | attach_client | `controlkeel attach goose` | `local_mcp`, `workflows`, `hooks` | `handoff` | `handoff` | `ck_owned` / `native` | `goose-native` |
 | `vscode` | attach_client | `controlkeel attach vscode` | `local_mcp`, `plugin`, `native_skills`, `workflows`, `hooks` | `handoff` | `handoff` | `ck_owned` / `native` | `github-repo` |
 | `copilot` | attach_client | `controlkeel attach copilot` | `local_mcp`, `plugin`, `native_skills`, `workflows`, `hooks` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
 | `cursor` | attach_client | `controlkeel attach cursor` | `local_mcp`, `native_skills`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
 | `windsurf` | attach_client | `controlkeel attach windsurf` | `local_mcp`, `native_skills`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `windsurf-native` |
-| `kiro` | attach_client | `controlkeel attach kiro` | `local_mcp`, `rules` | `handoff` | `handoff` | `ck_owned` / `instructions_only` | `instructions-only` |
-| `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `rules` | `handoff` | `handoff` | `ck_owned` / `instructions_only` | `instructions-only` |
-| `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `rules` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
-| `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `local_mcp`, `rules` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
+| `kiro` | attach_client | `controlkeel attach kiro` | `local_mcp`, `native_skills`, `hooks`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `kiro-native` |
+| `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `plugin`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `amp-native` |
+| `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules` | `embedded` | `direct` | `ck_owned` / `native` | `opencode-native` |
+| `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `local_mcp`, `native_skills`, `rules` | `embedded` | `direct` | `ck_owned` / `native` | `gemini-cli-native` |
 | `continue` | attach_client | `controlkeel attach continue` | `local_mcp`, `native_skills`, `rules`, `workflows` | `embedded` | `direct` | `ck_owned` / `native` | `continue-native` |
 | `aider` | attach_client | `controlkeel attach aider` | `local_mcp`, `rules` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
 | `hermes-agent` | attach_client | `controlkeel attach hermes-agent` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `native` | `hermes-native` |

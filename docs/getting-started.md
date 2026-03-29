@@ -151,6 +151,10 @@ Other supported attach commands:
 - `controlkeel attach windsurf`
 - `controlkeel attach continue`
 - `controlkeel attach aider`
+- `controlkeel attach kiro`
+- `controlkeel attach amp`
+- `controlkeel attach gemini-cli`
+- `controlkeel attach opencode`
 
 For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) and the canonical [support-matrix.md](support-matrix.md), or open `/skills` in the local app.
 
@@ -167,7 +171,7 @@ controlkeel status
 
 This writes the MCP configuration into the OpenCode config location and also generates the portable instruction bundle ControlKeel uses for MCP-plus-instructions targets.
 
-OpenCode does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options are:
+OpenCode now has a native-first integration that writes `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, and `.opencode/mcp.json`. However, it does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options for CK model work are:
 
 - keep using heuristic mode for governance-only flows
 - add a CK-owned provider profile

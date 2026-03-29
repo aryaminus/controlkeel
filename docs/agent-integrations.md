@@ -129,24 +129,18 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 | Goose | `controlkeel attach goose` | Writes `.goosehints`, `goose/workflow_recipes`, `AGENTS.md`, and registers a Goose MCP extension in `~/.config/goose/config.yaml` | `goose-native` |
 | VS Code | `controlkeel attach vscode` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 | GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
+| OpenCode | `controlkeel attach opencode` | Writes `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json`, `AGENTS.md` | `opencode-native`, `instructions-only` |
+| Kiro | `controlkeel attach kiro` | Writes `.kiro/hooks`, `.kiro/steering`, `.kiro/mcp.json`, `AGENTS.md` | `kiro-native`, `instructions-only` |
+| Amp | `controlkeel attach amp` | Writes `.amp/plugins/controlkeel-governance.ts`, `.mcp.json`, `AGENTS.md` | `amp-native`, `instructions-only` |
+| Gemini CLI | `controlkeel attach gemini-cli` | Writes `gemini-extension.json`, `.gemini/commands`, `skills/`, `GEMINI.md` | `gemini-cli-native`, `instructions-only` |
 
 ## MCP plus instructions agents
 
-These clients still attach through MCP, but the governed companion is an instructions bundle under `controlkeel/dist/instructions-only`. OpenCode is the recommended quick-start path in this class.
+These clients still attach through MCP, but the governed companion is an instructions bundle under `controlkeel/dist/instructions-only`.
 
 | Agent | Attach command |
 |---|---|
-| OpenCode | `controlkeel attach opencode` |
-| Kiro | `controlkeel attach kiro` |
-| Amp | `controlkeel attach amp` |
-| Gemini CLI | `controlkeel attach gemini-cli` |
 | Aider | `controlkeel attach aider` |
-
-OpenCode notes:
-
-- writes MCP configuration into the OpenCode config location
-- exports the portable instruction bundle used by MCP-plus-instructions targets
-- does not currently expose a documented provider bridge, so the best model-backed follow-up paths are a CK-owned provider profile or local Ollama
 
 ## Headless runtimes and typed non-attach surfaces
 
@@ -321,6 +315,10 @@ controlkeel skills export --target windsurf-native
 controlkeel skills export --target continue-native
 controlkeel skills export --target roo-native
 controlkeel skills export --target goose-native
+controlkeel skills export --target opencode-native
+controlkeel skills export --target kiro-native
+controlkeel skills export --target amp-native
+controlkeel skills export --target gemini-cli-native
 controlkeel skills export --target copilot-plugin
 controlkeel skills export --target codex
 controlkeel skills export --target provider-profile
@@ -358,6 +356,10 @@ Exported bundles are written under:
 - `controlkeel/dist/continue-native/`
 - `controlkeel/dist/roo-native/`
 - `controlkeel/dist/goose-native/`
+- `controlkeel/dist/opencode-native/`
+- `controlkeel/dist/kiro-native/`
+- `controlkeel/dist/amp-native/`
+- `controlkeel/dist/gemini-cli-native/`
 - `controlkeel/dist/copilot-plugin/`
 - `controlkeel/dist/openclaw-plugin/`
 - `controlkeel/dist/codex/`
