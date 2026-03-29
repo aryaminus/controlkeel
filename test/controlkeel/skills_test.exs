@@ -283,6 +283,51 @@ defmodule ControlKeel.SkillsTest do
     assert {:ok, devin_plan} = Skills.export("devin-runtime", tmp_dir, scope: "export")
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/README.md"))
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/controlkeel-mcp.json"))
+
+    assert {:ok, opencode_plan} = Skills.export("opencode-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(opencode_plan.output_dir, ".opencode/plugins/controlkeel-governance.ts")
+           )
+
+    assert File.exists?(
+             Path.join(opencode_plan.output_dir, ".opencode/agents/controlkeel-operator.md")
+           )
+
+    assert File.exists?(
+             Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-review.md")
+           )
+
+    assert File.exists?(Path.join(opencode_plan.output_dir, ".opencode/mcp.json"))
+    assert File.exists?(Path.join(opencode_plan.output_dir, "AGENTS.md"))
+
+    assert {:ok, gemini_plan} = Skills.export("gemini-cli-native", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(gemini_plan.output_dir, "gemini-extension.json"))
+
+    assert File.exists?(
+             Path.join(gemini_plan.output_dir, ".gemini/commands/controlkeel/review.toml")
+           )
+
+    assert File.exists?(
+             Path.join(gemini_plan.output_dir, "skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(Path.join(gemini_plan.output_dir, "GEMINI.md"))
+
+    assert {:ok, kiro_plan} = Skills.export("kiro-native", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/hooks/controlkeel-validate.json"))
+    assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/steering/controlkeel.md"))
+    assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/mcp.json"))
+    assert File.exists?(Path.join(kiro_plan.output_dir, "AGENTS.md"))
+
+    assert {:ok, amp_plan} = Skills.export("amp-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(amp_plan.output_dir, ".amp/plugins/controlkeel-governance.ts")
+           )
+
+    assert File.exists?(Path.join(amp_plan.output_dir, ".mcp.json"))
+    assert File.exists?(Path.join(amp_plan.output_dir, "AGENTS.md"))
   end
 
   test "installer writes project-scoped native bundles without nesting agent directories", %{
@@ -325,6 +370,36 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".goosehints"))
     assert File.exists?(Path.join(tmp_dir, "goose/workflow_recipes/controlkeel-review.yaml"))
     assert File.exists?(Path.join(tmp_dir, "goose/controlkeel-extension.yaml"))
+
+    assert {:ok, opencode_install} =
+             Skills.install("opencode-native", tmp_dir, scope: "project")
+
+    assert opencode_install.destination == Path.join(tmp_dir, ".opencode")
+    assert File.exists?(Path.join(tmp_dir, ".opencode/plugins/controlkeel-governance.ts"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/agents/controlkeel-operator.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/mcp.json"))
+    assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+
+    assert {:ok, gemini_install} =
+             Skills.install("gemini-cli-native", tmp_dir, scope: "project")
+
+    assert gemini_install.destination == Path.join(tmp_dir, ".gemini")
+    assert File.exists?(Path.join(tmp_dir, "gemini-extension.json"))
+    assert File.exists?(Path.join(tmp_dir, ".gemini/commands/controlkeel/review.toml"))
+    assert File.exists?(Path.join(tmp_dir, "skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, "GEMINI.md"))
+
+    assert {:ok, kiro_install} = Skills.install("kiro-native", tmp_dir, scope: "project")
+    assert kiro_install.destination == Path.join(tmp_dir, ".kiro")
+    assert File.exists?(Path.join(tmp_dir, ".kiro/hooks/controlkeel-validate.json"))
+    assert File.exists?(Path.join(tmp_dir, ".kiro/steering/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kiro/mcp.json"))
+
+    assert {:ok, amp_install} = Skills.install("amp-native", tmp_dir, scope: "project")
+    assert amp_install.destination == Path.join(tmp_dir, ".amp")
+    assert File.exists?(Path.join(tmp_dir, ".amp/plugins/controlkeel-governance.ts"))
+    assert File.exists?(Path.join(tmp_dir, ".mcp.json"))
 
     assert {:ok, cursor_install} = Skills.install("cursor-native", tmp_dir, scope: "project")
     assert cursor_install.destination == Path.join(tmp_dir, ".cursor")

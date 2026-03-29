@@ -75,7 +75,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert goose.support_class == "attach_client"
     assert goose.preferred_target == "goose-native"
     assert goose.auth_mode == "ck_owned"
-    assert goose.skills_mode == "instructions_only"
+    assert goose.skills_mode == "native"
     assert goose.supported_scopes == ["project"]
   end
 

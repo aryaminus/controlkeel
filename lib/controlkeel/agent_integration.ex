@@ -188,90 +188,94 @@ defmodule ControlKeel.AgentIntegration do
       attach_client(%{
         id: "kiro",
         label: "Kiro",
-        category: "mcp-plus-instructions",
+        category: "native-first",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches MCP server and delivers native governance via Kiro Agent Hooks, steering files, and MCP config.",
         attach_command: "controlkeel attach kiro",
-        config_location: "Kiro MCP config file.",
+        config_location:
+          "Kiro MCP config and `.kiro/hooks/`, `.kiro/steering/`.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
-        preferred_target: "instructions-only",
+          "Exports a postToolUse governance hook, steering file, MCP config, and `AGENTS.md` instructions.",
+        preferred_target: "kiro-native",
         default_scope: "project",
         router_agent_id: "kiro",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "kiro",
         upstream_docs_url: "https://kiro.dev",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        supported_scopes: ["project", "export"],
+        export_targets: ["kiro-native", "instructions-only"]
       }),
       attach_client(%{
         id: "amp",
         label: "Amp",
-        category: "mcp-plus-instructions",
+        category: "native-first",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches MCP server and delivers native governance via Amp TypeScript plugins with event hooks, custom tools, and commands.",
         attach_command: "controlkeel attach amp",
-        config_location: "Amp MCP config file.",
+        config_location:
+          "Amp MCP config and `.amp/plugins/`.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
-        preferred_target: "instructions-only",
+          "Exports a governance TypeScript plugin with `amp.on` hooks, `ck-validate` tool, `/controlkeel-review` command, and `AGENTS.md` instructions.",
+        preferred_target: "amp-native",
         default_scope: "project",
         router_agent_id: "amp",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "sourcegraph/amp",
         upstream_docs_url: "https://ampcode.com",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        supported_scopes: ["project", "export"],
+        export_targets: ["amp-native", "instructions-only"]
       }),
       attach_client(%{
         id: "opencode",
         label: "OpenCode",
-        category: "mcp-plus-instructions",
+        category: "native-first",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches MCP server and delivers native governance via OpenCode plugins, agents, commands, and instruction files.",
         attach_command: "controlkeel attach opencode",
-        config_location: "OpenCode MCP config file.",
+        config_location:
+          "OpenCode MCP config and `.opencode/plugins/`, `.opencode/agents/`, `.opencode/commands/`.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
-        preferred_target: "instructions-only",
+          "Exports a governance TypeScript plugin, review agent profile, `/controlkeel-review` command, MCP config, and `AGENTS.md` instructions.",
+        preferred_target: "opencode-native",
         default_scope: "project",
         router_agent_id: "opencode",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "sst/opencode",
         upstream_docs_url: "https://opencode.ai",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        supported_scopes: ["project", "export"],
+        export_targets: ["opencode-native", "instructions-only"]
       }),
       attach_client(%{
         id: "gemini-cli",
         label: "Gemini CLI",
-        category: "mcp-plus-instructions",
+        category: "native-first",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches MCP server and delivers native governance via Gemini CLI extensions with manifest, custom commands, agent skills, and GEMINI.md context.",
         attach_command: "controlkeel attach gemini-cli",
-        config_location: "Gemini CLI MCP config file.",
+        config_location:
+          "Gemini CLI extension directory and `.gemini/commands/`, `skills/`, `GEMINI.md`.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
-        preferred_target: "instructions-only",
+          "Exports a `gemini-extension.json` manifest, `/controlkeel:review` TOML command, `controlkeel-governance` agent skill, and `GEMINI.md` instructions.",
+        preferred_target: "gemini-cli-native",
         default_scope: "project",
         router_agent_id: "gemini-cli",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "google-gemini/gemini-cli",
         upstream_docs_url: "https://github.com/google-gemini/gemini-cli",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        supported_scopes: ["project", "export"],
+        export_targets: ["gemini-cli-native", "instructions-only"]
       }),
       attach_client(%{
         id: "continue",
@@ -379,7 +383,7 @@ defmodule ControlKeel.AgentIntegration do
         router_agent_id: "goose",
         auth_mode: "ck_owned",
         mcp_mode: "native",
-        skills_mode: "instructions_only",
+        skills_mode: "native",
         upstream_slug: "block/goose",
         upstream_docs_url: "https://block.github.io/goose/docs/getting-started/using-extensions/",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},

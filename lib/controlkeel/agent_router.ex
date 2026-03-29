@@ -71,7 +71,7 @@ defmodule ControlKeel.AgentRouter do
     },
     "kiro" => %{
       name: "Kiro (Amazon)",
-      capabilities: [:repo_edit, :file_write, :bash, :mcp],
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
       cost_tier: :medium,
       security_tier: :high,
       swe_bench_score: 0.60,
@@ -87,7 +87,7 @@ defmodule ControlKeel.AgentRouter do
     },
     "amp" => %{
       name: "Amp (Sourcegraph)",
-      capabilities: [:repo_edit, :file_write, :bash, :mcp, :git],
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :git, :skills],
       cost_tier: :medium,
       security_tier: :high,
       swe_bench_score: 0.60,
@@ -104,7 +104,7 @@ defmodule ControlKeel.AgentRouter do
     },
     "opencode" => %{
       name: "OpenCode",
-      capabilities: [:repo_edit, :file_write, :bash, :mcp],
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
       cost_tier: :free,
       security_tier: :critical,
       swe_bench_score: 0.52,
@@ -146,7 +146,7 @@ defmodule ControlKeel.AgentRouter do
     # gemini-cli calls Google's remote API by default, so local: false
     "gemini-cli" => %{
       name: "Gemini CLI",
-      capabilities: [:repo_edit, :file_write, :bash, :mcp],
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
       cost_tier: :medium,
       security_tier: :medium,
       swe_bench_score: 0.57,

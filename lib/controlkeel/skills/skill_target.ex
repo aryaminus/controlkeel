@@ -104,6 +104,42 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "opencode-native",
+        "OpenCode native bundle",
+        "OpenCode-native plugins, agents, commands, MCP config, and governance instructions.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "gemini-cli-native",
+        "Gemini CLI extension bundle",
+        "Gemini CLI extension with manifest, MCP server, custom commands, agent skills, and GEMINI.md context.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "kiro-native",
+        "Kiro native bundle",
+        "Kiro Agent Hooks, steering files, MCP config, and governance instructions.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "amp-native",
+        "Amp native bundle",
+        "Amp TypeScript plugin with event hooks, custom tools, commands, and governance instructions.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
         "hermes-native",
         "Hermes Agent bundle",
         "Hermes-native skills, AGENTS context, and MCP companion config.",

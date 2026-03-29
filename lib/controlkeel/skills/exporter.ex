@@ -668,6 +668,157 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "opencode-native"}, root, project_root, _skills, opts) do
+    # 1. Governance plugin — hooks into OpenCode's plugin lifecycle
+    plugin_path = Path.join(root, ".opencode/plugins/controlkeel-governance.ts")
+    File.mkdir_p!(Path.dirname(plugin_path))
+    File.write!(plugin_path, opencode_plugin_contents())
+
+    # 2. Agent profile — a governed review agent
+    agent_path = Path.join(root, ".opencode/agents/controlkeel-operator.md")
+    File.mkdir_p!(Path.dirname(agent_path))
+    File.write!(agent_path, opencode_agent_contents())
+
+    # 3. Command template — /controlkeel-review
+    command_path = Path.join(root, ".opencode/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, opencode_command_contents())
+
+    # 4. MCP config — opencode-format mcp.json
+    mcp_path = Path.join(root, ".opencode/mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    # 5. Instructions
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("opencode", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => plugin_path, "kind" => "plugin"},
+        %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Copy `.opencode/plugins/` into your project's `.opencode/plugins/` directory (loaded automatically at startup).",
+        "Copy `.opencode/agents/` into your project's `.opencode/agents/` directory for the governed review agent.",
+        "Copy `.opencode/commands/` into your project's `.opencode/commands/` directory for the `/controlkeel-review` command.",
+        "Merge `.opencode/mcp.json` into your `opencode.json` under the `mcp` key."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "gemini-cli-native"}, root, project_root, _skills, opts) do
+    # 1. Extension manifest
+    manifest_path = Path.join(root, "gemini-extension.json")
+
+    File.write!(
+      manifest_path,
+      Jason.encode!(gemini_extension_manifest(project_root, opts), pretty: true) <> "\n"
+    )
+
+    # 2. Custom command — /controlkeel:review
+    command_path = Path.join(root, ".gemini/commands/controlkeel/review.toml")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, gemini_command_contents())
+
+    # 3. Agent skill
+    skill_path = Path.join(root, "skills/controlkeel-governance/SKILL.md")
+    File.mkdir_p!(Path.dirname(skill_path))
+    File.write!(skill_path, gemini_skill_contents())
+
+    # 4. GEMINI.md context
+    gemini_md_path = Path.join(root, "GEMINI.md")
+    File.write!(gemini_md_path, instructions_only_contents("gemini-cli", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => manifest_path, "kind" => "settings"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => skill_path, "kind" => "skills"},
+        %{"path" => gemini_md_path, "kind" => "instructions"}
+      ],
+      [
+        "Install with `gemini extensions link .` or copy the directory into `~/.gemini/extensions/controlkeel/`.",
+        "The `/controlkeel:review` command and `controlkeel-governance` skill are auto-discovered."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "kiro-native"}, root, project_root, _skills, opts) do
+    # 1. Agent Hook — post-tool validation
+    hook_path = Path.join(root, ".kiro/hooks/controlkeel-validate.json")
+    File.mkdir_p!(Path.dirname(hook_path))
+    File.write!(hook_path, Jason.encode!(kiro_hook_spec(), pretty: true) <> "\n")
+
+    # 2. Steering file
+    steering_path = Path.join(root, ".kiro/steering/controlkeel.md")
+    File.mkdir_p!(Path.dirname(steering_path))
+    File.write!(steering_path, kiro_steering_contents())
+
+    # 3. MCP config
+    mcp_path = Path.join(root, ".kiro/mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    # 4. Instructions
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("kiro", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => hook_path, "kind" => "hook"},
+        %{"path" => steering_path, "kind" => "instructions"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Copy `.kiro/hooks/` into your project root for Agent Hook auto-discovery.",
+        "Copy `.kiro/steering/` for governed agent behavioral guidance.",
+        "Merge `.kiro/mcp.json` into your Kiro MCP settings."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "amp-native"}, root, project_root, _skills, opts) do
+    # 1. TypeScript plugin
+    plugin_path = Path.join(root, ".amp/plugins/controlkeel-governance.ts")
+    File.mkdir_p!(Path.dirname(plugin_path))
+    File.write!(plugin_path, amp_plugin_contents())
+
+    # 2. MCP config
+    mcp_path = Path.join(root, ".mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    # 3. Instructions
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("amp", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => plugin_path, "kind" => "plugin"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Copy `.amp/plugins/` into your project root (requires `PLUGINS=all` env var to activate).",
+        "Merge `.mcp.json` into your project's MCP config."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "instructions-only"}, root, project_root, _skills, opts) do
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, instructions_only_contents("agents", project_root, opts))
@@ -1852,4 +2003,292 @@ defmodule ControlKeel.Skills.Exporter do
   defp same_path?(left, right) do
     Path.expand(left) == Path.expand(right)
   end
+
+  # ── OpenCode native helpers ────────────────────────────────────────────────
+
+  defp opencode_plugin_contents do
+    ~S"""
+    import type { Plugin } from "@opencode-ai/plugin"
+    import { tool } from "@opencode-ai/plugin"
+
+    /**
+     * ControlKeel Governance Plugin for OpenCode
+     *
+     * Provides:
+     * - Pre-flight validation on tool execution (tool.execute.before)
+     * - Environment injection for ControlKeel project root (shell.env)
+     * - Session idle notifications (session.idle)
+     * - Custom ck-validate tool for on-demand governance checks
+     */
+    export const ControlKeelGovernance: Plugin = async ({ project, client, $, directory }) => {
+      return {
+        // Inject ControlKeel project root into all shell environments
+        "shell.env": async (_input, output) => {
+          output.env.CONTROLKEEL_PROJECT_ROOT = directory
+        },
+
+        // Log governance context before tool execution
+        "tool.execute.before": async (input, output) => {
+          if (input.tool === "bash" || input.tool === "shell") {
+            await client.app.log({
+              body: {
+                service: "controlkeel-governance",
+                level: "info",
+                message: `[CK] Tool execution: ${input.tool}`,
+                extra: { directory, args: output.args },
+              },
+            })
+          }
+        },
+
+        // Notify on session completion for audit logging
+        event: async ({ event }) => {
+          if (event.type === "session.idle") {
+            await client.app.log({
+              body: {
+                service: "controlkeel-governance",
+                level: "info",
+                message: "[CK] Session idle — run `controlkeel findings` to review governance status.",
+              },
+            })
+          }
+        },
+
+        // Custom tool: ck-validate — triggers ControlKeel validation via MCP
+        tool: {
+          "ck-validate": tool({
+            description:
+              "Run ControlKeel governance validation on the current project. " +
+              "Returns findings, budget status, and proof readiness.",
+            args: {
+              scope: tool.schema.enum(["full", "quick"]).default("quick"),
+            },
+            async execute(args, context) {
+              const result =
+                await $`controlkeel findings --format json`.text()
+              return result
+            },
+          }),
+        },
+      }
+    }
+    """
+  end
+
+  defp opencode_agent_contents do
+    """
+    ---
+    description: ControlKeel governed code review agent — validates changes against security, budget, and compliance policies.
+    model: anthropic/claude-sonnet-4-5
+    tools:
+      write: false
+      edit: false
+    ---
+
+    You are the ControlKeel governance operator. Your role is to review code changes
+    and validate them against the project's security, budget, and compliance policies.
+
+    ## Instructions
+
+    1. Use the `ck-validate` tool to run governance checks before providing feedback.
+    2. Report findings by severity: critical > high > medium > low.
+    3. Never approve changes that have unresolved critical or high findings.
+    4. Reference specific policy rules when flagging issues.
+    5. Summarize budget impact if token/cost tracking is enabled.
+
+    ## Available MCP Tools
+
+    - `ck_validate` — Run full governance validation
+    - `ck_budget` — Check remaining budget and spend history
+    - `ck_findings` — List open findings for the current session
+    - `ck_approve` — Approve a finding (requires operator confirmation)
+    """
+  end
+
+  defp opencode_command_contents do
+    """
+    ---
+    description: Run ControlKeel governance review on the current project
+    agent: controlkeel-operator
+    ---
+
+    Review the current project for governance compliance. Run `ck-validate` to check
+    for security findings, budget status, and proof readiness. Summarize the results
+    and highlight any blockers that need attention before shipping.
+
+    Focus on:
+    1. Open findings by severity
+    2. Budget remaining vs. spent
+    3. Proof coverage for completed tasks
+    4. Any policy violations that block release
+    """
+  end
+
+  # ── Gemini CLI native helpers ──────────────────────────────────────────────
+
+  defp gemini_extension_manifest(project_root, opts) do
+    %{
+      "name" => "controlkeel-governance",
+      "version" => "1.0.0",
+      "contextFileName" => "GEMINI.md",
+      "settings" => [
+        %{
+          "name" => "ControlKeel API Key",
+          "description" => "API key for the ControlKeel governance proxy (optional).",
+          "envVar" => "CONTROLKEEL_API_KEY",
+          "sensitive" => true
+        }
+      ],
+      "mcpServers" =>
+        mcp_payload(project_root, opts)
+        |> Map.get("mcpServers", %{})
+    }
+  end
+
+  defp gemini_command_contents do
+    """
+    # ControlKeel Governance Review
+    # Usage: /controlkeel:review [scope]
+
+    [command]
+    version = 1
+
+    prompt = \"\"\"
+    Run a ControlKeel governance review on this project.
+
+    Execute the following shell command and summarize the results:
+    !{controlkeel findings --format json}
+
+    Focus on:
+    1. Open findings by severity (critical > high > medium > low)
+    2. Budget remaining vs. spent
+    3. Proof coverage for completed tasks
+    4. Any policy violations that block release
+
+    {{args}}
+    \"\"\"
+    """
+  end
+
+  defp gemini_skill_contents do
+    """
+    ---
+    name: controlkeel-governance
+    description:
+      Expertise in governance validation, security review, budget tracking,
+      and compliance auditing. Use when the user asks to "review", "validate",
+      "audit", or check "governance" status of the project.
+    ---
+
+    # ControlKeel Governance Operator
+
+    You are a governance review specialist. When auditing code:
+
+    1. Run `controlkeel findings --format json` to get the current status.
+    2. Report findings by severity: critical > high > medium > low.
+    3. Never approve changes that have unresolved critical or high findings.
+    4. Reference specific policy rules when flagging issues.
+    5. Summarize budget impact if token/cost tracking is enabled.
+    6. Check proof coverage for completed tasks.
+    """
+  end
+
+  # ── Kiro native helpers ────────────────────────────────────────────────────
+
+  defp kiro_hook_spec do
+    %{
+      "name" => "ControlKeel Governance Validation",
+      "description" =>
+        "Runs ControlKeel governance checks after tool invocations to ensure compliance.",
+      "version" => "1.0",
+      "enabled" => true,
+      "when" => %{
+        "type" => "postToolUse",
+        "tool" => "write"
+      },
+      "then" => %{
+        "type" => "runCommand",
+        "command" => "controlkeel findings --format summary --quiet"
+      }
+    }
+  end
+
+  defp kiro_steering_contents do
+    """
+    # ControlKeel Governance
+
+    This project uses ControlKeel for governance, security, and compliance management.
+
+    ## Rules
+
+    1. **Always** run `controlkeel findings` after making significant code changes.
+    2. **Never** approve or merge changes with unresolved critical or high findings.
+    3. Reference specific policy rules when flagging issues in code reviews.
+    4. Summarize budget impact when token/cost tracking is enabled.
+    5. Check proof coverage before marking tasks as complete.
+
+    ## Available Tools
+
+    - `controlkeel findings` — List open governance findings
+    - `controlkeel validate` — Run full governance validation
+    - `controlkeel budget` — Check remaining budget and spend history
+    - `controlkeel approve <finding-id>` — Approve a finding (requires operator confirmation)
+    """
+  end
+
+  # ── Amp native helpers ─────────────────────────────────────────────────────
+
+  defp amp_plugin_contents do
+    ~S"""
+    /**
+     * ControlKeel Governance Plugin for Amp
+     *
+     * Provides:
+     * - Event hooks on tool calls for governance logging
+     * - Custom ck-validate tool for on-demand governance checks
+     * - /controlkeel-review command for full project review
+     *
+     * Requires: PLUGINS=all environment variable to activate
+     */
+
+    // Hook into tool call events for governance logging
+    amp.on("tool.call", async (ctx) => {
+      if (ctx.tool === "bash" || ctx.tool === "shell") {
+        ctx.ui.notify(`[CK] Tool execution: ${ctx.tool}`)
+      }
+    })
+
+    // Register custom governance validation tool
+    amp.registerTool("ck-validate", {
+      description:
+        "Run ControlKeel governance validation on the current project. " +
+        "Returns findings, budget status, and proof readiness.",
+      parameters: {
+        scope: {
+          type: "string",
+          enum: ["full", "quick"],
+          default: "quick",
+          description: "Validation scope: 'full' for complete review, 'quick' for summary",
+        },
+      },
+      async execute(args: { scope: string }) {
+        const { stdout } = await amp.shell(
+          `controlkeel findings --format json${args.scope === "full" ? " --full" : ""}`,
+        )
+        return stdout
+      },
+    })
+
+    // Register governance review command
+    amp.registerCommand("controlkeel-review", {
+      description: "Run a full ControlKeel governance review on the current project",
+      async execute(ctx) {
+        const result = await ctx.tool("ck-validate", { scope: "full" })
+        return `Review the following governance results and provide a summary:\n\n${result}`
+      },
+    })
+    """
+  end
 end
+
+

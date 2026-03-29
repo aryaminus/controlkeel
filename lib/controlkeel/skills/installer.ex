@@ -288,6 +288,125 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
+  defp do_install(%SkillTarget{id: "opencode-native"}, "project", project_root, _skills, _opts) do
+    {:ok, plan} = Exporter.export("opencode-native", project_root, scope: "project")
+
+    opencode_root = Path.join(project_root, ".opencode")
+    plugins_root = Path.join(opencode_root, "plugins")
+    agents_root = Path.join(opencode_root, "agents")
+    commands_root = Path.join(opencode_root, "commands")
+
+    File.mkdir_p!(plugins_root)
+    File.mkdir_p!(agents_root)
+    File.mkdir_p!(commands_root)
+
+    copy_tree_contents(Path.join(plan.output_dir, ".opencode/plugins"), plugins_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".opencode/agents"), agents_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".opencode/commands"), commands_root)
+
+    File.cp!(
+      Path.join(plan.output_dir, ".opencode/mcp.json"),
+      Path.join(opencode_root, "mcp.json")
+    )
+
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "opencode-native",
+       scope: "project",
+       destination: Path.join(project_root, ".opencode"),
+       plugins_destination: plugins_root,
+       agents_destination: agents_root,
+       commands_destination: commands_root
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "gemini-cli-native"}, "project", project_root, _skills, _opts) do
+    {:ok, plan} = Exporter.export("gemini-cli-native", project_root, scope: "project")
+
+    gemini_root = Path.join(project_root, ".gemini")
+    commands_root = Path.join(gemini_root, "commands")
+
+    File.mkdir_p!(commands_root)
+
+    copy_tree_contents(
+      Path.join(plan.output_dir, ".gemini/commands"),
+      commands_root
+    )
+
+    File.cp!(
+      Path.join(plan.output_dir, "gemini-extension.json"),
+      Path.join(project_root, "gemini-extension.json")
+    )
+
+    skills_root = Path.join(project_root, "skills")
+    File.mkdir_p!(skills_root)
+    copy_tree_contents(Path.join(plan.output_dir, "skills"), skills_root)
+
+    File.cp!(Path.join(plan.output_dir, "GEMINI.md"), Path.join(project_root, "GEMINI.md"))
+
+    {:ok,
+     %{
+       target: "gemini-cli-native",
+       scope: "project",
+       destination: gemini_root,
+       commands_destination: commands_root,
+       skills_destination: skills_root
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "kiro-native"}, "project", project_root, _skills, _opts) do
+    {:ok, plan} = Exporter.export("kiro-native", project_root, scope: "project")
+
+    kiro_root = Path.join(project_root, ".kiro")
+    hooks_root = Path.join(kiro_root, "hooks")
+    steering_root = Path.join(kiro_root, "steering")
+
+    File.mkdir_p!(hooks_root)
+    File.mkdir_p!(steering_root)
+
+    copy_tree_contents(Path.join(plan.output_dir, ".kiro/hooks"), hooks_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".kiro/steering"), steering_root)
+
+    File.cp!(
+      Path.join(plan.output_dir, ".kiro/mcp.json"),
+      Path.join(kiro_root, "mcp.json")
+    )
+
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "kiro-native",
+       scope: "project",
+       destination: kiro_root,
+       hooks_destination: hooks_root,
+       steering_destination: steering_root
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "amp-native"}, "project", project_root, _skills, _opts) do
+    {:ok, plan} = Exporter.export("amp-native", project_root, scope: "project")
+
+    amp_root = Path.join(project_root, ".amp")
+    plugins_root = Path.join(amp_root, "plugins")
+
+    File.mkdir_p!(plugins_root)
+
+    copy_tree_contents(Path.join(plan.output_dir, ".amp/plugins"), plugins_root)
+    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "amp-native",
+       scope: "project",
+       destination: amp_root,
+       plugins_destination: plugins_root
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "hermes-native"}, scope, project_root, skills, _opts)
        when scope in ["user", "project"] do
     base =
