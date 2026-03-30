@@ -51,6 +51,7 @@ defmodule ControlKeelWeb.Router do
     live "/missions/:id", MissionControlLive, :show
     live "/policies", PolicyStudioLive, :index
     live "/skills", SkillsLive, :index
+    live "/deploy", DeploymentLive, :index
   end
 
   scope "/api/v1", ControlKeelWeb do

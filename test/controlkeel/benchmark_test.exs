@@ -142,7 +142,6 @@ defmodule ControlKeel.BenchmarkTest do
     assert classification.fpr <= 0.5
   end
 
-
   test "runs validate and proxy subjects without creating sessions or ship analytics" do
     session_count = Repo.aggregate(Session, :count, :id)
     analytics_count = Repo.aggregate(Event, :count, :id)

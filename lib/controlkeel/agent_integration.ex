@@ -192,8 +192,7 @@ defmodule ControlKeel.AgentIntegration do
         description:
           "Attaches MCP server and delivers native governance via Kiro Agent Hooks, steering files, and MCP config.",
         attach_command: "controlkeel attach kiro",
-        config_location:
-          "Kiro MCP config and `.kiro/hooks/`, `.kiro/steering/`.",
+        config_location: "Kiro MCP config and `.kiro/hooks/`, `.kiro/steering/`.",
         companion_delivery:
           "Exports a postToolUse governance hook, steering file, MCP config, and `AGENTS.md` instructions.",
         preferred_target: "kiro-native",
@@ -215,8 +214,7 @@ defmodule ControlKeel.AgentIntegration do
         description:
           "Attaches MCP server and delivers native governance via Amp TypeScript plugins with event hooks, custom tools, and commands.",
         attach_command: "controlkeel attach amp",
-        config_location:
-          "Amp MCP config and `.amp/plugins/`.",
+        config_location: "Amp MCP config and `.amp/plugins/`.",
         companion_delivery:
           "Exports a governance TypeScript plugin with `amp.on` hooks, `ck-validate` tool, `/controlkeel-review` command, and `AGENTS.md` instructions.",
         preferred_target: "amp-native",

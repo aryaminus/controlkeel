@@ -322,9 +322,7 @@ defmodule ControlKeel.SkillsTest do
 
     assert {:ok, amp_plan} = Skills.export("amp-native", tmp_dir, scope: "export")
 
-    assert File.exists?(
-             Path.join(amp_plan.output_dir, ".amp/plugins/controlkeel-governance.ts")
-           )
+    assert File.exists?(Path.join(amp_plan.output_dir, ".amp/plugins/controlkeel-governance.ts"))
 
     assert File.exists?(Path.join(amp_plan.output_dir, ".mcp.json"))
     assert File.exists?(Path.join(amp_plan.output_dir, "AGENTS.md"))
