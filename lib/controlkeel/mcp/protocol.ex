@@ -12,7 +12,10 @@ defmodule ControlKeel.MCP.Protocol do
     CkRoute,
     CkSkillList,
     CkSkillLoad,
-    CkValidate
+    CkValidate,
+    CkCostOptimizer,
+    CkDeploymentAdvisor,
+    CkOutcomeTracker
   }
 
   @server_info %{
@@ -85,7 +88,10 @@ defmodule ControlKeel.MCP.Protocol do
       ck_finding_tool(),
       ck_budget_tool(),
       ck_route_tool(),
-      ck_delegate_tool()
+      ck_delegate_tool(),
+      ck_cost_optimizer_tool(),
+      ck_deployment_advisor_tool(),
+      ck_outcome_tracker_tool()
     ]
 
     if current_skill_names() == [] do
@@ -103,6 +109,9 @@ defmodule ControlKeel.MCP.Protocol do
   def dispatch_tool("ck_delegate", arguments), do: CkDelegate.call(arguments)
   def dispatch_tool("ck_skill_list", arguments), do: CkSkillList.call(arguments)
   def dispatch_tool("ck_skill_load", arguments), do: CkSkillLoad.call(arguments)
+  def dispatch_tool("ck_cost_optimizer", arguments), do: CkCostOptimizer.call(arguments)
+  def dispatch_tool("ck_deployment_advisor", arguments), do: CkDeploymentAdvisor.call(arguments)
+  def dispatch_tool("ck_outcome_tracker", arguments), do: CkOutcomeTracker.call(arguments)
 
   def dispatch_tool(unknown, _arguments),
     do: {:error, {:invalid_arguments, "Unknown tool: #{unknown}"}}
@@ -247,6 +256,63 @@ defmodule ControlKeel.MCP.Protocol do
           "agent" => %{"type" => "string"},
           "mode" => %{"type" => "string", "enum" => ["auto", "embedded", "handoff", "runtime"]},
           "project_root" => %{"type" => "string"}
+        }
+      }
+    }
+  end
+
+  defp ck_cost_optimizer_tool do
+    %{
+      "name" => "ck_cost_optimizer",
+      "description" => "Get cost optimization suggestions or compare agent prices for a task.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["mode"],
+        "properties" => %{
+          "mode" => %{"type" => "string", "enum" => ["suggest", "compare"]},
+          "session_id" => %{"type" => ["integer", "string"]},
+          "spending" => %{"type" => "array", "items" => %{"type" => "object"}},
+          "top_provider" => %{"type" => "string"},
+          "top_model" => %{"type" => "string"},
+          "task_description" => %{"type" => "string"},
+          "estimated_tokens" => %{"type" => "integer"}
+        }
+      }
+    }
+  end
+
+  defp ck_deployment_advisor_tool do
+    %{
+      "name" => "ck_deployment_advisor",
+      "description" => "Analyze project stack, suggest deployment platforms, and generate CI/CD/Docker files.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["mode", "project_root"],
+        "properties" => %{
+          "mode" => %{"type" => "string", "enum" => ["analyze", "generate_files", "dns_guide"]},
+          "project_root" => %{"type" => "string"},
+          "dry_run" => %{"type" => "boolean"}
+        }
+      }
+    }
+  end
+
+  defp ck_outcome_tracker_tool do
+    %{
+      "name" => "ck_outcome_tracker",
+      "description" => "Record session outcomes or get leaderboard for agents to power reinforcement learning.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["mode"],
+        "properties" => %{
+          "mode" => %{"type" => "string", "enum" => ["record", "get_session", "get_leaderboard"]},
+          "session_id" => %{"type" => ["integer", "string"]},
+          "outcome" => %{"type" => "string"},
+          "agent_id" => %{"type" => "string"},
+          "task_type" => %{"type" => "string"},
+          "workspace_id" => %{"type" => "string"},
+          "limit" => %{"type" => "integer"},
+          "window" => %{"type" => "integer"}
         }
       }
     }

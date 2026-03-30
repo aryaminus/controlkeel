@@ -14,6 +14,8 @@ metadata:
   author: controlkeel
   version: "2.0"
   category: policy
+  ck_mcp_tools:
+    - ck_outcome_tracker
 ---
 
 # Policy Training Skill
@@ -26,8 +28,8 @@ Use this skill only when the task is offline policy training or artifact promoti
 2. Use public and held-out benchmark data appropriately.
 3. Review promotion gates and never weaken deterministic controls.
 4. Summarize held-out metrics against the heuristic baseline before promotion.
+5. Consider real-world success inputs using `ck_outcome_tracker` (leaderboards, recorded session outcomes).
 
 ## Additional resources
 
 - [Promotion rules](references/promotion-rules.md)
-

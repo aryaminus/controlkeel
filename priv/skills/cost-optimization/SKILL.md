@@ -17,6 +17,7 @@ metadata:
     - ck_budget
     - ck_context
     - ck_route
+    - ck_cost_optimizer
 ---
 
 # Cost Optimization Skill
@@ -28,6 +29,7 @@ metadata:
 3. Use `ck_route` to prefer cheaper valid agents when quality permits.
 4. When the budget is low, reduce scope and escalate to the human early.
 5. Commit actual usage after completion if your harness is responsible for spend recording.
+6. Use `ck_cost_optimizer` to discover savings models, caching strategies, and local model alternatives.
 
 ## Additional resources
 

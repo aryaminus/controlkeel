@@ -17,6 +17,9 @@ allowed-tools:
   - ck_route
   - ck_skill_list
   - ck_skill_load
+  - ck_cost_optimizer
+  - ck_deployment_advisor
+  - ck_outcome_tracker
 metadata:
   author: controlkeel
   version: "2.0"
@@ -27,6 +30,9 @@ metadata:
     - ck_finding
     - ck_budget
     - ck_route
+    - ck_cost_optimizer
+    - ck_deployment_advisor
+    - ck_outcome_tracker
 ---
 
 # ControlKeel Governance Skill
@@ -38,9 +44,11 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 1. Call `ck_context` at task start to load mission, risk, budget, proof, and active findings.
 2. Call `ck_validate` before writing code, config, shell, or deploy text.
 3. If you discover a problem the scanner did not raise, call `ck_finding`.
-4. Call `ck_budget` before expensive model or bulk operations.
+4. Call `ck_budget` and `ck_cost_optimizer` before expensive model or bulk operations.
 5. Call `ck_route` before delegating sub-work to another agent.
-6. Use `ck_skill_list` and `ck_skill_load` to activate more specific CK workflows.
+6. Use `ck_deployment_advisor` to analyze stack and generate deployment templates when checking ship readiness.
+7. Use `ck_outcome_tracker` to track success/failure outcomes for continuous learning.
+8. Use `ck_skill_list` and `ck_skill_load` to activate more specific CK workflows.
 
 ## Non-negotiable rules
 
@@ -57,6 +65,9 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 - `ck_finding` — persist manual findings
 - `ck_budget` — cost estimate / commit
 - `ck_route` — best agent recommendation
+- `ck_cost_optimizer` — cost optimization strategies and model comparison
+- `ck_deployment_advisor` — repo stack detection, CI/Docker generation, DNS/SSL guide
+- `ck_outcome_tracker` — record and review session outcomes/agent scores
 - `ck_skill_list`, `ck_skill_load` — specialized workflow activation
 
 ## Additional resources

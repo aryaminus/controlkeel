@@ -15,6 +15,7 @@ metadata:
   category: release
   ck_mcp_tools:
     - ck_context
+    - ck_deployment_advisor
 ---
 
 # Ship Readiness Skill
@@ -27,8 +28,8 @@ Use this skill when the operator asks whether a mission or session is ready for 
 2. Verify there are no unresolved blockers.
 3. Confirm proof state and rollback guidance.
 4. Summarize approvals, rejections, and any remaining human work.
+5. Provide automatic deployment resources via `ck_deployment_advisor` (Dockerize, CI pipes) for the relevant stack (Phoenix, etc.).
 
 ## Additional resources
 
 - [Release checklist](references/release-checklist.md)
-
