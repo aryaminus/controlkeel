@@ -130,9 +130,60 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 | VS Code | `controlkeel attach vscode` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 | GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 | OpenCode | `controlkeel attach opencode` | Writes `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json`, `AGENTS.md` | `opencode-native`, `instructions-only` |
+| mcptocli | Manual setup | Wraps CK MCP as CLI; see [mcptocli integration](#mcptocli-cli-integration) | N/A |
 | Kiro | `controlkeel attach kiro` | Writes `.kiro/hooks`, `.kiro/steering`, `.kiro/mcp.json`, `AGENTS.md` | `kiro-native`, `instructions-only` |
 | Amp | `controlkeel attach amp` | Writes `.amp/plugins/controlkeel-governance.ts`, `.mcp.json`, `AGENTS.md` | `amp-native`, `instructions-only` |
 | Gemini CLI | `controlkeel attach gemini-cli` | Writes `gemini-extension.json`, `.gemini/commands`, `skills/`, `GEMINI.md` | `gemini-cli-native`, `instructions-only` |
+
+## mcptocli CLI integration
+
+[mcptocli](https://github.com/MaximeRivest/mcptocli) is a tool that wraps any MCP server as a CLI command. While ControlKeel's native OpenCode integration is the recommended approach, mcptocli can be used as an alternative CLI interface.
+
+### Installation
+
+```bash
+# macOS/Linux
+curl -fsSL https://raw.githubusercontent.com/MaximeRivest/mcptocli/main/install.sh | sh
+
+# Windows
+irm https://raw.githubusercontent.com/MaximeRivest/mcptocli/main/install.ps1 | iex
+```
+
+### Setup with ControlKeel
+
+Create a wrapper script to suppress debug output:
+
+```bash
+#!/bin/bash
+cd /path/to/your/project
+exec elixir --erl "-logger level error" -S mix ck.mcp --project-root /path/to/your/project
+```
+
+Then register with mcptocli:
+
+```bash
+mcptocli add controlkeel '/path/to/your/wrapper-script.sh'
+```
+
+### Usage
+
+```bash
+# List available tools
+mcptocli controlkeel tools
+
+# Run validation
+mcptocli controlkeel ck_validate --scope full
+
+# Check budget
+mcptocli controlkeel ck_budget
+
+# Interactive shell
+mcptocli controlkeel shell
+```
+
+### Note
+
+The native `controlkeel attach opencode` integration provides a deeper integration with OpenCode's plugin system, skill loading, and event hooks. mcptocli is useful if you want a simple CLI wrapper around the MCP tools without the full OpenCode integration.
 
 ## MCP plus instructions agents
 
