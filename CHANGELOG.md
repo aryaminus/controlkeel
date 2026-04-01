@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.15 — 2026-04-01
+
+### What's changed
+
+- feat: add new framework adapters and enhance security rules for leak-derived dependencies
+- feat: add Socket dependency review command and related tests
+- feat: enhance documentation and add security rules for SSRF and dependency hygiene
+
 ## v0.1.14 — 2026-04-01
 
 ### What's changed
