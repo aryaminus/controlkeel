@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.14 — 2026-04-01
+
+### What's changed
+
+- fix: improve plugin installation error handling and output messages
+- docs: update attach commands and release verification checkpoints
+- fix: update badge links in README for Release Smoke and Latest Release
+
 ## v0.1.13 — 2026-04-01
 
 ### What's changed
