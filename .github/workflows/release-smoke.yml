@@ -50,7 +50,7 @@ jobs:
       - run: mix assets.deploy
       - name: Build and smoke Linux
         run: |
-          BURRITO_TARGET=linux mix release
+          BURRITO_TARGET=linux mix release --overwrite
           chmod +x scripts/release_smoke.sh
           scripts/release_smoke.sh "burrito_out/controlkeel_linux"
 
@@ -58,7 +58,7 @@ jobs:
           cp burrito_out/controlkeel_linux release_stage/raw/linux/controlkeel-linux-x86_64
       - name: Build Windows binary
         run: |
-          BURRITO_TARGET=windows mix release
+          BURRITO_TARGET=windows mix release --overwrite
           cp burrito_out/controlkeel_windows.exe release_stage/raw/windows/controlkeel-windows-x86_64.exe
       - uses: actions/upload-artifact@v7
         with:
@@ -102,11 +102,11 @@ jobs:
           mkdir -p release_stage/raw/macos-intel release_stage/raw/macos-arm
           chmod +x scripts/release_smoke.sh
 
-          BURRITO_TARGET=macos mix release
+          BURRITO_TARGET=macos mix release --overwrite
           scripts/release_smoke.sh "burrito_out/controlkeel_macos"
           cp burrito_out/controlkeel_macos release_stage/raw/macos-intel/controlkeel-macos-x86_64
 
-          BURRITO_TARGET=macos_silicon mix release
+          BURRITO_TARGET=macos_silicon mix release --overwrite
           scripts/release_smoke.sh "burrito_out/controlkeel_macos_silicon"
           cp burrito_out/controlkeel_macos_silicon release_stage/raw/macos-arm/controlkeel-macos-arm64
       - uses: actions/upload-artifact@v7
