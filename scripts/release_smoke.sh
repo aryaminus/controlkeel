@@ -62,7 +62,14 @@ PY
 }
 
 run_command "$BINARY" version >/dev/null
-PHX_SERVER=true DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" daemon >"$SERVER_LOG" 2>&1
+if ! PHX_SERVER=true DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" daemon >"$SERVER_LOG" 2>&1; then
+  echo "daemon start failed" >&2
+  if [ -f "$SERVER_LOG" ]; then
+    echo "--- server log ---" >&2
+    cat "$SERVER_LOG" >&2
+  fi
+  exit 1
+fi
 STARTED=1
 
 for _ in $(seq 1 20); do
