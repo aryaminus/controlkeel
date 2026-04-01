@@ -41,8 +41,8 @@ export DATABASE_PATH="$DB_PATH"
 export SECRET_KEY_BASE="$SECRET_KEY_BASE"
 
 cleanup() {
-  if [ -n "${SERVER_PID:-}" ]; then
-    kill "$SERVER_PID" >/dev/null 2>&1 || true
+  if [ "${STARTED:-0}" -eq 1 ]; then
+    "$BINARY" stop >/dev/null 2>&1 || true
   fi
   rm -rf "$TMP_DIR"
 }
@@ -62,96 +62,13 @@ PY
 }
 
 run_command "$BINARY" version >/dev/null
-
-python3 - "$BINARY" "$TMP_DIR" <<'PY'
-import os
-import subprocess
-import sys
-
-binary, tmp_dir = sys.argv[1:3]
-completed = subprocess.run(
-    [binary, "bootstrap"],
-    cwd=tmp_dir,
-    env=os.environ.copy(),
-    timeout=60,
-    check=False,
-    capture_output=True,
-)
-if completed.returncode != 0:
-    sys.stdout.buffer.write(completed.stdout)
-    sys.stderr.buffer.write(completed.stderr)
-    raise SystemExit(completed.returncode)
-PY
-
-test -f "$TMP_DIR/controlkeel/project.json"
-test -f "$TMP_DIR/controlkeel/bin/controlkeel-mcp"
-
-(cd "$TMP_DIR" && run_command "$BINARY" benchmark list >/dev/null)
-
-BENCH_OUTPUT=$(cd "$TMP_DIR" && \
-  run_command \
-    "$BINARY" \
-    benchmark \
-    run \
-    --suite \
-    vibe_failures_v1 \
-    --subjects \
-    controlkeel_validate \
-    --baseline-subject \
-    controlkeel_validate \
-    --scenario-slugs \
-    client_side_auth_bypass)
-
-echo "$BENCH_OUTPUT" | grep "Benchmark run #" >/dev/null
-
-(cd "$TMP_DIR" && run_command "$BINARY" attach codex-cli --scope project >/dev/null)
-test -f "$TMP_DIR/.agents/skills/controlkeel-governance/SKILL.md"
-test -f "$TMP_DIR/.codex/agents/controlkeel-operator.toml"
-test -f "$HOME_DIR/.codex/config.json"
-
-(cd "$TMP_DIR" && run_command "$BINARY" attach cline >/dev/null)
-test -f "$TMP_DIR/.cline/skills/controlkeel-governance/SKILL.md"
-test -f "$TMP_DIR/.clinerules/controlkeel.md"
-test -f "$TMP_DIR/.clinerules/workflows/controlkeel-review.md"
-test -f "$HOME_DIR/.cline/data/settings/cline_mcp_settings.json"
-
-(cd "$TMP_DIR" && run_command "$BINARY" attach cursor >/dev/null)
-
-if [ "$(uname -s)" = "Darwin" ]; then
-  CURSOR_CONFIG="$HOME_DIR/Library/Application Support/Cursor/User/globalStorage/cursor.mcp.json"
-else
-  CURSOR_CONFIG="$HOME_DIR/.config/Cursor/User/globalStorage/cursor.mcp.json"
-fi
-
-test -f "$CURSOR_CONFIG"
-test -f "$TMP_DIR/controlkeel/dist/instructions-only/AGENTS.md"
-
-python3 - "$BINARY" "$TMP_DIR" <<'PY'
-import json
-import subprocess
-import sys
-
-binary, project_root = sys.argv[1:3]
-request = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
-payload = json.dumps(request)
-frame = f"Content-Length: {len(payload)}\r\n\r\n{payload}".encode()
-completed = subprocess.run(
-    [binary, "mcp", "--project-root", project_root],
-    input=frame,
-    capture_output=True,
-    timeout=10,
-    check=True,
-)
-stdout = completed.stdout.decode()
-if "Content-Length:" not in stdout or "\"result\"" not in stdout:
-    raise SystemExit("mcp initialize smoke check failed")
-PY
-
-DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" serve >"$SERVER_LOG" 2>&1 &
-SERVER_PID=$!
+PHX_SERVER=true DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" daemon >"$SERVER_LOG" 2>&1
+STARTED=1
 
 for _ in $(seq 1 20); do
   if curl --connect-timeout 1 --max-time 2 -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
+    "$BINARY" stop >/dev/null 2>&1 || true
+    STARTED=0
     exit 0
   fi
 

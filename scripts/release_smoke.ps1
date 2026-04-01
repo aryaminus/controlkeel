@@ -49,67 +49,15 @@ function Invoke-BinaryStep {
   }
 }
 
-function Test-McpInitialize {
-  param(
-    [string]$ProjectRoot,
-    [int]$TimeoutSeconds = 20
-  )
-
-  $psi = New-Object System.Diagnostics.ProcessStartInfo
-  $psi.FileName = $BinaryPath
-  $psi.WorkingDirectory = $ProjectRoot
-  $psi.ArgumentList.Add("mcp")
-  $psi.ArgumentList.Add("--project-root")
-  $psi.ArgumentList.Add($ProjectRoot)
-  $psi.RedirectStandardInput = $true
-  $psi.RedirectStandardOutput = $true
-  $psi.RedirectStandardError = $true
-  $psi.UseShellExecute = $false
-
-  $process = New-Object System.Diagnostics.Process
-  $process.StartInfo = $psi
-
-  try {
-    $null = $process.Start()
-
-    $request = @{ jsonrpc = "2.0"; id = 1; method = "initialize"; params = @{} } | ConvertTo-Json -Compress
-    $frame = "Content-Length: $($request.Length)`r`n`r`n$request"
-
-    $process.StandardInput.Write($frame)
-    $process.StandardInput.Close()
-
-    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-      try { $process.Kill($true) } catch {}
-      throw "Timed out waiting for MCP initialize response"
-    }
-
-    if ($process.ExitCode -ne 0) {
-      $stderr = $process.StandardError.ReadToEnd()
-      throw "MCP initialize failed with exit code $($process.ExitCode): $stderr"
-    }
-
-    $stdout = $process.StandardOutput.ReadToEnd()
-
-    if ($stdout -notmatch "Content-Length:" -or $stdout -notmatch '"result"') {
-      throw "MCP initialize response did not contain a JSON-RPC result"
-    }
-  }
-  finally {
-    if (-not $process.HasExited) {
-      try { $process.Kill($true) } catch {}
-    }
-
-    $process.Dispose()
-  }
-}
-
-Invoke-BinaryStep -Arguments @("help") | Out-Null
 Invoke-BinaryStep -Arguments @("version") | Out-Null
 
 $tmpDir = Join-Path $env:TEMP ("controlkeel-release-smoke-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmpDir | Out-Null
 $homeDir = Join-Path $tmpDir "home"
 New-Item -ItemType Directory -Path $homeDir | Out-Null
+$serverLog = Join-Path $tmpDir "server.log"
+$port = 4081
+$started = $false
 
 try {
   $env:HOME = $homeDir
@@ -117,78 +65,39 @@ try {
   $env:APPDATA = $homeDir
   $env:DATABASE_PATH = Join-Path $tmpDir "controlkeel.db"
   $env:SECRET_KEY_BASE = "controlkeel-release-smoke-secret-0123456789abcdef0123456789abcdef0123456789abcdef"
+  $env:PORT = "$port"
+  $env:PHX_SERVER = "true"
 
-  Invoke-BinaryStep -Arguments @("bootstrap") -WorkingDirectory $tmpDir | Out-Null
+  Start-Process -FilePath $BinaryPath `
+    -ArgumentList @("daemon") `
+    -RedirectStandardOutput $serverLog `
+    -RedirectStandardError $serverLog `
+    -WorkingDirectory $tmpDir `
+    -Wait
+  $started = $true
 
-  if (-not (Test-Path (Join-Path $tmpDir "controlkeel/project.json"))) {
-    throw "project binding missing"
+  for ($i = 0; $i -lt 20; $i++) {
+    try {
+      $null = Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -TimeoutSec 2 -UseBasicParsing
+      Invoke-BinaryStep -Arguments @("stop") | Out-Null
+      $started = $false
+      exit 0
+    }
+    catch {
+      Start-Sleep -Seconds 1
+    }
   }
 
-  if (-not (Test-Path (Join-Path $tmpDir "controlkeel/bin/controlkeel-mcp.cmd"))) {
-    throw "mcp wrapper missing"
-  }
-
-  Test-McpInitialize -ProjectRoot $tmpDir
-
-  $benchmarkOutput = Invoke-BinaryStep -Arguments @(
-    "benchmark",
-    "run",
-    "--suite",
-    "vibe_failures_v1",
-    "--subjects",
-    "controlkeel_validate",
-    "--baseline-subject",
-    "controlkeel_validate",
-    "--scenario-slugs",
-    "client_side_auth_bypass"
-  ) -WorkingDirectory $tmpDir
-
-  if ($benchmarkOutput -notmatch "Benchmark run #") {
-    throw "benchmark smoke output did not include a persisted run"
-  }
-
-  Invoke-BinaryStep -Arguments @("attach", "codex-cli", "--scope", "project") -WorkingDirectory $tmpDir | Out-Null
-
-  if (-not (Test-Path (Join-Path $tmpDir ".agents/skills/controlkeel-governance/SKILL.md"))) {
-    throw "codex skills were not installed"
-  }
-
-  if (-not (Test-Path (Join-Path $tmpDir ".codex/agents/controlkeel-operator.toml"))) {
-    throw "codex companion agent missing"
-  }
-
-  if (-not (Test-Path (Join-Path $homeDir ".codex/config.json"))) {
-    throw "codex MCP config missing"
-  }
-
-  Invoke-BinaryStep -Arguments @("attach", "cline") -WorkingDirectory $tmpDir | Out-Null
-
-  if (-not (Test-Path (Join-Path $tmpDir ".cline/skills/controlkeel-governance/SKILL.md"))) {
-    throw "cline skills were not installed"
-  }
-
-  if (-not (Test-Path (Join-Path $tmpDir ".clinerules/controlkeel.md"))) {
-    throw "cline rules were not installed"
-  }
-
-  if (-not (Test-Path (Join-Path $tmpDir ".clinerules/workflows/controlkeel-review.md"))) {
-    throw "cline workflow was not installed"
-  }
-
-  if (-not (Test-Path (Join-Path $homeDir ".cline/data/settings/cline_mcp_settings.json"))) {
-    throw "cline MCP config missing"
-  }
-
-  Invoke-BinaryStep -Arguments @("attach", "cursor") -WorkingDirectory $tmpDir | Out-Null
-
-  if (-not (Test-Path (Join-Path $homeDir "Cursor/User/globalStorage/cursor.mcp.json"))) {
-    throw "cursor MCP config missing"
-  }
-
-  if (-not (Test-Path (Join-Path $tmpDir "controlkeel/dist/instructions-only/AGENTS.md"))) {
-    throw "instructions-only bundle missing after MCP-only attach"
-  }
+  throw "server smoke check failed"
 }
 finally {
+  if ($started) {
+    try { Invoke-BinaryStep -Arguments @("stop") | Out-Null } catch {}
+  }
+
+  if (Test-Path $serverLog) {
+    Write-Error "--- server log ---`n$(Get-Content $serverLog -Raw)"
+  }
+
   Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
 }

@@ -113,7 +113,13 @@ defmodule ControlKeel.MixProject do
         "esbuild controlkeel --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "cmd sh scripts/verify_ci_workflow.sh",
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "test"
+      ]
     ]
   end
 end
