@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.13 — 2026-04-01
+
+### What's changed
+
+- fix: specify repository in gh run download command for artifact retrieval
+
 ## v0.1.12 — 2026-04-01
 
 ### What's changed
