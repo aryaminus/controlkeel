@@ -62,6 +62,30 @@ $started = $false
 $succeeded = $false
 $serverProcess = $null
 
+function Test-TcpPortOpen {
+  param(
+    [string]$Host,
+    [int]$Port,
+    [int]$TimeoutMs = 1000
+  )
+
+  $client = [System.Net.Sockets.TcpClient]::new()
+  try {
+    $connectTask = $client.ConnectAsync($Host, $Port)
+    if (-not $connectTask.Wait($TimeoutMs)) {
+      return $false
+    }
+
+    return $client.Connected
+  }
+  catch {
+    return $false
+  }
+  finally {
+    $client.Dispose()
+  }
+}
+
 try {
   $env:HOME = $homeDir
   $env:CONTROLKEEL_HOME = $homeDir
@@ -85,16 +109,14 @@ try {
   }
 
   for ($i = 0; $i -lt 20; $i++) {
-    try {
-      $null = Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -TimeoutSec 2 -UseBasicParsing
+    if (Test-TcpPortOpen -Host "127.0.0.1" -Port $port -TimeoutMs 1000) {
       try { Stop-Process -Id $serverProcess.Id -Force } catch {}
       $started = $false
       $succeeded = $true
       exit 0
     }
-    catch {
-      Start-Sleep -Seconds 1
-    }
+
+    Start-Sleep -Seconds 1
   }
 
   throw "server smoke check failed"
