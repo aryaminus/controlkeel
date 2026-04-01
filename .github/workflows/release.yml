@@ -43,6 +43,12 @@ jobs:
 
             if [ -n "$STATUS" ] && [ "$STATUS" != "null" ]; then
               echo "Attempt ${attempt}/${ATTEMPTS}: Release Smoke for ${GITHUB_SHA} status=${STATUS} conclusion=${CONCLUSION}"
+
+              if [ "$STATUS" = "completed" ] && [ -n "$CONCLUSION" ] && [ "$CONCLUSION" != "null" ] && [ "$CONCLUSION" != "success" ]; then
+                echo "Release Smoke for ${GITHUB_SHA} completed with conclusion=${CONCLUSION}; cannot publish this tag." >&2
+                echo "Ensure Release Smoke succeeds for this SHA on main before publishing a tag." >&2
+                exit 1
+              fi
             else
               echo "Attempt ${attempt}/${ATTEMPTS}: No Release Smoke run found yet for ${GITHUB_SHA}."
             fi

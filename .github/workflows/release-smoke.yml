@@ -21,8 +21,8 @@ env:
 jobs:
   build-unix-and-windows:
     if: >-
-      github.event_name != 'push' ||
-      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -68,8 +68,8 @@ jobs:
 
   build-macos:
     if: >-
-      github.event_name != 'push' ||
-      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -117,8 +117,8 @@ jobs:
 
   windows-smoke:
     if: >-
-      github.event_name != 'push' ||
-      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     runs-on: windows-latest
     needs: build-unix-and-windows
     steps:
@@ -135,8 +135,8 @@ jobs:
 
   package-release-candidate:
     if: >-
-      github.event_name != 'push' ||
-      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     needs: [build-unix-and-windows, build-macos, windows-smoke]
     runs-on: ubuntu-latest
     steps:

@@ -2,7 +2,7 @@ name: Bump Version
 
 on:
   workflow_run:
-    workflows: ["Release Smoke"]
+    workflows: ["CI"]
     types:
       - completed
 

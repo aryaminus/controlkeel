@@ -14,6 +14,27 @@ Keep this file on the latest confirmed green SHAs before relying on `CONTROLKEEL
 
 `Release Smoke` is the canonical release-candidate build for a SHA. Tag-triggered `Release` should publish the matching smoke artifact set for that same SHA instead of rebuilding binaries again.
 
+## Workflow topology
+
+```mermaid
+flowchart TD
+   A[Push to main] --> B[CI workflow]
+   B -->|success| C[Bump Version workflow]
+   C --> D[Create bump commit and tag]
+   D --> E[Push bump commit to main]
+   E --> F[Release Smoke workflow]
+   F -->|success for bump SHA| G[Release workflow on tag push]
+   G --> H[Download matching release-candidate artifact]
+   H --> I[Publish GitHub Release and optional package registries]
+```
+
+Guardrails for cost and correctness:
+
+- CI runs on normal pushes and PRs, and is the inexpensive gate.
+- Release Smoke is the expensive cross-platform packaging gate, and runs for release bump commits (or manual dispatch).
+- Tag-triggered Release must find a successful Release Smoke run for the exact tag SHA.
+- If Release Smoke for that SHA is completed but not successful (for example `skipped`), Release should fail fast.
+
 ## Checklist
 
 1. Confirm the latest [Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml) run on `main` is green for Linux, macOS Intel, macOS Apple Silicon, and Windows smoke.
