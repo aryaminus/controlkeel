@@ -145,6 +145,8 @@ Other supported attach commands:
 - `controlkeel attach claude-code`
 - `controlkeel attach codex-cli`
 - `controlkeel attach cline`
+- `controlkeel attach roo-code`
+- `controlkeel attach goose`
 - `controlkeel attach vscode`
 - `controlkeel attach copilot`
 - `controlkeel attach cursor`
@@ -155,6 +157,10 @@ Other supported attach commands:
 - `controlkeel attach amp`
 - `controlkeel attach gemini-cli`
 - `controlkeel attach opencode`
+- `controlkeel attach hermes-agent`
+- `controlkeel attach openclaw`
+- `controlkeel attach droid`
+- `controlkeel attach forge`
 
 For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) and the canonical [support-matrix.md](support-matrix.md), or open `/skills` in the local app.
 

@@ -73,7 +73,7 @@ controlkeel status
 ### From source
 
 ```bash
-git clone <repo> && cd controlkeel
+git clone https://github.com/aryaminus/controlkeel && cd controlkeel
 mix setup && mix phx.server
 
 # In the governed project
@@ -83,25 +83,27 @@ mix ck.findings
 
 ## Supported agents
 
-### Native-first (MCP + native companion install)
+### Attach targets (MCP + companion install)
 
-| Agent | Attach | Native surfaces |
-| --- | --- | --- |
-| Claude Code | `attach claude-code` | `.claude/skills`, `.claude/agents`, plugin bundle |
-| Codex CLI | `attach codex-cli` | `.agents/skills`, `.codex/agents`, plugin bundle |
-| Cline | `attach cline` | `.cline/skills`, `.clinerules/`, MCP config |
-| Roo Code | `attach roo-code` | `.roo/skills`, `.roo/rules`, `.roo/commands` |
-| Cursor | `attach cursor` | `.cursor/rules`, `.cursor/mcp.json` |
-| Windsurf | `attach windsurf` | `.windsurf/rules`, `.windsurf/mcp.json` |
-| Continue | `attach continue` | `.continue/prompts`, `.continue/mcp.json` |
-| Copilot / VS Code | `attach copilot` | `.github/skills`, `.github/agents`, `.vscode/mcp.json` |
-| Goose | `attach goose` | `.goosehints`, workflow recipes, extension config |
-| OpenCode | `attach opencode` | `.opencode/plugins`, `.opencode/agents`, `.opencode/commands` |
-| Gemini CLI | `attach gemini-cli` | `gemini-extension.json`, `.gemini/commands/`, `skills/`, `GEMINI.md` |
-| Kiro | `attach kiro` | `.kiro/hooks/`, `.kiro/steering/`, MCP config |
-| Amp | `attach amp` | `.amp/plugins/` (TypeScript plugin with event hooks) |
-| Hermes Agent | `attach hermes-agent` | `.hermes/skills`, `.hermes/mcp.json` |
-| Factory Droid | `attach droid` | `.factory/skills`, `.factory/droids`, `.factory/commands` |
+| Agent | Attach | Integration class | Native surfaces |
+| --- | --- | --- | --- |
+| Claude Code | `attach claude-code` | Provider-bridge | `.claude/skills`, `.claude/agents`, plugin bundle |
+| Codex CLI | `attach codex-cli` | Provider-bridge | `.agents/skills`, `.codex/agents`, plugin bundle |
+| Hermes Agent | `attach hermes-agent` | Provider-bridge | `.hermes/skills`, `.hermes/mcp.json` |
+| OpenClaw | `attach openclaw` | Provider-bridge | Workspace/managed skills and OpenClaw config |
+| Factory Droid | `attach droid` | Provider-bridge | `.factory/skills`, `.factory/droids`, `.factory/commands` |
+| Forge | `attach forge` | Provider-bridge | ACP companion + MCP fallback files |
+| Cline | `attach cline` | Native-first | `.cline/skills`, `.clinerules/`, MCP config |
+| Roo Code | `attach roo-code` | Native-first | `.roo/skills`, `.roo/rules`, `.roo/commands` |
+| Cursor | `attach cursor` | Native-first | `.cursor/rules`, `.cursor/mcp.json` |
+| Windsurf | `attach windsurf` | Native-first | `.windsurf/rules`, `.windsurf/mcp.json` |
+| Continue | `attach continue` | Native-first | `.continue/prompts`, `.continue/mcp.json` |
+| Copilot / VS Code | `attach copilot` | Native-first | `.github/skills`, `.github/agents`, `.vscode/mcp.json` |
+| Goose | `attach goose` | Native-first | `.goosehints`, workflow recipes, extension config |
+| OpenCode | `attach opencode` | Native-first | `.opencode/plugins`, `.opencode/agents`, `.opencode/commands` |
+| Gemini CLI | `attach gemini-cli` | Native-first | `gemini-extension.json`, `.gemini/commands/`, `skills/`, `GEMINI.md` |
+| Kiro | `attach kiro` | Native-first | `.kiro/hooks/`, `.kiro/steering/`, MCP config |
+| Amp | `attach amp` | Native-first | `.amp/plugins/` (TypeScript plugin with event hooks) |
 
 ### MCP + instructions only
 
@@ -115,7 +117,6 @@ mix ck.findings
 | --- | --- |
 | Devin | `runtime export devin` |
 | Open SWE | `runtime export open-swe` |
-| Cloudflare Workers | `runtime export cloudflare-workers` |
 
 See [docs/agent-integrations.md](docs/agent-integrations.md) and [docs/support-matrix.md](docs/support-matrix.md) for the full compatibility matrix, provider bridges, proxy-compatible clients, framework adapters, and export targets.
 

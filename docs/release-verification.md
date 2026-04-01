@@ -4,9 +4,9 @@ This checklist is the manual gate before enabling automatic version bumping.
 
 ## Latest known-good checkpoints
 
-- Release Smoke green on `main`: `5e73158d57a1c8743417cc02f251fcd1a9f4ed96` ([workflow run](https://github.com/aryaminus/controlkeel/actions/runs/23518768141), 2026-03-25)
-- Tag-triggered Release green: `10e3327bfe4e676bbb2271f5b9d359398be5f0a9` (`v0.1.8`, [workflow run](https://github.com/aryaminus/controlkeel/actions/runs/23518952206))
-- GitHub release assets published correctly: `10e3327bfe4e676bbb2271f5b9d359398be5f0a9` (`v0.1.8`, [GitHub Release](https://github.com/aryaminus/controlkeel/releases/tag/v0.1.8))
+- Release Smoke green on `main`: `e14138c478cba0502ea98cc259d710fa36b03b2f` ([workflow run](https://github.com/aryaminus/controlkeel/actions/runs/23857297933), 2026-04-01)
+- Tag-triggered Release green: `e14138c478cba0502ea98cc259d710fa36b03b2f` (`v0.1.13`, [workflow run](https://github.com/aryaminus/controlkeel/actions/runs/23857298249))
+- GitHub release assets published correctly: `e14138c478cba0502ea98cc259d710fa36b03b2f` (`v0.1.13`, [GitHub Release](https://github.com/aryaminus/controlkeel/releases/tag/v0.1.13))
 
 Re-verify after each release: confirm the latest successful [Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml) on `main` and the latest tag-triggered [Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml), then refresh the checkpoints above.
 
