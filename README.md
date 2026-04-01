@@ -1,7 +1,8 @@
 # ControlKeel
 
 [![CI](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml)
-[![Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml)
+[![Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml)
+[![Latest Release](https://img.shields.io/github/v/release/aryaminus/controlkeel)](https://github.com/aryaminus/controlkeel/releases/latest)
 
 **ControlKeel is the cerebellum for agent-generated software delivery.** Just as the cerebellum constantly compares motor intent against sensory feedback — detecting drift before you stumble — ControlKeel sits between your coding agents and production, comparing *intended* delivery against *actual* delivery, catching governance drift before it ships.
 
