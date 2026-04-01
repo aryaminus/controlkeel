@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.1.10 — 2026-04-01
+
+### What's changed
+
+- feat: rename parameter in Test-TcpPortOpen function for clarity and update references in Test-ProcessListeningPort function
+- feat: enhance Test-TcpPortOpen function with null check for connectTask and improved client disposal logic
+- feat: add Test-ProcessListeningPort function for enhanced server process checks in release smoke script
+- feat: add Test-TcpPortOpen function for improved server connectivity checks in release smoke script
+- feat: improve logging in release smoke script by separating stdout and stderr
+- feat: add overwrite option to mix release commands in release smoke script
+- feat: update release smoke scripts to improve server process handling and error reporting
+- feat: improve error handling for daemon startup in release smoke script
+- feat: enhance CI workflow, add file overwrite handling, and improve tests for deployment advisor
+- feat: update CI workflow and add verification script for required patterns
+- feat: remove redundant help command from release smoke script
+- feat: finalize governance/docs reconciliation and quality fixes
+- feat: enhance cost optimizer and outcome tracker tools with improved handling and new workspace_id defaults
+- feat: add comprehensive test suite for deployment advisor, findings translation, and project governance modules
+- feat: add MCP tools for cost optimization, outcome tracking, and deployment advisory with updated skill documentation
+- feat: implement learning, cost management, deployment guidance, and governance modules to close system gap analysis
+- feat: implement deployment advisor with automated infrastructure generation and project monitoring tools
+- docs: add pathfinder gap analysis and research documentation
+- docs: add documentation for mcptocli integration to agent-integrations.md
+- feat: implement OWASP-style classification metrics and add benign baseline benchmark suite
+- refactor: update agent support matrix to native integration and simplify README documentation
+- feat: upgrade Kiro, Amp, OpenCode, and Gemini-CLI integrations to native-first mode with expanded export and installation support.
+- feat: implement pluggable execution sandbox system with E2B, local, and Docker support, and add Gemini proxy capabilities
+- refactor: Update documentation and remove deprecated components
+- feat: Implement agent execution API and delegate tool
+
 ## v0.1.9 — 2026-03-27
 
 ### What's changed
