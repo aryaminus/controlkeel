@@ -61,6 +61,7 @@ $port = 4081
 $started = $false
 $succeeded = $false
 $serverProcess = $null
+$failureMessage = $null
 
 function Test-TcpPortOpen {
   param(
@@ -86,6 +87,33 @@ function Test-TcpPortOpen {
   }
 }
 
+function Test-ProcessListeningPort {
+  param(
+    [int]$ProcessId,
+    [int]$Port
+  )
+
+  try {
+    $connections = Get-NetTCPConnection -OwningProcess $ProcessId -LocalPort $Port -State Listen -ErrorAction Stop
+    if ($connections) {
+      return $true
+    }
+  }
+  catch {
+    # Fall through to socket probes when Get-NetTCPConnection is unavailable or restricted.
+  }
+
+  if (Test-TcpPortOpen -Host "127.0.0.1" -Port $Port -TimeoutMs 1000) {
+    return $true
+  }
+
+  if (Test-TcpPortOpen -Host "::1" -Port $Port -TimeoutMs 1000) {
+    return $true
+  }
+
+  return $false
+}
+
 try {
   $env:HOME = $homeDir
   $env:CONTROLKEEL_HOME = $homeDir
@@ -109,7 +137,7 @@ try {
   }
 
   for ($i = 0; $i -lt 20; $i++) {
-    if (Test-TcpPortOpen -Host "127.0.0.1" -Port $port -TimeoutMs 1000) {
+    if (Test-ProcessListeningPort -ProcessId $serverProcess.Id -Port $port) {
       try { Stop-Process -Id $serverProcess.Id -Force } catch {}
       $started = $false
       $succeeded = $true
@@ -121,6 +149,10 @@ try {
 
   throw "server smoke check failed"
 }
+catch {
+  $failureMessage = $_.Exception.Message
+  throw
+}
 finally {
   if ($started -and $serverProcess -and -not $serverProcess.HasExited) {
     try { Stop-Process -Id $serverProcess.Id -Force } catch {}
@@ -129,9 +161,18 @@ finally {
   if (-not $succeeded) {
     $stdout = if (Test-Path $serverStdoutLog) { Get-Content $serverStdoutLog -Raw } else { "" }
     $stderr = if (Test-Path $serverStderrLog) { Get-Content $serverStderrLog -Raw } else { "" }
+    $stdoutText = $stdout.Trim()
+    $stderrText = $stderr.Trim()
 
-    if ($stdout -ne "" -or $stderr -ne "") {
-      Write-Error "--- server stdout ---`n$stdout`n--- server stderr ---`n$stderr"
+    if ($failureMessage) {
+      Write-Host "Smoke failure: $failureMessage"
+    }
+
+    if ($stdoutText -ne "" -or $stderrText -ne "") {
+      Write-Host "--- server stdout ---`n$stdout`n--- server stderr ---`n$stderr"
+    }
+    else {
+      Write-Host "No server output captured from smoke run."
     }
   }
 
