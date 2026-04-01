@@ -285,6 +285,37 @@ defmodule ControlKeel.CLIRuntimeTest do
                goose_config["extensions"]["controlkeel"]["cmd"],
                "/controlkeel/bin/controlkeel-mcp"
              )
+
+    # Regression: attaching OpenCode should recover from malformed existing MCP config.
+    File.mkdir_p!(Path.dirname(opencode_config_path()))
+    File.write!(opencode_config_path(), "{\"mcpServers\": {\"broken\": ")
+
+    assert {:ok, opencode_attach} = CLI.parse(["attach", "opencode"])
+
+    opencode_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(opencode_attach, project_root: tmp_dir)
+      end)
+
+    assert opencode_output =~ "Attached ControlKeel to OpenCode."
+    assert opencode_output =~ "Companion target: opencode-native."
+    assert opencode_output =~ "Prepared native companion files for OpenCode."
+
+    assert File.exists?(Path.join(tmp_dir, ".opencode/plugins/controlkeel-governance.ts"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/agents/controlkeel-operator.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/mcp.json"))
+
+    assert {:ok, opencode_config} = Jason.decode(File.read!(opencode_config_path()))
+
+    assert get_in(opencode_config, ["mcp", "controlkeel", "type"]) == "local"
+
+    opencode_cmd = get_in(opencode_config, ["mcp", "controlkeel", "command"])
+    assert is_list(opencode_cmd)
+    assert length(opencode_cmd) >= 1
+
+    assert hd(opencode_cmd) == "controlkeel" or
+         String.ends_with?(hd(opencode_cmd), "/controlkeel/bin/controlkeel-mcp")
   end
 
   test "bootstrap and provider commands work without manual init", %{tmp_dir: tmp_dir} do
@@ -917,6 +948,15 @@ defmodule ControlKeel.CLIRuntimeTest do
 
   defp goose_config_path do
     Path.join([System.get_env("HOME") || System.user_home!(), ".config", "goose", "config.yaml"])
+  end
+
+  defp opencode_config_path do
+    Path.join([
+      System.get_env("HOME") || System.user_home!(),
+      ".config",
+      "opencode",
+      "config.json"
+    ])
   end
 
   describe "sandbox commands" do

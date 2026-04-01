@@ -3578,6 +3578,10 @@ defmodule ControlKeel.CLI do
         %{
           "cursor" => "cursor-native",
           "windsurf" => "windsurf-native",
+          "kiro" => "kiro-native",
+          "amp" => "amp-native",
+          "opencode" => "opencode-native",
+          "gemini-cli" => "gemini-cli-native",
           "continue" => "continue-native"
         }[agent]
 
@@ -3669,21 +3673,40 @@ defmodule ControlKeel.CLI do
 
     existing =
       case File.read(config_path) do
-        {:ok, contents} -> Jason.decode(contents) |> elem(1)
-        _ -> %{}
+        {:ok, contents} ->
+          case Jason.decode(contents) do
+            {:ok, %{} = decoded} -> decoded
+            _ -> %{}
+          end
+
+        _ ->
+          %{}
       end || %{}
 
-    mcpServers = Map.get(existing, "mcpServers", %{})
-
     updated =
-      Map.put(
-        existing,
-        "mcpServers",
-        Map.put(mcpServers, server_name, %{
-          "command" => command,
-          "args" => args
-        })
-      )
+      if ide_key == "opencode" do
+        mcp = Map.get(existing, "mcp", %{})
+
+        Map.put(
+          existing,
+          "mcp",
+          Map.put(mcp, server_name, %{
+            "type" => "local",
+            "command" => [command | args]
+          })
+        )
+      else
+        mcpServers = Map.get(existing, "mcpServers", %{})
+
+        Map.put(
+          existing,
+          "mcpServers",
+          Map.put(mcpServers, server_name, %{
+            "command" => command,
+            "args" => args
+          })
+        )
+      end
 
     with :ok <- File.mkdir_p(Path.dirname(config_path)),
          :ok <- File.write(config_path, Jason.encode!(updated, pretty: true) <> "\n") do
