@@ -48,6 +48,40 @@ When another tool already changed the repo, the current rescue path is:
 
 That keeps the support story honest: some tools have first-class attach flows, some work through proxy or runtime export, and unsupported tools still participate in the governance loop after bootstrap.
 
+## New subsystems
+
+### Deployment Advisor
+
+Stack detection, hosting cost estimation, and deployment file generation for 6 stacks (Phoenix, React, Rails, Node, Python, static) across 9 hosting platforms. Accessible via CLI (`deploy analyze/cost/dns/migration/scaling`) and the `/deploy` web UI.
+
+### Cost Optimizer
+
+Model-level cost comparison and optimization suggestions. Compares 27+ LLM models across providers, identifies caching opportunities, and recommends cheaper alternatives.
+
+### Outcome Tracker
+
+Records agent outcomes (deploy_success, test_pass, budget_exceeded, etc.) and computes reward signals. Feeds into agent leaderboard and router weight adjustments for learned routing.
+
+### Circuit Breaker
+
+Per-agent anomaly detection with configurable thresholds (API call rate, file modification rate, error rate, budget burn rate). Auto-trips when thresholds are exceeded, preventing runaway agents.
+
+### Agent Monitor
+
+Live event tracking for all active agents. Provides real-time activity feed, agent status, and event history for debugging and observability.
+
+### Pre-commit Hook
+
+Git pre-commit policy enforcement. Scans staged files against active policy packs before allowing commits, with enforce mode that blocks commits on violations.
+
+### Plain English Findings
+
+Translates technical findings (rule IDs, categories) into plain English explanations with fix suggestions and risk descriptions.
+
+### Progress Dashboard
+
+Session-level progress tracking with task, finding, and budget progress, remaining blockers, and effort estimation.
+
 ## Not shipped by design
 
 These ideas appeared in older planning documents, but they are not current product claims:

@@ -189,7 +189,7 @@ defmodule ControlKeel.Budget.CostOptimizer do
       m["provider"] == provider and m["model"] == model
     end)
     |> Enum.map(fn m ->
-      output_cost = m["pricing"].output
+      output_cost = Map.get(m["pricing"], :output, 0)
       %{provider: m["provider"], model: m["model"], cost_cents: output_cost}
     end)
     |> Enum.filter(fn alt -> alt.cost_cents < current_cost and alt.cost_cents > 0 end)

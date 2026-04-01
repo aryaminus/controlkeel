@@ -26,10 +26,10 @@ Every shipped integration row now declares both a **support class** and a **two-
 
 Only `attach_client` rows produce real `controlkeel attach <id>` commands. `headless_runtime` rows export runtime bundles, `framework_adapter` rows surface through benchmark/policy tooling, `provider_only` rows surface through CK provider flows, and `alias` rows point at a canonical shipped target.
 
-Attachable and runtime integrations use the **same required MCP tool set** (see below): `ck_context`, `ck_validate`, `ck_finding`, `ck_budget`, `ck_route`, `ck_delegate`, and when skills are enabled, `ck_skill_list` / `ck_skill_load`.
+Attachable and runtime integrations use the same governed MCP surface. Core routing/governance tools are always present, extended governance tools are currently enabled in protocol responses, and `ck_skill_list` / `ck_skill_load` are included when skills are available.
 
 | ID | Support class | Action | Agent uses CK via | CK runs agent via | Execution support | Auth / skills | Preferred export / bundle |
-|----|---------------|--------|-------------------|-------------------|------------------|---------------|---------------------------|
+| ---- | --------------- | -------- | ------------------- | ------------------- | ------------------ | --------------- | --------------------------- |
 | `claude-code` | attach_client | `controlkeel attach claude-code` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `env_bridge` / `native` | `claude-standalone` |
 | `codex-cli` | attach_client | `controlkeel attach codex-cli` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
 | `cline` | attach_client | `controlkeel attach cline` | `local_mcp`, `native_skills`, `rules`, `workflows` | `embedded` | `direct` | `ck_owned` / `native` | `cline-native` |
@@ -122,7 +122,7 @@ ControlKeel now exposes both local stdio MCP and hosted interop surfaces.
 Hosted MCP tool authorization uses these protocol scopes:
 
 | Tool | Required scopes |
-|------|-----------------|
+| ------ | ----------------- |
 | `ck_context` | `mcp:access`, `context:read` |
 | `ck_validate` | `mcp:access`, `validate:run` |
 | `ck_finding` | `mcp:access`, `finding:write` |
@@ -166,27 +166,30 @@ These reuse the existing task-run, findings, proofs, and policy-gate primitives 
 
 ## MCP runtime tools
 
-Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/). The MCP server advertises **six governed tools always**, and **adds** `ck_skill_list` and `ck_skill_load` when the runtime has a non-empty skill catalog (see `protocol.ex` `tool_schemas/0`).
+Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/). The MCP server advertises the core and extended governance tools, and adds `ck_skill_list` and `ck_skill_load` when the runtime has a non-empty skill catalog (see `protocol.ex` `tool_schemas/0`).
 
 | Tool | Purpose |
-|------|---------|
+| ------ | --------- |
 | `ck_validate` | Run FastPath scan (patterns, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present. |
 | `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, resume packet, provider status. Requires `session_id`. |
 | `ck_finding` | Record a governed finding for a session (and optional task). |
 | `ck_budget` | Budget estimate or commit (`mode`: `estimate` \| `commit`). |
 | `ck_route` | Agent routing recommendation from `AgentRouter` (`task`, optional `risk_tier`, `budget_remaining_cents`, `allowed_agents`). |
 | `ck_delegate` | Ask ControlKeel to run or hand off another agent for a task or session under the current policy gates. |
+| `ck_cost_optimizer` | Recommend spend reductions and lower-cost agent/model alternatives for current work context. |
+| `ck_deployment_advisor` | Analyze deployment posture and return stack-aware deployment guidance. |
+| `ck_outcome_tracker` | Record or query execution outcomes used for quality and routing feedback loops. |
 | `ck_skill_list` | List AgentSkills from the registry (optional `project_root`, `target`, `format`). **Only registered when skills exist.** |
 | `ck_skill_load` | Load `SKILL.md` for a named skill with optional target-family rendering. **Only registered when skills exist.** |
 
-Authoritative tool names in code: `ControlKeel.Distribution.required_mcp_tools/0` lists the **core** eight identifiers; the protocol may omit skill tools when no skills are bundled.
+Authoritative tool names in code are split between `ControlKeel.Distribution.required_mcp_tools/0` (core required set) and `ControlKeel.Mcp.Protocol.tool_schemas/0` (advertised runtime surface, including extended governance tools).
 
 ## Bundled skills (`priv/skills/`)
 
 These directories ship with the repo and are discovered by [`ControlKeel.Skills.Registry`](../lib/controlkeel/skills/registry.ex):
 
 | Skill directory | Role |
-|-----------------|------|
+| ----------------- | ------ |
 | `agent-integration` | Agent integration workflows and references (e.g. target matrix). |
 | `benchmark-operator` | Benchmark operator playbooks. |
 | `compliance-audit` | Compliance / control matrix audits. |

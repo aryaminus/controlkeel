@@ -130,7 +130,7 @@ defmodule ControlKeel.Deployment.Advisor do
     results =
       Enum.map(generators, fn gen ->
         path = Path.join(project_root, gen.filename)
-        content = String.trim(gen.content)
+        content = String.trim(gen.content || "")
 
         if dry_run do
           {:ok, gen.name, path, content, :skipped}

@@ -76,9 +76,6 @@ defmodule ControlKeel.Learning.OutcomeTracker do
           end)
 
         {:ok, outcomes}
-
-      _ ->
-        {:ok, []}
     end
   end
 
@@ -111,17 +108,6 @@ defmodule ControlKeel.Learning.OutcomeTracker do
            outcome_count: count,
            window_days: window,
            breakdown: group_outcomes(outcomes)
-         }}
-
-      _ ->
-        {:ok,
-         %{
-           agent_id: agent_id,
-           score: 0.0,
-           total_reward: 0.0,
-           outcome_count: 0,
-           window_days: window,
-           breakdown: []
          }}
     end
   end
@@ -157,9 +143,6 @@ defmodule ControlKeel.Learning.OutcomeTracker do
           |> Enum.take(limit)
 
         {:ok, agent_scores}
-
-      _ ->
-        {:ok, []}
     end
   end
 
@@ -193,7 +176,7 @@ defmodule ControlKeel.Learning.OutcomeTracker do
   defp within_window?(iso_datetime, cutoff) do
     case DateTime.from_iso8601(iso_datetime) do
       {:ok, dt, _} -> DateTime.compare(dt, cutoff) in [:gt, :eq]
-      _ -> true
+      _ -> false
     end
   end
 

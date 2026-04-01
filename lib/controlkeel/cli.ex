@@ -7,10 +7,18 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Analytics
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
+  alias ControlKeel.Budget.CostOptimizer
   alias ControlKeel.ClaudeCLI
   alias ControlKeel.Distribution
+  alias ControlKeel.Deployment.Advisor
+  alias ControlKeel.Deployment.HostingCost
   alias ControlKeel.Governance
+  alias ControlKeel.Governance.AgentMonitor
+  alias ControlKeel.Governance.CircuitBreaker
+  alias ControlKeel.Governance.PreCommitHook
   alias ControlKeel.Intent
+  alias ControlKeel.Findings.PlainEnglish
+  alias ControlKeel.Learning.OutcomeTracker
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
   alias ControlKeel.Mission
@@ -42,9 +50,24 @@ defmodule ControlKeel.CLI do
     scope: :string
   ]
   @findings_switches [severity: :string, status: :string]
+  @findings_translate_switches [session_id: :integer, severity: :string]
   @proofs_switches [session_id: :integer, task_id: :integer, deploy_ready: :boolean]
   @mcp_switches [project_root: :string]
   @memory_search_switches [session_id: :integer, type: :string]
+  @deploy_analyze_switches [project_root: :string]
+  @deploy_cost_switches [
+    stack: :string,
+    tier: :string,
+    needs_db: :boolean,
+    db_tier: :string,
+    bandwidth: :integer,
+    storage: :integer
+  ]
+  @cost_optimize_switches [session_id: :integer, provider: :string, model: :string]
+  @cost_compare_switches [tokens: :integer]
+  @precommit_check_switches [project_root: :string, domain_pack: :string, enforce: :boolean]
+  @progress_switches [session_id: :integer]
+  @circuit_breaker_switches [agent_id: :string]
   @skills_list_switches [project_root: :string, target: :string]
   @skills_validate_switches [project_root: :string]
   @skills_export_switches [project_root: :string, target: :string, scope: :string]
@@ -196,6 +219,9 @@ defmodule ControlKeel.CLI do
       ["status"] ->
         {:ok, %{command: :status, options: %{}, args: []}}
 
+      ["findings", "translate" | rest] ->
+        parse_with_switches(:findings_translate, rest, @findings_translate_switches)
+
       ["findings" | rest] ->
         parse_with_switches(:findings, rest, @findings_switches)
 
@@ -334,6 +360,60 @@ defmodule ControlKeel.CLI do
       ["watch" | rest] ->
         parse_with_switches(:watch, rest, @watch_switches)
 
+      ["deploy", "analyze" | rest] ->
+        parse_with_switches(:deploy_analyze, rest, @deploy_analyze_switches)
+
+      ["deploy", "cost" | rest] ->
+        parse_with_switches(:deploy_cost, rest, @deploy_cost_switches)
+
+      ["deploy", "dns", stack] ->
+        {:ok, %{command: :deploy_dns, options: %{stack: stack}, args: []}}
+
+      ["deploy", "migration", stack] ->
+        {:ok, %{command: :deploy_migration, options: %{stack: stack}, args: []}}
+
+      ["deploy", "scaling", stack] ->
+        {:ok, %{command: :deploy_scaling, options: %{stack: stack}, args: []}}
+
+      ["cost", "optimize" | rest] ->
+        parse_with_switches(:cost_optimize, rest, @cost_optimize_switches)
+
+      ["cost", "compare" | rest] ->
+        parse_with_switches(:cost_compare, rest, @cost_compare_switches)
+
+      ["precommit-check" | rest] ->
+        parse_with_switches(:precommit_check, rest, @precommit_check_switches)
+
+      ["precommit-install" | rest] ->
+        parse_with_switches(:precommit_install, rest, @precommit_check_switches)
+
+      ["precommit-uninstall" | rest] ->
+        parse_with_switches(:precommit_uninstall, rest, @precommit_check_switches)
+
+      ["progress" | rest] ->
+        parse_with_switches(:progress, rest, @progress_switches)
+
+      ["circuit-breaker", "status" | rest] ->
+        parse_with_switches(:circuit_breaker_status, rest, @circuit_breaker_switches)
+
+      ["circuit-breaker", "trip", agent_id] ->
+        {:ok, %{command: :circuit_breaker_trip, options: %{agent_id: agent_id}, args: []}}
+
+      ["circuit-breaker", "reset", agent_id] ->
+        {:ok, %{command: :circuit_breaker_reset, options: %{agent_id: agent_id}, args: []}}
+
+      ["agents", "monitor" | rest] ->
+        parse_with_switches(:agents_monitor, rest, @circuit_breaker_switches)
+
+      ["outcome", "record", session_id, outcome] ->
+        {:ok, %{command: :outcome_record, options: %{}, args: [session_id, outcome]}}
+
+      ["outcome", "score", agent_id] ->
+        {:ok, %{command: :outcome_score, options: %{}, args: [agent_id]}}
+
+      ["outcome", "leaderboard"] ->
+        {:ok, %{command: :outcome_leaderboard, options: %{}, args: []}}
+
       ["help"] ->
         {:ok, %{command: :help, options: %{}, args: []}}
 
@@ -460,6 +540,41 @@ defmodule ControlKeel.CLI do
                                       Stream findings and budget live (default: 2000ms)
       controlkeel mcp [--project-root /abs/path]
                                       Run the MCP server for a project
+      controlkeel deploy analyze [--project-root /abs/path]
+                                      Analyze project stack and generate deployment files
+      controlkeel deploy cost [--stack phoenix|react|rails|node|python|static]
+                                      Compare hosting costs across 9 platforms
+      controlkeel deploy dns <stack>   Show DNS and SSL setup guide
+      controlkeel deploy migration <stack>
+                                      Show database migration guide
+      controlkeel deploy scaling <stack>
+                                      Show scaling and infrastructure guide
+      controlkeel cost optimize [--session-id ID] [--provider PROVIDER] [--model MODEL]
+                                      Get cost optimization suggestions
+      controlkeel cost compare [--tokens N]
+                                      Compare agent costs for a token budget
+      controlkeel precommit-check [--domain-pack PACK] [--enforce]
+                                      Scan staged files for policy violations
+      controlkeel precommit-install [--enforce]
+                                      Install git pre-commit hook
+      controlkeel precommit-uninstall  Remove ControlKeel pre-commit hook
+      controlkeel progress [--session-id ID]
+                                      Show session progress, tasks, and findings
+      controlkeel findings translate [--session-id ID]
+                                      Translate findings to plain English
+      controlkeel circuit-breaker status [--agent-id ID]
+                                      Show circuit breaker status for agents
+      controlkeel circuit-breaker trip <agent-id>
+                                      Manually trip circuit breaker
+      controlkeel circuit-breaker reset <agent-id>
+                                      Reset circuit breaker for an agent
+      controlkeel agents monitor [--agent-id ID]
+                                      Show live agent activity and events
+      controlkeel outcome record <session-id> <outcome>
+                                      Record an agent outcome (deploy_success, test_pass, etc.)
+      controlkeel outcome score <agent-id>
+                                      Show agent score from outcomes
+      controlkeel outcome leaderboard  Show agent leaderboard by outcome scores
       controlkeel help                Show this help
       controlkeel version             Show the current version
     """
@@ -2267,6 +2382,461 @@ defmodule ControlKeel.CLI do
     else
       {:error, reason} ->
         {:error, "Failed to bootstrap local project for MCP: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :deploy_analyze, options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    case Advisor.analyze(root) do
+      {:ok, result} ->
+        platform_lines =
+          Enum.map_join(result.platforms, "\n", fn p ->
+            "  - " <> p.name <> " (" <> p.url <> ")"
+          end)
+
+        generator_lines =
+          Enum.map_join(result.generators, "\n", fn g ->
+            "  - " <> g.name <> " (" <> g.filename <> ")"
+          end)
+
+        lines =
+          ["Stack: " <> to_string(result.stack), ""] ++
+            ["Compatible platforms:", platform_lines, ""] ++
+            [
+              "Monthly cost estimate: $" <>
+                to_string(result.monthly_cost_range.low) <>
+                " - $" <> to_string(result.monthly_cost_range.high),
+              ""
+            ] ++
+            ["Generated files:", generator_lines]
+
+        {:ok, lines}
+    end
+  end
+
+  def run_command(%{command: :deploy_cost, options: options}, _project_root) do
+    stack = String.to_atom(options[:stack] || "static")
+    tier = String.to_atom(options[:tier] || "free")
+    needs_db = options[:needs_db] || false
+    db_tier = String.to_atom(options[:db_tier] || "managed_small")
+    bandwidth = options[:bandwidth] || 10
+    storage = options[:storage] || 1
+
+    case HostingCost.estimate(
+           stack: stack,
+           tier: tier,
+           needs_db: needs_db,
+           db_tier: db_tier,
+           expected_bandwidth_gb: bandwidth,
+           expected_storage_gb: storage
+         ) do
+      {:ok, estimates} ->
+        lines =
+          Enum.map(estimates, fn e ->
+            fit = if e.fits_stack, do: "check", else: " "
+
+            "$" <>
+              to_string(Float.round(e.total_monthly_usd, 2)) <>
+              " [#{fit}] " <> e.name <> " - " <> e.notes
+          end)
+
+        {:ok, ["Hosting cost estimates (stack: #{stack}):", "" | lines]}
+    end
+  end
+
+  def run_command(%{command: :deploy_dns, options: options}, _project_root) do
+    stack = String.to_atom(options[:stack] || "phoenix")
+    guide = Advisor.dns_ssl_guide(stack)
+
+    lines =
+      ["DNS Setup for #{stack}:", ""] ++
+        Enum.map(guide.dns_setup, &("  " <> &1)) ++
+        ["", "SSL Setup:", ""] ++
+        Enum.map(guide.ssl_setup, &("  " <> &1))
+
+    {:ok, lines}
+  end
+
+  def run_command(%{command: :deploy_migration, options: options}, _project_root) do
+    stack = String.to_atom(options[:stack] || "phoenix")
+    guide = Advisor.db_migration_guide(stack)
+
+    lines =
+      ["Database Migration Guide for #{stack}:", ""] ++
+        Enum.map(guide.steps, &("  " <> &1)) ++
+        ["", "Rollback: #{guide.rollback}", "Backup: #{guide.backup_before}"]
+
+    {:ok, lines}
+  end
+
+  def run_command(%{command: :deploy_scaling, options: options}, _project_root) do
+    stack = String.to_atom(options[:stack] || "phoenix")
+    guide = Advisor.scaling_guide(stack)
+
+    lines = ["Scaling Guide for #{stack}:", ""]
+
+    lines =
+      lines ++
+        ["Vertical Scaling:", "  #{guide.vertical_scaling.description}"] ++
+        Enum.map(guide.vertical_scaling.tiers, fn t ->
+          "  #{t.users} users: #{t.tier} - #{t.cost}"
+        end) ++
+        ["", "Horizontal: #{guide.horizontal_scaling}", "", "Database: #{guide.database_scaling}"]
+
+    {:ok, lines}
+  end
+
+  def run_command(%{command: :cost_optimize, options: options}, _project_root) do
+    session_id = options[:session_id]
+    provider = options[:provider]
+    model = options[:model]
+
+    spending =
+      if session_id do
+        import Ecto.Query
+
+        from(i in ControlKeel.Mission.Invocation,
+          where: i.session_id == ^session_id,
+          select: %{
+            estimated_cost_cents: i.estimated_cost_cents,
+            tool: i.tool,
+            metadata: i.metadata
+          }
+        )
+        |> ControlKeel.Repo.all()
+      else
+        []
+      end
+
+    case CostOptimizer.suggest(session_id || "cli",
+           spending: spending,
+           top_provider: provider,
+           top_model: model
+         ) do
+      {:ok, []} ->
+        {:ok, ["No cost optimization suggestions at this time."]}
+
+      {:ok, suggestions} ->
+        lines =
+          Enum.map(suggestions, fn s ->
+            "[#{s.priority}] #{s.title}\n  #{s.description}\n  Potential savings: #{s.savings_percent}%"
+          end)
+
+        {:ok, ["Cost Optimization Suggestions:", "" | lines]}
+    end
+  end
+
+  def run_command(%{command: :cost_compare, options: options}, _project_root) do
+    tokens = options[:tokens] || 10_000
+
+    case CostOptimizer.compare_agents("CLI comparison", estimated_tokens: tokens) do
+      {:ok, result} ->
+        lines =
+          Enum.map(result.comparisons, fn c ->
+            "$#{Float.round(c.estimated_cost_usd, 4)}  #{c.agent} (#{c.provider}/#{c.model})"
+          end)
+
+        savings =
+          if result.savings_range > 0 do
+            ["", "Potential savings: $#{Float.round(result.savings_range / 100, 2)}"]
+          else
+            []
+          end
+
+        {:ok, ["Agent cost comparison (#{tokens} tokens):", "" | lines] ++ savings}
+    end
+  end
+
+  def run_command(%{command: :precommit_check, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    domain_pack = options[:domain_pack]
+    enforce = options[:enforce] || false
+
+    case PreCommitHook.check(root, domain_pack: domain_pack, enforce: enforce) do
+      {:ok, result} ->
+        staged_count = length(Map.get(result, :staged_files, []))
+
+        case result.decision do
+          "allow" ->
+            {:ok, ["No policy violations found in #{staged_count} staged file(s)."]}
+
+          "warn" ->
+            lines =
+              ["#{result.summary}"] ++
+                Enum.map(result.findings, fn f ->
+                  "  [#{f.severity}] #{f.rule_id}: #{f.plain_message}"
+                end)
+
+            {:ok, lines}
+
+          "block" ->
+            lines =
+              ["BLOCKED: #{result.summary}"] ++
+                Enum.map(result.findings, fn f ->
+                  "  [#{f.severity}] #{f.rule_id}: #{f.plain_message}"
+                end)
+
+            {:error, Enum.join(lines, "\n")}
+        end
+    end
+  end
+
+  def run_command(%{command: :precommit_install, options: options}, project_root) do
+    root = options[:project_root] || project_root
+    enforce = options[:enforce] || false
+
+    case PreCommitHook.install(root, enforce: enforce) do
+      {:ok, :installed} ->
+        {:ok, ["Pre-commit hook installed in .git/hooks/pre-commit"]}
+
+      {:ok, :updated} ->
+        {:ok, ["Pre-commit hook updated in .git/hooks/pre-commit"]}
+
+      {:error, :hook_exists} ->
+        {:error, "A non-ControlKeel pre-commit hook already exists. Remove it first."}
+    end
+  end
+
+  def run_command(%{command: :precommit_uninstall, options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    case PreCommitHook.uninstall(root) do
+      {:ok, :uninstalled} ->
+        {:ok, ["Pre-commit hook removed."]}
+
+      {:ok, :not_controlkeel_hook} ->
+        {:error, "Existing hook is not a ControlKeel hook."}
+
+      {:ok, :no_hook_found} ->
+        {:ok, ["No pre-commit hook found."]}
+    end
+  end
+
+  def run_command(%{command: :progress, options: options}, project_root) do
+    session_id = options[:session_id]
+
+    session_id =
+      if session_id do
+        session_id
+      else
+        case LocalProject.load(project_root) do
+          {:ok, _binding, session} -> session.id
+          _ -> nil
+        end
+      end
+
+    if is_nil(session_id) do
+      {:error, "No active session. Use --session-id or run from a bound project."}
+    else
+      case ControlKeel.Mission.Progress.compute(session_id) do
+        {:ok, progress} ->
+          lines = [
+            "Session ##{session_id} Progress: #{progress.overall_percent}%",
+            "",
+            "Tasks: #{progress.tasks.done}/#{progress.tasks.total} done (#{progress.tasks.in_progress} in progress, #{progress.tasks.blocked} blocked)",
+            "Findings: #{progress.findings.resolved}/#{progress.findings.total} resolved (#{progress.findings.critical_open} critical open)",
+            "Budget: $#{progress.budget.spent_cents / 100} / $#{progress.budget.budget_cents / 100} (#{progress.budget.percent}%) [#{progress.budget.status}]",
+            "Estimated effort: #{progress.estimated_effort.estimated_hours}h (#{progress.estimated_effort.estimated_days} days)"
+          ]
+
+          remaining =
+            Enum.map(progress.remaining_items, fn item ->
+              prefix =
+                case item.type do
+                  :blocker -> "BLOCKER"
+                  :warning -> "WARN"
+                  _ -> "INFO"
+                end
+
+              "  #{prefix}: #{item.message}"
+            end)
+
+          lines =
+            if remaining != [] do
+              lines ++ ["", "Remaining:"] ++ remaining
+            else
+              lines
+            end
+
+          {:ok, lines}
+
+        {:error, :session_not_found} ->
+          {:error, "Session ##{session_id} not found."}
+      end
+    end
+  end
+
+  def run_command(%{command: :findings_translate, options: options}, project_root) do
+    session_id = options[:session_id]
+
+    findings =
+      if session_id do
+        ControlKeel.Mission.list_session_findings(session_id)
+      else
+        case LocalProject.load(project_root) do
+          {:ok, _binding, session} ->
+            ControlKeel.Mission.list_session_findings(session.id)
+
+          _ ->
+            []
+        end
+      end
+
+    if findings == [] do
+      {:ok, ["No findings to translate."]}
+    else
+      translated = PlainEnglish.translate_list(findings)
+
+      lines =
+        Enum.flat_map(translated, fn t ->
+          [""] ++
+            ["#{t.rule_id} [#{t.severity}]: #{t.title}"] ++
+            ["  #{t.category_explanation}"] ++
+            if(t.fix, do: ["  Fix: #{t.fix}"], else: []) ++
+            if(t.risk_if_ignored, do: ["  Risk: #{t.risk_if_ignored}"], else: [])
+        end)
+
+      {:ok, ["Findings in plain English:", "" | tl(lines)]}
+    end
+  end
+
+  def run_command(%{command: :circuit_breaker_status, options: options}, _project_root) do
+    agent_id = options[:agent_id]
+
+    if agent_id do
+      case CircuitBreaker.check_status(agent_id) do
+        {:ok, status} ->
+          lines = [
+            "Agent: #{status.agent_id}",
+            "Status: #{status.status}",
+            "Events: #{status.event_count} (API: #{status.api_calls}, Files: #{status.file_modifications}, Errors: #{status.errors})"
+          ]
+
+          lines =
+            if status.trip_reason do
+              lines ++ ["Trip reason: #{status.trip_reason}"]
+            else
+              lines
+            end
+
+          {:ok, lines}
+
+        {:error, reason} ->
+          {:error, inspect(reason)}
+      end
+    else
+      case CircuitBreaker.get_all_statuses() do
+        {:ok, statuses} ->
+          if statuses == [] do
+            {:ok, ["No agents tracked by circuit breaker."]}
+          else
+            lines =
+              Enum.map(statuses, fn s ->
+                "#{s.agent_id}: #{s.status} (#{s.event_count} events)"
+              end)
+
+            {:ok, ["Circuit Breaker Status:", "" | lines]}
+          end
+      end
+    end
+  end
+
+  def run_command(%{command: :circuit_breaker_trip, options: options}, _project_root) do
+    agent_id = options[:agent_id]
+
+    case CircuitBreaker.trip_breaker(agent_id, "manual CLI trip") do
+      {:ok, _} ->
+        {:ok, ["Circuit breaker tripped for agent: #{agent_id}"]}
+    end
+  end
+
+  def run_command(%{command: :circuit_breaker_reset, options: options}, _project_root) do
+    agent_id = options[:agent_id]
+
+    case CircuitBreaker.reset_breaker(agent_id) do
+      {:ok, _} ->
+        {:ok, ["Circuit breaker reset for agent: #{agent_id}"]}
+    end
+  end
+
+  def run_command(%{command: :agents_monitor, options: options}, _project_root) do
+    agent_id = options[:agent_id]
+
+    if agent_id do
+      {:ok, events} = AgentMonitor.get_events(agent_id, limit: 20)
+
+      if events == [] do
+        {:ok, ["No events for agent: #{agent_id}"]}
+      else
+        lines =
+          Enum.map(events, fn e ->
+            ts = e.timestamp |> DateTime.to_iso8601()
+            ts <> " " <> to_string(e.event_type) <> " " <> inspect(e.metadata)
+          end)
+
+        {:ok, ["Recent events for #{agent_id}:", "" | lines]}
+      end
+    else
+      {:ok, agents} = AgentMonitor.get_active_agents()
+
+      if agents == [] do
+        {:ok, ["No active agents."]}
+      else
+        lines =
+          Enum.map(agents, fn a ->
+            "#{a.agent_id}: #{to_string(a.status)} (#{a.recent_events_5min} events in 5min, #{a.total_events} total)"
+          end)
+
+        {:ok, ["Active agents:", "" | lines]}
+      end
+    end
+  end
+
+  def run_command(%{command: :outcome_record, args: [session_id, outcome]}, _project_root) do
+    {sid, _} = Integer.parse(session_id)
+    outcome_atom = String.to_atom(outcome)
+
+    agent_id = "cli-session-#{sid}"
+
+    case OutcomeTracker.record(sid, outcome_atom, agent_id: agent_id) do
+      {:ok, result} ->
+        {:ok, ["Recorded #{outcome} for session ##{session_id} (reward: #{result.reward})"]}
+
+      {:error, {:unknown_outcome, o}} ->
+        {:error,
+         "Unknown outcome: #{o}. Valid: #{Enum.join(OutcomeTracker.valid_outcomes(), ", ")}"}
+
+      {:error, reason} ->
+        {:error, "Failed: " <> inspect(reason)}
+    end
+  end
+
+  def run_command(%{command: :outcome_score, args: [agent_id]}, _project_root) do
+    case OutcomeTracker.get_agent_score(agent_id) do
+      {:ok, score} ->
+        {:ok,
+         [
+           "Agent: #{score.agent_id}",
+           "Score: #{score.score} (#{score.outcome_count} outcomes, total reward: #{score.total_reward})",
+           "Window: #{score.window_days} days"
+         ]}
+    end
+  end
+
+  def run_command(%{command: :outcome_leaderboard}, _project_root) do
+    case OutcomeTracker.get_leaderboard() do
+      {:ok, []} ->
+        {:ok, ["No outcomes recorded yet."]}
+
+      {:ok, scores} ->
+        lines =
+          Enum.map(scores, fn s ->
+            id = s.agent_id || "unknown"
+            id <> ": " <> to_string(s.score) <> " (" <> to_string(s.outcome_count) <> " outcomes)"
+          end)
+
+        {:ok, ["Agent Leaderboard:", "" | lines]}
     end
   end
 

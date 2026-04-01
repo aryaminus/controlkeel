@@ -131,7 +131,8 @@ defmodule ControlKeel.Governance.PreCommitHook do
       content: content,
       path: file_path,
       session_id: nil,
-      project_root: nil
+      project_root: nil,
+      domain_pack: domain_pack
     }
 
     packs =
@@ -143,7 +144,6 @@ defmodule ControlKeel.Governance.PreCommitHook do
 
     case Scanner.FastPath.scan(input, packs: packs) do
       %{findings: findings} -> findings
-      _ -> []
     end
   rescue
     _ -> []

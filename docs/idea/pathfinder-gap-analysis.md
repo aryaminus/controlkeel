@@ -1,167 +1,132 @@
-# Gap Analysis: ControlKeel vs Pathfinder Research — updated 2026-03-30
+# Gap Analysis: ControlKeel vs Pathfinder Research
 
-## Scorecard Updated 2026-03-30
+Updated: 2026-03-30
 
-| Dimension | Before | After | Module |
-|---|---|---|---|---|---|---|---|
-| 6. Learning / Memory | 55% | **90%** | `Learning.OutcomeTracker`, `Learning.CrossProject`, `Learning.PreferenceAdapter` |
-| 7. Cost Management | 60% | **90%** | `Deployment.HostingCost`, `Budget.SpendAlerts` `Budget.CostOptimizer` (27-model `Pricing`) |
-| 8. Deployment Guidance | 20% | **90%** | `Deployment.Advisor` + `Deployment.Live` |
-  9. Multi-agent Support | 95% | 95% | Already built |
-| 10. Distribution | 90% | **90%** | MCP server, CLI (60+ commands), LiveView web, REST API (40+ endpoints), A2A, proxy, skills, brew, npm | 95% | Already built |
-| 1. Intent Engine / Planning | 90% | 90% | Already built |
-| 2. Agent Orchestration | 85% | 85% | Already built |
-| 3. Security / Validation | 80% | 80% | Already built |
-| 4. Compliance | 90% | 90% | Already built |
-| 5. Governance | 85% | **95%** | `CircuitBreaker`, `AgentMonitor`, `PreCommitHook` |
-| 6. Learning / Memory | 55% | **90%** | `OutcomeTracker`, `CrossProject` `PreferenceAdapter` |
-| 7. Cost Management | 60% | **90%** | `HostingCost`, `SpendAlerts` `CostOptimizer` (27-model pricing) |
-| 8. Deployment Guidance | 20% | **90%** | `Advisor` + `HostingCost` + `Deployment.Live` + `Findings.PlainEnglish` + `Mission.Progress` |
-| 9. Multi-agent Support | 95% | 95% | Already built |
-| 10. Distribution | 90% | **90%** | MCP, CLI, LiveView web, REST API,40+ endpoints), A2A, proxy, skills, brew, npm | 95% | Already built |
+## Scorecard
 
----
+| Dimension | Before | Current | Status |
+| --- | ---: | ---: | --- |
+| Intent engine and planning | 90% | 90% | Strong baseline retained |
+| Agent orchestration | 85% | 85% | Strong baseline retained |
+| Security and validation | 80% | 80% | Strong baseline retained |
+| Compliance coverage | 90% | 90% | Strong baseline retained |
+| Governance and guardrails | 85% | 95% | Improved |
+| Learning and memory | 55% | 90% | Improved |
+| Cost management | 60% | 90% | Improved |
+| Deployment guidance | 20% | 90% | Improved |
+| Multi-agent support | 95% | 95% | Strong baseline retained |
+| Distribution channels | 90% | 90% | Strong baseline retained |
 
-## What's Fully Built (no gap)
+Estimated overall coverage moved from about 75% to about 90%.
 
-No dimensions need work. All were built already.
+## Dimensions Already Strong
 
----
+These dimensions were already in a strong state and remain that way:
 
-## What's Now built (Phase 1-4 complete)
+1. Intent engine and planning
+2. Agent orchestration
+3. Security and validation
+4. Compliance coverage
+5. Multi-agent support
+6. Distribution channels
 
-### Learning / Memory ✅ 90%
+## Major Improvements Completed
 
-**Modules:** `Learning.OutcomeTracker`, `Learning.CrossProject`, `Learning.PreferenceAdapter`
+### 1) Learning and memory (55% -> 90%)
 
-**What they do:**
-1. **OutcomeTracker** records 10 outcome types (deploy success/failure, test pass/fail etc.) as reward signals. 10 valid outcomes with time-window scoring and configurable time windows.
- `get_leaderboard/1` returns agent leaderboard sorted by score. `compute_router_weights/0` generates RL-based router weights from.
- agents ranked by agent score.
+Key modules:
 
- `get_agent_score/2` with configurable time windows. Breakdown by outcome type.
- `OutcomeTracker.get_agent_score/2`, `get_leaderboard/1`, `compute_router_weights/3` for RL-based router weights computation for agents ranked by agent score over time, `OutcomeTracker` integrates into the `Memory.record/1` to record outcomes.
+- Learning.OutcomeTracker
+- Learning.CrossProject
+- Learning.PreferenceAdapter
 
- Memory for persisted findings across projects via `aggregate_findings/2`, `store_patterns/3`, `search_similar/2`, `get_frequency_report/1`. Frequency reports filters by domain pack and minimum count. ` Pattern keys: `category:rule_id:file_extension` (e.g., `security.sql_injection` pattern appeared in 3 other healthcare projects.).
+What is now covered:
 
-4. **User preference adaptation** — `Learning.PreferenceAdapter` records user preferences ( stack, CSS framework, language, model). `detect_preferences/2` auto-detects from execution history. `apply_preferences_to_brief/2` merges them into briefs.
+1. Outcome-reward tracking and agent scoring over time.
+2. Agent leaderboards and router-weight support for performance-aware routing.
+3. Cross-project finding aggregation and recurring-pattern lookup.
+4. Preference detection and preference injection into planning briefs.
 
-### Cost Management ✅ 90%
-**Modules:** `Deployment.HostingCost`, `Budget.SpendAlerts` `Budget.CostOptimizer`, (27-model `Pricing`)
-**What they do:**
-1. **Hosting cost estimation** — `Deployment.HostingCost` estimates monthly costs across 9 platforms (Fly.io, Railway, Render, Vercel, Heroku, AWS, GCP, DigitalOcean, Netlify) with tier-based compute, database, bandwidth, and storage breakdowns. Cost comparison via `/deploy` LiveView UI. `estimate_costs/2` fires alerts on threshold crossings (50%/80%/95%/100%), detects burn rate anomalies, supports callbacks.
- external notifications.
- `estimate/2` estimates the task cost given stack. `estimate_cost_cents` for 100k tokens. `BillingCost` adds estimates the spend based on model for $X/mo100k. ` compare_agents/2` generates pre-flight cost estimates for 6 agents ( (Claude Code, Codex CLI, Gemini CLI, DeepSeek, Grok, Local Llama).
- `SpendAlerts` GenServer monitors budget ratios, fires alerts on threshold crossings (50%/80%/95%/100%), detects burn rate anomalies, supports callbacks for external notifications.
+### 2) Cost management (60% -> 90%)
 
-4. **Multi-model pricing coverage** — `Budget.Pricing` expanded from 8 to 27+ models: Anthropic (5), OpenAI (5), Google Gemini (3), DeepSeek (2), Groq (2), Together (2), Cohere (2), xAI Grok (2), Mistral (2), local models (3). `SpendAlerts` GenServer that monitors budget ratio, fires alert on threshold crossings (50%/80%/95%/100%), detects burn rate anomalies, supports callbacks for external notifications.
+Key modules:
 
-5. **Cost optimization suggestions** — `Budget.CostOptimizer` analyzes spending patterns, recommends cheaper model alternatives, caching strategies, local model adoption, and request batching. `compare_agents/2` generates pre-flight cost estimates for 6 agent- `Budget.SpendAlerts` GenServer monitors budget ratios, fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates the task cost given stack.
+- Budget.Pricing
+- Budget.SpendAlerts
+- Budget.CostOptimizer
+- Deployment.HostingCost
 
- `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio and fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications.
+What is now covered:
 
-5. **Agent cost comparison** — `Budget.CostOptimizer.compare_agents/2` generates pre-flight cost estimates for 6 agent- `Budget.SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates the task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates the task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications.
+1. Broader model-pricing coverage (multi-provider).
+2. Budget threshold alerts with burn-rate detection.
+3. Cost optimization suggestions (model choice, batching, caching, local model use).
+4. Hosting cost comparison across major platforms.
+5. Agent-level cost comparison for pre-flight planning.
 
- `estimate/2` estimates the task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callbacks for external notifications. `estimate/2` estimates the task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100%), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio, fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for for external notifications.
+### 3) Deployment guidance (20% -> 90%)
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for for external notifications.
+Key modules:
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
+- Deployment.Advisor
+- Deployment.HostingCost
+- ControlKeelWeb.DeploymentLive
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications.
+What is now covered:
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for in external notifications.
+1. Stack-aware Docker and compose guidance.
+2. Platform recommendation and cost-aware deployment choices.
+3. CI/CD guidance generation by stack.
+4. Environment variable setup templates.
+5. Database migration guidance by stack.
+6. DNS/SSL guidance and post-deploy readiness checks.
+7. Deploy-focused LiveView UX for analysis and preview.
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for in external notifications.
+### 4) Governance hardening (85% -> 95%)
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks in external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks in external notifications.
+Key modules:
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for in external notifications.
+- Governance.CircuitBreaker
+- Governance.AgentMonitor
+- Governance.PreCommitHook
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks in external notifications.
+What is now covered:
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks in external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for for external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for in external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. callback for in external notifications.
+1. Runtime policy interruption for risky behavior patterns.
+2. Better agent execution visibility and event telemetry.
+3. Stronger pre-commit enforcement before unsafe changes land.
 
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100), detect burn rate anomalies. Callbacks for external notifications.
+## Non-Technical UX Progress
 
- `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2` estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. Callbacks in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. Callbacks for external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications}
+Current level: about 70%
 
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
+Now covered:
 
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
+1. Guided onboarding and intent capture.
+2. Mission planning from structured specs.
+3. Plain-language finding explanations.
+4. Session progress visibility and remaining-work signals.
 
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents` in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. Callbacks for external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications. `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications.
+Still out of scope in this phase:
 
- `estimate/2" estimates in task cost given stack. `estimate_cost_cents" in 100k tokens. `BillingCost` module estimates monthly spend based on model. `SpendAlerts` GenServer monitors budget ratio in fires alert in threshold crossings (50%/80%/95%/100) detect burn rate anomalies. callback for in external notifications)
+1. Visual drag-and-drop project builder.
+2. One-click hosted deploy via first-party partner APIs.
+3. Full tutorial/content curriculum for novice workflows.
 
-### Deployment Guidance ✅ 90%
+## Remaining P4 Items
 
-**What exists:**
-- Release readiness gate (checks proofs, findings, smoke evidence)
-- GitHub Actions workflow scaffolding
+The remaining items are productization-heavy, not core-engine gaps:
 
-**What's now built:**
-1. **Docker/containerization guidance** — `Deployment.Advisor` generates Dockerfile + docker-compose.yml for 6 stacks (Phoenix, React, Rails, Node, Python, Static) with multi-stage builds, health check, runtime image.
- multi-stage build for small runtime image for production. Stacks `runtime` and `runtime` layers).
-2. **Hosting platform recommendations** — 9 platforms (Fly.io, Railway, Render, Vercel, Heroku, AWS, GCP, DigitalOcean, Netlify) with tier-based pricing, free tier, hosting cost calculator, database, bandwidth, storage breakdown. `hosting_cost` module).
-3. **CI/CD pipeline generation** — GitHub Actions CI configs for 6 stacks. Build steps: checkout, compile, test, deploy, deploy.
-4. **Domain/DNS setup** — Step-by-step DNS configuration guides per stack (Cloudflare/Namecheap/Google Domains). Platform-specific DNS for Fly.io, Vercel/Netlify.
-5. **Environment variable management** — `.env.example` templates per stack with documentation on what each variable does and and security best practices.
-6. **Database migration guidance** — Stack-specific instructions (Ecto for Phoenix, ActiveRecord in Rails, Prisma/Drizzle/Knex in Node, Alembic/Django in Python). Rollback commands per stack.
-7. **SSL/HTTPS setup** — All major platforms provide free automatic SSL via Let's Encrypt. Self-hosted: use Certbot. Platform-specific SSL guidance.
-8. **Scaling considerations** — Vertical/horizontal scaling tiers, horizontal scaling strategies (Phoenix PubSub for Rails SolidQueue/Sidekiq), database scaling (PgBouncer, read replicas, and caching recommendations. Concurrent user breakdown (1-100 to 10k+).
-9. **Monitoring/alerting** — UptimeRobot (Sentry, AppSignal, PagerDuty recommendations.
-10. **Deployment LiveView** — Web UI at `/deploy` with stack analysis, cost comparison, and file generation preview.
+1. Visual project builder.
+2. One-click deploy integrations.
+3. Guided tutorial system.
 
-### Non-Technical UX ✅ 70%
+## Verification Notes
 
-**What exists:**
-- `OnboardingLive` — guided setup wizard
-- `Intent.compile/2` — natural language to structured spec
-- `Mission.Planner` — generates tasks from specs
+Previous validation cycles reported compile, tests, and precommit passing after the related feature work.
+This document reflects capability coverage and architecture state; run the current branch validation again before release.
 
-**What's now built:**
-1. **Plain English explanations** — `Findings.PlainEnglish` translates findings ( severity, category, fix, risk) into non-technical language. 15+ rule patterns covered all 11 categories with 4 severity explanations.
-2. **Progress dashboard** — `Mission.Progress` computes session completion percentage from task progress (60%), finding resolution (40%), budget status. Remaining items list, and estimated effort.
+## Conclusion
 
-**What's not built (P4 only):**
-1. **Visual project builder** — Requires dedicated frontend work beyond current scope
-2. **One-click deploy** — Requires platform partnerships (Railway/Render/Fly.io)
-3. **Guided tutorials** — Content-heavy educational material, not code
-
----
-
-## What's not Built (P4 Only)
-
-1. **Visual project builder** — Drag-and-drop UI for describing what to build. Requires dedicated frontend work. Out of scope.
-2. **One-click deploy** — Direct API integration with hosting platforms. Requires business partnerships.
-3. **Guided tutorials** — Interactive tutorials (repo, PR, hosting). Content-heavy, not code.
-
----
-
-## Summary
-
-ControlKeel has **~90% of what the Pathfinder research recommends**. All code-level gaps from the gap analysis have now closed. The remaining 3 items are P4 (lowest priority):
-
-1. **Visual project builder** (P4) — requires dedicated frontend work
-2. **One-click deploy** (P2) — requires platform API partnerships
-3. **Guided tutorials** (P4) — content-heavy, not code
-
-All new modules compile, all 399 tests pass, and `mix precommit` succeeds.
- The **overall coverage went from ~75% to ~90%.**
+ControlKeel now covers nearly all high-impact Pathfinder recommendations in code and workflow terms.
+The unresolved items are mostly UX-product packaging and ecosystem integration work rather than missing governance architecture.

@@ -160,9 +160,11 @@ defmodule ControlKeel.Governance.CircuitBreaker do
       api_calls = count_by_type(events, :api_call)
       file_mods = count_by_type(events, :file_modification)
       errors = count_by_type(events, :error)
+      budget_events = count_by_type(events, :budget_consumption)
       total = max(length(events), 1)
 
       error_rate = errors / total * 100
+      budget_rate = budget_events / total * 100
       consecutive = count_consecutive_failures(events)
 
       cond do
@@ -184,6 +186,13 @@ defmodule ControlKeel.Governance.CircuitBreaker do
             agent_state
             | breaker_tripped: true,
               trip_reason: :consecutive_failure_threshold_exceeded
+          }
+
+        budget_rate > thresholds.budget_burn_rate_percent_per_minute ->
+          %{
+            agent_state
+            | breaker_tripped: true,
+              trip_reason: :budget_burn_rate_threshold_exceeded
           }
 
         true ->

@@ -11,7 +11,7 @@ It governs agent work across intent compilation, task planning, routing, validat
 
 ## How it works
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                      Your Coding Agent                       │
 │   Claude Code · Codex · Cursor · Windsurf · Cline · Aider   │
@@ -85,7 +85,7 @@ mix ck.findings
 ### Native-first (MCP + native companion install)
 
 | Agent | Attach | Native surfaces |
-|---|---|---|
+| --- | --- | --- |
 | Claude Code | `attach claude-code` | `.claude/skills`, `.claude/agents`, plugin bundle |
 | Codex CLI | `attach codex-cli` | `.agents/skills`, `.codex/agents`, plugin bundle |
 | Cline | `attach cline` | `.cline/skills`, `.clinerules/`, MCP config |
@@ -105,13 +105,13 @@ mix ck.findings
 ### MCP + instructions only
 
 | Agent | Attach |
-|---|---|
+| --- | --- |
 | Aider | `attach aider` |
 
 ### Headless runtimes
 
 | Agent | Command |
-|---|---|
+| --- | --- |
 | Devin | `runtime export devin` |
 | Open SWE | `runtime export open-swe` |
 | Cloudflare Workers | `runtime export cloudflare-workers` |
@@ -121,7 +121,7 @@ See [docs/agent-integrations.md](docs/agent-integrations.md) and [docs/support-m
 ## Web UI
 
 | Route | Purpose |
-|---|---|
+| --- | --- |
 | `/start` | Onboarding, interview, execution brief |
 | `/missions/:id` | Mission control, findings, proofs, pause/resume |
 | `/findings` | Cross-session findings browser |
@@ -130,6 +130,7 @@ See [docs/agent-integrations.md](docs/agent-integrations.md) and [docs/support-m
 | `/policies` | Policy packs and governance rules |
 | `/skills` | Skills studio, compatibility matrix, export/install |
 | `/ship` | Deploy-readiness and session metrics |
+| `/deploy` | Deployment advisor, cost estimates, file generation |
 
 ## CLI
 
@@ -138,22 +139,61 @@ controlkeel                                  # start server
 controlkeel attach <agent>                   # attach agent + install native bundle
 controlkeel status                           # show governed state
 controlkeel findings [--severity high]       # list findings
+controlkeel findings translate               # translate findings to plain English
 controlkeel approve <finding-id>             # approve a finding
 controlkeel proofs [--session-id ...]        # list proof bundles
+controlkeel progress [--session-id ID]       # show session progress dashboard
 controlkeel skills list|validate|export|install|doctor
 controlkeel benchmark list|run|show
 controlkeel policy list|train|promote|archive
 controlkeel agents doctor                    # show attached/runnable agents
+controlkeel agents monitor [--agent-id ID]  # live agent activity feed
 controlkeel run task <id>                    # governed agent execution
 controlkeel provider list|set-key|default|doctor
 controlkeel watch                            # continuous file-watch governance
 controlkeel mcp --project-root /path         # direct stdio MCP
 ```
 
+### Deployment commands
+
+```bash
+controlkeel deploy analyze                   # detect stack, estimate costs, generate files
+controlkeel deploy cost --stack phoenix      # compare hosting costs across 9 platforms
+controlkeel deploy dns <stack>               # DNS and SSL setup guide
+controlkeel deploy migration <stack>         # database migration guide
+controlkeel deploy scaling <stack>           # scaling and infrastructure guide
+```
+
+### Cost management
+
+```bash
+controlkeel cost optimize [--session-id ID]  # get cost optimization suggestions
+controlkeel cost compare [--tokens 10000]    # compare agent costs for a token budget
+```
+
+### Governance commands
+
+```bash
+controlkeel precommit-check [--enforce]      # scan staged files for policy violations
+controlkeel precommit-install [--enforce]    # install git pre-commit hook
+controlkeel precommit-uninstall              # remove ControlKeel pre-commit hook
+controlkeel circuit-breaker status           # show circuit breaker status for agents
+controlkeel circuit-breaker trip <agent-id>  # manually trip circuit breaker
+controlkeel circuit-breaker reset <agent-id> # reset circuit breaker for an agent
+```
+
+### Outcome tracking
+
+```bash
+controlkeel outcome record <session-id> <outcome>  # record deploy_success, test_pass, etc.
+controlkeel outcome score <agent-id>                # show agent score from outcomes
+controlkeel outcome leaderboard                     # show agent leaderboard
+```
+
 ## MCP tools
 
 | Tool | Purpose |
-|---|---|
+| --- | --- |
 | `ck_validate` | Run validation on code changes |
 | `ck_context` | Get assembled mission context |
 | `ck_finding` | Report or query findings |
@@ -162,6 +202,9 @@ controlkeel mcp --project-root /path         # direct stdio MCP
 | `ck_delegate` | Cross-agent delegation |
 | `ck_skill_list` | List available skills |
 | `ck_skill_load` | Load a skill by name |
+| `ck_cost_optimizer` | Get cost optimization suggestions |
+| `ck_deployment_advisor` | Analyze project for deployment |
+| `ck_outcome_tracker` | Record and query agent outcomes |
 
 ## Skills & plugins
 

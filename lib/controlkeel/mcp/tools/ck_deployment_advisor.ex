@@ -14,15 +14,15 @@ defmodule ControlKeel.MCP.Tools.CkDeploymentAdvisor do
         "generate_files" ->
           case Advisor.analyze(normalized["project_root"]) do
             {:ok, analysis} ->
-              Advisor.generate_files(normalized["project_root"], analysis.generators, dry_run: normalized["dry_run"])
-            error -> error
+              Advisor.generate_files(normalized["project_root"], analysis.generators,
+                dry_run: normalized["dry_run"]
+              )
           end
-          
+
         "dns_guide" ->
           case Advisor.analyze(normalized["project_root"]) do
             {:ok, analysis} ->
               {:ok, Advisor.dns_ssl_guide(analysis.stack)}
-            error -> error
           end
       end
     end
@@ -44,8 +44,12 @@ defmodule ControlKeel.MCP.Tools.CkDeploymentAdvisor do
 
   defp mode(arguments) do
     case Map.get(arguments, "mode", "analyze") do
-      value when value in @allowed_modes -> {:ok, value}
-      _ -> {:error, {:invalid_arguments, "`mode` must be `analyze`, `generate_files`, or `dns_guide`"}}
+      value when value in @allowed_modes ->
+        {:ok, value}
+
+      _ ->
+        {:error,
+         {:invalid_arguments, "`mode` must be `analyze`, `generate_files`, or `dns_guide`"}}
     end
   end
 
