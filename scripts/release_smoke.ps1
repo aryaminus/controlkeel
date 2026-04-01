@@ -70,9 +70,15 @@ function Test-TcpPortOpen {
     [int]$TimeoutMs = 1000
   )
 
-  $client = [System.Net.Sockets.TcpClient]::new()
+  $client = $null
   try {
+    $client = [System.Net.Sockets.TcpClient]::new()
     $connectTask = $client.ConnectAsync($Host, $Port)
+
+    if ($null -eq $connectTask) {
+      return $false
+    }
+
     if (-not $connectTask.Wait($TimeoutMs)) {
       return $false
     }
@@ -83,7 +89,9 @@ function Test-TcpPortOpen {
     return $false
   }
   finally {
-    $client.Dispose()
+    if ($null -ne $client) {
+      $client.Dispose()
+    }
   }
 }
 
@@ -161,8 +169,8 @@ finally {
   if (-not $succeeded) {
     $stdout = if (Test-Path $serverStdoutLog) { Get-Content $serverStdoutLog -Raw } else { "" }
     $stderr = if (Test-Path $serverStderrLog) { Get-Content $serverStderrLog -Raw } else { "" }
-    $stdoutText = $stdout.Trim()
-    $stderrText = $stderr.Trim()
+    $stdoutText = if ([string]::IsNullOrEmpty($stdout)) { "" } else { $stdout.Trim() }
+    $stderrText = if ([string]::IsNullOrEmpty($stderr)) { "" } else { $stderr.Trim() }
 
     if ($failureMessage) {
       Write-Host "Smoke failure: $failureMessage"
