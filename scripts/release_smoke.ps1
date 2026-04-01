@@ -65,7 +65,7 @@ $failureMessage = $null
 
 function Test-TcpPortOpen {
   param(
-    [string]$Host,
+    [string]$HostName,
     [int]$Port,
     [int]$TimeoutMs = 1000
   )
@@ -73,7 +73,7 @@ function Test-TcpPortOpen {
   $client = $null
   try {
     $client = [System.Net.Sockets.TcpClient]::new()
-    $connectTask = $client.ConnectAsync($Host, $Port)
+    $connectTask = $client.ConnectAsync($HostName, $Port)
 
     if ($null -eq $connectTask) {
       return $false
@@ -111,11 +111,11 @@ function Test-ProcessListeningPort {
     # Fall through to socket probes when Get-NetTCPConnection is unavailable or restricted.
   }
 
-  if (Test-TcpPortOpen -Host "127.0.0.1" -Port $Port -TimeoutMs 1000) {
+  if (Test-TcpPortOpen -HostName "127.0.0.1" -Port $Port -TimeoutMs 1000) {
     return $true
   }
 
-  if (Test-TcpPortOpen -Host "::1" -Port $Port -TimeoutMs 1000) {
+  if (Test-TcpPortOpen -HostName "::1" -Port $Port -TimeoutMs 1000) {
     return $true
   }
 
