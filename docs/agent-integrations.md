@@ -230,6 +230,25 @@ Execution stays policy-gated:
 - **runtime** paths create governed remote run packages and track remote refs
 - blocked findings and explicit approval constraints pause the run instead of being bypassed
 
+## Socket.dev supply-chain intake
+
+ControlKeel now supports direct ingestion of Socket findings through the CLI:
+
+- `controlkeel review socket --report socket-report.json`
+- `cat socket-report.json | controlkeel review socket --stdin`
+
+This path maps Socket issues into the same dependency-review finding model used by governance reviews:
+
+- `critical` and `high` Socket severities block by default
+- issues are persisted as runtime findings when a session binding is present
+- findings carry `dependencies.socket.alert` so they can be filtered and triaged consistently
+
+Recommended operational flow for Socket surfaces:
+
+1. GitHub App: export or fetch alert JSON in CI, then run `controlkeel review socket` before merge gates.
+2. Socket CLI: emit JSON from your dependency scan and pipe it into `--stdin`.
+3. VS Code extension: when it can export alert JSON, feed that report into the same command to keep triage centralized in CK.
+
 ## Proxy-compatible clients
 
 ControlKeel also exposes governed proxy endpoints for OpenAI-style and Anthropic-style traffic. This is useful for tools that can point directly at those APIs, but it is a different support tier from a native attach target or documented provider bridge.

@@ -16,6 +16,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Governance.AgentMonitor
   alias ControlKeel.Governance.CircuitBreaker
   alias ControlKeel.Governance.PreCommitHook
+  alias ControlKeel.Governance.Socket, as: GovernanceSocket
   alias ControlKeel.Intent
   alias ControlKeel.Findings.PlainEnglish
   alias ControlKeel.Learning.OutcomeTracker
@@ -127,6 +128,13 @@ defmodule ControlKeel.CLI do
     domain_pack: :string,
     project_root: :string
   ]
+  @review_socket_switches [
+    report: :string,
+    stdin: :boolean,
+    session_id: :integer,
+    domain_pack: :string,
+    project_root: :string
+  ]
   @release_ready_switches [
     session_id: :integer,
     sha: :string,
@@ -179,6 +187,9 @@ defmodule ControlKeel.CLI do
 
       ["review", "pr" | rest] ->
         parse_with_switches(:review_pr, rest, @review_pr_switches)
+
+      ["review", "socket" | rest] ->
+        parse_with_switches(:review_socket, rest, @review_socket_switches)
 
       ["release-ready" | rest] ->
         parse_with_switches(:release_ready, rest, @release_ready_switches)
@@ -472,6 +483,8 @@ defmodule ControlKeel.CLI do
       controlkeel review diff [options]
                                       Review a git diff between two refs before merge
       controlkeel review pr [options] Review a PR patch from --patch <file> or --stdin
+      controlkeel review socket [options]
+                  Review a Socket report from --report <file> or --stdin
       controlkeel release-ready [options]
                                       Check proof-backed release readiness for a session
       controlkeel govern install github
@@ -981,6 +994,23 @@ defmodule ControlKeel.CLI do
     with {:ok, patch} <- patch_input(options),
          {:ok, review} <- Governance.review_patch(patch, governance_opts(options, root)) do
       {:ok, review_lines(review, "merge")}
+    end
+  end
+
+  def run_command(%{command: :review_socket, options: options}, project_root) do
+    root = options[:project_root] || project_root
+
+    with {:ok, report} <- socket_report_input(options),
+         {:ok, dependency_review} <- GovernanceSocket.dependency_review(report),
+         {:ok, review} <-
+           Governance.review_patch(
+             "",
+             governance_opts(options, root)
+             |> Keyword.put(:dependency_review, dependency_review)
+             |> Keyword.put(:source, "socket_review")
+             |> Keyword.put(:phase, "dependency_review")
+           ) do
+      {:ok, review_lines(review, "dependency")}
     end
   end
 
@@ -3116,6 +3146,43 @@ defmodule ControlKeel.CLI do
 
       true ->
         {:error, "Provide --patch <file> or --stdin."}
+    end
+  end
+
+  defp socket_report_input(options) do
+    cond do
+      is_binary(options[:report]) and options[:report] != "" ->
+        case File.read(options[:report]) do
+          {:ok, content} ->
+            case Jason.decode(content) do
+              {:ok, %{} = payload} ->
+                {:ok, payload}
+
+              {:ok, _other} ->
+                {:error, "Socket report must decode to a JSON object."}
+
+              {:error, %Jason.DecodeError{} = error} ->
+                {:error, "Socket report must be valid JSON: #{Exception.message(error)}"}
+            end
+
+          {:error, reason} ->
+            {:error, "Failed to read Socket report file: #{inspect(reason)}"}
+        end
+
+      Keyword.get(options, :stdin, false) ->
+        case Jason.decode(IO.read(:stdio, :all)) do
+          {:ok, %{} = payload} ->
+            {:ok, payload}
+
+          {:ok, _other} ->
+            {:error, "Socket report must decode to a JSON object."}
+
+          {:error, %Jason.DecodeError{} = error} ->
+            {:error, "Socket report must be valid JSON: #{Exception.message(error)}"}
+        end
+
+      true ->
+        {:error, "Provide --report <file> or --stdin."}
     end
   end
 

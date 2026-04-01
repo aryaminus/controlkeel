@@ -428,6 +428,35 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert review_output =~ "Merge recommendation: blocked."
     assert review_output =~ "secret.aws_access_key"
 
+    socket_report_path = Path.join(tmp_dir, "socket-report.json")
+
+    socket_report =
+      Jason.encode!(%{
+        "issues" => [
+          %{
+            "package" => "left-pad",
+            "severity" => "high",
+            "summary" => "Known malicious postinstall behavior",
+            "manifest_path" => "package-lock.json",
+            "id" => "socket-alert-123"
+          }
+        ]
+      })
+
+    assert :ok == File.write(socket_report_path, socket_report)
+
+    assert {:ok, review_socket} =
+             CLI.parse(["review", "socket", "--report", socket_report_path])
+
+    socket_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(review_socket, project_root: tmp_dir)
+      end)
+
+    assert socket_output =~ "Dependency recommendation: blocked."
+    assert socket_output =~ "dependencies.socket.alert"
+    assert socket_output =~ "left-pad: Known malicious postinstall behavior"
+
     assert {:ok, release_ready} =
              CLI.parse([
                "release-ready",

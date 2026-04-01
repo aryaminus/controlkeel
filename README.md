@@ -159,6 +159,8 @@ controlkeel run task <id>                    # governed agent execution
 controlkeel provider list|set-key|default|doctor
 controlkeel watch                            # continuous file-watch governance
 controlkeel mcp --project-root /path         # direct stdio MCP
+controlkeel review socket --report report.json # ingest Socket dependency alerts
+cat report.json | controlkeel review socket --stdin
 ```
 
 ### Deployment commands
