@@ -68,6 +68,78 @@ defmodule ControlKeel.Findings.PlainEnglish do
       risk_if_ignored:
         "Attackers could trick users into visiting phishing sites that look like yours."
     },
+    "security.semgrep.ssrf_metadata_endpoint" => %{
+      title: "Cloud metadata endpoint access",
+      explanation:
+        "Your code references a cloud instance metadata endpoint (such as 169.254.169.254). These endpoints are common SSRF targets used to steal credentials.",
+      fix:
+        "Block access to link-local and metadata hosts by default. Only allow explicitly approved outbound hosts.",
+      risk_if_ignored:
+        "Attackers may retrieve cloud credentials and use them to access internal systems or data."
+    },
+    "security.semgrep.ssrf_user_controlled_url" => %{
+      title: "User-controlled outbound request",
+      explanation:
+        "An outbound HTTP call appears to use URL input that may come from users. This can enable SSRF to internal services or sensitive endpoints.",
+      fix:
+        "Validate URLs with strict parsing and enforce a host allowlist. Deny private, loopback, and link-local address ranges.",
+      risk_if_ignored:
+        "Attackers can force your server to call internal services and exfiltrate sensitive data."
+    },
+    "security.semgrep.axios_absolute_url_override" => %{
+      title: "Axios baseURL bypass risk",
+      explanation:
+        "Your Axios usage appears to combine a trusted baseURL with user-controlled URL input. Absolute URLs can bypass baseURL expectations and forward sensitive headers.",
+      fix:
+        "Accept only relative paths for trusted clients, reject absolute URLs from untrusted input, and apply host allowlists before sending requests.",
+      risk_if_ignored:
+        "Credentials or API keys may be sent to attacker-controlled hosts, enabling account or data compromise."
+    },
+    "security.semgrep.tls_verification_disabled" => %{
+      title: "TLS verification disabled",
+      explanation:
+        "Your code appears to disable TLS certificate verification. This removes protection against man-in-the-middle interception.",
+      fix:
+        "Re-enable certificate verification in all environments. If needed for development, isolate and guard that configuration from production paths.",
+      risk_if_ignored:
+        "Attackers on the network path can intercept or alter traffic, including credentials and sensitive data."
+    },
+    "security.semgrep.prompt_injection_indicator" => %{
+      title: "Prompt injection marker detected",
+      explanation:
+        "Text includes known prompt override markers (for example, instructions to ignore prior rules). This is a common LLM prompt injection pattern.",
+      fix:
+        "Treat prompt content as untrusted input, isolate system instructions from user content, and require policy/human approval for high-risk actions.",
+      risk_if_ignored:
+        "Model behavior may be hijacked to leak sensitive data, bypass safeguards, or trigger unsafe actions."
+    },
+    "security.semgrep.known_compromised_dependency" => %{
+      title: "Known compromised dependency version",
+      explanation:
+        "Your dependency manifest or lockfile includes a version associated with an active malware or supply-chain incident.",
+      fix:
+        "Remove the compromised version immediately, pin to a known safe release, regenerate lockfiles from trusted sources, and verify integrity/provenance.",
+      risk_if_ignored:
+        "Malicious install hooks or payloads may execute during dependency installation and compromise build agents or developer machines."
+    },
+    "security.semgrep.suspicious_lifecycle_script" => %{
+      title: "Suspicious package lifecycle script",
+      explanation:
+        "A package lifecycle script (such as postinstall) runs network/download or shell tooling. This is a frequent malware delivery mechanism in supply-chain attacks.",
+      fix:
+        "Review the script manually, remove unnecessary lifecycle hooks, and enforce least-privilege CI with script execution restrictions.",
+      risk_if_ignored:
+        "Installing dependencies could execute attacker-controlled code and lead to credential theft or remote access."
+    },
+    "security.semgrep.untrusted_dependency_source" => %{
+      title: "Untrusted dependency source",
+      explanation:
+        "A dependency is pulled from a direct URL, git source, or local file/link path instead of the normal registry flow. This increases provenance risk.",
+      fix:
+        "Prefer registry-published packages with verified provenance, pin exact versions, and use lockfile integrity checks in CI.",
+      risk_if_ignored:
+        "Unverified sources can introduce tampered code that bypasses normal package trust controls."
+    },
     "security.weak_password_hash" => %{
       title: "Weak password storage",
       explanation:

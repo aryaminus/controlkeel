@@ -50,6 +50,7 @@ Guardrails for cost and correctness:
 7. Ensure `PAT_TOKEN` is configured so the bump workflow can push commits and tags that trigger downstream workflows.
 8. If Homebrew publication is enabled, ensure `HOMEBREW_TAP_TOKEN` can push to `aryaminus/homebrew-controlkeel`.
 9. If npmjs publication is enabled, ensure `NPM_TOKEN` is configured for `@aryaminus/controlkeel`.
+10. Confirm `publish-github-packages` succeeds in [release.yml](../.github/workflows/release.yml) so the bootstrap package is also available via GitHub Packages.
 
 ## npmjs publish token setup (maintainers)
 

@@ -22,6 +22,7 @@ irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps
 ```
 
 Tagged releases publish the packaged binaries, checksum manifest, installer scripts, and the portable plugin bundles described below.
+The npmjs and GitHub Packages channels publish the same bootstrap package, which downloads native binaries from GitHub Releases.
 If npmjs is unavailable for a specific environment, GitHub Packages remains a fallback path and requires scoped registry config and a token.
 
 ## Support by mechanism

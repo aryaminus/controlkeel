@@ -178,6 +178,114 @@ rules:
       controlkeel_rule_id: security.semgrep.open_redirect
       controlkeel_severity: medium
 
+  # ─── SSRF / Outbound Request Safety ────────────────────────────────────────
+
+  - id: controlkeel.ssrf-metadata-endpoint
+    message: "Request targets a cloud metadata endpoint. This is a common SSRF target and should be blocked unless explicitly required."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(?i)(169\\.254\\.169\\.254|metadata\\.google\\.internal|100\\.100\\.100\\.200|169\\.254\\.170\\.2)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.ssrf_metadata_endpoint
+      controlkeel_severity: critical
+
+  - id: controlkeel.ssrf-user-controlled-url
+    message: "Outbound HTTP call appears to use a user-controlled URL. Validate host against an allowlist and block private/link-local targets."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "(?is)(axios\\.(get|post|put|patch|delete|request)|fetch\\s*\\(|Req\\.(get|post|put|patch|request)|HTTPoison\\.(get|post|request)|requests\\.(get|post|request)|Net::HTTP\\.(get|post)|http\\.Get)\\s*\\([^\\n]{0,220}(params|query|input|user|url|uri|request)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.ssrf_user_controlled_url
+      controlkeel_severity: high
+
+  - id: controlkeel.axios-baseurl-absolute-override
+    message: "Axios instance with baseURL appears to accept user-controlled absolute URLs, which can bypass host assumptions and leak credentials."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "(?is)axios\\.create\\s*\\(\\s*\\{[^}]{0,500}baseURL\\s*:[^}]+\\}\\s*\\)[\\s\\S]{0,500}\\.(get|post|put|patch|delete)\\s*\\(\\s*(params|query|input|user|url|uri)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.axios_absolute_url_override
+      controlkeel_severity: high
+
+  # ─── TLS / Transport Hardening ─────────────────────────────────────────────
+
+  - id: controlkeel.tls-verification-disabled
+    message: "TLS certificate verification appears disabled. This enables man-in-the-middle attacks and should not be used in production."
+    languages: [generic]
+    severity: ERROR
+    pattern-regex: "(?i)(rejectUnauthorized\\s*:\\s*false|NODE_TLS_REJECT_UNAUTHORIZED\\s*=\\s*['\"]?0|verify\\s*=\\s*False|ssl\\s*:\\s*\\[[^\\]]*verify_none|CURLOPT_SSL_VERIFYPEER\\s*,\\s*0)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.tls_verification_disabled
+      controlkeel_severity: high
+
+  # ─── LLM Prompt Injection Indicators ───────────────────────────────────────
+
+  - id: controlkeel.prompt-injection-indicator
+    message: "Prompt text contains known override/jailbreak markers. Treat as untrusted input and enforce policy boundaries."
+    languages: [generic]
+    severity: WARNING
+    pattern-regex: "(?i)(ignore\\s+(all\\s+)?(previous|prior)\\s+instructions|reveal\\s+(the\\s+)?(system|developer)\\s+prompt|jailbreak|do\\s+anything\\s+now|bypass\\s+safety\\s+filters)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.prompt_injection_indicator
+      controlkeel_severity: medium
+
+  # ─── Supply Chain / Dependency Hygiene ─────────────────────────────────────
+
+  - id: controlkeel.known-compromised-dependency-version
+    message: "Known compromised dependency version detected. Remove immediately and pin to a verified safe release."
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "**/package.json"
+        - "**/package-lock.json"
+        - "**/yarn.lock"
+        - "**/pnpm-lock.yaml"
+    pattern-regex: "(?i)(plain-crypto-js(@|[\\\"':\\s])4\\.2\\.[01]|axios(@|[\\\"':\\s])(1\\.14\\.1|0\\.30\\.4)|@qqbrowser/openclaw-qbot(@|[\\\"':\\s])0\\.0\\.130)"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.known_compromised_dependency
+      controlkeel_severity: critical
+
+  - id: controlkeel.npm-suspicious-lifecycle-script
+    message: "Package lifecycle script executes network/download commands. This is a common supply-chain malware technique and requires manual review."
+    languages: [generic]
+    severity: WARNING
+    paths:
+      include:
+        - "**/package.json"
+    pattern-regex: "(?is)\\\"(preinstall|install|postinstall|prepare)\\\"\\s*:\\s*\\\"[^\\\"]{0,400}(curl|wget|invoke-webrequest|iwr|powershell|pwsh|cscript|osascript|certutil|bitsadmin|python3?|node\\s+[^\\\"]*https?://)[^\\\"]*\\\""
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.suspicious_lifecycle_script
+      controlkeel_severity: high
+
+  - id: controlkeel.untrusted-dependency-source
+    message: "Dependency source uses non-registry transport (http/file/link/git). Ensure provenance and integrity checks are enforced."
+    languages: [generic]
+    severity: WARNING
+    paths:
+      include:
+        - "**/package.json"
+    pattern-regex: "(?is)\\\"(dependencies|devDependencies|optionalDependencies|overrides|resolutions)\\\"\\s*:\\s*\\{[^}]{0,5000}\\\"[^\\\"]+\\\"\\s*:\\s*\\\"(http://|https://|git\\+http://|git\\+https://|file:|link:|github:)[^\\\"]*\\\""
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: warn
+      controlkeel_rule_id: security.semgrep.untrusted_dependency_source
+      controlkeel_severity: medium
+
   # ─── Go ──────────────────────────────────────────────────────────────────────
 
   - id: controlkeel.go-sql-format
