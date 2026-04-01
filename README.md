@@ -51,6 +51,11 @@ brew tap aryaminus/controlkeel && brew install controlkeel
 
 # npm
 npm i -g @aryaminus/controlkeel
+# or: pnpm add -g @aryaminus/controlkeel
+# or: yarn global add @aryaminus/controlkeel
+
+# one-off run (no global install)
+npx @aryaminus/controlkeel@latest
 
 # Direct installer
 curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh

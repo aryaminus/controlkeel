@@ -151,9 +151,14 @@ jobs:
           VERSION="${TAG#v}"
           BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
 
-          MAC_INTEL_SHA=$(grep ' controlkeel-macos-x86_64.tar.gz$' /tmp/release-metadata/controlkeel-checksums.txt | awk '{print $1}')
-          MAC_ARM_SHA=$(grep ' controlkeel-macos-arm64.tar.gz$' /tmp/release-metadata/controlkeel-checksums.txt | awk '{print $1}')
-          LINUX_SHA=$(grep ' controlkeel-linux-x86_64.tar.gz$' /tmp/release-metadata/controlkeel-checksums.txt | awk '{print $1}')
+          MAC_INTEL_SHA=$(awk '$2 ~ /(^|\/)controlkeel-macos-x86_64\.tar\.gz$/ {print $1; exit}' /tmp/release-metadata/controlkeel-checksums.txt)
+          MAC_ARM_SHA=$(awk '$2 ~ /(^|\/)controlkeel-macos-arm64\.tar\.gz$/ {print $1; exit}' /tmp/release-metadata/controlkeel-checksums.txt)
+          LINUX_SHA=$(awk '$2 ~ /(^|\/)controlkeel-linux-x86_64\.tar\.gz$/ {print $1; exit}' /tmp/release-metadata/controlkeel-checksums.txt)
+
+          if [ -z "${MAC_INTEL_SHA}" ] || [ -z "${MAC_ARM_SHA}" ] || [ -z "${LINUX_SHA}" ]; then
+            echo "Missing one or more Homebrew checksums; refusing to publish formula with empty sha256 values." >&2
+            exit 1
+          fi
 
           cat > /tmp/controlkeel.rb <<EOF
           class Controlkeel < Formula
@@ -209,23 +214,23 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: Skip without npm token
+      - name: Check npm publish configuration
+        id: npm_gate
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -z "${NPM_TOKEN}" ]; then
             echo "NPM_TOKEN is not configured; skipping npm publish."
-            exit 0
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Publish npm bootstrap package
+        if: steps.npm_gate.outputs.enabled == 'true'
         working-directory: packages/npm/controlkeel
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            exit 0
-          fi
-
           npm publish --access public
 
   publish-github-packages:

@@ -1035,17 +1035,32 @@ defmodule ControlKeel.CLI do
     scope = options[:scope] || "project"
     mode = options[:mode] || "local"
 
-    with {:ok, target} <- plugin_target(plugin),
-         {:ok, result} <- Skills.install(target, root, scope: scope) do
-      {:ok,
-       [
-         "Installed #{plugin} plugin bundle.",
-         "Target: #{target}",
-         "Scope: #{scope}",
-         "Destination: #{result.destination}",
-         "MCP mode: #{mode} (use #{plugin_mcp_hint(mode)})"
-       ] ++
-         maybe_cli_line("Marketplace", Map.get(result, :marketplace_destination))}
+    with {:ok, target} <- plugin_target(plugin) do
+      case Skills.install(target, root, scope: scope) do
+        {:ok, %{destination: destination} = result} ->
+          {:ok,
+           [
+             "Installed #{plugin} plugin bundle.",
+             "Target: #{target}",
+             "Scope: #{scope}",
+             "Destination: #{destination}",
+             "MCP mode: #{mode} (use #{plugin_mcp_hint(mode)})"
+           ] ++
+             maybe_cli_line("Marketplace", Map.get(result, :marketplace_destination))}
+
+        {:ok, %ControlKeel.Skills.SkillExportPlan{} = plan} ->
+          {:ok,
+           [
+             "Prepared #{plugin} plugin bundle.",
+             "Target: #{plan.target}",
+             "Scope: #{scope}",
+             "Output: #{plan.output_dir}",
+             "MCP mode: #{mode} (use #{plugin_mcp_hint(mode)})"
+           ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+
+        {:error, reason} ->
+          {:error, "Failed to install plugin bundle: #{format_cli_error(reason)}"}
+      end
     else
       {:error, reason} ->
         {:error, "Failed to install plugin bundle: #{format_cli_error(reason)}"}

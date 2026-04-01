@@ -49,4 +49,26 @@ Guardrails for cost and correctness:
 6. Set repository variable `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED=true`.
 7. Ensure `PAT_TOKEN` is configured so the bump workflow can push commits and tags that trigger downstream workflows.
 8. If Homebrew publication is enabled, ensure `HOMEBREW_TAP_TOKEN` can push to `aryaminus/homebrew-controlkeel`.
-9. If npm publication is enabled, ensure `NPM_TOKEN` is configured for `@aryaminus/controlkeel`.
+9. If npmjs publication is enabled, ensure `NPM_TOKEN` is configured for `@aryaminus/controlkeel`.
+
+## npmjs publish token setup (maintainers)
+
+Use this once per token rotation. End users do not need any token for `npm i -g @aryaminus/controlkeel` or `npx @aryaminus/controlkeel@latest`.
+
+1. Sign in to npm and open **Access Tokens**.
+2. Create a new **granular access token** from the npm website.
+3. Grant package permission for `@aryaminus/controlkeel` with **Read and write**.
+4. Set an expiration date and keep the scope as narrow as possible.
+5. If your npm account enforces write-time 2FA, enable **Bypass 2FA** for this CI publish token.
+6. Copy the token immediately (npm only shows the full token once).
+7. In GitHub, open repository **Settings -> Secrets and variables -> Actions**.
+8. Create or update repository secret `NPM_TOKEN` with the token value.
+9. Verify `.github/workflows/release.yml` publishes npm with `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`.
+10. Trigger the next tag release and confirm `publish-npm` succeeds.
+
+### References
+
+- npm: [Creating and viewing access tokens](https://docs.npmjs.com/creating-and-viewing-access-tokens)
+- npm: [Using private packages in a CI/CD workflow](https://docs.npmjs.com/using-private-packages-in-a-ci-cd-workflow)
+- npm: [Configuring two-factor authentication](https://docs.npmjs.com/configuring-two-factor-authentication)
+- GitHub: [Using secrets in GitHub Actions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)

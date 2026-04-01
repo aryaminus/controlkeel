@@ -10,16 +10,19 @@ ControlKeel itself is distributed through GitHub Releases, with convenience inst
 
 ```bash
 brew tap aryaminus/controlkeel && brew install controlkeel
+
 npm i -g @aryaminus/controlkeel
-echo "@aryaminus:registry=https://npm.pkg.github.com" >> ~/.npmrc
-echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_CLASSIC_PAT" >> ~/.npmrc
-npm i -g @aryaminus/controlkeel --registry=https://npm.pkg.github.com
+pnpm add -g @aryaminus/controlkeel
+yarn global add @aryaminus/controlkeel
+
+npx @aryaminus/controlkeel@latest
+
 curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh
 irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex
 ```
 
 Tagged releases publish the packaged binaries, checksum manifest, installer scripts, and the portable plugin bundles described below.
-The GitHub Packages npm path is for the bootstrap installer only and requires a GitHub personal access token (classic) for local installs.
+If npmjs is unavailable for a specific environment, GitHub Packages remains a fallback path and requires scoped registry config and a token.
 
 ## Support by mechanism
 
