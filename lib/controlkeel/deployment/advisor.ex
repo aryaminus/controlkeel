@@ -126,6 +126,7 @@ defmodule ControlKeel.Deployment.Advisor do
 
   def generate_files(project_root, generators, opts \\ []) do
     dry_run = Keyword.get(opts, :dry_run, false)
+    overwrite = Keyword.get(opts, :overwrite, false)
 
     results =
       Enum.map(generators, fn gen ->
@@ -137,8 +138,13 @@ defmodule ControlKeel.Deployment.Advisor do
         else
           dir = Path.dirname(path)
           File.mkdir_p!(dir)
-          File.write(path, content)
-          {:ok, gen.name, path, content, :written}
+
+          if File.exists?(path) and not overwrite do
+            {:ok, gen.name, path, content, :skipped}
+          else
+            File.write(path, content)
+            {:ok, gen.name, path, content, :written}
+          end
         end
       end)
 
@@ -380,11 +386,11 @@ defmodule ControlKeel.Deployment.Advisor do
               --health-timeout 5s
               --health-retries 5
         steps:
-          - uses: actions/checkout@v4
-          - uses: erlef/setup-beam@v1
+          - uses: actions/checkout@v6
+          - uses: erlef/setup-beam@v1.23.0
             with:
-              otp-version: "27"
-              elixir-version: "1.18"
+              elixir-version: "1.19.5"
+              otp-version: "27.3.4.3"
           - name: Install dependencies
             run: mix deps.get
           - name: Compile

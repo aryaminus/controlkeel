@@ -118,7 +118,8 @@ defmodule ControlKeel.MixProject do
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format",
-        "test"
+        "test",
+        "cmd sh scripts/verify_ci_workflow.sh"
       ]
     ]
   end

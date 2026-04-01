@@ -45,6 +45,9 @@ defmodule ControlKeel.Deployment.AdvisorTest do
     assert dockerfile.content =~ "hexpm/elixir"
     assert compose.content =~ "postgres"
     assert ci.content =~ "setup-beam"
+    assert ci.content =~ "mix format --check-formatted"
+    refute ci.content =~ "scripts/verify_ci_workflow.sh"
+    refute ci.content =~ "postinstall.js"
     assert env.content =~ "SECRET_KEY_BASE"
   end
 
@@ -110,6 +113,20 @@ defmodule ControlKeel.Deployment.AdvisorTest do
     assert {:ok, results} = Advisor.generate_files(tmp_dir, generators, dry_run: true)
     [{:ok, "Test", _path, _content, :skipped}] = results
     refute File.exists?(Path.join(tmp_dir, "dry_run_test.txt"))
+  end
+
+  test "generate_files does not overwrite existing files by default", %{tmp_dir: tmp_dir} do
+    path = Path.join(tmp_dir, ".github/workflows/ci.yml")
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, "existing-content")
+
+    generators = [
+      %{name: "CI Pipeline", filename: ".github/workflows/ci.yml", content: "new-content"}
+    ]
+
+    assert {:ok, results} = Advisor.generate_files(tmp_dir, generators)
+    [{:ok, "CI Pipeline", ^path, "new-content", :skipped}] = results
+    assert File.read!(path) == "existing-content"
   end
 
   test "dns_ssl_guide returns DNS and SSL information" do
