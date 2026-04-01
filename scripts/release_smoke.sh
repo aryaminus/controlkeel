@@ -41,8 +41,9 @@ export DATABASE_PATH="$DB_PATH"
 export SECRET_KEY_BASE="$SECRET_KEY_BASE"
 
 cleanup() {
-  if [ "${STARTED:-0}" -eq 1 ]; then
-    "$BINARY" stop >/dev/null 2>&1 || true
+  if [ "${STARTED:-0}" -eq 1 ] && [ -n "${SERVER_PID:-}" ]; then
+    kill "$SERVER_PID" >/dev/null 2>&1 || true
+    wait "$SERVER_PID" >/dev/null 2>&1 || true
   fi
   rm -rf "$TMP_DIR"
 }
@@ -62,19 +63,24 @@ PY
 }
 
 run_command "$BINARY" version >/dev/null
-if ! PHX_SERVER=true DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" daemon >"$SERVER_LOG" 2>&1; then
-  echo "daemon start failed" >&2
+PHX_SERVER=true DATABASE_PATH="$DB_PATH" SECRET_KEY_BASE="$SECRET_KEY_BASE" PORT="$PORT" "$BINARY" serve >"$SERVER_LOG" 2>&1 &
+SERVER_PID=$!
+STARTED=1
+
+sleep 1
+if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+  echo "serve start failed" >&2
   if [ -f "$SERVER_LOG" ]; then
     echo "--- server log ---" >&2
     cat "$SERVER_LOG" >&2
   fi
   exit 1
 fi
-STARTED=1
 
 for _ in $(seq 1 20); do
   if curl --connect-timeout 1 --max-time 2 -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
-    "$BINARY" stop >/dev/null 2>&1 || true
+    kill "$SERVER_PID" >/dev/null 2>&1 || true
+    wait "$SERVER_PID" >/dev/null 2>&1 || true
     STARTED=0
     exit 0
   fi

@@ -58,6 +58,8 @@ New-Item -ItemType Directory -Path $homeDir | Out-Null
 $serverLog = Join-Path $tmpDir "server.log"
 $port = 4081
 $started = $false
+$succeeded = $false
+$serverProcess = $null
 
 try {
   $env:HOME = $homeDir
@@ -68,19 +70,25 @@ try {
   $env:PORT = "$port"
   $env:PHX_SERVER = "true"
 
-  Start-Process -FilePath $BinaryPath `
-    -ArgumentList @("daemon") `
+  $serverProcess = Start-Process -FilePath $BinaryPath `
+    -ArgumentList @("serve") `
     -RedirectStandardOutput $serverLog `
     -RedirectStandardError $serverLog `
     -WorkingDirectory $tmpDir `
-    -Wait
+    -PassThru
   $started = $true
+
+  Start-Sleep -Seconds 1
+  if ($serverProcess.HasExited) {
+    throw "serve start failed"
+  }
 
   for ($i = 0; $i -lt 20; $i++) {
     try {
       $null = Invoke-WebRequest -Uri "http://127.0.0.1:$port/" -TimeoutSec 2 -UseBasicParsing
-      Invoke-BinaryStep -Arguments @("stop") | Out-Null
+      try { Stop-Process -Id $serverProcess.Id -Force } catch {}
       $started = $false
+      $succeeded = $true
       exit 0
     }
     catch {
@@ -91,11 +99,11 @@ try {
   throw "server smoke check failed"
 }
 finally {
-  if ($started) {
-    try { Invoke-BinaryStep -Arguments @("stop") | Out-Null } catch {}
+  if ($started -and $serverProcess -and -not $serverProcess.HasExited) {
+    try { Stop-Process -Id $serverProcess.Id -Force } catch {}
   }
 
-  if (Test-Path $serverLog) {
+  if (-not $succeeded -and (Test-Path $serverLog)) {
     Write-Error "--- server log ---`n$(Get-Content $serverLog -Raw)"
   }
 
