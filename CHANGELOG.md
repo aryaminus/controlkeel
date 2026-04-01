@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.11 — 2026-04-01
+
+### What's changed
+
+- feat: implement retry logic for finding successful Release Smoke run in release workflow
+
 ## v0.1.10 — 2026-04-01
 
 ### What's changed
