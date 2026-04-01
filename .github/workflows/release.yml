@@ -25,14 +25,35 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RUN_ID=$(
-            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/release-smoke.yml/runs?branch=main&event=push&per_page=100" \
-            | jq -r --arg sha "$GITHUB_SHA" '.workflow_runs[] | select(.head_sha == $sha and .conclusion == "success") | .id' \
-            | head -n 1
-          )
+          ATTEMPTS=30
+          SLEEP_SECONDS=20
+          RUN_ID=""
+
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            RUNS_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/release-smoke.yml/runs?branch=main&event=push&per_page=100")
+
+            RUN_ID=$(echo "$RUNS_JSON" | jq -r --arg sha "$GITHUB_SHA" '.workflow_runs[] | select(.head_sha == $sha and .conclusion == "success") | .id' | head -n 1)
+            if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
+              echo "Found successful Release Smoke run: ${RUN_ID}"
+              break
+            fi
+
+            STATUS=$(echo "$RUNS_JSON" | jq -r --arg sha "$GITHUB_SHA" '.workflow_runs[] | select(.head_sha == $sha) | .status' | head -n 1)
+            CONCLUSION=$(echo "$RUNS_JSON" | jq -r --arg sha "$GITHUB_SHA" '.workflow_runs[] | select(.head_sha == $sha) | .conclusion' | head -n 1)
+
+            if [ -n "$STATUS" ] && [ "$STATUS" != "null" ]; then
+              echo "Attempt ${attempt}/${ATTEMPTS}: Release Smoke for ${GITHUB_SHA} status=${STATUS} conclusion=${CONCLUSION}"
+            else
+              echo "Attempt ${attempt}/${ATTEMPTS}: No Release Smoke run found yet for ${GITHUB_SHA}."
+            fi
+
+            if [ "$attempt" -lt "$ATTEMPTS" ]; then
+              sleep "$SLEEP_SECONDS"
+            fi
+          done
 
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-            echo "No successful Release Smoke run found for ${GITHUB_SHA} on main." >&2
+            echo "No successful Release Smoke run found for ${GITHUB_SHA} on main after waiting $((ATTEMPTS * SLEEP_SECONDS)) seconds." >&2
             echo "Run Release Smoke successfully for this SHA before publishing a tag." >&2
             exit 1
           fi
