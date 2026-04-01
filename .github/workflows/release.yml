@@ -71,7 +71,7 @@ jobs:
         run: |
           ARTIFACT_NAME="release-candidate-dist-${GITHUB_SHA}"
           mkdir -p /tmp/release-candidate
-          gh run download "${{ steps.smoke_run.outputs.run_id }}" -n "$ARTIFACT_NAME" -D /tmp/release-candidate
+          gh run download "${{ steps.smoke_run.outputs.run_id }}" -R "${GITHUB_REPOSITORY}" -n "$ARTIFACT_NAME" -D /tmp/release-candidate
           test -f /tmp/release-candidate/controlkeel-checksums.txt
       - uses: actions/upload-artifact@v7
         with:
