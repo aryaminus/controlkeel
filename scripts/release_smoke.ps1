@@ -55,7 +55,8 @@ $tmpDir = Join-Path $env:TEMP ("controlkeel-release-smoke-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmpDir | Out-Null
 $homeDir = Join-Path $tmpDir "home"
 New-Item -ItemType Directory -Path $homeDir | Out-Null
-$serverLog = Join-Path $tmpDir "server.log"
+$serverStdoutLog = Join-Path $tmpDir "server-stdout.log"
+$serverStderrLog = Join-Path $tmpDir "server-stderr.log"
 $port = 4081
 $started = $false
 $succeeded = $false
@@ -72,8 +73,8 @@ try {
 
   $serverProcess = Start-Process -FilePath $BinaryPath `
     -ArgumentList @("serve") `
-    -RedirectStandardOutput $serverLog `
-    -RedirectStandardError $serverLog `
+    -RedirectStandardOutput $serverStdoutLog `
+    -RedirectStandardError $serverStderrLog `
     -WorkingDirectory $tmpDir `
     -PassThru
   $started = $true
@@ -103,8 +104,13 @@ finally {
     try { Stop-Process -Id $serverProcess.Id -Force } catch {}
   }
 
-  if (-not $succeeded -and (Test-Path $serverLog)) {
-    Write-Error "--- server log ---`n$(Get-Content $serverLog -Raw)"
+  if (-not $succeeded) {
+    $stdout = if (Test-Path $serverStdoutLog) { Get-Content $serverStdoutLog -Raw } else { "" }
+    $stderr = if (Test-Path $serverStderrLog) { Get-Content $serverStderrLog -Raw } else { "" }
+
+    if ($stdout -ne "" -or $stderr -ne "") {
+      Write-Error "--- server stdout ---`n$stdout`n--- server stderr ---`n$stderr"
+    }
   }
 
   Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
