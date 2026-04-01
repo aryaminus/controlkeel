@@ -167,11 +167,21 @@ defmodule ControlKeel.Deployment.Advisor do
 
   defp detect_stack(root, files) do
     has_mix = Enum.any?(files, &String.ends_with?(&1, "/mix.exs"))
-    has_phoenix = Enum.any?(files, &String.contains?(&1, "phoenix"))
+
+    has_phoenix =
+      Enum.any?(files, &String.contains?(&1, "phoenix")) or
+        file_contains?(root, "mix.exs", "phoenix")
+
     has_pkg = Enum.any?(files, &String.ends_with?(&1, "/package.json"))
     has_react_dep = file_contains?(root, "package.json", "react")
-    has_gemfile = Enum.any?(files, &String.ends_with?(&1, "/Gemfile"))
-    has_requirements = Enum.any?(files, &String.ends_with?(&1, "/requirements.txt"))
+
+    has_gemfile =
+      Enum.any?(files, &String.ends_with?(&1, "/Gemfile")) or
+        File.exists?(Path.join(root, "Gemfile"))
+
+    has_requirements =
+      Enum.any?(files, &String.ends_with?(&1, "/requirements.txt")) or
+        File.exists?(Path.join(root, "requirements.txt"))
 
     has_flask =
       file_contains?(root, "requirements.txt", "Flask") ||

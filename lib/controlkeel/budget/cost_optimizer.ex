@@ -57,10 +57,10 @@ defmodule ControlKeel.Budget.CostOptimizer do
        cheapest: cheapest,
        most_expensive: most_expensive,
        savings_range:
-         if(cheapest and most_expensive,
-           do: most_expensive.estimated_cost_cents - cheapest.estimated_cost_cents,
-           else: 0
-         )
+         cond do
+           is_nil(cheapest) or is_nil(most_expensive) -> 0
+           true -> most_expensive.estimated_cost_cents - cheapest.estimated_cost_cents
+         end
      }}
   end
 

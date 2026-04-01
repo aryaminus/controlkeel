@@ -284,7 +284,8 @@ defmodule ControlKeel.MCP.Protocol do
   defp ck_deployment_advisor_tool do
     %{
       "name" => "ck_deployment_advisor",
-      "description" => "Analyze project stack, suggest deployment platforms, and generate CI/CD/Docker files.",
+      "description" =>
+        "Analyze project stack, suggest deployment platforms, and generate CI/CD/Docker files.",
       "inputSchema" => %{
         "type" => "object",
         "required" => ["mode", "project_root"],
@@ -300,7 +301,8 @@ defmodule ControlKeel.MCP.Protocol do
   defp ck_outcome_tracker_tool do
     %{
       "name" => "ck_outcome_tracker",
-      "description" => "Record session outcomes or get leaderboard for agents to power reinforcement learning.",
+      "description" =>
+        "Record session outcomes or get leaderboard for agents to power reinforcement learning.",
       "inputSchema" => %{
         "type" => "object",
         "required" => ["mode"],

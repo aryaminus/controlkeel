@@ -24,7 +24,7 @@ defmodule ControlKeel.Learning.OutcomeTracker do
       outcome_def ->
         agent_id = Keyword.get(opts, :agent_id)
         task_type = Keyword.get(opts, :task_type)
-        workspace_id = Keyword.get(opts, :workspace_id)
+        workspace_id = Keyword.get(opts, :workspace_id, 1)
         metadata = Keyword.get(opts, :metadata, %{})
 
         attrs = %{
@@ -106,8 +106,8 @@ defmodule ControlKeel.Learning.OutcomeTracker do
         {:ok,
          %{
            agent_id: agent_id,
-           score: Float.round(score, 3),
-           total_reward: Float.round(total_reward, 3),
+           score: Float.round(score * 1.0, 3),
+           total_reward: Float.round(total_reward * 1.0, 3),
            outcome_count: count,
            window_days: window,
            breakdown: group_outcomes(outcomes)

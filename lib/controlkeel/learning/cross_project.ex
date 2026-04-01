@@ -45,7 +45,7 @@ defmodule ControlKeel.Learning.CrossProject do
   end
 
   def store_patterns(session_id, patterns, opts \\ []) do
-    workspace_id = Keyword.get(opts, :workspace_id)
+    workspace_id = Keyword.get(opts, :workspace_id, 1)
     domain_pack = Keyword.get(opts, :domain_pack)
 
     results =

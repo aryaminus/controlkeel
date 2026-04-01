@@ -14,12 +14,14 @@ defmodule ControlKeel.MCP.Tools.CkCostOptimizer do
             top_provider: normalized["top_provider"],
             top_model: normalized["top_model"]
           ]
+
           CostOptimizer.suggest(normalized["session_id"], opts)
 
         "compare" ->
           opts = [
             estimated_tokens: normalized["estimated_tokens"] || 10_000
           ]
+
           CostOptimizer.compare_agents(normalized["task_description"] || "Unknown task", opts)
       end
     end

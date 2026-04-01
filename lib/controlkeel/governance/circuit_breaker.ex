@@ -92,7 +92,9 @@ defmodule ControlKeel.Governance.CircuitBreaker do
 
   @impl true
   def handle_call({:check_status, agent_id}, _from, state) do
-    agent_state = Map.get(state.agents, agent_id, %{breaker_tripped: false, events: []})
+    agent_state =
+      Map.get(state.agents, agent_id, %{breaker_tripped: false, events: [], trip_reason: nil})
+
     status = build_status(agent_id, agent_state, state)
     {:reply, {:ok, status}, state}
   end
