@@ -61,7 +61,7 @@ An integration is only considered shipped when all of the following are true:
 - Goose is shipped as an attach target with:
   - user-level Goose extension registration in `~/.config/goose/config.yaml`
   - project-level `.goosehints`, workflow recipe, `AGENTS.md`, and MCP companion files
-- `rlm-agent`, `slate`, and `retune` remain intentionally unverified.
+- `rlm-agent`, `slate`, `retune`, `claw-code`, `claude-code-source-mirror`, `z-ai-cli`, `capydotai`, and `neosigma` remain intentionally unverified.
 
 ## Degraded-mode requirement
 

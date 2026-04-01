@@ -619,6 +619,44 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["export"],
         export_targets: ["framework-adapter"]
       }),
+      framework_adapter(%{
+        id: "conductor",
+        label: "Conductor",
+        category: "framework-adapter",
+        description:
+          "Multi-agent workflow orchestration layer (CLI/web surfaces) treated as an adapter path for governed worktree and routing flows, not a first-class local attach target.",
+        companion_delivery:
+          "Appears in orchestration/export guidance rather than `controlkeel attach`.",
+        preferred_target: "framework-adapter",
+        default_scope: "export",
+        auth_mode: "none",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "microsoft/conductor",
+        upstream_docs_url: "https://www.conductor.build",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        supported_scopes: ["export"],
+        export_targets: ["framework-adapter"]
+      }),
+      framework_adapter(%{
+        id: "augment-intent",
+        label: "Intent by Augment",
+        category: "framework-adapter",
+        description:
+          "Spec-driven, multi-agent orchestration workspace. Tracked as an orchestration adapter, not a CK attach target.",
+        companion_delivery:
+          "Appears in orchestration/export guidance while canonical CK execution still runs through shipped attach/runtime integrations.",
+        preferred_target: "framework-adapter",
+        default_scope: "export",
+        auth_mode: "none",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "augmentcode/intent",
+        upstream_docs_url: "https://docs.augmentcode.com/intent/overview",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        supported_scopes: ["export"],
+        export_targets: ["framework-adapter"]
+      }),
       provider_only(%{
         id: "codestral",
         label: "Codestral",
@@ -804,6 +842,65 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["github-repo", "copilot-plugin"]
       }),
       alias_entry(%{
+        id: "copilot-web",
+        label: "GitHub Copilot web surfaces",
+        category: "alias",
+        description:
+          "Alias for GitHub Copilot web and agent-management surfaces; CK support resolves to the canonical repo-native Copilot integration.",
+        alias_of: "copilot",
+        auth_mode: "ck_owned",
+        upstream_slug: "github/copilot-web",
+        upstream_docs_url: "https://docs.github.com/en/copilot",
+        supported_scopes: ["project"],
+        preferred_target: "github-repo",
+        export_targets: ["github-repo", "copilot-plugin"]
+      }),
+      alias_entry(%{
+        id: "cursor-web",
+        label: "Cursor web/mobile surfaces",
+        category: "alias",
+        description:
+          "Alias for Cursor web/mobile agent surfaces; CK support resolves to the canonical Cursor integration.",
+        alias_of: "cursor",
+        auth_mode: "ck_owned",
+        upstream_slug: "cursor/web",
+        upstream_docs_url: "https://cursor.com/blog/agent-web",
+        supported_scopes: ["project"],
+        preferred_target: "cursor-native",
+        export_targets: ["cursor-native", "instructions-only"]
+      }),
+      alias_entry(%{
+        id: "conductor-web",
+        label: "Conductor web",
+        category: "alias",
+        description:
+          "Alias for Conductor web surface. CK resolves this to the Conductor adapter row rather than a direct attach target.",
+        alias_of: "conductor",
+        auth_mode: "none",
+        mcp_mode: "none",
+        skills_mode: "none",
+        upstream_slug: "conductor/build-web",
+        upstream_docs_url: "https://www.conductor.build",
+        supported_scopes: ["export"],
+        preferred_target: "framework-adapter",
+        export_targets: ["framework-adapter"]
+      }),
+      alias_entry(%{
+        id: "kimi-cli",
+        label: "Kimi Code CLI",
+        category: "alias",
+        description:
+          "Alias path for Kimi Code CLI through CK's canonical terminal-agent companion flow until a dedicated native CK target is validated.",
+        alias_of: "codex-cli",
+        auth_mode: "env_bridge",
+        upstream_slug: "MoonshotAI/kimi-cli",
+        upstream_docs_url:
+          "https://www.kimi.com/code/docs/en/kimi-cli/guides/getting-started.html",
+        supported_scopes: ["user", "project"],
+        preferred_target: "codex",
+        export_targets: ["codex", "codex-plugin", "open-standard"]
+      }),
+      alias_entry(%{
         id: "t3code",
         label: "T3 Chat / T3 Code wrapper",
         category: "alias",
@@ -850,6 +947,70 @@ defmodule ControlKeel.AgentIntegration do
         auth_mode: "none",
         upstream_slug: "khadgi-sujan/retune",
         upstream_docs_url: "https://github.com/khadgi-sujan/retune",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "none"
+      }),
+      unverified_entry(%{
+        id: "claw-code",
+        label: "Claw Code community ports",
+        category: "unverified",
+        description:
+          "Community ports and rewrites tied to leaked Claude Code snapshots are tracked for awareness only. No stable, official integration contract has been verified for CK attach/runtime flows.",
+        auth_mode: "none",
+        upstream_slug: "instructkr/claw-code",
+        upstream_docs_url: "https://github.com/instructkr/claw-code",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "none"
+      }),
+      unverified_entry(%{
+        id: "claude-code-source-mirror",
+        label: "Claude Code source mirror ports",
+        category: "unverified",
+        description:
+          "Leak-derived Claude Code source mirrors/ports are intentionally classified as unverified. Prefer the official `claude-code` integration path and avoid treating mirror repos as trusted supply-chain inputs.",
+        auth_mode: "none",
+        upstream_slug: "VineeTagarwaL-code/claude-code",
+        upstream_docs_url: "https://github.com/VineeTagarwaL-code/claude-code",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "none"
+      }),
+      unverified_entry(%{
+        id: "z-ai-cli",
+        label: "Z.AI CLI ecosystem",
+        category: "unverified",
+        description:
+          "Z.AI coding-agent CLI surfaces are evolving across official docs and community implementations; no single stable CK integration contract is verified yet.",
+        auth_mode: "none",
+        upstream_slug: "z-ai/cli-ecosystem",
+        upstream_docs_url: "https://docs.z.ai/devpack/using5.1",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "none"
+      }),
+      unverified_entry(%{
+        id: "capydotai",
+        label: "Capy.ai / captain-agent style surfaces",
+        category: "unverified",
+        description:
+          "Community references to capy/captain agent orchestration are tracked for awareness only; no canonical integration contract was verified.",
+        auth_mode: "none",
+        upstream_slug: "unverified/capydotai",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "none"
+      }),
+      unverified_entry(%{
+        id: "neosigma",
+        label: "NeoSigma",
+        category: "unverified",
+        description:
+          "Tracked as an emerging agentic platform/research surface without a verified attach/runtime integration contract for ControlKeel yet.",
+        auth_mode: "none",
+        upstream_slug: "neosigma/agent-platform",
+        upstream_docs_url: "https://www.neosigma.ai",
         provider_bridge: %{supported: false, mode: "none", owner: "none"},
         mcp_mode: "none",
         skills_mode: "none"

@@ -140,6 +140,15 @@ defmodule ControlKeel.Findings.PlainEnglish do
       risk_if_ignored:
         "Unverified sources can introduce tampered code that bypasses normal package trust controls."
     },
+    "security.semgrep.leak_derived_dependency_source" => %{
+      title: "Leak-derived dependency source",
+      explanation:
+        "A dependency appears to reference a known leak-derived mirror or port of Claude Code. Leak-derived repos can carry unclear provenance and legal/security uncertainty.",
+      fix:
+        "Replace the source with an official upstream release or a verified clean-room package, then regenerate lockfiles and enforce provenance checks in CI.",
+      risk_if_ignored:
+        "Your build could ingest untrusted code, increasing malware, tampering, and compliance exposure in the supply chain."
+    },
     "security.weak_password_hash" => %{
       title: "Weak password storage",
       explanation:

@@ -55,6 +55,8 @@ Attachable and runtime integrations use the same governed MCP surface. Core rout
 | `gepa` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `deepagents` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `fastmcp` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
+| `conductor` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
+| `augment-intent` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
 | `codestral` | provider_only | provider template only | none | `none` | `inbound_only` | `ck_owned` / `none` | `provider-profile` |
 | `ollama-runtime` | provider_only | provider template only | none | `none` | `inbound_only` | `local` / `none` | `provider-profile` |
 | `vllm` | provider_only | provider template only | none | `none` | `inbound_only` | `ck_owned` / `none` | `provider-profile` |
@@ -66,10 +68,19 @@ Attachable and runtime integrations use the same governed MCP surface. Core rout
 | `codex-app-server` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
 | `cursor-agent` | alias | use `cursor` | same as `cursor` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
 | `copilot-cli` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
+| `copilot-web` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
+| `cursor-web` | alias | use `cursor` | same as `cursor` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
+| `conductor-web` | alias | use `conductor` | same as `conductor` | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
+| `kimi-cli` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
 | `t3code` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
 | `rlm-agent` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `slate` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `retune` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
+| `claw-code` | unverified | research only (community leak-era port) | none | `none` | `inbound_only` | `none` / `none` | n/a |
+| `claude-code-source-mirror` | unverified | research only (leak-derived mirror) | none | `none` | `inbound_only` | `none` / `none` | n/a |
+| `z-ai-cli` | unverified | research only (evolving ecosystem) | none | `none` | `inbound_only` | `none` / `none` | n/a |
+| `capydotai` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
+| `neosigma` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 
 The shipped `copilot` attach target is the repo-native path for GitHub Copilot, and the exported `copilot-plugin` bundle is the same companion path used for GitHub Copilot CLI and VS Code agent mode.
 

@@ -286,6 +286,23 @@ rules:
       controlkeel_rule_id: security.semgrep.untrusted_dependency_source
       controlkeel_severity: medium
 
+  - id: controlkeel.leak-derived-dependency-source
+    message: "Dependency references a known leak-derived Claude Code mirror/port repository. Treat as untrusted source and require clean-room/provenance review."
+    languages: [generic]
+    severity: ERROR
+    paths:
+      include:
+        - "**/package.json"
+        - "**/package-lock.json"
+        - "**/pnpm-lock.yaml"
+        - "**/yarn.lock"
+    pattern-regex: "(?i)(github\\.com[:/](openkedge/claude-code-source|vinee\w*/claude-code|instructkr/claw-code)|github:(openkedge/claude-code-source|vinee\w*/claude-code|instructkr/claw-code))"
+    metadata:
+      controlkeel_category: security
+      controlkeel_decision: block
+      controlkeel_rule_id: security.semgrep.leak_derived_dependency_source
+      controlkeel_severity: high
+
   # ─── Go ──────────────────────────────────────────────────────────────────────
 
   - id: controlkeel.go-sql-format
