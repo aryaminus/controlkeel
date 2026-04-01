@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.16 — 2026-04-01
+
+### What's changed
+
+- feat: add OpenCode integration support and enhance CLI configuration handling
+
 ## v0.1.15 — 2026-04-01
 
 ### What's changed
