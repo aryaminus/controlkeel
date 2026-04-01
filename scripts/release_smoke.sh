@@ -61,7 +61,6 @@ sys.stderr.buffer.write(completed.stderr)
 PY
 }
 
-run_command "$BINARY" help >/dev/null
 run_command "$BINARY" version >/dev/null
 
 python3 - "$BINARY" "$TMP_DIR" <<'PY'
