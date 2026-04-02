@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
   @moduledoc false
 
   alias ControlKeel.Mission
+  alias ControlKeel.ReviewBridge
 
   def call(arguments) when is_map(arguments) do
     with {:ok, review} <- resolve_review(arguments) do
@@ -15,6 +16,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
          "task_id" => review.task_id,
          "feedback_notes" => review.feedback_notes,
          "annotations" => review.annotations,
+         "agent_feedback" => ReviewBridge.agent_feedback(review),
          "responded_at" => review.responded_at,
          "browser_url" => ControlKeelWeb.Endpoint.url() <> "/reviews/#{review.id}"
        }}

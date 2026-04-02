@@ -20,9 +20,9 @@ ControlKeel keeps `controlkeel attach <host>` as the safest default because it i
 
 | Host | Direct install | Notes |
 | --- | --- | --- |
-| Claude Code | `claude --plugin-dir ./controlkeel/dist/claude-plugin` | Local plugin-dir install for the exported Claude plugin bundle. |
-| GitHub Copilot | `controlkeel plugin install copilot` | Installs the local Copilot plugin bundle and hooks into the project. |
-| Codex CLI | `controlkeel plugin install codex` | Installs the local Codex plugin bundle and marketplace manifest. |
+| Claude Code | `claude --plugin-dir ./controlkeel/dist/claude-plugin` | Local plugin-dir install for the exported Claude plugin bundle, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
+| GitHub Copilot | `controlkeel plugin install copilot` | Installs the local Copilot plugin bundle and hooks into the project, plus `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
+| Codex CLI | `controlkeel plugin install codex` | Installs the local Codex plugin bundle and marketplace manifest, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
 
 ## Attach-first native installs
 
@@ -73,3 +73,11 @@ Current release automation now supports:
 - conditional VS Code marketplace publication when `VSCE_PAT` is configured
 
 Hosts without a documented published package flow remain attach-first in the docs and `/skills`.
+
+## Remote and browser behavior
+
+CK also pulls a few practical host patterns from Plannotator for direct-install flows:
+
+- `CONTROLKEEL_REMOTE=1`: treat the current environment as remote or forwarded; CK will avoid trying to auto-open a browser and will return the review URL instead.
+- `CONTROLKEEL_BROWSER=/path/to/browser` or `BROWSER=...`: force a specific browser command for `controlkeel review plan open`.
+- `CONTROLKEEL_REVIEW_EMBED=vscode_webview`: prefer the VS Code companion embed path instead of an external browser.

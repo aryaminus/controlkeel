@@ -221,6 +221,20 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(agent_path))
     File.write!(agent_path, claude_agent_contents(skills))
 
+    review_command_path = Path.join(root, "commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(review_command_path))
+    File.write!(review_command_path, host_review_command_contents("Claude Code", "claude-code"))
+
+    annotate_command_path = Path.join(root, "commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Claude Code", "claude-code", ".claude/annotate.md")
+    )
+
+    last_command_path = Path.join(root, "commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Claude Code"))
+
     manifest_path = Path.join(root, ".claude-plugin/plugin.json")
     File.mkdir_p!(Path.dirname(manifest_path))
     File.write!(manifest_path, Jason.encode!(claude_plugin_manifest(), pretty: true) <> "\n")
@@ -261,6 +275,9 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => manifest_path, "kind" => "manifest"},
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => review_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => shell_hook_path, "kind" => "hook"},
         %{"path" => powershell_hook_path, "kind" => "hook"},
@@ -270,6 +287,7 @@ defmodule ControlKeel.Skills.Exporter do
       ],
       [
         "Run `claude --plugin-dir #{root}` to test the plugin locally.",
+        "The plugin also ships `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last` command prompts for explicit governed review passes.",
         "Use hooks/manual-settings.json when you prefer Claude's manual hook installation path.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
@@ -763,6 +781,23 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, copilot_plan_review_command_contents())
 
+    review_command_path = Path.join(root, "commands/controlkeel-review.md")
+    File.write!(review_command_path, host_review_command_contents("GitHub Copilot", "copilot"))
+
+    annotate_command_path = Path.join(root, "commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents(
+        "GitHub Copilot",
+        "copilot",
+        ".github/controlkeel-annotate.md"
+      )
+    )
+
+    last_command_path = Path.join(root, "commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("GitHub Copilot"))
+
     manifest_path = Path.join(root, "plugin.json")
     File.write!(manifest_path, Jason.encode!(copilot_plugin_manifest(), pretty: true) <> "\n")
 
@@ -789,6 +824,9 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => review_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => shell_hook_path, "kind" => "hook"},
         %{"path" => powershell_hook_path, "kind" => "hook"},
@@ -796,6 +834,7 @@ defmodule ControlKeel.Skills.Exporter do
       ],
       [
         "Use this bundle as a local Copilot / VS Code plugin or publish it through your plugin workflow.",
+        "The plugin ships `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last` command prompts alongside plan-mode interception.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
@@ -812,6 +851,23 @@ defmodule ControlKeel.Skills.Exporter do
     command_path = Path.join(root, ".github/commands/controlkeel-plan-review.md")
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, copilot_plan_review_command_contents())
+
+    review_command_path = Path.join(root, ".github/commands/controlkeel-review.md")
+    File.write!(review_command_path, host_review_command_contents("GitHub Copilot", "copilot"))
+
+    annotate_command_path = Path.join(root, ".github/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents(
+        "GitHub Copilot",
+        "copilot",
+        ".github/controlkeel-annotate.md"
+      )
+    )
+
+    last_command_path = Path.join(root, ".github/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("GitHub Copilot"))
 
     github_mcp = Path.join(root, ".github/mcp.json")
     File.write!(github_mcp, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
@@ -839,6 +895,9 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => review_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => github_mcp, "kind" => "mcp"},
         %{"path" => vscode_mcp, "kind" => "mcp"},
         %{"path" => vscode_extensions, "kind" => "settings"},
@@ -846,7 +905,7 @@ defmodule ControlKeel.Skills.Exporter do
       ],
       [
         "Copy the .github and .vscode folders into your repository root.",
-        "VS Code and Copilot can then discover the skills, custom agent, command prompt, and MCP server config from the repo."
+        "VS Code and Copilot can then discover the skills, custom agent, command prompts, and MCP server config from the repo."
       ]
     )
   end
@@ -2032,6 +2091,7 @@ defmodule ControlKeel.Skills.Exporter do
       "keywords" => ["governance", "mcp", "skills", "security"],
       "agents" => "./agents/",
       "skills" => "./skills/",
+      "commands" => "./commands/",
       "hooks" => "./hooks/hooks.json",
       "mcpServers" => "./.mcp.json"
     }
@@ -3348,6 +3408,45 @@ defmodule ControlKeel.Skills.Exporter do
     1. Read the last stored review id from your working notes or command output
     2. Run `controlkeel review plan open --id <review_id> --json`
     3. If still pending, run `controlkeel review plan wait --id <review_id> --json`
+    """
+  end
+
+  defp host_review_command_contents(host_label, submitted_by) do
+    """
+    # /controlkeel-review
+
+    Use this command in #{host_label} when the current work needs an explicit ControlKeel review pass.
+
+    Suggested flow:
+    1. Save the current summary or diff notes to a temporary markdown file in the repo.
+    2. Run `controlkeel review plan submit --title "#{host_label} review" --body-file <path> --submitted-by #{submitted_by} --json`
+    3. Open or wait on the returned review id before continuing risky work.
+    """
+  end
+
+  defp host_annotate_command_contents(host_label, submitted_by, suggested_path) do
+    """
+    # /controlkeel-annotate <file>
+
+    Use this command in #{host_label} when a specific file needs focused human notes.
+
+    Suggested flow:
+    1. Save the file path, risks, and requested annotation context to `#{suggested_path}`.
+    2. Run `controlkeel review plan submit --title "File annotation review" --body-file #{suggested_path} --submitted-by #{submitted_by} --json`
+    3. Wait for the response before applying risky edits.
+    """
+  end
+
+  defp host_last_command_contents(host_label) do
+    """
+    # /controlkeel-last
+
+    Use this command in #{host_label} to reopen the latest ControlKeel review you are tracking for the current task.
+
+    Suggested flow:
+    1. Read the last stored review id from your notes or prior command output.
+    2. Run `controlkeel review plan open --id <review_id> --json`
+    3. If the review is still pending, run `controlkeel review plan wait --id <review_id> --json`
     """
   end
 

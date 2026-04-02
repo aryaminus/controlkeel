@@ -276,9 +276,11 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
       previous_agent_id = System.get_env("CONTROLKEEL_AGENT_ID")
       previous_thread_id = System.get_env("CONTROLKEEL_THREAD_ID")
+      previous_remote = System.get_env("CONTROLKEEL_REMOTE")
 
       System.put_env("CONTROLKEEL_AGENT_ID", "opencode")
       System.put_env("CONTROLKEEL_THREAD_ID", "thread-123")
+      System.put_env("CONTROLKEEL_REMOTE", "1")
 
       on_exit(fn ->
         if previous_agent_id,
@@ -288,6 +290,10 @@ defmodule ControlKeel.CLI.NewCommandsTest do
         if previous_thread_id,
           do: System.put_env("CONTROLKEEL_THREAD_ID", previous_thread_id),
           else: System.delete_env("CONTROLKEEL_THREAD_ID")
+
+        if previous_remote,
+          do: System.put_env("CONTROLKEEL_REMOTE", previous_remote),
+          else: System.delete_env("CONTROLKEEL_REMOTE")
       end)
 
       assert {:ok, [submit_json]} =
@@ -315,6 +321,9 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
       open_payload = Jason.decode!(open_json)
       assert open_payload["browser_url"] =~ "/reviews/#{review_id}"
+      assert open_payload["open_target"] == "manual"
+      assert open_payload["opened"] == false
+      assert open_payload["remote"] == true
 
       assert {:ok, _respond_lines} =
                CLI.run_command(
@@ -338,6 +347,50 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
       wait_payload = Jason.decode!(wait_json)
       assert get_in(wait_payload, ["review", "status"]) == "approved"
+    end
+
+    test "denied review json includes strong agent feedback guidance", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      plan_path = Path.join(tmp_dir, "PLAN.md")
+      File.write!(plan_path, "# Plan\n\n1. Do the work")
+
+      assert {:ok, [submit_json]} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_submit,
+                   options: %{task_id: task.id, body_file: plan_path, json: true},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      review_id = get_in(Jason.decode!(submit_json), ["review", "id"])
+
+      assert {:ok, [_respond_json]} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_respond,
+                   options: %{decision: "denied", feedback_notes: "Add tests first", json: true},
+                   args: [Integer.to_string(review_id)]
+                 },
+                 tmp_dir
+               )
+
+      assert {:error, wait_json} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_wait,
+                   options: %{id: review_id, timeout: 1, json: true},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      wait_payload = Jason.decode!(wait_json)
+      assert get_in(wait_payload, ["review", "status"]) == "denied"
+      assert wait_payload["agent_feedback"] =~ "YOUR PLAN WAS NOT APPROVED"
+      assert wait_payload["agent_feedback"] =~ "Add tests first"
     end
   end
 

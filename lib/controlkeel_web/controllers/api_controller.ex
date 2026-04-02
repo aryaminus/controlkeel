@@ -1382,6 +1382,7 @@ defmodule ControlKeelWeb.ApiController do
       submission_body: review.submission_body,
       annotations: review.annotations,
       feedback_notes: review.feedback_notes,
+      agent_feedback: ControlKeel.ReviewBridge.agent_feedback(review),
       submitted_by: review.submitted_by,
       reviewed_by: review.reviewed_by,
       previous_review_id: review.previous_review_id,

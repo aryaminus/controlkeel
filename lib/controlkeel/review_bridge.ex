@@ -15,13 +15,18 @@ defmodule ControlKeel.ReviewBridge do
       embed = Keyword.get(opts, :browser_embed, browser_embed())
       open_target = open_target(embed, remote_mode?())
 
+      open_result =
+        maybe_open_browser(browser_url(review), open_target, Keyword.get(opts, :auto_open, true))
+
       {:ok,
        %{
          review: review,
          url: browser_url(review),
          browser_embed: embed,
          remote: remote_mode?(),
-         open_target: open_target
+         open_target: open_target,
+         opened: open_result.opened,
+         open_error: open_result.open_error
        }}
     end
   end
@@ -39,6 +44,40 @@ defmodule ControlKeel.ReviewBridge do
       System.get_env("CONTROLKEEL_BROWSER_EMBED") ||
       "external"
   end
+
+  def browser_command do
+    System.get_env("CONTROLKEEL_BROWSER") ||
+      System.get_env("BROWSER")
+  end
+
+  def agent_feedback(%Review{status: "denied"} = review) do
+    plan_file_rule =
+      case get_in(review.metadata || %{}, ["body_file"]) do
+        path when is_binary(path) and path != "" ->
+          "- Your plan is saved at: #{path}\n  Edit this file to make targeted changes before resubmitting.\n"
+
+        _ ->
+          ""
+      end
+
+    feedback = review.feedback_notes || "Plan changes requested."
+
+    """
+    YOUR PLAN WAS NOT APPROVED.
+
+    You MUST revise the plan to address ALL feedback below before submitting it again.
+
+    Rules:
+    #{plan_file_rule}- Do not resubmit the same plan unchanged.
+    - Keep the plan title stable unless a human explicitly asks you to rename it.
+    - Do not begin implementation until the review is approved.
+
+    #{feedback}
+    """
+    |> String.trim()
+  end
+
+  def agent_feedback(_review), do: nil
 
   def remote_mode? do
     System.get_env("CONTROLKEEL_REMOTE") in ["1", "true", "TRUE"]
@@ -76,4 +115,91 @@ defmodule ControlKeel.ReviewBridge do
   defp open_target(_embed, true), do: "manual"
   defp open_target("vscode_webview", false), do: "vscode_webview"
   defp open_target(_embed, false), do: "external_browser"
+
+  defp maybe_open_browser(_url, _open_target, false), do: %{opened: false, open_error: nil}
+  defp maybe_open_browser(_url, "manual", _auto_open), do: %{opened: false, open_error: nil}
+
+  defp maybe_open_browser(_url, "vscode_webview", _auto_open),
+    do: %{opened: false, open_error: nil}
+
+  defp maybe_open_browser(url, "external_browser", _auto_open) do
+    case open_browser(url) do
+      :ok -> %{opened: true, open_error: nil}
+      {:error, reason} -> %{opened: false, open_error: reason}
+    end
+  end
+
+  defp open_browser(url) do
+    cond do
+      browser = present_browser_command() ->
+        open_with_configured_browser(browser, url)
+
+      wsl?() ->
+        run_browser_command("cmd.exe", ["/c", "start", "", url])
+
+      match?({:win32, _}, :os.type()) ->
+        run_browser_command("cmd", ["/c", "start", "", url])
+
+      match?({:unix, :darwin}, :os.type()) ->
+        run_browser_command("open", [url])
+
+      true ->
+        run_browser_command("xdg-open", [url])
+    end
+  end
+
+  defp open_with_configured_browser(browser, url) do
+    cond do
+      match?({:unix, :darwin}, :os.type()) and String.contains?(browser, "/") and
+          not String.ends_with?(browser, ".app") ->
+        run_browser_command(browser, [url], resolve_executable?: false)
+
+      match?({:unix, :darwin}, :os.type()) ->
+        run_browser_command("open", ["-a", browser, url])
+
+      wsl?() ->
+        run_browser_command("cmd.exe", ["/c", "start", "", browser, url])
+
+      match?({:win32, _}, :os.type()) ->
+        run_browser_command("cmd", ["/c", "start", "", browser, url])
+
+      true ->
+        run_browser_command(browser, [url], resolve_executable?: false)
+    end
+  end
+
+  defp run_browser_command(command, args, opts \\ []) do
+    executable =
+      if Keyword.get(opts, :resolve_executable?, true) do
+        System.find_executable(command) || command
+      else
+        command
+      end
+
+    case System.cmd(executable, args, stderr_to_stdout: true) do
+      {_output, 0} ->
+        :ok
+
+      {output, status} ->
+        {:error, "browser open failed with exit #{status}: #{String.trim(output)}"}
+    end
+  rescue
+    error ->
+      {:error, Exception.message(error)}
+  end
+
+  defp wsl? do
+    match?({:unix, :linux}, :os.type()) and
+      case File.read("/proc/version") do
+        {:ok, content} -> String.contains?(String.downcase(content), "microsoft")
+        _ -> false
+      end
+  end
+
+  defp present_browser_command do
+    case browser_command() do
+      value when is_binary(value) and value != "" -> value
+      _ -> nil
+    end
+  end
 end

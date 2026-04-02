@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewFeedback do
   @moduledoc false
 
   alias ControlKeel.Mission
+  alias ControlKeel.ReviewBridge
 
   def call(arguments) when is_map(arguments) do
     with {:ok, review_id} <- required_integer(arguments, "review_id"),
@@ -18,6 +19,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewFeedback do
          "review_id" => updated.id,
          "status" => updated.status,
          "feedback_notes" => updated.feedback_notes,
+         "agent_feedback" => ReviewBridge.agent_feedback(updated),
          "responded_at" => updated.responded_at,
          "browser_url" => ControlKeelWeb.Endpoint.url() <> "/reviews/#{updated.id}"
        }}

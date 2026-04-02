@@ -235,6 +235,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(claude_plan.output_dir, "hooks/hooks.json"))
     assert File.exists?(Path.join(claude_plan.output_dir, "hooks/controlkeel-review.sh"))
     assert File.exists?(Path.join(claude_plan.output_dir, "hooks/controlkeel-review.ps1"))
+    assert File.exists?(Path.join(claude_plan.output_dir, "commands/controlkeel-review.md"))
+
+    assert File.exists?(Path.join(claude_plan.output_dir, "commands/controlkeel-annotate.md"))
+
+    assert File.exists?(Path.join(claude_plan.output_dir, "commands/controlkeel-last.md"))
 
     assert File.read!(Path.join(claude_plan.output_dir, "CONTROLKEEL_INSTALL.md")) =~
              "@aryaminus/controlkeel"
@@ -317,6 +322,12 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(copilot_plan.output_dir, "plugin.json"))
     assert File.exists?(Path.join(copilot_plan.output_dir, "hooks.json"))
     assert File.exists?(Path.join(copilot_plan.output_dir, ".mcp.hosted.json"))
+    assert File.exists?(Path.join(copilot_plan.output_dir, "commands/controlkeel-plan-review.md"))
+    assert File.exists?(Path.join(copilot_plan.output_dir, "commands/controlkeel-review.md"))
+
+    assert File.exists?(Path.join(copilot_plan.output_dir, "commands/controlkeel-annotate.md"))
+
+    assert File.exists?(Path.join(copilot_plan.output_dir, "commands/controlkeel-last.md"))
 
     assert {:ok, droid_plan} = Skills.export("droid-bundle", tmp_dir, scope: "export")
 
@@ -453,6 +464,12 @@ defmodule ControlKeel.SkillsTest do
     assert github_install.destination == Path.join(tmp_dir, ".github/skills")
     assert File.exists?(Path.join(tmp_dir, ".github/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".github/agents/controlkeel-operator.agent.md"))
+    assert File.exists?(Path.join(tmp_dir, ".github/commands/controlkeel-plan-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".github/commands/controlkeel-review.md"))
+
+    assert File.exists?(Path.join(tmp_dir, ".github/commands/controlkeel-annotate.md"))
+
+    assert File.exists?(Path.join(tmp_dir, ".github/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".github/mcp.json"))
     assert File.exists?(Path.join(tmp_dir, ".vscode/mcp.json"))
 

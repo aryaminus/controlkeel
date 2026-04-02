@@ -1096,7 +1096,9 @@ defmodule ControlKeel.CLI do
           "browser_url" => review_open.url,
           "browser_embed" => review_open.browser_embed,
           "open_target" => review_open.open_target,
-          "remote" => review_open.remote
+          "remote" => review_open.remote,
+          "opened" => review_open.opened,
+          "open_error" => review_open.open_error
         })
 
       if options[:json] do
@@ -1109,7 +1111,10 @@ defmodule ControlKeel.CLI do
            "Type: #{review.review_type}",
            "Browser URL: #{review_open.url}",
            "Browser embed: #{review_open.browser_embed}"
-         ]}
+         ] ++
+           maybe_cli_line("Open target", review_open.open_target) ++
+           maybe_cli_line("Opened browser", to_string(review_open.opened)) ++
+           maybe_cli_line("Open error", review_open.open_error)}
       end
     else
       {:error, :not_found} ->
@@ -3392,7 +3397,8 @@ defmodule ControlKeel.CLI do
        "submission_body" => submission_body,
        "submitted_by" => options[:submitted_by] || runtime_context["agent_id"] || "cli",
        "metadata" => %{
-         "runtime_context" => runtime_context
+         "runtime_context" => runtime_context,
+         "body_file" => options[:body_file]
        }
      }}
   end
@@ -3571,11 +3577,19 @@ defmodule ControlKeel.CLI do
         "task_id" => review.task_id,
         "feedback_notes" => review.feedback_notes,
         "submitted_by" => review.submitted_by,
-        "reviewed_by" => review.reviewed_by
+        "reviewed_by" => review.reviewed_by,
+        "annotations" => review.annotations
       }
     }
+    |> maybe_put_agent_feedback(review)
     |> Map.merge(extra)
   end
+
+  defp maybe_put_agent_feedback(payload, %{status: "denied"} = review) do
+    Map.put(payload, "agent_feedback", ReviewBridge.agent_feedback(review))
+  end
+
+  defp maybe_put_agent_feedback(payload, _review), do: payload
 
   defp cli_error(prefix, reason, options, extra_payload \\ %{}) do
     message = "#{prefix}: #{format_cli_error(reason)}"

@@ -317,6 +317,37 @@ defmodule ControlKeel.MCP.ProtocolTest do
       })
 
     assert get_in(feedback_response, ["result", "structuredContent", "status"]) == "approved"
+
+    denied_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 80,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_feedback",
+          "arguments" => %{
+            "review_id" => review_id,
+            "decision" => "denied",
+            "feedback_notes" => "Revise the plan"
+          }
+        }
+      })
+
+    assert get_in(denied_response, ["result", "structuredContent", "status"]) == "denied"
+
+    status_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 81,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_status",
+          "arguments" => %{"review_id" => review_id}
+        }
+      })
+
+    assert get_in(status_response, ["result", "structuredContent", "agent_feedback"]) =~
+             "YOUR PLAN WAS NOT APPROVED"
   end
 
   test "tools/call ck_budget estimates and commits invocation cost" do

@@ -171,6 +171,12 @@ Where the host supports it, CK now publishes or packages a direct-install surfac
 - Copilot: `controlkeel plugin install copilot`
 - Codex CLI: `controlkeel plugin install codex`
 
+Claude, Copilot, and Codex plugin bundles now all ship explicit review commands as well:
+
+- `/controlkeel-review`
+- `/controlkeel-annotate`
+- `/controlkeel-last`
+
 For the full host-by-host truth table, see [docs/direct-host-installs.md](docs/direct-host-installs.md).
 
 ### Attach targets (MCP + companion install)
