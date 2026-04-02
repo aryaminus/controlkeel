@@ -127,4 +127,25 @@ defmodule ControlKeel.AgentExecutionTest do
     assert result["mode"] == "embedded"
     assert result["metadata"]["execution_sandbox"] == "local"
   end
+
+  test "execution is blocked while a submitted plan review is pending", %{tmp_dir: tmp_dir} do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    assert {:ok, review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "submission_body" => "Pending approval"
+             })
+
+    assert {:error, {:review_pending, details}} =
+             AgentExecution.run_task(task.id,
+               project_root: tmp_dir,
+               agent: "cursor",
+               mode: "handoff"
+             )
+
+    assert details[:review_id] == review.id
+    assert details[:review_status] == "pending"
+  end
 end

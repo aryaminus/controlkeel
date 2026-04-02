@@ -14,6 +14,9 @@ defmodule ControlKeel.ProtocolAccess do
     validate:run
     finding:write
     budget:write
+    review:read
+    review:write
+    review:respond
     route:read
     skills:read
     delegate:run

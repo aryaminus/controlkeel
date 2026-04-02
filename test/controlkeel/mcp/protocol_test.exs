@@ -49,6 +49,9 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_validate",
              "ck_context",
              "ck_finding",
+             "ck_review_submit",
+             "ck_review_status",
+             "ck_review_feedback",
              "ck_budget",
              "ck_route",
              "ck_delegate",
@@ -262,6 +265,58 @@ defmodule ControlKeel.MCP.ProtocolTest do
            } = response
 
     assert Mission.get_finding!(finding_id).status == "escalated"
+  end
+
+  test "review tools submit, inspect, and respond to plan reviews" do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    submit_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 77,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_submit",
+          "arguments" => %{
+            "task_id" => task.id,
+            "submission_body" => "Plan from MCP"
+          }
+        }
+      })
+
+    review_id = get_in(submit_response, ["result", "structuredContent", "review_id"])
+    assert is_integer(review_id)
+
+    status_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 78,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_status",
+          "arguments" => %{"review_id" => review_id}
+        }
+      })
+
+    assert get_in(status_response, ["result", "structuredContent", "status"]) == "pending"
+
+    feedback_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 79,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_feedback",
+          "arguments" => %{
+            "review_id" => review_id,
+            "decision" => "approved",
+            "feedback_notes" => "Proceed"
+          }
+        }
+      })
+
+    assert get_in(feedback_response, ["result", "structuredContent", "status"]) == "approved"
   end
 
   test "tools/call ck_budget estimates and commits invocation cost" do

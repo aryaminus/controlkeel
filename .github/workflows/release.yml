@@ -232,6 +232,32 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm publish --access public
+      - uses: actions/download-artifact@v8
+        if: steps.npm_gate.outputs.enabled == 'true'
+        with:
+          name: release-candidate-dist
+          path: dist
+      - uses: erlef/setup-beam@v1.23.0
+        if: steps.npm_gate.outputs.enabled == 'true'
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "27.3.4.3"
+      - name: Publish OpenCode adapter package
+        if: steps.npm_gate.outputs.enabled == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          mix deps.get
+          mix run scripts/export_release_bundles.exs
+          npm publish controlkeel/dist/opencode-native --access public
+      - name: Publish Pi adapter package
+        if: steps.npm_gate.outputs.enabled == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          mix deps.get
+          mix run scripts/export_release_bundles.exs
+          npm publish controlkeel/dist/pi-native --access public
 
   publish-github-packages:
     needs: release
@@ -251,3 +277,34 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm publish --registry=https://npm.pkg.github.com
+
+  publish-vscode-marketplace:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-candidate-dist
+          path: dist
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check VS Code marketplace publish configuration
+        id: vscode_gate
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "${VSCE_PAT}" ]; then
+            echo "VSCE_PAT is not configured; skipping VS Code marketplace publish."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish VS Code companion
+        if: steps.vscode_gate.outputs.enabled == 'true'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          npx --yes @vscode/vsce publish --packagePath dist/controlkeel-vscode-companion.vsix -p "${VSCE_PAT}"

@@ -34,6 +34,9 @@ defmodule ControlKeel.AgentExecution do
     "validate:run",
     "finding:write",
     "budget:write",
+    "review:read",
+    "review:write",
+    "review:respond",
     "route:read",
     "skills:read",
     "delegate:run"
@@ -94,6 +97,7 @@ defmodule ControlKeel.AgentExecution do
 
     result =
       with %{} = task <- Mission.get_task(task_id),
+           :ok <- ensure_review_gate(task),
            %{} = session <- Mission.get_session_context(task.session_id),
            {:ok, integration} <- resolve_integration(task, project_root, opts),
            {:ok, execution_mode} <- resolve_execution_mode(integration, opts),
@@ -271,6 +275,22 @@ defmodule ControlKeel.AgentExecution do
 
       "runtime" ->
         {:ok, "runtime"}
+    end
+  end
+
+  defp ensure_review_gate(%{id: task_id} = task) do
+    if Mission.execution_ready?(task) do
+      :ok
+    else
+      review = Mission.latest_review_for_task(task_id, "plan")
+
+      {:error,
+       {:review_pending,
+        %{
+          task_id: task_id,
+          review_id: review && review.id,
+          review_status: review && review.status
+        }}}
     end
   end
 

@@ -3,6 +3,8 @@
 This is the current ControlKeel distribution and attachment matrix.
 
 **Canonical inventory:** [support-matrix.md](support-matrix.md) lists every `AgentIntegration.catalog/0` row, all MCP runtime tools, and `priv/skills/` bundles in one place. Use it when aligning docs with code.
+For the broader April 2026 host-surface rollout, see [host-surface-parity.md](host-surface-parity.md).
+For direct plugin, npm, VSIX, and extension-link install paths, see [direct-host-installs.md](direct-host-installs.md).
 
 ## Install ControlKeel
 
@@ -143,19 +145,27 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 
 | Agent | Attach command | Native companion | Exportable bundles |
 |---|---|---|---|
-| Cline | `controlkeel attach cline` | Writes `.cline/skills`, `.clinerules`, `AGENTS.md`, and updates Cline MCP settings | `cline-native` |
-| Cursor | `controlkeel attach cursor` | Writes `.agents/skills`, `.cursor/rules`, and `.cursor/mcp.json` | `cursor-native`, `instructions-only` |
-| Windsurf | `controlkeel attach windsurf` | Writes `.agents/skills`, `.windsurf/rules`, and `.windsurf/mcp.json` | `windsurf-native`, `instructions-only` |
-| Continue | `controlkeel attach continue` | Writes `.continue/prompts`, `.continue/mcp.json`, and governed guidance bundle | `continue-native`, `instructions-only` |
+| Cline | `controlkeel attach cline` | Writes `.cline/skills`, `.clinerules`, `.cline/commands`, `.cline/hooks`, `AGENTS.md`, and updates Cline MCP settings | `cline-native` |
+| Cursor | `controlkeel attach cursor` | Writes `.agents/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, and `.cursor/mcp.json` | `cursor-native`, `instructions-only` |
+| Windsurf | `controlkeel attach windsurf` | Writes `.agents/skills`, `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks`, and `.windsurf/mcp.json` | `windsurf-native`, `instructions-only` |
+| Continue | `controlkeel attach continue` | Writes `.continue/prompts`, `.continue/commands`, `.continue/mcpServers/controlkeel.yaml`, `.continue/mcp.json`, and governed guidance bundle | `continue-native`, `instructions-only` |
 | Roo Code | `controlkeel attach roo-code` | Writes `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, `.roomodes`, `AGENTS.md`, and `.mcp.json` | `roo-native` |
-| Goose | `controlkeel attach goose` | Writes `.goosehints`, `goose/workflow_recipes`, `AGENTS.md`, and registers a Goose MCP extension in `~/.config/goose/config.yaml` | `goose-native` |
+| Goose | `controlkeel attach goose` | Writes `.goosehints`, `goose/workflow_recipes`, `goose/commands`, `AGENTS.md`, and registers a Goose MCP extension in `~/.config/goose/config.yaml` | `goose-native` |
 | VS Code | `controlkeel attach vscode` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 | GitHub Copilot / Copilot CLI | `controlkeel attach copilot` | Writes `.github/skills`, `.github/agents`, `.github/mcp.json`, `.vscode/mcp.json` | `github-repo`, `copilot-plugin` |
 | OpenCode | `controlkeel attach opencode` | Writes `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json`, `AGENTS.md` | `opencode-native`, `instructions-only` |
 | mcptocli | Manual setup | Wraps CK MCP as CLI; see [mcptocli integration](#mcptocli-cli-integration) | N/A |
-| Kiro | `controlkeel attach kiro` | Writes `.kiro/hooks`, `.kiro/steering`, `.kiro/mcp.json`, `AGENTS.md` | `kiro-native`, `instructions-only` |
-| Amp | `controlkeel attach amp` | Writes `.amp/plugins/controlkeel-governance.ts`, `.mcp.json`, `AGENTS.md` | `amp-native`, `instructions-only` |
-| Gemini CLI | `controlkeel attach gemini-cli` | Writes `gemini-extension.json`, `.gemini/commands`, `skills/`, `GEMINI.md` | `gemini-cli-native`, `instructions-only` |
+| Kiro | `controlkeel attach kiro` | Writes `.kiro/hooks`, `.kiro/steering`, `.kiro/settings`, `.kiro/commands`, `.kiro/mcp.json`, `AGENTS.md` | `kiro-native`, `instructions-only` |
+| Amp | `controlkeel attach amp` | Writes `.amp/plugins/controlkeel-governance.ts`, `.amp/commands`, `.amp/package.json`, `.mcp.json`, `AGENTS.md` | `amp-native`, `instructions-only` |
+| Gemini CLI | `controlkeel attach gemini-cli` | Writes `gemini-extension.json`, `.gemini/commands`, `skills/`, `GEMINI.md`, and extension README | `gemini-cli-native`, `instructions-only` |
+
+## Command-driven integrations
+
+These hosts do not have a strong official native plugin surface comparable to Claude/OpenCode/Amp, so CK keeps them truthful and command-driven.
+
+| Agent | Attach command | Native companion |
+|---|---|---|
+| Aider | `controlkeel attach aider` | Writes `AIDER.md`, `.aider.conf.yml`, `.aider/commands/controlkeel-review.md`, and shared repo instructions |
 
 ## mcptocli CLI integration
 

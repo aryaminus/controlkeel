@@ -3,7 +3,7 @@ defmodule ControlKeel.Mission.Task do
   import Ecto.Changeset
 
   alias ControlKeel.Memory.Record
-  alias ControlKeel.Mission.{ProofBundle, Session, TaskCheckpoint}
+  alias ControlKeel.Mission.{ProofBundle, Review, Session, TaskCheckpoint}
   alias ControlKeel.Platform.{TaskCheckResult, TaskEdge, TaskRun}
 
   schema "tasks" do
@@ -18,6 +18,7 @@ defmodule ControlKeel.Mission.Task do
 
     belongs_to :session, Session
     has_many :proof_bundles, ProofBundle
+    has_many :reviews, Review
     has_many :task_checkpoints, TaskCheckpoint
     has_many :memory_records, Record
     has_many :outgoing_edges, TaskEdge, foreign_key: :from_task_id

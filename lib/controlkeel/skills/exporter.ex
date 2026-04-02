@@ -64,6 +64,23 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(agent_path))
     File.write!(agent_path, codex_agent_contents(project_root, skills, opts))
 
+    diff_command_path = Path.join(root, ".codex/commands/controlkeel-diff-review.md")
+    File.mkdir_p!(Path.dirname(diff_command_path))
+    File.write!(diff_command_path, codex_diff_review_command_contents())
+
+    completion_command_path = Path.join(root, ".codex/commands/controlkeel-completion-review.md")
+    File.mkdir_p!(Path.dirname(completion_command_path))
+    File.write!(completion_command_path, codex_completion_review_command_contents())
+
+    review_command_path = Path.join(root, ".codex/commands/controlkeel-review.md")
+    File.write!(review_command_path, codex_review_command_contents())
+
+    annotate_command_path = Path.join(root, ".codex/commands/controlkeel-annotate.md")
+    File.write!(annotate_command_path, codex_annotate_command_contents())
+
+    last_command_path = Path.join(root, ".codex/commands/controlkeel-last.md")
+    File.write!(last_command_path, codex_last_command_contents())
+
     mcp_path = Path.join(root, ".mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
 
@@ -77,12 +94,18 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => diff_command_path, "kind" => "command"},
+        %{"path" => completion_command_path, "kind" => "command"},
+        %{"path" => review_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
       [
         "Copy .agents/skills into your repo or user skill folder.",
         "Copy .codex/agents/controlkeel-operator.toml into your Codex agents directory if you want a preconfigured operator.",
+        "Use .codex/commands/ for browser-reviewed review, annotate, last, diff, and completion approval flows.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
@@ -95,6 +118,23 @@ defmodule ControlKeel.Skills.Exporter do
     agent_path = Path.join(root, "agents/controlkeel-operator.md")
     File.mkdir_p!(Path.dirname(agent_path))
     File.write!(agent_path, copilot_agent_contents(skills))
+
+    diff_command_path = Path.join(root, "commands/controlkeel-diff-review.md")
+    File.mkdir_p!(Path.dirname(diff_command_path))
+    File.write!(diff_command_path, codex_diff_review_command_contents())
+
+    completion_command_path = Path.join(root, "commands/controlkeel-completion-review.md")
+    File.mkdir_p!(Path.dirname(completion_command_path))
+    File.write!(completion_command_path, codex_completion_review_command_contents())
+
+    review_command_path = Path.join(root, "commands/controlkeel-review.md")
+    File.write!(review_command_path, codex_review_command_contents())
+
+    annotate_command_path = Path.join(root, "commands/controlkeel-annotate.md")
+    File.write!(annotate_command_path, codex_annotate_command_contents())
+
+    last_command_path = Path.join(root, "commands/controlkeel-last.md")
+    File.write!(last_command_path, codex_last_command_contents())
 
     manifest_path = Path.join(root, ".codex-plugin/plugin.json")
     File.mkdir_p!(Path.dirname(manifest_path))
@@ -125,6 +165,11 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => manifest_path, "kind" => "manifest"},
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => diff_command_path, "kind" => "command"},
+        %{"path" => completion_command_path, "kind" => "command"},
+        %{"path" => review_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => app_path, "kind" => "app"},
         %{"path" => mcp_path, "kind" => "mcp"},
@@ -182,7 +227,21 @@ defmodule ControlKeel.Skills.Exporter do
 
     hooks_path = Path.join(root, "hooks/hooks.json")
     File.mkdir_p!(Path.dirname(hooks_path))
-    File.write!(hooks_path, Jason.encode!(empty_hooks_manifest(), pretty: true) <> "\n")
+
+    File.write!(
+      hooks_path,
+      Jason.encode!(claude_hooks_manifest(), pretty: true) <> "\n"
+    )
+
+    shell_hook_path = Path.join(root, "hooks/controlkeel-review.sh")
+    File.write!(shell_hook_path, review_bridge_shell_contents("claude-code"))
+    File.chmod!(shell_hook_path, 0o755)
+
+    powershell_hook_path = Path.join(root, "hooks/controlkeel-review.ps1")
+    File.write!(powershell_hook_path, review_bridge_powershell_contents("claude-code"))
+
+    manual_hook_path = Path.join(root, "hooks/manual-settings.json")
+    File.write!(manual_hook_path, Jason.encode!(claude_manual_settings(), pretty: true) <> "\n")
 
     settings_path = Path.join(root, "settings.json")
 
@@ -203,11 +262,15 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => hooks_path, "kind" => "hooks"},
+        %{"path" => shell_hook_path, "kind" => "hook"},
+        %{"path" => powershell_hook_path, "kind" => "hook"},
+        %{"path" => manual_hook_path, "kind" => "settings"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => settings_path, "kind" => "settings"}
       ],
       [
         "Run `claude --plugin-dir #{root}` to test the plugin locally.",
+        "Use hooks/manual-settings.json when you prefer Claude's manual hook installation path.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
@@ -229,6 +292,23 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(workflow_path))
     File.write!(workflow_path, cline_workflow_contents())
 
+    command_path = Path.join(root, ".cline/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, cline_command_contents())
+
+    submit_command_path = Path.join(root, ".cline/commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, cline_submit_plan_command_contents())
+
+    pretool_hook_path = Path.join(root, ".cline/hooks/PreToolUse/controlkeel-review.sh")
+    File.mkdir_p!(Path.dirname(pretool_hook_path))
+    File.write!(pretool_hook_path, review_bridge_shell_contents("cline"))
+    File.chmod!(pretool_hook_path, 0o755)
+
+    taskstart_hook_path = Path.join(root, ".cline/hooks/TaskStart/controlkeel-context.sh")
+    File.mkdir_p!(Path.dirname(taskstart_hook_path))
+    File.write!(taskstart_hook_path, cline_taskstart_hook_contents())
+    File.chmod!(taskstart_hook_path, 0o755)
+
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, instructions_only_contents("cline", project_root, opts))
 
@@ -241,11 +321,15 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => workflow_path, "kind" => "workflow"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => pretool_hook_path, "kind" => "hook"},
+        %{"path" => taskstart_hook_path, "kind" => "hook"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
         "Copy `.cline/skills` into your project or `~/.cline/skills`.",
-        "Keep `.clinerules/` in the repo so Cline loads ControlKeel rules and workflows for the governed workspace.",
+        "Keep `.clinerules/`, `.cline/commands`, and `.cline/hooks` in the repo so Cline loads ControlKeel rules, workflows, commands, and hooks for the governed workspace.",
         "Merge `.cline/data/settings/cline_mcp_settings.json` into Cline MCP settings (`~/.cline/data/settings/cline_mcp_settings.json` or `$CLINE_DIR/data/settings/cline_mcp_settings.json`)."
       ]
     )
@@ -258,6 +342,17 @@ defmodule ControlKeel.Skills.Exporter do
     rule_path = Path.join(root, ".cursor/rules/controlkeel.mdc")
     File.mkdir_p!(Path.dirname(rule_path))
     File.write!(rule_path, cursor_rule_contents())
+
+    command_path = Path.join(root, ".cursor/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, cursor_command_contents())
+
+    submit_command_path = Path.join(root, ".cursor/commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, cursor_submit_plan_command_contents())
+
+    background_agent_path = Path.join(root, ".cursor/background-agents/controlkeel.md")
+    File.mkdir_p!(Path.dirname(background_agent_path))
+    File.write!(background_agent_path, cursor_background_agent_contents())
 
     mcp_path = Path.join(root, ".cursor/mcp.json")
     File.mkdir_p!(Path.dirname(mcp_path))
@@ -273,11 +368,14 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => rule_path, "kind" => "rules"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => background_agent_path, "kind" => "workflow"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.cursor/rules` in the repo so Cursor loads ControlKeel guidance.",
+        "Keep `.cursor/rules`, `.cursor/commands`, and `.cursor/background-agents` in the repo so Cursor loads ControlKeel guidance, review commands, and background-agent handoff notes.",
         "Use .cursor/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
@@ -290,6 +388,22 @@ defmodule ControlKeel.Skills.Exporter do
     rule_path = Path.join(root, ".windsurf/rules/controlkeel.md")
     File.mkdir_p!(Path.dirname(rule_path))
     File.write!(rule_path, windsurf_rule_contents())
+
+    command_path = Path.join(root, ".windsurf/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, windsurf_command_contents())
+
+    workflow_path = Path.join(root, ".windsurf/workflows/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(workflow_path))
+    File.write!(workflow_path, windsurf_workflow_contents())
+
+    hook_path = Path.join(root, ".windsurf/hooks/controlkeel-review.json")
+    File.mkdir_p!(Path.dirname(hook_path))
+    File.write!(hook_path, Jason.encode!(windsurf_hook_manifest(), pretty: true) <> "\n")
+
+    hook_script_path = Path.join(root, ".windsurf/hooks/controlkeel-review.sh")
+    File.write!(hook_script_path, review_bridge_shell_contents("windsurf"))
+    File.chmod!(hook_script_path, 0o755)
 
     mcp_path = Path.join(root, ".windsurf/mcp.json")
     File.mkdir_p!(Path.dirname(mcp_path))
@@ -305,11 +419,15 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => rule_path, "kind" => "rules"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => workflow_path, "kind" => "workflow"},
+        %{"path" => hook_path, "kind" => "hook"},
+        %{"path" => hook_script_path, "kind" => "hook"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.windsurf/rules` in the repo so Windsurf loads ControlKeel guidance.",
+        "Keep `.windsurf/rules`, `.windsurf/workflows`, and `.windsurf/hooks` in the repo so Windsurf loads ControlKeel guidance, Cascade workflows, and hook-native review interception.",
         "Use .windsurf/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
@@ -323,8 +441,28 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(prompt_path))
     File.write!(prompt_path, continue_prompt_contents())
 
+    plan_prompt_path = Path.join(root, ".continue/prompts/controlkeel-plan.md")
+    File.write!(plan_prompt_path, continue_plan_prompt_contents())
+
+    review_prompt_path = Path.join(root, ".continue/prompts/controlkeel-review.md")
+    File.write!(review_prompt_path, continue_review_prompt_contents())
+
+    headless_prompt_path = Path.join(root, ".continue/prompts/controlkeel-headless.md")
+    File.write!(headless_prompt_path, continue_headless_prompt_contents())
+
+    command_path = Path.join(root, ".continue/commands/controlkeel-review.prompt")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, continue_command_contents())
+
+    submit_command_path = Path.join(root, ".continue/commands/controlkeel-submit-plan.prompt")
+    File.write!(submit_command_path, continue_submit_plan_command_contents())
+
     config_path = Path.join(root, ".continue/mcp.json")
     File.write!(config_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    mcp_server_path = Path.join(root, ".continue/mcpServers/controlkeel.yaml")
+    File.mkdir_p!(Path.dirname(mcp_server_path))
+    File.write!(mcp_server_path, continue_mcp_server_contents(project_root, opts))
 
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, instructions_only_contents("continue", project_root, opts))
@@ -336,12 +474,82 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => prompt_path, "kind" => "instructions"},
+        %{"path" => plan_prompt_path, "kind" => "instructions"},
+        %{"path" => review_prompt_path, "kind" => "instructions"},
+        %{"path" => headless_prompt_path, "kind" => "instructions"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
         %{"path" => config_path, "kind" => "mcp"},
+        %{"path" => mcp_server_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.continue/skills` and `.continue/prompts/controlkeel.md` into the repo for Continue-native guidance.",
-        "Use .continue/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+        "Copy `.continue/skills`, `.continue/prompts`, and `.continue/commands` into the repo for Continue-native plan, review, and headless guidance.",
+        "Use `.continue/mcpServers/controlkeel.yaml` for MCP registration or `.continue/mcp.json` as the portable fallback."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "pi-native"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, ".agents/skills")
+    write_skill_tree(skills, skill_root)
+
+    command_path = Path.join(root, ".pi/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, pi_command_contents())
+
+    submit_command_path = Path.join(root, ".pi/commands/controlkeel-submit-plan.md")
+    File.mkdir_p!(Path.dirname(submit_command_path))
+    File.write!(submit_command_path, pi_submit_plan_command_contents())
+
+    phase_config_path = Path.join(root, ".pi/controlkeel.json")
+    File.mkdir_p!(Path.dirname(phase_config_path))
+
+    File.write!(
+      phase_config_path,
+      Jason.encode!(pi_phase_manifest(project_root, opts), pretty: true) <> "\n"
+    )
+
+    mcp_path = Path.join(root, ".pi/mcp.json")
+    File.mkdir_p!(Path.dirname(mcp_path))
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    extension_path = Path.join(root, "pi-extension.json")
+
+    File.write!(
+      extension_path,
+      Jason.encode!(pi_extension_manifest(project_root, opts), pretty: true) <> "\n"
+    )
+
+    package_json_path = Path.join(root, "package.json")
+    File.write!(package_json_path, Jason.encode!(pi_package_manifest(), pretty: true) <> "\n")
+
+    package_readme_path = Path.join(root, "README.md")
+    File.write!(package_readme_path, pi_package_readme_contents())
+
+    instructions_path = Path.join(root, "PI.md")
+    File.write!(instructions_path, instructions_only_contents("pi", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => phase_config_path, "kind" => "settings"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => extension_path, "kind" => "plugin"},
+        %{"path" => package_json_path, "kind" => "package"},
+        %{"path" => package_readme_path, "kind" => "instructions"},
+        %{"path" => instructions_path, "kind" => "instructions"}
+      ],
+      [
+        "Keep `.pi/controlkeel.json` and `.pi/commands/` in the repo so Pi can switch between planning and execution with a governed plan file.",
+        "Use `.pi/mcp.json` for local stdio MCP and `.mcp.hosted.json` as the hosted MCP template.",
+        "Install `pi-extension.json` into Pi's local extension directory when a standalone extension link flow is preferred.",
+        "For direct npm installs on Pi builds that support extension packages, use `pi install npm:@aryaminus/controlkeel-pi-extension`."
       ]
     )
   end
@@ -358,9 +566,15 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, roo_command_contents())
 
+    submit_command_path = Path.join(root, ".roo/commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, roo_submit_plan_command_contents())
+
     guidance_path = Path.join(root, ".roo/guidance/controlkeel.md")
     File.mkdir_p!(Path.dirname(guidance_path))
     File.write!(guidance_path, roo_guidance_contents())
+
+    cloud_guidance_path = Path.join(root, ".roo/guidance/controlkeel-cloud-agent.md")
+    File.write!(cloud_guidance_path, roo_cloud_guidance_contents())
 
     modes_path = Path.join(root, ".roomodes")
     File.write!(modes_path, roo_modes_contents())
@@ -379,7 +593,9 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
         %{"path" => guidance_path, "kind" => "guidance"},
+        %{"path" => cloud_guidance_path, "kind" => "guidance"},
         %{"path" => modes_path, "kind" => "settings"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
@@ -399,6 +615,13 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(workflow_path))
     File.write!(workflow_path, goose_workflow_contents())
 
+    command_path = Path.join(root, "goose/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, goose_command_contents())
+
+    submit_command_path = Path.join(root, "goose/commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, goose_submit_plan_command_contents())
+
     extension_path = Path.join(root, "goose/controlkeel-extension.yaml")
     File.mkdir_p!(Path.dirname(extension_path))
     File.write!(extension_path, goose_extension_yaml(project_root, opts))
@@ -416,12 +639,14 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => hints_path, "kind" => "instructions"},
         %{"path" => workflow_path, "kind" => "workflow"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
         %{"path" => extension_path, "kind" => "settings"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.goosehints` and `AGENTS.md` at the repo root so Goose loads ControlKeel context automatically.",
+        "Keep `.goosehints`, `goose/workflow_recipes/`, and `goose/commands/` at the repo root so Goose loads ControlKeel context, recipes, and slash-command review flows automatically.",
         "Merge `goose/controlkeel-extension.yaml` into `~/.config/goose/config.yaml` or add the same stdio extension through `goose configure`."
       ]
     )
@@ -534,11 +759,23 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(agent_path))
     File.write!(agent_path, copilot_agent_contents(skills))
 
+    command_path = Path.join(root, "commands/controlkeel-plan-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, copilot_plan_review_command_contents())
+
     manifest_path = Path.join(root, "plugin.json")
     File.write!(manifest_path, Jason.encode!(copilot_plugin_manifest(), pretty: true) <> "\n")
 
     hooks_path = Path.join(root, "hooks.json")
-    File.write!(hooks_path, Jason.encode!(empty_hooks_manifest(), pretty: true) <> "\n")
+    File.write!(hooks_path, Jason.encode!(copilot_hooks_manifest(), pretty: true) <> "\n")
+
+    shell_hook_path = Path.join(root, "bin/controlkeel-review.sh")
+    File.mkdir_p!(Path.dirname(shell_hook_path))
+    File.write!(shell_hook_path, review_bridge_shell_contents("copilot"))
+    File.chmod!(shell_hook_path, 0o755)
+
+    powershell_hook_path = Path.join(root, "bin/controlkeel-review.ps1")
+    File.write!(powershell_hook_path, review_bridge_powershell_contents("copilot"))
 
     mcp_path = Path.join(root, ".mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
@@ -551,7 +788,10 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => manifest_path, "kind" => "manifest"},
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => command_path, "kind" => "command"},
         %{"path" => hooks_path, "kind" => "hooks"},
+        %{"path" => shell_hook_path, "kind" => "hook"},
+        %{"path" => powershell_hook_path, "kind" => "hook"},
         %{"path" => mcp_path, "kind" => "mcp"}
       ],
       [
@@ -569,12 +809,23 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(agent_path))
     File.write!(agent_path, copilot_agent_contents(skills))
 
+    command_path = Path.join(root, ".github/commands/controlkeel-plan-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, copilot_plan_review_command_contents())
+
     github_mcp = Path.join(root, ".github/mcp.json")
     File.write!(github_mcp, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
 
     vscode_mcp = Path.join(root, ".vscode/mcp.json")
     File.mkdir_p!(Path.dirname(vscode_mcp))
     File.write!(vscode_mcp, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    vscode_extensions = Path.join(root, ".vscode/extensions.json")
+
+    File.write!(
+      vscode_extensions,
+      Jason.encode!(vscode_extensions_manifest(), pretty: true) <> "\n"
+    )
 
     instructions_path = Path.join(root, ".github/copilot-instructions.md")
     File.mkdir_p!(Path.dirname(instructions_path))
@@ -587,13 +838,48 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => command_path, "kind" => "command"},
         %{"path" => github_mcp, "kind" => "mcp"},
         %{"path" => vscode_mcp, "kind" => "mcp"},
+        %{"path" => vscode_extensions, "kind" => "settings"},
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
       [
         "Copy the .github and .vscode folders into your repository root.",
-        "VS Code and Copilot can then discover the skills, custom agent, and MCP server config from the repo."
+        "VS Code and Copilot can then discover the skills, custom agent, command prompt, and MCP server config from the repo."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "vscode-companion"}, root, _project_root, _skills, _opts) do
+    extension_root = Path.join(root, "extension")
+    File.mkdir_p!(extension_root)
+
+    package_json_path = Path.join(extension_root, "package.json")
+
+    File.write!(
+      package_json_path,
+      Jason.encode!(vscode_companion_manifest(), pretty: true) <> "\n"
+    )
+
+    extension_js_path = Path.join(extension_root, "extension.js")
+    File.write!(extension_js_path, vscode_companion_extension_contents())
+
+    readme_path = Path.join(extension_root, "README.md")
+    File.write!(readme_path, vscode_companion_readme_contents())
+
+    with_common_assets(
+      root,
+      root,
+      [],
+      [
+        %{"path" => package_json_path, "kind" => "package"},
+        %{"path" => extension_js_path, "kind" => "runtime"},
+        %{"path" => readme_path, "kind" => "instructions"}
+      ],
+      [
+        "Zip the `extension/` directory as a `.vsix` when publishing the VS Code companion.",
+        "The companion opens ControlKeel review URLs inside a VS Code webview and injects terminal routing env vars."
       ]
     )
   end
@@ -684,9 +970,26 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, opencode_command_contents())
 
+    submit_command_path = Path.join(root, ".opencode/commands/controlkeel-submit-plan.md")
+    File.mkdir_p!(Path.dirname(submit_command_path))
+    File.write!(submit_command_path, opencode_submit_plan_command_contents())
+
     # 4. MCP config — opencode-format mcp.json
     mcp_path = Path.join(root, ".opencode/mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    package_json_path = Path.join(root, "package.json")
+
+    File.write!(
+      package_json_path,
+      Jason.encode!(opencode_package_manifest(), pretty: true) <> "\n"
+    )
+
+    package_entry_path = Path.join(root, "index.js")
+    File.write!(package_entry_path, opencode_package_entry_contents())
+
+    package_readme_path = Path.join(root, "README.md")
+    File.write!(package_readme_path, opencode_package_readme_contents())
 
     # 5. Instructions
     agents_path = Path.join(root, "AGENTS.md")
@@ -700,14 +1003,19 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => plugin_path, "kind" => "plugin"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
         %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => package_json_path, "kind" => "package"},
+        %{"path" => package_entry_path, "kind" => "runtime"},
+        %{"path" => package_readme_path, "kind" => "instructions"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
         "Copy `.opencode/plugins/` into your project's `.opencode/plugins/` directory (loaded automatically at startup).",
         "Copy `.opencode/agents/` into your project's `.opencode/agents/` directory for the governed review agent.",
-        "Copy `.opencode/commands/` into your project's `.opencode/commands/` directory for the `/controlkeel-review` command.",
-        "Merge `.opencode/mcp.json` into your `opencode.json` under the `mcp` key."
+        "Copy `.opencode/commands/` into your project's `.opencode/commands/` directory for the `/controlkeel-review` and `/controlkeel-submit-plan` commands.",
+        "Merge `.opencode/mcp.json` into your `opencode.json` under the `mcp` key.",
+        "For direct npm plugin installs, add `\"plugin\": [\"@aryaminus/controlkeel-opencode\"]` to your `opencode.json`."
       ]
     )
   end
@@ -726,6 +1034,9 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, gemini_command_contents())
 
+    submit_plan_command_path = Path.join(root, ".gemini/commands/controlkeel/submit-plan.toml")
+    File.write!(submit_plan_command_path, gemini_submit_plan_command_contents())
+
     # 3. Agent skill
     skill_path = Path.join(root, "skills/controlkeel-governance/SKILL.md")
     File.mkdir_p!(Path.dirname(skill_path))
@@ -735,6 +1046,9 @@ defmodule ControlKeel.Skills.Exporter do
     gemini_md_path = Path.join(root, "GEMINI.md")
     File.write!(gemini_md_path, instructions_only_contents("gemini-cli", project_root, opts))
 
+    extension_readme_path = Path.join(root, "README.md")
+    File.write!(extension_readme_path, gemini_extension_readme_contents())
+
     with_common_assets(
       root,
       project_root,
@@ -742,12 +1056,14 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => manifest_path, "kind" => "settings"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_plan_command_path, "kind" => "command"},
         %{"path" => skill_path, "kind" => "skills"},
-        %{"path" => gemini_md_path, "kind" => "instructions"}
+        %{"path" => gemini_md_path, "kind" => "instructions"},
+        %{"path" => extension_readme_path, "kind" => "instructions"}
       ],
       [
         "Install with `gemini extensions link .` or copy the directory into `~/.gemini/extensions/controlkeel/`.",
-        "The `/controlkeel:review` command and `controlkeel-governance` skill are auto-discovered."
+        "The `/controlkeel:review` and `/controlkeel:submit-plan` commands plus the `controlkeel-governance` skill are auto-discovered."
       ]
     )
   end
@@ -758,10 +1074,25 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(hook_path))
     File.write!(hook_path, Jason.encode!(kiro_hook_spec(), pretty: true) <> "\n")
 
+    review_hook_path = Path.join(root, ".kiro/hooks/controlkeel-review.json")
+    File.write!(review_hook_path, Jason.encode!(kiro_review_hook_spec(), pretty: true) <> "\n")
+
     # 2. Steering file
     steering_path = Path.join(root, ".kiro/steering/controlkeel.md")
     File.mkdir_p!(Path.dirname(steering_path))
     File.write!(steering_path, kiro_steering_contents())
+
+    tool_policy_path = Path.join(root, ".kiro/settings/controlkeel-tools.json")
+    File.mkdir_p!(Path.dirname(tool_policy_path))
+
+    File.write!(
+      tool_policy_path,
+      Jason.encode!(kiro_tool_policy_manifest(), pretty: true) <> "\n"
+    )
+
+    command_path = Path.join(root, ".kiro/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, kiro_command_contents())
 
     # 3. MCP config
     mcp_path = Path.join(root, ".kiro/mcp.json")
@@ -777,13 +1108,16 @@ defmodule ControlKeel.Skills.Exporter do
       opts,
       [
         %{"path" => hook_path, "kind" => "hook"},
+        %{"path" => review_hook_path, "kind" => "hook"},
         %{"path" => steering_path, "kind" => "instructions"},
+        %{"path" => tool_policy_path, "kind" => "settings"},
+        %{"path" => command_path, "kind" => "command"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.kiro/hooks/` into your project root for Agent Hook auto-discovery.",
-        "Copy `.kiro/steering/` for governed agent behavioral guidance.",
+        "Copy `.kiro/hooks/` into your project root for Agent Hook auto-discovery and review interception.",
+        "Copy `.kiro/steering/`, `.kiro/settings/`, and `.kiro/commands/` for governed agent behavioral guidance and tool controls.",
         "Merge `.kiro/mcp.json` into your Kiro MCP settings."
       ]
     )
@@ -794,6 +1128,13 @@ defmodule ControlKeel.Skills.Exporter do
     plugin_path = Path.join(root, ".amp/plugins/controlkeel-governance.ts")
     File.mkdir_p!(Path.dirname(plugin_path))
     File.write!(plugin_path, amp_plugin_contents())
+
+    command_path = Path.join(root, ".amp/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, amp_command_contents())
+
+    package_json_path = Path.join(root, ".amp/package.json")
+    File.write!(package_json_path, Jason.encode!(amp_package_manifest(), pretty: true) <> "\n")
 
     # 2. MCP config
     mcp_path = Path.join(root, ".mcp.json")
@@ -809,11 +1150,13 @@ defmodule ControlKeel.Skills.Exporter do
       opts,
       [
         %{"path" => plugin_path, "kind" => "plugin"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => package_json_path, "kind" => "package"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.amp/plugins/` into your project root (requires `PLUGINS=all` env var to activate).",
+        "Copy `.amp/plugins/` and `.amp/commands/` into your project root (requires `PLUGINS=all` env var to activate).",
         "Merge `.mcp.json` into your project's MCP config."
       ]
     )
@@ -829,6 +1172,16 @@ defmodule ControlKeel.Skills.Exporter do
     copilot_path = Path.join(root, "copilot-instructions.md")
     File.write!(copilot_path, instructions_only_contents("copilot", project_root, opts))
 
+    aider_path = Path.join(root, "AIDER.md")
+    File.write!(aider_path, aider_instructions_contents())
+
+    aider_config_path = Path.join(root, ".aider.conf.yml")
+    File.write!(aider_config_path, aider_config_contents(project_root, opts))
+
+    aider_command_path = Path.join(root, ".aider/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(aider_command_path))
+    File.write!(aider_command_path, aider_command_contents())
+
     with_common_assets(
       root,
       project_root,
@@ -836,9 +1189,14 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => agents_path, "kind" => "instructions"},
         %{"path" => claude_path, "kind" => "instructions"},
-        %{"path" => copilot_path, "kind" => "instructions"}
+        %{"path" => copilot_path, "kind" => "instructions"},
+        %{"path" => aider_path, "kind" => "instructions"},
+        %{"path" => aider_config_path, "kind" => "settings"},
+        %{"path" => aider_command_path, "kind" => "command"}
       ],
-      ["Use these snippets with MCP-only tools that do not support native skills or plugins."]
+      [
+        "Use these snippets with MCP-only or command-driven tools such as Aider that do not support native skills or plugins."
+      ]
     )
   end
 
@@ -1338,6 +1696,17 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp roo_submit_plan_command_contents do
+    """
+    # ControlKeel submit plan
+
+    1. Save the plan to `.roo/review-plan.md`.
+    2. Run `controlkeel review plan submit --body-file .roo/review-plan.md --submitted-by roo-code --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Do not continue until ControlKeel approves the plan.
+    """
+  end
+
   defp roo_guidance_contents do
     """
     # ControlKeel + Roo Code
@@ -1345,6 +1714,18 @@ defmodule ControlKeel.Skills.Exporter do
     Use ControlKeel as the governance layer for risky work. Treat CK findings as the safety boundary, not optional advice.
 
     Start with `controlkeel-governance`, then load domain skills as needed.
+    """
+  end
+
+  defp roo_cloud_guidance_contents do
+    """
+    # ControlKeel + Roo cloud agents
+
+    When Roo cloud or remote agents are involved:
+
+    1. Keep the human-readable plan in the repo.
+    2. Submit plan or completion packets through ControlKeel review.
+    3. Return blocked findings and proof state with the final handoff.
     """
   end
 
@@ -1389,6 +1770,29 @@ defmodule ControlKeel.Skills.Exporter do
       - Gather repo and task context before editing.
       - Use ControlKeel MCP tools for validation, findings, budgets, routing, and proofs.
       - Summarize risk, findings, and proof state before handoff.
+    """
+  end
+
+  defp goose_command_contents do
+    """
+    # ControlKeel review
+
+    Use this command when Goose needs a governed review pass before finalizing work.
+
+    1. Read `.goosehints` and `AGENTS.md`.
+    2. Use `ck_context` and `ck_validate`.
+    3. Summarize blocked findings and proof status.
+    """
+  end
+
+  defp goose_submit_plan_command_contents do
+    """
+    # ControlKeel submit plan
+
+    1. Save the plan to `goose/review-plan.md`.
+    2. Run `controlkeel review plan submit --body-file goose/review-plan.md --submitted-by goose --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Continue only after approval.
     """
   end
 
@@ -1557,7 +1961,8 @@ defmodule ControlKeel.Skills.Exporter do
     %{
       "name" => "controlkeel",
       "version" => @app_version,
-      "description" => "ControlKeel governance skills, agents, hooks, and MCP bridge for Codex.",
+      "description" =>
+        "ControlKeel governance skills, commands, agents, and MCP bridge for Codex.",
       "author" => %{
         "name" => "ControlKeel",
         "url" => "https://github.com/aryaminus/controlkeel"
@@ -1568,6 +1973,7 @@ defmodule ControlKeel.Skills.Exporter do
       "keywords" => ["governance", "security", "agent-skills", "mcp"],
       "skills" => "./skills/",
       "hooks" => "./hooks.json",
+      "commands" => "./commands/",
       "mcpServers" => "./.mcp.json",
       "apps" => "./.app.json",
       "interface" => %{
@@ -1641,14 +2047,187 @@ defmodule ControlKeel.Skills.Exporter do
       "keywords" => ["governance", "security", "skills"],
       "skills" => "skills",
       "agents" => "agents",
+      "commands" => "commands",
       "hooks" => "hooks.json",
       "mcpServers" => ".mcp.json",
       "tags" => ["governance", "security", "skills"]
     }
   end
 
+  defp claude_hooks_manifest do
+    %{
+      "hooks" => %{
+        "PermissionRequest" => [
+          %{
+            "matcher" => "ExitPlanMode",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/controlkeel-review.sh",
+                "timeout" => 345_600
+              }
+            ]
+          }
+        ]
+      }
+    }
+  end
+
+  defp claude_manual_settings do
+    %{
+      "hooks" => %{
+        "PermissionRequest" => [
+          %{
+            "matcher" => "ExitPlanMode",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "controlkeel review plan submit --stdin --submitted-by claude-code"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  end
+
+  defp copilot_hooks_manifest do
+    %{
+      "version" => 1,
+      "hooks" => %{
+        "preToolUse" => [
+          %{
+            "type" => "command",
+            "bash" => "./bin/controlkeel-review.sh",
+            "powershell" => "./bin/controlkeel-review.ps1",
+            "timeoutSec" => 345_600,
+            "comment" => "Intercepts plan-mode exit and waits for ControlKeel browser review."
+          }
+        ]
+      }
+    }
+  end
+
   defp empty_hooks_manifest do
     %{"hooks" => %{}}
+  end
+
+  defp vscode_extensions_manifest do
+    %{
+      "recommendations" => ["aryaminus.controlkeel-review"],
+      "unwantedRecommendations" => []
+    }
+  end
+
+  defp vscode_companion_manifest do
+    %{
+      "name" => "controlkeel-review",
+      "displayName" => "ControlKeel Review",
+      "description" =>
+        "Open ControlKeel review URLs in VS Code and route browser review into editor webviews.",
+      "version" => @app_version,
+      "publisher" => "aryaminus",
+      "homepage" => "https://github.com/aryaminus/controlkeel",
+      "repository" => %{
+        "type" => "git",
+        "url" => "https://github.com/aryaminus/controlkeel.git"
+      },
+      "categories" => ["Other", "Testing"],
+      "keywords" => ["controlkeel", "review", "governance", "mcp"],
+      "engines" => %{"vscode" => "^1.85.0"},
+      "main" => "./extension.js",
+      "activationEvents" => ["onStartupFinished"],
+      "contributes" => %{
+        "commands" => [
+          %{
+            "command" => "controlkeel-review.openUrl",
+            "title" => "ControlKeel: Open review URL in editor"
+          },
+          %{
+            "command" => "controlkeel-review.openPayload",
+            "title" => "ControlKeel: Open review payload in editor"
+          },
+          %{
+            "command" => "controlkeel-review.annotateSelection",
+            "title" => "ControlKeel: Annotate current selection"
+          }
+        ],
+        "configuration" => %{
+          "title" => "ControlKeel Review",
+          "properties" => %{
+            "controlkeelReview.injectBrowser" => %{
+              "type" => "boolean",
+              "default" => true,
+              "description" =>
+                "Inject browser routing environment variables into integrated terminals."
+            }
+          }
+        }
+      }
+    }
+  end
+
+  defp review_bridge_shell_contents(submitted_by) do
+    """
+    #!/usr/bin/env sh
+    set -eu
+
+    tmp_body=$(mktemp)
+    trap 'rm -f "$tmp_body"' EXIT INT TERM
+
+    cat >"$tmp_body"
+
+    : "${CONTROLKEEL_AGENT_ID:=#{submitted_by}}"
+    export CONTROLKEEL_AGENT_ID
+
+    submit_output=$(controlkeel review plan submit --stdin --submitted-by "#{submitted_by}" --json <"$tmp_body")
+    printf "%s\\n" "$submit_output"
+
+    if command -v jq >/dev/null 2>&1; then
+      review_id=$(printf "%s\\n" "$submit_output" | jq -r '.review.id // empty')
+    else
+      review_id=$(printf "%s\\n" "$submit_output" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' | head -n 1)
+    fi
+
+    if [ -z "$review_id" ]; then
+      echo "ControlKeel hook could not parse the submitted review id." >&2
+      exit 1
+    fi
+
+    controlkeel review plan wait --id "$review_id" --json
+    """
+  end
+
+  defp review_bridge_powershell_contents(submitted_by) do
+    """
+    $plan = [Console]::In.ReadToEnd()
+    $tempPath = Join-Path $env:TEMP ("controlkeel-plan-" + [Guid]::NewGuid().ToString() + ".md")
+
+    try {
+      Set-Content -Path $tempPath -Value $plan -NoNewline
+      if (-not $env:CONTROLKEEL_AGENT_ID) {
+        $env:CONTROLKEEL_AGENT_ID = "#{submitted_by}"
+      }
+
+      $submitOutput = & controlkeel review plan submit --stdin --submitted-by #{submitted_by} --json < $tempPath
+      $submitOutput | ForEach-Object { Write-Output $_ }
+      $submitJson = $submitOutput | ConvertFrom-Json
+
+      if (-not $submitJson.review.id) {
+        Write-Error "ControlKeel hook could not parse the submitted review id."
+        exit 1
+      }
+
+      $reviewId = $submitJson.review.id
+      & controlkeel review plan wait --id $reviewId --json
+      exit $LASTEXITCODE
+    }
+    finally {
+      if (Test-Path $tempPath) {
+        Remove-Item $tempPath -Force
+      }
+    }
+    """
   end
 
   defp cline_rule_contents do
@@ -1682,6 +2261,38 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp cline_command_contents do
+    """
+    # ControlKeel review
+
+    Use this command when Cline should run a governed review pass before completing risky work.
+
+    1. Read `AGENTS.md` and the current `.clinerules/` guidance.
+    2. Use `ck_context` and `ck_validate` before presenting a conclusion.
+    3. Summarize findings, proof status, and any blockers.
+    """
+  end
+
+  defp cline_submit_plan_command_contents do
+    """
+    # ControlKeel submit plan
+
+    1. Save the current plan to `.cline/review-plan.md`.
+    2. Run `controlkeel review plan submit --body-file .cline/review-plan.md --submitted-by cline --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Do not execute until the review is approved.
+    """
+  end
+
+  defp cline_taskstart_hook_contents do
+    """
+    #!/usr/bin/env sh
+    set -eu
+
+    controlkeel status >/dev/null 2>&1 || true
+    """
+  end
+
   defp cursor_rule_contents do
     """
     ---
@@ -1690,6 +2301,41 @@ defmodule ControlKeel.Skills.Exporter do
 
     Always call ControlKeel before risky edits, shell commands, auth changes, or release work.
     Load `controlkeel-governance` first, then add domain-specific skills as needed.
+    """
+  end
+
+  defp cursor_command_contents do
+    """
+    # ControlKeel review
+
+    Use ControlKeel before finalizing risky edits, schema changes, auth changes, or release work.
+
+    1. Call `ck_context`.
+    2. Call `ck_validate`.
+    3. Summarize findings, proof status, and follow-up work.
+    """
+  end
+
+  defp cursor_submit_plan_command_contents do
+    """
+    # ControlKeel submit plan
+
+    1. Save the current plan to `.cursor/review-plan.md`.
+    2. Run `controlkeel review plan submit --body-file .cursor/review-plan.md --submitted-by cursor --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Only implement after approval.
+    """
+  end
+
+  defp cursor_background_agent_contents do
+    """
+    # ControlKeel background agent guidance
+
+    When Cursor background agents are enabled, use this handoff:
+
+    1. Draft the plan first.
+    2. Submit the plan with ControlKeel before execution.
+    3. Return proof status, unresolved findings, and any blocked work with the final handoff.
     """
   end
 
@@ -1702,6 +2348,43 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp windsurf_command_contents do
+    """
+    # ControlKeel review
+
+    Use this command in Windsurf before exiting plan mode or finalizing risky work.
+
+    1. Gather context with `ck_context`.
+    2. Validate with `ck_validate`.
+    3. If a human plan review is needed, submit it through ControlKeel and wait for approval.
+    """
+  end
+
+  defp windsurf_workflow_contents do
+    """
+    # ControlKeel review workflow
+
+    1. Stay in planning until ControlKeel approves the plan.
+    2. Use ControlKeel MCP tools before risky edits.
+    3. Surface blocked findings immediately.
+    4. Finish with proof and risk status.
+    """
+  end
+
+  defp windsurf_hook_manifest do
+    %{
+      "version" => 1,
+      "hooks" => [
+        %{
+          "event" => "ExitPlanMode",
+          "type" => "command",
+          "command" => "./controlkeel-review.sh",
+          "timeoutSec" => 345_600
+        }
+      ]
+    }
+  end
+
   defp continue_prompt_contents do
     """
     # ControlKeel Continue Prompt
@@ -1709,6 +2392,65 @@ defmodule ControlKeel.Skills.Exporter do
     Start with `controlkeel-governance`, use CK MCP tools before risky work, and surface blocked findings immediately.
     Keep proofs and budget state current before marking a task complete.
     """
+  end
+
+  defp continue_plan_prompt_contents do
+    """
+    # ControlKeel Continue Plan Mode
+
+    Stay in plan mode until ControlKeel has reviewed and approved the plan. Use MCP tools for context gathering, but do not switch into implementation until approval returns.
+    """
+  end
+
+  defp continue_review_prompt_contents do
+    """
+    # ControlKeel Continue Review
+
+    Before finalizing, summarize:
+    - unresolved findings
+    - proof status
+    - budget or routing concerns
+    - any human review follow-up
+    """
+  end
+
+  defp continue_headless_prompt_contents do
+    """
+    # ControlKeel Continue Headless
+
+    In headless runs, prefer structured CLI calls:
+    - `controlkeel review plan submit --json`
+    - `controlkeel review plan wait --json`
+    - `controlkeel findings --format json`
+    """
+  end
+
+  defp continue_command_contents do
+    """
+    name: controlkeel-review
+    description: Review the current task through ControlKeel validation, findings, and proof state.
+    prompt: |
+      Read AGENTS.md, run CK context/validation, and summarize blocked findings and proof state before completion.
+    """
+  end
+
+  defp continue_submit_plan_command_contents do
+    """
+    name: controlkeel-submit-plan
+    description: Submit the current plan to ControlKeel and wait for review.
+    prompt: |
+      Save the plan to `.continue/review-plan.md`, run `controlkeel review plan submit --body-file .continue/review-plan.md --submitted-by continue --json`, then wait with `controlkeel review plan wait --id <review_id> --json`.
+    """
+  end
+
+  defp continue_mcp_server_contents(project_root, opts) do
+    %{
+      "name" => "controlkeel",
+      "transport" => "stdio",
+      "command" => mcp_command(project_root, opts),
+      "args" => mcp_args(project_root, opts)
+    }
+    |> yaml_document()
   end
 
   defp codex_agent_contents(project_root, skills, opts) do
@@ -1786,9 +2528,10 @@ defmodule ControlKeel.Skills.Exporter do
     Required workflow:
     1. Call `ck_context` at the start of a task.
     2. Call `ck_validate` before writing code, config, shell, or deploy content.
-    3. Record any human-review issue with `ck_finding`.
-    4. Check `ck_budget` before expensive model or multi-agent work.
-    5. Use `ck_route`, `ck_skill_list`, and `ck_skill_load` to delegate or activate specialized CK workflows.
+    3. Submit plans or approval packets with `ck_review_submit` and check `ck_review_status` before execution.
+    4. Record any human-review issue with `ck_finding`.
+    5. Check `ck_budget` before expensive model or multi-agent work.
+    6. Use `ck_route`, `ck_skill_list`, and `ck_skill_load` to delegate or activate specialized CK workflows.
 
     Install ControlKeel:
     #{Enum.map_join(Distribution.install_channels(), "\n", fn channel -> "- #{channel.label}: `#{channel.command}`" end)}
@@ -2012,61 +2755,82 @@ defmodule ControlKeel.Skills.Exporter do
     import { tool } from "@opencode-ai/plugin"
 
     /**
-     * ControlKeel Governance Plugin for OpenCode
+     * ControlKeel Review Bridge for OpenCode
      *
-     * Provides:
-     * - Pre-flight validation on tool execution (tool.execute.before)
-     * - Environment injection for ControlKeel project root (shell.env)
-     * - Session idle notifications (session.idle)
-     * - Custom ck-validate tool for on-demand governance checks
+     * Host-specific adapter behavior:
+     * - injects a submit_plan review tool for planning agents
+     * - suppresses plan_exit in favor of ControlKeel browser review
+     * - keeps the review tool primary-agent only by default
+     * - routes plan submission and wait decisions through the CK CLI
      */
     export const ControlKeelGovernance: Plugin = async ({ project, client, $, directory }) => {
+      const parseJson = (output: string) => {
+        try {
+          return JSON.parse(output)
+        } catch (_error) {
+          throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+        }
+      }
+
+      const submitPlan = async (body: string, submittedBy: string) => {
+        const result = await $`controlkeel review plan submit --stdin --submitted-by ${submittedBy} --json`
+          .text(body)
+        const submitPayload = parseJson(result)
+        const reviewId = submitPayload?.review?.id
+        if (!reviewId) {
+          throw new Error("ControlKeel did not return a review id")
+        }
+        const waitPayload = parseJson(await $`controlkeel review plan wait --id ${reviewId} --json`)
+        return {
+          reviewId,
+          submitPayload,
+          waitPayload,
+          browserUrl: submitPayload?.browser_url,
+          status: waitPayload?.review?.status,
+          feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+        }
+      }
+
       return {
-        // Inject ControlKeel project root into all shell environments
         "shell.env": async (_input, output) => {
           output.env.CONTROLKEEL_PROJECT_ROOT = directory
+          output.env.CONTROLKEEL_AGENT_ID = "opencode"
         },
 
-        // Log governance context before tool execution
-        "tool.execute.before": async (input, output) => {
-          if (input.tool === "bash" || input.tool === "shell") {
-            await client.app.log({
-              body: {
-                service: "controlkeel-governance",
-                level: "info",
-                message: `[CK] Tool execution: ${input.tool}`,
-                extra: { directory, args: output.args },
-              },
-            })
+        config: async (config) => {
+          const primaryTools = config.experimental?.primary_tools ?? []
+          if (!primaryTools.includes("submit_plan")) {
+            config.experimental = {
+              ...config.experimental,
+              primary_tools: [...primaryTools, "submit_plan"],
+            }
           }
         },
 
-        // Notify on session completion for audit logging
-        event: async ({ event }) => {
-          if (event.type === "session.idle") {
-            await client.app.log({
-              body: {
-                service: "controlkeel-governance",
-                level: "info",
-                message: "[CK] Session idle — run `controlkeel findings` to review governance status.",
-              },
-            })
+        "tool.definition": async (input, output) => {
+          if (input.toolID === "plan_exit") {
+            output.description =
+              "Do not call this tool. Use submit_plan so ControlKeel can collect approval in the browser review flow."
           }
         },
 
-        // Custom tool: ck-validate — triggers ControlKeel validation via MCP
+        "experimental.chat.system.transform": async (_input, output) => {
+          output.system.push(
+            "Use submit_plan when you are ready for human review. Do not proceed with implementation until ControlKeel approves the plan."
+          )
+        },
+
         tool: {
-          "ck-validate": tool({
+          "submit_plan": tool({
             description:
-              "Run ControlKeel governance validation on the current project. " +
-              "Returns findings, budget status, and proof readiness.",
+              "Submit a plan to ControlKeel for browser review. The tool waits for approval before execution continues.",
             args: {
-              scope: tool.schema.enum(["full", "quick"]).default("quick"),
+              plan: tool.schema.string().describe("Markdown plan body to submit for review."),
+              title: tool.schema.string().optional(),
             },
-            async execute(args, context) {
-              const result =
-                await $`controlkeel findings --format json`.text()
-              return result
+            async execute(args) {
+              const result = await submitPlan(args.plan, "opencode")
+              return JSON.stringify(result, null, 2)
             },
           }),
         },
@@ -2124,6 +2888,165 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp opencode_submit_plan_command_contents do
+    """
+    ---
+    description: Submit the current plan to ControlKeel browser review and wait for approval
+    ---
+
+    Save the current plan to a markdown file, then submit it through ControlKeel.
+
+    Recommended flow:
+    1. Save the plan to `.opencode/review-plan.md`
+    2. Run `controlkeel review plan submit --body-file .opencode/review-plan.md --submitted-by opencode --json`
+    3. Read the returned `review.id` and `browser_url`
+    4. Wait with `controlkeel review plan wait --id <review_id> --json`
+    4. Do not execute until the review is approved
+    """
+  end
+
+  defp opencode_package_manifest do
+    %{
+      "name" => "@aryaminus/controlkeel-opencode",
+      "version" => @app_version,
+      "type" => "module",
+      "description" => "ControlKeel OpenCode adapter bundle",
+      "homepage" => "https://github.com/aryaminus/controlkeel",
+      "repository" => %{
+        "type" => "git",
+        "url" => "git+https://github.com/aryaminus/controlkeel.git"
+      },
+      "bugs" => %{"url" => "https://github.com/aryaminus/controlkeel/issues"},
+      "keywords" => ["controlkeel", "opencode", "plugin", "governance", "mcp"],
+      "exports" => %{
+        "." => "./index.js",
+        "./plugin" => "./index.js"
+      },
+      "main" => "./index.js",
+      "files" => [".opencode", "AGENTS.md", "README.md", "index.js"],
+      "publishConfig" => %{"access" => "public"},
+      "license" => "Apache-2.0"
+    }
+  end
+
+  defp opencode_package_entry_contents do
+    ~S"""
+    /**
+     * Published OpenCode package entrypoint for ControlKeel.
+     *
+     * This mirrors the repo-local plugin in `.opencode/plugins/controlkeel-governance.ts`
+     * but ships as plain JavaScript for npm-based installs.
+     */
+    export const ControlKeelGovernance = async ({ $, directory }) => {
+      const parseJson = (output) => {
+        try {
+          return JSON.parse(output)
+        } catch (_error) {
+          throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+        }
+      }
+
+      const submitPlan = async (body, submittedBy) => {
+        const result = await $`controlkeel review plan submit --stdin --submitted-by ${submittedBy} --json`
+          .text(body)
+        const submitPayload = parseJson(result)
+        const reviewId = submitPayload?.review?.id
+        if (!reviewId) {
+          throw new Error("ControlKeel did not return a review id")
+        }
+        const waitPayload = parseJson(await $`controlkeel review plan wait --id ${reviewId} --json`)
+        return {
+          reviewId,
+          submitPayload,
+          waitPayload,
+          browserUrl: submitPayload?.browser_url,
+          status: waitPayload?.review?.status,
+          feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+        }
+      }
+
+      return {
+        "shell.env": async (_input, output) => {
+          output.env.CONTROLKEEL_PROJECT_ROOT = directory
+          output.env.CONTROLKEEL_AGENT_ID = "opencode"
+        },
+
+        config: async (config) => {
+          const primaryTools = config.experimental?.primary_tools ?? []
+          if (!primaryTools.includes("submit_plan")) {
+            config.experimental = {
+              ...config.experimental,
+              primary_tools: [...primaryTools, "submit_plan"],
+            }
+          }
+        },
+
+        "tool.definition": async (input, output) => {
+          if (input.toolID === "plan_exit") {
+            output.description =
+              "Do not call this tool. Use submit_plan so ControlKeel can collect approval in the browser review flow."
+          }
+        },
+
+        "tool.execute": async (input, output) => {
+          if (input.toolID !== "submit_plan") {
+            return
+          }
+
+          const planBody = typeof input.args?.plan === "string" ? input.args.plan : ""
+          const review = await submitPlan(planBody, "opencode")
+          output.metadata = {
+            reviewId: review.reviewId,
+            browserUrl: review.browserUrl,
+            status: review.status,
+            feedbackNotes: review.feedbackNotes,
+          }
+          output.result = JSON.stringify(output.metadata, null, 2)
+        },
+
+        tools: async () => ({
+          submit_plan: {
+            description: "Submit the current plan to ControlKeel and wait for browser review approval.",
+            parameters: {
+              type: "object",
+              properties: {
+                plan: {
+                  type: "string",
+                  description: "Markdown plan body to submit to ControlKeel review.",
+                },
+              },
+              required: ["plan"],
+            },
+          },
+        }),
+      }
+    }
+
+    export default ControlKeelGovernance
+    """
+  end
+
+  defp opencode_package_readme_contents do
+    """
+    # ControlKeel OpenCode plugin
+
+    Direct install:
+
+    ```json
+    {
+      "plugin": ["@aryaminus/controlkeel-opencode"]
+    }
+    ```
+
+    This npm package exposes the ControlKeel OpenCode governance plugin entrypoint.
+    For the full repo-local experience with commands, agents, and MCP config, also run:
+
+    ```bash
+    controlkeel attach opencode
+    ```
+    """
+  end
+
   # ── Gemini CLI native helpers ──────────────────────────────────────────────
 
   defp gemini_extension_manifest(project_root, opts) do
@@ -2143,6 +3066,137 @@ defmodule ControlKeel.Skills.Exporter do
         mcp_payload(project_root, opts)
         |> Map.get("mcpServers", %{})
     }
+  end
+
+  defp pi_extension_manifest(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    %{
+      "name" => "controlkeel-pi-review",
+      "version" => @app_version,
+      "project_root" => project_root,
+      "phase_model" => "file_plan_mode",
+      "review_command" => "controlkeel-review",
+      "submit_command" => "controlkeel-submit-plan",
+      "browser_review" => true,
+      "mcp" => %{
+        "path" => ".pi/mcp.json",
+        "hosted_template" => ".mcp.hosted.json"
+      },
+      "phase_config" => ".pi/controlkeel.json",
+      "actions" => [
+        %{
+          "id" => "submit-plan-review",
+          "label" => "Submit plan review",
+          "command" =>
+            "controlkeel review plan submit --body-file ${plan_file} --submitted-by pi --json"
+        },
+        %{
+          "id" => "open-browser-review",
+          "label" => "Open browser review",
+          "command" => "controlkeel review plan open --id ${review_id} --json"
+        },
+        %{
+          "id" => "wait-plan-review",
+          "label" => "Wait for review decision",
+          "command" => "controlkeel review plan wait --id ${review_id} --json"
+        }
+      ],
+      "state" => %{
+        "review_state_file" => ".pi/controlkeel-state.json",
+        "progress_file" => "PLAN.md"
+      }
+    }
+  end
+
+  defp pi_phase_manifest(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    %{
+      "project_root" => project_root,
+      "phases" => %{
+        "planning" => %{
+          "phase_model" => "file_plan_mode",
+          "plan_file" => "PLAN.md",
+          "allowed_tools" => [
+            "read",
+            "grep",
+            "find",
+            "ls",
+            "write",
+            "edit",
+            "controlkeel-submit-plan"
+          ],
+          "write_scope" => ["PLAN.md"],
+          "prompt" =>
+            "Plan mode active. Only PLAN.md may be edited. Use controlkeel-submit-plan when the plan is ready."
+        },
+        "execution" => %{
+          "phase_model" => "file_plan_mode",
+          "progress_marker" => "[DONE:n]",
+          "prompt" =>
+            "Execution mode active after approval. Follow the approved plan in PLAN.md and mark completed steps with [DONE:n]."
+        }
+      }
+    }
+  end
+
+  defp pi_package_manifest do
+    %{
+      "name" => "@aryaminus/controlkeel-pi-extension",
+      "version" => @app_version,
+      "description" => "ControlKeel Pi adapter bundle",
+      "homepage" => "https://github.com/aryaminus/controlkeel",
+      "repository" => %{
+        "type" => "git",
+        "url" => "git+https://github.com/aryaminus/controlkeel.git"
+      },
+      "bugs" => %{"url" => "https://github.com/aryaminus/controlkeel/issues"},
+      "keywords" => ["controlkeel", "pi", "extension", "governance", "mcp"],
+      "main" => "./pi-extension.json",
+      "exports" => %{
+        "." => "./pi-extension.json",
+        "./manifest" => "./pi-extension.json"
+      },
+      "files" => [".pi", "pi-extension.json", "PI.md", "README.md"],
+      "publishConfig" => %{"access" => "public"},
+      "controlkeel" => %{
+        "host" => "pi",
+        "extension_manifest" => "pi-extension.json",
+        "phase_config" => ".pi/controlkeel.json"
+      },
+      "license" => "Apache-2.0"
+    }
+  end
+
+  defp pi_package_readme_contents do
+    """
+    # ControlKeel Pi extension
+
+    Direct install on Pi builds that support npm-backed extensions:
+
+    ```bash
+    pi install npm:@aryaminus/controlkeel-pi-extension
+    ```
+
+    Short form:
+
+    ```bash
+    pi -e npm:@aryaminus/controlkeel-pi-extension
+    ```
+
+    For the full repo-local planning, commands, and MCP configuration, also run:
+
+    ```bash
+    controlkeel attach pi
+    ```
+    """
   end
 
   defp gemini_command_contents do
@@ -2167,6 +3221,277 @@ defmodule ControlKeel.Skills.Exporter do
 
     {{args}}
     \"\"\"
+    """
+  end
+
+  defp gemini_submit_plan_command_contents do
+    """
+    # ControlKeel Submit Plan
+    # Usage: /controlkeel:submit-plan
+
+    [command]
+    version = 1
+
+    prompt = \"\"\"
+    Save the current plan to `.gemini/review-plan.md`, then submit it with:
+    !{controlkeel review plan submit --body-file .gemini/review-plan.md --submitted-by gemini-cli --json}
+
+    Read the returned review id and wait with:
+    !{controlkeel review plan wait --id <review_id> --json}
+
+    Do not continue until the review is approved.
+    \"\"\"
+    """
+  end
+
+  defp gemini_extension_readme_contents do
+    """
+    # ControlKeel Gemini extension
+
+    This extension provides:
+    - `/controlkeel:review`
+    - `/controlkeel:submit-plan`
+    - the `controlkeel-governance` skill
+    - MCP registration through `gemini-extension.json`
+    """
+  end
+
+  defp pi_command_contents do
+    """
+    # /controlkeel-review
+
+    Use this command when Pi has a plan, diff, or completion packet that needs approval before execution.
+
+    Workflow:
+    1. Save the current plan to a markdown file in the repo, for example `.pi/review-plan.md`.
+    2. Run `controlkeel review plan submit --body-file .pi/review-plan.md --submitted-by pi --json`.
+    3. Open the returned `browser_url` and wait for approval or denial notes.
+    4. Poll `controlkeel review plan open --id <review_id> --json` or use `ck_review_status`.
+    5. Do not continue execution until the review is approved.
+    """
+  end
+
+  defp pi_submit_plan_command_contents do
+    """
+    # /controlkeel-submit-plan
+
+    Use this command from Pi planning mode after the current plan has been written to `PLAN.md`.
+
+    Workflow:
+    1. Confirm the plan file is up to date.
+    2. Run `controlkeel review plan submit --body-file PLAN.md --submitted-by pi --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Only switch into execution after approval.
+    """
+  end
+
+  defp codex_diff_review_command_contents do
+    """
+    # /controlkeel-diff-review
+
+    Submit the current diff for ControlKeel browser review.
+
+    Suggested flow:
+    1. Save the diff to `.codex/review.diff`
+    2. Run `controlkeel review plan submit --title "Diff review" --body-file .codex/review.diff --submitted-by codex-cli --json`
+    3. Open or wait on the returned review id before finalizing
+    """
+  end
+
+  defp codex_completion_review_command_contents do
+    """
+    # /controlkeel-completion-review
+
+    Submit the final completion summary for ControlKeel approval.
+
+    Suggested flow:
+    1. Save the completion notes to `.codex/completion.md`
+    2. Run `controlkeel review plan submit --title "Completion review" --body-file .codex/completion.md --submitted-by codex-cli --json`
+    3. Wait with `controlkeel review plan wait --id <review_id> --json` before presenting the task as complete
+    """
+  end
+
+  defp codex_review_command_contents do
+    """
+    # /controlkeel-review
+
+    Run a general ControlKeel review flow for the current task or working tree.
+
+    Suggested flow:
+    1. Save the current summary to `.codex/review.md`
+    2. Run `controlkeel review plan submit --title "Codex review" --body-file .codex/review.md --submitted-by codex-cli --json`
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`
+    """
+  end
+
+  defp codex_annotate_command_contents do
+    """
+    # /controlkeel-annotate <file>
+
+    Use this when a single file needs focused human review notes.
+
+    Suggested flow:
+    1. Save the relevant notes to `.codex/annotate.md`
+    2. Mention the target file path and risks at the top of the note
+    3. Run `controlkeel review plan submit --title "File annotation review" --body-file .codex/annotate.md --submitted-by codex-cli --json`
+    4. Wait for the response before applying risky edits
+    """
+  end
+
+  defp codex_last_command_contents do
+    """
+    # /controlkeel-last
+
+    Re-open the most recent ControlKeel review decision you are tracking for this task.
+
+    Suggested flow:
+    1. Read the last stored review id from your working notes or command output
+    2. Run `controlkeel review plan open --id <review_id> --json`
+    3. If still pending, run `controlkeel review plan wait --id <review_id> --json`
+    """
+  end
+
+  defp copilot_plan_review_command_contents do
+    """
+    ---
+    description: Submit a plan to ControlKeel browser review and wait for approval
+    ---
+
+    When you are in plan mode, send the plan through ControlKeel before executing:
+
+    1. Save the plan to `.github/controlkeel-plan.md`
+    2. Run `controlkeel review plan submit --body-file .github/controlkeel-plan.md --submitted-by copilot --json`
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`
+    4. Do not implement until the review is approved
+    """
+  end
+
+  defp vscode_companion_extension_contents do
+    """
+    const vscode = require("vscode")
+
+    function setEnv(collection, key, value) {
+      collection.replace(key, value)
+    }
+
+    async function openUrl(url, title = "ControlKeel Review") {
+      const panel = vscode.window.createWebviewPanel(
+        "controlkeel-review",
+        title,
+        vscode.ViewColumn.Beside,
+        { enableScripts: true }
+      )
+
+      panel.webview.html = `
+      <!doctype html>
+      <html>
+        <body style="padding:0;margin:0">
+          <iframe src="${url}" style="border:0;width:100vw;height:100vh"></iframe>
+        </body>
+      </html>`
+    }
+
+    async function openPayload(payload) {
+      const data = typeof payload === "string" ? JSON.parse(payload) : payload
+      const url = data.browser_url || data.url || data.review?.browser_url
+      const title = data.review?.title || data.title || "ControlKeel Review"
+
+      if (!url) {
+        throw new Error("Payload did not include a browser_url")
+      }
+
+      await openUrl(url, title)
+    }
+
+    function activate(context) {
+      const openCommand = vscode.commands.registerCommand("controlkeel-review.openUrl", async () => {
+        const url = await vscode.window.showInputBox({
+          prompt: "Enter the ControlKeel review URL",
+          placeHolder: "https://..."
+        })
+
+        if (url) {
+          await openUrl(url)
+        }
+      })
+
+      const openPayloadCommand = vscode.commands.registerCommand(
+        "controlkeel-review.openPayload",
+        async payload => {
+          if (!payload) {
+            const raw = await vscode.window.showInputBox({
+              prompt: "Paste ControlKeel review JSON",
+              placeHolder: '{"browser_url":"https://..."}'
+            })
+
+            if (!raw) {
+              return
+            }
+
+            payload = raw
+          }
+
+          await openPayload(payload)
+        }
+      )
+
+      const annotateSelectionCommand = vscode.commands.registerCommand(
+        "controlkeel-review.annotateSelection",
+        async () => {
+          const editor = vscode.window.activeTextEditor
+          if (!editor || editor.selection.isEmpty) {
+            vscode.window.showInformationMessage("Select text to attach a ControlKeel review note.")
+            return
+          }
+
+          const note = await vscode.window.showInputBox({
+            prompt: "ControlKeel review note for the selected code",
+            placeHolder: "Needs a follow-up review before merge"
+          })
+
+          if (!note) {
+            return
+          }
+
+          const key = `controlkeel.annotation.${Date.now()}`
+          await context.workspaceState.update(key, {
+            note,
+            path: editor.document.uri.fsPath,
+            selection: editor.selection
+          })
+
+          vscode.window.showInformationMessage("Stored ControlKeel annotation locally in the workspace.")
+        }
+      )
+
+      context.subscriptions.push(openCommand, openPayloadCommand, annotateSelectionCommand)
+
+      const config = vscode.workspace.getConfiguration("controlkeelReview")
+      if (config.get("injectBrowser", true)) {
+        setEnv(context.environmentVariableCollection, "CONTROLKEEL_REVIEW_EMBED", "vscode_webview")
+        setEnv(context.environmentVariableCollection, "CONTROLKEEL_BROWSER_EMBED", "vscode_webview")
+        setEnv(context.environmentVariableCollection, "CONTROLKEEL_VSCODE_WEBVIEW", "1")
+
+        const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+        if (workspace) {
+          setEnv(context.environmentVariableCollection, "CONTROLKEEL_VSCODE_WORKSPACE", workspace)
+        }
+      }
+    }
+
+    function deactivate() {}
+
+    module.exports = { activate, deactivate }
+    """
+  end
+
+  defp vscode_companion_readme_contents do
+    """
+    # ControlKeel VS Code Companion
+
+    This companion extension opens ControlKeel review URLs in a VS Code webview and
+    injects terminal environment variables so ControlKeel-aware commands can prefer
+    editor embedding over an external browser when appropriate.
     """
   end
 
@@ -2213,6 +3538,40 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
+  defp kiro_review_hook_spec do
+    %{
+      "name" => "ControlKeel Plan Review Gate",
+      "description" =>
+        "Submits a plan review packet through ControlKeel before implementation leaves plan mode.",
+      "version" => "1.0",
+      "enabled" => true,
+      "triggers" => [
+        %{
+          "type" => "PreToolUse",
+          "toolNames" => ["write_file", "replace_in_file", "run_terminal_command"]
+        }
+      ],
+      "actions" => [
+        %{
+          "type" => "command",
+          "command" => "controlkeel review plan submit --stdin --submitted-by kiro --json"
+        }
+      ]
+    }
+  end
+
+  defp kiro_tool_policy_manifest do
+    %{
+      "planning" => %{
+        "allowed" => ["read_file", "search", "list_directory", "controlkeel"],
+        "blocked" => ["write_file", "replace_in_file"]
+      },
+      "execution" => %{
+        "allowed" => ["read_file", "search", "list_directory", "write_file", "replace_in_file"]
+      }
+    }
+  end
+
   defp kiro_steering_contents do
     """
     # ControlKeel Governance
@@ -2236,6 +3595,18 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp kiro_command_contents do
+    """
+    # ControlKeel review
+
+    Use this Kiro command to run a governed review pass:
+
+    1. Read `.kiro/steering/controlkeel.md`.
+    2. Use `ck_context` and `ck_validate`.
+    3. Surface blocked findings and proof status before completion.
+    """
+  end
+
   # ── Amp native helpers ─────────────────────────────────────────────────────
 
   defp amp_plugin_contents do
@@ -2247,6 +3618,7 @@ defmodule ControlKeel.Skills.Exporter do
      * - Event hooks on tool calls for governance logging
      * - Custom ck-validate tool for on-demand governance checks
      * - /controlkeel-review command for full project review
+     * - submit-plan tool for ControlKeel browser review gating
      *
      * Requires: PLUGINS=all environment variable to activate
      */
@@ -2279,6 +3651,20 @@ defmodule ControlKeel.Skills.Exporter do
       },
     })
 
+    amp.registerTool("submit-plan", {
+      description: "Submit a plan to ControlKeel and wait for approval.",
+      parameters: {
+        plan: { type: "string", description: "Markdown plan body" },
+      },
+      async execute(args: { plan: string }) {
+        const { stdout } = await amp.shell(
+          "controlkeel review plan submit --stdin --submitted-by amp --json",
+          { stdin: args.plan },
+        )
+        return stdout
+      },
+    })
+
     // Register governance review command
     amp.registerCommand("controlkeel-review", {
       description: "Run a full ControlKeel governance review on the current project",
@@ -2287,6 +3673,60 @@ defmodule ControlKeel.Skills.Exporter do
         return `Review the following governance results and provide a summary:\n\n${result}`
       },
     })
+    """
+  end
+
+  defp amp_command_contents do
+    """
+    # /controlkeel-review
+
+    Use this command to run a full ControlKeel review, then summarize:
+    - blocked findings
+    - proof status
+    - budget or routing concerns
+    """
+  end
+
+  defp amp_package_manifest do
+    %{
+      "name" => "@aryaminus/controlkeel-amp",
+      "version" => @app_version,
+      "private" => true,
+      "description" => "ControlKeel Amp plugin bundle",
+      "files" => [".amp"],
+      "license" => "Apache-2.0"
+    }
+  end
+
+  defp aider_instructions_contents do
+    """
+    # ControlKeel + Aider
+
+    Use Aider for execution and ControlKeel for governance:
+
+    1. Keep `AGENTS.md` in the repo root.
+    2. Use `.aider/commands/controlkeel-review.md` for governed review flow.
+    3. Use MCP plus command-driven review packets rather than pretending Aider has native plugin hooks.
+    """
+  end
+
+  defp aider_config_contents(project_root, opts) do
+    """
+    mcpservers:
+      controlkeel:
+        command: #{mcp_command(project_root, opts)}
+        args: [#{Enum.map_join(mcp_args(project_root, opts), ", ", &~s("#{&1}"))}]
+    """
+  end
+
+  defp aider_command_contents do
+    """
+    # ControlKeel review
+
+    1. Save the current plan or diff to a markdown file.
+    2. Run `controlkeel review plan submit --body-file <file> --submitted-by aider --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Summarize blocked findings and proof status before completion.
     """
   end
 end

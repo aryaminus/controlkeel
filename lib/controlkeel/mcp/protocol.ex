@@ -9,6 +9,9 @@ defmodule ControlKeel.MCP.Protocol do
     CkContext,
     CkDelegate,
     CkFinding,
+    CkReviewFeedback,
+    CkReviewStatus,
+    CkReviewSubmit,
     CkRoute,
     CkSkillList,
     CkSkillLoad,
@@ -86,6 +89,9 @@ defmodule ControlKeel.MCP.Protocol do
       ck_validate_tool(),
       ck_context_tool(),
       ck_finding_tool(),
+      ck_review_submit_tool(),
+      ck_review_status_tool(),
+      ck_review_feedback_tool(),
       ck_budget_tool(),
       ck_route_tool(),
       ck_delegate_tool(),
@@ -104,6 +110,9 @@ defmodule ControlKeel.MCP.Protocol do
   def dispatch_tool("ck_validate", arguments), do: CkValidate.call(arguments)
   def dispatch_tool("ck_context", arguments), do: CkContext.call(arguments)
   def dispatch_tool("ck_finding", arguments), do: CkFinding.call(arguments)
+  def dispatch_tool("ck_review_submit", arguments), do: CkReviewSubmit.call(arguments)
+  def dispatch_tool("ck_review_status", arguments), do: CkReviewStatus.call(arguments)
+  def dispatch_tool("ck_review_feedback", arguments), do: CkReviewFeedback.call(arguments)
   def dispatch_tool("ck_budget", arguments), do: CkBudget.call(arguments)
   def dispatch_tool("ck_route", arguments), do: CkRoute.call(arguments)
   def dispatch_tool("ck_delegate", arguments), do: CkDelegate.call(arguments)
@@ -171,6 +180,63 @@ defmodule ControlKeel.MCP.Protocol do
             "enum" => ["allow", "warn", "block", "escalate_to_human"]
           },
           "metadata" => %{"type" => "object"}
+        }
+      }
+    }
+  end
+
+  def ck_review_submit_tool do
+    %{
+      "name" => "ck_review_submit",
+      "description" =>
+        "Submit a governed plan, diff, or completion packet for browser review and execution gating.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["submission_body"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "title" => %{"type" => "string"},
+          "review_type" => %{"type" => "string", "enum" => ["plan", "diff", "completion"]},
+          "submission_body" => %{"type" => "string"},
+          "annotations" => %{"type" => "object"},
+          "feedback_notes" => %{"type" => "string"},
+          "submitted_by" => %{"type" => "string"},
+          "metadata" => %{"type" => "object"},
+          "previous_review_id" => %{"type" => ["integer", "string"]}
+        }
+      }
+    }
+  end
+
+  def ck_review_status_tool do
+    %{
+      "name" => "ck_review_status",
+      "description" => "Fetch the latest status, notes, and browser URL for a submitted review.",
+      "inputSchema" => %{
+        "type" => "object",
+        "properties" => %{
+          "review_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "review_type" => %{"type" => "string", "enum" => ["plan", "diff", "completion"]}
+        }
+      }
+    }
+  end
+
+  def ck_review_feedback_tool do
+    %{
+      "name" => "ck_review_feedback",
+      "description" => "Approve or deny a submitted review and attach feedback or annotations.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["review_id", "decision"],
+        "properties" => %{
+          "review_id" => %{"type" => ["integer", "string"]},
+          "decision" => %{"type" => "string", "enum" => ["approved", "denied"]},
+          "feedback_notes" => %{"type" => "string"},
+          "annotations" => %{"type" => "object"},
+          "reviewed_by" => %{"type" => "string"}
         }
       }
     }

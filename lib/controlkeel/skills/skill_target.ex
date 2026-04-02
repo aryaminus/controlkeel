@@ -1,6 +1,8 @@
 defmodule ControlKeel.Skills.SkillTarget do
   @moduledoc false
 
+  alias ControlKeel.AgentAdapters.Registry, as: AdapterRegistry
+
   defstruct [
     :id,
     :label,
@@ -80,6 +82,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         "continue-native",
         "Continue native bundle",
         "Continue-native prompts, checks guidance, and MCP companion config.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "pi-native",
+        "Pi native bundle",
+        "Pi-native command bundle, review extension manifest, MCP companion config, and browser review instructions.",
         true,
         "project",
         ["project", "export"],
@@ -216,8 +227,8 @@ defmodule ControlKeel.Skills.SkillTarget do
         "Instructions only",
         "Companion AGENTS / CLAUDE / Copilot instruction snippets for MCP-only tools.",
         false,
-        "export",
-        ["export"],
+        "project",
+        ["project", "export"],
         true
       ),
       target(
@@ -265,7 +276,7 @@ defmodule ControlKeel.Skills.SkillTarget do
         ["export"],
         true
       )
-    ]
+    ] ++ AdapterRegistry.skill_targets()
   end
 
   def ids, do: Enum.map(catalog(), & &1.id)

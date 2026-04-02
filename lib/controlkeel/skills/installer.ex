@@ -64,8 +64,27 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("codex", project_root, scope: scope)
     copy_tree_contents(Path.join(plan.output_dir, ".codex/agents"), agent_root)
 
+    commands_root =
+      if scope == "user",
+        do: Path.join(user_home(), ".codex/commands"),
+        else: Path.join(project_root, ".codex/commands")
+
+    File.mkdir_p!(commands_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".codex/commands"), commands_root)
+
+    if scope == "project" do
+      File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    end
+
     {:ok,
-     %{target: "codex", scope: scope, destination: skill_root, agent_destination: agent_root}}
+     %{
+       target: "codex",
+       scope: scope,
+       destination: skill_root,
+       agent_destination: agent_root,
+       commands_destination: commands_root
+     }}
   end
 
   defp do_install(%SkillTarget{id: "codex-plugin"}, scope, project_root, _skills, _opts)
@@ -139,11 +158,15 @@ defmodule ControlKeel.Skills.Installer do
         rules_root = cline_documents_dir("Rules")
         workflows_root = cline_documents_dir("Workflows")
         config_root = Path.join([cline_root, "data", "settings"])
+        commands_root = Path.join(cline_root, "commands")
+        hooks_root = Path.join(cline_root, "hooks")
 
         copy_skills(skills, skill_root)
         File.mkdir_p!(rules_root)
         File.mkdir_p!(workflows_root)
         File.mkdir_p!(config_root)
+        File.mkdir_p!(commands_root)
+        File.mkdir_p!(hooks_root)
 
         File.cp!(
           Path.join(plan.output_dir, ".clinerules/controlkeel.md"),
@@ -154,6 +177,9 @@ defmodule ControlKeel.Skills.Installer do
           Path.join(plan.output_dir, ".clinerules/workflows/controlkeel-review.md"),
           Path.join(workflows_root, "controlkeel-review.md")
         )
+
+        copy_tree_contents(Path.join(plan.output_dir, ".cline/commands"), commands_root)
+        copy_tree_contents(Path.join(plan.output_dir, ".cline/hooks"), hooks_root)
 
         merge_json_file!(
           Path.join(plan.output_dir, ".cline/data/settings/cline_mcp_settings.json"),
@@ -167,7 +193,9 @@ defmodule ControlKeel.Skills.Installer do
            destination: skill_root,
            agent_destination: config_root,
            rules_destination: rules_root,
-           workflows_destination: workflows_root
+           workflows_destination: workflows_root,
+           commands_destination: commands_root,
+           hooks_destination: hooks_root
          }}
 
       "project" ->
@@ -176,6 +204,17 @@ defmodule ControlKeel.Skills.Installer do
 
         copy_skills(skills, skill_root)
         copy_tree_contents(Path.join(plan.output_dir, ".clinerules"), rules_root)
+
+        copy_tree_contents(
+          Path.join(plan.output_dir, ".cline/commands"),
+          Path.join(project_root, ".cline/commands")
+        )
+
+        copy_tree_contents(
+          Path.join(plan.output_dir, ".cline/hooks"),
+          Path.join(project_root, ".cline/hooks")
+        )
+
         File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
 
         {:ok,
@@ -183,7 +222,9 @@ defmodule ControlKeel.Skills.Installer do
            target: "cline-native",
            scope: scope,
            destination: skill_root,
-           rules_destination: rules_root
+           rules_destination: rules_root,
+           commands_destination: Path.join(project_root, ".cline/commands"),
+           hooks_destination: Path.join(project_root, ".cline/hooks")
          }}
     end
   end
@@ -242,6 +283,28 @@ defmodule ControlKeel.Skills.Installer do
        target: "continue-native",
        scope: "project",
        destination: Path.join(project_root, ".continue")
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "pi-native"}, "project", project_root, skills, _opts) do
+    {:ok, plan} = Exporter.export("pi-native", project_root, scope: "project")
+
+    copy_skills(skills, Path.join(project_root, ".agents/skills"))
+    copy_tree_contents(Path.join(plan.output_dir, ".pi"), Path.join(project_root, ".pi"))
+
+    File.cp!(
+      Path.join(plan.output_dir, "pi-extension.json"),
+      Path.join(project_root, "pi-extension.json")
+    )
+
+    File.cp!(Path.join(plan.output_dir, "PI.md"), Path.join(project_root, "PI.md"))
+
+    {:ok,
+     %{
+       target: "pi-native",
+       scope: "project",
+       destination: Path.join(project_root, ".pi"),
+       skill_destination: Path.join(project_root, ".agents/skills")
      }}
   end
 
@@ -346,6 +409,11 @@ defmodule ControlKeel.Skills.Installer do
 
     File.cp!(Path.join(plan.output_dir, "GEMINI.md"), Path.join(project_root, "GEMINI.md"))
 
+    File.cp!(
+      Path.join(plan.output_dir, "README.md"),
+      Path.join(project_root, "README.gemini-controlkeel.md")
+    )
+
     {:ok,
      %{
        target: "gemini-cli-native",
@@ -362,12 +430,18 @@ defmodule ControlKeel.Skills.Installer do
     kiro_root = Path.join(project_root, ".kiro")
     hooks_root = Path.join(kiro_root, "hooks")
     steering_root = Path.join(kiro_root, "steering")
+    settings_root = Path.join(kiro_root, "settings")
+    commands_root = Path.join(kiro_root, "commands")
 
     File.mkdir_p!(hooks_root)
     File.mkdir_p!(steering_root)
+    File.mkdir_p!(settings_root)
+    File.mkdir_p!(commands_root)
 
     copy_tree_contents(Path.join(plan.output_dir, ".kiro/hooks"), hooks_root)
     copy_tree_contents(Path.join(plan.output_dir, ".kiro/steering"), steering_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".kiro/settings"), settings_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".kiro/commands"), commands_root)
 
     File.cp!(
       Path.join(plan.output_dir, ".kiro/mcp.json"),
@@ -382,7 +456,9 @@ defmodule ControlKeel.Skills.Installer do
        scope: "project",
        destination: kiro_root,
        hooks_destination: hooks_root,
-       steering_destination: steering_root
+       steering_destination: steering_root,
+       settings_destination: settings_root,
+       commands_destination: commands_root
      }}
   end
 
@@ -390,11 +466,9 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("amp-native", project_root, scope: "project")
 
     amp_root = Path.join(project_root, ".amp")
-    plugins_root = Path.join(amp_root, "plugins")
+    File.mkdir_p!(amp_root)
 
-    File.mkdir_p!(plugins_root)
-
-    copy_tree_contents(Path.join(plan.output_dir, ".amp/plugins"), plugins_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".amp"), amp_root)
     File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
     File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
 
@@ -403,7 +477,36 @@ defmodule ControlKeel.Skills.Installer do
        target: "amp-native",
        scope: "project",
        destination: amp_root,
-       plugins_destination: plugins_root
+       plugins_destination: Path.join(amp_root, "plugins"),
+       commands_destination: Path.join(amp_root, "commands")
+     }}
+  end
+
+  defp do_install(%SkillTarget{id: "instructions-only"}, "project", project_root, _skills, _opts) do
+    {:ok, plan} = Exporter.export("instructions-only", project_root, scope: "project")
+
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    File.cp!(Path.join(plan.output_dir, "CLAUDE.md"), Path.join(project_root, "CLAUDE.md"))
+
+    File.cp!(
+      Path.join(plan.output_dir, "copilot-instructions.md"),
+      Path.join(project_root, "copilot-instructions.md")
+    )
+
+    File.cp!(Path.join(plan.output_dir, "AIDER.md"), Path.join(project_root, "AIDER.md"))
+
+    File.cp!(
+      Path.join(plan.output_dir, ".aider.conf.yml"),
+      Path.join(project_root, ".aider.conf.yml")
+    )
+
+    copy_tree_contents(Path.join(plan.output_dir, ".aider"), Path.join(project_root, ".aider"))
+
+    {:ok,
+     %{
+       target: "instructions-only",
+       scope: "project",
+       destination: project_root
      }}
   end
 

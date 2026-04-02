@@ -158,6 +158,36 @@ defmodule ControlKeel.ProviderBrokerTest do
     assert attached["auth_owner"] == "agent"
   end
 
+  test "runtime-backed agents expose host-owned auth hints even without CK keys", %{
+    project_root: project_root
+  } do
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => 1,
+                 "session_id" => 1,
+                 "agent" => "opencode",
+                 "attached_agents" => %{
+                   "opencode" => %{
+                     "attached_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+                   }
+                 }
+               },
+               project_root
+             )
+
+    status = ProviderBroker.status(project_root)
+
+    attached = Enum.find(status["attached_agents"], &(&1["id"] == "opencode"))
+    hint = Enum.find(status["runtime_hints"], &(&1["agent_id"] == "opencode"))
+
+    assert attached["runtime_transport"] == "opencode_sdk"
+    assert attached["runtime_auth_owner"] == "agent"
+    assert attached["runtime_provider_hint"]["source"] == "agent_runtime"
+    assert hint["transport"] == "opencode_sdk"
+    assert hint["hint"]["auth_owner"] == "agent"
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 end

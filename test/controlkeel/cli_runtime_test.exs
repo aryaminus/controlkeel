@@ -315,7 +315,7 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert length(opencode_cmd) >= 1
 
     assert hd(opencode_cmd) == "controlkeel" or
-         String.ends_with?(hd(opencode_cmd), "/controlkeel/bin/controlkeel-mcp")
+             String.ends_with?(hd(opencode_cmd), "/controlkeel/bin/controlkeel-mcp")
   end
 
   test "bootstrap and provider commands work without manual init", %{tmp_dir: tmp_dir} do

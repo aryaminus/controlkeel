@@ -11,13 +11,26 @@ defmodule ControlKeel.ProtocolInterop do
     "ck_context" => ["mcp:access", "context:read"],
     "ck_validate" => ["mcp:access", "validate:run"],
     "ck_finding" => ["mcp:access", "finding:write"],
+    "ck_review_submit" => ["mcp:access", "review:write"],
+    "ck_review_status" => ["mcp:access", "review:read"],
+    "ck_review_feedback" => ["mcp:access", "review:respond"],
     "ck_budget" => ["mcp:access", "budget:write"],
     "ck_route" => ["mcp:access", "route:read"],
     "ck_delegate" => ["mcp:access", "delegate:run"],
     "ck_skill_list" => ["mcp:access", "skills:read"],
     "ck_skill_load" => ["mcp:access", "skills:read"]
   }
-  @a2a_skill_ids ~w(ck_context ck_validate ck_finding ck_budget ck_route ck_delegate)
+  @a2a_skill_ids ~w(
+    ck_context
+    ck_validate
+    ck_finding
+    ck_review_submit
+    ck_review_status
+    ck_review_feedback
+    ck_budget
+    ck_route
+    ck_delegate
+  )
 
   def handle_mcp_request(request, auth_context) when is_map(request) do
     Protocol.handle_request(request,
@@ -127,7 +140,8 @@ defmodule ControlKeel.ProtocolInterop do
   defp verify_workspace_scope(%ServiceAccount{} = service_account, arguments)
        when is_map(arguments) do
     with :ok <- maybe_verify_session_workspace(service_account, Map.get(arguments, "session_id")),
-         :ok <- maybe_verify_task_workspace(service_account, Map.get(arguments, "task_id")) do
+         :ok <- maybe_verify_task_workspace(service_account, Map.get(arguments, "task_id")),
+         :ok <- maybe_verify_review_workspace(service_account, Map.get(arguments, "review_id")) do
       :ok
     end
   end
@@ -158,6 +172,23 @@ defmodule ControlKeel.ProtocolInterop do
         :ok
       else
         {:error, {:forbidden, "Task access is outside the service account workspace."}}
+      end
+    else
+      {:error, reason} -> {:error, reason}
+      nil -> :ok
+    end
+  end
+
+  defp maybe_verify_review_workspace(_service_account, nil), do: :ok
+
+  defp maybe_verify_review_workspace(%ServiceAccount{} = service_account, review_id) do
+    with {:ok, parsed_id} <- parse_integer(review_id, "review_id"),
+         %{session_id: session_id} <- Mission.get_review(parsed_id),
+         %{workspace_id: workspace_id} <- Mission.get_session(session_id) do
+      if workspace_id == service_account.workspace_id do
+        :ok
+      else
+        {:error, {:forbidden, "Review access is outside the service account workspace."}}
       end
     else
       {:error, reason} -> {:error, reason}
@@ -231,6 +262,33 @@ defmodule ControlKeel.ProtocolInterop do
       "name" => "Finding persistence",
       "description" => "Persist governed findings and obtain ruling state.",
       "tags" => ["findings", "governance"]
+    }
+  end
+
+  defp a2a_skill("ck_review_submit") do
+    %{
+      "id" => "ck_review_submit",
+      "name" => "Review submission",
+      "description" => "Submit a plan, diff, or completion packet for governed browser review.",
+      "tags" => ["review", "planning"]
+    }
+  end
+
+  defp a2a_skill("ck_review_status") do
+    %{
+      "id" => "ck_review_status",
+      "name" => "Review status",
+      "description" => "Check review status, notes, and browser link for the current task.",
+      "tags" => ["review", "status"]
+    }
+  end
+
+  defp a2a_skill("ck_review_feedback") do
+    %{
+      "id" => "ck_review_feedback",
+      "name" => "Review feedback",
+      "description" => "Approve or deny a submitted review and return actionable feedback.",
+      "tags" => ["review", "approval"]
     }
   end
 

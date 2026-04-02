@@ -39,6 +39,77 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  def create_review(conn, params) do
+    attrs =
+      Map.take(
+        params,
+        ~w(session_id task_id title review_type submission_body annotations feedback_notes submitted_by metadata previous_review_id)
+      )
+
+    case Mission.submit_review(attrs) do
+      {:ok, review} ->
+        conn |> put_status(:created) |> json(%{review: review_summary(review)})
+
+      {:error, {:invalid_arguments, message}} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "invalid review", details: changeset_errors(changeset)})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
+  def get_review(conn, %{"id" => id}) do
+    case parse_integer_param(id) do
+      {:ok, review_id} ->
+        case Mission.get_review_with_context(review_id) do
+          nil -> conn |> put_status(:not_found) |> json(%{error: "review not found"})
+          review -> json(conn, %{review: review_summary(review)})
+        end
+
+      {:error, :invalid_integer} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "review id must be an integer"})
+    end
+  end
+
+  def respond_review(conn, %{"id" => id} = params) do
+    attrs = Map.take(params, ~w(decision status feedback_notes annotations reviewed_by metadata))
+
+    with {:ok, review_id} <- parse_integer_param(id),
+         {:ok, review} <- fetch_review(review_id),
+         {:ok, updated} <- Mission.respond_review(review, attrs) do
+      json(conn, %{review: review_summary(updated)})
+    else
+      {:error, :invalid_integer} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "review id must be an integer"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "review not found"})
+
+      {:error, {:invalid_arguments, message}} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "invalid review", details: changeset_errors(changeset)})
+
+      {:error, reason} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+    end
+  end
+
   def create_session(conn, params) do
     attrs =
       Map.take(
@@ -1291,6 +1362,37 @@ defmodule ControlKeelWeb.ApiController do
     }
   end
 
+  defp fetch_review(review_id) do
+    case Mission.get_review(review_id) do
+      nil -> {:error, :not_found}
+      review -> {:ok, review}
+    end
+  end
+
+  defp review_summary(review) do
+    review = Mission.get_review_with_context(review.id)
+
+    %{
+      id: review.id,
+      title: review.title,
+      review_type: review.review_type,
+      status: review.status,
+      session_id: review.session_id,
+      task_id: review.task_id,
+      submission_body: review.submission_body,
+      annotations: review.annotations,
+      feedback_notes: review.feedback_notes,
+      submitted_by: review.submitted_by,
+      reviewed_by: review.reviewed_by,
+      previous_review_id: review.previous_review_id,
+      responded_at: review.responded_at,
+      inserted_at: review.inserted_at,
+      browser_url: ControlKeelWeb.Endpoint.url() <> "/reviews/#{review.id}",
+      task_title: review.task && review.task.title,
+      previous_status: review.previous_review && review.previous_review.status
+    }
+  end
+
   defp agent_integration_summary(integration) do
     %{
       id: integration.id,
@@ -1302,6 +1404,22 @@ defmodule ControlKeelWeb.ApiController do
       runtime_export_command: integration.runtime_export_command,
       config_location: integration.config_location,
       companion_delivery: integration.companion_delivery,
+      install_experience: integration.install_experience,
+      review_experience: integration.review_experience,
+      submission_mode: integration.submission_mode,
+      feedback_mode: integration.feedback_mode,
+      phase_model: integration.phase_model,
+      browser_embed: integration.browser_embed,
+      subagent_visibility: integration.subagent_visibility,
+      runtime_transport: integration.runtime_transport,
+      runtime_auth_owner: integration.runtime_auth_owner,
+      runtime_session_support: integration.runtime_session_support,
+      runtime_review_transport: integration.runtime_review_transport,
+      plan_phase_support: integration.plan_phase_support,
+      artifact_surfaces: integration.artifact_surfaces,
+      package_outputs: integration.package_outputs,
+      direct_install_methods: integration.direct_install_methods,
+      confidence_level: integration.confidence_level,
       preferred_target: integration.preferred_target,
       default_scope: integration.default_scope,
       supported_scopes: integration.supported_scopes,
@@ -1352,7 +1470,8 @@ defmodule ControlKeelWeb.ApiController do
       risk_tier: session.risk_tier,
       spent_cents: session.spent_cents,
       budget_cents: session.budget_cents,
-      inserted_at: session.inserted_at
+      inserted_at: session.inserted_at,
+      runtime_context: get_in(session.metadata || %{}, ["runtime_context"])
     }
   end
 
@@ -1374,6 +1493,7 @@ defmodule ControlKeelWeb.ApiController do
       position: task.position,
       estimated_cost_cents: task.estimated_cost_cents,
       validation_gate: task.validation_gate,
+      runtime_context: get_in(task.metadata || %{}, ["runtime_context"]),
       latest_proof: Mission.proof_summary_for_task(task)
     }
   end

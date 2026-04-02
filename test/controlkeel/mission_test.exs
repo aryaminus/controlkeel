@@ -3,7 +3,7 @@ defmodule ControlKeel.MissionTest do
 
   alias ControlKeel.Memory
   alias ControlKeel.Mission
-  alias ControlKeel.Mission.ProofBundle
+  alias ControlKeel.Mission.{ProofBundle, Review}
   alias ControlKeel.Repo
   import ControlKeel.MissionFixtures
   import ControlKeel.IntentFixtures
@@ -209,6 +209,69 @@ defmodule ControlKeel.MissionTest do
 
     assert task.session_id
     assert finding.session_id
+  end
+
+  test "submit_review/1 supersedes prior plan reviews and unlocks execution on approval" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "queued"})
+
+    assert {:ok, first_review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "submission_body" => "Plan v1",
+               "submitted_by" => "codex"
+             })
+
+    assert first_review.status == "pending"
+    assert Mission.execution_ready?(Mission.get_task!(task.id)) == false
+
+    assert {:ok, second_review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "submission_body" => "Plan v2",
+               "submitted_by" => "codex"
+             })
+
+    assert second_review.previous_review_id == first_review.id
+    assert Mission.get_review!(first_review.id).status == "superseded"
+    assert Mission.review_gate_status(Mission.get_task!(task.id))["phase"] == "review"
+
+    assert {:ok, approved_review} =
+             Mission.respond_review(second_review, %{
+               "decision" => "approved",
+               "feedback_notes" => "Looks good"
+             })
+
+    assert approved_review.status == "approved"
+
+    gate = Mission.review_gate_status(Mission.get_task!(task.id))
+    assert gate["phase"] == "execution"
+    assert gate["execution_ready"] == true
+  end
+
+  test "reviews are included in the audit log and proof bundle summary" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "done"})
+
+    assert {:ok, review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "submission_body" => "Plan with review trail"
+             })
+
+    assert {:ok, %Review{} = _approved} =
+             Mission.respond_review(review, %{
+               "decision" => "approved",
+               "feedback_notes" => "Proceed"
+             })
+
+    assert {:ok, proof} = Mission.generate_proof_bundle(task.id)
+    assert {:ok, audit_log} = Mission.audit_log(session.id)
+
+    assert Enum.any?(audit_log.events, &(&1.type == "review_submitted"))
+    assert Enum.any?(audit_log.events, &(&1.type == "review_responded"))
+    assert proof.bundle["review_summary"]["approved"] == 1
+    assert proof.bundle["review_summary"]["latest_review_status"] == "approved"
   end
 
   describe "complete_task/1" do

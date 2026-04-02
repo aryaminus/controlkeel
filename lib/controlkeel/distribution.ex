@@ -121,12 +121,14 @@ defmodule ControlKeel.Distribution do
   end
 
   def raw_binary_asset_name("linux", "x86_64"), do: "controlkeel-linux-x86_64"
+  def raw_binary_asset_name("linux", "arm64"), do: "controlkeel-linux-arm64"
   def raw_binary_asset_name("macos", "x86_64"), do: "controlkeel-macos-x86_64"
   def raw_binary_asset_name("macos", "arm64"), do: "controlkeel-macos-arm64"
   def raw_binary_asset_name("windows", "x86_64"), do: "controlkeel-windows-x86_64.exe"
   def raw_binary_asset_name(_, _), do: nil
 
   def binary_archive_name("linux", "x86_64"), do: "controlkeel-linux-x86_64.tar.gz"
+  def binary_archive_name("linux", "arm64"), do: "controlkeel-linux-arm64.tar.gz"
   def binary_archive_name("macos", "x86_64"), do: "controlkeel-macos-x86_64.tar.gz"
   def binary_archive_name("macos", "arm64"), do: "controlkeel-macos-arm64.tar.gz"
   def binary_archive_name("windows", "x86_64"), do: "controlkeel-windows-x86_64.zip"

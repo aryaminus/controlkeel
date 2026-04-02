@@ -112,7 +112,7 @@ defmodule ControlKeel.ACPRegistry do
       entry_id = normalize_slug(entry["id"])
       repository = normalize_slug(entry["repository"])
 
-      (normalized_slug && repository == normalized_slug) or entry_id in candidates
+      (is_binary(normalized_slug) and repository == normalized_slug) or entry_id in candidates
     end)
   end
 

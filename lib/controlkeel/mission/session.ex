@@ -3,7 +3,17 @@ defmodule ControlKeel.Mission.Session do
   import Ecto.Changeset
 
   alias ControlKeel.Memory.Record
-  alias ControlKeel.Mission.{Finding, Invocation, ProofBundle, Task, TaskCheckpoint, Workspace}
+
+  alias ControlKeel.Mission.{
+    Finding,
+    Invocation,
+    ProofBundle,
+    Review,
+    Task,
+    TaskCheckpoint,
+    Workspace
+  }
+
   alias ControlKeel.Platform.{AuditExport, TaskEdge, TaskRun}
 
   schema "sessions" do
@@ -16,12 +26,14 @@ defmodule ControlKeel.Mission.Session do
     field :spent_cents, :integer, default: 0
     field :proxy_token, :string
     field :execution_brief, :map, default: %{}
+    field :metadata, :map, default: %{}
 
     belongs_to :workspace, Workspace
     has_many :tasks, Task
     has_many :findings, Finding
     has_many :invocations, Invocation
     has_many :proof_bundles, ProofBundle
+    has_many :reviews, Review
     has_many :task_checkpoints, TaskCheckpoint
     has_many :memory_records, Record
     has_many :task_edges, TaskEdge
@@ -43,6 +55,7 @@ defmodule ControlKeel.Mission.Session do
       :spent_cents,
       :proxy_token,
       :execution_brief,
+      :metadata,
       :workspace_id
     ])
     |> ensure_proxy_token()

@@ -2,6 +2,7 @@ defmodule ControlKeel.ProviderBroker do
   @moduledoc false
 
   alias ControlKeel.AgentIntegration
+  alias ControlKeel.AgentRuntimes.Registry, as: RuntimeRegistry
   alias ControlKeel.ProjectBinding
   alias ControlKeel.ProviderConfig
 
@@ -36,7 +37,8 @@ defmodule ControlKeel.ProviderBroker do
       "profiles" => Enum.map(provider_ids(), &profile_summary(config, &1)),
       "bootstrap" => ProjectBinding.bootstrap_summary(root),
       "binding_mode" => bootstrap_mode(root),
-      "attached_agents" => attached_agent_summaries(binding)
+      "attached_agents" => attached_agent_summaries(binding, root, opts),
+      "runtime_hints" => runtime_hint_summaries(binding, root, opts)
     }
   end
 
@@ -115,17 +117,30 @@ defmodule ControlKeel.ProviderBroker do
 
   def doctor(project_root \\ File.cwd!(), opts \\ []) do
     status = status(project_root, opts)
+    runtime_hints = status["runtime_hints"] || []
 
     suggestions =
-      case {status["selected_source"], status["selected_provider"]} do
-        {"heuristic", "heuristic"} ->
+      case {status["selected_source"], status["selected_provider"], runtime_hints} do
+        {"heuristic", "heuristic", [_ | _] = hints} ->
+          transports =
+            hints
+            |> Enum.map(&"#{&1["agent_id"]}:#{&1["transport"] || "runtime"}")
+            |> Enum.join(", ")
+
+          [
+            "No CK-owned provider is currently configured for advisory requests.",
+            "Attached runtime-backed agents can still execute with host-owned auth: #{transports}.",
+            "Configure a provider only if you want CK itself to call hosted model APIs for advisory, validation, or embeddings."
+          ]
+
+        {"heuristic", "heuristic", _} ->
           [
             "No model provider is currently available.",
             "Configure a provider with `controlkeel provider set-key <provider> --value ...`, `controlkeel provider set-base-url openai --value ...`, run a supported agent bridge, or start Ollama.",
             "CK still works in heuristic mode for governance, proof, benchmark, and MCP surfaces."
           ]
 
-        {source, provider} ->
+        {source, provider, _} ->
           [
             "Current provider source: #{source}.",
             "Current provider: #{provider}.",
@@ -555,23 +570,56 @@ defmodule ControlKeel.ProviderBroker do
 
   defp attached_agents(_binding, _raw), do: []
 
-  defp attached_agent_summaries(binding) do
+  defp attached_agent_summaries(binding, project_root, opts) do
     binding
     |> attached_agents(binding)
     |> Enum.map(fn {id, attrs} ->
-      integration = AgentIntegration.get(normalize_agent_id(id))
+      normalized_id = normalize_agent_id(id)
+      integration = AgentIntegration.get(normalized_id)
+      runtime_hint = RuntimeRegistry.provider_hint(normalized_id, project_root, opts)
 
       %{
-        "id" => normalize_agent_id(id),
+        "id" => normalized_id,
         "label" => if(integration, do: integration.label, else: id),
-        "provider_bridge_supported" => bridge_supported?(normalize_agent_id(id)),
+        "provider_bridge_supported" => bridge_supported?(normalized_id),
         "support_class" => integration && integration.support_class,
         "auth_mode" => integration && integration.auth_mode,
         "auth_owner" => integration && AgentIntegration.auth_owner(integration),
         "mcp_mode" => integration && integration.mcp_mode,
         "skills_mode" => integration && integration.skills_mode,
+        "runtime_transport" => integration && integration.runtime_transport,
+        "runtime_review_transport" => integration && integration.runtime_review_transport,
+        "runtime_auth_owner" => integration && integration.runtime_auth_owner,
+        "runtime_session_support" => integration && integration.runtime_session_support,
+        "runtime_provider_hint" => sanitize_runtime_hint(runtime_hint),
         "attached_at" => attrs["attached_at"] || attrs[:attached_at]
       }
+    end)
+  end
+
+  defp runtime_hint_summaries(binding, project_root, opts) do
+    binding
+    |> attached_agents(binding)
+    |> Enum.flat_map(fn {id, _attrs} ->
+      normalized_id = normalize_agent_id(id)
+
+      case RuntimeRegistry.provider_hint(normalized_id, project_root, opts) do
+        nil ->
+          []
+
+        hint ->
+          [
+            %{
+              "agent_id" => normalized_id,
+              "transport" =>
+                case AgentIntegration.get(normalized_id) do
+                  nil -> nil
+                  integration -> integration.runtime_transport
+                end,
+              "hint" => sanitize_runtime_hint(hint)
+            }
+          ]
+      end
     end)
   end
 
@@ -795,6 +843,14 @@ defmodule ControlKeel.ProviderBroker do
       "auth_mode" => resolution.auth_mode,
       "auth_owner" => resolution.auth_owner
     }
+  end
+
+  defp sanitize_runtime_hint(nil), do: nil
+
+  defp sanitize_runtime_hint(hint) when is_map(hint) do
+    hint
+    |> Enum.reject(fn {key, _value} -> to_string(key) in ["api_key", "token", "secret"] end)
+    |> Enum.into(%{})
   end
 
   defp source_auth_mode("agent_bridge"), do: "env_bridge"

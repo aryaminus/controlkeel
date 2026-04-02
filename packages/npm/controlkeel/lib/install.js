@@ -21,6 +21,10 @@ function assetName(platform = process.platform, arch = process.arch) {
     return "controlkeel-linux-x86_64";
   }
 
+  if (platform === "linux" && arch === "arm64") {
+    return "controlkeel-linux-arm64";
+  }
+
   if (platform === "darwin" && arch === "x64") {
     return "controlkeel-macos-x86_64";
   }

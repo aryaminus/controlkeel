@@ -10,7 +10,7 @@ This document is the **single inventory** for attach targets, MCP tools, and bun
 - [`lib/controlkeel/protocol_interop.ex`](../lib/controlkeel/protocol_interop.ex) — hosted MCP/A2A dispatch wrappers
 - [`priv/skills/`](../priv/skills/) — on-disk AgentSkills bundles
 
-For install paths and proxy URLs, see [agent-integrations.md](agent-integrations.md) and [getting-started.md](getting-started.md).
+For install paths and proxy URLs, see [agent-integrations.md](agent-integrations.md), [getting-started.md](getting-started.md), [host-surface-parity.md](host-surface-parity.md), and [direct-host-installs.md](direct-host-installs.md).
 Product intent and acceptance criteria for this matrix live in [agent-support-prd.md](agent-support-prd.md) and [agent-support-requirements.md](agent-support-requirements.md).
 
 ## Typed integration catalog (`AgentIntegration.catalog/0`)
@@ -26,25 +26,86 @@ Every shipped integration row now declares both a **support class** and a **two-
 
 Only `attach_client` rows produce real `controlkeel attach <id>` commands. `headless_runtime` rows export runtime bundles, `framework_adapter` rows surface through benchmark/policy tooling, `provider_only` rows surface through CK provider flows, and `alias` rows point at a canonical shipped target.
 
+Every shipped row also carries the stricter parity contract exposed in `/skills` and `GET /api/v1/skills/targets`:
+
+- `install_experience`
+- `review_experience`
+- `submission_mode`
+- `feedback_mode`
+- `plan_phase_support`
+- `phase_model`
+- `browser_embed`
+- `subagent_visibility`
+- `artifact_surfaces`
+- `package_outputs`
+- `direct_install_methods`
+- `confidence_level`
+- `runtime_transport`
+- `runtime_auth_owner`
+- `runtime_session_support`
+- `runtime_review_transport`
+
 Attachable and runtime integrations use the same governed MCP surface. Core routing/governance tools are always present, extended governance tools are currently enabled in protocol responses, and `ck_skill_list` / `ck_skill_load` are included when skills are available.
+
+## Host parity classes
+
+These are the first-class host adapters that currently implement the richer review transport instead of a generic support claim:
+
+| Host | Attach command | Phase model | Review experience | Browser embed | Subagent visibility | Declared package outputs |
+| ---- | ---------------- | ------------- | ------------------- | --------------- | --------------------- | -------------------------- |
+| `claude-code` | `controlkeel attach claude-code` | `host_plan_mode` | `native_review` via Claude hooks | `external` | `primary_only` | `controlkeel-claude-plugin.tar.gz` |
+| `copilot` | `controlkeel attach copilot` | `host_plan_mode` | `native_review` via repo/plugin hooks | `external` | `primary_only` | `controlkeel-copilot-plugin.tar.gz` |
+| `opencode` | `controlkeel attach opencode` | `host_plan_mode` | `native_review` via plugin tool call | `external` | `primary_only` | `controlkeel-opencode-native.tar.gz`, `controlkeel-opencode-native.tgz` |
+| `pi` | `controlkeel attach pi` | `file_plan_mode` | `browser_review` with persisted plan file state | `external` | `primary_only` | `controlkeel-pi-native.tar.gz`, `controlkeel-pi-native.tgz` |
+| `vscode` | `controlkeel attach vscode` | `review_only` | `browser_review` through companion extension | `vscode_webview` | `none` | `controlkeel-github-repo.tar.gz`, `controlkeel-vscode-companion.vsix` |
+| `codex-cli` | `controlkeel attach codex-cli` | `review_only` | `browser_review` through native commands | `none` | `primary_only` | `controlkeel-codex.tar.gz`, `controlkeel-codex-plugin.tar.gz` |
+
+Everything else in the catalog remains supported according to its own typed row, but is not marketed as a first-class host adapter unless it has a real install surface plus a defined review path.
+
+The broader native matrix now also tracks the strongest official surfaces CK exports for each host:
+
+| Host | Strongest shipped official surface |
+| ---- | ---------------------------------- |
+| `windsurf` | Cascade hooks, workflows, commands, and MCP config |
+| `continue` | prompts, command prompts, headless guidance, and `.continue/mcpServers/controlkeel.yaml` |
+| `cline` | rules, workflows, commands, hook scripts, and CLI MCP config |
+| `goose` | repo hints, workflow recipes, commands, and Goose extension YAML |
+| `kiro` | hooks, steering, tool-policy settings, commands, and MCP config |
+| `amp` | TypeScript plugin, custom tool/command surface, and package scaffold |
+| `gemini-cli` | extension manifest, review/submit-plan commands, and skill bundle |
+| `cursor` | rules, commands, background-agent guidance, and MCP config |
+| `roo-code` | rules, commands, governed modes, and cloud-agent guidance |
+| `aider` | command-driven snippets, `.aider.conf.yml`, and `AIDER.md` |
+
+Runtime transport truth for those first-class hosts:
+
+| Host | Runtime transport | Runtime auth owner | Runtime review transport | Session support |
+| ---- | ----------------- | ------------------ | ------------------------ | --------------- |
+| `claude-code` | `claude_agent_sdk` | `agent` | `hook_sdk` | create, fork, resume, streaming |
+| `copilot` | `hook_session_parser` | `agent` | `hook_session_state` | no CK-owned session lifecycle claims |
+| `opencode` | `opencode_sdk` | `agent` | `plugin_session_tool` | create, fork, resume, streaming |
+| `pi` | `pi_rpc` | `agent` | `extension_rpc` | create and streaming; no fork claims |
+| `vscode` | `vscode_companion` | `workspace` | `vscode_ipc` | none |
+| `codex-cli` | `codex_sdk` | `agent` | `command_thread` | create, resume, streaming; no fork claims |
 
 | ID | Support class | Action | Agent uses CK via | CK runs agent via | Execution support | Auth / skills | Preferred export / bundle |
 | ---- | --------------- | -------- | ------------------- | ------------------- | ------------------ | --------------- | --------------------------- |
 | `claude-code` | attach_client | `controlkeel attach claude-code` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `env_bridge` / `native` | `claude-standalone` |
 | `codex-cli` | attach_client | `controlkeel attach codex-cli` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
-| `cline` | attach_client | `controlkeel attach cline` | `local_mcp`, `native_skills`, `rules`, `workflows` | `embedded` | `direct` | `ck_owned` / `native` | `cline-native` |
-| `roo-code` | attach_client | `controlkeel attach roo-code` | `local_mcp`, `native_skills`, `rules`, `workflows` | `handoff` | `handoff` | `ck_owned` / `native` | `roo-native` |
-| `goose` | attach_client | `controlkeel attach goose` | `local_mcp`, `workflows`, `hooks` | `handoff` | `handoff` | `ck_owned` / `native` | `goose-native` |
+| `cline` | attach_client | `controlkeel attach cline` | `local_mcp`, `native_skills`, `rules`, `workflows`, `hooks`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `cline-native` |
+| `roo-code` | attach_client | `controlkeel attach roo-code` | `local_mcp`, `native_skills`, `rules`, `workflows`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `roo-native` |
+| `goose` | attach_client | `controlkeel attach goose` | `local_mcp`, `workflows`, `hooks`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `goose-native` |
 | `vscode` | attach_client | `controlkeel attach vscode` | `local_mcp`, `plugin`, `native_skills`, `workflows`, `hooks` | `handoff` | `handoff` | `ck_owned` / `native` | `github-repo` |
-| `copilot` | attach_client | `controlkeel attach copilot` | `local_mcp`, `plugin`, `native_skills`, `workflows`, `hooks` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
-| `cursor` | attach_client | `controlkeel attach cursor` | `local_mcp`, `native_skills`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
-| `windsurf` | attach_client | `controlkeel attach windsurf` | `local_mcp`, `native_skills`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `windsurf-native` |
-| `kiro` | attach_client | `controlkeel attach kiro` | `local_mcp`, `native_skills`, `hooks`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `kiro-native` |
-| `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `plugin`, `rules` | `handoff` | `handoff` | `ck_owned` / `native` | `amp-native` |
-| `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules` | `embedded` | `direct` | `ck_owned` / `native` | `opencode-native` |
-| `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `local_mcp`, `native_skills`, `rules` | `embedded` | `direct` | `ck_owned` / `native` | `gemini-cli-native` |
-| `continue` | attach_client | `controlkeel attach continue` | `local_mcp`, `native_skills`, `rules`, `workflows` | `embedded` | `direct` | `ck_owned` / `native` | `continue-native` |
-| `aider` | attach_client | `controlkeel attach aider` | `local_mcp`, `rules` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
+| `copilot` | attach_client | `controlkeel attach copilot` | `local_mcp`, `plugin`, `native_skills`, `workflows`, `hooks` | `embedded` | `direct` | `agent_runtime` / `native` | `github-repo` |
+| `cursor` | attach_client | `controlkeel attach cursor` | `local_mcp`, `native_skills`, `rules`, `commands`, `workflows` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
+| `windsurf` | attach_client | `controlkeel attach windsurf` | `local_mcp`, `native_skills`, `rules`, `hooks`, `workflows`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `windsurf-native` |
+| `kiro` | attach_client | `controlkeel attach kiro` | `local_mcp`, `native_skills`, `hooks`, `rules`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `kiro-native` |
+| `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `plugin`, `rules`, `commands`, `tool_call` | `handoff` | `handoff` | `ck_owned` / `native` | `amp-native` |
+| `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules` | `embedded` | `direct` | `agent_runtime` / `native` | `opencode-native` |
+| `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `local_mcp`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `gemini-cli-native` |
+| `continue` | attach_client | `controlkeel attach continue` | `local_mcp`, `native_skills`, `rules`, `workflows`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `continue-native` |
+| `pi` | attach_client | `controlkeel attach pi` | `local_mcp`, `rules` | `handoff` | `handoff` | `agent_runtime` / `native` | `pi-native` |
+| `aider` | attach_client | `controlkeel attach aider` | `local_mcp`, `commands` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
 | `hermes-agent` | attach_client | `controlkeel attach hermes-agent` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `native` | `hermes-native` |
 | `openclaw` | attach_client | `controlkeel attach openclaw` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `plugin_bundle` | `openclaw-native` |
 | `droid` | attach_client | `controlkeel attach droid` | `local_mcp` | `handoff` | `handoff` | `gateway_base_url` / `native` | `droid-bundle` |
@@ -137,6 +198,9 @@ Hosted MCP tool authorization uses these protocol scopes:
 | `ck_context` | `mcp:access`, `context:read` |
 | `ck_validate` | `mcp:access`, `validate:run` |
 | `ck_finding` | `mcp:access`, `finding:write` |
+| `ck_review_submit` | `mcp:access`, `review:write` |
+| `ck_review_status` | `mcp:access`, `review:read` |
+| `ck_review_feedback` | `mcp:access`, `review:respond` |
 | `ck_budget` | `mcp:access`, `budget:write` |
 | `ck_route` | `mcp:access`, `route:read` |
 | `ck_delegate` | `mcp:access`, `delegate:run` |
@@ -158,6 +222,9 @@ Advertised A2A skills map directly to the core governed capabilities:
 - `ck_context`
 - `ck_validate`
 - `ck_finding`
+- `ck_review_submit`
+- `ck_review_status`
+- `ck_review_feedback`
 - `ck_budget`
 - `ck_route`
 - `ck_delegate`
@@ -184,6 +251,9 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | `ck_validate` | Run FastPath scan (patterns, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present. |
 | `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, resume packet, provider status. Requires `session_id`. |
 | `ck_finding` | Record a governed finding for a session (and optional task). |
+| `ck_review_submit` | Submit a plan, diff, or completion packet for browser review and execution gating. |
+| `ck_review_status` | Fetch latest review status, notes, and browser URL by `review_id` or `task_id`. |
+| `ck_review_feedback` | Approve or deny a submitted review and persist feedback notes or annotations. |
 | `ck_budget` | Budget estimate or commit (`mode`: `estimate` \| `commit`). |
 | `ck_route` | Agent routing recommendation from `AgentRouter` (`task`, optional `risk_tier`, `budget_remaining_cents`, `allowed_agents`). |
 | `ck_delegate` | Ask ControlKeel to run or hand off another agent for a task or session under the current policy gates. |

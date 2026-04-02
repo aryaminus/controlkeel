@@ -97,6 +97,30 @@ defmodule ControlKeel.MissionFixtures do
     proof
   end
 
+  def review_fixture(attrs \\ %{}) do
+    task = Map.get(attrs, :task)
+
+    session =
+      Map.get_lazy(attrs, :session, fn ->
+        if task, do: Mission.get_session!(task.session_id), else: session_fixture()
+      end)
+
+    {:ok, review} =
+      attrs
+      |> Enum.into(%{
+        review_type: "plan",
+        submission_body: "1. Validate constraints\n2. Implement changes\n3. Request approval",
+        session_id: session.id,
+        task_id: task && task.id,
+        submitted_by: "fixture"
+      })
+      |> Map.delete(:session)
+      |> Map.delete(:task)
+      |> Mission.submit_review()
+
+    review
+  end
+
   def memory_record_fixture(attrs \\ %{}) do
     session = Map.get_lazy(attrs, :session, fn -> session_fixture() end)
 

@@ -141,6 +141,37 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
   end
 
+  describe "review lifecycle API" do
+    test "creates, fetches, and responds to reviews", %{conn: conn} do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+
+      conn =
+        post(conn, ~p"/api/v1/reviews", %{
+          task_id: task.id,
+          submission_body: "Plan from API"
+        })
+
+      assert %{"review" => review} = json_response(conn, 201)
+      assert review["status"] == "pending"
+      assert review["browser_url"] =~ "/reviews/"
+
+      conn = build_conn() |> get(~p"/api/v1/reviews/#{review["id"]}")
+      assert %{"review" => fetched} = json_response(conn, 200)
+      assert fetched["id"] == review["id"]
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/reviews/#{review["id"]}/respond", %{
+          decision: "approved",
+          feedback_notes: "Proceed"
+        })
+
+      assert %{"review" => updated} = json_response(conn, 200)
+      assert updated["status"] == "approved"
+    end
+  end
+
   # ─── Tasks ───────────────────────────────────────────────────────────────────
 
   describe "POST /api/v1/sessions/:session_id/tasks" do
@@ -416,6 +447,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert Enum.any?(targets, &(&1["id"] == "claude-plugin"))
       assert Enum.any?(targets, &(&1["id"] == "copilot-plugin"))
+      assert Enum.any?(targets, &(&1["id"] == "vscode-companion"))
       assert Enum.any?(targets, &(&1["id"] == "cline-native"))
       assert Enum.any?(targets, &(&1["id"] == "roo-native"))
       assert Enum.any?(targets, &(&1["id"] == "goose-native"))
@@ -439,8 +471,24 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert claude["preferred_target"] == "claude-standalone"
       assert claude["support_class"] == "attach_client"
+      assert claude["phase_model"] == "host_plan_mode"
+      assert claude["browser_embed"] == "external"
+      assert claude["runtime_transport"] == "claude_agent_sdk"
+      assert claude["runtime_auth_owner"] == "agent"
+      assert claude["runtime_review_transport"] == "hook_sdk"
+      assert claude["runtime_session_support"]["fork"] == true
       assert "ck_validate" in claude["required_mcp_tools"]
       assert Enum.any?(claude["install_channels"], &(&1["id"] == "homebrew"))
+
+      assert Enum.any?(
+               claude["package_outputs"],
+               &(&1["artifact"] == "controlkeel-claude-plugin.tar.gz")
+             )
+
+      assert Enum.any?(
+               claude["direct_install_methods"],
+               &(&1["command"] == "claude --plugin-dir ./controlkeel/dist/claude-plugin")
+             )
 
       open_swe =
         Enum.find(agents, fn agent ->
@@ -457,6 +505,29 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert devin["support_class"] == "headless_runtime"
       assert devin["runtime_export_command"] == "controlkeel runtime export devin"
+
+      opencode =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "opencode"
+        end)
+
+      assert opencode["runtime_transport"] == "opencode_sdk"
+      assert opencode["runtime_auth_owner"] == "agent"
+      assert opencode["auth_mode"] == "agent_runtime"
+
+      assert Enum.any?(
+               opencode["direct_install_methods"],
+               &(&1["command"] =~ "@aryaminus/controlkeel-opencode")
+             )
+
+      vscode =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "vscode"
+        end)
+
+      assert vscode["phase_model"] == "review_only"
+      assert vscode["runtime_transport"] == "vscode_companion"
+      assert vscode["runtime_review_transport"] == "vscode_ipc"
 
       cline =
         Enum.find(agents, fn agent ->

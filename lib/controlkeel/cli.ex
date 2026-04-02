@@ -28,10 +28,12 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.ProviderBroker
   alias ControlKeel.ProtocolAccess
   alias ControlKeel.ProjectBinding
+  alias ControlKeel.ReviewBridge
   alias ControlKeel.ExecutionSandbox
   alias ControlKeel.Proxy
   alias ControlKeel.RuntimePaths
   alias ControlKeel.Skills
+  alias ControlKeelWeb.Endpoint
 
   @init_switches [
     industry: :string,
@@ -135,6 +137,29 @@ defmodule ControlKeel.CLI do
     domain_pack: :string,
     project_root: :string
   ]
+  @review_plan_submit_switches [
+    session_id: :integer,
+    task_id: :integer,
+    body_file: :string,
+    stdin: :boolean,
+    title: :string,
+    submitted_by: :string,
+    json: :boolean
+  ]
+  @review_plan_open_switches [id: :integer, json: :boolean]
+  @review_plan_wait_switches [
+    id: :integer,
+    timeout: :integer,
+    interval_ms: :integer,
+    json: :boolean
+  ]
+  @review_plan_respond_switches [
+    decision: :string,
+    feedback_notes: :string,
+    reviewed_by: :string,
+    annotations: :string,
+    json: :boolean
+  ]
   @release_ready_switches [
     session_id: :integer,
     sha: :string,
@@ -190,6 +215,18 @@ defmodule ControlKeel.CLI do
 
       ["review", "socket" | rest] ->
         parse_with_switches(:review_socket, rest, @review_socket_switches)
+
+      ["review", "plan", "submit" | rest] ->
+        parse_with_switches(:review_plan_submit, rest, @review_plan_submit_switches)
+
+      ["review", "plan", "open" | rest] ->
+        parse_with_switches(:review_plan_open, rest, @review_plan_open_switches)
+
+      ["review", "plan", "wait" | rest] ->
+        parse_with_switches(:review_plan_wait, rest, @review_plan_wait_switches)
+
+      ["review", "plan", "respond", review_id | rest] ->
+        parse_review_plan_respond(review_id, rest)
 
       ["release-ready" | rest] ->
         parse_with_switches(:release_ready, rest, @release_ready_switches)
@@ -485,6 +522,12 @@ defmodule ControlKeel.CLI do
       controlkeel review pr [options] Review a PR patch from --patch <file> or --stdin
       controlkeel review socket [options]
                   Review a Socket report from --report <file> or --stdin
+      controlkeel review plan submit [options]
+                                      Submit a plan for browser review from --body-file <file> or --stdin
+      controlkeel review plan open --id <review-id>
+                                      Print the browser review URL and current state
+      controlkeel review plan respond <review-id> --decision approved|denied [--feedback-notes ...]
+                                      Record an approval or denial for a submitted plan review
       controlkeel release-ready [options]
                                       Check proof-backed release readiness for a session
       controlkeel govern install github
@@ -868,14 +911,15 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["roo-code", "hermes-agent", "openclaw", "droid", "forge"] do
+      when agent in ["roo-code", "hermes-agent", "openclaw", "droid", "forge", "pi"] do
     target =
       %{
         "roo-code" => "roo-native",
         "hermes-agent" => "hermes-native",
         "openclaw" => "openclaw-native",
         "droid" => "droid-bundle",
-        "forge" => "forge-acp"
+        "forge" => "forge-acp",
+        "pi" => "pi-native"
       }[agent]
 
     scope = attach_scope(agent, options)
@@ -1011,6 +1055,160 @@ defmodule ControlKeel.CLI do
              |> Keyword.put(:phase, "dependency_review")
            ) do
       {:ok, review_lines(review, "dependency")}
+    end
+  end
+
+  def run_command(%{command: :review_plan_submit, options: options}, _project_root) do
+    with {:ok, submission_body} <- review_submission_input(options),
+         {:ok, attrs} <- review_submission_attrs(options, submission_body),
+         {:ok, review} <- Mission.submit_review(attrs) do
+      payload =
+        review_cli_payload(review, %{
+          "message" => "submitted",
+          "browser_url" => review_url(review.id)
+        })
+
+      if options[:json] do
+        {:ok, [Jason.encode!(payload)]}
+      else
+        {:ok,
+         [
+           "Submitted plan review ##{review.id}.",
+           "Status: #{review.status}",
+           "Browser URL: #{review_url(review.id)}",
+           "Execution gate: task remains blocked until the plan review is approved."
+         ]}
+      end
+    else
+      {:error, reason} ->
+        cli_error("Failed to submit plan review", reason, options)
+    end
+  end
+
+  def run_command(%{command: :review_plan_open, options: options}, _project_root) do
+    with {:ok, review_id} <- required_integer_option(options, :id, "--id"),
+         {:ok, review_open} <- ReviewBridge.open_review(review_id) do
+      review = review_open.review
+
+      payload =
+        review_cli_payload(review, %{
+          "message" => "open",
+          "browser_url" => review_open.url,
+          "browser_embed" => review_open.browser_embed,
+          "open_target" => review_open.open_target,
+          "remote" => review_open.remote
+        })
+
+      if options[:json] do
+        {:ok, [Jason.encode!(payload)]}
+      else
+        {:ok,
+         [
+           "Review ##{review.id}: #{review.title}",
+           "Status: #{review.status}",
+           "Type: #{review.review_type}",
+           "Browser URL: #{review_open.url}",
+           "Browser embed: #{review_open.browser_embed}"
+         ]}
+      end
+    else
+      {:error, :not_found} ->
+        cli_error("Review not found", :not_found, options)
+
+      {:error, reason} ->
+        cli_error("Failed to open plan review", reason, options)
+    end
+  end
+
+  def run_command(%{command: :review_plan_wait, options: options}, _project_root) do
+    with {:ok, review_id} <- required_integer_option(options, :id, "--id"),
+         {:ok, review} <-
+           ReviewBridge.wait_for_review(review_id,
+             timeout_ms: (options[:timeout] || 120) * 1000,
+             interval_ms: options[:interval_ms] || 1000
+           ) do
+      payload =
+        review_cli_payload(review, %{
+          "message" => "wait",
+          "browser_url" => review_url(review.id)
+        })
+
+      case review.status do
+        "approved" ->
+          if options[:json] do
+            {:ok, [Jason.encode!(payload)]}
+          else
+            {:ok,
+             [
+               "Plan review ##{review.id} approved.",
+               "Status: #{review.status}",
+               "Browser URL: #{review_url(review.id)}"
+             ] ++ review_feedback_lines(review)}
+          end
+
+        "denied" ->
+          cli_error(
+            "Plan review ##{review.id} was denied",
+            {:review_denied, review},
+            options,
+            payload
+          )
+
+        other ->
+          cli_error(
+            "Plan review ##{review.id} is still #{other}",
+            {:review_pending, %{review_id: review.id, review_status: other}},
+            options,
+            payload
+          )
+      end
+    else
+      {:error, {:timeout, review}} ->
+        cli_error(
+          "Timed out waiting for plan review ##{review.id}",
+          {:timeout, review},
+          options,
+          review_cli_payload(review, %{
+            "message" => "timeout",
+            "browser_url" => review_url(review.id)
+          })
+        )
+
+      {:error, reason} ->
+        cli_error("Failed while waiting for plan review", reason, options)
+    end
+  end
+
+  def run_command(
+        %{command: :review_plan_respond, args: [review_id], options: options},
+        _project_root
+      ) do
+    with {:ok, parsed_id} <- parse_id(review_id),
+         {:ok, decision} <- required_option(options, :decision, "--decision"),
+         attrs <- review_response_attrs(options, decision),
+         {:ok, review} <- Mission.respond_review(parsed_id, attrs) do
+      payload =
+        review_cli_payload(review, %{
+          "message" => "responded",
+          "browser_url" => review_url(review.id)
+        })
+
+      if options[:json] do
+        {:ok, [Jason.encode!(payload)]}
+      else
+        {:ok,
+         [
+           "Updated plan review ##{review.id}.",
+           "Status: #{review.status}",
+           "Browser URL: #{review_url(review.id)}"
+         ]}
+      end
+    else
+      {:error, :invalid_id} ->
+        cli_error("Review id must be an integer", :invalid_id, options)
+
+      {:error, reason} ->
+        cli_error("Failed to respond to plan review", reason, options)
     end
   end
 
@@ -3066,6 +3264,16 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_review_plan_respond(review_id, argv) do
+    case OptionParser.parse(argv, strict: @review_plan_respond_switches) do
+      {options, [], []} ->
+        {:ok, %{command: :review_plan_respond, options: options, args: [review_id]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
   defp parse_plugin_command(command, plugin, argv) do
     if plugin in ~w(codex claude copilot openclaw) do
       case OptionParser.parse(argv, strict: @plugin_switches) do
@@ -3091,7 +3299,14 @@ defmodule ControlKeel.CLI do
   end
 
   defp required_option(options, key, flag) do
-    case Keyword.get(options, key) do
+    value =
+      cond do
+        is_list(options) -> Keyword.get(options, key)
+        is_map(options) -> Map.get(options, key)
+        true -> nil
+      end
+
+    case value do
       value when is_binary(value) and value != "" -> {:ok, value}
       _ -> {:error, "#{flag} is required."}
     end
@@ -3146,6 +3361,71 @@ defmodule ControlKeel.CLI do
 
       true ->
         {:error, "Provide --patch <file> or --stdin."}
+    end
+  end
+
+  defp review_submission_input(options) do
+    cond do
+      is_binary(options[:body_file]) and options[:body_file] != "" ->
+        case File.read(options[:body_file]) do
+          {:ok, body} -> {:ok, body}
+          {:error, reason} -> {:error, "Failed to read plan file: #{inspect(reason)}"}
+        end
+
+      Keyword.get(options, :stdin, false) ->
+        {:ok, IO.read(:stdio, :all)}
+
+      true ->
+        {:error, "Provide --body-file <file> or --stdin."}
+    end
+  end
+
+  defp review_submission_attrs(options, submission_body) do
+    runtime_context = review_runtime_context_from_env()
+
+    {:ok,
+     %{
+       "session_id" => options[:session_id],
+       "task_id" => options[:task_id],
+       "title" => options[:title],
+       "review_type" => "plan",
+       "submission_body" => submission_body,
+       "submitted_by" => options[:submitted_by] || runtime_context["agent_id"] || "cli",
+       "metadata" => %{
+         "runtime_context" => runtime_context
+       }
+     }}
+  end
+
+  defp review_response_attrs(options, decision) do
+    %{
+      "decision" => decision,
+      "feedback_notes" => options[:feedback_notes],
+      "reviewed_by" => options[:reviewed_by] || "cli",
+      "annotations" => parse_review_annotations(options[:annotations])
+    }
+  end
+
+  defp parse_review_annotations(nil), do: %{}
+
+  defp parse_review_annotations(value) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, %{} = annotations} -> annotations
+      _ -> %{"cli_notes" => value}
+    end
+  end
+
+  defp required_integer_option(options, key, flag) do
+    value =
+      cond do
+        is_list(options) -> Keyword.get(options, key)
+        is_map(options) -> Map.get(options, key)
+        true -> nil
+      end
+
+    case value do
+      value when is_integer(value) -> {:ok, value}
+      _ -> {:error, "#{flag} is required."}
     end
   end
 
@@ -3237,7 +3517,75 @@ defmodule ControlKeel.CLI do
 
   defp format_cli_error({:invalid_arguments, reason}), do: reason
   defp format_cli_error({:policy_blocked, reason}), do: reason
+  defp format_cli_error(:not_found), do: "not found"
+  defp format_cli_error(:invalid_id), do: "invalid id"
+
+  defp format_cli_error({:review_denied, review}),
+    do: "Plan review was denied." <> format_review_feedback_error(review)
+
+  defp format_cli_error({:review_pending, details}),
+    do:
+      "Task is waiting on plan approval (review ##{details[:review_id] || "unknown"}, status #{details[:review_status] || "pending"})."
+
+  defp format_cli_error({:timeout, review}),
+    do: "Timed out waiting for plan review ##{review.id}." <> format_review_feedback_error(review)
+
   defp format_cli_error(reason), do: inspect(reason)
+
+  defp review_url(review_id), do: Endpoint.url() <> "/reviews/#{review_id}"
+
+  defp review_feedback_lines(%{feedback_notes: notes}) when is_binary(notes) and notes != "",
+    do: ["Feedback: #{notes}"]
+
+  defp review_feedback_lines(_review), do: []
+
+  defp format_review_feedback_error(%{feedback_notes: notes})
+       when is_binary(notes) and notes != "" do
+    " Feedback: #{notes}"
+  end
+
+  defp format_review_feedback_error(_review), do: ""
+
+  defp review_runtime_context_from_env do
+    %{
+      "session_id" => System.get_env("CONTROLKEEL_SESSION_ID"),
+      "task_id" => System.get_env("CONTROLKEEL_TASK_ID"),
+      "agent_id" => System.get_env("CONTROLKEEL_AGENT_ID"),
+      "thread_id" => System.get_env("CONTROLKEEL_THREAD_ID"),
+      "host_session_id" => System.get_env("CONTROLKEEL_HOST_SESSION_ID"),
+      "browser_embed" =>
+        System.get_env("CONTROLKEEL_REVIEW_EMBED") || System.get_env("CONTROLKEEL_BROWSER_EMBED")
+    }
+    |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+    |> Enum.into(%{})
+  end
+
+  defp review_cli_payload(review, extra) do
+    %{
+      "review" => %{
+        "id" => review.id,
+        "title" => review.title,
+        "status" => review.status,
+        "review_type" => review.review_type,
+        "session_id" => review.session_id,
+        "task_id" => review.task_id,
+        "feedback_notes" => review.feedback_notes,
+        "submitted_by" => review.submitted_by,
+        "reviewed_by" => review.reviewed_by
+      }
+    }
+    |> Map.merge(extra)
+  end
+
+  defp cli_error(prefix, reason, options, extra_payload \\ %{}) do
+    message = "#{prefix}: #{format_cli_error(reason)}"
+
+    if options[:json] do
+      {:error, Jason.encode!(Map.merge(%{"error" => message}, extra_payload))}
+    else
+      {:error, message}
+    end
+  end
 
   defp review_lines(review, recommendation_label) do
     decision =
@@ -3582,7 +3930,8 @@ defmodule ControlKeel.CLI do
           "amp" => "amp-native",
           "opencode" => "opencode-native",
           "gemini-cli" => "gemini-cli-native",
-          "continue" => "continue-native"
+          "continue" => "continue-native",
+          "aider" => "instructions-only"
         }[agent]
 
       case if(target,

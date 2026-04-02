@@ -33,6 +33,7 @@ binary_asset_name() {
 
   case "${os}:${arch}" in
     linux:x86_64) printf "controlkeel-linux-x86_64" ;;
+    linux:arm64) printf "controlkeel-linux-arm64" ;;
     macos:x86_64) printf "controlkeel-macos-x86_64" ;;
     macos:arm64) printf "controlkeel-macos-arm64" ;;
     *)

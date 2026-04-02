@@ -1,0 +1,75 @@
+# Direct Host Installs
+
+This document answers a narrower question than the main support matrix:
+
+**If a user wants to install the ControlKeel companion directly into the host, what is the strongest real path available today?**
+
+ControlKeel keeps `controlkeel attach <host>` as the safest default because it installs the full governed repo-local experience. But several hosts now also have stronger direct-install paths.
+
+## Published package or extension installs
+
+| Host | Direct install | Notes |
+| --- | --- | --- |
+| OpenCode | Add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json` | Publishes the npm plugin entrypoint. Use `controlkeel attach opencode` as well for repo-local commands, agents, and MCP config. |
+| Pi | `pi install npm:@aryaminus/controlkeel-pi-extension` | For Pi builds that support npm-backed extension installs. |
+| Pi | `pi -e npm:@aryaminus/controlkeel-pi-extension` | Short form of the same Pi extension flow. |
+| VS Code | `code --install-extension controlkeel-vscode-companion.vsix` | Installs the CK browser-review companion from a packaged VSIX. |
+| Gemini CLI | `gemini extensions link ./controlkeel/dist/gemini-cli-native` | Direct extension-link flow for the exported Gemini companion bundle. |
+
+## Direct local plugin or bundle installs
+
+| Host | Direct install | Notes |
+| --- | --- | --- |
+| Claude Code | `claude --plugin-dir ./controlkeel/dist/claude-plugin` | Local plugin-dir install for the exported Claude plugin bundle. |
+| GitHub Copilot | `controlkeel plugin install copilot` | Installs the local Copilot plugin bundle and hooks into the project. |
+| Codex CLI | `controlkeel plugin install codex` | Installs the local Codex plugin bundle and marketplace manifest. |
+
+## Attach-first native installs
+
+These hosts now ship richer hook, command, workflow, or config surfaces, but the truthful install path is still `controlkeel attach <host>`:
+
+| Host | Direct install path today |
+| --- | --- |
+| Windsurf | `controlkeel attach windsurf` |
+| Continue | `controlkeel attach continue` |
+| Cline | `controlkeel attach cline` |
+| Goose | `controlkeel attach goose` |
+| Kiro | `controlkeel attach kiro` |
+| Amp | `controlkeel attach amp` |
+| Cursor | `controlkeel attach cursor` |
+| Roo Code | `controlkeel attach roo-code` |
+| Aider | `controlkeel attach aider` |
+| Hermes Agent | `controlkeel attach hermes-agent` |
+| OpenClaw | `controlkeel attach openclaw` |
+| Factory Droid | `controlkeel attach droid` |
+| Forge | `controlkeel attach forge` |
+
+## Why some hosts stay attach-first
+
+Some hosts expose hooks, workflows, rules, or repo-local command surfaces but do not expose a stable package marketplace or npm extension flow that CK can truthfully claim today.
+
+For those hosts, CK now installs stronger native assets than before:
+
+- Windsurf: hooks, workflows, commands, MCP config
+- Continue: prompts, command prompts, headless review prompts, MCP server config
+- Cline: hooks, commands, rules, workflows
+- Goose: commands, workflow recipes, extension YAML
+- Kiro: hooks, steering, tool policy settings, commands
+- Amp: plugin scaffold and commands
+- Cursor: commands, background-agent guidance, rules
+- Roo Code: commands, guidance, `.roomodes`
+- Aider: command-driven review snippets and config
+
+That is a real improvement in host usability, but it is not the same thing as a published marketplace package.
+
+## Release and publish truth
+
+Current release automation now supports:
+
+- npm publication for the main CK bootstrap package
+- npm publication for the OpenCode package
+- npm publication for the Pi package
+- `.vsix` packaging for the VS Code companion
+- conditional VS Code marketplace publication when `VSCE_PAT` is configured
+
+Hosts without a documented published package flow remain attach-first in the docs and `/skills`.

@@ -162,7 +162,7 @@ Other supported attach commands:
 - `controlkeel attach droid`
 - `controlkeel attach forge`
 
-For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md) and the canonical [support-matrix.md](support-matrix.md), or open `/skills` in the local app.
+For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md), the canonical [support-matrix.md](support-matrix.md), the broader host rollout map in [host-surface-parity.md](host-surface-parity.md), and the direct-install matrix in [direct-host-installs.md](direct-host-installs.md), or open `/skills` in the local app.
 
 If you use Cline, the attach flow is first-class for MCP, skills, rules, and workflows, but CK still needs its own provider profile or local Ollama for CK-internal model work because Cline's provider secrets are not exposed as a documented bridge.
 

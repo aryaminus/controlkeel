@@ -79,6 +79,7 @@ Supported packaged binaries today:
 | --- | --- |
 | macOS Apple Silicon | `controlkeel-macos-arm64` / `.tar.gz` |
 | macOS Intel | `controlkeel-macos-x86_64` / `.tar.gz` |
+| Linux arm64 | `controlkeel-linux-arm64` / `.tar.gz` |
 | Linux x86_64 | `controlkeel-linux-x86_64` / `.tar.gz` |
 | Windows x86_64 | `controlkeel-windows-x86_64.exe` / `.zip` |
 
@@ -111,29 +112,92 @@ mix ck.findings
 
 ## Supported agents
 
+### Choose your agent
+
+- Hook-native: `claude-code`, `copilot`, `windsurf`, `cline`, `kiro`
+- Plugin-native: `opencode`, `amp`
+- File-plan-mode: `pi`
+- Prompt/command-native: `continue`, `gemini-cli`, `goose`, `roo-code`
+- Browser/embed companion: `vscode`
+- Review-only: `codex-cli`, `aider`
+- Broader native/governed matrix: see [docs/support-matrix.md](docs/support-matrix.md) and [docs/host-surface-parity.md](docs/host-surface-parity.md)
+- Direct host installs: see [docs/direct-host-installs.md](docs/direct-host-installs.md)
+
+### Host parity classes
+
+| Host | Attach | Phase model | Review path | Browser embedding | Package outputs |
+| --- | --- | --- | --- | --- | --- |
+| Claude Code | `controlkeel attach claude-code` | `host_plan_mode` | native hook submits and waits on review | external | `controlkeel-claude-plugin.tar.gz` |
+| GitHub Copilot | `controlkeel attach copilot` | `host_plan_mode` | hook and command review flow | external | `controlkeel-copilot-plugin.tar.gz` |
+| OpenCode | `controlkeel attach opencode` | `host_plan_mode` | plugin tool submits plan review | external | `controlkeel-opencode-native.tar.gz`, `controlkeel-opencode-native.tgz` |
+| Pi | `controlkeel attach pi` | `file_plan_mode` | plan-file submit plus browser approval | external | `controlkeel-pi-native.tar.gz`, `controlkeel-pi-native.tgz` |
+| VS Code | `controlkeel attach vscode` | `review_only` | browser review in a companion webview | `vscode_webview` | `controlkeel-vscode-companion.vsix` |
+| Codex CLI | `controlkeel attach codex-cli` | `review_only` | diff and completion review commands | none | `controlkeel-codex.tar.gz`, `controlkeel-codex-plugin.tar.gz` |
+
+Expanded official surfaces now shipped for the broader matrix:
+
+- Windsurf: Cascade hooks, workflows, commands, and MCP repo bundle
+- Continue: prompts, slash-command style review prompts, headless guidance, and `.continue/mcpServers/controlkeel.yaml`
+- Cline: rules, workflows, commands, hooks, and CLI MCP config companion
+- Goose: repo hints, workflow recipes, commands, and Goose extension YAML
+- Kiro: hooks, steering, tool-policy settings, commands, and MCP config
+- Amp: TypeScript plugin, command docs, and plugin package scaffold
+- Gemini CLI: extension manifest plus review and submit-plan commands
+- Cursor: rules, commands, background-agent guidance, and MCP config
+- Roo Code: rules, commands, cloud-agent guidance, and governed mode files
+- Aider: `AIDER.md`, `.aider.conf.yml`, and command-driven review snippets
+
+Each shipped host now publishes the same code-backed parity contract in `/skills`: install experience, review experience, phase model, browser embedding, subagent visibility, installed artifacts, and packaged outputs.
+
+Runtime-backed hosts also publish runtime transport metadata. Today that means:
+
+- Claude Code: `claude_agent_sdk`, host-owned Anthropic auth, hook/SDK review transport
+- GitHub Copilot: `hook_session_parser`, host-owned auth, hook/session review transport
+- OpenCode: `opencode_sdk`, host-owned provider auth, plugin/session review transport
+- Pi: `pi_rpc`, host-owned provider auth, extension/RPC review transport
+- VS Code: `vscode_companion`, workspace-owned embed surface, companion review transport
+- Codex CLI: `codex_sdk`, host-owned OpenAI auth, command/thread review transport
+
+### Direct host installs
+
+Where the host supports it, CK now publishes or packages a direct-install surface in addition to `controlkeel attach`:
+
+- OpenCode: add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json`
+- Pi: `pi install npm:@aryaminus/controlkeel-pi-extension`
+- Pi short form: `pi -e npm:@aryaminus/controlkeel-pi-extension`
+- VS Code: `code --install-extension controlkeel-vscode-companion.vsix`
+- Gemini CLI: `gemini extensions link ./controlkeel/dist/gemini-cli-native`
+- Claude Code: `claude --plugin-dir ./controlkeel/dist/claude-plugin`
+- Copilot: `controlkeel plugin install copilot`
+- Codex CLI: `controlkeel plugin install codex`
+
+For the full host-by-host truth table, see [docs/direct-host-installs.md](docs/direct-host-installs.md).
+
 ### Attach targets (MCP + companion install)
 
 | Agent | Attach | Integration class | Native surfaces |
 | --- | --- | --- | --- |
 | Claude Code | `attach claude-code` | Provider-bridge | `.claude/skills`, `.claude/agents`, plugin bundle |
-| Codex CLI | `attach codex-cli` | Provider-bridge | `.agents/skills`, `.codex/agents`, plugin bundle |
+| Codex CLI | `attach codex-cli` | Review-only | `.agents/skills`, `.codex/agents`, review commands |
 | Hermes Agent | `attach hermes-agent` | Provider-bridge | `.hermes/skills`, `.hermes/mcp.json` |
 | OpenClaw | `attach openclaw` | Provider-bridge | Workspace/managed skills and OpenClaw config |
 | Factory Droid | `attach droid` | Provider-bridge | `.factory/skills`, `.factory/droids`, `.factory/commands` |
 | Forge | `attach forge` | Provider-bridge | ACP companion + MCP fallback files |
-| Cline | `attach cline` | Native-first | `.cline/skills`, `.clinerules/`, MCP config |
-| Roo Code | `attach roo-code` | Native-first | `.roo/skills`, `.roo/rules`, `.roo/commands` |
-| Cursor | `attach cursor` | Native-first | `.cursor/rules`, `.cursor/mcp.json` |
-| Windsurf | `attach windsurf` | Native-first | `.windsurf/rules`, `.windsurf/mcp.json` |
-| Continue | `attach continue` | Native-first | `.continue/prompts`, `.continue/mcp.json` |
-| Copilot / VS Code | `attach copilot` | Native-first | `.github/skills`, `.github/agents`, `.vscode/mcp.json` |
-| Goose | `attach goose` | Native-first | `.goosehints`, workflow recipes, extension config |
-| OpenCode | `attach opencode` | Native-first | `.opencode/plugins`, `.opencode/agents`, `.opencode/commands` |
-| Gemini CLI | `attach gemini-cli` | Native-first | `gemini-extension.json`, `.gemini/commands/`, `skills/`, `GEMINI.md` |
-| Kiro | `attach kiro` | Native-first | `.kiro/hooks/`, `.kiro/steering/`, MCP config |
-| Amp | `attach amp` | Native-first | `.amp/plugins/` (TypeScript plugin with event hooks) |
+| Cline | `attach cline` | Hook-native | `.cline/skills`, `.clinerules/`, `.cline/commands`, `.cline/hooks`, MCP config |
+| Roo Code | `attach roo-code` | Prompt/command-native | `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, `.roomodes` |
+| Cursor | `attach cursor` | Native-first | `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, `.cursor/mcp.json` |
+| Windsurf | `attach windsurf` | Hook-native | `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks`, `.windsurf/mcp.json` |
+| Continue | `attach continue` | Prompt/command-native | `.continue/prompts`, `.continue/commands`, `.continue/mcpServers/controlkeel.yaml`, `.continue/mcp.json` |
+| Pi | `attach pi` | File-plan-mode | `.pi/controlkeel.json`, `.pi/commands`, `.pi/mcp.json`, `pi-extension.json`, `PI.md` |
+| Copilot | `attach copilot` | Hook-native | `.github/skills`, `.github/agents`, `.github/commands`, `.vscode/mcp.json` |
+| VS Code | `attach vscode` | Browser/embed companion | `.github/skills`, `.github/agents`, `.vscode/mcp.json`, `.vscode/extensions.json`, companion `.vsix` |
+| Goose | `attach goose` | Prompt/command-native | `.goosehints`, workflow recipes, Goose commands, extension config |
+| OpenCode | `attach opencode` | Plugin-native | `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `package.json` |
+| Gemini CLI | `attach gemini-cli` | Prompt/command-native | `gemini-extension.json`, `.gemini/commands/`, `skills/`, `GEMINI.md`, extension README |
+| Kiro | `attach kiro` | Hook-native | `.kiro/hooks/`, `.kiro/steering/`, `.kiro/settings/`, `.kiro/commands/`, MCP config |
+| Amp | `attach amp` | Plugin-native | `.amp/plugins/`, `.amp/commands/`, `.amp/package.json` |
 
-### MCP + instructions only
+### MCP + command-driven
 
 | Agent | Attach |
 | --- | --- |
@@ -182,6 +246,10 @@ controlkeel run task <id>                    # governed agent execution
 controlkeel provider list|set-key|default|doctor
 controlkeel watch                            # continuous file-watch governance
 controlkeel mcp --project-root /path         # direct stdio MCP
+controlkeel review plan submit --task-id 12 --body-file plan.md --json
+controlkeel review plan wait --id 34 --json
+controlkeel review plan open --id 34 --json
+controlkeel review plan respond 34 --decision approved --json
 controlkeel review socket --report report.json # ingest Socket dependency alerts
 cat report.json | controlkeel review socket --stdin
 ```

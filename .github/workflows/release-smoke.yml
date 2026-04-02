@@ -54,8 +54,11 @@ jobs:
           chmod +x scripts/release_smoke.sh
           scripts/release_smoke.sh "burrito_out/controlkeel_linux"
 
-          mkdir -p release_stage/raw/linux release_stage/raw/windows
+          mkdir -p release_stage/raw/linux release_stage/raw/linux-arm release_stage/raw/windows
           cp burrito_out/controlkeel_linux release_stage/raw/linux/controlkeel-linux-x86_64
+
+          BURRITO_TARGET=linux_arm64 mix release --overwrite
+          cp burrito_out/controlkeel_linux_arm64 release_stage/raw/linux-arm/controlkeel-linux-arm64
       - name: Build Windows binary
         run: |
           BURRITO_TARGET=windows mix release --overwrite
@@ -170,6 +173,7 @@ jobs:
 
           mkdir -p "$DIST_DIR" \
             release_stage/package/linux \
+            release_stage/package/linux-arm \
             release_stage/package/macos-intel \
             release_stage/package/macos-arm \
             release_stage/package/windows
@@ -177,6 +181,10 @@ jobs:
           cp release_stage/raw/linux/controlkeel-linux-x86_64 "$DIST_DIR/controlkeel-linux-x86_64"
           cp release_stage/raw/linux/controlkeel-linux-x86_64 release_stage/package/linux/controlkeel
           tar -C release_stage/package/linux -czf "$DIST_DIR/controlkeel-linux-x86_64.tar.gz" controlkeel
+
+          cp release_stage/raw/linux-arm/controlkeel-linux-arm64 "$DIST_DIR/controlkeel-linux-arm64"
+          cp release_stage/raw/linux-arm/controlkeel-linux-arm64 release_stage/package/linux-arm/controlkeel
+          tar -C release_stage/package/linux-arm -czf "$DIST_DIR/controlkeel-linux-arm64.tar.gz" controlkeel
 
           cp release_stage/raw/macos-intel/controlkeel-macos-x86_64 "$DIST_DIR/controlkeel-macos-x86_64"
           cp release_stage/raw/macos-intel/controlkeel-macos-x86_64 release_stage/package/macos-intel/controlkeel
@@ -197,6 +205,19 @@ jobs:
             target=$(basename "$target_dir")
             tar -C controlkeel/dist -czf "dist/controlkeel-${target}.tar.gz" "$target"
           done
+      - name: Package adapter companion artifacts
+        run: |
+          if [ -d controlkeel/dist/vscode-companion/extension ]; then
+            (cd controlkeel/dist/vscode-companion/extension && npx --yes @vscode/vsce package --out "$PWD/../../../dist/controlkeel-vscode-companion.vsix")
+          fi
+
+          if [ -d controlkeel/dist/opencode-native ]; then
+            tar -C controlkeel/dist/opencode-native -czf dist/controlkeel-opencode-native.tgz .
+          fi
+
+          if [ -d controlkeel/dist/pi-native ]; then
+            tar -C controlkeel/dist/pi-native -czf dist/controlkeel-pi-native.tgz .
+          fi
       - name: Copy installer assets
         run: |
           cp scripts/install.sh dist/install.sh

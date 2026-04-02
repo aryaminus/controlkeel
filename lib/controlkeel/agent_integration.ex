@@ -1,6 +1,8 @@
 defmodule ControlKeel.AgentIntegration do
   @moduledoc false
 
+  alias ControlKeel.AgentAdapters.Registry, as: AdapterRegistry
+  alias ControlKeel.AgentRuntimes.Registry, as: RuntimeRegistry
   alias ControlKeel.Distribution
 
   defstruct [
@@ -13,6 +15,17 @@ defmodule ControlKeel.AgentIntegration do
     :runtime_export_command,
     :config_location,
     :companion_delivery,
+    :install_experience,
+    :review_experience,
+    :submission_mode,
+    :feedback_mode,
+    :phase_model,
+    :browser_embed,
+    :subagent_visibility,
+    :runtime_transport,
+    :runtime_auth_owner,
+    :runtime_review_transport,
+    :confidence_level,
     :preferred_target,
     :default_scope,
     :router_agent_id,
@@ -33,6 +46,11 @@ defmodule ControlKeel.AgentIntegration do
     :ck_runs_agent_via,
     :execution_support,
     :autonomy_mode,
+    plan_phase_support: [],
+    artifact_surfaces: [],
+    package_outputs: [],
+    direct_install_methods: [],
+    runtime_session_support: %{},
     supported_scopes: [],
     required_mcp_tools: [],
     install_channels: [],
@@ -46,12 +64,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Claude Code",
         category: "native-first",
         description:
-          "Uses the official Claude CLI MCP registration flow and installs native Claude skills by default.",
+          "Uses the official Claude CLI MCP registration flow, installs native Claude skills by default, and can export a local plugin-dir bundle.",
         attach_command: "controlkeel attach claude-code",
         config_location:
           "Claude CLI local MCP registration (`claude mcp add-json ... --scope local`).",
         companion_delivery:
-          "Installs `.claude/skills` and `.claude/agents`; can also export a publishable Claude plugin bundle.",
+          "Installs `.claude/skills` and `.claude/agents`; can also export a local Claude plugin-dir bundle for direct host install.",
         preferred_target: "claude-standalone",
         default_scope: "user",
         router_agent_id: "claude-code",
@@ -74,12 +92,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Codex CLI",
         category: "native-first",
         description:
-          "Writes MCP config and installs open-standard skills plus a Codex operator agent.",
+          "Writes MCP config, installs open-standard skills plus a Codex operator agent, and ships review, annotate, and last command aliases.",
         attach_command: "controlkeel attach codex-cli",
         config_location:
           "Codex MCP config (`~/.codex/config.json` or project-scoped equivalent).",
         companion_delivery:
-          "Installs `.agents/skills` and `.codex/agents`; can also export portable Codex bundles or a Codex plugin.",
+          "Installs `.agents/skills`, `.codex/agents`, and `.codex/commands`; can also export portable Codex bundles or a Codex plugin.",
         preferred_target: "codex",
         default_scope: "user",
         router_agent_id: "codex-cli",
@@ -102,11 +120,11 @@ defmodule ControlKeel.AgentIntegration do
         label: "VS Code agent mode",
         category: "repo-native",
         description:
-          "Prepares repository-native skill, agent, and MCP files for VS Code discovery.",
+          "Prepares repository-native skill, agent, and MCP files for VS Code discovery and ships a packaged review companion extension.",
         attach_command: "controlkeel attach vscode",
         config_location: "Repository MCP config in `.github/mcp.json` and `.vscode/mcp.json`.",
         companion_delivery:
-          "Writes `.github/skills`, `.github/agents`, and repo MCP config; can also export a Copilot / VS Code plugin bundle.",
+          "Writes `.github/skills`, `.github/agents`, and repo MCP config; can also export a VS Code companion `.vsix` and a Copilot / VS Code plugin bundle.",
         preferred_target: "github-repo",
         default_scope: "project",
         router_agent_id: nil,
@@ -117,7 +135,7 @@ defmodule ControlKeel.AgentIntegration do
         upstream_docs_url: "https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["github-repo", "copilot-plugin"]
+        export_targets: ["github-repo", "copilot-plugin", "vscode-companion"]
       }),
       attach_client(%{
         id: "copilot",
@@ -132,7 +150,7 @@ defmodule ControlKeel.AgentIntegration do
         preferred_target: "github-repo",
         default_scope: "project",
         router_agent_id: "copilot",
-        auth_mode: "ck_owned",
+        auth_mode: "agent_runtime",
         mcp_mode: "native",
         skills_mode: "native",
         upstream_slug: "github/copilot",
@@ -142,15 +160,45 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["github-repo", "copilot-plugin"]
       }),
       attach_client(%{
+        id: "pi",
+        label: "Pi",
+        category: "repo-native",
+        description:
+          "Prepares a Pi-native review extension bundle, MCP config, browser review command flow, and a publishable npm extension package.",
+        attach_command: "controlkeel attach pi",
+        config_location: "Repository Pi config under `.pi/` plus `pi-extension.json`.",
+        companion_delivery:
+          "Installs `.agents/skills`, `.pi/commands`, `.pi/mcp.json`, `pi-extension.json`, `PI.md`, and a publishable npm extension package for governed browser reviews.",
+        preferred_target: "pi-native",
+        default_scope: "project",
+        router_agent_id: "pi",
+        auth_mode: "agent_runtime",
+        mcp_mode: "native",
+        skills_mode: "native",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["pi-native", "instructions-only"],
+        review_experience: "browser_review",
+        submission_mode: "command",
+        feedback_mode: "command_reply",
+        artifact_surfaces: [
+          ".agents/skills",
+          ".pi/commands/controlkeel-review.md",
+          ".pi/mcp.json",
+          "pi-extension.json",
+          "PI.md"
+        ]
+      }),
+      attach_client(%{
         id: "cursor",
         label: "Cursor",
         category: "native-first",
         description:
-          "Attaches the MCP server and prepares Cursor-native rules, MCP config, and portable skill bundles for governed repo work.",
+          "Attaches the MCP server and prepares Cursor-native rules, review commands, background-agent guidance, MCP config, and portable skill bundles for governed repo work.",
         attach_command: "controlkeel attach cursor",
         config_location: "Cursor global MCP config file.",
         companion_delivery:
-          "Installs `.agents/skills`, `.cursor/rules`, and `.cursor/mcp.json`; can also export a portable native Cursor bundle.",
+          "Installs `.agents/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, and `.cursor/mcp.json`; can also export a portable native Cursor bundle.",
         preferred_target: "cursor-native",
         default_scope: "project",
         router_agent_id: "cursor",
@@ -168,11 +216,11 @@ defmodule ControlKeel.AgentIntegration do
         label: "Windsurf",
         category: "native-first",
         description:
-          "Attaches the MCP server and prepares Windsurf-native rules, MCP config, and portable skill bundles for governed repo work.",
+          "Attaches the MCP server and prepares Windsurf-native rules, review commands, workflows, hooks, MCP config, and portable skill bundles for governed repo work.",
         attach_command: "controlkeel attach windsurf",
         config_location: "Windsurf global MCP config file.",
         companion_delivery:
-          "Installs `.agents/skills`, `.windsurf/rules`, and `.windsurf/mcp.json`; can also export a portable native Windsurf bundle.",
+          "Installs `.agents/skills`, `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks`, and `.windsurf/mcp.json`; can also export a portable native Windsurf bundle.",
         preferred_target: "windsurf-native",
         default_scope: "project",
         router_agent_id: "windsurf",
@@ -190,11 +238,11 @@ defmodule ControlKeel.AgentIntegration do
         label: "Kiro",
         category: "native-first",
         description:
-          "Attaches MCP server and delivers native governance via Kiro Agent Hooks, steering files, and MCP config.",
+          "Attaches MCP server and delivers native governance via Kiro Agent Hooks, steering files, command guides, tool controls, and MCP config.",
         attach_command: "controlkeel attach kiro",
         config_location: "Kiro MCP config and `.kiro/hooks/`, `.kiro/steering/`.",
         companion_delivery:
-          "Exports a postToolUse governance hook, steering file, MCP config, and `AGENTS.md` instructions.",
+          "Exports governance hooks, steering files, review commands, tool policy settings, MCP config, and `AGENTS.md` instructions.",
         preferred_target: "kiro-native",
         default_scope: "project",
         router_agent_id: "kiro",
@@ -216,7 +264,7 @@ defmodule ControlKeel.AgentIntegration do
         attach_command: "controlkeel attach amp",
         config_location: "Amp MCP config and `.amp/plugins/`.",
         companion_delivery:
-          "Exports a governance TypeScript plugin with `amp.on` hooks, `ck-validate` tool, `/controlkeel-review` command, and `AGENTS.md` instructions.",
+          "Exports a governance TypeScript plugin with `amp.on` hooks, `ck-validate` tool, `/controlkeel-review` command, package scaffold, and `AGENTS.md` instructions.",
         preferred_target: "amp-native",
         default_scope: "project",
         router_agent_id: "amp",
@@ -239,11 +287,11 @@ defmodule ControlKeel.AgentIntegration do
         config_location:
           "OpenCode MCP config and `.opencode/plugins/`, `.opencode/agents/`, `.opencode/commands/`.",
         companion_delivery:
-          "Exports a governance TypeScript plugin, review agent profile, `/controlkeel-review` command, MCP config, and `AGENTS.md` instructions.",
+          "Exports a governance plugin, review agent profile, `/controlkeel-review` command set, MCP config, and a publishable npm plugin package.",
         preferred_target: "opencode-native",
         default_scope: "project",
         router_agent_id: "opencode",
-        auth_mode: "ck_owned",
+        auth_mode: "agent_runtime",
         mcp_mode: "native",
         skills_mode: "native",
         upstream_slug: "sst/opencode",
@@ -257,12 +305,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Gemini CLI",
         category: "native-first",
         description:
-          "Attaches MCP server and delivers native governance via Gemini CLI extensions with manifest, custom commands, agent skills, and GEMINI.md context.",
+          "Attaches MCP server and delivers native governance via Gemini CLI extensions with manifest, multiple custom commands, agent skills, and GEMINI.md context.",
         attach_command: "controlkeel attach gemini-cli",
         config_location:
           "Gemini CLI extension directory and `.gemini/commands/`, `skills/`, `GEMINI.md`.",
         companion_delivery:
-          "Exports a `gemini-extension.json` manifest, `/controlkeel:review` TOML command, `controlkeel-governance` agent skill, and `GEMINI.md` instructions.",
+          "Exports a `gemini-extension.json` manifest, submit-plan and review TOML commands, `controlkeel-governance` agent skill, extension README, and `GEMINI.md` instructions.",
         preferred_target: "gemini-cli-native",
         default_scope: "project",
         router_agent_id: "gemini-cli",
@@ -280,11 +328,11 @@ defmodule ControlKeel.AgentIntegration do
         label: "Continue",
         category: "native-first",
         description:
-          "Attaches the MCP server and prepares Continue-native skills, prompts, and MCP config for governed repo work.",
+          "Attaches the MCP server and prepares Continue-native prompts, command prompts, headless review flows, and MCP config for governed repo work.",
         attach_command: "controlkeel attach continue",
         config_location: "Continue MCP config file.",
         companion_delivery:
-          "Installs `.continue/skills`, `.continue/prompts`, and `.continue/mcp.json`; can also export a portable native Continue bundle.",
+          "Installs `.continue/prompts`, `.continue/commands`, and `.continue/mcpServers/controlkeel.yaml`; can also export a portable native Continue bundle.",
         preferred_target: "continue-native",
         default_scope: "project",
         router_agent_id: "continue",
@@ -302,11 +350,11 @@ defmodule ControlKeel.AgentIntegration do
         label: "Aider",
         category: "mcp-plus-instructions",
         description:
-          "Attaches the MCP server and prepares portable instruction snippets for skill-like workflows.",
+          "Attaches the MCP server and prepares command-driven Aider instructions, config, and review helpers for governed repo workflows.",
         attach_command: "controlkeel attach aider",
         config_location: "Aider MCP config file in the current project.",
         companion_delivery:
-          "Exports `AGENTS.md`, `CLAUDE.md`, and Copilot-style instruction snippets under `controlkeel/dist/instructions-only`.",
+          "Installs `AIDER.md`, `.aider.conf.yml`, `.aider/commands`, and shared instruction snippets for command-driven review flows.",
         preferred_target: "instructions-only",
         default_scope: "project",
         router_agent_id: "aider",
@@ -324,12 +372,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Cline",
         category: "native-first",
         description:
-          "Registers ControlKeel as an MCP server for Cline and installs Cline-native skills, rules, and workflow guidance.",
+          "Registers ControlKeel as an MCP server for Cline and installs Cline-native skills, rules, commands, hooks, and workflow guidance.",
         attach_command: "controlkeel attach cline",
         config_location:
           "Cline CLI MCP settings live in `~/.cline/data/settings/cline_mcp_settings.json` or `<CLINE_DIR>/data/settings/cline_mcp_settings.json`; project rules live in `.clinerules/` and project skills in `.cline/skills/`.",
         companion_delivery:
-          "Installs `.cline/skills`, emits `.clinerules` guidance plus a workflow, and prepares a Cline MCP config snippet.",
+          "Installs `.cline/skills`, `.cline/commands`, `.cline/hooks`, emits `.clinerules` guidance plus a workflow, and prepares a Cline MCP config snippet.",
         preferred_target: "cline-native",
         default_scope: "project",
         router_agent_id: "cline",
@@ -347,12 +395,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Roo Code",
         category: "native-first",
         description:
-          "Installs Roo-native skills, rules, commands, guidance, and `.roomodes` companion files for governed repo work.",
+          "Installs Roo-native skills, rules, commands, cloud-agent guidance, and `.roomodes` companion files for governed repo work.",
         attach_command: "controlkeel attach roo-code",
         config_location:
           "Roo project companions live in `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, and `.roomodes` at the repo root.",
         companion_delivery:
-          "Installs `.roo/skills`, emits repo-native rules, commands, guidance, and a ControlKeel `.roomodes` mode.",
+          "Installs `.roo/skills`, emits repo-native rules, submit-plan commands, cloud-agent guidance, and a ControlKeel `.roomodes` mode.",
         preferred_target: "roo-native",
         default_scope: "project",
         router_agent_id: "roo-code",
@@ -370,12 +418,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Goose",
         category: "native-first",
         description:
-          "Registers ControlKeel as a Goose MCP extension and installs project-native `.goosehints` and workflow companions.",
+          "Registers ControlKeel as a Goose MCP extension and installs project-native `.goosehints`, review commands, and workflow companions.",
         attach_command: "controlkeel attach goose",
         config_location:
           "Goose custom extensions live in `~/.config/goose/config.yaml`; project context lives in `.goosehints`, `AGENTS.md`, and optional `goose/workflow_recipes/` files.",
         companion_delivery:
-          "Merges a ControlKeel Goose extension into the user Goose config and writes repo-local `.goosehints`, workflow recipe, and MCP companion files.",
+          "Merges a ControlKeel Goose extension into the user Goose config and writes repo-local `.goosehints`, review commands, workflow recipes, and MCP companion files.",
         preferred_target: "goose-native",
         default_scope: "project",
         router_agent_id: "goose",
@@ -1118,8 +1166,12 @@ defmodule ControlKeel.AgentIntegration do
   def runtime_exportable?(%__MODULE__{support_class: "headless_runtime"}), do: true
   def runtime_exportable?(_integration), do: false
 
-  def auth_owner(%__MODULE__{provider_bridge: %{owner: owner}}) when is_binary(owner), do: owner
+  def auth_owner(%__MODULE__{provider_bridge: %{supported: true, owner: owner}})
+      when is_binary(owner),
+      do: owner
+
   def auth_owner(%__MODULE__{auth_mode: "ck_owned"}), do: "controlkeel"
+  def auth_owner(%__MODULE__{auth_mode: "agent_runtime"}), do: "agent"
   def auth_owner(%__MODULE__{auth_mode: "local"}), do: "local"
   def auth_owner(%__MODULE__{auth_mode: "none"}), do: "none"
   def auth_owner(%__MODULE__{auth_mode: "heuristic"}), do: "none"
@@ -1202,6 +1254,11 @@ defmodule ControlKeel.AgentIntegration do
       runtime_export_command: attrs[:runtime_export_command],
       config_location: attrs[:config_location],
       companion_delivery: attrs[:companion_delivery],
+      install_experience: attrs[:install_experience] || default_install_experience(attrs),
+      review_experience: attrs[:review_experience] || default_review_experience(attrs),
+      submission_mode: attrs[:submission_mode] || default_submission_mode(attrs),
+      feedback_mode: attrs[:feedback_mode] || default_feedback_mode(attrs),
+      confidence_level: attrs[:confidence_level] || default_confidence_level(attrs),
       preferred_target: attrs[:preferred_target],
       default_scope: attrs[:default_scope],
       router_agent_id: attrs[:router_agent_id],
@@ -1218,6 +1275,14 @@ defmodule ControlKeel.AgentIntegration do
       ck_runs_agent_via: attrs[:ck_runs_agent_via] || default_ck_runs_agent_via(attrs),
       execution_support: attrs[:execution_support] || default_execution_support(attrs),
       autonomy_mode: attrs[:autonomy_mode] || "policy_gated",
+      plan_phase_support: attrs[:plan_phase_support] || default_plan_phase_support(attrs),
+      artifact_surfaces: attrs[:artifact_surfaces] || default_artifact_surfaces(attrs),
+      phase_model: attrs[:phase_model] || default_phase_model(attrs),
+      browser_embed: attrs[:browser_embed] || default_browser_embed(attrs),
+      subagent_visibility: attrs[:subagent_visibility] || default_subagent_visibility(attrs),
+      package_outputs: attrs[:package_outputs] || default_package_outputs(attrs),
+      direct_install_methods:
+        attrs[:direct_install_methods] || default_direct_install_methods(attrs),
       supported_scopes: attrs[:supported_scopes] || [],
       required_mcp_tools:
         if(attrs[:support_class] in ["framework_adapter", "provider_only", "unverified"],
@@ -1227,6 +1292,8 @@ defmodule ControlKeel.AgentIntegration do
       install_channels: install_channels,
       export_targets: attrs[:export_targets] || []
     }
+    |> AdapterRegistry.enrich_integration()
+    |> RuntimeRegistry.enrich_integration()
   end
 
   defp default_agent_uses_ck_via(attrs) do
@@ -1241,19 +1308,34 @@ defmodule ControlKeel.AgentIntegration do
         ["local_mcp", "plugin", "native_skills", "workflows", "hooks"]
 
       id when id in ["cursor", "cursor-agent", "windsurf"] ->
-        ["local_mcp", "native_skills", "rules"]
+        ["local_mcp", "native_skills", "rules", "commands", "workflows"]
 
       id when id in ["cline", "continue", "roo-code"] ->
-        ["local_mcp", "native_skills", "rules", "workflows"]
+        ["local_mcp", "native_skills", "rules", "workflows", "commands"]
 
       "goose" ->
-        ["local_mcp", "workflows", "hooks"]
+        ["local_mcp", "workflows", "hooks", "commands"]
 
       id when id in ["hermes-agent", "openclaw"] ->
         ["local_mcp", "plugin", "native_skills"]
 
-      id when id in ["kiro", "amp", "aider", "opencode", "gemini-cli"] ->
-        ["local_mcp", "rules"]
+      "kiro" ->
+        ["local_mcp", "native_skills", "hooks", "rules", "commands"]
+
+      "amp" ->
+        ["local_mcp", "plugin", "rules", "commands", "tool_call"]
+
+      "aider" ->
+        ["local_mcp", "commands"]
+
+      "opencode" ->
+        ["local_mcp", "plugin", "native_skills", "rules", "commands"]
+
+      "gemini-cli" ->
+        ["local_mcp", "native_skills", "rules", "commands"]
+
+      "pi" ->
+        ["local_mcp", "native_skills", "commands", "rules"]
 
       id when id in ["forge", "devin", "open-swe"] ->
         ["hosted_mcp", "a2a"]
@@ -1296,6 +1378,7 @@ defmodule ControlKeel.AgentIntegration do
              "goose",
              "kiro",
              "amp",
+             "pi",
              "hermes-agent",
              "openclaw",
              "droid"
@@ -1325,6 +1408,335 @@ defmodule ControlKeel.AgentIntegration do
       _ -> "none"
     end
   end
+
+  defp default_install_experience(%{support_class: support_class})
+       when support_class in ["unverified", "alias"] do
+    "fallback"
+  end
+
+  defp default_install_experience(%{support_class: support_class})
+       when support_class in ["framework_adapter", "provider_only"] do
+    "guided"
+  end
+
+  defp default_install_experience(_attrs), do: "first_class"
+
+  defp default_review_experience(%{support_class: "unverified"}), do: "none"
+  defp default_review_experience(%{support_class: "provider_only"}), do: "none"
+  defp default_review_experience(%{support_class: "framework_adapter"}), do: "feedback_only"
+
+  defp default_review_experience(%{id: id})
+       when id in ["claude-code", "opencode", "windsurf", "cline", "kiro", "amp"] do
+    "native_review"
+  end
+
+  defp default_review_experience(%{support_class: "attach_client"}), do: "browser_review"
+  defp default_review_experience(%{support_class: "headless_runtime"}), do: "browser_review"
+  defp default_review_experience(_attrs), do: "feedback_only"
+
+  defp default_submission_mode(%{support_class: "unverified"}), do: "manual"
+  defp default_submission_mode(%{support_class: "provider_only"}), do: "manual"
+  defp default_submission_mode(%{support_class: "framework_adapter"}), do: "manual"
+
+  defp default_submission_mode(%{id: id})
+       when id in ["claude-code", "amp", "opencode"] do
+    "tool_call"
+  end
+
+  defp default_submission_mode(%{id: id})
+       when id in ["vscode", "copilot", "windsurf", "cline", "kiro"] do
+    "hook"
+  end
+
+  defp default_submission_mode(%{id: id})
+       when id in ["cursor", "continue", "roo-code", "goose", "gemini-cli", "pi", "aider"] do
+    "command"
+  end
+
+  defp default_submission_mode(%{support_class: "headless_runtime"}), do: "file_watch"
+  defp default_submission_mode(_attrs), do: "manual"
+
+  defp default_feedback_mode(%{support_class: "unverified"}), do: "manual"
+  defp default_feedback_mode(%{support_class: "provider_only"}), do: "manual"
+
+  defp default_feedback_mode(%{id: id})
+       when id in ["claude-code", "codex-cli", "amp", "opencode"] do
+    "tool_call"
+  end
+
+  defp default_feedback_mode(%{id: id})
+       when id in [
+              "vscode",
+              "copilot",
+              "cursor",
+              "windsurf",
+              "continue",
+              "cline",
+              "goose",
+              "kiro",
+              "gemini-cli",
+              "roo-code",
+              "aider"
+            ] do
+    "command_reply"
+  end
+
+  defp default_feedback_mode(_attrs), do: "command_reply"
+
+  defp default_plan_phase_support(%{support_class: support_class})
+       when support_class in ["unverified", "provider_only"] do
+    []
+  end
+
+  defp default_plan_phase_support(%{support_class: "framework_adapter"}),
+    do: ["planning", "review"]
+
+  defp default_plan_phase_support(_attrs), do: ["planning", "review", "execution"]
+
+  defp default_confidence_level(%{support_class: "unverified"}), do: "research"
+  defp default_confidence_level(%{support_class: "framework_adapter"}), do: "experimental"
+  defp default_confidence_level(%{support_class: "provider_only"}), do: "experimental"
+  defp default_confidence_level(_attrs), do: "shipped"
+
+  defp default_phase_model(%{support_class: "unverified"}), do: "review_only"
+  defp default_phase_model(%{support_class: "provider_only"}), do: "review_only"
+  defp default_phase_model(%{support_class: "framework_adapter"}), do: "review_only"
+  defp default_phase_model(%{id: "pi"}), do: "file_plan_mode"
+  defp default_phase_model(%{id: "codex-cli"}), do: "review_only"
+  defp default_phase_model(%{id: "vscode"}), do: "review_only"
+
+  defp default_phase_model(%{id: id}) when id in ["goose", "gemini-cli", "roo-code", "aider"],
+    do: "review_only"
+
+  defp default_phase_model(%{support_class: "attach_client"}), do: "host_plan_mode"
+  defp default_phase_model(_attrs), do: "review_only"
+
+  defp default_browser_embed(%{id: "vscode"}), do: "vscode_webview"
+  defp default_browser_embed(%{support_class: "attach_client"}), do: "external"
+  defp default_browser_embed(_attrs), do: "none"
+
+  defp default_subagent_visibility(%{id: id})
+       when id in ["claude-code", "copilot", "opencode", "codex-cli", "pi"] do
+    "primary_only"
+  end
+
+  defp default_subagent_visibility(%{id: "vscode"}), do: "none"
+  defp default_subagent_visibility(%{support_class: "attach_client"}), do: "all"
+  defp default_subagent_visibility(_attrs), do: "none"
+
+  defp default_package_outputs(%{id: id}), do: AdapterRegistry.package_outputs(id)
+
+  defp default_direct_install_methods(%{id: "claude-code"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach claude-code"),
+      direct_install(
+        "local_plugin_dir",
+        "Claude plugin dir",
+        "claude --plugin-dir ./controlkeel/dist/claude-plugin"
+      )
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "codex-cli"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach codex-cli"),
+      direct_install("local_plugin", "Codex plugin", "controlkeel plugin install codex")
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "copilot"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach copilot"),
+      direct_install("local_plugin", "Copilot plugin", "controlkeel plugin install copilot")
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "opencode"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach opencode"),
+      direct_install(
+        "npm_plugin",
+        "OpenCode npm plugin",
+        ~s|"plugin": ["@aryaminus/controlkeel-opencode"]|
+      )
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "pi"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach pi"),
+      direct_install(
+        "npm_extension",
+        "Pi npm extension",
+        "pi install npm:@aryaminus/controlkeel-pi-extension"
+      ),
+      direct_install(
+        "npm_extension_short",
+        "Pi extension flag",
+        "pi -e npm:@aryaminus/controlkeel-pi-extension"
+      )
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "vscode"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach vscode"),
+      direct_install(
+        "vsix",
+        "VS Code VSIX",
+        "code --install-extension controlkeel-vscode-companion.vsix"
+      )
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "gemini-cli"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach gemini-cli"),
+      direct_install(
+        "extension_link",
+        "Gemini extension link",
+        "gemini extensions link ./controlkeel/dist/gemini-cli-native"
+      )
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: id})
+       when id in [
+              "cursor",
+              "windsurf",
+              "continue",
+              "cline",
+              "goose",
+              "kiro",
+              "amp",
+              "roo-code",
+              "aider",
+              "hermes-agent",
+              "openclaw",
+              "droid",
+              "forge"
+            ] do
+    [direct_install("ck_attach", "CK attach", "controlkeel attach #{id}")]
+  end
+
+  defp default_direct_install_methods(%{support_class: "headless_runtime"}), do: []
+  defp default_direct_install_methods(%{support_class: "framework_adapter"}), do: []
+  defp default_direct_install_methods(%{support_class: "provider_only"}), do: []
+  defp default_direct_install_methods(%{support_class: "alias"}), do: []
+  defp default_direct_install_methods(_attrs), do: []
+
+  defp direct_install(kind, label, command) do
+    %{
+      "kind" => kind,
+      "label" => label,
+      "command" => command,
+      "availability" => "shipped"
+    }
+  end
+
+  defp default_artifact_surfaces(%{id: "claude-code"}),
+    do: [".claude/skills", ".claude/agents", "Claude MCP registration"]
+
+  defp default_artifact_surfaces(%{id: "codex-cli"}),
+    do: [".agents/skills", ".codex/agents", "~/.codex/config.json"]
+
+  defp default_artifact_surfaces(%{id: id}) when id in ["vscode", "copilot"] do
+    [".github/skills", ".github/agents", ".github/mcp.json", ".vscode/mcp.json"]
+  end
+
+  defp default_artifact_surfaces(%{id: "cursor"}),
+    do: [
+      ".agents/skills",
+      ".cursor/rules/controlkeel.mdc",
+      ".cursor/commands",
+      ".cursor/background-agents",
+      ".cursor/mcp.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "windsurf"}),
+    do: [
+      ".agents/skills",
+      ".windsurf/rules/controlkeel.md",
+      ".windsurf/commands",
+      ".windsurf/workflows",
+      ".windsurf/hooks",
+      ".windsurf/mcp.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "continue"}),
+    do: [
+      ".continue/skills",
+      ".continue/prompts",
+      ".continue/commands",
+      ".continue/mcpServers/controlkeel.yaml",
+      ".continue/mcp.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "cline"}),
+    do: [
+      ".cline/skills",
+      ".clinerules",
+      ".cline/commands",
+      ".cline/hooks",
+      ".cline/data/settings/cline_mcp_settings.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "goose"}),
+    do: [
+      ".goosehints",
+      "goose/workflow_recipes/controlkeel-review.yaml",
+      "goose/commands",
+      "goose/controlkeel-extension.yaml",
+      ".mcp.json"
+    ]
+
+  defp default_artifact_surfaces(%{id: "opencode"}),
+    do: [".opencode/plugins", ".opencode/commands", ".opencode/mcp.json", "AGENTS.md"]
+
+  defp default_artifact_surfaces(%{id: "gemini-cli"}),
+    do: [
+      "gemini-extension.json",
+      ".gemini/commands/controlkeel",
+      "skills/controlkeel-governance/SKILL.md",
+      "GEMINI.md",
+      "README.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "kiro"}),
+    do: [
+      ".kiro/hooks",
+      ".kiro/steering",
+      ".kiro/settings",
+      ".kiro/commands",
+      ".kiro/mcp.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "amp"}),
+    do: [".amp/plugins", ".amp/commands", ".amp/package.json", ".mcp.json", "AGENTS.md"]
+
+  defp default_artifact_surfaces(%{id: "roo-code"}),
+    do: [
+      ".roo/skills",
+      ".roo/rules",
+      ".roo/commands",
+      ".roo/guidance",
+      ".roomodes",
+      ".mcp.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "aider"}),
+    do: ["AGENTS.md", "AIDER.md", ".aider.conf.yml", ".aider/commands"]
+
+  defp default_artifact_surfaces(%{support_class: "headless_runtime"}),
+    do: ["AGENTS.md", ".mcp.hosted.json", "runtime export bundle"]
+
+  defp default_artifact_surfaces(_attrs), do: []
 
   defp normalize_id(id) do
     id

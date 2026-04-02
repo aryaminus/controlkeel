@@ -47,6 +47,7 @@ defmodule ControlKeelWeb.Router do
     live "/benchmarks/policies/:id", BenchmarkPolicyLive, :show
     live "/proofs", ProofBrowserLive, :index
     live "/proofs/:id", ProofBrowserLive, :show
+    live "/reviews/:id", ReviewLive, :show
     live "/ship", ShipLive, :index
     live "/missions/:id", MissionControlLive, :show
     live "/policies", PolicyStudioLive, :index
@@ -60,6 +61,9 @@ defmodule ControlKeelWeb.Router do
     get "/sessions", ApiController, :list_sessions
     post "/sessions", ApiController, :create_session
     get "/sessions/:id", ApiController, :get_session
+    post "/reviews", ApiController, :create_review
+    get "/reviews/:id", ApiController, :get_review
+    post "/reviews/:id/respond", ApiController, :respond_review
     get "/domains", ApiController, :list_domains
     get "/context", ApiController, :context
     post "/context", ApiController, :context

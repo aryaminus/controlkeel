@@ -415,6 +415,9 @@ defmodule ControlKeelWeb.SkillsLive do
                             Scope: {Enum.join(integration.supported_scopes, ", ")}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
+                            Install path: {human_install_experience(integration.install_experience)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
                             Auto-bootstrap: {if integration.auto_bootstrap, do: "yes", else: "no"}
                           </p>
                         </td>
@@ -424,6 +427,27 @@ defmodule ControlKeelWeb.SkillsLive do
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Execution support: {integration.execution_support || "inbound_only"}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Review experience: {human_review_experience(integration.review_experience)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Submit / feedback: {integration.submission_mode} / {integration.feedback_mode}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Phase model / embed: {human_phase_model(integration.phase_model)} / {human_browser_embed(
+                              integration.browser_embed
+                            )}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Runtime / review transport: {integration.runtime_transport ||
+                              "artifact_only"} / {integration.runtime_review_transport ||
+                              "artifact_only"}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Subagent visibility: {human_subagent_visibility(
+                              integration.subagent_visibility
+                            )}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Autonomy: {integration.autonomy_mode || "policy_gated"}
@@ -439,6 +463,9 @@ defmodule ControlKeelWeb.SkillsLive do
                             Provider bridge: {format_provider_bridge(integration.provider_bridge)}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
+                            Runtime auth owner: {integration.runtime_auth_owner || "none"}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
                             MCP / skills: {integration.mcp_mode} / {integration.skills_mode}
                           </p>
                         </td>
@@ -448,7 +475,29 @@ defmodule ControlKeelWeb.SkillsLive do
                             Export targets: {format_targets(integration.export_targets)}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
+                            Plan phases: {format_targets(integration.plan_phase_support)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Runtime sessions: {format_runtime_session_support(
+                              integration.runtime_session_support
+                            )}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Files written: {format_paths(integration.artifact_surfaces)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Package outputs: {format_package_outputs(integration.package_outputs)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Direct install: {format_direct_install_methods(
+                              integration.direct_install_methods
+                            )}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
                             Human intervention: {human_intervention_copy(integration)}
+                          </p>
+                          <p class="ck-note" style="margin-top: 0.35rem;">
+                            Confidence: {human_confidence_level(integration.confidence_level)}
                           </p>
                           <p class="ck-note" style="margin-top: 0.35rem;">
                             Upstream: {integration.upstream_slug || "n/a"}
@@ -570,6 +619,46 @@ defmodule ControlKeelWeb.SkillsLive do
   defp format_paths(nil), do: "not installed"
   defp format_paths(paths), do: Enum.join(paths, ", ")
 
+  defp format_package_outputs([]), do: "none"
+  defp format_package_outputs(nil), do: "none"
+
+  defp format_package_outputs(outputs) do
+    outputs
+    |> Enum.map(fn output ->
+      case output do
+        %{"artifact" => artifact, "kind" => kind} -> "#{kind}: #{artifact}"
+        %{artifact: artifact, kind: kind} -> "#{kind}: #{artifact}"
+        other -> inspect(other)
+      end
+    end)
+    |> Enum.join(", ")
+  end
+
+  defp format_direct_install_methods([]), do: "attach only"
+  defp format_direct_install_methods(nil), do: "attach only"
+
+  defp format_direct_install_methods(methods) do
+    methods
+    |> Enum.map(fn method ->
+      case method do
+        %{"label" => label, "command" => command} -> "#{label}: #{command}"
+        %{label: label, command: command} -> "#{label}: #{command}"
+        other -> inspect(other)
+      end
+    end)
+    |> Enum.join(" | ")
+  end
+
+  defp format_runtime_session_support(nil), do: "none"
+  defp format_runtime_session_support(%{} = support) when map_size(support) == 0, do: "none"
+
+  defp format_runtime_session_support(%{} = support) do
+    support
+    |> Enum.filter(fn {_key, value} -> value end)
+    |> Enum.map(fn {key, _value} -> to_string(key) end)
+    |> Enum.join(", ")
+  end
+
   defp scope_pill_class("builtin"), do: "ck-pill-critical"
   defp scope_pill_class("user"), do: "ck-pill-medium"
   defp scope_pill_class("project"), do: "ck-pill-neutral"
@@ -586,6 +675,37 @@ defmodule ControlKeelWeb.SkillsLive do
   defp human_support_class("alias"), do: "Alias"
   defp human_support_class("unverified"), do: "Unverified"
   defp human_support_class(_), do: "Portable integration"
+
+  defp human_install_experience("first_class"), do: "first-class"
+  defp human_install_experience("guided"), do: "guided"
+  defp human_install_experience("fallback"), do: "fallback"
+  defp human_install_experience(_value), do: "guided"
+
+  defp human_review_experience("native_review"), do: "native review"
+  defp human_review_experience("browser_review"), do: "browser review"
+  defp human_review_experience("feedback_only"), do: "feedback only"
+  defp human_review_experience("none"), do: "none"
+  defp human_review_experience(_value), do: "browser review"
+
+  defp human_phase_model("host_plan_mode"), do: "host plan mode"
+  defp human_phase_model("file_plan_mode"), do: "file plan mode"
+  defp human_phase_model("review_only"), do: "review only"
+  defp human_phase_model(_value), do: "review only"
+
+  defp human_browser_embed("external"), do: "external browser"
+  defp human_browser_embed("vscode_webview"), do: "VS Code webview"
+  defp human_browser_embed("none"), do: "none"
+  defp human_browser_embed(_value), do: "external browser"
+
+  defp human_subagent_visibility("primary_only"), do: "primary only"
+  defp human_subagent_visibility("all"), do: "all agents"
+  defp human_subagent_visibility("none"), do: "none"
+  defp human_subagent_visibility(_value), do: "none"
+
+  defp human_confidence_level("shipped"), do: "shipped"
+  defp human_confidence_level("experimental"), do: "experimental"
+  defp human_confidence_level("research"), do: "research"
+  defp human_confidence_level(_value), do: "shipped"
 
   defp alias_action(%{alias_of: alias_of}) when is_binary(alias_of), do: "Use #{alias_of}"
   defp alias_action(_integration), do: "reference only"

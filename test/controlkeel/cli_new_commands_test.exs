@@ -5,6 +5,7 @@ defmodule ControlKeel.CLI.NewCommandsTest do
   import ExUnit.CaptureIO
 
   alias ControlKeel.CLI
+  alias ControlKeel.Mission
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Governance.CircuitBreaker
   alias ControlKeel.Governance.AgentMonitor
@@ -194,6 +195,149 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
       assert parsed.command == :cost_optimize
       assert parsed.options[:session_id] == 42
+    end
+  end
+
+  describe "review plan commands" do
+    test "parse review plan subcommands" do
+      assert {:ok, %{command: :review_plan_submit}} =
+               CLI.parse(["review", "plan", "submit", "--stdin"])
+
+      assert {:ok, %{command: :review_plan_open, options: [id: 42]}} =
+               CLI.parse(["review", "plan", "open", "--id", "42"])
+
+      assert {:ok, %{command: :review_plan_wait, options: [id: 42]}} =
+               CLI.parse(["review", "plan", "wait", "--id", "42"])
+
+      assert {:ok, %{command: :review_plan_respond, args: ["9"]}} =
+               CLI.parse(["review", "plan", "respond", "9", "--decision", "approved"])
+    end
+
+    test "submit, open, wait, and respond work end-to-end", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      plan_path = Path.join(tmp_dir, "plan.md")
+      File.write!(plan_path, "1. Draft implementation\n2. Request approval")
+
+      assert {:ok, submit_lines} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_submit,
+                   options: %{task_id: task.id, body_file: plan_path},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      assert Enum.any?(submit_lines, &String.contains?(&1, "Submitted plan review"))
+
+      review = ControlKeel.Mission.latest_review_for_task(task.id, "plan")
+
+      assert {:ok, open_lines} =
+               CLI.run_command(
+                 %{command: :review_plan_open, options: %{id: review.id}, args: []},
+                 tmp_dir
+               )
+
+      assert Enum.any?(open_lines, &String.contains?(&1, "/reviews/#{review.id}"))
+
+      assert {:ok, respond_lines} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_respond,
+                   options: %{decision: "approved", feedback_notes: "Ship it"},
+                   args: [Integer.to_string(review.id)]
+                 },
+                 tmp_dir
+               )
+
+      assert Enum.any?(respond_lines, &String.contains?(&1, "Status: approved"))
+
+      assert {:ok, wait_lines} =
+               CLI.run_command(
+                 %{command: :review_plan_wait, options: %{id: review.id, timeout: 1}, args: []},
+                 tmp_dir
+               )
+
+      assert Enum.any?(wait_lines, &String.contains?(&1, "approved"))
+    end
+
+    test "submit supports env-inferred runtime context and json payloads", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      plan_path = Path.join(tmp_dir, "plan.md")
+      File.write!(plan_path, "1. Explore runtime-backed submission")
+
+      {:ok, _task} =
+        Mission.attach_task_runtime_context(task.id, %{
+          "agent_id" => "opencode",
+          "thread_id" => "thread-123"
+        })
+
+      previous_agent_id = System.get_env("CONTROLKEEL_AGENT_ID")
+      previous_thread_id = System.get_env("CONTROLKEEL_THREAD_ID")
+
+      System.put_env("CONTROLKEEL_AGENT_ID", "opencode")
+      System.put_env("CONTROLKEEL_THREAD_ID", "thread-123")
+
+      on_exit(fn ->
+        if previous_agent_id,
+          do: System.put_env("CONTROLKEEL_AGENT_ID", previous_agent_id),
+          else: System.delete_env("CONTROLKEEL_AGENT_ID")
+
+        if previous_thread_id,
+          do: System.put_env("CONTROLKEEL_THREAD_ID", previous_thread_id),
+          else: System.delete_env("CONTROLKEEL_THREAD_ID")
+      end)
+
+      assert {:ok, [submit_json]} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_submit,
+                   options: %{body_file: plan_path, json: true},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      payload = Jason.decode!(submit_json)
+      review_id = get_in(payload, ["review", "id"])
+
+      assert is_integer(review_id)
+      assert get_in(payload, ["review", "task_id"]) == task.id
+      assert payload["browser_url"] =~ "/reviews/#{review_id}"
+
+      assert {:ok, [open_json]} =
+               CLI.run_command(
+                 %{command: :review_plan_open, options: %{id: review_id, json: true}, args: []},
+                 tmp_dir
+               )
+
+      open_payload = Jason.decode!(open_json)
+      assert open_payload["browser_url"] =~ "/reviews/#{review_id}"
+
+      assert {:ok, _respond_lines} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_respond,
+                   options: %{decision: "approved", feedback_notes: "Proceed", json: true},
+                   args: [Integer.to_string(review_id)]
+                 },
+                 tmp_dir
+               )
+
+      assert {:ok, [wait_json]} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_wait,
+                   options: %{id: review_id, timeout: 1, json: true},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      wait_payload = Jason.decode!(wait_json)
+      assert get_in(wait_payload, ["review", "status"]) == "approved"
     end
   end
 

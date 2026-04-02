@@ -45,6 +45,20 @@ def main() -> None:
     print(
         "- Raw GitHub PowerShell installer: `irm https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.ps1 | iex`"
     )
+    print("\n## Adapter Artifacts\n")
+    print("- Claude plugin bundle: `controlkeel-claude-plugin.tar.gz`")
+    print("- Copilot plugin bundle: `controlkeel-copilot-plugin.tar.gz`")
+    print("- OpenCode bundle: `controlkeel-opencode-native.tar.gz` and `controlkeel-opencode-native.tgz`")
+    print("- Pi bundle: `controlkeel-pi-native.tar.gz` and `controlkeel-pi-native.tgz`")
+    print("- VS Code companion: `controlkeel-vscode-companion.vsix`")
+    print("\n## Direct Host Installs\n")
+    print("- OpenCode npm plugin: add `\"plugin\": [\"@aryaminus/controlkeel-opencode\"]` to `opencode.json`")
+    print("- Pi npm extension: `pi install npm:@aryaminus/controlkeel-pi-extension`")
+    print("- Pi short form: `pi -e npm:@aryaminus/controlkeel-pi-extension`")
+    print("- VS Code companion: `code --install-extension controlkeel-vscode-companion.vsix`")
+    print("- Claude local plugin dir: `claude --plugin-dir ./controlkeel/dist/claude-plugin`")
+    print("- Copilot local plugin bundle: `controlkeel plugin install copilot`")
+    print("- Codex local plugin bundle: `controlkeel plugin install codex`")
     print("\n## Changelog\n")
     print(changelog_entry)
 
