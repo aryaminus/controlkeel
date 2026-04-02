@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.17 — 2026-04-02
+
+### What's changed
+
+- docs: clarify release installs and bundle coverage
+
 ## v0.1.16 — 2026-04-01
 
 ### What's changed
