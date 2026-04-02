@@ -183,7 +183,7 @@ defmodule ControlKeel.AgentIntegration do
         feedback_mode: "command_reply",
         artifact_surfaces: [
           ".agents/skills",
-          ".pi/commands/controlkeel-review.md",
+          ".pi/commands",
           ".pi/mcp.json",
           "pi-extension.json",
           "PI.md"
@@ -260,11 +260,11 @@ defmodule ControlKeel.AgentIntegration do
         label: "Amp",
         category: "native-first",
         description:
-          "Attaches MCP server and delivers native governance via Amp TypeScript plugins with event hooks, custom tools, and commands.",
+          "Attaches MCP server and delivers native governance via Amp TypeScript plugins, a native skill bundle, custom tools, and commands.",
         attach_command: "controlkeel attach amp",
         config_location: "Amp MCP config and `.amp/plugins/`.",
         companion_delivery:
-          "Exports a governance TypeScript plugin with `amp.on` hooks, `ck-validate` tool, `/controlkeel-review` command, package scaffold, and `AGENTS.md` instructions.",
+          "Exports a governance TypeScript plugin with `amp.on` hooks, `ck-validate` tool, a native `controlkeel-governance` skill bundle, review commands, package scaffold, and `AGENTS.md` instructions.",
         preferred_target: "amp-native",
         default_scope: "project",
         router_agent_id: "amp",
@@ -1305,10 +1305,13 @@ defmodule ControlKeel.AgentIntegration do
         ["local_mcp", "plugin", "native_skills"]
 
       id when id in ["vscode", "copilot", "copilot-cli"] ->
-        ["local_mcp", "plugin", "native_skills", "workflows", "hooks"]
+        ["local_mcp", "plugin", "native_skills", "workflows", "hooks", "commands"]
 
-      id when id in ["cursor", "cursor-agent", "windsurf"] ->
+      id when id in ["cursor", "cursor-agent"] ->
         ["local_mcp", "native_skills", "rules", "commands", "workflows"]
+
+      "windsurf" ->
+        ["local_mcp", "native_skills", "rules", "commands", "workflows", "hooks"]
 
       id when id in ["cline", "continue", "roo-code"] ->
         ["local_mcp", "native_skills", "rules", "workflows", "commands"]
@@ -1323,7 +1326,7 @@ defmodule ControlKeel.AgentIntegration do
         ["local_mcp", "native_skills", "hooks", "rules", "commands"]
 
       "amp" ->
-        ["local_mcp", "plugin", "rules", "commands", "tool_call"]
+        ["local_mcp", "plugin", "native_skills", "commands", "tool_call"]
 
       "aider" ->
         ["local_mcp", "commands"]
@@ -1529,6 +1532,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_direct_install_methods(%{id: "claude-code"}) do
     [
       direct_install("ck_attach", "CK attach", "controlkeel attach claude-code"),
+      direct_install("local_plugin", "Claude plugin", "controlkeel plugin install claude"),
       direct_install(
         "local_plugin_dir",
         "Claude plugin dir",
@@ -1600,6 +1604,24 @@ defmodule ControlKeel.AgentIntegration do
     ]
   end
 
+  defp default_direct_install_methods(%{id: "amp"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach amp"),
+      direct_install(
+        "local_skill",
+        "Amp skill",
+        "amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance"
+      )
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "openclaw"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach openclaw"),
+      direct_install("local_plugin", "OpenClaw plugin", "controlkeel plugin install openclaw")
+    ]
+  end
+
   defp default_direct_install_methods(%{id: id})
        when id in [
               "cursor",
@@ -1608,11 +1630,9 @@ defmodule ControlKeel.AgentIntegration do
               "cline",
               "goose",
               "kiro",
-              "amp",
               "roo-code",
               "aider",
               "hermes-agent",
-              "openclaw",
               "droid",
               "forge"
             ] do
@@ -1641,7 +1661,15 @@ defmodule ControlKeel.AgentIntegration do
     do: [".agents/skills", ".codex/agents", "~/.codex/config.json"]
 
   defp default_artifact_surfaces(%{id: id}) when id in ["vscode", "copilot"] do
-    [".github/skills", ".github/agents", ".github/mcp.json", ".vscode/mcp.json"]
+    [
+      ".github/skills",
+      ".github/agents",
+      ".github/commands",
+      ".github/mcp.json",
+      ".github/copilot-instructions.md",
+      ".vscode/mcp.json",
+      ".vscode/extensions.json"
+    ]
   end
 
   defp default_artifact_surfaces(%{id: "cursor"}),
@@ -1660,6 +1688,7 @@ defmodule ControlKeel.AgentIntegration do
       ".windsurf/rules/controlkeel.md",
       ".windsurf/commands",
       ".windsurf/workflows",
+      ".windsurf/hooks.json",
       ".windsurf/hooks",
       ".windsurf/mcp.json",
       "AGENTS.md"
@@ -1717,7 +1746,14 @@ defmodule ControlKeel.AgentIntegration do
     ]
 
   defp default_artifact_surfaces(%{id: "amp"}),
-    do: [".amp/plugins", ".amp/commands", ".amp/package.json", ".mcp.json", "AGENTS.md"]
+    do: [
+      ".amp/plugins",
+      ".agents/skills/controlkeel-governance",
+      ".amp/commands",
+      ".amp/package.json",
+      ".mcp.json",
+      "AGENTS.md"
+    ]
 
   defp default_artifact_surfaces(%{id: "roo-code"}),
     do: [

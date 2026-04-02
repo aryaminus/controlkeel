@@ -317,6 +317,16 @@ defmodule ControlKeel.Skills.Exporter do
     submit_command_path = Path.join(root, ".cline/commands/controlkeel-submit-plan.md")
     File.write!(submit_command_path, cline_submit_plan_command_contents())
 
+    annotate_command_path = Path.join(root, ".cline/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Cline", "cline", ".cline/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".cline/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Cline"))
+
     pretool_hook_path = Path.join(root, ".cline/hooks/PreToolUse/controlkeel-review.sh")
     File.mkdir_p!(Path.dirname(pretool_hook_path))
     File.write!(pretool_hook_path, review_bridge_shell_contents("cline"))
@@ -341,6 +351,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => workflow_path, "kind" => "workflow"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => pretool_hook_path, "kind" => "hook"},
         %{"path" => taskstart_hook_path, "kind" => "hook"},
         %{"path" => agents_path, "kind" => "instructions"}
@@ -368,6 +380,16 @@ defmodule ControlKeel.Skills.Exporter do
     submit_command_path = Path.join(root, ".cursor/commands/controlkeel-submit-plan.md")
     File.write!(submit_command_path, cursor_submit_plan_command_contents())
 
+    annotate_command_path = Path.join(root, ".cursor/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Cursor", "cursor", ".cursor/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".cursor/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Cursor"))
+
     background_agent_path = Path.join(root, ".cursor/background-agents/controlkeel.md")
     File.mkdir_p!(Path.dirname(background_agent_path))
     File.write!(background_agent_path, cursor_background_agent_contents())
@@ -388,6 +410,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => background_agent_path, "kind" => "workflow"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
@@ -411,9 +435,33 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, windsurf_command_contents())
 
+    submit_command_path = Path.join(root, ".windsurf/commands/controlkeel-submit-plan.md")
+
+    File.write!(
+      submit_command_path,
+      host_submit_plan_command_contents("Windsurf", "windsurf", ".windsurf/review-plan.md")
+    )
+
+    annotate_command_path = Path.join(root, ".windsurf/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Windsurf", "windsurf", ".windsurf/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".windsurf/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Windsurf"))
+
     workflow_path = Path.join(root, ".windsurf/workflows/controlkeel-review.md")
     File.mkdir_p!(Path.dirname(workflow_path))
     File.write!(workflow_path, windsurf_workflow_contents())
+
+    workspace_hooks_path = Path.join(root, ".windsurf/hooks.json")
+
+    File.write!(
+      workspace_hooks_path,
+      Jason.encode!(windsurf_workspace_hook_manifest(), pretty: true) <> "\n"
+    )
 
     hook_path = Path.join(root, ".windsurf/hooks/controlkeel-review.json")
     File.mkdir_p!(Path.dirname(hook_path))
@@ -438,7 +486,11 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => workflow_path, "kind" => "workflow"},
+        %{"path" => workspace_hooks_path, "kind" => "hooks"},
         %{"path" => hook_path, "kind" => "hook"},
         %{"path" => hook_script_path, "kind" => "hook"},
         %{"path" => mcp_path, "kind" => "mcp"},
@@ -446,6 +498,7 @@ defmodule ControlKeel.Skills.Exporter do
       ],
       [
         "Keep `.windsurf/rules`, `.windsurf/workflows`, and `.windsurf/hooks` in the repo so Windsurf loads ControlKeel guidance, Cascade workflows, and hook-native review interception.",
+        "Use `.windsurf/hooks.json` as the canonical workspace hook config; the per-hook JSON and shell script are included as portable review assets.",
         "Use .windsurf/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
@@ -475,6 +528,16 @@ defmodule ControlKeel.Skills.Exporter do
     submit_command_path = Path.join(root, ".continue/commands/controlkeel-submit-plan.prompt")
     File.write!(submit_command_path, continue_submit_plan_command_contents())
 
+    annotate_command_path = Path.join(root, ".continue/commands/controlkeel-annotate.prompt")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Continue", "continue", ".continue/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".continue/commands/controlkeel-last.prompt")
+    File.write!(last_command_path, host_last_command_contents("Continue"))
+
     config_path = Path.join(root, ".continue/mcp.json")
     File.write!(config_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
 
@@ -497,6 +560,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => headless_prompt_path, "kind" => "instructions"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => config_path, "kind" => "mcp"},
         %{"path" => mcp_server_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
@@ -519,6 +584,16 @@ defmodule ControlKeel.Skills.Exporter do
     submit_command_path = Path.join(root, ".pi/commands/controlkeel-submit-plan.md")
     File.mkdir_p!(Path.dirname(submit_command_path))
     File.write!(submit_command_path, pi_submit_plan_command_contents())
+
+    annotate_command_path = Path.join(root, ".pi/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Pi", "pi", ".pi/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".pi/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Pi"))
 
     phase_config_path = Path.join(root, ".pi/controlkeel.json")
     File.mkdir_p!(Path.dirname(phase_config_path))
@@ -556,6 +631,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => phase_config_path, "kind" => "settings"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => extension_path, "kind" => "plugin"},
@@ -587,6 +664,16 @@ defmodule ControlKeel.Skills.Exporter do
     submit_command_path = Path.join(root, ".roo/commands/controlkeel-submit-plan.md")
     File.write!(submit_command_path, roo_submit_plan_command_contents())
 
+    annotate_command_path = Path.join(root, ".roo/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Roo Code", "roo-code", ".roo/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".roo/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Roo Code"))
+
     guidance_path = Path.join(root, ".roo/guidance/controlkeel.md")
     File.mkdir_p!(Path.dirname(guidance_path))
     File.write!(guidance_path, roo_guidance_contents())
@@ -612,6 +699,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => guidance_path, "kind" => "guidance"},
         %{"path" => cloud_guidance_path, "kind" => "guidance"},
         %{"path" => modes_path, "kind" => "settings"},
@@ -640,6 +729,16 @@ defmodule ControlKeel.Skills.Exporter do
     submit_command_path = Path.join(root, "goose/commands/controlkeel-submit-plan.md")
     File.write!(submit_command_path, goose_submit_plan_command_contents())
 
+    annotate_command_path = Path.join(root, "goose/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Goose", "goose", "goose/annotate.md")
+    )
+
+    last_command_path = Path.join(root, "goose/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Goose"))
+
     extension_path = Path.join(root, "goose/controlkeel-extension.yaml")
     File.mkdir_p!(Path.dirname(extension_path))
     File.write!(extension_path, goose_extension_yaml(project_root, opts))
@@ -659,6 +758,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => workflow_path, "kind" => "workflow"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => extension_path, "kind" => "settings"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
@@ -1033,6 +1134,16 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(submit_command_path))
     File.write!(submit_command_path, opencode_submit_plan_command_contents())
 
+    annotate_command_path = Path.join(root, ".opencode/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("OpenCode", "opencode", ".opencode/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".opencode/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("OpenCode"))
+
     # 4. MCP config — opencode-format mcp.json
     mcp_path = Path.join(root, ".opencode/mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
@@ -1063,6 +1174,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => package_json_path, "kind" => "package"},
         %{"path" => package_entry_path, "kind" => "runtime"},
@@ -1072,7 +1185,7 @@ defmodule ControlKeel.Skills.Exporter do
       [
         "Copy `.opencode/plugins/` into your project's `.opencode/plugins/` directory (loaded automatically at startup).",
         "Copy `.opencode/agents/` into your project's `.opencode/agents/` directory for the governed review agent.",
-        "Copy `.opencode/commands/` into your project's `.opencode/commands/` directory for the `/controlkeel-review` and `/controlkeel-submit-plan` commands.",
+        "Copy `.opencode/commands/` into your project's `.opencode/commands/` directory for the `/controlkeel-review`, `/controlkeel-submit-plan`, `/controlkeel-annotate`, and `/controlkeel-last` commands.",
         "Merge `.opencode/mcp.json` into your `opencode.json` under the `mcp` key.",
         "For direct npm plugin installs, add `\"plugin\": [\"@aryaminus/controlkeel-opencode\"]` to your `opencode.json`."
       ]
@@ -1096,6 +1209,12 @@ defmodule ControlKeel.Skills.Exporter do
     submit_plan_command_path = Path.join(root, ".gemini/commands/controlkeel/submit-plan.toml")
     File.write!(submit_plan_command_path, gemini_submit_plan_command_contents())
 
+    annotate_command_path = Path.join(root, ".gemini/commands/controlkeel/annotate.toml")
+    File.write!(annotate_command_path, gemini_annotate_command_contents())
+
+    last_command_path = Path.join(root, ".gemini/commands/controlkeel/last.toml")
+    File.write!(last_command_path, gemini_last_command_contents())
+
     # 3. Agent skill
     skill_path = Path.join(root, "skills/controlkeel-governance/SKILL.md")
     File.mkdir_p!(Path.dirname(skill_path))
@@ -1116,13 +1235,15 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => manifest_path, "kind" => "settings"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_plan_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => skill_path, "kind" => "skills"},
         %{"path" => gemini_md_path, "kind" => "instructions"},
         %{"path" => extension_readme_path, "kind" => "instructions"}
       ],
       [
         "Install with `gemini extensions link .` or copy the directory into `~/.gemini/extensions/controlkeel/`.",
-        "The `/controlkeel:review` and `/controlkeel:submit-plan` commands plus the `controlkeel-governance` skill are auto-discovered."
+        "The `/controlkeel:review`, `/controlkeel:submit-plan`, `/controlkeel:annotate`, and `/controlkeel:last` commands plus the `controlkeel-governance` skill are auto-discovered."
       ]
     )
   end
@@ -1153,6 +1274,23 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, kiro_command_contents())
 
+    submit_command_path = Path.join(root, ".kiro/commands/controlkeel-submit-plan.md")
+
+    File.write!(
+      submit_command_path,
+      host_submit_plan_command_contents("Kiro", "kiro", ".kiro/review-plan.md")
+    )
+
+    annotate_command_path = Path.join(root, ".kiro/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Kiro", "kiro", ".kiro/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".kiro/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Kiro"))
+
     # 3. MCP config
     mcp_path = Path.join(root, ".kiro/mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
@@ -1171,6 +1309,9 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => steering_path, "kind" => "instructions"},
         %{"path" => tool_policy_path, "kind" => "settings"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
@@ -1188,9 +1329,37 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(plugin_path))
     File.write!(plugin_path, amp_plugin_contents())
 
+    skill_path = Path.join(root, ".agents/skills/controlkeel-governance/SKILL.md")
+    File.mkdir_p!(Path.dirname(skill_path))
+    File.write!(skill_path, amp_skill_contents())
+
+    skill_mcp_path = Path.join(root, ".agents/skills/controlkeel-governance/mcp.json")
+
+    File.write!(
+      skill_mcp_path,
+      Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n"
+    )
+
     command_path = Path.join(root, ".amp/commands/controlkeel-review.md")
     File.mkdir_p!(Path.dirname(command_path))
     File.write!(command_path, amp_command_contents())
+
+    submit_command_path = Path.join(root, ".amp/commands/controlkeel-submit-plan.md")
+
+    File.write!(
+      submit_command_path,
+      host_submit_plan_command_contents("Amp", "amp", ".amp/review-plan.md")
+    )
+
+    annotate_command_path = Path.join(root, ".amp/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Amp", "amp", ".amp/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".amp/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Amp"))
 
     package_json_path = Path.join(root, ".amp/package.json")
     File.write!(package_json_path, Jason.encode!(amp_package_manifest(), pretty: true) <> "\n")
@@ -1209,13 +1378,19 @@ defmodule ControlKeel.Skills.Exporter do
       opts,
       [
         %{"path" => plugin_path, "kind" => "plugin"},
+        %{"path" => skill_path, "kind" => "skills"},
+        %{"path" => skill_mcp_path, "kind" => "mcp"},
         %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => package_json_path, "kind" => "package"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
         "Copy `.amp/plugins/` and `.amp/commands/` into your project root (requires `PLUGINS=all` env var to activate).",
+        "Prefer the native skill path when possible: `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance`.",
         "Merge `.mcp.json` into your project's MCP config."
       ]
     )
@@ -1241,6 +1416,16 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(aider_command_path))
     File.write!(aider_command_path, aider_command_contents())
 
+    aider_annotate_command_path = Path.join(root, ".aider/commands/controlkeel-annotate.md")
+
+    File.write!(
+      aider_annotate_command_path,
+      host_annotate_command_contents("Aider", "aider", ".aider/annotate.md")
+    )
+
+    aider_last_command_path = Path.join(root, ".aider/commands/controlkeel-last.md")
+    File.write!(aider_last_command_path, host_last_command_contents("Aider"))
+
     with_common_assets(
       root,
       project_root,
@@ -1251,7 +1436,9 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => copilot_path, "kind" => "instructions"},
         %{"path" => aider_path, "kind" => "instructions"},
         %{"path" => aider_config_path, "kind" => "settings"},
-        %{"path" => aider_command_path, "kind" => "command"}
+        %{"path" => aider_command_path, "kind" => "command"},
+        %{"path" => aider_annotate_command_path, "kind" => "command"},
+        %{"path" => aider_last_command_path, "kind" => "command"}
       ],
       [
         "Use these snippets with MCP-only or command-driven tools such as Aider that do not support native skills or plugins."
@@ -2445,6 +2632,20 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
+  defp windsurf_workspace_hook_manifest do
+    %{
+      "version" => 1,
+      "hooks" => [
+        %{
+          "event" => "ExitPlanMode",
+          "type" => "command",
+          "command" => "./hooks/controlkeel-review.sh",
+          "timeoutSec" => 345_600
+        }
+      ]
+    }
+  end
+
   defp continue_prompt_contents do
     """
     # ControlKeel Continue Prompt
@@ -3104,6 +3305,12 @@ defmodule ControlKeel.Skills.Exporter do
     ```bash
     controlkeel attach opencode
     ```
+
+    The repo-local command bundle now includes:
+    - `/controlkeel-review`
+    - `/controlkeel-submit-plan`
+    - `/controlkeel-annotate`
+    - `/controlkeel-last`
     """
   end
 
@@ -3256,6 +3463,12 @@ defmodule ControlKeel.Skills.Exporter do
     ```bash
     controlkeel attach pi
     ```
+
+    The repo-local command bundle now includes:
+    - `/controlkeel-review`
+    - `/controlkeel-submit-plan`
+    - `/controlkeel-annotate`
+    - `/controlkeel-last`
     """
   end
 
@@ -3304,6 +3517,41 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp gemini_annotate_command_contents do
+    """
+    # ControlKeel Annotate
+    # Usage: /controlkeel:annotate <file>
+
+    [command]
+    version = 1
+
+    prompt = \"\"\"
+    Save focused annotation notes for {{args}} to `.gemini/annotate.md`, then submit them with:
+    !{controlkeel review plan submit --title "File annotation review" --body-file .gemini/annotate.md --submitted-by gemini-cli --json}
+
+    Wait for the review decision before making risky follow-up edits.
+    \"\"\"
+    """
+  end
+
+  defp gemini_last_command_contents do
+    """
+    # ControlKeel Last
+    # Usage: /controlkeel:last
+
+    [command]
+    version = 1
+
+    prompt = \"\"\"
+    Re-open the most recent ControlKeel review you are tracking for this task:
+    !{controlkeel review plan open --id <review_id> --json}
+
+    If the review is still pending, wait with:
+    !{controlkeel review plan wait --id <review_id> --json}
+    \"\"\"
+    """
+  end
+
   defp gemini_extension_readme_contents do
     """
     # ControlKeel Gemini extension
@@ -3311,6 +3559,8 @@ defmodule ControlKeel.Skills.Exporter do
     This extension provides:
     - `/controlkeel:review`
     - `/controlkeel:submit-plan`
+    - `/controlkeel:annotate`
+    - `/controlkeel:last`
     - the `controlkeel-governance` skill
     - MCP registration through `gemini-extension.json`
     """
@@ -3421,6 +3671,20 @@ defmodule ControlKeel.Skills.Exporter do
     1. Save the current summary or diff notes to a temporary markdown file in the repo.
     2. Run `controlkeel review plan submit --title "#{host_label} review" --body-file <path> --submitted-by #{submitted_by} --json`
     3. Open or wait on the returned review id before continuing risky work.
+    """
+  end
+
+  defp host_submit_plan_command_contents(host_label, submitted_by, suggested_path) do
+    """
+    # /controlkeel-submit-plan
+
+    Use this command in #{host_label} when the current plan is ready for ControlKeel approval.
+
+    Suggested flow:
+    1. Save the current plan to `#{suggested_path}`.
+    2. Run `controlkeel review plan submit --body-file #{suggested_path} --submitted-by #{submitted_by} --json`
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`
+    4. Do not begin implementation until approval is returned.
     """
   end
 
@@ -3707,6 +3971,30 @@ defmodule ControlKeel.Skills.Exporter do
   end
 
   # ── Amp native helpers ─────────────────────────────────────────────────────
+
+  defp amp_skill_contents do
+    """
+    ---
+    name: controlkeel-governance
+    description: Native ControlKeel governance skill for Amp with MCP-backed review, plan gating, and finding checks.
+    ---
+
+    # ControlKeel Governance For Amp
+
+    Prefer this skill whenever you need to review a plan, annotate risky edits, or check the latest governed state.
+
+    Primary flow:
+    1. Use `/controlkeel-submit-plan` before leaving planning for risky work.
+    2. Use `/controlkeel-review` before completion.
+    3. Use `/controlkeel-annotate` for file-specific risk notes.
+    4. Use `/controlkeel-last` to reopen the most recent active review.
+
+    MCP expectations:
+    - `ck_context` for task and workspace context
+    - `ck_review_submit`, `ck_review_status`, and `ck_review_feedback` for review transport
+    - `ck_validate` and `ck_finding` for governance results
+    """
+  end
 
   defp amp_plugin_contents do
     ~S"""

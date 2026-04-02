@@ -141,7 +141,7 @@ Expanded official surfaces now shipped for the broader matrix:
 - Cline: rules, workflows, commands, hooks, and CLI MCP config companion
 - Goose: repo hints, workflow recipes, commands, and Goose extension YAML
 - Kiro: hooks, steering, tool-policy settings, commands, and MCP config
-- Amp: TypeScript plugin, command docs, and plugin package scaffold
+- Amp: TypeScript plugin, native skill bundle, command docs, and plugin package scaffold
 - Gemini CLI: extension manifest plus review and submit-plan commands
 - Cursor: rules, commands, background-agent guidance, and MCP config
 - Roo Code: rules, commands, cloud-agent guidance, and governed mode files
@@ -167,13 +167,17 @@ Where the host supports it, CK now publishes or packages a direct-install surfac
 - Pi short form: `pi -e npm:@aryaminus/controlkeel-pi-extension`
 - VS Code: `code --install-extension controlkeel-vscode-companion.vsix`
 - Gemini CLI: `gemini extensions link ./controlkeel/dist/gemini-cli-native`
+- Claude Code: `controlkeel plugin install claude`
 - Claude Code: `claude --plugin-dir ./controlkeel/dist/claude-plugin`
 - Copilot: `controlkeel plugin install copilot`
 - Codex CLI: `controlkeel plugin install codex`
+- Amp: `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance`
+- OpenClaw: `controlkeel plugin install openclaw`
 
-Claude, Copilot, and Codex plugin bundles now all ship explicit review commands as well:
+Claude, Copilot, Codex, and the broader command-native host bundles now ship an explicit CK command layer so the agent can drive review loops directly:
 
 - `/controlkeel-review`
+- `/controlkeel-submit-plan`
 - `/controlkeel-annotate`
 - `/controlkeel-last`
 
@@ -192,7 +196,7 @@ For the full host-by-host truth table, see [docs/direct-host-installs.md](docs/d
 | Cline | `attach cline` | Hook-native | `.cline/skills`, `.clinerules/`, `.cline/commands`, `.cline/hooks`, MCP config |
 | Roo Code | `attach roo-code` | Prompt/command-native | `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, `.roomodes` |
 | Cursor | `attach cursor` | Native-first | `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, `.cursor/mcp.json` |
-| Windsurf | `attach windsurf` | Hook-native | `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks`, `.windsurf/mcp.json` |
+| Windsurf | `attach windsurf` | Hook-native | `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks.json`, `.windsurf/hooks`, `.windsurf/mcp.json` |
 | Continue | `attach continue` | Prompt/command-native | `.continue/prompts`, `.continue/commands`, `.continue/mcpServers/controlkeel.yaml`, `.continue/mcp.json` |
 | Pi | `attach pi` | File-plan-mode | `.pi/controlkeel.json`, `.pi/commands`, `.pi/mcp.json`, `pi-extension.json`, `PI.md` |
 | Copilot | `attach copilot` | Hook-native | `.github/skills`, `.github/agents`, `.github/commands`, `.vscode/mcp.json` |
@@ -201,7 +205,7 @@ For the full host-by-host truth table, see [docs/direct-host-installs.md](docs/d
 | OpenCode | `attach opencode` | Plugin-native | `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `package.json` |
 | Gemini CLI | `attach gemini-cli` | Prompt/command-native | `gemini-extension.json`, `.gemini/commands/`, `skills/`, `GEMINI.md`, extension README |
 | Kiro | `attach kiro` | Hook-native | `.kiro/hooks/`, `.kiro/steering/`, `.kiro/settings/`, `.kiro/commands/`, MCP config |
-| Amp | `attach amp` | Plugin-native | `.amp/plugins/`, `.amp/commands/`, `.amp/package.json` |
+| Amp | `attach amp` | Plugin-native | `.amp/plugins/`, `.agents/skills/controlkeel-governance/`, `.amp/commands/`, `.amp/package.json` |
 
 ### MCP + command-driven
 

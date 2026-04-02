@@ -20,9 +20,12 @@ ControlKeel keeps `controlkeel attach <host>` as the safest default because it i
 
 | Host | Direct install | Notes |
 | --- | --- | --- |
+| Claude Code | `controlkeel plugin install claude` | Installs the local Claude plugin bundle with hooks, MCP config, and command prompts. |
 | Claude Code | `claude --plugin-dir ./controlkeel/dist/claude-plugin` | Local plugin-dir install for the exported Claude plugin bundle, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
 | GitHub Copilot | `controlkeel plugin install copilot` | Installs the local Copilot plugin bundle and hooks into the project, plus `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
 | Codex CLI | `controlkeel plugin install codex` | Installs the local Codex plugin bundle and marketplace manifest, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
+| Amp | `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance` | Installs the native CK skill bundle directly into Amp. Use alongside the exported `.amp/plugins/` directory when you want event hooks and custom tools too. |
+| OpenClaw | `controlkeel plugin install openclaw` | Installs the local OpenClaw plugin bundle and MCP manifest. |
 
 ## Attach-first native installs
 
@@ -35,7 +38,6 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | Cline | `controlkeel attach cline` |
 | Goose | `controlkeel attach goose` |
 | Kiro | `controlkeel attach kiro` |
-| Amp | `controlkeel attach amp` |
 | Cursor | `controlkeel attach cursor` |
 | Roo Code | `controlkeel attach roo-code` |
 | Aider | `controlkeel attach aider` |
@@ -50,17 +52,26 @@ Some hosts expose hooks, workflows, rules, or repo-local command surfaces but do
 
 For those hosts, CK now installs stronger native assets than before:
 
-- Windsurf: hooks, workflows, commands, MCP config
+- Windsurf: hooks, canonical `hooks.json`, workflows, commands, MCP config
 - Continue: prompts, command prompts, headless review prompts, MCP server config
 - Cline: hooks, commands, rules, workflows
 - Goose: commands, workflow recipes, extension YAML
 - Kiro: hooks, steering, tool policy settings, commands
-- Amp: plugin scaffold and commands
+- Amp: plugin scaffold, native skill bundle, and commands
 - Cursor: commands, background-agent guidance, rules
 - Roo Code: commands, guidance, `.roomodes`
 - Aider: command-driven review snippets and config
 
 That is a real improvement in host usability, but it is not the same thing as a published marketplace package.
+
+Across the command-capable bundles, CK now standardizes the agent-facing command loop as much as the host format allows:
+
+- `review`
+- `submit-plan`
+- `annotate`
+- `last`
+
+That matters because CK is intended to be agent-operated first: the host should be able to call into ControlKeel directly for plan approval, focused annotation, and review reopening without requiring the human to manually reconstruct the flow.
 
 ## Release and publish truth
 

@@ -57,6 +57,11 @@ defmodule ControlKeel.AgentIntegrationTest do
 
     assert Enum.any?(
              claude.direct_install_methods,
+             &(&1["command"] == "controlkeel plugin install claude")
+           )
+
+    assert Enum.any?(
+             claude.direct_install_methods,
              &(&1["command"] == "claude --plugin-dir ./controlkeel/dist/claude-plugin")
            )
 
@@ -119,11 +124,15 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert pi.auth_mode == "agent_runtime"
     assert pi.runtime_transport == "pi_rpc"
     assert pi.runtime_review_transport == "extension_rpc"
+    assert ".pi/commands/controlkeel-review.md" in pi.artifact_surfaces
+    assert ".pi/commands/controlkeel-submit-plan.md" in pi.artifact_surfaces
     assert ".pi/mcp.json" in pi.artifact_surfaces
     assert Enum.any?(pi.direct_install_methods, &(&1["command"] =~ "pi install npm:"))
 
     assert windsurf.review_experience == "native_review"
     assert windsurf.submission_mode == "hook"
+    assert "hooks" in windsurf.agent_uses_ck_via
+    assert ".windsurf/hooks.json" in windsurf.artifact_surfaces
     assert ".windsurf/hooks" in windsurf.artifact_surfaces
 
     assert continue.submission_mode == "command"
@@ -140,11 +149,26 @@ defmodule ControlKeel.AgentIntegrationTest do
 
     assert amp.review_experience == "native_review"
     assert amp.submission_mode == "tool_call"
+    assert "native_skills" in amp.agent_uses_ck_via
+    assert ".agents/skills/controlkeel-governance" in amp.artifact_surfaces
     assert ".amp/commands" in amp.artifact_surfaces
+
+    assert Enum.any?(
+             amp.direct_install_methods,
+             &(&1["command"] ==
+                 "amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance")
+           )
 
     assert aider.phase_model == "review_only"
     assert aider.submission_mode == "command"
     assert "AIDER.md" in aider.artifact_surfaces
+
+    openclaw = AgentIntegration.get("openclaw")
+
+    assert Enum.any?(
+             openclaw.direct_install_methods,
+             &(&1["command"] == "controlkeel plugin install openclaw")
+           )
   end
 
   test "every integration references valid targets and install channels" do

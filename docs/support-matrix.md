@@ -71,11 +71,25 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | `cline` | rules, workflows, commands, hook scripts, and CLI MCP config |
 | `goose` | repo hints, workflow recipes, commands, and Goose extension YAML |
 | `kiro` | hooks, steering, tool-policy settings, commands, and MCP config |
-| `amp` | TypeScript plugin, custom tool/command surface, and package scaffold |
+| `amp` | TypeScript plugin, native skill bundle, custom tool/command surface, and package scaffold |
 | `gemini-cli` | extension manifest, review/submit-plan commands, and skill bundle |
 | `cursor` | rules, commands, background-agent guidance, and MCP config |
 | `roo-code` | rules, commands, governed modes, and cloud-agent guidance |
 | `aider` | command-driven snippets, `.aider.conf.yml`, and `AIDER.md` |
+
+For command-capable hosts, CK now standardizes the agent-facing governance loop as much as the host format allows:
+
+- `review`
+- `submit-plan`
+- `annotate`
+- `last`
+
+For hosts with a stronger native capability container, CK now prefers that too instead of forcing humans to reconstruct the flow:
+
+- Windsurf ships a canonical `.windsurf/hooks.json` workspace hook config in addition to the portable hook assets.
+- Amp ships a native `controlkeel-governance` skill bundle with MCP wiring in addition to the plugin and command layer.
+
+This keeps the product aligned with CK’s intent: agents should be able to invoke ControlKeel directly during autonomous work, rather than depending on the human operator to manually drive review state transitions.
 
 Runtime transport truth for those first-class hosts:
 

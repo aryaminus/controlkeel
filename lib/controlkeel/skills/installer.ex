@@ -466,9 +466,12 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("amp-native", project_root, scope: "project")
 
     amp_root = Path.join(project_root, ".amp")
+    skill_root = Path.join(project_root, ".agents/skills")
     File.mkdir_p!(amp_root)
+    File.mkdir_p!(skill_root)
 
     copy_tree_contents(Path.join(plan.output_dir, ".amp"), amp_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), skill_root)
     File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
     File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
 
@@ -477,6 +480,7 @@ defmodule ControlKeel.Skills.Installer do
        target: "amp-native",
        scope: "project",
        destination: amp_root,
+       skill_destination: skill_root,
        plugins_destination: Path.join(amp_root, "plugins"),
        commands_destination: Path.join(amp_root, "commands")
      }}

@@ -272,6 +272,12 @@ defmodule ControlKeel.SkillsTest do
            )
 
     assert File.exists?(
+             Path.join(cline_plan.output_dir, ".cline/commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(Path.join(cline_plan.output_dir, ".cline/commands/controlkeel-last.md"))
+
+    assert File.exists?(
              Path.join(cline_plan.output_dir, ".cline/hooks/PreToolUse/controlkeel-review.sh")
            )
 
@@ -290,6 +296,10 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(
              Path.join(roo_plan.output_dir, ".roo/commands/controlkeel-submit-plan.md")
            )
+
+    assert File.exists?(Path.join(roo_plan.output_dir, ".roo/commands/controlkeel-annotate.md"))
+
+    assert File.exists?(Path.join(roo_plan.output_dir, ".roo/commands/controlkeel-last.md"))
 
     assert File.exists?(Path.join(roo_plan.output_dir, ".roo/guidance/controlkeel.md"))
 
@@ -311,6 +321,12 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(
              Path.join(goose_plan.output_dir, "goose/commands/controlkeel-submit-plan.md")
            )
+
+    assert File.exists?(
+             Path.join(goose_plan.output_dir, "goose/commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(Path.join(goose_plan.output_dir, "goose/commands/controlkeel-last.md"))
 
     assert File.exists?(Path.join(goose_plan.output_dir, "goose/controlkeel-extension.yaml"))
 
@@ -367,6 +383,14 @@ defmodule ControlKeel.SkillsTest do
              Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-submit-plan.md")
            )
 
+    assert File.exists?(
+             Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(
+             Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-last.md")
+           )
+
     assert File.exists?(Path.join(opencode_plan.output_dir, ".opencode/mcp.json"))
     assert File.exists?(Path.join(opencode_plan.output_dir, "index.js"))
     assert File.exists?(Path.join(opencode_plan.output_dir, "README.md"))
@@ -392,6 +416,14 @@ defmodule ControlKeel.SkillsTest do
            )
 
     assert File.exists?(
+             Path.join(gemini_plan.output_dir, ".gemini/commands/controlkeel/annotate.toml")
+           )
+
+    assert File.exists?(
+             Path.join(gemini_plan.output_dir, ".gemini/commands/controlkeel/last.toml")
+           )
+
+    assert File.exists?(
              Path.join(gemini_plan.output_dir, "skills/controlkeel-governance/SKILL.md")
            )
 
@@ -401,6 +433,8 @@ defmodule ControlKeel.SkillsTest do
     assert {:ok, pi_plan} = Skills.export("pi-native", tmp_dir, scope: "export")
     assert File.exists?(Path.join(pi_plan.output_dir, ".pi/commands/controlkeel-review.md"))
     assert File.exists?(Path.join(pi_plan.output_dir, ".pi/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(pi_plan.output_dir, ".pi/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(pi_plan.output_dir, ".pi/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(pi_plan.output_dir, ".pi/controlkeel.json"))
     assert File.exists?(Path.join(pi_plan.output_dir, ".pi/mcp.json"))
     assert File.exists?(Path.join(pi_plan.output_dir, "pi-extension.json"))
@@ -422,13 +456,36 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/steering/controlkeel.md"))
     assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/settings/controlkeel-tools.json"))
     assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/commands/controlkeel-review.md"))
+
+    assert File.exists?(
+             Path.join(kiro_plan.output_dir, ".kiro/commands/controlkeel-submit-plan.md")
+           )
+
+    assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/mcp.json"))
     assert File.exists?(Path.join(kiro_plan.output_dir, "AGENTS.md"))
 
     assert {:ok, amp_plan} = Skills.export("amp-native", tmp_dir, scope: "export")
 
     assert File.exists?(Path.join(amp_plan.output_dir, ".amp/plugins/controlkeel-governance.ts"))
+
+    assert File.exists?(
+             Path.join(amp_plan.output_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(
+             Path.join(amp_plan.output_dir, ".agents/skills/controlkeel-governance/mcp.json")
+           )
+
     assert File.exists?(Path.join(amp_plan.output_dir, ".amp/commands/controlkeel-review.md"))
+
+    assert File.exists?(
+             Path.join(amp_plan.output_dir, ".amp/commands/controlkeel-submit-plan.md")
+           )
+
+    assert File.exists?(Path.join(amp_plan.output_dir, ".amp/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(amp_plan.output_dir, ".amp/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(amp_plan.output_dir, ".amp/package.json"))
 
     assert File.exists?(Path.join(amp_plan.output_dir, ".mcp.json"))
@@ -440,6 +497,14 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.exists?(
              Path.join(instructions_plan.output_dir, ".aider/commands/controlkeel-review.md")
+           )
+
+    assert File.exists?(
+             Path.join(instructions_plan.output_dir, ".aider/commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(
+             Path.join(instructions_plan.output_dir, ".aider/commands/controlkeel-last.md")
            )
   end
 
@@ -484,6 +549,9 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".clinerules/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".clinerules/workflows/controlkeel-review.md"))
     assert File.exists?(Path.join(tmp_dir, ".cline/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".cline/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".cline/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".cline/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".cline/hooks/PreToolUse/controlkeel-review.sh"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
 
@@ -493,6 +561,8 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".roo/rules/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".roo/commands/controlkeel-review.md"))
     assert File.exists?(Path.join(tmp_dir, ".roo/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".roo/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".roo/guidance/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".roo/guidance/controlkeel-cloud-agent.md"))
     assert File.exists?(Path.join(tmp_dir, ".roomodes"))
@@ -502,6 +572,9 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".goosehints"))
     assert File.exists?(Path.join(tmp_dir, "goose/workflow_recipes/controlkeel-review.yaml"))
     assert File.exists?(Path.join(tmp_dir, "goose/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, "goose/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, "goose/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, "goose/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, "goose/controlkeel-extension.yaml"))
 
     assert {:ok, opencode_install} =
@@ -511,6 +584,9 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".opencode/plugins/controlkeel-governance.ts"))
     assert File.exists?(Path.join(tmp_dir, ".opencode/agents/controlkeel-operator.md"))
     assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".opencode/mcp.json"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
 
@@ -521,6 +597,8 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, "gemini-extension.json"))
     assert File.exists?(Path.join(tmp_dir, ".gemini/commands/controlkeel/review.toml"))
     assert File.exists?(Path.join(tmp_dir, ".gemini/commands/controlkeel/submit-plan.toml"))
+    assert File.exists?(Path.join(tmp_dir, ".gemini/commands/controlkeel/annotate.toml"))
+    assert File.exists?(Path.join(tmp_dir, ".gemini/commands/controlkeel/last.toml"))
     assert File.exists?(Path.join(tmp_dir, "skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, "GEMINI.md"))
 
@@ -531,18 +609,29 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".kiro/steering/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".kiro/settings/controlkeel-tools.json"))
     assert File.exists?(Path.join(tmp_dir, ".kiro/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kiro/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kiro/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kiro/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".kiro/mcp.json"))
 
     assert {:ok, amp_install} = Skills.install("amp-native", tmp_dir, scope: "project")
     assert amp_install.destination == Path.join(tmp_dir, ".amp")
     assert File.exists?(Path.join(tmp_dir, ".amp/plugins/controlkeel-governance.ts"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/mcp.json"))
     assert File.exists?(Path.join(tmp_dir, ".amp/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".amp/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".amp/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".amp/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".mcp.json"))
 
     assert {:ok, cursor_install} = Skills.install("cursor-native", tmp_dir, scope: "project")
     assert cursor_install.destination == Path.join(tmp_dir, ".cursor")
     assert File.exists?(Path.join(tmp_dir, ".cursor/rules/controlkeel.mdc"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/background-agents/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/mcp.json"))
 
@@ -550,7 +639,11 @@ defmodule ControlKeel.SkillsTest do
     assert windsurf_install.destination == Path.join(tmp_dir, ".windsurf")
     assert File.exists?(Path.join(tmp_dir, ".windsurf/rules/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".windsurf/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".windsurf/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".windsurf/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".windsurf/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".windsurf/workflows/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".windsurf/hooks.json"))
     assert File.exists?(Path.join(tmp_dir, ".windsurf/hooks/controlkeel-review.json"))
     assert File.exists?(Path.join(tmp_dir, ".windsurf/mcp.json"))
 
@@ -560,6 +653,9 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".continue/prompts/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".continue/prompts/controlkeel-plan.md"))
     assert File.exists?(Path.join(tmp_dir, ".continue/commands/controlkeel-review.prompt"))
+    assert File.exists?(Path.join(tmp_dir, ".continue/commands/controlkeel-submit-plan.prompt"))
+    assert File.exists?(Path.join(tmp_dir, ".continue/commands/controlkeel-annotate.prompt"))
+    assert File.exists?(Path.join(tmp_dir, ".continue/commands/controlkeel-last.prompt"))
     assert File.exists?(Path.join(tmp_dir, ".continue/mcpServers/controlkeel.yaml"))
     assert File.exists?(Path.join(tmp_dir, ".continue/mcp.json"))
 
@@ -568,6 +664,8 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, "AIDER.md"))
     assert File.exists?(Path.join(tmp_dir, ".aider.conf.yml"))
     assert File.exists?(Path.join(tmp_dir, ".aider/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".aider/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".aider/commands/controlkeel-last.md"))
 
     assert {:ok, codex_plugin_install} = Skills.install("codex-plugin", tmp_dir, scope: "project")
     assert File.exists?(Path.join(codex_plugin_install.destination, ".codex-plugin/plugin.json"))
