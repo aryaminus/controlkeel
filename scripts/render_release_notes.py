@@ -37,7 +37,13 @@ def main() -> None:
         "- Unix installer: `curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh`"
     )
     print(
+        "- Raw GitHub shell installer: `curl -fsSL https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.sh | sh`"
+    )
+    print(
         "- PowerShell installer: `irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex`"
+    )
+    print(
+        "- Raw GitHub PowerShell installer: `irm https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.ps1 | iex`"
     )
     print("\n## Changelog\n")
     print(changelog_entry)

@@ -9,21 +9,39 @@ This is the current ControlKeel distribution and attachment matrix.
 ControlKeel itself is distributed through GitHub Releases, with convenience install channels layered on top:
 
 ```bash
+# Homebrew (macOS and Linux x86_64)
 brew tap aryaminus/controlkeel && brew install controlkeel
 
+# npm bootstrap (macOS x86_64/arm64, Linux x86_64, Windows x86_64)
 npm i -g @aryaminus/controlkeel
 pnpm add -g @aryaminus/controlkeel
 yarn global add @aryaminus/controlkeel
 
 npx @aryaminus/controlkeel@latest
 
+# Release-hosted installers
 curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh
 irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex
+
+# Raw bootstrap scripts from this repo
+curl -fsSL https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.sh | sh
+irm https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.ps1 | iex
 ```
 
 Tagged releases publish the packaged binaries, checksum manifest, installer scripts, and the portable plugin bundles described below.
 The npmjs and GitHub Packages channels publish the same bootstrap package, which downloads native binaries from GitHub Releases.
 If npmjs is unavailable for a specific environment, GitHub Packages remains a fallback path and requires scoped registry config and a token.
+
+Current packaged binary coverage is:
+
+| Platform | Assets |
+|---|---|
+| macOS Apple Silicon | `controlkeel-macos-arm64`, `controlkeel-macos-arm64.tar.gz` |
+| macOS Intel | `controlkeel-macos-x86_64`, `controlkeel-macos-x86_64.tar.gz` |
+| Linux x86_64 | `controlkeel-linux-x86_64`, `controlkeel-linux-x86_64.tar.gz` |
+| Windows x86_64 | `controlkeel-windows-x86_64.exe`, `controlkeel-windows-x86_64.zip` |
+
+The shell installer, PowerShell installer, and npm bootstrapper all download from that same packaged binary set.
 
 ## Support by mechanism
 
@@ -442,23 +460,39 @@ Exported bundles are written under:
 - `controlkeel/dist/open-standard/`
 - `controlkeel/dist/instructions-only/`
 
-Published release bundles use the same target set, but ship as release assets:
+Published release bundles are the release-qualified subset of export targets:
 
+- `controlkeel-amp-native.tar.gz`
 - `controlkeel-claude-plugin.tar.gz`
-- `controlkeel-codex-plugin.tar.gz`
 - `controlkeel-cline-native.tar.gz`
-- `controlkeel-cursor-native.tar.gz`
-- `controlkeel-windsurf-native.tar.gz`
-- `controlkeel-continue-native.tar.gz`
-- `controlkeel-roo-native.tar.gz`
-- `controlkeel-goose-native.tar.gz`
-- `controlkeel-copilot-plugin.tar.gz`
-- `controlkeel-openclaw-plugin.tar.gz`
+- `controlkeel-cloudflare-workers-runtime.tar.gz`
+- `controlkeel-codex-plugin.tar.gz`
 - `controlkeel-codex.tar.gz`
+- `controlkeel-continue-native.tar.gz`
+- `controlkeel-copilot-plugin.tar.gz`
+- `controlkeel-cursor-native.tar.gz`
 - `controlkeel-devin-runtime.tar.gz`
-- `controlkeel-provider-profile.tar.gz`
-- `controlkeel-open-standard.tar.gz`
+- `controlkeel-droid-bundle.tar.gz`
+- `controlkeel-forge-acp.tar.gz`
+- `controlkeel-framework-adapter.tar.gz`
+- `controlkeel-gemini-cli-native.tar.gz`
+- `controlkeel-goose-native.tar.gz`
+- `controlkeel-hermes-native.tar.gz`
 - `controlkeel-instructions-only.tar.gz`
+- `controlkeel-kiro-native.tar.gz`
+- `controlkeel-open-standard.tar.gz`
+- `controlkeel-open-swe-runtime.tar.gz`
+- `controlkeel-openclaw-native.tar.gz`
+- `controlkeel-openclaw-plugin.tar.gz`
+- `controlkeel-opencode-native.tar.gz`
+- `controlkeel-provider-profile.tar.gz`
+- `controlkeel-roo-native.tar.gz`
+- `controlkeel-windsurf-native.tar.gz`
+
+These targets are installable/exportable locally but are intentionally not published as release tarballs:
+
+- `claude-standalone` is a direct install/export target for `.claude/skills` and `.claude/agents`
+- `github-repo` is the repo-local install/export target for Copilot / VS Code files
 
 ## MCP tool surface
 

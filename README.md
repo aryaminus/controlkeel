@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/ci.yml)
 [![Release Smoke](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml/badge.svg)](https://github.com/aryaminus/controlkeel/actions/workflows/release-smoke.yml)
-[![Latest Release](https://img.shields.io/github/v/release/aryaminus/controlkeel)](https://github.com/aryaminus/controlkeel/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/aryaminus/controlkeel.svg)](https://github.com/aryaminus/controlkeel/releases/latest)
+[![npm version](https://img.shields.io/npm/v/%40aryaminus/controlkeel.svg)](https://www.npmjs.com/package/@aryaminus/controlkeel)
 
 **ControlKeel is the cerebellum for agent-generated software delivery.** Just as the cerebellum constantly compares motor intent against sensory feedback — detecting drift before you stumble — ControlKeel sits between your coding agents and production, comparing *intended* delivery against *actual* delivery, catching governance drift before it ships.
 
@@ -46,10 +47,10 @@ It governs agent work across intent compilation, task planning, routing, validat
 ### Install
 
 ```bash
-# macOS / Linux
+# Homebrew (macOS and Linux x86_64)
 brew tap aryaminus/controlkeel && brew install controlkeel
 
-# npm
+# npm bootstrap (macOS x86_64/arm64, Linux x86_64, Windows x86_64)
 npm i -g @aryaminus/controlkeel
 # or: pnpm add -g @aryaminus/controlkeel
 # or: yarn global add @aryaminus/controlkeel
@@ -57,9 +58,31 @@ npm i -g @aryaminus/controlkeel
 # one-off run (no global install)
 npx @aryaminus/controlkeel@latest
 
-# Direct installer
+# Unix installer from the latest GitHub release
 curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh
+
+# Raw bootstrap script from this repo
+curl -fsSL https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.sh | sh
 ```
+
+```powershell
+# Windows PowerShell installer
+irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex
+
+# Raw bootstrap script from this repo
+irm https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.ps1 | iex
+```
+
+Supported packaged binaries today:
+
+| Platform | Asset |
+| --- | --- |
+| macOS Apple Silicon | `controlkeel-macos-arm64` / `.tar.gz` |
+| macOS Intel | `controlkeel-macos-x86_64` / `.tar.gz` |
+| Linux x86_64 | `controlkeel-linux-x86_64` / `.tar.gz` |
+| Windows x86_64 | `controlkeel-windows-x86_64.exe` / `.zip` |
+
+`npm`, the raw installer scripts, and the release-hosted installer scripts all resolve to the same GitHub release binaries. If you need a platform outside that list, use source install for now.
 
 ### First run
 

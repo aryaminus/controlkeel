@@ -44,6 +44,7 @@ Guardrails for cost and correctness:
    - `controlkeel attach opencode`
    - `controlkeel findings`
    - `controlkeel status`
+   - raw installer scripts from `raw.githubusercontent.com` still install the latest release
 4. Verify the OpenCode quick-start and provider/no-key guidance in `README.md` and `docs/getting-started.md` still match runtime behavior.
 5. Verify release notes/changelog content matches the tagged version.
 6. Set repository variable `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED=true`.
@@ -51,6 +52,7 @@ Guardrails for cost and correctness:
 8. If Homebrew publication is enabled, ensure `HOMEBREW_TAP_TOKEN` can push to `aryaminus/homebrew-controlkeel`.
 9. If npmjs publication is enabled, ensure `NPM_TOKEN` is configured for `@aryaminus/controlkeel`.
 10. Confirm `publish-github-packages` succeeds in [release.yml](../.github/workflows/release.yml) so the bootstrap package is also available via GitHub Packages.
+11. Confirm the Homebrew tap formula resolves to the tagged release assets and the npm bootstrap package downloads the matching binary assets for supported platforms.
 
 ## npmjs publish token setup (maintainers)
 

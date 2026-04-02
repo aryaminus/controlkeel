@@ -42,12 +42,28 @@ defmodule ControlKeel.Distribution do
       description: "Direct latest-release installer for shell environments."
     },
     %{
+      id: "raw-shell-installer",
+      label: "Raw GitHub shell installer",
+      command:
+        "curl -fsSL https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.sh | sh",
+      platforms: ["macos", "linux"],
+      description: "Stable bootstrap script from the repository that installs the latest release."
+    },
+    %{
       id: "powershell-installer",
       label: "PowerShell installer",
       command:
         "irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex",
       platforms: ["windows"],
       description: "Direct latest-release installer for Windows PowerShell."
+    },
+    %{
+      id: "raw-powershell-installer",
+      label: "Raw GitHub PowerShell installer",
+      command:
+        "irm https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.ps1 | iex",
+      platforms: ["windows"],
+      description: "Stable bootstrap script from the repository that installs the latest release."
     },
     %{
       id: "github-releases",
@@ -141,6 +157,14 @@ defmodule ControlKeel.Distribution do
   def latest_installer_url("sh"), do: latest_download_base_url() <> "/install.sh"
   def latest_installer_url("ps1"), do: latest_download_base_url() <> "/install.ps1"
   def latest_installer_url(_), do: nil
+
+  def raw_installer_url("sh"),
+    do: "https://raw.githubusercontent.com/#{github_repo_slug()}/main/scripts/install.sh"
+
+  def raw_installer_url("ps1"),
+    do: "https://raw.githubusercontent.com/#{github_repo_slug()}/main/scripts/install.ps1"
+
+  def raw_installer_url(_), do: nil
 
   def portable_project_root, do: "."
 
