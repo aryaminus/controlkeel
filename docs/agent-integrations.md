@@ -132,7 +132,7 @@ These are the strongest zero-setup paths today because ControlKeel can reuse a c
 | Agent | Attach command | Bridge | Native companion | Exportable bundles |
 |---|---|---|---|---|
 | Claude Code | `controlkeel attach claude-code` | Anthropic-compatible environment | Installs `.claude/skills` and `.claude/agents` | `claude-standalone`, `claude-plugin` |
-| Codex CLI | `controlkeel attach codex-cli` | OpenAI-compatible environment | Installs `.agents/skills` and `.codex/agents` | `codex`, `codex-plugin`, `open-standard` |
+| Codex CLI | `controlkeel attach codex-cli` | OpenAI-compatible environment | Installs `.agents/skills`, `.codex/config.toml`, `.codex/agents`, and `.codex/commands` | `codex`, `codex-plugin`, `open-standard` |
 | Hermes Agent | `controlkeel attach hermes-agent` | Config-reference bridge from Hermes config | Installs `.hermes/skills` and `.hermes/mcp.json` | `hermes-native` |
 | OpenClaw | `controlkeel attach openclaw` | Config-reference bridge from OpenClaw settings | Installs workspace or managed skills and emits OpenClaw config | `openclaw-native`, `openclaw-plugin` |
 | Factory Droid | `controlkeel attach droid` | Gateway/base-URL bridge from Factory settings | Installs `.factory/skills`, `.factory/droids`, `.factory/commands`, `.factory/mcp.json` | `droid-bundle` |

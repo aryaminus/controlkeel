@@ -18,6 +18,7 @@ defmodule ControlKeel.AgentAdapters.CodexCLI do
   def artifact_manifest(_opts) do
     [
       ".agents/skills",
+      ".codex/config.toml",
       ".codex/agents/controlkeel-operator.toml",
       ".codex/commands/controlkeel-review.md",
       ".codex/commands/controlkeel-annotate.md",

@@ -192,7 +192,7 @@ For the full host-by-host truth table, see [docs/direct-host-installs.md](docs/d
 | Agent | Attach | Integration class | Native surfaces |
 | --- | --- | --- | --- |
 | Claude Code | `attach claude-code` | Provider-bridge | `.claude/skills`, `.claude/agents`, plugin bundle |
-| Codex CLI | `attach codex-cli` | Review-only | `.agents/skills`, `.codex/agents`, review commands |
+| Codex CLI | `attach codex-cli` | Review-only | `.agents/skills`, `.codex/config.toml`, `.codex/agents`, review commands |
 | Hermes Agent | `attach hermes-agent` | Provider-bridge | `.hermes/skills`, `.hermes/mcp.json` |
 | OpenClaw | `attach openclaw` | Provider-bridge | Workspace/managed skills and OpenClaw config |
 | Factory Droid | `attach droid` | Provider-bridge | `.factory/skills`, `.factory/droids`, `.factory/commands` |

@@ -72,6 +72,18 @@ defmodule ControlKeel.Skills.Installer do
     File.mkdir_p!(commands_root)
     copy_tree_contents(Path.join(plan.output_dir, ".codex/commands"), commands_root)
 
+    config_root =
+      if scope == "user",
+        do: Path.join(user_home(), ".codex"),
+        else: Path.join(project_root, ".codex")
+
+    File.mkdir_p!(config_root)
+
+    File.cp!(
+      Path.join(plan.output_dir, ".codex/config.toml"),
+      Path.join(config_root, "config.toml")
+    )
+
     if scope == "project" do
       File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
       File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
@@ -83,7 +95,8 @@ defmodule ControlKeel.Skills.Installer do
        scope: scope,
        destination: skill_root,
        agent_destination: agent_root,
-       commands_destination: commands_root
+       commands_destination: commands_root,
+       config_destination: Path.join(config_root, "config.toml")
      }}
   end
 

@@ -319,6 +319,8 @@ defmodule ControlKeel.CLITasksTest do
     assert File.exists?(
              Path.join(tmp_dir, "controlkeel/dist/codex/.codex/agents/controlkeel-operator.toml")
            )
+
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/codex/.codex/config.toml"))
   end
 
   test "ck.benchmark delegates to the runtime benchmark CLI", %{tmp_dir: tmp_dir} do

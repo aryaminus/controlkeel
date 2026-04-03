@@ -95,9 +95,9 @@ defmodule ControlKeel.AgentIntegration do
           "Writes MCP config, installs open-standard skills plus a Codex operator agent, and ships review, annotate, and last command aliases.",
         attach_command: "controlkeel attach codex-cli",
         config_location:
-          "Codex MCP config (`~/.codex/config.json` or project-scoped equivalent).",
+          "Codex MCP config (`~/.codex/config.toml` or `<project>/.codex/config.toml`).",
         companion_delivery:
-          "Installs `.agents/skills`, `.codex/agents`, and `.codex/commands`; can also export portable Codex bundles or a Codex plugin.",
+          "Installs `.agents/skills`, `.codex/config.toml`, `.codex/agents`, and `.codex/commands`; can also export portable Codex bundles or a Codex plugin.",
         preferred_target: "codex",
         default_scope: "user",
         router_agent_id: "codex-cli",
@@ -1732,7 +1732,12 @@ defmodule ControlKeel.AgentIntegration do
     do: [".claude/skills", ".claude/agents", "Claude MCP registration"]
 
   defp default_artifact_surfaces(%{id: "codex-cli"}),
-    do: [".agents/skills", ".codex/agents", "~/.codex/config.json"]
+    do: [
+      ".agents/skills",
+      ".codex/config.toml",
+      ".codex/agents",
+      ".codex/commands"
+    ]
 
   defp default_artifact_surfaces(%{id: id}) when id in ["vscode", "copilot"] do
     [

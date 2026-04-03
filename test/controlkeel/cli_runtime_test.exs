@@ -207,7 +207,12 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert codex_output =~ "@aryaminus/controlkeel"
     assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
-    assert File.exists?(codex_config_path())
+    assert File.exists?(project_codex_config_path(tmp_dir))
+    refute File.exists?(user_codex_config_path())
+
+    codex_config = File.read!(project_codex_config_path(tmp_dir))
+    assert codex_config =~ "[mcp_servers.controlkeel]"
+    assert codex_config =~ ~s(config_file = "./agents/controlkeel-operator.toml")
 
     assert {:ok, vscode_attach} = CLI.parse(["attach", "vscode"])
 
@@ -330,6 +335,26 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert hd(opencode_cmd) == "controlkeel" or
              String.ends_with?(hd(opencode_cmd), "/controlkeel/bin/controlkeel-mcp")
+  end
+
+  test "codex attach supports mcp-only mode without native bundle install", %{tmp_dir: tmp_dir} do
+    assert {:ok, init} = CLI.parse(["init", "--no-attach"])
+    assert 0 == CLI.execute(init, project_root: tmp_dir)
+
+    assert {:ok, codex_attach} =
+             CLI.parse(["attach", "codex-cli", "--scope", "project", "--mcp-only"])
+
+    codex_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(codex_attach, project_root: tmp_dir)
+      end)
+
+    assert codex_output =~ "Attached ControlKeel to Codex CLI."
+    assert File.exists?(project_codex_config_path(tmp_dir))
+    refute codex_output =~ "Installed Codex skills"
+    refute File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    refute File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
+    refute File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-review.md"))
   end
 
   test "bootstrap and provider commands work without manual init", %{tmp_dir: tmp_dir} do
@@ -914,13 +939,17 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert Platform.list_workspace_policy_sets(workspace.id) != []
   end
 
-  defp codex_config_path do
+  defp user_codex_config_path do
     home = System.get_env("HOME") || System.user_home!()
 
     case :os.type() do
-      {:win32, _} -> Path.join([System.get_env("APPDATA") || home, ".codex", "config.json"])
-      _ -> Path.join([home, ".codex", "config.json"])
+      {:win32, _} -> Path.join([System.get_env("APPDATA") || home, ".codex", "config.toml"])
+      _ -> Path.join([home, ".codex", "config.toml"])
     end
+  end
+
+  defp project_codex_config_path(project_root) do
+    Path.join([project_root, ".codex", "config.toml"])
   end
 
   defp cursor_config_path do

@@ -10,6 +10,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Budget
   alias ControlKeel.Budget.CostOptimizer
   alias ControlKeel.ClaudeCLI
+  alias ControlKeel.CodexConfig
   alias ControlKeel.Distribution
   alias ControlKeel.Deployment.Advisor
   alias ControlKeel.Deployment.HostingCost
@@ -779,15 +780,60 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(%{command: :attach, args: ["codex-cli"], options: options}, project_root) do
+    scope = attach_scope("codex-cli", options)
+
+    with {:ok, binding, _session, _mode} <-
+           ensure_local_project(project_root, %{"agent" => "codex-cli"}),
+         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         config_path <- CodexConfig.path_for_scope(project_root, scope),
+         {:ok, _} <- CodexConfig.write(config_path, command_spec),
+         {:ok, install_result} <- maybe_install_codex_native(project_root, scope, options),
+         attached <-
+           %{
+             "server_name" => "controlkeel",
+             "ide" => "codex-cli",
+             "config_path" => config_path,
+             "scope" => scope,
+             "target" => "codex",
+             "destination" => install_result && install_result[:destination],
+             "agents_destination" => install_result && install_result[:agent_destination],
+             "commands_destination" => install_result && install_result[:commands_destination],
+             "config_destination" => config_path,
+             "controlkeel_version" => to_string(Application.spec(:controlkeel, :vsn) || "0.1.0"),
+             "attached_at" =>
+               DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+           },
+         updated <- ProjectBinding.update_attached_agent(binding, "codex-cli", attached),
+         {:ok, _} <-
+           ProjectBinding.write_effective(updated, project_root,
+             mode: binding_write_mode(binding)
+           ) do
+      {:ok,
+       [
+         "Attached ControlKeel to Codex CLI.",
+         "MCP server written to #{config_path}.",
+         "Restart Codex CLI to activate."
+       ] ++
+         bootstrap_lines(project_root) ++
+         codex_attach_install_lines(install_result) ++ attach_guidance_lines("codex-cli")}
+    else
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
+      {:error, reason} ->
+        {:error, "Failed to attach ControlKeel to Codex CLI: #{inspect(reason)}"}
+    end
+  end
+
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["kiro", "amp", "augment", "opencode", "gemini-cli", "codex-cli", "cline"] do
+      when agent in ["kiro", "amp", "augment", "opencode", "gemini-cli", "cline"] do
     config_path_fn = %{
       "kiro" => &kiro_mcp_config_path/0,
       "amp" => &amp_mcp_config_path/0,
       "augment" => &augment_mcp_config_path/0,
       "opencode" => &opencode_mcp_config_path/0,
       "gemini-cli" => &gemini_cli_config_path/0,
-      "codex-cli" => &codex_cli_config_path/0,
       "cline" => &cline_mcp_config_path/0
     }
 
@@ -797,7 +843,6 @@ defmodule ControlKeel.CLI do
       "augment" => "Augment / Auggie CLI",
       "opencode" => "OpenCode",
       "gemini-cli" => "Gemini CLI",
-      "codex-cli" => "Codex CLI",
       "cline" => "Cline"
     }
 
@@ -3898,23 +3943,6 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  defp native_attach_lines("codex-cli", project_root, options) do
-    if native_attach_skipped?(options) do
-      []
-    else
-      case Skills.install("codex", project_root, scope: attach_scope("codex-cli", options)) do
-        {:ok, %{destination: destination, agent_destination: agent_destination}} ->
-          [
-            "Installed Codex skills at #{destination}.",
-            "Installed Codex companion agent at #{agent_destination}."
-          ]
-
-        {:error, reason} ->
-          ["Native Codex skills were not installed: #{inspect(reason)}"]
-      end
-    end
-  end
-
   defp native_attach_lines("cline", project_root, options) do
     if native_attach_skipped?(options) do
       []
@@ -4018,6 +4046,24 @@ defmodule ControlKeel.CLI do
 
   defp native_attach_skipped?(options) do
     Keyword.get(options, :mcp_only, false) or Keyword.get(options, :no_native, false)
+  end
+
+  defp maybe_install_codex_native(project_root, scope, options) do
+    if native_attach_skipped?(options) do
+      {:ok, nil}
+    else
+      Skills.install("codex", project_root, scope: scope)
+    end
+  end
+
+  defp codex_attach_install_lines(nil), do: []
+
+  defp codex_attach_install_lines(install_result) do
+    [
+      "Installed Codex skills at #{install_result[:destination]}.",
+      "Installed Codex companion agent at #{install_result[:agent_destination]}.",
+      "Installed Codex review commands at #{install_result[:commands_destination]}."
+    ]
   end
 
   defp attach_scope("claude-code", options), do: options[:scope] || "user"
@@ -4163,18 +4209,6 @@ defmodule ControlKeel.CLI do
   defp cline_mcp_config_path do
     base = System.get_env("CLINE_DIR") || Path.join(user_home(), ".cline")
     Path.join([base, "data", "settings", "cline_mcp_settings.json"])
-  end
-
-  defp codex_cli_config_path do
-    home = user_home()
-
-    case :os.type() do
-      {:win32, _} ->
-        Path.join([System.get_env("APPDATA") || home, ".codex", "config.json"])
-
-      _ ->
-        Path.join([home, ".codex", "config.json"])
-    end
   end
 
   defp continue_config_path do

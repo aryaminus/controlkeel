@@ -1,6 +1,7 @@
 defmodule ControlKeel.Skills.Exporter do
   @moduledoc false
 
+  alias ControlKeel.CodexConfig
   alias ControlKeel.Distribution
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Skills
@@ -60,6 +61,15 @@ defmodule ControlKeel.Skills.Exporter do
     skill_root = Path.join(root, ".agents/skills")
     write_skill_tree(skills, skill_root)
 
+    config_path = Path.join(root, ".codex/config.toml")
+    File.mkdir_p!(Path.dirname(config_path))
+
+    {:ok, _} =
+      CodexConfig.write(config_path, %{
+        command: mcp_command(project_root, opts),
+        args: mcp_args(project_root, opts)
+      })
+
     agent_path = Path.join(root, ".codex/agents/controlkeel-operator.toml")
     File.mkdir_p!(Path.dirname(agent_path))
     File.write!(agent_path, codex_agent_contents(project_root, skills, opts))
@@ -93,6 +103,7 @@ defmodule ControlKeel.Skills.Exporter do
       opts,
       [
         %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => config_path, "kind" => "config"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => diff_command_path, "kind" => "command"},
         %{"path" => completion_command_path, "kind" => "command"},
@@ -104,6 +115,7 @@ defmodule ControlKeel.Skills.Exporter do
       ],
       [
         "Copy .agents/skills into your repo or user skill folder.",
+        "Use .codex/config.toml to register the ControlKeel MCP server and operator role with Codex.",
         "Copy .codex/agents/controlkeel-operator.toml into your Codex agents directory if you want a preconfigured operator.",
         "Use .codex/commands/ for browser-reviewed review, annotate, last, diff, and completion approval flows.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."

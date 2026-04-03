@@ -86,6 +86,8 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert codex.submission_mode == "command"
     assert codex.runtime_transport == "codex_sdk"
     assert codex.runtime_auth_owner == "agent"
+    assert ".codex/config.toml" in codex.artifact_surfaces
+    assert ".codex/commands/controlkeel-review.md" in codex.artifact_surfaces
     refute codex.runtime_session_support["fork"]
 
     assert codex.provider_bridge == %{

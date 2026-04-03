@@ -189,6 +189,7 @@ defmodule ControlKeel.SkillsTest do
              Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-operator.toml")
            )
 
+    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/config.toml"))
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/commands/controlkeel-review.md"))
 
     assert File.exists?(
@@ -576,11 +577,16 @@ defmodule ControlKeel.SkillsTest do
     assert {:ok, codex_install} = Skills.install("codex", tmp_dir, scope: "project")
     assert codex_install.destination == Path.join(tmp_dir, ".agents/skills")
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/config.toml"))
     assert File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-review.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-annotate.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".mcp.json"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+
+    codex_config = File.read!(Path.join(tmp_dir, ".codex/config.toml"))
+    assert codex_config =~ "[mcp_servers.controlkeel]"
+    assert codex_config =~ ~s(config_file = "./agents/controlkeel-operator.toml")
 
     assert {:ok, claude_install} = Skills.install("claude-standalone", tmp_dir, scope: "project")
     assert claude_install.destination == Path.join(tmp_dir, ".claude/skills")
