@@ -130,6 +130,7 @@ Start here:
 
 Reference:
 
+- [docs/qa-validation-guide.md](docs/qa-validation-guide.md)
 - [docs/support-matrix.md](docs/support-matrix.md)
 - [docs/agent-integrations.md](docs/agent-integrations.md)
 - [docs/autonomy-and-findings.md](docs/autonomy-and-findings.md)

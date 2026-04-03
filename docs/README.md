@@ -17,6 +17,7 @@ Use this page to decide where to read next.
 
 ## Product and behavior reference
 
+- [qa-validation-guide.md](qa-validation-guide.md): end-to-end QA playbook for validating the full product surface
 - [agent-integrations.md](agent-integrations.md): how ControlKeel models integrations, bidirectional execution, and protocol interop
 - [autonomy-and-findings.md](autonomy-and-findings.md): how findings, review state, and human approval interact
 - [benchmarks.md](benchmarks.md): benchmark and evaluation surfaces

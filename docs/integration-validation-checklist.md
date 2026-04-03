@@ -2,6 +2,8 @@
 
 This checklist tracks real-world validation of install channels and agent integrations.
 
+For the full QA procedure and feature-by-feature test plan, use [qa-validation-guide.md](qa-validation-guide.md).
+
 ## Scope
 
 - Install channels: Homebrew, npm global
