@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.18 — 2026-04-03
+
+### What's changed
+
+- feat: add augment-native and augment-plugin support
+- Add annotate and last commands for various skills in ControlKeel
+- feat: add explicit review commands and enhance feedback handling in ControlKeel
+- Add agent adapters and runtimes for OpenCode, Pi, and VSCode
+- Add review lifecycle functionality and associated tests
+
 ## v0.1.17 — 2026-04-02
 
 ### What's changed
