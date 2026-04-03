@@ -19,6 +19,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Governance.CircuitBreaker
   alias ControlKeel.Governance.PreCommitHook
   alias ControlKeel.Governance.Socket, as: GovernanceSocket
+  alias ControlKeel.Help
   alias ControlKeel.Intent
   alias ControlKeel.Findings.PlainEnglish
   alias ControlKeel.Learning.OutcomeTracker
@@ -464,14 +465,14 @@ defmodule ControlKeel.CLI do
       ["outcome", "leaderboard"] ->
         {:ok, %{command: :outcome_leaderboard, options: %{}, args: []}}
 
-      ["help"] ->
-        {:ok, %{command: :help, options: %{}, args: []}}
+      ["help" | rest] ->
+        {:ok, %{command: :help, options: %{}, args: rest}}
 
       ["version"] ->
         {:ok, %{command: :version, options: %{}, args: []}}
 
       _ ->
-        {:error, usage_text()}
+        {:error, Help.unknown_command_text(argv)}
     end
   end
 
@@ -506,140 +507,10 @@ defmodule ControlKeel.CLI do
     |> to_string()
   end
 
-  def usage_text do
-    """
-    ControlKeel CLI
-
-    Commands:
-      controlkeel                     Start the web app
-      controlkeel serve               Start the web app
-      controlkeel init [options]      Initialize ControlKeel in the current project
-      controlkeel attach <agent>      Register ControlKeel MCP server with your coding tool
-                                      Native skills install by default unless --mcp-only
-                                      Flags: --mcp-only, --no-native, --with-skills,
-                                             --scope user|project
-                                      Supported: #{supported_attach_agents_text()}
-      controlkeel review diff [options]
-                                      Review a git diff between two refs before merge
-      controlkeel review pr [options] Review a PR patch from --patch <file> or --stdin
-      controlkeel review socket [options]
-                  Review a Socket report from --report <file> or --stdin
-      controlkeel review plan submit [options]
-                                      Submit a plan for browser review from --body-file <file> or --stdin
-      controlkeel review plan open --id <review-id>
-                                      Print the browser review URL and current state
-      controlkeel review plan respond <review-id> --decision approved|denied [--feedback-notes ...]
-                                      Record an approval or denial for a submitted plan review
-      controlkeel release-ready [options]
-                                      Check proof-backed release readiness for a session
-      controlkeel govern install github
-                                      Scaffold repo-native GitHub governance workflows
-      controlkeel plugin export codex|claude|copilot|openclaw|augment
-                                      Export a first-class plugin bundle for a supported agent
-      controlkeel plugin install codex|claude|copilot|openclaw [--scope user|project] [--mode local|hosted]
-                                      Install a plugin bundle with local and hosted MCP templates
-      controlkeel agents doctor       Show bidirectional execution and install readiness
-      controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b|nono]
-                                      Run or hand off a governed task through a supported agent
-      controlkeel run session <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b|nono]
-                                      Run all ready tasks for a governed session
-      controlkeel sandbox status       Show execution sandbox adapter availability
-      controlkeel sandbox config local|docker|e2b|nono
-                                      Set the default execution sandbox adapter
-      controlkeel registry sync acp  Refresh the cached ACP registry metadata
-      controlkeel registry status acp
-                                      Show ACP registry cache freshness and matches
-      controlkeel status              Show current session status
-      controlkeel findings [options]  List findings for the current session
-      controlkeel approve <id>        Approve a finding in the current session
-      controlkeel proofs [options]    List proof bundles for the current session
-      controlkeel proof <id>          Show a proof bundle by proof id or task id
-      controlkeel audit-log <id>      Export a session audit log as json|csv|pdf
-      controlkeel pause <task-id>     Pause a task and capture a resume packet
-      controlkeel resume <task-id>    Resume a paused or blocked task
-      controlkeel memory search <q>   Search typed memory for the current session
-      controlkeel skills list         List skills, diagnostics, and compatibility targets
-      controlkeel skills validate     Validate the catalog for the current project
-      controlkeel skills export       Export native skill/plugin bundles
-      controlkeel skills install      Install skills for a native target
-      controlkeel skills doctor       Show trust, catalog, and install health
-      controlkeel benchmark list [--domain-pack pack]
-                                      List built-in suites and recent runs
-      controlkeel benchmark run [options]
-                                      Run a benchmark suite and persist the matrix
-      controlkeel benchmark show <id> Show a benchmark run with subject summaries
-      controlkeel benchmark import <run-id> <subject> <json-file>
-                                      Import manual benchmark output for a subject
-      controlkeel benchmark export <run-id> [--format json|csv]
-                                      Export a benchmark run
-      controlkeel policy list         List recent policy artifacts and training runs
-      controlkeel policy train --type router|budget_hint
-                                      Train a new policy artifact
-      controlkeel policy show <id>    Show a policy artifact
-      controlkeel policy promote <id> Promote a policy artifact if gates pass
-      controlkeel policy archive <id> Archive a policy artifact
-      controlkeel service-account create|list|revoke|rotate
-                                      Manage workspace-scoped machine credentials
-      controlkeel policy-set create|list|apply
-                                      Manage enterprise policy sets and assignments
-      controlkeel webhook create|list|replay
-                                      Manage outbound CI/CD webhooks and deliveries
-      controlkeel graph show <id>     Show the persisted task DAG for a session
-      controlkeel execute <id>        Materialize ready tasks and task runs
-      controlkeel worker start [--service-account-token TOKEN]
-                                      Poll ready work for a workspace service account
-      controlkeel provider list|show|default|set-key|set-base-url|set-model|doctor
-                                      Inspect and configure CK provider brokerage
-      controlkeel runtime export <id> [--project-root /abs/path]
-                                      Export headless/runtime bundles such as Open SWE
-      controlkeel bootstrap [--project-root /abs/path] [--ephemeral-ok]
-                                      Auto-create project or ephemeral binding on first use
-      controlkeel watch [--interval N]
-                                      Stream findings and budget live (default: 2000ms)
-      controlkeel mcp [--project-root /abs/path]
-                                      Run the MCP server for a project
-      controlkeel deploy analyze [--project-root /abs/path]
-                                      Analyze project stack and generate deployment files
-      controlkeel deploy cost [--stack phoenix|react|rails|node|python|static]
-                                      Compare hosting costs across 9 platforms
-      controlkeel deploy dns <stack>   Show DNS and SSL setup guide
-      controlkeel deploy migration <stack>
-                                      Show database migration guide
-      controlkeel deploy scaling <stack>
-                                      Show scaling and infrastructure guide
-      controlkeel cost optimize [--session-id ID] [--provider PROVIDER] [--model MODEL]
-                                      Get cost optimization suggestions
-      controlkeel cost compare [--tokens N]
-                                      Compare agent costs for a token budget
-      controlkeel precommit-check [--domain-pack PACK] [--enforce]
-                                      Scan staged files for policy violations
-      controlkeel precommit-install [--enforce]
-                                      Install git pre-commit hook
-      controlkeel precommit-uninstall  Remove ControlKeel pre-commit hook
-      controlkeel progress [--session-id ID]
-                                      Show session progress, tasks, and findings
-      controlkeel findings translate [--session-id ID]
-                                      Translate findings to plain English
-      controlkeel circuit-breaker status [--agent-id ID]
-                                      Show circuit breaker status for agents
-      controlkeel circuit-breaker trip <agent-id>
-                                      Manually trip circuit breaker
-      controlkeel circuit-breaker reset <agent-id>
-                                      Reset circuit breaker for an agent
-      controlkeel agents monitor [--agent-id ID]
-                                      Show live agent activity and events
-      controlkeel outcome record <session-id> <outcome>
-                                      Record an agent outcome (deploy_success, test_pass, etc.)
-      controlkeel outcome score <agent-id>
-                                      Show agent score from outcomes
-      controlkeel outcome leaderboard  Show agent leaderboard by outcome scores
-      controlkeel help                Show this help
-      controlkeel version             Show the current version
-    """
-  end
+  def usage_text, do: Help.usage_text()
 
   def run_command(%{command: :serve}, _project_root), do: :ok
-  def run_command(%{command: :help}, _project_root), do: {:ok, [usage_text()]}
+  def run_command(%{command: :help, args: args}, _project_root), do: {:ok, [Help.render(args)]}
   def run_command(%{command: :version}, _project_root), do: {:ok, ["ControlKeel #{version()}"]}
 
   def run_command(%{command: :init, options: options}, project_root) do
@@ -4521,10 +4392,4 @@ defmodule ControlKeel.CLI do
 
   defp maybe_attach_line(_label, nil), do: []
   defp maybe_attach_line(label, path), do: ["#{label} at #{path}."]
-
-  defp supported_attach_agents_text do
-    AgentIntegration.attach_catalog()
-    |> Enum.map(& &1.id)
-    |> Enum.join(", ")
-  end
 end

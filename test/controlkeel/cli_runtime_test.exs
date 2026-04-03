@@ -44,6 +44,9 @@ defmodule ControlKeel.CLIRuntimeTest do
   test "parse defaults to serve and help/version render cleanly" do
     assert {:ok, %{command: :serve}} = CLI.parse([])
 
+    assert {:ok, %{command: :help, args: ["attach", "codex"]}} =
+             CLI.parse(["help", "attach", "codex"])
+
     help_output =
       capture_io(fn ->
         assert 0 == CLI.execute(%{command: :help, options: %{}, args: []})
@@ -54,8 +57,32 @@ defmodule ControlKeel.CLIRuntimeTest do
         assert 0 == CLI.execute(%{command: :version, options: %{}, args: []})
       end)
 
-    assert help_output =~ "ControlKeel CLI"
+    assert help_output =~ "ControlKeel help"
+    assert help_output =~ "controlkeel help why is my task blocked"
     assert version_output =~ "ControlKeel"
+  end
+
+  test "guided help routes attach questions to the codex topic" do
+    help_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(%{
+                   command: :help,
+                   options: %{},
+                   args: ["how", "do", "i", "attach", "codex"]
+                 })
+      end)
+
+    assert help_output =~ "Matched topic: Attach and host setup"
+    assert help_output =~ "Matched agent: Codex CLI"
+    assert help_output =~ "controlkeel attach codex-cli --scope project"
+    assert help_output =~ ".codex/config.toml"
+  end
+
+  test "unknown commands return guided help suggestions" do
+    assert {:error, message} = CLI.parse(["codx", "attach"])
+    assert message =~ "Unknown command: controlkeel codx attach"
+    assert message =~ "controlkeel help codx attach"
   end
 
   test "runtime init and status use the packaged CLI path", %{tmp_dir: tmp_dir} do
