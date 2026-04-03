@@ -56,6 +56,7 @@ These are the first-class host adapters that currently implement the richer revi
 | `claude-code` | `controlkeel attach claude-code` | `host_plan_mode` | `native_review` via Claude hooks | `external` | `primary_only` | `controlkeel-claude-plugin.tar.gz` |
 | `copilot` | `controlkeel attach copilot` | `host_plan_mode` | `native_review` via repo/plugin hooks | `external` | `primary_only` | `controlkeel-copilot-plugin.tar.gz` |
 | `opencode` | `controlkeel attach opencode` | `host_plan_mode` | `native_review` via plugin tool call | `external` | `primary_only` | `controlkeel-opencode-native.tar.gz`, `controlkeel-opencode-native.tgz` |
+| `augment` | `controlkeel attach augment` | `host_plan_mode` | `native_review` via Auggie plugin hooks and command loop | `external` | `all` | `controlkeel-augment-native.tar.gz`, `controlkeel-augment-plugin.tar.gz` |
 | `pi` | `controlkeel attach pi` | `file_plan_mode` | `browser_review` with persisted plan file state | `external` | `primary_only` | `controlkeel-pi-native.tar.gz`, `controlkeel-pi-native.tgz` |
 | `vscode` | `controlkeel attach vscode` | `review_only` | `browser_review` through companion extension | `vscode_webview` | `none` | `controlkeel-github-repo.tar.gz`, `controlkeel-vscode-companion.vsix` |
 | `codex-cli` | `controlkeel attach codex-cli` | `review_only` | `browser_review` through native commands | `none` | `primary_only` | `controlkeel-codex.tar.gz`, `controlkeel-codex-plugin.tar.gz` |
@@ -72,6 +73,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | `goose` | repo hints, workflow recipes, commands, and Goose extension YAML |
 | `kiro` | hooks, steering, tool-policy settings, commands, and MCP config |
 | `amp` | TypeScript plugin, native skill bundle, custom tool/command surface, and package scaffold |
+| `augment` | workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime metadata |
 | `gemini-cli` | extension manifest, review/submit-plan commands, and skill bundle |
 | `cursor` | rules, commands, background-agent guidance, and MCP config |
 | `roo-code` | rules, commands, governed modes, and cloud-agent guidance |
@@ -88,6 +90,7 @@ For hosts with a stronger native capability container, CK now prefers that too i
 
 - Windsurf ships a canonical `.windsurf/hooks.json` workspace hook config in addition to the portable hook assets.
 - Amp ships a native `controlkeel-governance` skill bundle with MCP wiring in addition to the plugin and command layer.
+- Augment ships a repo-native `.augment/` workspace bundle plus a local `.augment-plugin` hook bundle, so CK can be used by the agent through either workspace commands or hook-native interception.
 
 This keeps the product aligned with CK’s intent: agents should be able to invoke ControlKeel directly during autonomous work, rather than depending on the human operator to manually drive review state transitions.
 
@@ -98,6 +101,7 @@ Runtime transport truth for those first-class hosts:
 | `claude-code` | `claude_agent_sdk` | `agent` | `hook_sdk` | create, fork, resume, streaming |
 | `copilot` | `hook_session_parser` | `agent` | `hook_session_state` | no CK-owned session lifecycle claims |
 | `opencode` | `opencode_sdk` | `agent` | `plugin_session_tool` | create, fork, resume, streaming |
+| `augment` | `auggie_sdk_acp` | `agent` | `plugin_hook_acp` | create, resume, streaming; no fork claims |
 | `pi` | `pi_rpc` | `agent` | `extension_rpc` | create and streaming; no fork claims |
 | `vscode` | `vscode_companion` | `workspace` | `vscode_ipc` | none |
 | `codex-cli` | `codex_sdk` | `agent` | `command_thread` | create, resume, streaming; no fork claims |
@@ -114,11 +118,12 @@ Runtime transport truth for those first-class hosts:
 | `cursor` | attach_client | `controlkeel attach cursor` | `local_mcp`, `native_skills`, `rules`, `commands`, `workflows` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
 | `windsurf` | attach_client | `controlkeel attach windsurf` | `local_mcp`, `native_skills`, `rules`, `hooks`, `workflows`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `windsurf-native` |
 | `kiro` | attach_client | `controlkeel attach kiro` | `local_mcp`, `native_skills`, `hooks`, `rules`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `kiro-native` |
-| `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `plugin`, `rules`, `commands`, `tool_call` | `handoff` | `handoff` | `ck_owned` / `native` | `amp-native` |
-| `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules` | `embedded` | `direct` | `agent_runtime` / `native` | `opencode-native` |
+| `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `plugin`, `native_skills`, `commands`, `tool_call` | `handoff` | `handoff` | `ck_owned` / `native` | `amp-native` |
+| `augment` | attach_client | `controlkeel attach augment` | `local_mcp`, `plugin`, `native_skills`, `rules`, `commands`, `hooks` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
+| `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `agent_runtime` / `native` | `opencode-native` |
 | `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `local_mcp`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `gemini-cli-native` |
 | `continue` | attach_client | `controlkeel attach continue` | `local_mcp`, `native_skills`, `rules`, `workflows`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `continue-native` |
-| `pi` | attach_client | `controlkeel attach pi` | `local_mcp`, `rules` | `handoff` | `handoff` | `agent_runtime` / `native` | `pi-native` |
+| `pi` | attach_client | `controlkeel attach pi` | `local_mcp`, `native_skills`, `commands`, `rules` | `handoff` | `handoff` | `agent_runtime` / `native` | `pi-native` |
 | `aider` | attach_client | `controlkeel attach aider` | `local_mcp`, `commands` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
 | `hermes-agent` | attach_client | `controlkeel attach hermes-agent` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `native` | `hermes-native` |
 | `openclaw` | attach_client | `controlkeel attach openclaw` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `plugin_bundle` | `openclaw-native` |
@@ -146,6 +151,8 @@ Runtime transport truth for those first-class hosts:
 | `copilot-web` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
 | `cursor-web` | alias | use `cursor` | same as `cursor` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
 | `conductor-web` | alias | use `conductor` | same as `conductor` | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
+| `augment-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
+| `auggie-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
 | `kimi-cli` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
 | `t3code` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
 | `rlm-agent` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |

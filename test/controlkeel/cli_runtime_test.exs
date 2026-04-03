@@ -121,6 +121,20 @@ defmodule ControlKeel.CLIRuntimeTest do
              Path.join(tmp_dir, "controlkeel/dist/codex-plugin/.codex-plugin/plugin.json")
            )
 
+    assert {:ok, augment_plugin_export} =
+             CLI.parse(["plugin", "export", "augment", "--project-root", tmp_dir])
+
+    augment_export_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(augment_plugin_export, project_root: tmp_dir)
+      end)
+
+    assert augment_export_output =~ "Exported augment plugin bundle."
+
+    assert File.exists?(
+             Path.join(tmp_dir, "controlkeel/dist/augment-plugin/.augment-plugin/plugin.json")
+           )
+
     assert {:ok, plugin_install} =
              CLI.parse([
                "plugin",
@@ -977,17 +991,18 @@ defmodule ControlKeel.CLIRuntimeTest do
       assert output =~ "local"
       assert output =~ "docker"
       assert output =~ "e2b"
+      assert output =~ "nono"
     end
 
     test "sandbox config sets adapter", %{tmp_dir: tmp_dir} do
       output =
         capture_io(fn ->
-          CLI.execute(%{command: :sandbox_config, options: %{adapter: "docker"}, args: []},
+          CLI.execute(%{command: :sandbox_config, options: %{adapter: "nono"}, args: []},
             project_root: tmp_dir
           )
         end)
 
-      assert output =~ "Execution sandbox set to: docker"
+      assert output =~ "Execution sandbox set to: nono"
     end
 
     test "sandbox config rejects unknown adapter", %{tmp_dir: tmp_dir} do

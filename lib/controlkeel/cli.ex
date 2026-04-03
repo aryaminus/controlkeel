@@ -4,6 +4,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.ACPRegistry
   alias ControlKeel.AgentExecution
   alias ControlKeel.AgentIntegration
+  alias ControlKeel.AttachedAgentSync
   alias ControlKeel.Analytics
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
@@ -532,17 +533,17 @@ defmodule ControlKeel.CLI do
                                       Check proof-backed release readiness for a session
       controlkeel govern install github
                                       Scaffold repo-native GitHub governance workflows
-      controlkeel plugin export codex|claude|copilot|openclaw
+      controlkeel plugin export codex|claude|copilot|openclaw|augment
                                       Export a first-class plugin bundle for a supported agent
       controlkeel plugin install codex|claude|copilot|openclaw [--scope user|project] [--mode local|hosted]
                                       Install a plugin bundle with local and hosted MCP templates
       controlkeel agents doctor       Show bidirectional execution and install readiness
-      controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b]
+      controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b|nono]
                                       Run or hand off a governed task through a supported agent
-      controlkeel run session <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b]
+      controlkeel run session <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b|nono]
                                       Run all ready tasks for a governed session
       controlkeel sandbox status       Show execution sandbox adapter availability
-      controlkeel sandbox config local|docker|e2b
+      controlkeel sandbox config local|docker|e2b|nono
                                       Set the default execution sandbox adapter
       controlkeel registry sync acp  Refresh the cached ACP registry metadata
       controlkeel registry status acp
@@ -779,10 +780,11 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["kiro", "amp", "opencode", "gemini-cli", "codex-cli", "cline"] do
+      when agent in ["kiro", "amp", "augment", "opencode", "gemini-cli", "codex-cli", "cline"] do
     config_path_fn = %{
       "kiro" => &kiro_mcp_config_path/0,
       "amp" => &amp_mcp_config_path/0,
+      "augment" => &augment_mcp_config_path/0,
       "opencode" => &opencode_mcp_config_path/0,
       "gemini-cli" => &gemini_cli_config_path/0,
       "codex-cli" => &codex_cli_config_path/0,
@@ -792,6 +794,7 @@ defmodule ControlKeel.CLI do
     display_name = %{
       "kiro" => "Kiro",
       "amp" => "Amp",
+      "augment" => "Augment / Auggie CLI",
       "opencode" => "OpenCode",
       "gemini-cli" => "Gemini CLI",
       "codex-cli" => "Codex CLI",
@@ -812,7 +815,11 @@ defmodule ControlKeel.CLI do
        [
          "Attached ControlKeel to #{display_name[agent]}.",
          "MCP server written to #{attached["config_path"]}.",
-         "Restart #{display_name[agent]} to activate."
+         if(agent == "augment",
+           do:
+             "Restart Auggie or use `auggie --mcp-config #{attached["config_path"]}` to activate.",
+           else: "Restart #{display_name[agent]} to activate."
+         )
        ] ++
          bootstrap_lines(project_root) ++
          native_attach_lines(agent, project_root, options) ++
@@ -1087,7 +1094,8 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :review_plan_open, options: options}, _project_root) do
     with {:ok, review_id} <- required_integer_option(options, :id, "--id"),
-         {:ok, review_open} <- ReviewBridge.open_review(review_id) do
+         {:ok, review_open} <-
+           ReviewBridge.open_review(review_id, auto_open: ReviewBridge.auto_open_reviews?()) do
       review = review_open.review
 
       payload =
@@ -1371,7 +1379,7 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :status}, project_root) do
     case ensure_local_project(project_root) do
-      {:ok, _binding, session, _mode} ->
+      {:ok, binding, session, _mode} ->
         metrics = Analytics.session_metrics(session.id) || %{}
         rolling_24h = Budget.rolling_24h_spend_cents(session.id)
         provider_status = ProviderBroker.status(project_root)
@@ -1398,6 +1406,7 @@ defmodule ControlKeel.CLI do
            "Provider: #{provider_status["selected_provider"]}",
            "Auth mode: #{provider_status["selected_auth_mode"]}",
            "Auth owner: #{provider_status["selected_auth_owner"]}",
+           "Execution sandbox: #{ExecutionSandbox.adapter_name([])}",
            "OpenAI responses: #{Proxy.url(session, :openai, "/v1/responses")}",
            "OpenAI chat: #{Proxy.url(session, :openai, "/v1/chat/completions")}",
            "OpenAI completions: #{Proxy.url(session, :openai, "/v1/completions")}",
@@ -1405,7 +1414,7 @@ defmodule ControlKeel.CLI do
            "OpenAI models: #{Proxy.url(session, :openai, "/v1/models")}",
            "OpenAI realtime: #{Proxy.realtime_url(session, :openai, "/v1/realtime")}",
            "Anthropic messages: #{Proxy.url(session, :anthropic, "/v1/messages")}"
-         ]}
+         ] ++ attached_agent_status_lines(binding)}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -3280,7 +3289,13 @@ defmodule ControlKeel.CLI do
   end
 
   defp parse_plugin_command(command, plugin, argv) do
-    if plugin in ~w(codex claude copilot openclaw) do
+    allowed =
+      case command do
+        :plugin_export -> ~w(codex claude copilot openclaw augment)
+        :plugin_install -> ~w(codex claude copilot openclaw)
+      end
+
+    if plugin in allowed do
       case OptionParser.parse(argv, strict: @plugin_switches) do
         {options, [], []} ->
           {:ok, %{command: command, options: options, args: [plugin]}}
@@ -3476,6 +3491,7 @@ defmodule ControlKeel.CLI do
   defp plugin_target("claude"), do: {:ok, "claude-plugin"}
   defp plugin_target("copilot"), do: {:ok, "copilot-plugin"}
   defp plugin_target("openclaw"), do: {:ok, "openclaw-plugin"}
+  defp plugin_target("augment"), do: {:ok, "augment-plugin"}
   defp plugin_target(_plugin), do: {:error, :unknown_plugin}
 
   defp plugin_mcp_hint("hosted"), do: ".mcp.hosted.json"
@@ -3507,6 +3523,27 @@ defmodule ControlKeel.CLI do
 
   defp maybe_cli_line(_label, nil), do: []
   defp maybe_cli_line(label, value), do: ["#{label}: #{value}"]
+
+  defp attached_agent_status_lines(binding) do
+    attached_agents =
+      binding
+      |> Map.get("attached_agents", %{})
+      |> Enum.sort_by(fn {agent, _attrs} -> agent end)
+
+    case attached_agents do
+      [] ->
+        []
+
+      rows ->
+        [
+          "Attached agents:"
+          | Enum.map(rows, fn {agent, attrs} ->
+              version = attrs["controlkeel_version"] || "unknown"
+              "  #{agent} (CK v#{version})"
+            end)
+        ]
+    end
+  end
 
   defp agent_execution_lines(result) do
     [
@@ -3736,7 +3773,12 @@ defmodule ControlKeel.CLI do
   defp selected_base_url(_status), do: "default"
 
   defp ensure_local_project(project_root, overrides \\ %{}) do
-    LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: true)
+    with {:ok, binding, session, mode} <-
+           LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: true),
+         {:ok, synced_binding, _changes} <-
+           AttachedAgentSync.sync(binding, project_root, mode: mode) do
+      {:ok, synced_binding, session, mode}
+    end
   end
 
   defp binding_write_mode(binding) do
@@ -3928,6 +3970,7 @@ defmodule ControlKeel.CLI do
               "windsurf",
               "kiro",
               "amp",
+              "augment",
               "opencode",
               "gemini-cli",
               "continue",
@@ -3942,6 +3985,7 @@ defmodule ControlKeel.CLI do
           "windsurf" => "windsurf-native",
           "kiro" => "kiro-native",
           "amp" => "amp-native",
+          "augment" => "augment-native",
           "opencode" => "opencode-native",
           "gemini-cli" => "gemini-cli-native",
           "continue" => "continue-native",
@@ -4102,6 +4146,10 @@ defmodule ControlKeel.CLI do
 
   defp amp_mcp_config_path do
     Path.join([user_home(), ".config", "amp", "mcp.json"])
+  end
+
+  defp augment_mcp_config_path do
+    Path.join([user_home(), ".augment", "settings.json"])
   end
 
   defp opencode_mcp_config_path do

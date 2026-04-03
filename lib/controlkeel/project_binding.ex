@@ -127,10 +127,15 @@ defmodule ControlKeel.ProjectBinding do
   end
 
   def update_attached_agent(binding, agent_key, attrs) when is_map(binding) and is_map(attrs) do
+    attached =
+      attrs
+      |> stringify_keys()
+      |> Map.put("controlkeel_version", controlkeel_version())
+
     attached_agents =
       binding
       |> Map.get("attached_agents", %{})
-      |> Map.put(agent_key, attrs)
+      |> Map.put(agent_key, attached)
 
     Map.put(binding, "attached_agents", attached_agents)
   end
@@ -306,5 +311,9 @@ defmodule ControlKeel.ProjectBinding do
       {:win32, _} -> "controlkeel.exe"
       _ -> "controlkeel"
     end
+  end
+
+  defp controlkeel_version do
+    to_string(Application.spec(:controlkeel, :vsn) || "0.1.0")
   end
 end

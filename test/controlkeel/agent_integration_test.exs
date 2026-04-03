@@ -16,6 +16,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert "cline" in ids
     assert "roo-code" in ids
     assert "goose" in ids
+    assert "augment" in ids
     assert "pi" in ids
     assert "devin" in ids
     assert "vllm" in ids
@@ -35,6 +36,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     gemini = AgentIntegration.get("gemini-cli")
     kiro = AgentIntegration.get("kiro")
     amp = AgentIntegration.get("amp")
+    augment = AgentIntegration.get("augment")
     aider = AgentIntegration.get("aider")
 
     assert claude.label == "Claude Code"
@@ -157,6 +159,40 @@ defmodule ControlKeel.AgentIntegrationTest do
              amp.direct_install_methods,
              &(&1["command"] ==
                  "amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance")
+           )
+
+    assert augment.label == "Augment / Auggie CLI"
+    assert augment.preferred_target == "augment-native"
+    assert augment.install_experience == "first_class"
+    assert augment.review_experience == "native_review"
+    assert augment.submission_mode == "hook"
+    assert augment.phase_model == "host_plan_mode"
+    assert augment.auth_mode == "agent_runtime"
+    assert augment.runtime_transport == "auggie_sdk_acp"
+    assert augment.runtime_auth_owner == "agent"
+    assert augment.runtime_review_transport == "plugin_hook_acp"
+    assert augment.runtime_session_support["create"]
+    assert augment.runtime_session_support["resume"]
+    refute augment.runtime_session_support["fork"]
+    assert ".augment/commands/controlkeel-review.md" in augment.artifact_surfaces
+    assert ".augment-plugin/plugin.json" in augment.artifact_surfaces
+    assert "hooks/hooks.json" in augment.artifact_surfaces
+    assert "hooks" in augment.agent_uses_ck_via
+    assert "plugin" in augment.agent_uses_ck_via
+
+    assert Enum.any?(
+             augment.direct_install_methods,
+             &(&1["command"] == "npm install -g @augmentcode/auggie")
+           )
+
+    assert Enum.any?(
+             augment.direct_install_methods,
+             &(&1["command"] == "auggie --plugin-dir ./controlkeel/dist/augment-plugin")
+           )
+
+    assert Enum.any?(
+             augment.package_outputs,
+             &(&1["artifact"] == "controlkeel-augment-plugin.tar.gz")
            )
 
     assert aider.phase_model == "review_only"

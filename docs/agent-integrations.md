@@ -157,6 +157,7 @@ On a clean repo, `attach` also auto-bootstraps the governed project binding by d
 | mcptocli | Manual setup | Wraps CK MCP as CLI; see [mcptocli integration](#mcptocli-cli-integration) | N/A |
 | Kiro | `controlkeel attach kiro` | Writes `.kiro/hooks`, `.kiro/steering`, `.kiro/settings`, `.kiro/commands`, `.kiro/mcp.json`, `AGENTS.md` | `kiro-native`, `instructions-only` |
 | Amp | `controlkeel attach amp` | Writes `.amp/plugins/controlkeel-governance.ts`, `.amp/commands`, `.amp/package.json`, `.mcp.json`, `AGENTS.md` | `amp-native`, `instructions-only` |
+| Augment / Auggie CLI | `controlkeel attach augment` | Writes `.augment/skills`, `.augment/agents`, `.augment/commands`, `.augment/rules`, `.augment/mcp.json`, `.augment/settings.controlkeel.json`, `AUGMENT.md`, `AGENTS.md`; can also export a local `.augment-plugin` bundle for hook-native review interception | `augment-native`, `augment-plugin`, `instructions-only` |
 | Gemini CLI | `controlkeel attach gemini-cli` | Writes `gemini-extension.json`, `.gemini/commands`, `skills/`, `GEMINI.md`, and extension README | `gemini-cli-native`, `instructions-only` |
 
 ## Command-driven integrations
@@ -234,7 +235,7 @@ These appear in the same integration catalog, but they are intentionally **not**
 | Headless runtime | `devin`, `open-swe` | `controlkeel runtime export devin` and `controlkeel runtime export open-swe` write repo/runtime bundle files (`AGENTS.md`, MCP or webhook recipes, CI guidance). |
 | Framework adapter | `dspy`, `gepa`, `deepagents`, `fastmcp`, `conductor`, `augment-intent` | Exposed through benchmark, policy-training, runtime-harness adapter exports, or generic MCP interoperability scaffolds. |
 | Provider-only | `codestral`, `ollama-runtime`, `vllm`, `sglang`, `lmstudio`, `huggingface` | Exposed through CK provider/profile templates and OpenAI-compatible backend guidance. |
-| Alias | `claude-dispatch`, `cognition`, `cursor-agent`, `codex-app-server`, `copilot-cli`, `copilot-web`, `cursor-web`, `conductor-web`, `kimi-cli`, `t3code` | Resolve to canonical shipped targets rather than creating duplicate attach flows. |
+| Alias | `claude-dispatch`, `cognition`, `cursor-agent`, `codex-app-server`, `copilot-cli`, `copilot-web`, `augment-cli`, `auggie-cli`, `cursor-web`, `conductor-web`, `kimi-cli`, `t3code` | Resolve to canonical shipped targets rather than creating duplicate attach flows. |
 | Unverified | `rlm-agent`, `slate`, `retune`, `claw-code`, `claude-code-source-mirror`, `z-ai-cli`, `capydotai`, `neosigma` | Kept visible as research names, but not over-promised as shipped support. |
 
 Headless runtimes and remote clients can combine these with the hosted protocol layer above rather than relying on repo-local stdio MCP.

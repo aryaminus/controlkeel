@@ -278,6 +278,34 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["amp-native", "instructions-only"]
       }),
       attach_client(%{
+        id: "augment",
+        label: "Augment / Auggie CLI",
+        category: "native-first",
+        description:
+          "Attaches MCP server and delivers native governance via Auggie workspace commands, subagents, rules, plugin hooks, and ACP-compatible runtime transport.",
+        attach_command: "controlkeel attach augment",
+        config_location:
+          "Workspace assets under `.augment/`; persistent MCP and permission settings live in `~/.augment/settings.json` when configured outside a plugin.",
+        companion_delivery:
+          "Exports `.augment/skills`, `.augment/agents`, `.augment/commands`, `.augment/rules`, `.augment/mcp.json`, a settings snippet, and a local `.augment-plugin` bundle with hooks and MCP bridge.",
+        preferred_target: "augment-native",
+        default_scope: "project",
+        router_agent_id: "augment",
+        auth_mode: "agent_runtime",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "augmentcode/auggie",
+        upstream_docs_url: "https://docs.augmentcode.com/cli",
+        provider_bridge: %{
+          supported: true,
+          provider: "augment",
+          mode: "agent_runtime",
+          owner: "agent"
+        },
+        supported_scopes: ["project", "export"],
+        export_targets: ["augment-native", "augment-plugin", "instructions-only"]
+      }),
+      attach_client(%{
         id: "opencode",
         label: "OpenCode",
         category: "native-first",
@@ -904,6 +932,34 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["github-repo", "copilot-plugin"]
       }),
       alias_entry(%{
+        id: "augment-cli",
+        label: "Augment CLI",
+        category: "alias",
+        description:
+          "Alias to the shipped Augment / Auggie CLI integration and plugin bundle surfaces.",
+        alias_of: "augment",
+        auth_mode: "agent_runtime",
+        upstream_slug: "augmentcode/auggie",
+        upstream_docs_url: "https://docs.augmentcode.com/cli",
+        supported_scopes: ["project", "export"],
+        preferred_target: "augment-native",
+        export_targets: ["augment-native", "augment-plugin", "instructions-only"]
+      }),
+      alias_entry(%{
+        id: "auggie-cli",
+        label: "Auggie CLI",
+        category: "alias",
+        description:
+          "Alias to the shipped Augment / Auggie CLI integration and plugin bundle surfaces.",
+        alias_of: "augment",
+        auth_mode: "agent_runtime",
+        upstream_slug: "augmentcode/auggie",
+        upstream_docs_url: "https://docs.augmentcode.com/cli",
+        supported_scopes: ["project", "export"],
+        preferred_target: "augment-native",
+        export_targets: ["augment-native", "augment-plugin", "instructions-only"]
+      }),
+      alias_entry(%{
         id: "cursor-web",
         label: "Cursor web/mobile surfaces",
         category: "alias",
@@ -1328,6 +1384,9 @@ defmodule ControlKeel.AgentIntegration do
       "amp" ->
         ["local_mcp", "plugin", "native_skills", "commands", "tool_call"]
 
+      "augment" ->
+        ["local_mcp", "plugin", "native_skills", "rules", "commands", "hooks"]
+
       "aider" ->
         ["local_mcp", "commands"]
 
@@ -1366,6 +1425,7 @@ defmodule ControlKeel.AgentIntegration do
              "cline",
              "continue",
              "aider",
+             "augment",
              "opencode",
              "gemini-cli"
            ] ->
@@ -1429,7 +1489,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_review_experience(%{support_class: "framework_adapter"}), do: "feedback_only"
 
   defp default_review_experience(%{id: id})
-       when id in ["claude-code", "opencode", "windsurf", "cline", "kiro", "amp"] do
+       when id in ["claude-code", "opencode", "windsurf", "cline", "kiro", "amp", "augment"] do
     "native_review"
   end
 
@@ -1447,7 +1507,7 @@ defmodule ControlKeel.AgentIntegration do
   end
 
   defp default_submission_mode(%{id: id})
-       when id in ["vscode", "copilot", "windsurf", "cline", "kiro"] do
+       when id in ["vscode", "copilot", "windsurf", "cline", "kiro", "augment"] do
     "hook"
   end
 
@@ -1477,6 +1537,7 @@ defmodule ControlKeel.AgentIntegration do
               "cline",
               "goose",
               "kiro",
+              "augment",
               "gemini-cli",
               "roo-code",
               "aider"
@@ -1615,6 +1676,18 @@ defmodule ControlKeel.AgentIntegration do
     ]
   end
 
+  defp default_direct_install_methods(%{id: "augment"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach augment"),
+      direct_install("host_cli", "Install Auggie CLI", "npm install -g @augmentcode/auggie"),
+      direct_install(
+        "local_plugin_dir",
+        "Augment plugin dir",
+        "auggie --plugin-dir ./controlkeel/dist/augment-plugin"
+      )
+    ]
+  end
+
   defp default_direct_install_methods(%{id: "openclaw"}) do
     [
       direct_install("ck_attach", "CK attach", "controlkeel attach openclaw"),
@@ -1630,6 +1703,7 @@ defmodule ControlKeel.AgentIntegration do
               "cline",
               "goose",
               "kiro",
+              "augment",
               "roo-code",
               "aider",
               "hermes-agent",
@@ -1753,6 +1827,20 @@ defmodule ControlKeel.AgentIntegration do
       ".amp/package.json",
       ".mcp.json",
       "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "augment"}),
+    do: [
+      ".augment/skills",
+      ".augment/agents",
+      ".augment/commands",
+      ".augment/rules",
+      ".augment/mcp.json",
+      ".augment/settings.controlkeel.json",
+      ".augment-plugin",
+      "AGENTS.md",
+      "AUGMENT.md",
+      "README.md"
     ]
 
   defp default_artifact_surfaces(%{id: "roo-code"}),

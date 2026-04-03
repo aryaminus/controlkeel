@@ -81,6 +81,31 @@ defmodule ControlKeel.ExecutionSandboxTest do
     end
   end
 
+  describe "nono adapter" do
+    test "adapter name" do
+      assert ExecutionSandbox.Nono.adapter_name() == "nono"
+    end
+
+    test "available check does not crash" do
+      assert is_boolean(ExecutionSandbox.Nono.available?())
+    end
+
+    test "wraps commands with nono flags and inferred profile", %{tmp_dir: tmp_dir} do
+      with_fake_nono(tmp_dir)
+
+      project_root = Path.join(tmp_dir, "project")
+      File.mkdir_p!(project_root)
+
+      assert {:ok, %{output: output, exit_status: 0}} =
+               ExecutionSandbox.Nono.run("codex", ["exec"], cwd: project_root)
+
+      assert output =~ "PWD="
+      assert output =~ "/controlkeel-sandbox-test-"
+      assert output =~ "/project"
+      assert output =~ "ARGS=run --profile codex --allow-cwd --rollback -- codex exec"
+    end
+  end
+
   describe "adapter resolution" do
     test "resolves local by default" do
       adapter = ExecutionSandbox.resolve_adapter(sandbox: "local")
@@ -97,6 +122,11 @@ defmodule ControlKeel.ExecutionSandboxTest do
       assert adapter in [ExecutionSandbox.E2B, ExecutionSandbox.Local]
     end
 
+    test "resolves nono when requested (or falls back to local if unavailable)" do
+      adapter = ExecutionSandbox.resolve_adapter(sandbox: "nono")
+      assert adapter in [ExecutionSandbox.Nono, ExecutionSandbox.Local]
+    end
+
     test "falls back to local for unknown adapter" do
       adapter = ExecutionSandbox.resolve_adapter(sandbox: "unknown")
       assert adapter == ExecutionSandbox.Local
@@ -104,14 +134,15 @@ defmodule ControlKeel.ExecutionSandboxTest do
   end
 
   describe "supported_adapters/0" do
-    test "returns three adapters" do
+    test "returns four adapters" do
       adapters = ExecutionSandbox.supported_adapters()
-      assert length(adapters) == 3
+      assert length(adapters) == 4
 
       ids = Enum.map(adapters, & &1[:id])
       assert "local" in ids
       assert "docker" in ids
       assert "e2b" in ids
+      assert "nono" in ids
     end
 
     test "each adapter has required fields" do
@@ -127,6 +158,7 @@ defmodule ControlKeel.ExecutionSandboxTest do
   describe "config persistence" do
     test "adapter_name uses opts over config" do
       assert ExecutionSandbox.adapter_name(sandbox: "docker") == "docker"
+      assert ExecutionSandbox.adapter_name(sandbox: "nono") == "nono"
     end
 
     test "adapter_name defaults to local when no opts" do
@@ -136,5 +168,35 @@ defmodule ControlKeel.ExecutionSandboxTest do
     test "defaults to local when config file does not exist" do
       assert ExecutionSandbox.adapter_name([]) == "local"
     end
+  end
+
+  defp with_fake_nono(tmp_dir) do
+    bin_dir = Path.join(tmp_dir, "bin")
+    File.mkdir_p!(bin_dir)
+
+    script_path = Path.join(bin_dir, "nono")
+
+    File.write!(
+      script_path,
+      """
+      #!/usr/bin/env sh
+      set -eu
+
+      if [ "${1:-}" = "--version" ]; then
+        echo "nono 0.1.0"
+        exit 0
+      fi
+
+      echo "PWD=$PWD"
+      echo "ARGS=$*"
+      """
+    )
+
+    File.chmod!(script_path, 0o755)
+
+    original_path = System.get_env("PATH") || ""
+    System.put_env("PATH", "#{bin_dir}:#{original_path}")
+
+    on_exit(fn -> System.put_env("PATH", original_path) end)
   end
 end

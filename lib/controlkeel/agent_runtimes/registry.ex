@@ -4,6 +4,7 @@ defmodule ControlKeel.AgentRuntimes.Registry do
   alias ControlKeel.AgentIntegration
 
   @modules [
+    ControlKeel.AgentRuntimes.Augment,
     ControlKeel.AgentRuntimes.ClaudeCode,
     ControlKeel.AgentRuntimes.CodexCLI,
     ControlKeel.AgentRuntimes.Copilot,

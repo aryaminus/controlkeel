@@ -151,6 +151,24 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "augment-native",
+        "Augment native bundle",
+        "Augment workspace bundle with `.augment` skills, subagents, commands, rules, MCP config, and governance instructions.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
+        "augment-plugin",
+        "Augment plugin bundle",
+        "Local Auggie plugin bundle with hooks, agents, commands, rules, skills, and MCP bridge.",
+        true,
+        "export",
+        ["export"],
+        true
+      ),
+      target(
         "hermes-native",
         "Hermes Agent bundle",
         "Hermes-native skills, AGENTS context, and MCP companion config.",

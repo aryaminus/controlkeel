@@ -38,6 +38,7 @@ defmodule ControlKeel.ExecutionSandbox do
   def adapter_module("local"), do: ControlKeel.ExecutionSandbox.Local
   def adapter_module("docker"), do: ControlKeel.ExecutionSandbox.Docker
   def adapter_module("e2b"), do: ControlKeel.ExecutionSandbox.E2B
+  def adapter_module("nono"), do: ControlKeel.ExecutionSandbox.Nono
   def adapter_module(_), do: ControlKeel.ExecutionSandbox.Local
 
   def supported_adapters do
@@ -59,6 +60,13 @@ defmodule ControlKeel.ExecutionSandbox do
         name: "E2B sandbox",
         description: "Run commands inside an E2B Firecracker microVM.",
         available: ControlKeel.ExecutionSandbox.E2B.available?()
+      },
+      %{
+        id: "nono",
+        name: "nono sandbox",
+        description:
+          "Wrap agent execution with nono kernel sandboxing, rollback, and built-in client profiles.",
+        available: ControlKeel.ExecutionSandbox.Nono.available?()
       }
     ]
   end

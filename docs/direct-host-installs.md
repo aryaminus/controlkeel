@@ -15,6 +15,7 @@ ControlKeel keeps `controlkeel attach <host>` as the safest default because it i
 | Pi | `pi -e npm:@aryaminus/controlkeel-pi-extension` | Short form of the same Pi extension flow. |
 | VS Code | `code --install-extension controlkeel-vscode-companion.vsix` | Installs the CK browser-review companion from a packaged VSIX. |
 | Gemini CLI | `gemini extensions link ./controlkeel/dist/gemini-cli-native` | Direct extension-link flow for the exported Gemini companion bundle. |
+| Augment / Auggie CLI | `npm install -g @augmentcode/auggie` | Installs the host CLI so CK’s Augment-native workspace bundle and plugin bundle can be used locally. |
 
 ## Direct local plugin or bundle installs
 
@@ -24,6 +25,7 @@ ControlKeel keeps `controlkeel attach <host>` as the safest default because it i
 | Claude Code | `claude --plugin-dir ./controlkeel/dist/claude-plugin` | Local plugin-dir install for the exported Claude plugin bundle, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
 | GitHub Copilot | `controlkeel plugin install copilot` | Installs the local Copilot plugin bundle and hooks into the project, plus `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
 | Codex CLI | `controlkeel plugin install codex` | Installs the local Codex plugin bundle and marketplace manifest, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
+| Augment / Auggie CLI | `auggie --plugin-dir ./controlkeel/dist/augment-plugin` | Loads the local Augment plugin bundle with hook-native review interception, MCP, rules, subagent, and command prompts. Export it first or use the release artifact. |
 | Amp | `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance` | Installs the native CK skill bundle directly into Amp. Use alongside the exported `.amp/plugins/` directory when you want event hooks and custom tools too. |
 | OpenClaw | `controlkeel plugin install openclaw` | Installs the local OpenClaw plugin bundle and MCP manifest. |
 
@@ -38,6 +40,7 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | Cline | `controlkeel attach cline` |
 | Goose | `controlkeel attach goose` |
 | Kiro | `controlkeel attach kiro` |
+| Augment / Auggie CLI | `controlkeel attach augment` |
 | Cursor | `controlkeel attach cursor` |
 | Roo Code | `controlkeel attach roo-code` |
 | Aider | `controlkeel attach aider` |
@@ -57,6 +60,7 @@ For those hosts, CK now installs stronger native assets than before:
 - Cline: hooks, commands, rules, workflows
 - Goose: commands, workflow recipes, extension YAML
 - Kiro: hooks, steering, tool policy settings, commands
+- Augment / Auggie CLI: workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime transport
 - Amp: plugin scaffold, native skill bundle, and commands
 - Cursor: commands, background-agent guidance, rules
 - Roo Code: commands, guidance, `.roomodes`
@@ -85,6 +89,20 @@ Current release automation now supports:
 
 Hosts without a documented published package flow remain attach-first in the docs and `/skills`.
 
+## Update behavior after a new CK release
+
+ControlKeel does not silently rewrite repo files or host plugin directories when a new release ships.
+
+- Upgrading the main `controlkeel` binary through Homebrew, npm bootstrap, or the release installers updates the CLI itself.
+- MCP registrations that call `controlkeel` directly, or call the generated `controlkeel-mcp` wrapper, start using the new binary automatically on the next host invocation.
+- CK now auto-syncs stale attached bundles on the next governed CLI load when the attachment has a real install target and scope. In practice, repo-local and user-scope `controlkeel attach <host>` installs can self-heal to the current CK version.
+- Some artifacts still do not auto-refresh. That includes exported tarballs, local `--plugin-dir` installs, manually copied plugin directories, and sideloaded `.vsix` files.
+- Refresh those by rerunning `controlkeel attach <host>` or the relevant `controlkeel skills install` / `controlkeel plugin export` flow.
+- Published host packages follow the host package manager:
+  - OpenCode / Pi npm packages update through npm or the host’s extension updater.
+  - VS Code marketplace installs can auto-update through VS Code itself; sideloaded `.vsix` installs still require a newer package to be installed.
+  - Local `--plugin-dir` installs do not auto-update; rebuild or reinstall the bundle.
+
 ## Remote and browser behavior
 
 CK also pulls a few practical host patterns from Plannotator for direct-install flows:
@@ -92,3 +110,4 @@ CK also pulls a few practical host patterns from Plannotator for direct-install 
 - `CONTROLKEEL_REMOTE=1`: treat the current environment as remote or forwarded; CK will avoid trying to auto-open a browser and will return the review URL instead.
 - `CONTROLKEEL_BROWSER=/path/to/browser` or `BROWSER=...`: force a specific browser command for `controlkeel review plan open`.
 - `CONTROLKEEL_REVIEW_EMBED=vscode_webview`: prefer the VS Code companion embed path instead of an external browser.
+- `CONTROLKEEL_AUTO_OPEN_REVIEWS=0`: disable automatic browser launching entirely. Test runs already default to this behavior.

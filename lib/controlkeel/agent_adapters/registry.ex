@@ -6,6 +6,7 @@ defmodule ControlKeel.AgentAdapters.Registry do
 
   @modules [
     ControlKeel.AgentAdapters.ClaudeCode,
+    ControlKeel.AgentAdapters.Augment,
     ControlKeel.AgentAdapters.CodexCLI,
     ControlKeel.AgentAdapters.Copilot,
     ControlKeel.AgentAdapters.OpenCode,

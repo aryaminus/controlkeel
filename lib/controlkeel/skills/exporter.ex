@@ -941,6 +941,79 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "augment-plugin"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, "skills")
+    write_skill_tree(skills, skill_root)
+
+    agent_path = Path.join(root, "agents/controlkeel-operator.md")
+    File.mkdir_p!(Path.dirname(agent_path))
+    File.write!(agent_path, augment_agent_contents(skills))
+
+    command_path = Path.join(root, "commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, augment_review_command_contents())
+
+    submit_command_path = Path.join(root, "commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, augment_submit_plan_command_contents())
+
+    annotate_command_path = Path.join(root, "commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Augment", "augment", ".augment/annotate.md")
+    )
+
+    last_command_path = Path.join(root, "commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Augment"))
+
+    rule_path = Path.join(root, "rules/controlkeel.md")
+    File.mkdir_p!(Path.dirname(rule_path))
+    File.write!(rule_path, augment_rule_contents())
+
+    manifest_path = Path.join(root, ".augment-plugin/plugin.json")
+    File.mkdir_p!(Path.dirname(manifest_path))
+    File.write!(manifest_path, Jason.encode!(augment_plugin_manifest(), pretty: true) <> "\n")
+
+    hooks_path = Path.join(root, "hooks/hooks.json")
+    File.mkdir_p!(Path.dirname(hooks_path))
+    File.write!(hooks_path, Jason.encode!(augment_hooks_manifest(), pretty: true) <> "\n")
+
+    shell_hook_path = Path.join(root, "hooks/controlkeel-review.sh")
+    File.write!(shell_hook_path, review_bridge_shell_contents("augment"))
+    File.chmod!(shell_hook_path, 0o755)
+
+    mcp_path = Path.join(root, ".mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    readme_path = Path.join(root, "README.md")
+    File.write!(readme_path, augment_plugin_readme_contents())
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => manifest_path, "kind" => "manifest"},
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
+        %{"path" => rule_path, "kind" => "rules"},
+        %{"path" => hooks_path, "kind" => "hooks"},
+        %{"path" => shell_hook_path, "kind" => "hook"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => readme_path, "kind" => "instructions"}
+      ],
+      [
+        "Run `auggie --plugin-dir #{root}` to test the plugin locally.",
+        "The plugin ships hook-native review interception plus the `/controlkeel-review`, `/controlkeel-submit-plan`, `/controlkeel-annotate`, and `/controlkeel-last` commands.",
+        "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "github-repo"}, root, project_root, skills, opts) do
     skill_root = Path.join(root, ".github/skills")
     write_skill_tree(skills, skill_root)
@@ -1392,6 +1465,76 @@ defmodule ControlKeel.Skills.Exporter do
         "Copy `.amp/plugins/` and `.amp/commands/` into your project root (requires `PLUGINS=all` env var to activate).",
         "Prefer the native skill path when possible: `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance`.",
         "Merge `.mcp.json` into your project's MCP config."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "augment-native"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, ".augment/skills")
+    write_skill_tree(skills, skill_root)
+
+    agent_path = Path.join(root, ".augment/agents/controlkeel-operator.md")
+    File.mkdir_p!(Path.dirname(agent_path))
+    File.write!(agent_path, augment_agent_contents(skills))
+
+    command_path = Path.join(root, ".augment/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, augment_review_command_contents())
+
+    submit_command_path = Path.join(root, ".augment/commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, augment_submit_plan_command_contents())
+
+    annotate_command_path = Path.join(root, ".augment/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Augment", "augment", ".augment/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".augment/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Augment"))
+
+    rule_path = Path.join(root, ".augment/rules/controlkeel.md")
+    File.mkdir_p!(Path.dirname(rule_path))
+    File.write!(rule_path, augment_rule_contents())
+
+    mcp_path = Path.join(root, ".augment/mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    settings_path = Path.join(root, ".augment/settings.controlkeel.json")
+
+    File.write!(
+      settings_path,
+      Jason.encode!(augment_settings_snippet(project_root, opts), pretty: true) <> "\n"
+    )
+
+    instructions_path = Path.join(root, "AUGMENT.md")
+    File.write!(instructions_path, instructions_only_contents("augment", project_root, opts))
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("augment", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
+        %{"path" => rule_path, "kind" => "rules"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => settings_path, "kind" => "settings"},
+        %{"path" => instructions_path, "kind" => "instructions"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Keep `.augment/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
+        "Use `.augment/mcp.json` with `auggie --mcp-config ./.augment/mcp.json` for ephemeral MCP wiring or merge `.augment/settings.controlkeel.json` into `~/.augment/settings.json` for persistence.",
+        "For hook-native review interception, run Auggie with the local plugin bundle from `controlkeel/dist/augment-plugin`."
       ]
     )
   end
@@ -2301,6 +2444,24 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
+  defp augment_plugin_manifest do
+    %{
+      "name" => "controlkeel",
+      "description" => "ControlKeel governance bundle for Augment / Auggie CLI.",
+      "version" => @app_version,
+      "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
+      "homepage" => "https://github.com/aryaminus/controlkeel",
+      "repository" => "https://github.com/aryaminus/controlkeel",
+      "license" => "Apache-2.0",
+      "keywords" => ["augment", "auggie", "governance", "mcp", "skills"],
+      "skills" => "./skills/",
+      "agents" => "./agents/",
+      "commands" => "./commands/",
+      "hooks" => "./hooks/hooks.json",
+      "mcpServers" => "./.mcp.json"
+    }
+  end
+
   defp claude_hooks_manifest do
     %{
       "hooks" => %{
@@ -2349,6 +2510,25 @@ defmodule ControlKeel.Skills.Exporter do
             "powershell" => "./bin/controlkeel-review.ps1",
             "timeoutSec" => 345_600,
             "comment" => "Intercepts plan-mode exit and waits for ControlKeel browser review."
+          }
+        ]
+      }
+    }
+  end
+
+  defp augment_hooks_manifest do
+    %{
+      "hooks" => %{
+        "PreToolUse" => [
+          %{
+            "matcher" => "str-replace-editor|save-file|launch-process",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/controlkeel-review.sh",
+                "timeout" => 345_600
+              }
+            ]
           }
         ]
       }
@@ -2646,6 +2826,65 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
+  defp augment_rule_contents do
+    """
+    # ControlKeel governance for Augment
+
+    - Prefer ControlKeel MCP tools before risky edits, shell commands, auth changes, or release work.
+    - Use `/controlkeel-submit-plan` before leaving planning for non-trivial changes.
+    - Use `/controlkeel-review` before declaring work complete.
+    - Use `/controlkeel-annotate` for file-specific risk notes and `/controlkeel-last` to reopen the latest review.
+    - Stay autonomous where possible, but respect ControlKeel review gates and blocked findings.
+    """
+  end
+
+  defp augment_review_command_contents do
+    """
+    ---
+    description: Run a governed ControlKeel review for the current Augment task
+    ---
+
+    Read `.augment/rules/controlkeel.md`, use ControlKeel MCP tools, and summarize blocked findings, proof status, and follow-up work before completing the task.
+    """
+  end
+
+  defp augment_submit_plan_command_contents do
+    """
+    ---
+    description: Submit the current Augment plan to ControlKeel and wait for approval
+    ---
+
+    1. Save the current plan to `.augment/review-plan.md`.
+    2. Run `controlkeel review plan submit --body-file .augment/review-plan.md --submitted-by augment --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Do not implement until the review is approved.
+    """
+  end
+
+  defp augment_settings_snippet(project_root, opts) do
+    %{
+      "mcpServers" => mcp_payload(project_root, opts)["mcpServers"],
+      "note" =>
+        "Merge this into ~/.augment/settings.json if you want persistent ControlKeel MCP registration outside per-workspace --mcp-config usage."
+    }
+  end
+
+  defp augment_plugin_readme_contents do
+    """
+    # ControlKeel Augment Plugin Bundle
+
+    Use this bundle with:
+
+    `auggie --plugin-dir ./controlkeel/dist/augment-plugin`
+
+    The bundle ships:
+    - hook-native plan interception
+    - ControlKeel review, submit-plan, annotate, and last commands
+    - a ControlKeel operator subagent
+    - a local MCP bridge
+    """
+  end
+
   defp continue_prompt_contents do
     """
     # ControlKeel Continue Prompt
@@ -2769,6 +3008,27 @@ defmodule ControlKeel.Skills.Exporter do
     #{Enum.map_join(skills, "\n", &"- `#{&1.name}` — #{&1.description}")}
 
     Prefer CK MCP tools for validation, routing, findings, budgets, proofs, and benchmark control.
+    """
+  end
+
+  defp augment_agent_contents(skills) do
+    """
+    ---
+    name: controlkeel-operator
+    description: Operate inside a ControlKeel-governed repository and use CK tools proactively.
+    color: cyan
+    tools:
+      - "*"
+    ---
+
+    # ControlKeel Operator
+
+    Start with the `controlkeel-governance` skill. Use these supporting skills when relevant:
+
+    #{Enum.map_join(skills, "\n", &"- `#{&1.name}` — #{&1.description}")}
+
+    Prefer CK MCP tools for plan review, validation, findings, budgets, routing, and proof state.
+    Stay autonomous, but do not bypass explicit ControlKeel review gates.
     """
   end
 

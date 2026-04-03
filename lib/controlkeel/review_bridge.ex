@@ -16,7 +16,11 @@ defmodule ControlKeel.ReviewBridge do
       open_target = open_target(embed, remote_mode?())
 
       open_result =
-        maybe_open_browser(browser_url(review), open_target, Keyword.get(opts, :auto_open, true))
+        maybe_open_browser(
+          browser_url(review),
+          open_target,
+          Keyword.get(opts, :auto_open, auto_open_reviews?())
+        )
 
       {:ok,
        %{
@@ -81,6 +85,19 @@ defmodule ControlKeel.ReviewBridge do
 
   def remote_mode? do
     System.get_env("CONTROLKEEL_REMOTE") in ["1", "true", "TRUE"]
+  end
+
+  def auto_open_reviews? do
+    case System.get_env("CONTROLKEEL_AUTO_OPEN_REVIEWS") do
+      value when value in ["0", "false", "FALSE"] ->
+        false
+
+      value when value in ["1", "true", "TRUE"] ->
+        true
+
+      _ ->
+        Mix.env() != :test
+    end
   end
 
   defp do_wait(review_or_id, deadline, interval_ms) do

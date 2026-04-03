@@ -114,7 +114,7 @@ mix ck.findings
 
 ### Choose your agent
 
-- Hook-native: `claude-code`, `copilot`, `windsurf`, `cline`, `kiro`
+- Hook-native: `claude-code`, `copilot`, `windsurf`, `cline`, `kiro`, `augment`
 - Plugin-native: `opencode`, `amp`
 - File-plan-mode: `pi`
 - Prompt/command-native: `continue`, `gemini-cli`, `goose`, `roo-code`
@@ -131,6 +131,7 @@ mix ck.findings
 | GitHub Copilot | `controlkeel attach copilot` | `host_plan_mode` | hook and command review flow | external | `controlkeel-copilot-plugin.tar.gz` |
 | OpenCode | `controlkeel attach opencode` | `host_plan_mode` | plugin tool submits plan review | external | `controlkeel-opencode-native.tar.gz`, `controlkeel-opencode-native.tgz` |
 | Pi | `controlkeel attach pi` | `file_plan_mode` | plan-file submit plus browser approval | external | `controlkeel-pi-native.tar.gz`, `controlkeel-pi-native.tgz` |
+| Augment / Auggie CLI | `controlkeel attach augment` | `host_plan_mode` | plugin hook submits and waits on review, with ACP-compatible runtime transport | external | `controlkeel-augment-native.tar.gz`, `controlkeel-augment-plugin.tar.gz` |
 | VS Code | `controlkeel attach vscode` | `review_only` | browser review in a companion webview | `vscode_webview` | `controlkeel-vscode-companion.vsix` |
 | Codex CLI | `controlkeel attach codex-cli` | `review_only` | diff and completion review commands | none | `controlkeel-codex.tar.gz`, `controlkeel-codex-plugin.tar.gz` |
 
@@ -142,6 +143,7 @@ Expanded official surfaces now shipped for the broader matrix:
 - Goose: repo hints, workflow recipes, commands, and Goose extension YAML
 - Kiro: hooks, steering, tool-policy settings, commands, and MCP config
 - Amp: TypeScript plugin, native skill bundle, command docs, and plugin package scaffold
+- Augment / Auggie CLI: workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime metadata
 - Gemini CLI: extension manifest plus review and submit-plan commands
 - Cursor: rules, commands, background-agent guidance, and MCP config
 - Roo Code: rules, commands, cloud-agent guidance, and governed mode files
@@ -167,6 +169,8 @@ Where the host supports it, CK now publishes or packages a direct-install surfac
 - Pi short form: `pi -e npm:@aryaminus/controlkeel-pi-extension`
 - VS Code: `code --install-extension controlkeel-vscode-companion.vsix`
 - Gemini CLI: `gemini extensions link ./controlkeel/dist/gemini-cli-native`
+- Augment / Auggie CLI: `npm install -g @augmentcode/auggie`
+- Augment / Auggie CLI: `auggie --plugin-dir ./controlkeel/dist/augment-plugin`
 - Claude Code: `controlkeel plugin install claude`
 - Claude Code: `claude --plugin-dir ./controlkeel/dist/claude-plugin`
 - Copilot: `controlkeel plugin install copilot`
@@ -198,6 +202,7 @@ For the full host-by-host truth table, see [docs/direct-host-installs.md](docs/d
 | Cursor | `attach cursor` | Native-first | `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, `.cursor/mcp.json` |
 | Windsurf | `attach windsurf` | Hook-native | `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks.json`, `.windsurf/hooks`, `.windsurf/mcp.json` |
 | Continue | `attach continue` | Prompt/command-native | `.continue/prompts`, `.continue/commands`, `.continue/mcpServers/controlkeel.yaml`, `.continue/mcp.json` |
+| Augment / Auggie CLI | `attach augment` | Hook-native | `.augment/skills`, `.augment/agents`, `.augment/commands`, `.augment/rules`, `.augment/mcp.json`, `.augment/settings.controlkeel.json`, local `.augment-plugin` bundle |
 | Pi | `attach pi` | File-plan-mode | `.pi/controlkeel.json`, `.pi/commands`, `.pi/mcp.json`, `pi-extension.json`, `PI.md` |
 | Copilot | `attach copilot` | Hook-native | `.github/skills`, `.github/agents`, `.github/commands`, `.vscode/mcp.json` |
 | VS Code | `attach vscode` | Browser/embed companion | `.github/skills`, `.github/agents`, `.vscode/mcp.json`, `.vscode/extensions.json`, companion `.vsix` |
@@ -253,6 +258,8 @@ controlkeel policy list|train|promote|archive
 controlkeel agents doctor                    # show attached/runnable agents
 controlkeel agents monitor [--agent-id ID]  # live agent activity feed
 controlkeel run task <id>                    # governed agent execution
+controlkeel sandbox status                   # list local/docker/e2b/nono execution adapters
+controlkeel sandbox config nono              # set nono as the default execution sandbox
 controlkeel provider list|set-key|default|doctor
 controlkeel watch                            # continuous file-watch governance
 controlkeel mcp --project-root /path         # direct stdio MCP
@@ -327,6 +334,14 @@ controlkeel plugin export codex
 ```
 
 Exported bundles are written to `controlkeel/dist/<target>/`. Tagged releases also publish platform binaries, plugin tarballs, and checksums.
+
+## Updates
+
+Upgrading the `controlkeel` binary via Homebrew, npm bootstrap, or the release installers updates the CLI itself. Attached MCP entries that execute `controlkeel` or the generated `controlkeel-mcp` wrapper start using the new binary automatically.
+
+CK now auto-syncs stale attached bundles when a CLI command loads a governed project, as long as the attachment has a real install target and scope. That covers repo-local or user-installed assets managed by `controlkeel attach <agent>`.
+
+Some artifacts still do **not** auto-refresh by themselves. That includes exported tarballs, local `--plugin-dir` installs, manually copied plugin directories, and sideloaded `.vsix` files. Rebuild or reinstall those explicitly after upgrading.
 
 ## Provider access
 

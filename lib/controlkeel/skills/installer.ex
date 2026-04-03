@@ -486,6 +486,28 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
+  defp do_install(%SkillTarget{id: "augment-native"}, "project", project_root, _skills, _opts) do
+    {:ok, plan} = Exporter.export("augment-native", project_root, scope: "project")
+
+    augment_root = Path.join(project_root, ".augment")
+    File.mkdir_p!(augment_root)
+
+    copy_tree_contents(Path.join(plan.output_dir, ".augment"), augment_root)
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    File.cp!(Path.join(plan.output_dir, "AUGMENT.md"), Path.join(project_root, "AUGMENT.md"))
+
+    {:ok,
+     %{
+       target: "augment-native",
+       scope: "project",
+       destination: augment_root,
+       skills_destination: Path.join(augment_root, "skills"),
+       agents_destination: Path.join(augment_root, "agents"),
+       commands_destination: Path.join(augment_root, "commands"),
+       rules_destination: Path.join(augment_root, "rules")
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "instructions-only"}, "project", project_root, _skills, _opts) do
     {:ok, plan} = Exporter.export("instructions-only", project_root, scope: "project")
 

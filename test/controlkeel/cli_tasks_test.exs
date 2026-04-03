@@ -213,6 +213,41 @@ defmodule ControlKeel.CLITasksTest do
     assert Mission.get_finding!(open_finding.id).status == "approved"
   end
 
+  test "ck.status auto-syncs stale attached agent bundles", %{tmp_dir: tmp_dir} do
+    session = session_fixture()
+
+    {:ok, _binding} =
+      ProjectBinding.write(
+        %{
+          "workspace_id" => session.workspace_id,
+          "session_id" => session.id,
+          "agent" => "claude",
+          "attached_agents" => %{
+            "augment" => %{
+              "target" => "augment-native",
+              "scope" => "project",
+              "controlkeel_version" => "0.0.1"
+            }
+          }
+        },
+        tmp_dir
+      )
+
+    status_output =
+      with_project(tmp_dir, fn ->
+        rerun_task("ck.status")
+        capture_io(fn -> Mix.Tasks.Ck.Status.run([]) end)
+      end)
+
+    assert status_output =~ "Execution sandbox:"
+    assert status_output =~ "Attached agents:"
+    assert status_output =~ "augment (CK v"
+
+    assert {:ok, binding} = ProjectBinding.read(tmp_dir)
+    assert binding["attached_agents"]["augment"]["synced_at"]
+    assert File.exists?(Path.join(tmp_dir, ".augment/mcp.json"))
+  end
+
   test "ck.proofs, ck.pause, ck.resume, and ck.memory.search operate on the bound session", %{
     tmp_dir: tmp_dir
   } do

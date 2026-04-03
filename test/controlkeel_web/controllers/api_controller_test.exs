@@ -520,6 +520,31 @@ defmodule ControlKeelWeb.ApiControllerTest do
                &(&1["command"] =~ "@aryaminus/controlkeel-opencode")
              )
 
+      augment =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "augment"
+        end)
+
+      assert augment["preferred_target"] == "augment-native"
+      assert augment["phase_model"] == "host_plan_mode"
+      assert augment["review_experience"] == "native_review"
+      assert augment["runtime_transport"] == "auggie_sdk_acp"
+      assert augment["runtime_auth_owner"] == "agent"
+      assert augment["runtime_review_transport"] == "plugin_hook_acp"
+      assert augment["runtime_session_support"]["resume"] == true
+      assert "hooks" in augment["agent_uses_ck_via"]
+      assert ".augment/commands/controlkeel-review.md" in augment["artifact_surfaces"]
+
+      assert Enum.any?(
+               augment["package_outputs"],
+               &(&1["artifact"] == "controlkeel-augment-plugin.tar.gz")
+             )
+
+      assert Enum.any?(
+               augment["direct_install_methods"],
+               &(&1["command"] == "auggie --plugin-dir ./controlkeel/dist/augment-plugin")
+             )
+
       vscode =
         Enum.find(agents, fn agent ->
           agent["id"] == "vscode"

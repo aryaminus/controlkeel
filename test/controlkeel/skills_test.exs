@@ -491,6 +491,68 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(amp_plan.output_dir, ".mcp.json"))
     assert File.exists?(Path.join(amp_plan.output_dir, "AGENTS.md"))
 
+    assert {:ok, augment_plan} = Skills.export("augment-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(augment_plan.output_dir, ".augment/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plan.output_dir, ".augment/agents/controlkeel-operator.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plan.output_dir, ".augment/commands/controlkeel-review.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plan.output_dir, ".augment/commands/controlkeel-submit-plan.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plan.output_dir, ".augment/commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plan.output_dir, ".augment/commands/controlkeel-last.md")
+           )
+
+    assert File.exists?(Path.join(augment_plan.output_dir, ".augment/rules/controlkeel.md"))
+    assert File.exists?(Path.join(augment_plan.output_dir, ".augment/mcp.json"))
+    assert File.exists?(Path.join(augment_plan.output_dir, ".augment/settings.controlkeel.json"))
+    assert File.exists?(Path.join(augment_plan.output_dir, "AUGMENT.md"))
+    assert File.exists?(Path.join(augment_plan.output_dir, "AGENTS.md"))
+
+    assert {:ok, augment_plugin_plan} = Skills.export("augment-plugin", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(augment_plugin_plan.output_dir, ".augment-plugin/plugin.json"))
+
+    assert File.exists?(
+             Path.join(augment_plugin_plan.output_dir, "skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plugin_plan.output_dir, "agents/controlkeel-operator.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plugin_plan.output_dir, "commands/controlkeel-review.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plugin_plan.output_dir, "commands/controlkeel-submit-plan.md")
+           )
+
+    assert File.exists?(
+             Path.join(augment_plugin_plan.output_dir, "commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(Path.join(augment_plugin_plan.output_dir, "commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(augment_plugin_plan.output_dir, "rules/controlkeel.md"))
+    assert File.exists?(Path.join(augment_plugin_plan.output_dir, "hooks/hooks.json"))
+    assert File.exists?(Path.join(augment_plugin_plan.output_dir, "hooks/controlkeel-review.sh"))
+    assert File.exists?(Path.join(augment_plugin_plan.output_dir, ".mcp.json"))
+    assert File.exists?(Path.join(augment_plugin_plan.output_dir, "README.md"))
+
     assert {:ok, instructions_plan} = Skills.export("instructions-only", tmp_dir, scope: "export")
     assert File.exists?(Path.join(instructions_plan.output_dir, "AIDER.md"))
     assert File.exists?(Path.join(instructions_plan.output_dir, ".aider.conf.yml"))
@@ -624,6 +686,20 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".amp/commands/controlkeel-annotate.md"))
     assert File.exists?(Path.join(tmp_dir, ".amp/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".mcp.json"))
+
+    assert {:ok, augment_install} = Skills.install("augment-native", tmp_dir, scope: "project")
+    assert augment_install.destination == Path.join(tmp_dir, ".augment")
+    assert File.exists?(Path.join(tmp_dir, ".augment/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/agents/controlkeel-operator.md"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/rules/controlkeel.md"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/mcp.json"))
+    assert File.exists?(Path.join(tmp_dir, ".augment/settings.controlkeel.json"))
+    assert File.exists?(Path.join(tmp_dir, "AUGMENT.md"))
+    assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
 
     assert {:ok, cursor_install} = Skills.install("cursor-native", tmp_dir, scope: "project")
     assert cursor_install.destination == Path.join(tmp_dir, ".cursor")
