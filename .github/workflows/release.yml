@@ -231,6 +231,20 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if [ "${PACKAGE_VERSION}" != "${VERSION}" ]; then
+            echo "Refusing to publish ${PACKAGE_NAME}@${PACKAGE_VERSION} for tag v${VERSION}." >&2
+            exit 1
+          fi
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm; skipping publish."
+            exit 0
+          fi
+
           npm publish --access public
       - uses: actions/download-artifact@v8
         if: steps.npm_gate.outputs.enabled == 'true'
@@ -247,16 +261,46 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           mix deps.get
           mix run scripts/export_release_bundles.exs
+
+          PACKAGE_NAME=$(node -p "require('./controlkeel/dist/opencode-native/package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./controlkeel/dist/opencode-native/package.json').version")
+
+          if [ "${PACKAGE_VERSION}" != "${VERSION}" ]; then
+            echo "Refusing to publish ${PACKAGE_NAME}@${PACKAGE_VERSION} for tag v${VERSION}." >&2
+            exit 1
+          fi
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm; skipping publish."
+            exit 0
+          fi
+
           npm publish controlkeel/dist/opencode-native --access public
       - name: Publish Pi adapter package
         if: steps.npm_gate.outputs.enabled == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           mix deps.get
           mix run scripts/export_release_bundles.exs
+
+          PACKAGE_NAME=$(node -p "require('./controlkeel/dist/pi-native/package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./controlkeel/dist/pi-native/package.json').version")
+
+          if [ "${PACKAGE_VERSION}" != "${VERSION}" ]; then
+            echo "Refusing to publish ${PACKAGE_NAME}@${PACKAGE_VERSION} for tag v${VERSION}." >&2
+            exit 1
+          fi
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on npm; skipping publish."
+            exit 0
+          fi
+
           npm publish controlkeel/dist/pi-native --access public
 
   publish-github-packages:
@@ -276,7 +320,22 @@ jobs:
         working-directory: packages/npm/controlkeel
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm publish --registry=https://npm.pkg.github.com
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if [ "${PACKAGE_VERSION}" != "${VERSION}" ]; then
+            echo "Refusing to publish ${PACKAGE_NAME}@${PACKAGE_VERSION} for tag v${VERSION}." >&2
+            exit 1
+          fi
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" --registry=https://npm.pkg.github.com version >/dev/null 2>&1; then
+            echo "${PACKAGE_NAME}@${PACKAGE_VERSION} already exists on GitHub Packages; skipping publish."
+            exit 0
+          fi
+
+          npm publish --registry=https://npm.pkg.github.com
 
   publish-vscode-marketplace:
     needs: release

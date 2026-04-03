@@ -10,6 +10,8 @@ This document is the **single inventory** for attach targets, MCP tools, and bun
 - [`lib/controlkeel/protocol_interop.ex`](../lib/controlkeel/protocol_interop.ex) — hosted MCP/A2A dispatch wrappers
 - [`priv/skills/`](../priv/skills/) — on-disk AgentSkills bundles
 
+If you want the smaller user-facing docs map first, start with [README.md](README.md).
+
 For install paths and proxy URLs, see [agent-integrations.md](agent-integrations.md), [getting-started.md](getting-started.md), [host-surface-parity.md](host-surface-parity.md), and [direct-host-installs.md](direct-host-installs.md).
 Product intent and acceptance criteria for this matrix live in [agent-support-prd.md](agent-support-prd.md) and [agent-support-requirements.md](agent-support-requirements.md).
 

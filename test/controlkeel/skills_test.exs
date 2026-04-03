@@ -402,6 +402,7 @@ defmodule ControlKeel.SkillsTest do
       |> File.read!()
       |> Jason.decode!()
 
+    assert opencode_manifest["version"] == ControlKeel.CLI.version()
     assert opencode_manifest["publishConfig"]["access"] == "public"
     assert opencode_manifest["exports"]["."] == "./index.js"
 
@@ -448,6 +449,7 @@ defmodule ControlKeel.SkillsTest do
       |> File.read!()
       |> Jason.decode!()
 
+    assert pi_manifest["version"] == ControlKeel.CLI.version()
     assert pi_manifest["publishConfig"]["access"] == "public"
     assert pi_manifest["exports"]["."] == "./pi-extension.json"
 

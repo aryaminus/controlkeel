@@ -6,7 +6,6 @@ defmodule ControlKeel.ACPRegistry do
 
   @default_registry_url "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json"
   @default_ttl_seconds 86_400
-  @user_agent "ControlKeel/#{Application.spec(:controlkeel, :vsn) || "0.1.0"}"
   @registry_id_overrides %{
     "droid" => ["factory-droid"],
     "cursor" => ["cursor"],
@@ -19,7 +18,7 @@ defmodule ControlKeel.ACPRegistry do
     cache = read_cache()
 
     headers =
-      [{"user-agent", @user_agent}] ++
+      [{"user-agent", user_agent()}] ++
         case cache["etag"] do
           value when is_binary(value) and value != "" -> [{"if-none-match", value}]
           _ -> []
@@ -207,6 +206,10 @@ defmodule ControlKeel.ACPRegistry do
 
   defp registry_url do
     Application.get_env(:controlkeel, :acp_registry_url, @default_registry_url)
+  end
+
+  defp user_agent do
+    "ControlKeel/#{ControlKeel.CLI.version()}"
   end
 
   defp ttl_seconds do

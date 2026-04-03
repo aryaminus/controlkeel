@@ -4,6 +4,8 @@ This document answers a narrower question than the main support matrix:
 
 **If a user wants to install the ControlKeel companion directly into the host, what is the strongest real path available today?**
 
+If you are orienting across the whole documentation set first, start with [README.md](README.md).
+
 ControlKeel keeps `controlkeel attach <host>` as the safest default because it installs the full governed repo-local experience. But several hosts now also have stronger direct-install paths.
 
 ## Published package or extension installs

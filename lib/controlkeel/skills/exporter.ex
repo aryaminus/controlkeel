@@ -8,8 +8,6 @@ defmodule ControlKeel.Skills.Exporter do
   alias ControlKeel.Skills.SkillExportPlan
   alias ControlKeel.Skills.SkillTarget
 
-  @app_version to_string(Application.spec(:controlkeel, :vsn) || "0.1.0")
-
   def export(target_id, project_root, opts \\ []) do
     with %SkillTarget{} = target <- SkillTarget.get(target_id),
          analysis <- Skills.validate(project_root, trust_project_skills: true),
@@ -853,7 +851,7 @@ defmodule ControlKeel.Skills.Exporter do
     File.write!(
       package_json,
       Jason.encode!(
-        %{"name" => "controlkeel-openclaw", "private" => true, "version" => @app_version},
+        %{"name" => "controlkeel-openclaw", "private" => true, "version" => app_version()},
         pretty: true
       ) <> "\n"
     )
@@ -2237,7 +2235,7 @@ defmodule ControlKeel.Skills.Exporter do
   defp openclaw_plugin_manifest do
     %{
       "name" => "controlkeel",
-      "version" => @app_version,
+      "version" => app_version(),
       "description" => "ControlKeel governance skills and MCP companion for OpenClaw.",
       "skills" => "skills",
       "mcpServers" => ".mcp.json"
@@ -2361,7 +2359,7 @@ defmodule ControlKeel.Skills.Exporter do
   defp codex_plugin_manifest do
     %{
       "name" => "controlkeel",
-      "version" => @app_version,
+      "version" => app_version(),
       "description" =>
         "ControlKeel governance skills, commands, agents, and MCP bridge for Codex.",
       "author" => %{
@@ -2425,7 +2423,7 @@ defmodule ControlKeel.Skills.Exporter do
     %{
       "name" => "controlkeel",
       "description" => "ControlKeel governance skills, subagents, and MCP bridge.",
-      "version" => @app_version,
+      "version" => app_version(),
       "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
       "homepage" => "https://github.com/aryaminus/controlkeel",
       "repository" => "https://github.com/aryaminus/controlkeel",
@@ -2443,7 +2441,7 @@ defmodule ControlKeel.Skills.Exporter do
     %{
       "name" => "controlkeel",
       "description" => "ControlKeel governance skills, agents, and MCP bridge.",
-      "version" => @app_version,
+      "version" => app_version(),
       "author" => %{"name" => "ControlKeel", "email" => "opensource@controlkeel.local"},
       "license" => "Apache-2.0",
       "keywords" => ["governance", "security", "skills"],
@@ -2460,7 +2458,7 @@ defmodule ControlKeel.Skills.Exporter do
     %{
       "name" => "controlkeel",
       "description" => "ControlKeel governance bundle for Augment / Auggie CLI.",
-      "version" => @app_version,
+      "version" => app_version(),
       "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
       "homepage" => "https://github.com/aryaminus/controlkeel",
       "repository" => "https://github.com/aryaminus/controlkeel",
@@ -2564,7 +2562,7 @@ defmodule ControlKeel.Skills.Exporter do
       "displayName" => "ControlKeel Review",
       "description" =>
         "Open ControlKeel review URLs in VS Code and route browser review into editor webviews.",
-      "version" => @app_version,
+      "version" => app_version(),
       "publisher" => "aryaminus",
       "homepage" => "https://github.com/aryaminus/controlkeel",
       "repository" => %{
@@ -3441,7 +3439,7 @@ defmodule ControlKeel.Skills.Exporter do
   defp opencode_package_manifest do
     %{
       "name" => "@aryaminus/controlkeel-opencode",
-      "version" => @app_version,
+      "version" => app_version(),
       "type" => "module",
       "description" => "ControlKeel OpenCode adapter bundle",
       "homepage" => "https://github.com/aryaminus/controlkeel",
@@ -3615,7 +3613,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     %{
       "name" => "controlkeel-pi-review",
-      "version" => @app_version,
+      "version" => app_version(),
       "project_root" => project_root,
       "phase_model" => "file_plan_mode",
       "review_command" => "controlkeel-review",
@@ -3689,7 +3687,7 @@ defmodule ControlKeel.Skills.Exporter do
   defp pi_package_manifest do
     %{
       "name" => "@aryaminus/controlkeel-pi-extension",
-      "version" => @app_version,
+      "version" => app_version(),
       "description" => "ControlKeel Pi adapter bundle",
       "homepage" => "https://github.com/aryaminus/controlkeel",
       "repository" => %{
@@ -4349,7 +4347,7 @@ defmodule ControlKeel.Skills.Exporter do
   defp amp_package_manifest do
     %{
       "name" => "@aryaminus/controlkeel-amp",
-      "version" => @app_version,
+      "version" => app_version(),
       "private" => true,
       "description" => "ControlKeel Amp plugin bundle",
       "files" => [".amp"],
@@ -4387,5 +4385,9 @@ defmodule ControlKeel.Skills.Exporter do
     3. Wait with `controlkeel review plan wait --id <review_id> --json`.
     4. Summarize blocked findings and proof status before completion.
     """
+  end
+
+  defp app_version do
+    ControlKeel.CLI.version()
   end
 end

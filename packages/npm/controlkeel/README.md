@@ -17,6 +17,18 @@ npx @aryaminus/controlkeel@latest
 
 The package installs and exposes the `controlkeel` command.
 
+Published companion packages that tie into the main CLI:
+
+- [`@aryaminus/controlkeel-opencode`](https://www.npmjs.com/package/@aryaminus/controlkeel-opencode) for OpenCode plugin installs
+- [`@aryaminus/controlkeel-pi-extension`](https://www.npmjs.com/package/@aryaminus/controlkeel-pi-extension) for Pi extension installs
+
+Main project docs:
+
+- [Repository README](https://github.com/aryaminus/controlkeel#readme)
+- [Getting started](https://github.com/aryaminus/controlkeel/blob/main/docs/getting-started.md)
+- [Direct host installs](https://github.com/aryaminus/controlkeel/blob/main/docs/direct-host-installs.md)
+- [Support matrix](https://github.com/aryaminus/controlkeel/blob/main/docs/support-matrix.md)
+
 You can also install the same bootstrap package from GitHub Packages:
 
 ```bash

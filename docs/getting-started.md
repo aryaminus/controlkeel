@@ -140,29 +140,9 @@ In that mode, model-backed features such as advisory review and intent compilati
 
 The LLM **advisory** layer (extra review beyond pattern matchers) only runs when a provider is available. The HTTP validate API and MCP validate tool include an **`advisory`** field describing whether advisory ran or was skipped—see [autonomy-and-findings.md](autonomy-and-findings.md) for how findings relate to human review.
 
-Other supported attach commands:
+Other common attach targets include `claude-code`, `codex-cli`, `cline`, `cursor`, `windsurf`, `continue`, `kiro`, `amp`, `gemini-cli`, `copilot`, `vscode`, `goose`, `roo-code`, `hermes-agent`, `openclaw`, `droid`, and `forge`.
 
-- `controlkeel attach claude-code`
-- `controlkeel attach codex-cli`
-- `controlkeel attach cline`
-- `controlkeel attach roo-code`
-- `controlkeel attach goose`
-- `controlkeel attach vscode`
-- `controlkeel attach copilot`
-- `controlkeel attach cursor`
-- `controlkeel attach windsurf`
-- `controlkeel attach continue`
-- `controlkeel attach aider`
-- `controlkeel attach kiro`
-- `controlkeel attach amp`
-- `controlkeel attach gemini-cli`
-- `controlkeel attach opencode`
-- `controlkeel attach hermes-agent`
-- `controlkeel attach openclaw`
-- `controlkeel attach droid`
-- `controlkeel attach forge`
-
-For the full native skills / plugin matrix, see [agent-integrations.md](agent-integrations.md), the canonical [support-matrix.md](support-matrix.md), the broader host rollout map in [host-surface-parity.md](host-surface-parity.md), and the direct-install matrix in [direct-host-installs.md](direct-host-installs.md), or open `/skills` in the local app.
+For the full host truth, use the canonical [support-matrix.md](support-matrix.md), the install-focused [direct-host-installs.md](direct-host-installs.md), the behavior model in [agent-integrations.md](agent-integrations.md), or the docs map in [README.md](README.md). You can also open `/skills` in the local app.
 
 If you use Cline, the attach flow is first-class for MCP, skills, rules, and workflows, but CK still needs its own provider profile or local Ollama for CK-internal model work because Cline's provider secrets are not exposed as a documented bridge.
 
