@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.19 — 2026-04-03
+
+### What's changed
+
+- feat: enhance Codex CLI integration with config management and installation support
+
 ## v0.1.18 — 2026-04-03
 
 ### What's changed
