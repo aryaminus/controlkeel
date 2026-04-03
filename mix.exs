@@ -4,7 +4,7 @@ defmodule ControlKeel.MixProject do
   def project do
     [
       app: :controlkeel,
-      version: "0.1.19",
+      version: "0.1.20",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.20 — 2026-04-03
+
+### What's changed
+
+- Refactor documentation and code for ControlKeel integrations
+- feat: add guided help system and enhance help command functionality
+
 ## v0.1.19 — 2026-04-03
 
 ### What's changed
