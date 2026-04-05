@@ -8,6 +8,7 @@ defmodule ControlKeel.AgentExecution do
   alias ControlKeel.MCP.Tools.CkValidate
   alias ControlKeel.Mission
   alias ControlKeel.Platform
+  alias ControlKeel.ProjectRoot
   alias ControlKeel.ProjectBinding
   alias ControlKeel.ProtocolAccess
   alias ControlKeel.SessionTranscript
@@ -44,6 +45,7 @@ defmodule ControlKeel.AgentExecution do
   ]
 
   def list_agents(project_root \\ File.cwd!()) do
+    project_root = ProjectRoot.resolve(project_root)
     attached = attached_agent_ids(project_root)
 
     Skills.agent_integrations()
@@ -77,6 +79,7 @@ defmodule ControlKeel.AgentExecution do
   end
 
   def doctor(project_root \\ File.cwd!()) do
+    project_root = ProjectRoot.resolve(project_root)
     attached = attached_agent_ids(project_root)
     agents = list_agents(project_root)
 

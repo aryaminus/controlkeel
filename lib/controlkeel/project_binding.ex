@@ -1,6 +1,7 @@
 defmodule ControlKeel.ProjectBinding do
   @moduledoc false
 
+  alias ControlKeel.ProjectRoot
   alias ControlKeel.RuntimePaths
 
   @version 1
@@ -232,24 +233,7 @@ defmodule ControlKeel.ProjectBinding do
   end
 
   defp canonical_root(project_root) do
-    expanded = Path.expand(project_root)
-
-    case :os.type() do
-      {:win32, _} ->
-        expanded
-
-      _ ->
-        case System.find_executable("pwd") do
-          nil ->
-            expanded
-
-          executable ->
-            case System.cmd(executable, ["-P"], cd: expanded, stderr_to_stdout: true) do
-              {realpath, 0} -> String.trim(realpath)
-              {_output, _code} -> expanded
-            end
-        end
-    end
+    ProjectRoot.resolve(project_root)
   end
 
   defp wrapper_filename do

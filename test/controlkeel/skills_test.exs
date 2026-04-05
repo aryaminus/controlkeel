@@ -205,6 +205,7 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(codex_plan.output_dir, "AGENTS.md"))
     assert File.exists?(Path.join(codex_plan.output_dir, "CONTROLKEEL_INSTALL.md"))
     assert File.exists?(Path.join(codex_plan.output_dir, ".mcp.hosted.json"))
+    assert File.read!(Path.join(codex_plan.output_dir, "AGENTS.md")) =~ "Primary CK loop:"
 
     assert {:ok, codex_plugin_plan} = Skills.export("codex-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(codex_plugin_plan.output_dir, ".codex-plugin/plugin.json"))

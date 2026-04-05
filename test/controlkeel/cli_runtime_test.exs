@@ -12,6 +12,7 @@ defmodule ControlKeel.CLIRuntimeTest do
   alias ControlKeel.CLI
   alias ControlKeel.Platform
   alias ControlKeel.ProjectBinding
+  alias ControlKeel.ProjectRoot
 
   setup do
     tmp_dir =
@@ -133,6 +134,36 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert parsed.options[:project_root] == tmp_dir
   end
 
+  test "setup bootstraps from a nested directory and reports detected hosts", %{tmp_dir: tmp_dir} do
+    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Demo.MixProject do\nend\n")
+
+    nested = Path.join(tmp_dir, "lib/demo")
+    File.mkdir_p!(nested)
+
+    File.mkdir_p!(
+      Path.join([System.get_env("HOME") || System.user_home!(), ".config", "opencode"])
+    )
+
+    assert {:ok, parsed} = CLI.parse(["setup", "--project-root", nested])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(parsed, project_root: nested)
+      end)
+
+    resolved_root = ProjectRoot.resolve(tmp_dir)
+
+    assert output =~ "ControlKeel setup"
+    assert output =~ "Project root: #{resolved_root}"
+    assert output =~ "OpenCode"
+
+    assert output =~
+             "Core loop: ck_context -> ck_validate -> ck_review_submit/ck_finding -> ck_budget/ck_route/ck_delegate"
+
+    assert output =~ "Attach next: controlkeel attach opencode"
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/project.json"))
+  end
+
   test "plugin and delegated execution commands work", %{tmp_dir: tmp_dir} do
     assert {:ok, plugin_export} =
              CLI.parse(["plugin", "export", "codex", "--project-root", tmp_dir])
@@ -216,6 +247,7 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert doctor_output =~ "Agent execution doctor"
+    assert doctor_output =~ "Detected hosts:"
     assert doctor_output =~ "cursor: handoff / handoff"
   end
 
@@ -449,6 +481,7 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert bootstrap_output =~ "Bootstrapped ControlKeel"
     assert bootstrap_output =~ "Binding mode: existing"
+    assert bootstrap_output =~ "Detected hosts:"
   end
 
   test "runtime export emits the Open SWE headless bundle", %{tmp_dir: tmp_dir} do
@@ -459,7 +492,10 @@ defmodule ControlKeel.CLIRuntimeTest do
         assert 0 == CLI.execute(export, project_root: tmp_dir)
       end)
 
+    resolved_root = ProjectRoot.resolve(tmp_dir)
+
     assert output =~ "Prepared Open SWE runtime export."
+    assert output =~ "Project root: #{resolved_root}"
     assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/open-swe-runtime/AGENTS.md"))
 
     assert File.exists?(
@@ -475,7 +511,10 @@ defmodule ControlKeel.CLIRuntimeTest do
         assert 0 == CLI.execute(export, project_root: tmp_dir)
       end)
 
+    resolved_root = ProjectRoot.resolve(tmp_dir)
+
     assert output =~ "Prepared Devin runtime export."
+    assert output =~ "Project root: #{resolved_root}"
     assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/devin-runtime/AGENTS.md"))
     assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/devin-runtime/devin/README.md"))
 

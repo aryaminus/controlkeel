@@ -12,14 +12,14 @@ defmodule ControlKeel.Help do
       keywords: ["overview", "start", "intro", "what", "capabilities", "does", "do"],
       phrases: ["what can controlkeel do", "what does controlkeel do", "what can ck do"],
       commands: [
-        "controlkeel init",
+        "controlkeel setup",
         "controlkeel attach codex-cli",
         "controlkeel status",
         "controlkeel findings",
         "controlkeel help getting-started"
       ],
       next_steps: [
-        "Use `controlkeel init` to create the governed project binding.",
+        "Use `controlkeel setup` to bootstrap the governed project and see recommended attach and runtime-export paths.",
         "Use `controlkeel attach <agent>` to wire an agent to CK.",
         "Use `controlkeel status`, `findings`, and `proofs` to inspect governed state."
       ],
@@ -45,13 +45,13 @@ defmodule ControlKeel.Help do
       ],
       phrases: ["first run", "getting started", "set up", "setup ck"],
       commands: [
-        "controlkeel init",
+        "controlkeel setup",
         "controlkeel attach codex-cli",
         "controlkeel status",
         "controlkeel help attach"
       ],
       next_steps: [
-        "Run `controlkeel init` inside the project you want to govern.",
+        "Run `controlkeel setup` inside the project you want to govern.",
         "Attach a client such as `codex-cli`, `claude-code`, `cursor`, or `opencode`.",
         "Check the result with `controlkeel status` and `controlkeel findings`."
       ],
@@ -293,6 +293,8 @@ defmodule ControlKeel.Help do
     Commands:
       controlkeel                     Start the web app
       controlkeel serve               Start the web app
+      controlkeel setup [options]     Bootstrap the project and show detected hosts,
+                                      provider state, core loop, and suggested next steps
       controlkeel init [options]      Initialize ControlKeel in the current project
       controlkeel attach <agent>      Register ControlKeel MCP server with your coding tool
                                       Native skills install by default unless --mcp-only

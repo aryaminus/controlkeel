@@ -41,14 +41,17 @@ irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps
 # 1. Start ControlKeel
 controlkeel
 
-# 2. In the target repo, attach a supported host
+# 2. In the target repo, bootstrap and inspect the environment
+controlkeel setup
+
+# 3. Attach a supported host
 controlkeel attach opencode
 
-# 3. Inspect governance state
+# 4. Inspect governance state
 controlkeel status
 controlkeel findings
 
-# 4. Use guided CLI help whenever you need it
+# 5. Use guided CLI help whenever you need it
 controlkeel help
 controlkeel help codex
 controlkeel help "how do i attach opencode"

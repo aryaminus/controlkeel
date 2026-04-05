@@ -50,7 +50,15 @@ The web app will be available at `http://localhost:4000`.
 
 ## 2. Attach a target project
 
-Change into the project you want to govern and attach an agent. If you want the fastest first-run path today, OpenCode is now a blessed target:
+Change into the project you want to govern and run the first-run setup flow:
+
+```bash
+controlkeel setup
+```
+
+That bootstraps the governed project binding, detects likely local hosts, shows provider state, and suggests the next attach or runtime-export commands.
+
+Then attach an agent. If you want the fastest first-run path today, OpenCode is now a blessed target:
 
 ```bash
 controlkeel attach opencode
@@ -66,6 +74,7 @@ controlkeel init
 Source wrapper:
 
 ```bash
+mix ck.setup
 mix ck.attach opencode
 mix ck.init
 ```

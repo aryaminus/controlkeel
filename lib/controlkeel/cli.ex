@@ -31,10 +31,12 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.ProviderBroker
   alias ControlKeel.ProtocolAccess
   alias ControlKeel.ProjectBinding
+  alias ControlKeel.ProjectRoot
   alias ControlKeel.ReviewBridge
   alias ControlKeel.ExecutionSandbox
   alias ControlKeel.Proxy
   alias ControlKeel.RuntimePaths
+  alias ControlKeel.SetupAdvisor
   alias ControlKeel.Skills
   alias ControlKeelWeb.Endpoint
 
@@ -118,6 +120,7 @@ defmodule ControlKeel.CLI do
   @provider_list_switches [project_root: :string]
   @provider_doctor_switches [project_root: :string]
   @bootstrap_switches [project_root: :string, ephemeral_ok: :boolean, agent: :string]
+  @setup_switches [project_root: :string, ephemeral_ok: :boolean, agent: :string]
   @runtime_export_switches [project_root: :string]
   @review_diff_switches [
     base: :string,
@@ -199,6 +202,9 @@ defmodule ControlKeel.CLI do
 
       ["init" | rest] ->
         parse_with_switches(:init, rest, @init_switches)
+
+      ["setup" | rest] ->
+        parse_with_switches(:setup, rest, @setup_switches)
 
       ["attach", agent | rest] ->
         if agent in AgentIntegration.attachable_ids() do
@@ -485,7 +491,11 @@ defmodule ControlKeel.CLI do
   def execute(parsed, opts \\ []) do
     printer = Keyword.get(opts, :printer, &IO.puts/1)
     error_printer = Keyword.get(opts, :error_printer, fn line -> IO.puts(:stderr, line) end)
-    project_root = Keyword.get(opts, :project_root, File.cwd!())
+
+    project_root =
+      opts
+      |> Keyword.get(:project_root, File.cwd!())
+      |> ProjectRoot.resolve()
 
     case run_command(parsed, project_root) do
       {:ok, lines} ->
@@ -514,6 +524,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :version}, _project_root), do: {:ok, ["ControlKeel #{version()}"]}
 
   def run_command(%{command: :init, options: options}, project_root) do
+    project_root = resolve_project_root(options, project_root)
     attrs = Enum.into(options, %{}, fn {key, value} -> {Atom.to_string(key), value} end)
     no_attach = Keyword.get(options, :no_attach, false)
 
@@ -556,6 +567,35 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to initialize ControlKeel: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :setup, options: options}, project_root) do
+    root = resolve_project_root(options, project_root)
+    overrides = %{"agent" => options[:agent] || "claude"}
+
+    case ensure_local_project(root, overrides) do
+      {:ok, _binding, session, mode} ->
+        snapshot = SetupAdvisor.snapshot(root)
+
+        {:ok,
+         [
+           "ControlKeel setup",
+           "Project root: #{snapshot["project_root"]}",
+           "Session: #{session.title} (##{session.id})",
+           "Binding mode: #{mode}",
+           SetupAdvisor.detected_hosts_line(snapshot),
+           SetupAdvisor.attached_agents_line(snapshot),
+           "Provider source: #{snapshot["provider_status"]["selected_source"]}.",
+           "Provider: #{snapshot["provider_status"]["selected_provider"]}.",
+           "Core loop: #{SetupAdvisor.core_loop()}",
+           "Recommended next steps:"
+         ] ++
+           Enum.map(SetupAdvisor.recommended_attach_lines(snapshot), &"  - #{&1}") ++
+           maybe_line(SetupAdvisor.service_account_hint(snapshot), "  - ")}
+
+      {:error, reason} ->
+        {:error, "Failed to set up ControlKeel: #{inspect(reason)}"}
     end
   end
 
@@ -905,15 +945,21 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :runtime_export, args: ["open-swe"], options: options}, project_root) do
-    root = options[:project_root] || project_root
+    root = resolve_project_root(options, project_root)
+    snapshot = SetupAdvisor.snapshot(root)
 
     case Skills.export("open-swe-runtime", root, scope: "export") do
       {:ok, plan} ->
         {:ok,
          [
            "Prepared Open SWE runtime export.",
-           "Output: #{plan.output_dir}"
-         ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+           "Project root: #{snapshot["project_root"]}",
+           SetupAdvisor.detected_hosts_line(snapshot),
+           "Output: #{plan.output_dir}",
+           "Core loop: #{SetupAdvisor.core_loop()}"
+         ] ++
+           Enum.map(plan.instructions, &"  #{&1}") ++
+           maybe_line(SetupAdvisor.service_account_hint(snapshot), "  ")}
 
       {:error, reason} ->
         {:error, "Failed to export Open SWE runtime bundle: #{inspect(reason)}"}
@@ -921,15 +967,21 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :runtime_export, args: ["devin"], options: options}, project_root) do
-    root = options[:project_root] || project_root
+    root = resolve_project_root(options, project_root)
+    snapshot = SetupAdvisor.snapshot(root)
 
     case Skills.export("devin-runtime", root, scope: "export") do
       {:ok, plan} ->
         {:ok,
          [
            "Prepared Devin runtime export.",
-           "Output: #{plan.output_dir}"
-         ] ++ Enum.map(plan.instructions, &"  #{&1}")}
+           "Project root: #{snapshot["project_root"]}",
+           SetupAdvisor.detected_hosts_line(snapshot),
+           "Output: #{plan.output_dir}",
+           "Core loop: #{SetupAdvisor.core_loop()}"
+         ] ++
+           Enum.map(plan.instructions, &"  #{&1}") ++
+           maybe_line(SetupAdvisor.service_account_hint(snapshot), "  ")}
 
       {:error, reason} ->
         {:error, "Failed to export Devin runtime bundle: #{inspect(reason)}"}
@@ -1225,8 +1277,9 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :agents_doctor, options: options}, project_root) do
-    root = options[:project_root] || project_root
+    root = resolve_project_root(options, project_root)
     doctor = AgentExecution.doctor(root)
+    snapshot = SetupAdvisor.snapshot(root)
 
     agent_lines =
       Enum.map(doctor["agents"], fn agent ->
@@ -1237,10 +1290,12 @@ defmodule ControlKeel.CLI do
      [
        "Agent execution doctor",
        "Project root: #{doctor["project_root"]}",
+       SetupAdvisor.detected_hosts_line(snapshot),
        "Attached agents: #{if(doctor["attached_agents"] == [], do: "none", else: Enum.join(doctor["attached_agents"], ", "))}",
        "Direct ready: #{length(doctor["direct_ready"])}",
        "Handoff ready: #{length(doctor["handoff_ready"])}",
        "Runtime ready: #{length(doctor["runtime_ready"])}",
+       "Core loop: #{SetupAdvisor.core_loop()}",
        "Agents:"
        | agent_lines
      ]}
@@ -2247,7 +2302,7 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :bootstrap, options: options}, project_root) do
-    root = options[:project_root] || project_root
+    root = resolve_project_root(options, project_root)
     overrides = %{"agent" => options[:agent] || "claude"}
 
     case LocalProject.load_or_bootstrap(root, overrides,
@@ -3690,6 +3745,8 @@ defmodule ControlKeel.CLI do
   defp selected_base_url(_status), do: "default"
 
   defp ensure_local_project(project_root, overrides \\ %{}) do
+    project_root = ProjectRoot.resolve(project_root)
+
     with {:ok, binding, session, mode} <-
            LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: true),
          {:ok, synced_binding, _changes} <-
@@ -3706,15 +3763,19 @@ defmodule ControlKeel.CLI do
   end
 
   defp bootstrap_lines(project_root) do
+    snapshot = SetupAdvisor.snapshot(project_root)
     status = ProviderBroker.status(project_root)
     bootstrap = status["bootstrap"]
 
     [
+      "Project root: #{snapshot["project_root"]}.",
+      SetupAdvisor.detected_hosts_line(snapshot),
       "Bootstrap mode: #{bootstrap["mode"]}.",
       "Provider source: #{status["selected_source"]}.",
       "Provider: #{status["selected_provider"]}.",
       "Auth mode: #{status["selected_auth_mode"]}.",
-      "Auth owner: #{status["selected_auth_owner"]}."
+      "Auth owner: #{status["selected_auth_owner"]}.",
+      "Core loop: #{SetupAdvisor.core_loop()}."
     ]
   end
 
@@ -3809,12 +3870,23 @@ defmodule ControlKeel.CLI do
           "MCP mode: #{integration.mcp_mode}.",
           "Skills mode: #{integration.skills_mode}.",
           "Provider bridge: #{format_provider_bridge(integration.provider_bridge)}.",
+          "Core loop: #{SetupAdvisor.core_loop()}.",
+          "Next: controlkeel status.",
           integration.upstream_docs_url && "Upstream docs: #{integration.upstream_docs_url}"
         ]
         |> Enum.reject(&is_nil/1)
         |> Kernel.++(Distribution.current_install_lines())
     end
   end
+
+  defp resolve_project_root(options, project_root) do
+    options[:project_root] ||
+      project_root
+      |> ProjectRoot.resolve()
+  end
+
+  defp maybe_line(nil, _prefix), do: []
+  defp maybe_line(line, prefix), do: ["#{prefix}#{line}"]
 
   defp native_attach_lines("claude-code", project_root, options) do
     if native_attach_skipped?(options) do

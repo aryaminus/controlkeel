@@ -7,6 +7,7 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 ## Scope
 
 - Install channels: Homebrew, npm global
+- First-run setup advisor and project-root resolution
 - IDE/agent path: GitHub Copilot in VS Code (repo-native companion)
 - Agent path: OpenCode (native companion + MCP)
 - Catalog truth audit: alias/framework/unverified inventory
@@ -55,6 +56,16 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
   - `.opencode/commands/controlkeel-review.md`
   - `.opencode/mcp.json`
 
+### Setup advisor and root resolution
+
+- [ ] Validate `controlkeel setup` against packaged binaries
+- [ ] Confirm running `controlkeel setup` from a nested repo directory resolves the real project root
+- [ ] Confirm setup output includes:
+  - detected hosts
+  - provider source
+  - primary CK core loop
+  - attach/runtime-export next-step suggestions
+
 ## Follow-up TODO
 
 ### Release and channel parity
@@ -67,6 +78,7 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 
 ### Documentation alignment
 
+- [ ] Add `controlkeel setup` to any remaining first-run docs that still start with `init` only
 - [ ] Add a short install-channel note in docs explaining Homebrew/npm binary path collisions on same machine
 - [ ] Add explicit Copilot-in-VSCode runtime check recipe (framed MCP `tools/list` probe)
 - [ ] Add OpenCode verification recipe to getting-started docs
@@ -77,6 +89,21 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 - [ ] Add a small docs/code consistency test for support-matrix claims vs `AgentIntegration.catalog/0`
 
 ## Operator runbook
+
+### First-run setup
+
+```bash
+controlkeel setup
+```
+
+Check:
+
+```bash
+controlkeel status
+controlkeel findings
+```
+
+If validating path resolution, also run `controlkeel setup` from a nested subdirectory inside the same repo and confirm the reported project root is still the repo root.
 
 ### Install channels
 

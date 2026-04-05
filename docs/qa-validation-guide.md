@@ -68,6 +68,7 @@ Use this when validating an unreleased fix:
 ```bash
 mix setup
 mix phx.server
+mix ck.setup
 mix ck.attach opencode
 ```
 
@@ -246,19 +247,37 @@ Check these routes:
 - `/ship`
 - `/deploy`
 
-### 7.3 Initialize a governed project
+### 7.3 First-run setup
 
 Inside a temp repo:
 
 ```bash
-controlkeel init
+controlkeel setup
 ```
+
+Expected:
+
+- the command succeeds from the repo root or a nested subdirectory
+- output includes:
+  - resolved `Project root: ...`
+  - `Detected hosts: ...`
+  - `Provider source: ...`
+  - `Core loop: ck_context -> ck_validate -> ck_review_submit/ck_finding -> ck_budget/ck_route/ck_delegate`
+- recommended next steps are actionable
+- a governed project binding is created
 
 Expected files:
 
 - `controlkeel/project.json`
 - `controlkeel/bin/controlkeel-mcp`
 - `.gitignore` includes `/controlkeel`
+
+If you want to validate the explicit low-level bootstrap/init path separately, also run:
+
+```bash
+controlkeel bootstrap
+controlkeel init
+```
 
 Then run:
 
@@ -280,7 +299,7 @@ ControlKeel must expose a working local stdio MCP server.
 
 ### 8.1 MCP bootstrap
 
-After `controlkeel init`, validate:
+After `controlkeel setup` or `controlkeel init`, validate:
 
 ```bash
 test -x controlkeel/bin/controlkeel-mcp
@@ -509,11 +528,13 @@ Expected:
 
 For each host below, validate:
 
-1. `controlkeel attach <host>` or the documented direct-install path
-2. expected files are generated
-3. MCP config points at ControlKeel
-4. commands, hooks, skills, agents, or extensions are present as claimed
-5. if the host is installed locally, the host can see the generated integration
+1. `controlkeel setup`
+2. `controlkeel attach <host>` or the documented direct-install path
+3. confirm the setup output resolved the intended project root when run from nested directories
+4. expected files are generated
+5. MCP config points at ControlKeel
+6. commands, hooks, skills, agents, or extensions are present as claimed
+7. if the host is installed locally, the host can see the generated integration
 
 If the host is **not** installed, validate export/install artifacts and mark runtime validation as blocked by environment.
 

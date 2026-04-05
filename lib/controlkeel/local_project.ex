@@ -2,11 +2,12 @@ defmodule ControlKeel.LocalProject do
   @moduledoc false
 
   alias ControlKeel.Mission
+  alias ControlKeel.ProjectRoot
   alias ControlKeel.ProjectBinding
   alias ControlKeel.SessionTranscript
 
   def init(attrs, project_root \\ File.cwd!()) when is_map(attrs) do
-    root = Path.expand(project_root)
+    root = ProjectRoot.resolve(project_root)
 
     case ProjectBinding.read(root) do
       {:ok, binding} ->
@@ -30,7 +31,7 @@ defmodule ControlKeel.LocalProject do
   end
 
   def load(project_root \\ File.cwd!()) do
-    root = Path.expand(project_root)
+    root = ProjectRoot.resolve(project_root)
 
     with {:ok, binding, _mode} <- ProjectBinding.read_effective(root),
          session when not is_nil(session) <- Mission.get_session_context(binding["session_id"]) do
@@ -42,7 +43,7 @@ defmodule ControlKeel.LocalProject do
   end
 
   def load_or_bootstrap(project_root \\ File.cwd!(), overrides \\ %{}, opts \\ []) do
-    root = Path.expand(project_root)
+    root = ProjectRoot.resolve(project_root)
 
     case load(root) do
       {:ok, binding, session} ->
@@ -60,7 +61,7 @@ defmodule ControlKeel.LocalProject do
   end
 
   def bootstrap(project_root \\ File.cwd!(), overrides \\ %{}, opts \\ []) do
-    root = Path.expand(project_root)
+    root = ProjectRoot.resolve(project_root)
     ephemeral_ok? = Keyword.get(opts, :ephemeral_ok, true)
     bootstrap_metadata = %{"auto_bootstrapped" => true}
     launch_attrs = default_init_attrs(root, overrides)
@@ -85,7 +86,7 @@ defmodule ControlKeel.LocalProject do
   end
 
   def default_init_attrs(project_root, overrides \\ %{}) do
-    root = Path.expand(project_root)
+    root = ProjectRoot.resolve(project_root)
     project_name = Map.get(overrides, "project_name", Path.basename(root))
 
     %{
