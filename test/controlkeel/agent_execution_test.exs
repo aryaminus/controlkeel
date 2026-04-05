@@ -55,6 +55,8 @@ defmodule ControlKeel.AgentExecutionTest do
 
     assert result["status"] == "done"
     assert File.exists?(Path.join(result["package_root"], "TASK.md"))
+    assert File.exists?(Path.join(result["package_root"], "workspace_context.json"))
+    assert File.exists?(Path.join(result["package_root"], "recent_events.json"))
     assert Mission.get_task(task.id).status == "done"
     assert Mission.proof_summary_for_task(task.id)["deploy_ready"] in [true, false]
   end
@@ -74,6 +76,8 @@ defmodule ControlKeel.AgentExecutionTest do
     assert result["oauth_client_id"] =~ "ck-sa-"
     assert is_binary(result["client_secret"])
     assert File.exists?(Path.join(result["package_root"], "credentials.json"))
+    assert File.exists?(Path.join(result["package_root"], "workspace_context.json"))
+    assert File.exists?(Path.join(result["package_root"], "recent_events.json"))
     assert File.exists?(Path.join(result["bundle_path"], ".cursor/mcp.json"))
     assert Mission.get_task(task.id).status == "waiting_callback"
     assert Platform.list_service_accounts(session.workspace_id) != []

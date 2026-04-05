@@ -4,7 +4,7 @@ Use this reference with `controlkeel-governance`.
 
 ## Start
 
-1. `ck_context` to load mission, task, risk, budget, proof summary, and memory hits.
+1. `ck_context` to load mission, task, risk, budget, proof summary, memory hits, workspace snapshot, and recent transcript events.
 2. Identify whether the task is implementation, review, compliance, benchmark, or policy work.
 3. Load a more specific CK skill if the task has a narrower workflow.
 
@@ -26,4 +26,3 @@ Use this reference with `controlkeel-governance`.
 1. Re-check active findings.
 2. Re-check budget and proof state.
 3. If the session is high or critical risk, summarize decisions and unresolved items explicitly.
-

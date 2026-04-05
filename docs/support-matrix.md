@@ -272,7 +272,7 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | Tool | Purpose |
 | ------ | --------- |
 | `ck_validate` | Run FastPath scan (patterns, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present. |
-| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, resume packet, provider status. Requires `session_id`. |
+| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, recent transcript events, transcript summary, resume packet, and provider status. Requires `session_id`. |
 | `ck_finding` | Record a governed finding for a session (and optional task). |
 | `ck_review_submit` | Submit a plan, diff, or completion packet for browser review and execution gating. |
 | `ck_review_status` | Fetch latest review status, notes, and browser URL by `review_id` or `task_id`. |

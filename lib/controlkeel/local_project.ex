@@ -3,6 +3,7 @@ defmodule ControlKeel.LocalProject do
 
   alias ControlKeel.Mission
   alias ControlKeel.ProjectBinding
+  alias ControlKeel.SessionTranscript
 
   def init(attrs, project_root \\ File.cwd!()) when is_map(attrs) do
     root = Path.expand(project_root)
@@ -116,7 +117,10 @@ defmodule ControlKeel.LocalProject do
                "attached_agents" => %{}
              },
              root
-           ) do
+           ),
+         {:ok, _updated_session} <-
+           Mission.attach_session_runtime_context(session.id, %{"project_root" => root}) do
+      record_bootstrap_event(session, root, "project")
       emit_initialized(session, root, launch_attrs)
       {:ok, binding, :created}
     end
@@ -134,7 +138,10 @@ defmodule ControlKeel.LocalProject do
                "bootstrap" => Map.put(bootstrap_metadata, "mode", "project")
              },
              root
-           ) do
+           ),
+         {:ok, _updated_session} <-
+           Mission.attach_session_runtime_context(session.id, %{"project_root" => root}) do
+      record_bootstrap_event(session, root, "project")
       emit_initialized(session, root, launch_attrs)
       {:ok, binding, :bootstrapped_project}
     else
@@ -153,7 +160,10 @@ defmodule ControlKeel.LocalProject do
                "bootstrap" => Map.put(bootstrap_metadata, "mode", "ephemeral")
              },
              root
-           ) do
+           ),
+         {:ok, _updated_session} <-
+           Mission.attach_session_runtime_context(session.id, %{"project_root" => root}) do
+      record_bootstrap_event(session, root, "ephemeral")
       emit_initialized(session, root, launch_attrs)
       {:ok, binding, Mission.get_session_context(session.id), :bootstrapped_ephemeral}
     end
@@ -185,5 +195,16 @@ defmodule ControlKeel.LocalProject do
         agent: Map.get(launch_attrs, "agent", "claude")
       }
     )
+  end
+
+  defp record_bootstrap_event(session, root, mode) do
+    SessionTranscript.record(%{
+      session_id: session.id,
+      event_type: "session.bootstrap",
+      actor: "system",
+      summary: "ControlKeel bootstrapped the project workspace.",
+      body: "Project root: #{root}",
+      payload: %{"mode" => mode, "project_root" => root}
+    })
   end
 end

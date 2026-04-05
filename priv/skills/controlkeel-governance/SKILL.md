@@ -41,7 +41,7 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 
 ## Core loop
 
-1. Call `ck_context` at task start to load mission, risk, budget, proof, and active findings.
+1. Call `ck_context` at task start to load mission, risk, budget, proof, active findings, workspace context, and recent transcript state.
 2. Call `ck_validate` before writing code, config, shell, or deploy text.
 3. If you discover a problem the scanner did not raise, call `ck_finding`.
 4. Call `ck_budget` and `ck_cost_optimizer` before expensive model or bulk operations.
@@ -60,7 +60,7 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 
 ## Quick reference
 
-- `ck_context` — mission, task, budget, proof, memory
+- `ck_context` — mission, task, budget, proof, memory, workspace snapshot, transcript summary, resume context
 - `ck_validate` — governed preflight scan
 - `ck_finding` — persist manual findings
 - `ck_budget` — cost estimate / commit

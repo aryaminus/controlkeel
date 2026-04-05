@@ -9,7 +9,7 @@
 
 **ControlKeel is the cerebellum for agent-generated software delivery.** ControlKeel sits between your coding agents and production, comparing *intended* delivery against *actual* delivery, catching governance drift before it ships and turning intent into governed tasks through validation and review gates.
 
-It does not replace the coding model underneath. It governs the delivery layer around that model: routing, review, findings, proofs, policy, budgets, and deployment readiness.
+It does not replace the coding model underneath. It governs the delivery layer around that model: routing, review, findings, proofs, policy, budgets, deployment readiness, and the governed context agents need to keep work grounded in the repo and session state.
 
 ## Quick start
 
@@ -119,6 +119,8 @@ controlkeel help
 ```
 
 Full command coverage is available in the CLI itself through `controlkeel help`.
+
+For MCP tool details, hosted protocol access, and the exact `ck_context` contract, use [docs/agent-integrations.md](docs/agent-integrations.md) and [docs/support-matrix.md](docs/support-matrix.md).
 
 ## Docs
 

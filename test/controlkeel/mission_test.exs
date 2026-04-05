@@ -247,6 +247,9 @@ defmodule ControlKeel.MissionTest do
     gate = Mission.review_gate_status(Mission.get_task!(task.id))
     assert gate["phase"] == "execution"
     assert gate["execution_ready"] == true
+
+    review_memory = Memory.search("Plan v2", session_id: session.id, top_k: 10)
+    assert Enum.any?(review_memory.entries, &(&1.record_type == "review"))
   end
 
   test "reviews are included in the audit log and proof bundle summary" do
@@ -398,6 +401,10 @@ defmodule ControlKeel.MissionTest do
       assert packet["task_id"] == task.id
       assert is_list(packet["unresolved_findings"])
       assert is_list(packet["memory_hits"])
+      assert is_map(packet["workspace_context"])
+      assert is_binary(packet["workspace_cache_key"])
+      assert is_list(packet["recent_events"])
+      assert is_map(packet["transcript_summary"])
 
       assert {:ok, %{task: resumed, checkpoint: resumed_checkpoint}} =
                Mission.resume_task(paused, "test")
@@ -418,6 +425,22 @@ defmodule ControlKeel.MissionTest do
 
     assert "finding" in record_types
     assert Enum.any?(result.entries, &(&1.source_id == Integer.to_string(finding.id)))
+  end
+
+  test "transcript summary and recent events reflect session lifecycle" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "in_progress"})
+
+    assert {:ok, _paused} = Mission.pause_task(task, "test")
+
+    recent_events = Mission.list_session_events(session.id)
+    summary = Mission.transcript_summary(session.id)
+
+    assert Enum.any?(recent_events, &(&1["event_type"] == "task.paused"))
+    assert Enum.any?(recent_events, &(&1["event_type"] == "checkpoint.pause"))
+    assert summary["total_events"] >= 3
+    assert Enum.any?(summary["families"], &(&1["family"] == "task"))
+    assert Enum.any?(summary["families"], &(&1["family"] == "checkpoint"))
   end
 
   describe "audit_log/1" do

@@ -4,13 +4,15 @@ This document explains the current product architecture.
 
 ControlKeel is not the code generator. It is the control plane above generators: the layer that turns agent output into governed, reviewable, production-minded delivery.
 
+That context layer is intentionally bounded. CK exposes the repo facts an agent needs to stay oriented, plus the recent CK-visible transcript and resumable task state, without pretending to be the full coding harness or persisting hidden model reasoning.
+
 ## The control-plane map
 
 The older strategy split the product into seven pillars. In current ControlKeel terms, those map like this:
 
 - **Harness**: typed integrations, attach flows, runtime export, provider broker, and project bootstrap
 - **Tools**: MCP runtime, skills, generated plugin bundles, and governed proxy endpoints
-- **Context**: execution brief, typed memory, proof bundles, resume packets, and current mission state
+- **Context**: execution brief, typed memory, proof bundles, workspace snapshots, clipped session transcript events, resume packets, and current mission state
 - **Orchestration**: planner, task graph, router, Mission Control, and agent recommendations
 - **Invocation**: provider resolution, budget checks, governed forwarding, and no-key fallback behavior
 - **Validation**: FastPath, Semgrep, optional advisory review, findings, and guided auto-fix

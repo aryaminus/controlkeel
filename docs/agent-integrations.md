@@ -107,6 +107,8 @@ It advertises the current governed capabilities only:
 - `ck_route`
 - `ck_delegate`
 
+In practice, `ck_context` is the main continuity surface across those transports. It returns current mission state plus a bounded workspace snapshot, a deterministic workspace cache key, recent CK-visible transcript events, transcript summaries, and resumable task context for the active session.
+
 ACP registry support is supplemental only:
 
 - `controlkeel registry sync acp`

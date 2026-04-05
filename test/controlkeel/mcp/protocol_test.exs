@@ -225,12 +225,18 @@ defmodule ControlKeel.MCP.ProtocolTest do
                  "current_task" => %{"title" => "Implement router"},
                  "proof_summary" => %{"task_id" => _},
                  "memory_hits" => memory_hits,
-                 "resume_packet" => %{"task_id" => _}
+                 "resume_packet" => %{"task_id" => _, "workspace_context" => %{}},
+                 "workspace_context" => %{"cache_key" => workspace_cache_key},
+                 "workspace_cache_key" => workspace_cache_key,
+                 "recent_events" => recent_events,
+                 "transcript_summary" => %{"total_events" => total_events}
                }
              }
            } = response
 
     assert is_list(memory_hits)
+    assert is_list(recent_events)
+    assert total_events >= 1
   end
 
   test "tools/call ck_finding persists a governed finding" do

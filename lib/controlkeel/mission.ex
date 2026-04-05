@@ -9,7 +9,9 @@ defmodule ControlKeel.Mission do
   alias ControlKeel.Memory
   alias ControlKeel.Notifications.Webhook
   alias ControlKeel.Platform
+  alias ControlKeel.SessionTranscript
   alias ControlKeel.Repo
+  alias ControlKeel.WorkspaceContext
 
   alias ControlKeel.Mission.{
     Finding,
@@ -382,6 +384,31 @@ defmodule ControlKeel.Mission do
           invocations: from(i in Invocation, order_by: [desc: i.inserted_at]),
           reviews: from(r in Review, order_by: [desc: r.inserted_at, desc: r.id])
         ])
+    end
+  end
+
+  def list_session_events(session_id, limit \\ 10) when is_integer(session_id) do
+    SessionTranscript.recent_events(session_id, limit: limit)
+  end
+
+  def transcript_summary(session_id) when is_integer(session_id) do
+    SessionTranscript.summary(session_id)
+  end
+
+  def workspace_context(session_or_id, opts \\ [])
+
+  def workspace_context(%Session{} = session, opts) do
+    fallback_root = Keyword.get(opts, :fallback_root, File.cwd!())
+
+    session
+    |> WorkspaceContext.resolve_project_root(fallback_root)
+    |> WorkspaceContext.build()
+  end
+
+  def workspace_context(session_id, opts) when is_integer(session_id) do
+    case get_session(session_id) do
+      nil -> WorkspaceContext.build(nil)
+      session -> workspace_context(session, opts)
     end
   end
 
@@ -1215,6 +1242,9 @@ defmodule ControlKeel.Mission do
     memory_hits = Memory.retrieve_for_task(session, task, findings: relevant_findings)
     latest_proof = latest_proof_bundle_for_task(task.id)
     latest_invocations = list_task_invocations(task.id, 5)
+    workspace_context = workspace_context(session)
+    recent_events = list_session_events(session.id)
+    transcript_summary = transcript_summary(session.id)
 
     %{
       "task_id" => task.id,
@@ -1233,7 +1263,11 @@ defmodule ControlKeel.Mission do
         |> Enum.map(&finding_bundle_entry/1),
       "latest_invocations" => Enum.map(latest_invocations, &audit_invocation_entry/1),
       "proof_summary" => proof_summary(latest_proof),
-      "memory_hits" => memory_hits.entries
+      "memory_hits" => memory_hits.entries,
+      "workspace_context" => workspace_context,
+      "workspace_cache_key" => workspace_context["cache_key"],
+      "recent_events" => recent_events,
+      "transcript_summary" => transcript_summary
     }
   end
 
@@ -1264,6 +1298,18 @@ defmodule ControlKeel.Mission do
         "domain_pack" => brief["domain_pack"],
         "risk_tier" => session.risk_tier,
         "occupation" => brief["occupation"]
+      }
+    })
+
+    record_session_event(%{
+      session_id: session.id,
+      event_type: "session.created",
+      actor: "system",
+      summary: "Session created: #{session.title}",
+      body: brief_body(session, brief),
+      payload: %{
+        "risk_tier" => session.risk_tier,
+        "domain_pack" => brief["domain_pack"]
       }
     })
   end
@@ -1303,6 +1349,23 @@ defmodule ControlKeel.Mission do
             "proof_id" => Keyword.get(extra, :proof_id)
           }
         })
+
+        record_session_event(%{
+          session_id: session.id,
+          task_id: task.id,
+          event_type: task_event_type(action),
+          actor: "system",
+          summary: task_memory_title(action, task),
+          body: task.validation_gate || "",
+          payload: %{
+            "status" => task.status,
+            "previous_status" => Keyword.get(extra, :previous_status),
+            "proof_id" => Keyword.get(extra, :proof_id)
+          },
+          metadata: %{
+            "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"])
+          }
+        })
     end
   end
 
@@ -1338,6 +1401,24 @@ defmodule ControlKeel.Mission do
               "rule_id" => finding.rule_id
             }
             |> Map.merge(finding.metadata || %{})
+        })
+
+        record_session_event(%{
+          session_id: session.id,
+          task_id: finding.metadata["task_id"],
+          event_type: finding_event_type(action),
+          actor: "system",
+          summary: "Finding #{to_string(action)}: #{finding.title}",
+          body: finding.plain_message,
+          payload: %{
+            "rule_id" => finding.rule_id,
+            "severity" => finding.severity,
+            "status" => finding.status,
+            "category" => finding.category
+          },
+          metadata: %{
+            "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"])
+          }
         })
     end
   end
@@ -1386,6 +1467,20 @@ defmodule ControlKeel.Mission do
         "previous_review_id" => review.previous_review_id
       }
     })
+
+    record_session_event(%{
+      session_id: review.session_id,
+      task_id: review.task_id,
+      event_type: review_event_type(action),
+      actor: review.submitted_by || review.reviewed_by || "system",
+      summary: review_memory_title(action, review),
+      body: review_memory_body(review),
+      payload: %{
+        "review_type" => review.review_type,
+        "status" => review.status,
+        "previous_review_id" => review.previous_review_id
+      }
+    })
   end
 
   defp review_memory_title(:submitted, review), do: "Review submitted: #{review.title}"
@@ -1420,8 +1515,47 @@ defmodule ControlKeel.Mission do
           "created_by" => checkpoint.created_by
         }
       })
+
+      record_session_event(%{
+        session_id: session.id,
+        task_id: task.id,
+        event_type: "checkpoint.#{checkpoint.checkpoint_type}",
+        actor: checkpoint.created_by,
+        summary: checkpoint.summary,
+        body: Jason.encode!(checkpoint.payload, pretty: true),
+        payload: checkpoint.payload,
+        metadata: %{
+          "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"])
+        }
+      })
     end
   end
+
+  defp record_session_event(attrs) when is_map(attrs) do
+    SessionTranscript.record(
+      attrs
+      |> Enum.into(%{}, fn {key, value} -> {to_string(key), value} end)
+      |> Map.put_new("metadata", %{})
+    )
+  end
+
+  defp task_event_type(:created), do: "task.created"
+  defp task_event_type(:completed), do: "task.completed"
+  defp task_event_type(:paused), do: "task.paused"
+  defp task_event_type(:resumed), do: "task.resumed"
+  defp task_event_type(:updated), do: "task.updated"
+  defp task_event_type(_action), do: "task.changed"
+
+  defp finding_event_type(:created), do: "finding.created"
+  defp finding_event_type(:approved), do: "finding.approved"
+  defp finding_event_type(:rejected), do: "finding.rejected"
+  defp finding_event_type(:escalated), do: "finding.escalated"
+  defp finding_event_type(_action), do: "finding.updated"
+
+  defp review_event_type(:submitted), do: "review.submitted"
+  defp review_event_type(:approved), do: "review.approved"
+  defp review_event_type(:denied), do: "review.denied"
+  defp review_event_type(_action), do: "review.updated"
 
   defp normalize_review_submission(attrs) when is_map(attrs) do
     attrs = Enum.into(attrs, %{}, fn {key, value} -> {to_string(key), value} end)
@@ -1756,6 +1890,7 @@ defmodule ControlKeel.Mission do
       "agent_id" => System.get_env("CONTROLKEEL_AGENT_ID"),
       "thread_id" => System.get_env("CONTROLKEEL_THREAD_ID"),
       "host_session_id" => System.get_env("CONTROLKEEL_HOST_SESSION_ID"),
+      "project_root" => System.get_env("CONTROLKEEL_PROJECT_ROOT"),
       "browser_embed" =>
         System.get_env("CONTROLKEEL_REVIEW_EMBED") || System.get_env("CONTROLKEEL_BROWSER_EMBED")
     }

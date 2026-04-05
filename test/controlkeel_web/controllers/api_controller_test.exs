@@ -901,6 +901,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       body = json_response(conn, 200)
       assert body["task"]["status"] == "paused"
       assert Map.has_key?(body["resume_packet"], "memory_hits")
+      assert Map.has_key?(body["resume_packet"], "workspace_context")
+      assert Map.has_key?(body["resume_packet"], "recent_events")
 
       conn = post(recycle(conn), ~p"/api/v1/tasks/#{task.id}/resume")
       body = json_response(conn, 200)

@@ -170,7 +170,10 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "in_progress"})
 
-    {:ok, view, _html} = live(conn, ~p"/missions/#{session.id}")
+    {:ok, view, html} = live(conn, ~p"/missions/#{session.id}")
+
+    assert html =~ "Workspace context"
+    assert html =~ "Recent transcript"
 
     render_click(element(view, "#current-task-generate-proof-#{task.id}"))
     assert render(view) =~ "Proof bundle generated."

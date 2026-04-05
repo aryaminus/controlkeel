@@ -2090,7 +2090,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     1. Read `AGENTS.md`, `.roomodes`, and any Roo guidance files in the workspace.
     2. Gather context before editing files.
-    3. Use `ck_context` and `ck_validate` before and after risky changes.
+    3. Use `ck_context` for task, workspace, transcript, and resume context, then `ck_validate` before and after risky changes.
     4. Summarize findings, risk, proof state, and benchmark impact before finishing.
     """
   end
@@ -2179,7 +2179,7 @@ defmodule ControlKeel.Skills.Exporter do
     Use this command when Goose needs a governed review pass before finalizing work.
 
     1. Read `.goosehints` and `AGENTS.md`.
-    2. Use `ck_context` and `ck_validate`.
+    2. Use `ck_context` for task, workspace, and transcript context, then `ck_validate`.
     3. Summarize blocked findings and proof status.
     """
   end
@@ -2705,7 +2705,7 @@ defmodule ControlKeel.Skills.Exporter do
     Use this command when Cline should run a governed review pass before completing risky work.
 
     1. Read `AGENTS.md` and the current `.clinerules/` guidance.
-    2. Use `ck_context` and `ck_validate` before presenting a conclusion.
+    2. Use `ck_context` for task, workspace, and transcript context, then `ck_validate` before presenting a conclusion.
     3. Summarize findings, proof status, and any blockers.
     """
   end
@@ -2747,7 +2747,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     Use ControlKeel before finalizing risky edits, schema changes, auth changes, or release work.
 
-    1. Call `ck_context`.
+    1. Call `ck_context` for mission, workspace, transcript, and resume context.
     2. Call `ck_validate`.
     3. Summarize findings, proof status, and follow-up work.
     """
@@ -2791,7 +2791,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     Use this command in Windsurf before exiting plan mode or finalizing risky work.
 
-    1. Gather context with `ck_context`.
+    1. Gather mission, workspace, and recent transcript context with `ck_context`.
     2. Validate with `ck_validate`.
     3. If a human plan review is needed, submit it through ControlKeel and wait for approval.
     """
@@ -3051,13 +3051,13 @@ defmodule ControlKeel.Skills.Exporter do
     """
     # ControlKeel Companion Instructions
 
-    This project is governed by ControlKeel. Prefer the ControlKeel MCP server for validation, findings, budgets, proof context, and routing.
+    This project is governed by ControlKeel. Prefer the ControlKeel MCP server for validation, findings, budgets, proof context, workspace snapshots, transcript state, and routing.
 
     Project root: `#{project_root}`
     Target: `#{target}`
 
     Required workflow:
-    1. Call `ck_context` at the start of a task.
+    1. Call `ck_context` at the start of a task for mission, workspace, transcript, and resume context.
     2. Call `ck_validate` before writing code, config, shell, or deploy content.
     3. Submit plans or approval packets with `ck_review_submit` and check `ck_review_status` before execution.
     4. Record any human-review issue with `ck_finding`.
@@ -3112,6 +3112,7 @@ defmodule ControlKeel.Skills.Exporter do
     ## ControlKeel Integration
 
     - Use `ck_context`, `ck_validate`, `ck_finding`, `ck_budget` via MCP
+    - `ck_context` returns bounded workspace and transcript state alongside governance data
     - The agent includes built-in governance tools wired to the MCP server
     - All AI requests pass through ControlKeel policy gates
 
@@ -4235,7 +4236,7 @@ defmodule ControlKeel.Skills.Exporter do
     Use this Kiro command to run a governed review pass:
 
     1. Read `.kiro/steering/controlkeel.md`.
-    2. Use `ck_context` and `ck_validate`.
+    2. Use `ck_context` for task, workspace, and transcript context, then `ck_validate`.
     3. Surface blocked findings and proof status before completion.
     """
   end
@@ -4260,7 +4261,7 @@ defmodule ControlKeel.Skills.Exporter do
     4. Use `/controlkeel-last` to reopen the most recent active review.
 
     MCP expectations:
-    - `ck_context` for task and workspace context
+    - `ck_context` for task, workspace, transcript, and resume context
     - `ck_review_submit`, `ck_review_status`, and `ck_review_feedback` for review transport
     - `ck_validate` and `ck_finding` for governance results
     """

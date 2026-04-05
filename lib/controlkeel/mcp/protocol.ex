@@ -148,7 +148,7 @@ defmodule ControlKeel.MCP.Protocol do
     %{
       "name" => "ck_context",
       "description" =>
-        "Fetch the current mission, risk, finding, and budget context for a session.",
+        "Fetch current mission state, governed findings, budget, proof summary, workspace snapshot, recent transcript events, and resume context for a session.",
       "inputSchema" => %{
         "type" => "object",
         "required" => ["session_id"],

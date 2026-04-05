@@ -3512,6 +3512,7 @@ defmodule ControlKeel.CLI do
       "agent_id" => System.get_env("CONTROLKEEL_AGENT_ID"),
       "thread_id" => System.get_env("CONTROLKEEL_THREAD_ID"),
       "host_session_id" => System.get_env("CONTROLKEEL_HOST_SESSION_ID"),
+      "project_root" => System.get_env("CONTROLKEEL_PROJECT_ROOT"),
       "browser_embed" =>
         System.get_env("CONTROLKEEL_REVIEW_EMBED") || System.get_env("CONTROLKEEL_BROWSER_EMBED")
     }
@@ -3758,13 +3759,33 @@ defmodule ControlKeel.CLI do
   defp format_provider_bridge(_bridge), do: "none"
 
   defp emit_attach_succeeded(binding, project_root, attached_agent) do
+    root = Path.expand(project_root)
+
+    if is_integer(binding["session_id"]) do
+      _ = Mission.attach_session_runtime_context(binding["session_id"], %{"project_root" => root})
+
+      _ =
+        ControlKeel.SessionTranscript.record(%{
+          session_id: binding["session_id"],
+          event_type: "session.attach",
+          actor: "cli",
+          summary: "Attached #{attached_agent["server_name"] || "agent"} to ControlKeel.",
+          body: "Project root: #{root}",
+          payload: %{
+            "project_root" => root,
+            "server_name" => attached_agent["server_name"],
+            "scope" => attached_agent["scope"]
+          }
+        })
+    end
+
     :telemetry.execute(
       [:controlkeel, :claude, :attach, :succeeded],
       %{count: 1},
       %{
         session_id: binding["session_id"],
         workspace_id: binding["workspace_id"],
-        project_root: Path.expand(project_root),
+        project_root: root,
         server_name: attached_agent["server_name"],
         scope: attached_agent["scope"]
       }

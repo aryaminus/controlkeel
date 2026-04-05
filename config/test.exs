@@ -7,6 +7,7 @@ import Config
 # Run `mix help test` for more information.
 config :controlkeel, ControlKeel.Repo,
   database: Path.expand("../controlkeel_test.db", __DIR__),
+  busy_timeout: 5_000,
   pool_size: 5,
   pool: Ecto.Adapters.SQL.Sandbox
 

@@ -16,6 +16,9 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          {:ok, session} <- fetch_session(session_id),
          {:ok, task} <- resolve_task(session, task_id) do
       provider_status = ProviderBroker.status(File.cwd!())
+      workspace_context = workspace_context(session)
+      transcript_summary = Mission.transcript_summary(session.id)
+      recent_events = Mission.list_session_events(session.id)
 
       {:ok,
        %{
@@ -31,6 +34,10 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "proof_summary" => Mission.proof_summary_for_task(task),
          "memory_hits" => memory_hits(session, task),
          "resume_packet" => resume_packet(task),
+         "workspace_context" => workspace_context,
+         "workspace_cache_key" => workspace_context["cache_key"],
+         "recent_events" => recent_events,
+         "transcript_summary" => transcript_summary,
          "provider_status" => %{
            "source" => provider_status["selected_source"],
            "provider" => provider_status["selected_provider"],
@@ -119,6 +126,10 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       {:ok, packet} -> packet
       _error -> nil
     end
+  end
+
+  defp workspace_context(session) do
+    Mission.workspace_context(session)
   end
 
   # ─── Episodic memory: past patterns ─────────────────────────────────────────

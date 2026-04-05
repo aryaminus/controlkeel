@@ -9,6 +9,7 @@ defmodule ControlKeel.Mission.Session do
     Invocation,
     ProofBundle,
     Review,
+    SessionEvent,
     Task,
     TaskCheckpoint,
     Workspace
@@ -34,6 +35,7 @@ defmodule ControlKeel.Mission.Session do
     has_many :invocations, Invocation
     has_many :proof_bundles, ProofBundle
     has_many :reviews, Review
+    has_many :session_events, SessionEvent
     has_many :task_checkpoints, TaskCheckpoint
     has_many :memory_records, Record
     has_many :task_edges, TaskEdge

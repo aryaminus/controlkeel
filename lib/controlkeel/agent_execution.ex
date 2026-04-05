@@ -10,6 +10,7 @@ defmodule ControlKeel.AgentExecution do
   alias ControlKeel.Platform
   alias ControlKeel.ProjectBinding
   alias ControlKeel.ProtocolAccess
+  alias ControlKeel.SessionTranscript
   alias ControlKeel.Skills
 
   @direct_executable_candidates %{
@@ -101,8 +102,11 @@ defmodule ControlKeel.AgentExecution do
            %{} = session <- Mission.get_session_context(task.session_id),
            {:ok, integration} <- resolve_integration(task, project_root, opts),
            {:ok, execution_mode} <- resolve_execution_mode(integration, opts),
+           :ok <-
+             attach_runtime_contexts(task, session, integration, execution_mode, project_root),
            {:ok, package_root} <-
              prepare_run_package(project_root, session, task, integration, execution_mode),
+           :ok <- record_delegate_prepared(task, integration, execution_mode, package_root),
            {:ok, service_account_context} <- maybe_create_service_account(session, execution_mode),
            {:ok, service_account_context} <-
              prepare_support_assets(
@@ -320,8 +324,22 @@ defmodule ControlKeel.AgentExecution do
                    "policy_gate_reason" => reason
                  })
              }) do
-          {:ok, _run} -> {:error, {:policy_blocked, reason}}
-          {:error, reason} -> {:error, reason}
+          {:ok, _run} ->
+            _ =
+              SessionTranscript.record(%{
+                session_id: session.id,
+                task_id: task.id,
+                event_type: "delegate.blocked",
+                actor: "controlkeel",
+                summary: "Delegated execution was blocked by policy.",
+                body: reason,
+                payload: %{"reason" => reason}
+              })
+
+            {:error, {:policy_blocked, reason}}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end
@@ -370,6 +388,13 @@ defmodule ControlKeel.AgentExecution do
              }
            }) do
         {:ok, _run} ->
+          _ =
+            record_delegate_result(task, integration, status, %{
+              "mode" => "embedded",
+              "package_root" => package_root,
+              "command" => [command | args]
+            })
+
           {:ok,
            %{
              "task_id" => task.id,
@@ -387,10 +412,23 @@ defmodule ControlKeel.AgentExecution do
            }}
 
         {:error, reason} ->
+          _ =
+            record_delegate_result(task, integration, "failed", %{
+              "mode" => "embedded",
+              "package_root" => package_root,
+              "error" => inspect(reason)
+            })
+
           {:error, reason}
       end
     else
       {:error, :missing_direct_command} ->
+        _ =
+          record_delegate_result(task, integration, "failed", %{
+            "mode" => "embedded",
+            "error" => "missing_direct_command"
+          })
+
         {:error, :missing_direct_command}
     end
   end
@@ -429,6 +467,12 @@ defmodule ControlKeel.AgentExecution do
            metadata: metadata
          }) do
       {:ok, _run} ->
+        _ =
+          record_delegate_result(task, integration, "waiting_callback", %{
+            "mode" => mode,
+            "package_root" => package_root
+          })
+
         {:ok,
          %{
            "task_id" => task.id,
@@ -443,6 +487,13 @@ defmodule ControlKeel.AgentExecution do
          }}
 
       {:error, reason} ->
+        _ =
+          record_delegate_result(task, integration, "failed", %{
+            "mode" => mode,
+            "package_root" => package_root,
+            "error" => inspect(reason)
+          })
+
         {:error, reason}
     end
   end
@@ -458,6 +509,8 @@ defmodule ControlKeel.AgentExecution do
 
     brief = session.execution_brief || %{}
     boundary_summary = Intent.boundary_summary(brief)
+    workspace_context = Mission.workspace_context(session, fallback_root: project_root)
+    recent_events = Mission.list_session_events(session.id)
 
     with :ok <- File.mkdir_p(root),
          :ok <-
@@ -481,10 +534,21 @@ defmodule ControlKeel.AgentExecution do
                  "objective" => session.objective,
                  "risk_tier" => session.risk_tier,
                  "execution_brief" => brief,
-                 "boundary_summary" => boundary_summary
+                 "boundary_summary" => boundary_summary,
+                 "workspace_context_cache_key" => workspace_context["cache_key"]
                },
                pretty: true
              ) <> "\n"
+           ),
+         :ok <-
+           File.write(
+             Path.join(root, "workspace_context.json"),
+             Jason.encode!(workspace_context, pretty: true) <> "\n"
+           ),
+         :ok <-
+           File.write(
+             Path.join(root, "recent_events.json"),
+             Jason.encode!(recent_events, pretty: true) <> "\n"
            ) do
       {:ok, root}
     end
@@ -626,13 +690,20 @@ defmodule ControlKeel.AgentExecution do
   end
 
   defp direct_run_env(task, session, integration, package_root, result_path) do
+    project_root =
+      get_in(session.metadata || %{}, ["runtime_context", "project_root"]) ||
+        Path.expand(Path.join(package_root, "../../.."))
+
     [
       {"CONTROLKEEL_TASK_ID", to_string(task.id)},
       {"CONTROLKEEL_SESSION_ID", to_string(session.id)},
       {"CONTROLKEEL_AGENT_ID", integration.id},
+      {"CONTROLKEEL_PROJECT_ROOT", Path.expand(project_root)},
       {"CONTROLKEEL_RUN_PACKAGE", package_root},
       {"CONTROLKEEL_TASK_JSON", Path.join(package_root, "task.json")},
       {"CONTROLKEEL_SESSION_JSON", Path.join(package_root, "session.json")},
+      {"CONTROLKEEL_WORKSPACE_CONTEXT_JSON", Path.join(package_root, "workspace_context.json")},
+      {"CONTROLKEEL_RECENT_EVENTS_JSON", Path.join(package_root, "recent_events.json")},
       {"CONTROLKEEL_RESULT_PATH", result_path}
     ]
   end
@@ -721,6 +792,62 @@ defmodule ControlKeel.AgentExecution do
   defp task_run_execution_mode("embedded"), do: "local"
   defp task_run_execution_mode("handoff"), do: "external"
   defp task_run_execution_mode("runtime"), do: "cloud"
+
+  defp attach_runtime_contexts(task, session, integration, execution_mode, project_root) do
+    runtime_context = %{
+      "project_root" => Path.expand(project_root),
+      "agent_id" => integration.id,
+      "execution_mode" => execution_mode
+    }
+
+    with {:ok, _task} <- Mission.attach_task_runtime_context(task.id, runtime_context),
+         {:ok, _session} <- Mission.attach_session_runtime_context(session.id, runtime_context) do
+      :ok
+    else
+      _ -> :ok
+    end
+  end
+
+  defp record_delegate_prepared(task, integration, execution_mode, package_root) do
+    SessionTranscript.record(%{
+      session_id: task.session_id,
+      task_id: task.id,
+      event_type: "delegate.prepared",
+      actor: integration.id,
+      summary: "Prepared a governed run package for #{integration.label}.",
+      body: "Execution mode: #{execution_mode}",
+      payload: %{
+        "agent_id" => integration.id,
+        "execution_mode" => execution_mode,
+        "package_root" => package_root
+      }
+    })
+
+    :ok
+  end
+
+  defp record_delegate_result(task, integration, status, payload) do
+    event_type =
+      case status do
+        "waiting_callback" -> "delegate.waiting"
+        "done" -> "delegate.done"
+        "blocked" -> "delegate.blocked"
+        _ -> "delegate.failed"
+      end
+
+    SessionTranscript.record(%{
+      session_id: task.session_id,
+      task_id: task.id,
+      event_type: event_type,
+      actor: integration.id,
+      summary: "Delegated execution is #{String.replace(status, "_", " ")}.",
+      body: "Task #{task.title}",
+      payload:
+        Map.merge(%{"agent_id" => integration.id, "status" => status}, stringify_payload(payload))
+    })
+
+    :ok
+  end
 
   defp attached_agent_ids(project_root) do
     with {:ok, binding, _mode} <- ProjectBinding.read_effective(project_root),
@@ -816,5 +943,9 @@ defmodule ControlKeel.AgentExecution do
       File.rm_rf!(destination)
       File.cp_r!(source, destination)
     end)
+  end
+
+  defp stringify_payload(map) when is_map(map) do
+    Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
   end
 end
