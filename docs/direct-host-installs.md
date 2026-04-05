@@ -8,13 +8,20 @@ If you are orienting across the whole documentation set first, start with [READM
 
 ControlKeel keeps `controlkeel attach <host>` as the safest default because it installs the full governed repo-local experience. But several hosts now also have stronger direct-install paths.
 
+The published host-facing npm companions currently are:
+
+- OpenCode companion: [`@aryaminus/controlkeel-opencode`](https://www.npmjs.com/package/@aryaminus/controlkeel-opencode)
+- Pi extension: [`@aryaminus/controlkeel-pi-extension`](https://www.npmjs.com/package/@aryaminus/controlkeel-pi-extension)
+
+This page owns the exact host-facing package names and install commands. The main CLI bootstrap package stays documented in the root [README](../README.md).
+
 ## Published package or extension installs
 
 | Host | Direct install | Notes |
 | --- | --- | --- |
-| OpenCode | Add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json` | Publishes the npm plugin entrypoint. Use `controlkeel attach opencode` as well for repo-local commands, agents, and MCP config. |
-| Pi | `pi install npm:@aryaminus/controlkeel-pi-extension` | For Pi builds that support npm-backed extension installs. |
-| Pi | `pi -e npm:@aryaminus/controlkeel-pi-extension` | Short form of the same Pi extension flow. |
+| OpenCode | Add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json` | Uses the published npm companion package `@aryaminus/controlkeel-opencode`. Use `controlkeel attach opencode` as well for repo-local commands, agents, and MCP config. |
+| Pi | `pi install npm:@aryaminus/controlkeel-pi-extension` | Uses the published npm extension package `@aryaminus/controlkeel-pi-extension` for Pi builds that support npm-backed installs. |
+| Pi | `pi -e npm:@aryaminus/controlkeel-pi-extension` | Short form of the same published Pi extension flow. |
 | VS Code | `code --install-extension controlkeel-vscode-companion.vsix` | Installs the CK browser-review companion from a packaged VSIX. |
 | Gemini CLI | `gemini extensions link ./controlkeel/dist/gemini-cli-native` | Direct extension-link flow for the exported Gemini companion bundle. |
 | Augment / Auggie CLI | `npm install -g @augmentcode/auggie` | Installs the host CLI so CK’s Augment-native workspace bundle and plugin bundle can be used locally. |
@@ -83,9 +90,9 @@ That matters because CK is intended to be agent-operated first: the host should 
 
 Current release automation now supports:
 
-- npm publication for the main CK bootstrap package
-- npm publication for the OpenCode package
-- npm publication for the Pi package
+- npm publication for the main CK bootstrap package `@aryaminus/controlkeel`
+- npm publication for the OpenCode companion package `@aryaminus/controlkeel-opencode`
+- npm publication for the Pi extension package `@aryaminus/controlkeel-pi-extension`
 - `.vsix` packaging for the VS Code companion
 - conditional VS Code marketplace publication when `VSCE_PAT` is configured
 

@@ -65,6 +65,8 @@ These are the first-class host adapters that currently implement the richer revi
 
 Everything else in the catalog remains supported according to its own typed row, but is not marketed as a first-class host adapter unless it has a real install surface plus a defined review path.
 
+Use [direct-host-installs.md](direct-host-installs.md) for the exact companion package names, install commands, and current package-manager truth.
+
 The broader native matrix now also tracks the strongest official surfaces CK exports for each host:
 
 | Host | Strongest shipped official surface |

@@ -79,6 +79,8 @@ mix ck.attach opencode
 mix ck.init
 ```
 
+For exact companion package names and direct-install commands, use [direct-host-installs.md](direct-host-installs.md).
+
 Bootstrap or init writes:
 
 - `controlkeel/project.json`
@@ -171,6 +173,8 @@ OpenCode now has a native-first integration that writes `.opencode/plugins`, `.o
 - keep using heuristic mode for governance-only flows
 - add a CK-owned provider profile
 - point ControlKeel at a local Ollama model
+
+If you prefer the direct host package path, OpenCode also has a published npm companion. Use [direct-host-installs.md](direct-host-installs.md) for the exact package name and command. `controlkeel attach opencode` remains the recommended path when you want the repo-local MCP wiring, commands, and agent bundle too.
 
 ## 3b. Hosted MCP or A2A access for headless clients
 

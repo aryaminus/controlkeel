@@ -7,6 +7,7 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 ## Scope
 
 - Install channels: Homebrew, npm global
+- Published host packages: OpenCode npm companion, Pi npm extension
 - First-run setup advisor and project-root resolution
 - IDE/agent path: GitHub Copilot in VS Code (repo-native companion)
 - Agent path: OpenCode (native companion + MCP)
@@ -56,6 +57,12 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
   - `.opencode/commands/controlkeel-review.md`
   - `.opencode/mcp.json`
 
+### Published companion packages
+
+- [ ] Validate OpenCode direct install through `@aryaminus/controlkeel-opencode`
+- [ ] Validate Pi direct install through `pi install npm:@aryaminus/controlkeel-pi-extension`
+- [ ] Validate Pi short-form direct install through `pi -e npm:@aryaminus/controlkeel-pi-extension`
+
 ### Setup advisor and root resolution
 
 - [ ] Validate `controlkeel setup` against packaged binaries
@@ -70,10 +77,11 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 
 ### Release and channel parity
 
-- [ ] Cut a new ControlKeel release so Homebrew/npm binaries include the OpenCode malformed-config fix
-- [ ] Publish release notes calling out:
-  - OpenCode attach robustness fix
-  - Native attach target mapping correction
+- [ ] Validate the latest tagged release publishes all npm surfaces:
+  - `@aryaminus/controlkeel`
+  - `@aryaminus/controlkeel-opencode`
+  - `@aryaminus/controlkeel-pi-extension`
+- [ ] Confirm direct-install docs and package names match the published npm artifacts
 - [ ] Validate post-release channels without `--force` path clobbering guidance ambiguity
 
 ### Documentation alignment

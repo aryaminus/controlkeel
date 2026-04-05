@@ -41,6 +41,9 @@ Guardrails for cost and correctness:
 2. Confirm the latest tag-triggered [Release](https://github.com/aryaminus/controlkeel/actions/workflows/release.yml) run is green and uploaded all Burrito artifacts.
 3. Verify the packaged install path matches current docs:
    - `controlkeel`
+   - published npm bootstrap package `@aryaminus/controlkeel`
+   - published OpenCode companion package `@aryaminus/controlkeel-opencode`
+   - published Pi extension package `@aryaminus/controlkeel-pi-extension`
    - `controlkeel attach opencode`
    - `controlkeel findings`
    - `controlkeel status`
@@ -50,24 +53,24 @@ Guardrails for cost and correctness:
 6. Set repository variable `CONTROLKEEL_RELEASE_AUTOTAG_ENABLED=true`.
 7. Ensure `PAT_TOKEN` is configured so the bump workflow can push commits and tags that trigger downstream workflows.
 8. If Homebrew publication is enabled, ensure `HOMEBREW_TAP_TOKEN` can push to `aryaminus/homebrew-controlkeel`.
-9. If npmjs publication is enabled, ensure `NPM_TOKEN` is configured for `@aryaminus/controlkeel`.
+9. If npmjs publication is enabled, ensure `NPM_TOKEN` is configured for `@aryaminus/controlkeel`, `@aryaminus/controlkeel-opencode`, and `@aryaminus/controlkeel-pi-extension`.
 10. Confirm `publish-github-packages` succeeds in [release.yml](../.github/workflows/release.yml) so the bootstrap package is also available via GitHub Packages.
-11. Confirm the Homebrew tap formula resolves to the tagged release assets and the npm bootstrap package downloads the matching binary assets for supported platforms.
+11. Confirm the Homebrew tap formula resolves to the tagged release assets, the npm bootstrap package downloads the matching binary assets for supported platforms, and the published OpenCode and Pi companion packages resolve at the tagged version.
 
 ## npmjs publish token setup (maintainers)
 
-Use this once per token rotation. End users do not need any token for `npm i -g @aryaminus/controlkeel` or `npx @aryaminus/controlkeel@latest`.
+Use this once per token rotation. End users do not need any token for `npm i -g @aryaminus/controlkeel`, `npx @aryaminus/controlkeel@latest`, OpenCode companion installs, or Pi extension installs.
 
 1. Sign in to npm and open **Access Tokens**.
 2. Create a new **granular access token** from the npm website.
-3. Grant package permission for `@aryaminus/controlkeel` with **Read and write**.
+3. Grant package permission for `@aryaminus/controlkeel`, `@aryaminus/controlkeel-opencode`, and `@aryaminus/controlkeel-pi-extension` with **Read and write**.
 4. Set an expiration date and keep the scope as narrow as possible.
 5. If your npm account enforces write-time 2FA, enable **Bypass 2FA** for this CI publish token.
 6. Copy the token immediately (npm only shows the full token once).
 7. In GitHub, open repository **Settings -> Secrets and variables -> Actions**.
 8. Create or update repository secret `NPM_TOKEN` with the token value.
 9. Verify `.github/workflows/release.yml` publishes npm with `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`.
-10. Trigger the next tag release and confirm `publish-npm` succeeds.
+10. Trigger the next tag release and confirm `publish-npm` succeeds for all three npm packages.
 
 ### References
 
