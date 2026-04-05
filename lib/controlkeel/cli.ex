@@ -738,9 +738,10 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["kiro", "amp", "augment", "opencode", "gemini-cli", "cline"] do
+      when agent in ["kiro", "kilo", "amp", "augment", "opencode", "gemini-cli", "cline"] do
     config_path_fn = %{
       "kiro" => &kiro_mcp_config_path/0,
+      "kilo" => &kilo_config_path/0,
       "amp" => &amp_mcp_config_path/0,
       "augment" => &augment_mcp_config_path/0,
       "opencode" => &opencode_mcp_config_path/0,
@@ -750,6 +751,7 @@ defmodule ControlKeel.CLI do
 
     display_name = %{
       "kiro" => "Kiro",
+      "kilo" => "Kilo Code",
       "amp" => "Amp",
       "augment" => "Augment / Auggie CLI",
       "opencode" => "OpenCode",
@@ -3961,6 +3963,7 @@ defmodule ControlKeel.CLI do
               "cursor",
               "windsurf",
               "kiro",
+              "kilo",
               "amp",
               "augment",
               "opencode",
@@ -3976,6 +3979,7 @@ defmodule ControlKeel.CLI do
           "cursor" => "cursor-native",
           "windsurf" => "windsurf-native",
           "kiro" => "kiro-native",
+          "kilo" => "kilo-native",
           "amp" => "amp-native",
           "augment" => "augment-native",
           "opencode" => "opencode-native",
@@ -4101,16 +4105,25 @@ defmodule ControlKeel.CLI do
       end || %{}
 
     updated =
-      if ide_key == "opencode" do
+      if ide_key in ["opencode", "kilo"] do
         mcp = Map.get(existing, "mcp", %{})
+
+        entry = %{
+          "type" => "local",
+          "command" => [command | args]
+        }
+
+        entry =
+          if ide_key == "kilo" do
+            Map.put(entry, "enabled", true)
+          else
+            entry
+          end
 
         Map.put(
           existing,
           "mcp",
-          Map.put(mcp, server_name, %{
-            "type" => "local",
-            "command" => [command | args]
-          })
+          Map.put(mcp, server_name, entry)
         )
       else
         mcpServers = Map.get(existing, "mcpServers", %{})
@@ -4152,6 +4165,10 @@ defmodule ControlKeel.CLI do
       _ ->
         Path.join([home, ".kiro", "settings", "mcp.json"])
     end
+  end
+
+  defp kilo_config_path do
+    Path.join([user_home(), ".config", "kilo", "kilo.json"])
   end
 
   defp amp_mcp_config_path do

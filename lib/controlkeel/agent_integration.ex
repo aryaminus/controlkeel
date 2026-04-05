@@ -256,6 +256,29 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["kiro-native", "instructions-only"]
       }),
       attach_client(%{
+        id: "kilo",
+        label: "Kilo Code",
+        category: "native-first",
+        description:
+          "Attaches MCP server and delivers native governance via Kilo Agent Skills, slash-command workflows, and AGENTS.md guidance.",
+        attach_command: "controlkeel attach kilo",
+        config_location:
+          "Kilo MCP config lives in `kilo.json`, `./.kilo/kilo.json`, or `~/.config/kilo/kilo.json`; skills load from `.kilo/skills/` and workflows from `.kilo/commands/`.",
+        companion_delivery:
+          "Exports `.kilo/skills`, `.kilo/commands`, `.kilo/kilo.json`, and `AGENTS.md` for governed repo work.",
+        preferred_target: "kilo-native",
+        default_scope: "project",
+        router_agent_id: "kilo",
+        auth_mode: "ck_owned",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "Kilo-Org/kilocode",
+        upstream_docs_url: "https://kilo.ai/docs",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["kilo-native", "instructions-only"]
+      }),
+      attach_client(%{
         id: "amp",
         label: "Amp",
         category: "native-first",
@@ -1125,31 +1148,6 @@ defmodule ControlKeel.AgentIntegration do
         ]
       }),
       unverified_entry(%{
-        id: "kilo",
-        label: "Kilo",
-        category: "skills-compatible",
-        description:
-          "No verified native CK attach/runtime contract yet. ControlKeel support for Kilo is currently through open-standard AgentSkills installs such as the skills.sh flow.",
-        auth_mode: "none",
-        upstream_slug: "unverified/kilo",
-        upstream_docs_url: "https://kilo.ai/",
-        provider_bridge: %{supported: false, mode: "none", owner: "none"},
-        mcp_mode: "none",
-        skills_mode: "native",
-        preferred_target: "open-standard",
-        export_targets: ["open-standard"],
-        agent_uses_ck_via: ["native_skills"],
-        direct_install_methods: [
-          %{
-            "kind" => "skills_sh",
-            "label" => "skills.sh install",
-            "command" =>
-              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
-            "availability" => "supported"
-          }
-        ]
-      }),
-      unverified_entry(%{
         id: "nous-research",
         label: "Nous Research",
         category: "skills-compatible",
@@ -1846,6 +1844,10 @@ defmodule ControlKeel.AgentIntegration do
     ]
   end
 
+  defp default_direct_install_methods(%{id: "kilo"}) do
+    [direct_install("ck_attach", "CK attach", "controlkeel attach kilo")]
+  end
+
   defp default_direct_install_methods(%{id: "amp"}) do
     [
       direct_install("ck_attach", "CK attach", "controlkeel attach amp"),
@@ -2002,6 +2004,14 @@ defmodule ControlKeel.AgentIntegration do
       ".kiro/settings",
       ".kiro/commands",
       ".kiro/mcp.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "kilo"}),
+    do: [
+      ".kilo/skills",
+      ".kilo/commands",
+      ".kilo/kilo.json",
       "AGENTS.md"
     ]
 

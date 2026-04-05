@@ -160,6 +160,16 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert kiro.review_experience == "native_review"
     assert ".kiro/settings" in kiro.artifact_surfaces
 
+    kilo = AgentIntegration.get("kilo")
+    assert kilo.support_class == "attach_client"
+    assert kilo.preferred_target == "kilo-native"
+    assert kilo.auth_mode == "ck_owned"
+    assert kilo.skills_mode == "native"
+    assert ".kilo/skills" in kilo.artifact_surfaces
+    assert ".kilo/commands" in kilo.artifact_surfaces
+    assert ".kilo/kilo.json" in kilo.artifact_surfaces
+    assert Enum.any?(kilo.direct_install_methods, &(&1["command"] == "controlkeel attach kilo"))
+
     assert amp.review_experience == "native_review"
     assert amp.submission_mode == "tool_call"
     assert "native_skills" in amp.agent_uses_ck_via
@@ -240,11 +250,10 @@ defmodule ControlKeel.AgentIntegrationTest do
   test "skills-compatible agent names stay honest about support tier" do
     antigravity = AgentIntegration.get("antigravity")
     clawdbot = AgentIntegration.get("clawdbot")
-    kilo = AgentIntegration.get("kilo")
     nous = AgentIntegration.get("nous-research")
     trae = AgentIntegration.get("trae")
 
-    for integration <- [antigravity, clawdbot, kilo, nous, trae] do
+    for integration <- [antigravity, clawdbot, nous, trae] do
       assert integration.support_class == "unverified"
       assert integration.preferred_target == "open-standard"
       assert integration.export_targets == ["open-standard"]

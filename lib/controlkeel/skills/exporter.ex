@@ -1406,6 +1406,63 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "kilo-native"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, ".kilo/skills")
+    write_skill_tree(skills, skill_root)
+
+    command_path = Path.join(root, ".kilo/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(command_path))
+    File.write!(command_path, kilo_command_contents())
+
+    submit_command_path = Path.join(root, ".kilo/commands/controlkeel-submit-plan.md")
+
+    File.write!(
+      submit_command_path,
+      host_submit_plan_command_contents("Kilo Code", "kilo", ".kilo/review-plan.md")
+    )
+
+    annotate_command_path = Path.join(root, ".kilo/commands/controlkeel-annotate.md")
+
+    File.write!(
+      annotate_command_path,
+      host_annotate_command_contents("Kilo Code", "kilo", ".kilo/annotate.md")
+    )
+
+    last_command_path = Path.join(root, ".kilo/commands/controlkeel-last.md")
+    File.write!(last_command_path, host_last_command_contents("Kilo Code"))
+
+    config_path = Path.join(root, ".kilo/kilo.json")
+    File.mkdir_p!(Path.dirname(config_path))
+
+    File.write!(
+      config_path,
+      Jason.encode!(kilo_config_snippet(project_root, opts), pretty: true) <> "\n"
+    )
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("kilo", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
+        %{"path" => config_path, "kind" => "settings"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Copy `.kilo/skills/` into your repo or `~/.kilo/skills/` for Kilo Agent Skills discovery.",
+        "Copy `.kilo/commands/` into the project root so Kilo can expose `/controlkeel-review`, `/controlkeel-submit-plan`, `/controlkeel-annotate`, and `/controlkeel-last`.",
+        "Merge `.kilo/kilo.json` into `kilo.json` or `~/.config/kilo/kilo.json` to register the ControlKeel MCP server."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "amp-native"}, root, project_root, _skills, opts) do
     # 1. TypeScript plugin
     plugin_path = Path.join(root, ".amp/plugins/controlkeel-governance.ts")
@@ -2232,6 +2289,18 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
+  defp kilo_config_snippet(project_root, opts) do
+    %{
+      "mcp" => %{
+        "controlkeel" => %{
+          "type" => "local",
+          "command" => [mcp_command(project_root, opts) | mcp_args(project_root, opts)],
+          "enabled" => true
+        }
+      }
+    }
+  end
+
   defp openclaw_plugin_manifest do
     %{
       "name" => "controlkeel",
@@ -2240,6 +2309,17 @@ defmodule ControlKeel.Skills.Exporter do
       "skills" => "skills",
       "mcpServers" => ".mcp.json"
     }
+  end
+
+  defp kilo_command_contents do
+    """
+    # ControlKeel review
+
+    1. Read `AGENTS.md` and any repo-local Kilo guidance before making risky edits.
+    2. Call `ck_context` for task, workspace, transcript, and resume context.
+    3. Run `ck_validate` before and after risky code, config, shell, or deploy work.
+    4. Summarize blocked findings, proof state, and review status before completion.
+    """
   end
 
   defp droid_profile_contents do

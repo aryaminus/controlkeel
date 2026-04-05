@@ -11,6 +11,7 @@ defmodule ControlKeel.Skills.TargetFamily do
     "continue" => ["continue", "continue-native"],
     "roo" => ["roo-code", "roo-native"],
     "goose" => ["goose", "goose-native"],
+    "kilo" => ["kilo", "kilo-native"],
     "open-standard" => ["open-standard"],
     "openclaw" => ["openclaw", "openclaw-native", "openclaw-plugin"],
     "hermes" => ["hermes-agent", "hermes-native"],

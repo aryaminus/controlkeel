@@ -31,9 +31,9 @@ This works today because the `skills` CLI already discovers the CK skill set in 
 The [skills.sh](https://skills.sh/) agent list is broader than CK's native attach catalog. Treat those names in three buckets:
 
 - Native CK support already exists:
-  `amp`, `claude-code`, `cline`, `codex` via `codex-cli`, `cursor`, `droid`, `gemini` via `gemini-cli`, `copilot`, `goose`, `kiro` / `kiro-cli`, `opencode`, `roo` / `roo-code`, `vscode`, `windsurf`
+  `amp`, `claude-code`, `cline`, `codex` via `codex-cli`, `cursor`, `droid`, `gemini` via `gemini-cli`, `copilot`, `goose`, `kiro` / `kiro-cli`, `kilo`, `opencode`, `roo` / `roo-code`, `vscode`, `windsurf`
 - Skills-only compatibility currently exists through the `skills.sh` install path:
-  `antigravity`, `clawdbot`, `kilo`, `nous-research`, `trae`
+  `antigravity`, `clawdbot`, `nous-research`, `trae`
 - Not every skills.sh logo implies a native CK MCP/plugin/hook/extension contract.
   For the skills-only names above, CK currently ships open-standard AgentSkills compatibility, not a repo-native attach command.
 
@@ -71,6 +71,7 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | Cline | `controlkeel attach cline` |
 | Goose | `controlkeel attach goose` |
 | Kiro | `controlkeel attach kiro` |
+| Kilo Code | `controlkeel attach kilo` |
 | Augment / Auggie CLI | `controlkeel attach augment` |
 | Cursor | `controlkeel attach cursor` |
 | Roo Code | `controlkeel attach roo-code` |
@@ -91,6 +92,7 @@ For those hosts, CK now installs stronger native assets than before:
 - Cline: hooks, commands, rules, workflows
 - Goose: commands, workflow recipes, extension YAML
 - Kiro: hooks, steering, tool policy settings, commands
+- Kilo Code: Agent Skills, slash-command workflows, MCP config, and `AGENTS.md`
 - Augment / Auggie CLI: workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime transport
 - Amp: plugin scaffold, native skill bundle, and commands
 - Cursor: commands, background-agent guidance, rules

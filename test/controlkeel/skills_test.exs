@@ -470,6 +470,23 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(kiro_plan.output_dir, ".kiro/mcp.json"))
     assert File.exists?(Path.join(kiro_plan.output_dir, "AGENTS.md"))
 
+    assert {:ok, kilo_plan} = Skills.export("kilo-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(kilo_plan.output_dir, ".kilo/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(Path.join(kilo_plan.output_dir, ".kilo/commands/controlkeel-review.md"))
+
+    assert File.exists?(
+             Path.join(kilo_plan.output_dir, ".kilo/commands/controlkeel-submit-plan.md")
+           )
+
+    assert File.exists?(Path.join(kilo_plan.output_dir, ".kilo/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(kilo_plan.output_dir, ".kilo/commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(kilo_plan.output_dir, ".kilo/kilo.json"))
+    assert File.exists?(Path.join(kilo_plan.output_dir, "AGENTS.md"))
+
     assert {:ok, amp_plan} = Skills.export("amp-native", tmp_dir, scope: "export")
 
     assert File.exists?(Path.join(amp_plan.output_dir, ".amp/plugins/controlkeel-governance.ts"))
@@ -684,6 +701,15 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".kiro/commands/controlkeel-annotate.md"))
     assert File.exists?(Path.join(tmp_dir, ".kiro/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".kiro/mcp.json"))
+
+    assert {:ok, kilo_install} = Skills.install("kilo-native", tmp_dir, scope: "project")
+    assert kilo_install.destination == Path.join(tmp_dir, ".kilo")
+    assert File.exists?(Path.join(tmp_dir, ".kilo/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kilo/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kilo/commands/controlkeel-submit-plan.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kilo/commands/controlkeel-annotate.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kilo/commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kilo/kilo.json"))
 
     assert {:ok, amp_install} = Skills.install("amp-native", tmp_dir, scope: "project")
     assert amp_install.destination == Path.join(tmp_dir, ".amp")

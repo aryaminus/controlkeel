@@ -142,6 +142,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "kilo-native",
+        "Kilo native bundle",
+        "Kilo-native skills, slash-command workflows, MCP config, and AGENTS.md governance instructions.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
         "amp-native",
         "Amp native bundle",
         "Amp TypeScript plugin with event hooks, custom tools, commands, and governance instructions.",

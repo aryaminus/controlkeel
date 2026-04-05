@@ -475,6 +475,36 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
+  defp do_install(%SkillTarget{id: "kilo-native"}, "project", project_root, skills, _opts) do
+    kilo_root = Path.join(project_root, ".kilo")
+    skills_root = Path.join(kilo_root, "skills")
+
+    copy_skills(skills, skills_root)
+
+    {:ok, plan} = Exporter.export("kilo-native", project_root, scope: "project")
+
+    commands_root = Path.join(kilo_root, "commands")
+    File.mkdir_p!(commands_root)
+
+    copy_tree_contents(Path.join(plan.output_dir, ".kilo/commands"), commands_root)
+
+    File.cp!(
+      Path.join(plan.output_dir, ".kilo/kilo.json"),
+      Path.join(kilo_root, "kilo.json")
+    )
+
+    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+
+    {:ok,
+     %{
+       target: "kilo-native",
+       scope: "project",
+       destination: kilo_root,
+       skills_destination: skills_root,
+       commands_destination: commands_root
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "amp-native"}, "project", project_root, _skills, _opts) do
     {:ok, plan} = Exporter.export("amp-native", project_root, scope: "project")
 

@@ -325,6 +325,29 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert File.exists?(Path.join(tmp_dir, ".clinerules/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".clinerules/workflows/controlkeel-review.md"))
 
+    assert {:ok, kilo_attach} = CLI.parse(["attach", "kilo"])
+
+    kilo_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(kilo_attach, project_root: tmp_dir)
+      end)
+
+    assert kilo_output =~ "Attached ControlKeel to Kilo Code."
+    assert kilo_output =~ "Companion target: kilo-native."
+    assert kilo_output =~ "Auth mode: ck_owned."
+    assert File.exists?(kilo_config_path())
+    assert File.exists?(Path.join(tmp_dir, ".kilo/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kilo/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(tmp_dir, ".kilo/kilo.json"))
+
+    assert {:ok, kilo_config} = Jason.decode(File.read!(kilo_config_path()))
+    assert get_in(kilo_config, ["mcp", "controlkeel", "type"]) == "local"
+    assert get_in(kilo_config, ["mcp", "controlkeel", "enabled"]) == true
+
+    kilo_cmd = get_in(kilo_config, ["mcp", "controlkeel", "command"])
+    assert is_list(kilo_cmd)
+    assert length(kilo_cmd) >= 1
+
     assert {:ok, roo_attach} = CLI.parse(["attach", "roo-code"])
 
     roo_output =
@@ -1065,6 +1088,15 @@ defmodule ControlKeel.CLIRuntimeTest do
       ".config",
       "opencode",
       "config.json"
+    ])
+  end
+
+  defp kilo_config_path do
+    Path.join([
+      System.get_env("HOME") || System.user_home!(),
+      ".config",
+      "kilo",
+      "kilo.json"
     ])
   end
 

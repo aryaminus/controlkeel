@@ -71,7 +71,7 @@ For the broader `skills.sh` agent list, CK currently splits support into:
 
 - canonical native targets already in this matrix
 - alias rows that normalize naming differences such as `codex`, `gemini`, `kiro-cli`, and `roo`
-- skills-compatible-only research rows such as `antigravity`, `clawdbot`, `kilo`, `nous-research`, and `trae`, which currently resolve to open-standard AgentSkills installs rather than a native attach command
+- skills-compatible-only research rows such as `antigravity`, `clawdbot`, `nous-research`, and `trae`, which currently resolve to open-standard AgentSkills installs rather than a native attach command
 
 The broader native matrix now also tracks the strongest official surfaces CK exports for each host:
 
@@ -82,6 +82,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | `cline` | rules, workflows, commands, hook scripts, and CLI MCP config |
 | `goose` | repo hints, workflow recipes, commands, and Goose extension YAML |
 | `kiro` | hooks, steering, tool-policy settings, commands, and MCP config |
+| `kilo` | Agent Skills, slash-command workflows, `.kilo/kilo.json`, and `AGENTS.md` |
 | `amp` | TypeScript plugin, native skill bundle, custom tool/command surface, and package scaffold |
 | `augment` | workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime metadata |
 | `gemini-cli` | extension manifest, review/submit-plan commands, and skill bundle |
@@ -133,6 +134,7 @@ Runtime transport truth for those first-class hosts:
 | `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `agent_runtime` / `native` | `opencode-native` |
 | `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `local_mcp`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `gemini-cli-native` |
 | `continue` | attach_client | `controlkeel attach continue` | `local_mcp`, `native_skills`, `rules`, `workflows`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `continue-native` |
+| `kilo` | attach_client | `controlkeel attach kilo` | `local_mcp`, `native_skills`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `kilo-native` |
 | `pi` | attach_client | `controlkeel attach pi` | `local_mcp`, `native_skills`, `commands`, `rules` | `handoff` | `handoff` | `agent_runtime` / `native` | `pi-native` |
 | `aider` | attach_client | `controlkeel attach aider` | `local_mcp`, `commands` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
 | `hermes-agent` | attach_client | `controlkeel attach hermes-agent` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `native` | `hermes-native` |

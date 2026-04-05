@@ -65,6 +65,7 @@ Current examples:
 - Cline: hooks, commands, rules, and workflow guidance
 - Goose: hints, workflow recipes, commands, and extension YAML
 - Kiro: hooks, steering, tool policy settings, and commands
+- Kilo Code: Agent Skills, slash-command workflows, MCP config, and `AGENTS.md`
 - Amp: TypeScript plugin scaffold, native skill bundle, commands, and MCP wiring
 - Gemini CLI: extension manifest, commands, skills, and `GEMINI.md`
 - Cursor: rules, commands, background-agent guidance, and MCP config
@@ -73,7 +74,7 @@ Current examples:
 
 These are real shipped surfaces, but they are not all published marketplaces or npm packages. That distinction is why [direct-host-installs.md](direct-host-installs.md) exists separately.
 
-The same distinction applies to the broader `skills.sh` ecosystem. Some names there map directly to shipped CK targets such as `codex` -> `codex-cli`, `gemini` -> `gemini-cli`, `kiro-cli` -> `kiro`, and `roo` -> `roo-code`. Other names such as `antigravity`, `clawdbot`, `kilo`, `nous-research`, and `trae` are currently skills-compatible only through open-standard AgentSkills installs, not through a native CK attach/runtime contract.
+The same distinction applies to the broader `skills.sh` ecosystem. Some names there map directly to shipped CK targets such as `codex` -> `codex-cli`, `gemini` -> `gemini-cli`, `kiro-cli` -> `kiro`, `kilo` -> `kilo`, and `roo` -> `roo-code`. Other names such as `antigravity`, `clawdbot`, `nous-research`, and `trae` are currently skills-compatible only through open-standard AgentSkills installs, not through a native CK attach/runtime contract.
 
 ## Protocol interop
 
