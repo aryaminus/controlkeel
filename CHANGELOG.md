@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.23 — 2026-04-05
+
+### What's changed
+
+- feat: add Kilo Code integration with native support and enhance documentation
+- feat: enhance documentation and tests for skills.sh integration and aliases
+
 ## v0.1.22 — 2026-04-05
 
 ### What's changed
