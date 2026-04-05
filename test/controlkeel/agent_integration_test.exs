@@ -21,6 +21,15 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert "devin" in ids
     assert "vllm" in ids
     assert "huggingface" in ids
+    assert "codex" in ids
+    assert "gemini" in ids
+    assert "kiro-cli" in ids
+    assert "roo" in ids
+    assert "antigravity" in ids
+    assert "clawdbot" in ids
+    assert "kilo" in ids
+    assert "nous-research" in ids
+    assert "trae" in ids
   end
 
   test "labels and targets are available for native-first agents" do
@@ -207,6 +216,48 @@ defmodule ControlKeel.AgentIntegrationTest do
              openclaw.direct_install_methods,
              &(&1["command"] == "controlkeel plugin install openclaw")
            )
+
+    codex_alias = AgentIntegration.get("codex")
+    gemini_alias = AgentIntegration.get("gemini")
+    kiro_cli_alias = AgentIntegration.get("kiro-cli")
+    roo_alias = AgentIntegration.get("roo")
+
+    assert codex_alias.support_class == "alias"
+    assert codex_alias.alias_of == "codex-cli"
+    assert codex_alias.preferred_target == "codex"
+
+    assert gemini_alias.support_class == "alias"
+    assert gemini_alias.alias_of == "gemini-cli"
+    assert gemini_alias.preferred_target == "gemini-cli-native"
+
+    assert kiro_cli_alias.support_class == "alias"
+    assert kiro_cli_alias.alias_of == "kiro"
+
+    assert roo_alias.support_class == "alias"
+    assert roo_alias.alias_of == "roo-code"
+  end
+
+  test "skills-compatible agent names stay honest about support tier" do
+    antigravity = AgentIntegration.get("antigravity")
+    clawdbot = AgentIntegration.get("clawdbot")
+    kilo = AgentIntegration.get("kilo")
+    nous = AgentIntegration.get("nous-research")
+    trae = AgentIntegration.get("trae")
+
+    for integration <- [antigravity, clawdbot, kilo, nous, trae] do
+      assert integration.support_class == "unverified"
+      assert integration.preferred_target == "open-standard"
+      assert integration.export_targets == ["open-standard"]
+      assert integration.agent_uses_ck_via == ["native_skills"]
+      assert integration.skills_mode == "native"
+      assert integration.required_mcp_tools == []
+
+      assert Enum.any?(
+               integration.direct_install_methods,
+               &(&1["command"] ==
+                   "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance")
+             )
+    end
   end
 
   test "every integration references valid targets and install channels" do

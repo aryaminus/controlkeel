@@ -890,6 +890,20 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["cursor-native", "instructions-only"]
       }),
       alias_entry(%{
+        id: "codex",
+        label: "Codex",
+        category: "alias",
+        description:
+          "Alias to the shipped Codex CLI integration for ecosystems that label the terminal agent simply as Codex.",
+        alias_of: "codex-cli",
+        auth_mode: "env_bridge",
+        upstream_slug: "openai/codex",
+        upstream_docs_url: "https://openai.com/codex",
+        supported_scopes: ["user", "project"],
+        preferred_target: "codex",
+        export_targets: ["codex", "codex-plugin", "open-standard"]
+      }),
+      alias_entry(%{
         id: "codex-app-server",
         label: "Codex app / app server surface",
         category: "alias",
@@ -990,6 +1004,34 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["framework-adapter"]
       }),
       alias_entry(%{
+        id: "gemini",
+        label: "Gemini",
+        category: "alias",
+        description:
+          "Alias to the shipped Gemini CLI integration for skill ecosystems that label the agent surface as Gemini.",
+        alias_of: "gemini-cli",
+        auth_mode: "ck_owned",
+        upstream_slug: "google-gemini/gemini-cli",
+        upstream_docs_url: "https://gemini.google.com",
+        supported_scopes: ["project", "export"],
+        preferred_target: "gemini-cli-native",
+        export_targets: ["gemini-cli-native", "instructions-only"]
+      }),
+      alias_entry(%{
+        id: "kiro-cli",
+        label: "Kiro CLI",
+        category: "alias",
+        description:
+          "Alias to the shipped Kiro integration for ecosystems that distinguish the CLI name from the broader Kiro product.",
+        alias_of: "kiro",
+        auth_mode: "ck_owned",
+        upstream_slug: "kiro",
+        upstream_docs_url: "https://kiro.dev/cli",
+        supported_scopes: ["project", "export"],
+        preferred_target: "kiro-native",
+        export_targets: ["kiro-native", "instructions-only"]
+      }),
+      alias_entry(%{
         id: "kimi-cli",
         label: "Kimi Code CLI",
         category: "alias",
@@ -1005,6 +1047,20 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       alias_entry(%{
+        id: "roo",
+        label: "Roo",
+        category: "alias",
+        description:
+          "Alias to the shipped Roo Code integration for ecosystems that shorten the product name to Roo.",
+        alias_of: "roo-code",
+        auth_mode: "ck_owned",
+        upstream_slug: "RooCodeInc/Roo-Code",
+        upstream_docs_url: "https://roocode.com/",
+        supported_scopes: ["project"],
+        preferred_target: "roo-native",
+        export_targets: ["roo-native", "instructions-only"]
+      }),
+      alias_entry(%{
         id: "t3code",
         label: "T3 Chat / T3 Code wrapper",
         category: "alias",
@@ -1017,6 +1073,106 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["user", "project"],
         preferred_target: "codex",
         export_targets: ["codex", "codex-plugin", "open-standard"]
+      }),
+      unverified_entry(%{
+        id: "antigravity",
+        label: "Antigravity",
+        category: "skills-compatible",
+        description:
+          "No verified native CK attach/runtime contract yet. ControlKeel support for Antigravity is currently through open-standard AgentSkills installs such as the skills.sh flow.",
+        auth_mode: "none",
+        upstream_slug: "unverified/antigravity",
+        upstream_docs_url: "https://antigravity.google/",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "native",
+        preferred_target: "open-standard",
+        export_targets: ["open-standard"],
+        agent_uses_ck_via: ["native_skills"],
+        direct_install_methods: [
+          %{
+            "kind" => "skills_sh",
+            "label" => "skills.sh install",
+            "command" =>
+              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
+            "availability" => "supported"
+          }
+        ]
+      }),
+      unverified_entry(%{
+        id: "clawdbot",
+        label: "ClawdBot",
+        category: "skills-compatible",
+        description:
+          "No verified native CK attach/runtime contract yet. ControlKeel support for ClawdBot is currently through open-standard AgentSkills installs such as the skills.sh flow.",
+        auth_mode: "none",
+        upstream_slug: "unverified/clawdbot",
+        upstream_docs_url: "https://clawd.bot/",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "native",
+        preferred_target: "open-standard",
+        export_targets: ["open-standard"],
+        agent_uses_ck_via: ["native_skills"],
+        direct_install_methods: [
+          %{
+            "kind" => "skills_sh",
+            "label" => "skills.sh install",
+            "command" =>
+              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
+            "availability" => "supported"
+          }
+        ]
+      }),
+      unverified_entry(%{
+        id: "kilo",
+        label: "Kilo",
+        category: "skills-compatible",
+        description:
+          "No verified native CK attach/runtime contract yet. ControlKeel support for Kilo is currently through open-standard AgentSkills installs such as the skills.sh flow.",
+        auth_mode: "none",
+        upstream_slug: "unverified/kilo",
+        upstream_docs_url: "https://kilo.ai/",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "native",
+        preferred_target: "open-standard",
+        export_targets: ["open-standard"],
+        agent_uses_ck_via: ["native_skills"],
+        direct_install_methods: [
+          %{
+            "kind" => "skills_sh",
+            "label" => "skills.sh install",
+            "command" =>
+              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
+            "availability" => "supported"
+          }
+        ]
+      }),
+      unverified_entry(%{
+        id: "nous-research",
+        label: "Nous Research",
+        category: "skills-compatible",
+        description:
+          "No verified generic CK attach/runtime contract exists for the broader Nous Research brand surface. CK's verified Nous path remains `hermes-agent`; broader compatibility is currently through open-standard AgentSkills installs such as the skills.sh flow.",
+        auth_mode: "none",
+        upstream_slug: "unverified/nous-research",
+        upstream_docs_url: "https://nousresearch.com/",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "native",
+        preferred_target: "open-standard",
+        export_targets: ["open-standard"],
+        agent_uses_ck_via: ["native_skills"],
+        direct_install_methods: [
+          %{
+            "kind" => "skills_sh",
+            "label" => "skills.sh install",
+            "command" =>
+              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
+            "availability" => "supported"
+          }
+        ]
       }),
       unverified_entry(%{
         id: "rlm-agent",
@@ -1080,6 +1236,31 @@ defmodule ControlKeel.AgentIntegration do
         provider_bridge: %{supported: false, mode: "none", owner: "none"},
         mcp_mode: "none",
         skills_mode: "none"
+      }),
+      unverified_entry(%{
+        id: "trae",
+        label: "Trae",
+        category: "skills-compatible",
+        description:
+          "No verified native CK attach/runtime contract yet. ControlKeel support for Trae is currently through open-standard AgentSkills installs such as the skills.sh flow.",
+        auth_mode: "none",
+        upstream_slug: "unverified/trae",
+        upstream_docs_url: "https://www.trae.ai/",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "none",
+        skills_mode: "native",
+        preferred_target: "open-standard",
+        export_targets: ["open-standard"],
+        agent_uses_ck_via: ["native_skills"],
+        direct_install_methods: [
+          %{
+            "kind" => "skills_sh",
+            "label" => "skills.sh install",
+            "command" =>
+              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
+            "availability" => "supported"
+          }
+        ]
       }),
       unverified_entry(%{
         id: "z-ai-cli",

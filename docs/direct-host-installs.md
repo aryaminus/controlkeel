@@ -15,6 +15,28 @@ The published host-facing npm companions currently are:
 
 This page owns the exact host-facing package names and install commands. The main CLI bootstrap package stays documented in the root [README](../README.md).
 
+## Skills.sh / AgentSkills installs
+
+ControlKeel's built-in skills are already installable through the public [skills.sh](https://skills.sh/) CLI and registry flow.
+
+| Surface | Install |
+| --- | --- |
+| Whole CK skill collection | `npx skills add https://github.com/aryaminus/controlkeel` |
+| Single CK governance skill | `npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance` |
+
+This works today because the `skills` CLI already discovers the CK skill set in this repository. In a local validation run, it found 11 ControlKeel skills and offered installation into universal `.agents/skills` plus supported agent-specific skill directories.
+
+## skills.sh agent-name coverage
+
+The [skills.sh](https://skills.sh/) agent list is broader than CK's native attach catalog. Treat those names in three buckets:
+
+- Native CK support already exists:
+  `amp`, `claude-code`, `cline`, `codex` via `codex-cli`, `cursor`, `droid`, `gemini` via `gemini-cli`, `copilot`, `goose`, `kiro` / `kiro-cli`, `opencode`, `roo` / `roo-code`, `vscode`, `windsurf`
+- Skills-only compatibility currently exists through the `skills.sh` install path:
+  `antigravity`, `clawdbot`, `kilo`, `nous-research`, `trae`
+- Not every skills.sh logo implies a native CK MCP/plugin/hook/extension contract.
+  For the skills-only names above, CK currently ships open-standard AgentSkills compatibility, not a repo-native attach command.
+
 ## Published package or extension installs
 
 | Host | Direct install | Notes |
@@ -97,6 +119,8 @@ Current release automation now supports:
 - conditional VS Code marketplace publication when `VSCE_PAT` is configured
 
 Hosts without a documented published package flow remain attach-first in the docs and `/skills`.
+
+For `skills.sh`, there is no separate marketplace submission step documented today. The official FAQ says leaderboard/listing visibility happens automatically from anonymous `npx skills add <owner/repo>` installs.
 
 ## Update behavior after a new CK release
 

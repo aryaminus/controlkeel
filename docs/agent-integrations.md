@@ -73,6 +73,8 @@ Current examples:
 
 These are real shipped surfaces, but they are not all published marketplaces or npm packages. That distinction is why [direct-host-installs.md](direct-host-installs.md) exists separately.
 
+The same distinction applies to the broader `skills.sh` ecosystem. Some names there map directly to shipped CK targets such as `codex` -> `codex-cli`, `gemini` -> `gemini-cli`, `kiro-cli` -> `kiro`, and `roo` -> `roo-code`. Other names such as `antigravity`, `clawdbot`, `kilo`, `nous-research`, and `trae` are currently skills-compatible only through open-standard AgentSkills installs, not through a native CK attach/runtime contract.
+
 ## Protocol interop
 
 ControlKeel exposes three protocol surfaces around the integration catalog:

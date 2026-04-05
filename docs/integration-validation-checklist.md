@@ -7,6 +7,7 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 ## Scope
 
 - Install channels: Homebrew, npm global
+- Skills registry installs: skills.sh / AgentSkills
 - Published host packages: OpenCode npm companion, Pi npm extension
 - First-run setup advisor and project-root resolution
 - IDE/agent path: GitHub Copilot in VS Code (repo-native companion)
@@ -59,6 +60,8 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 
 ### Published companion packages
 
+- [ ] Validate skills.sh collection install through `npx skills add https://github.com/aryaminus/controlkeel`
+- [ ] Validate skills.sh single-skill install through `npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance`
 - [ ] Validate OpenCode direct install through `@aryaminus/controlkeel-opencode`
 - [ ] Validate Pi direct install through `pi install npm:@aryaminus/controlkeel-pi-extension`
 - [ ] Validate Pi short-form direct install through `pi -e npm:@aryaminus/controlkeel-pi-extension`

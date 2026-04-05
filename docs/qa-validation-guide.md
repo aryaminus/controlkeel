@@ -575,6 +575,8 @@ Validate these separately from `attach`:
 
 | Surface | Validation command |
 | --- | --- |
+| Skills.sh collection install | `npx skills add https://github.com/aryaminus/controlkeel` |
+| Skills.sh single-skill install | `npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance` |
 | OpenCode npm companion | add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json` |
 | Pi npm extension | `pi install npm:@aryaminus/controlkeel-pi-extension` |
 | Pi short form | `pi -e npm:@aryaminus/controlkeel-pi-extension` |

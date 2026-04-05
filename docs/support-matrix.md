@@ -67,6 +67,12 @@ Everything else in the catalog remains supported according to its own typed row,
 
 Use [direct-host-installs.md](direct-host-installs.md) for the exact companion package names, install commands, and current package-manager truth.
 
+For the broader `skills.sh` agent list, CK currently splits support into:
+
+- canonical native targets already in this matrix
+- alias rows that normalize naming differences such as `codex`, `gemini`, `kiro-cli`, and `roo`
+- skills-compatible-only research rows such as `antigravity`, `clawdbot`, `kilo`, `nous-research`, and `trae`, which currently resolve to open-standard AgentSkills installs rather than a native attach command
+
 The broader native matrix now also tracks the strongest official surfaces CK exports for each host:
 
 | Host | Strongest shipped official surface |

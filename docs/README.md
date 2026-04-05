@@ -12,7 +12,7 @@ Use this page to decide where to read next.
 ## Start here
 
 - [getting-started.md](getting-started.md): first install, first attach, provider setup, and hosted protocol basics
-- [direct-host-installs.md](direct-host-installs.md): package, plugin, VSIX, and attach-first host install paths
+- [direct-host-installs.md](direct-host-installs.md): package, plugin, skills.sh, VSIX, and attach-first host install paths
 - [support-matrix.md](support-matrix.md): canonical code-aligned inventory of hosts, transport modes, exports, and protocol tools
 
 ## Product and behavior reference
