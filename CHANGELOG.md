@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.21 — 2026-04-05
+
+### What's changed
+
+- Enhance ControlKeel governance and memory management
+- feat: add QA validation guide and update documentation references
+
 ## v0.1.20 — 2026-04-03
 
 ### What's changed
