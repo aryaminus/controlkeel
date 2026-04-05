@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.22 — 2026-04-05
+
+### What's changed
+
+- docs: update installation documentation with direct host package details and commands
+- feat: introduce setup command for bootstrapping ControlKeel and enhance project root resolution
+
 ## v0.1.21 — 2026-04-05
 
 ### What's changed
