@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Coding agents are increasingly judged by whether they can finish tasks. In practice, teams also need help with a different question: once an agent proposes code, what should happen next? Should the change move forward, trigger review, or stop? We describe ControlKeel as a delivery control plane for that stage of the workflow and present an executable benchmark note for it. The submission runs ControlKeel's two public benchmark suites in a clean test environment, using the built-in validator rather than a specific host integration. This isolates the review layer itself: findings, gates, proofs, and exported evidence. On the current repository snapshot, ControlKeel catches 5 of 10 unsafe scenarios in the positive suite, blocks 3 of them, and raises findings on 3 of 10 benign counterparts. These are not strong enough results to claim broad protection. They are strong enough to show something useful: the governance layer can be measured directly, reproduced by another agent, and improved against explicit misses and false positives.
+Coding-agent papers usually ask whether an agent can finish a task. In practice, teams also need an answer to a different question: once an agent proposes a change, should that change move forward, trigger review, or stop? We describe ControlKeel as a delivery control plane for that stage of the workflow and present an executable calibration benchmark for its review layer. The submission runs ControlKeel's two public benchmark suites in a clean test environment and fixes the subject to the built-in validator rather than a host-specific integration. In the reproduced skill, no provider keys are required, so the artifact exercises the deterministic validation path and reports inspectable findings, decisions, and exports. On the current repository snapshot, ControlKeel catches 5 of 10 unsafe scenarios in the positive suite, blocks 3 of them, and raises findings on 3 of 10 benign counterparts. These numbers are too small to support broad safety claims. They are still useful as a baseline: they show that the governance layer can be measured directly, reproduced by another agent, and improved against explicit misses and false positives.
 
 ## 1. Introduction
 
@@ -18,7 +18,7 @@ This note makes three concrete claims:
 - The repository already contains a reproducible public benchmark for that purpose: a positive suite of unsafe patterns and a paired benign suite of corrected counterparts.
 - Running that benchmark yields a calibrated baseline, not a victory lap: the current validator catches some important failures, misses others, and still produces false positives.
 
-## 2. Benchmark Design
+## 2. Method
 
 The benchmark uses two shipped suites. `vibe_failures_v1` contains ten unsafe scenarios covering secrets, unsafe execution, privacy handling, and deployment mistakes. `benign_baseline_v1` contains ten corrected versions of similar patterns that should pass cleanly. The repository's benchmark playbook explicitly marks public suites as the ones meant for comparable external reporting; held-out suites are reserved for internal promotion and policy work. That makes these two suites the right choice for a conference artifact.
 
@@ -31,6 +31,10 @@ positive suite + benign suite -> controlkeel_validate -> decisions + findings ->
 ```
 
 The submission intentionally evaluates only `controlkeel_validate`. ControlKeel supports richer host-specific paths too, including governed proxy mode and imported external-agent outputs. But those comparisons mix multiple effects at once: the quality of the validator, the quality of the host attachment, and the quality of any plugin or capture pathway. This note asks the narrower question first: how good is the core review layer when we hold those other variables fixed? The underlying method is broader than this artifact: the same benchmark engine can later score governed proxy runs, scripted shell subjects, and imported external-agent outputs.
+
+At the code level, `controlkeel_validate` is not a generic black box. It accepts `content`, `path`, `kind`, and an optional `domain_pack`, then runs ControlKeel's `FastPath` scanner. `FastPath` loads baseline rules plus any relevant domain or workspace policy rules, applies pattern-based detectors and entropy checks, adds budget findings when a live session exists, optionally runs Semgrep on code-like content, and then optionally asks an advisory model for extra findings if a provider is configured. Findings are deduplicated, and the final decision is the strongest finding severity at the decision layer: `block` overrides `warn`, and `warn` overrides `allow`.
+
+The published skill does not require provider credentials, so the reproduced artifact is intentionally narrower than the full product. In that environment, the benchmark measures the deterministic review path and any locally available static tooling, not model-backed advisory review. That choice is deliberate. It keeps the conference artifact runnable on a fresh machine and makes the baseline easier to interpret.
 
 That choice also matches a broader design principle in the repository. ControlKeel is careful about support claims. Some systems have first-class attach flows, some only have proxy or runtime support, and some are intentionally marked as unverified. Evaluating the built-in validator avoids overstating what any one host integration proves.
 
@@ -46,7 +50,7 @@ We report the benchmark engine's native summary fields:
 
 The ground truth comes from each scenario's `expected_decision`: `warn` and `block` count as positives, while `allow` counts as a negative. Another agent can reproduce the run from the submitted `SKILL.md` without external model keys or host integrations.
 
-The same engine also supports JSON and CSV export, so the artifact is easy to inspect mechanically.
+The same engine also supports JSON and CSV export, so the artifact is easy to inspect mechanically. It also computes classification metrics from `expected_decision`, treating `warn` and `block` scenarios as positives and `allow` scenarios as negatives.
 
 ## 3. Results
 
@@ -67,20 +71,21 @@ The benign suite is useful for the opposite reason. Seven corrected scenarios pa
 
 The main contribution of this note is methodological rather than performance-driven. We are not claiming that ControlKeel already solves coding-agent safety. The benchmark shows the opposite: the current validator is useful, incomplete, and uneven. That is exactly why the benchmark matters. It turns a vague product claim into something another agent can rerun, inspect, and challenge.
 
-This also helps position the work relative to nearby literatures. Capability benchmarks such as [ProjectEval](https://arxiv.org/abs/2503.07010) and [TheAgentCompany](https://arxiv.org/abs/2412.14161) ask whether agents can complete meaningful tasks. Benchmarking work such as [OSS-Bench](https://arxiv.org/abs/2505.12331) and [SEC-bench](https://arxiv.org/abs/2506.11791) focuses on building realistic software and security evaluations at scale. Security studies such as [How Safe Are AI-Generated Patches?](https://arxiv.org/abs/2507.02976) and [Security Degradation in Iterative AI Code Generation](https://arxiv.org/abs/2506.11022) show that LLM-based workflows often introduce serious vulnerabilities. Oversight work such as [Patch Reasoner](https://openreview.net/forum?id=AXXCo0pOSO) studies how to supervise software agents more effectively. Our contribution sits one layer over these: not generating patches, not solving tasks, and not training a reward model, but benchmarking the delivery-time review layer of a shipped governance tool.
+This also helps position the work relative to nearby literatures. Capability benchmarks such as [AgentBench](https://arxiv.org/abs/2308.03688), [SWE-bench](https://arxiv.org/abs/2310.06770), [SWE-agent](https://arxiv.org/abs/2405.15793), [TheAgentCompany](https://arxiv.org/abs/2412.14161), and [ProjectEval](https://arxiv.org/abs/2503.07010) ask whether agents can solve tasks or repositories end to end. Security work asks a different question: how often do LLM-based systems produce or exploit vulnerabilities? Examples include [Enhancing Large Language Models for Secure Code Generation](https://arxiv.org/abs/2310.16263), [A Case Study of LLM for Automated Vulnerability Repair](https://arxiv.org/abs/2405.15690), and [Teams of LLM Agents can Exploit Zero-Day Vulnerabilities](https://arxiv.org/abs/2406.01637). Our contribution sits one layer over these: not generating patches, not solving tasks, and not exploiting vulnerabilities, but measuring the delivery-time review layer of a governance tool.
 
-The limitations are straightforward. This note studies one built-in subject on repository-defined suites. It does not evaluate every host adapter, every policy pack, or every deployment path. It is also small: twenty scenarios total, designed as a public calibration set rather than a comprehensive threat model. The right interpretation is therefore narrow. We provide evidence that ControlKeel's review layer can be benchmarked reproducibly and that the current baseline is informative enough to guide improvement.
+The limitations are straightforward. This note studies one built-in subject on repository-defined suites. It does not evaluate every host adapter, every policy pack, or every deployment path. It is also small: twenty scenarios total, designed as a public calibration set rather than a comprehensive threat model. With only ten positive and ten negative examples, the reported rates have wide uncertainty and should not be treated as leaderboard-quality estimates. The right interpretation is therefore narrow. We provide evidence that ControlKeel's review layer can be benchmarked reproducibly and that the current baseline is informative enough to guide improvement.
 
-## 5. Acknowledged Limits
+## 5. Limitations
 
 The note is intentionally narrow and should not be read as a general claim of secure autonomous delivery. The benchmark is public, small, and designed for external reproducibility. That is a strength for a Claw4S submission, but it also means there is plenty of room for stronger held-out evaluation later.
 
 ## References
 
-1. Carlos E. Jimenez et al. "ProjectEval: A Benchmark for Programming Agents Automated Evaluation on Project-Level Code Generation." arXiv:2503.07010, 2025. https://arxiv.org/abs/2503.07010
-2. Frank F. Xu et al. "TheAgentCompany: Benchmarking LLM Agents on Consequential Real World Tasks." arXiv:2412.14161, 2024. https://arxiv.org/abs/2412.14161
-3. Yuancheng Jiang et al. "OSS-Bench: Benchmark Generator for Coding LLMs." arXiv:2505.12331, 2025. https://arxiv.org/abs/2505.12331
-4. Hwiwon Lee et al. "SEC-bench: Automated Benchmarking of LLM Agents on Real-World Software Security Tasks." arXiv:2506.11791, 2025. https://arxiv.org/abs/2506.11791
-5. Amirali Sajadi, Kostadin Damevski, and Preetha Chatterjee. "How Safe Are AI-Generated Patches? A Large-scale Study on Security Risks in LLM and Agentic Automated Program Repair on SWE-bench." arXiv:2507.02976, 2025. https://arxiv.org/abs/2507.02976
-6. Shivani Shukla, Himanshu Joshi, and Romilla Syed. "Security Degradation in Iterative AI Code Generation -- A Systematic Analysis of the Paradox." arXiv:2506.11022, 2025. https://arxiv.org/abs/2506.11022
-7. Junjielong Xu et al. "Scalable Supervising Software Agents with Patch Reasoner." OpenReview, ICLR 2026 submission. https://openreview.net/forum?id=AXXCo0pOSO
+1. Xiao Liu et al. "AgentBench: Evaluating LLMs as Agents." arXiv:2308.03688, 2023. https://arxiv.org/abs/2308.03688
+2. John Yang et al. "SWE-bench: Can Language Models Resolve Real-World GitHub Issues?" arXiv:2310.06770, 2023. https://arxiv.org/abs/2310.06770
+3. John Yang et al. "SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering." arXiv:2405.15793, 2024. https://arxiv.org/abs/2405.15793
+4. Frank F. Xu et al. "TheAgentCompany: Benchmarking LLM Agents on Consequential Real World Tasks." arXiv:2412.14161, 2024. https://arxiv.org/abs/2412.14161
+5. Carlos E. Jimenez et al. "ProjectEval: A Benchmark for Programming Agents Automated Evaluation on Project-Level Code Generation." arXiv:2503.07010, 2025. https://arxiv.org/abs/2503.07010
+6. Jiexin Wang et al. "Enhancing Large Language Models for Secure Code Generation: A Dataset-driven Study on Vulnerability Mitigation." arXiv:2310.16263, 2023. https://arxiv.org/abs/2310.16263
+7. Ummay Kulsum et al. "A Case Study of LLM for Automated Vulnerability Repair: Assessing Impact of Reasoning and Patch Validation Feedback." arXiv:2405.15690, 2024. https://arxiv.org/abs/2405.15690
+8. Yipan Lu et al. "Teams of LLM Agents can Exploit Zero-Day Vulnerabilities." arXiv:2406.01637, 2024. https://arxiv.org/abs/2406.01637
