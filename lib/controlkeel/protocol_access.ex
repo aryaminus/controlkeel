@@ -11,7 +11,13 @@ defmodule ControlKeel.ProtocolAccess do
     mcp:access
     a2a:access
     context:read
+    memory:read
+    cost:read
+    outcome:read
     validate:run
+    memory:write
+    regression:write
+    outcome:write
     finding:write
     budget:write
     review:read

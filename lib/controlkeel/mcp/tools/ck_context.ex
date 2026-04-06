@@ -8,6 +8,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   alias ControlKeel.Mission.{Finding, Session}
   alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
+  alias ControlKeel.TrustBoundary
   import Ecto.Query, warn: false
 
   def call(arguments) when is_map(arguments) do
@@ -19,6 +20,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       workspace_context = workspace_context(session)
       transcript_summary = Mission.transcript_summary(session.id)
       recent_events = Mission.list_session_events(session.id)
+      context_reacquisition = context_reacquisition(workspace_context)
 
       {:ok,
        %{
@@ -32,10 +34,13 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "current_task" => task_summary(task),
          "past_patterns" => past_patterns(session),
          "proof_summary" => Mission.proof_summary_for_task(task),
+         "planning_context" => planning_context(task),
          "memory_hits" => memory_hits(session, task),
          "resume_packet" => resume_packet(task),
          "workspace_context" => workspace_context,
          "workspace_cache_key" => workspace_context["cache_key"],
+         "context_reacquisition" => context_reacquisition,
+         "instruction_hierarchy" => TrustBoundary.instruction_hierarchy(),
          "recent_events" => recent_events,
          "transcript_summary" => transcript_summary,
          "provider_status" => %{
@@ -111,6 +116,20 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     }
   end
 
+  defp planning_context(nil), do: %{}
+
+  defp planning_context(task) do
+    %{
+      "review_gate" => Mission.review_gate_status(task),
+      "latest_submitted_plan" =>
+        get_in(task.metadata || %{}, ["planning_context", "latest_submitted_plan"]),
+      "latest_approved_plan" =>
+        get_in(task.metadata || %{}, ["planning_context", "latest_approved_plan"]),
+      "latest_plan_decision" =>
+        get_in(task.metadata || %{}, ["planning_context", "latest_plan_decision"])
+    }
+  end
+
   defp memory_hits(_session, nil), do: []
 
   defp memory_hits(session, task) do
@@ -130,6 +149,17 @@ defmodule ControlKeel.MCP.Tools.CkContext do
 
   defp workspace_context(session) do
     Mission.workspace_context(session)
+  end
+
+  defp context_reacquisition(workspace_context) do
+    %{
+      "recent_commits" => get_in(workspace_context, ["orientation", "recent_commits"]) || [],
+      "active_assumptions" =>
+        get_in(workspace_context, ["orientation", "active_assumptions"]) || [],
+      "design_drift_summary" => get_in(workspace_context, ["design_drift", "summary"]),
+      "high_risk_design_drift" =>
+        get_in(workspace_context, ["design_drift", "high_risk"]) || false
+    }
   end
 
   # ─── Episodic memory: past patterns ─────────────────────────────────────────

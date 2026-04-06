@@ -29,6 +29,8 @@ defmodule ControlKeel.Mission do
 
   @findings_page_size 20
   @proofs_page_size 20
+  @plan_phases ~w(ticket research_packet design_options narrowed_decision implementation_plan code_backed_plan)
+  @execution_ready_plan_phases ~w(implementation_plan code_backed_plan)
 
   def list_sessions, do: Repo.all(Session)
   def get_session(id), do: Repo.get(Session, id)
@@ -182,7 +184,12 @@ defmodule ControlKeel.Mission do
       "execution_ready" => Map.get(gate, "execution_ready", true),
       "latest_review_id" => gate["latest_review_id"],
       "latest_review_status" => gate["latest_review_status"],
-      "latest_review_type" => gate["latest_review_type"]
+      "latest_review_type" => gate["latest_review_type"],
+      "latest_plan_phase" => gate["latest_plan_phase"],
+      "plan_quality_status" => gate["plan_quality_status"],
+      "plan_quality_score" => gate["plan_quality_score"],
+      "planning_depth" => gate["planning_depth"],
+      "grill_questions" => gate["grill_questions"] || []
     }
   end
 
@@ -228,8 +235,10 @@ defmodule ControlKeel.Mission do
 
   def respond_review(%Review{} = review, attrs) do
     with {:ok, normalized} <- normalize_review_response(attrs) do
+      review_attrs = merge_review_response_attrs(review, normalized.review_attrs)
+
       Multi.new()
-      |> Multi.update(:review, Review.changeset(review, normalized.review_attrs))
+      |> Multi.update(:review, Review.changeset(review, review_attrs))
       |> maybe_apply_review_response_gate(review, normalized)
       |> Repo.transaction()
       |> case do
@@ -299,6 +308,35 @@ defmodule ControlKeel.Mission do
     %Invocation{}
     |> Invocation.changeset(attrs)
     |> Repo.insert()
+  end
+
+  def record_regression_result(attrs) when is_map(attrs) do
+    with {:ok, normalized} <- normalize_regression_result(attrs),
+         {:ok, invocation} <-
+           create_invocation(%{
+             source: "external_qa",
+             tool: "regression_test",
+             provider: normalized["engine"],
+             model: nil,
+             estimated_cost_cents: 0,
+             decision: regression_decision(normalized["outcome"]),
+             metadata: regression_metadata(normalized),
+             session_id: normalized["session_id"],
+             task_id: normalized["task_id"]
+           }) do
+      {:ok,
+       %{
+         "recorded" => true,
+         "invocation_id" => invocation.id,
+         "session_id" => invocation.session_id,
+         "task_id" => invocation.task_id,
+         "engine" => normalized["engine"],
+         "flow_name" => normalized["flow_name"],
+         "outcome" => normalized["outcome"],
+         "summary" => normalized["summary"],
+         "evidence" => normalized["evidence"]
+       }}
+    end
   end
 
   def list_proof_bundles do
@@ -899,6 +937,277 @@ defmodule ControlKeel.Mission do
     task_id |> latest_proof_bundle_for_task() |> proof_summary()
   end
 
+  def trace_improvement_packet(session_id, opts \\ []) when is_integer(session_id) do
+    with %Session{} = session <- get_session_context(session_id) do
+      task_id = Keyword.get(opts, :task_id)
+      task = trace_packet_task(session, task_id)
+
+      if is_nil(task) and is_integer(task_id) do
+        {:error, {:invalid_arguments, "`task_id` must belong to the current session"}}
+      else
+        invocations = trace_packet_invocations(session, task)
+        reviews = trace_packet_reviews(session, task)
+        findings = trace_packet_findings(session, task)
+        recent_events = list_session_events(session.id, Keyword.get(opts, :events_limit, 25))
+        transcript = transcript_summary(session.id)
+        latest_proof = trace_packet_proof(task)
+        test_outcomes = derive_test_outcomes(invocations)
+
+        verification_assessment =
+          cond do
+            match?(%ProofBundle{}, latest_proof) and
+                is_map(latest_proof.bundle["verification_assessment"]) ->
+              latest_proof.bundle["verification_assessment"]
+
+            match?(%Task{}, task) ->
+              derive_verification_assessment(task, findings, invocations, reviews, test_outcomes)
+
+            true ->
+              nil
+          end
+
+        planning_continuity =
+          if match?(%Task{}, task) do
+            derive_planning_continuity(task, reviews)
+          else
+            nil
+          end
+
+        failure_patterns =
+          derive_trace_failure_patterns(
+            findings,
+            verification_assessment,
+            planning_continuity,
+            test_outcomes,
+            reviews
+          )
+
+        {:ok,
+         %{
+           "session_id" => session.id,
+           "session_title" => session.title,
+           "task_id" => task && task.id,
+           "task_title" => task && task.title,
+           "trace_summary" => %{
+             "invocations" => length(invocations),
+             "reviews" => length(reviews),
+             "findings" => length(findings),
+             "recent_events" => length(recent_events),
+             "proof_available" => not is_nil(latest_proof)
+           },
+           "trace" => %{
+             "invocations" => Enum.map(invocations, &trace_invocation_entry/1),
+             "reviews" => Enum.map(reviews, &trace_review_entry/1),
+             "findings" => Enum.map(findings, &trace_finding_entry/1),
+             "recent_events" => recent_events,
+             "transcript_summary" => transcript
+           },
+           "verification_assessment" => verification_assessment,
+           "planning_continuity" => planning_continuity,
+           "test_outcomes" => test_outcomes,
+           "failure_patterns" => failure_patterns,
+           "eval_candidates" => Enum.map(failure_patterns, &trace_eval_candidate/1)
+         }}
+      end
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def failure_mode_clusters(session_id, opts \\ []) when is_integer(session_id) do
+    with %Session{} = session <- get_session_with_workspace(session_id) do
+      session_limit = Keyword.get(opts, :session_limit, 5)
+      same_domain_only = Keyword.get(opts, :same_domain_only, true)
+      domain_pack = get_in(session.execution_brief || %{}, ["domain_pack"])
+
+      sessions =
+        recent_sessions_for_failure_clusters(
+          session.workspace_id,
+          session.id,
+          session_limit,
+          same_domain_only,
+          domain_pack
+        )
+
+      packets =
+        Enum.map(sessions, fn cluster_session ->
+          {:ok, packet} = trace_improvement_packet(cluster_session.id)
+          packet
+        end)
+
+      patterns =
+        Enum.flat_map(packets, fn packet ->
+          Enum.map(packet["failure_patterns"] || [], fn pattern ->
+            Map.merge(pattern, %{
+              "session_id" => packet["session_id"],
+              "session_title" => packet["session_title"],
+              "task_id" => packet["task_id"],
+              "task_title" => packet["task_title"]
+            })
+          end)
+        end)
+
+      clusters = build_failure_clusters(patterns)
+
+      {:ok,
+       %{
+         "workspace_id" => session.workspace_id,
+         "source_session_id" => session.id,
+         "sessions_analyzed" => length(sessions),
+         "same_domain_only" => same_domain_only,
+         "domain_pack" => domain_pack,
+         "cluster_count" => length(clusters),
+         "clusters" => clusters,
+         "eval_candidates" => Enum.map(clusters, &cluster_eval_candidate/1)
+       }}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def skill_evolution_packet(session_id, opts \\ []) when is_integer(session_id) do
+    with %Session{} = session <- get_session_with_workspace(session_id) do
+      session_limit = Keyword.get(opts, :session_limit, 5)
+      same_domain_only = Keyword.get(opts, :same_domain_only, true)
+      current_skill_name = Keyword.get(opts, :current_skill_name, "trace-evolved-skill")
+      current_skill_content = Keyword.get(opts, :current_skill_content, "")
+      domain_pack = get_in(session.execution_brief || %{}, ["domain_pack"])
+
+      sessions =
+        recent_sessions_for_failure_clusters(
+          session.workspace_id,
+          session.id,
+          session_limit,
+          same_domain_only,
+          domain_pack
+        )
+
+      packets =
+        Enum.map(sessions, fn skill_session ->
+          {:ok, packet} = trace_improvement_packet(skill_session.id)
+          packet
+        end)
+
+      patterns =
+        Enum.flat_map(packets, fn packet ->
+          Enum.map(packet["failure_patterns"] || [], fn pattern ->
+            Map.merge(pattern, %{
+              "session_id" => packet["session_id"],
+              "session_title" => packet["session_title"],
+              "task_id" => packet["task_id"],
+              "task_title" => packet["task_title"]
+            })
+          end)
+        end)
+
+      clusters = build_failure_clusters(patterns)
+      anti_patterns = Enum.map(clusters, &skill_anti_pattern/1)
+      reinforced_practices = derive_reinforced_practices(packets)
+
+      guidance =
+        build_skill_guidance(anti_patterns, reinforced_practices, current_skill_content)
+
+      draft =
+        render_evolved_skill_document(
+          current_skill_name,
+          guidance,
+          anti_patterns,
+          reinforced_practices,
+          packets,
+          clusters
+        )
+
+      {:ok,
+       %{
+         "workspace_id" => session.workspace_id,
+         "source_session_id" => session.id,
+         "same_domain_only" => same_domain_only,
+         "domain_pack" => domain_pack,
+         "sessions_analyzed" => length(sessions),
+         "source_summary" => %{
+           "cluster_count" => length(clusters),
+           "failure_pattern_count" => length(patterns),
+           "strong_runs" =>
+             Enum.count(packets, &(get_in(&1, ["verification_assessment", "status"]) == "strong")),
+           "weak_runs" =>
+             Enum.count(packets, fn packet ->
+               get_in(packet, ["verification_assessment", "status"]) in ["weak", nil]
+             end)
+         },
+         "anti_patterns" => anti_patterns,
+         "reinforced_practices" => reinforced_practices,
+         "guidance" => guidance,
+         "merge_strategy" => %{
+           "recommendation" =>
+             "Prefer updating one strong, deduplicated skill tree instead of adding sibling docs for each failure cluster.",
+           "current_skill_name" => current_skill_name,
+           "current_skill_supplied" => String.trim(current_skill_content) != "",
+           "notes" => [
+             "Merge repeated lessons into shared Do/Avoid/Verification sections.",
+             "Keep failure-specific examples as evidence, not as competing skill files.",
+             "Retire overlapping guidance once the consolidated skill draft absorbs it."
+           ]
+         },
+         "suggested_skill_document" => draft
+       }}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def experience_history_index(session_id, opts \\ []) when is_integer(session_id) do
+    with %Session{} = session <- get_session_with_workspace(session_id) do
+      session_limit = Keyword.get(opts, :session_limit, 10)
+      same_domain_only = Keyword.get(opts, :same_domain_only, true)
+      domain_pack = get_in(session.execution_brief || %{}, ["domain_pack"])
+
+      sessions =
+        recent_sessions_for_failure_clusters(
+          session.workspace_id,
+          session.id,
+          session_limit,
+          same_domain_only,
+          domain_pack
+        )
+        |> Enum.map(&get_session_context(&1.id))
+        |> Enum.reject(&is_nil/1)
+
+      {:ok,
+       %{
+         "workspace_id" => session.workspace_id,
+         "source_session_id" => session.id,
+         "same_domain_only" => same_domain_only,
+         "domain_pack" => domain_pack,
+         "sessions_analyzed" => length(sessions),
+         "artifact_types" => ["session_summary", "audit_log", "trace_packet", "proof_summary"],
+         "sessions" => Enum.map(sessions, &experience_index_entry/1),
+         "usage_hint" =>
+           "Call ck_experience_read with a source_session_id and artifact_type to inspect one prior run in detail."
+       }}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  def experience_history_read(session_id, opts \\ []) when is_integer(session_id) do
+    with %Session{} = session <- get_session_with_workspace(session_id),
+         {:ok, target_session} <- experience_target_session(session, opts),
+         {:ok, artifact_type} <- experience_artifact_type(opts),
+         {:ok, artifact} <- experience_artifact(target_session, artifact_type, opts) do
+      {:ok,
+       %{
+         "workspace_id" => session.workspace_id,
+         "source_session_id" => session.id,
+         "target_session_id" => target_session.id,
+         "artifact_type" => artifact_type,
+         "content" => encode_pretty_json(artifact),
+         "structured_content" => artifact
+       }}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
   @doc """
   Return a structured audit log for a session: all invocations and findings
   in chronological order.
@@ -960,6 +1269,731 @@ defmodule ControlKeel.Mission do
     Float.round(min(raw / max(length(findings), 1), 1.0), 2)
   end
 
+  defp trace_packet_task(_session, nil), do: nil
+
+  defp trace_packet_task(%Session{} = session, task_id) do
+    Enum.find(session.tasks || [], &(&1.id == task_id))
+  end
+
+  defp trace_packet_invocations(%Session{} = session, nil), do: session.invocations || []
+
+  defp trace_packet_invocations(%Session{} = session, %Task{id: task_id}) do
+    Enum.filter(session.invocations || [], &(&1.task_id == task_id))
+  end
+
+  defp trace_packet_reviews(%Session{} = session, nil), do: session.reviews || []
+
+  defp trace_packet_reviews(%Session{} = session, %Task{id: task_id}) do
+    Enum.filter(session.reviews || [], &(&1.task_id == task_id))
+  end
+
+  defp trace_packet_findings(%Session{} = session, nil), do: session.findings || []
+
+  defp trace_packet_findings(%Session{} = session, %Task{id: task_id}) do
+    Enum.filter(session.findings || [], fn finding ->
+      get_in(finding.metadata || %{}, ["task_id"]) == task_id
+    end)
+  end
+
+  defp trace_packet_proof(nil), do: nil
+
+  defp trace_packet_proof(%Task{id: task_id}) do
+    latest_proof_bundle_for_task(task_id)
+  end
+
+  defp trace_invocation_entry(invocation) do
+    %{
+      "id" => invocation.id,
+      "source" => invocation.source,
+      "tool" => invocation.tool,
+      "provider" => invocation.provider,
+      "decision" => invocation.decision,
+      "task_id" => invocation.task_id,
+      "estimated_cost_cents" => invocation.estimated_cost_cents,
+      "inserted_at" => invocation.inserted_at,
+      "metadata" => invocation.metadata || %{}
+    }
+  end
+
+  defp trace_review_entry(review) do
+    %{
+      "id" => review.id,
+      "review_type" => review.review_type,
+      "status" => review.status,
+      "task_id" => review.task_id,
+      "feedback_notes" => review.feedback_notes,
+      "annotations" => review.annotations || %{},
+      "plan_refinement" => get_in(review.metadata || %{}, ["plan_refinement"]) || %{},
+      "inserted_at" => review.inserted_at
+    }
+  end
+
+  defp trace_finding_entry(finding) do
+    %{
+      "id" => finding.id,
+      "rule_id" => finding.rule_id,
+      "title" => finding.title,
+      "category" => finding.category,
+      "severity" => finding.severity,
+      "status" => finding.status,
+      "plain_message" => finding.plain_message,
+      "task_id" => get_in(finding.metadata || %{}, ["task_id"]),
+      "inserted_at" => finding.inserted_at
+    }
+  end
+
+  defp derive_trace_failure_patterns(
+         findings,
+         verification_assessment,
+         planning_continuity,
+         test_outcomes,
+         reviews
+       ) do
+    finding_patterns =
+      findings
+      |> Enum.filter(&(&1.status in ["open", "blocked", "escalated"]))
+      |> Enum.map(fn finding ->
+        %{
+          "type" => "finding",
+          "code" => finding.rule_id,
+          "title" => finding.title,
+          "severity" => finding.severity,
+          "summary" => finding.plain_message,
+          "source_id" => finding.id
+        }
+      end)
+
+    verification_patterns =
+      verification_assessment
+      |> case do
+        %{"suspicious_test_changes" => suspicious} when is_list(suspicious) ->
+          Enum.map(suspicious, fn signal ->
+            %{
+              "type" => "verification",
+              "code" => signal["code"],
+              "title" => signal["summary"],
+              "severity" => signal["severity"] || "medium",
+              "summary" => signal["recommendation"] || signal["summary"],
+              "source_id" => signal["review_id"]
+            }
+          end)
+
+        _ ->
+          []
+      end
+
+    planning_patterns =
+      planning_continuity
+      |> case do
+        %{"drift_signals" => signals} when is_list(signals) ->
+          Enum.map(signals, fn signal ->
+            %{
+              "type" => "planning",
+              "code" => signal["code"],
+              "title" => signal["summary"],
+              "severity" => "medium",
+              "summary" => signal["summary"],
+              "source_id" => planning_continuity["approved_plan_review_id"]
+            }
+          end)
+
+        _ ->
+          []
+      end
+
+    regression_patterns =
+      (test_outcomes["latest_failures"] || [])
+      |> Enum.map(fn failure ->
+        %{
+          "type" => "regression",
+          "code" => "external_regression_failure",
+          "title" => failure["flow_name"] || "External regression failure",
+          "severity" => if(failure["outcome"] == "flaky", do: "medium", else: "high"),
+          "summary" => failure["summary"] || "Regression evidence failed.",
+          "source_id" => failure["external_run_id"]
+        }
+      end)
+
+    denied_review_patterns =
+      reviews
+      |> Enum.filter(&(&1.status == "denied"))
+      |> Enum.map(fn review ->
+        %{
+          "type" => "review",
+          "code" => "review_denied",
+          "title" => review.title,
+          "severity" => "medium",
+          "summary" => review.feedback_notes || "A human denied this review.",
+          "source_id" => review.id
+        }
+      end)
+
+    finding_patterns ++
+      verification_patterns ++ planning_patterns ++ regression_patterns ++ denied_review_patterns
+  end
+
+  defp trace_eval_candidate(pattern) do
+    %{
+      "pattern_type" => pattern["type"],
+      "source_code" => pattern["code"],
+      "title" => eval_title(pattern),
+      "why" => pattern["summary"],
+      "suggested_check_type" => eval_check_type(pattern),
+      "assertion_hint" => eval_assertion_hint(pattern),
+      "source_id" => pattern["source_id"]
+    }
+  end
+
+  defp recent_sessions_for_failure_clusters(
+         workspace_id,
+         source_session_id,
+         session_limit,
+         same_domain_only,
+         domain_pack
+       ) do
+    sessions =
+      Session
+      |> where([session], session.workspace_id == ^workspace_id)
+      |> order_by([session], desc: session.inserted_at, desc: session.id)
+      |> limit(^max(session_limit, 1))
+      |> Repo.all()
+
+    sessions
+    |> Enum.reject(&is_nil(&1.workspace_id))
+    |> Enum.filter(fn candidate ->
+      candidate.id == source_session_id or
+        not same_domain_only or
+        get_in(candidate.execution_brief || %{}, ["domain_pack"]) == domain_pack
+    end)
+  end
+
+  defp build_failure_clusters(patterns) do
+    patterns
+    |> Enum.group_by(fn pattern -> {pattern["type"], pattern["code"]} end)
+    |> Enum.map(fn {{type, code}, rows} ->
+      severity = rows |> Enum.map(&(&1["severity"] || "low")) |> Enum.max_by(&severity_rank/1)
+      sessions = rows |> Enum.map(& &1["session_id"]) |> Enum.uniq()
+      titles = rows |> Enum.map(& &1["title"]) |> Enum.reject(&is_nil/1) |> Enum.uniq()
+
+      %{
+        "type" => type,
+        "code" => code,
+        "severity" => severity,
+        "count" => length(rows),
+        "session_count" => length(sessions),
+        "titles" => Enum.take(titles, 3),
+        "summary" => cluster_summary(rows),
+        "examples" =>
+          rows
+          |> Enum.take(3)
+          |> Enum.map(fn row ->
+            %{
+              "session_id" => row["session_id"],
+              "session_title" => row["session_title"],
+              "task_id" => row["task_id"],
+              "task_title" => row["task_title"],
+              "source_id" => row["source_id"],
+              "summary" => row["summary"]
+            }
+          end)
+      }
+    end)
+    |> Enum.sort_by(fn cluster ->
+      {-severity_rank(cluster["severity"]), -cluster["count"], cluster["code"]}
+    end)
+  end
+
+  defp cluster_eval_candidate(cluster) do
+    %{
+      "cluster_code" => cluster["code"],
+      "pattern_type" => cluster["type"],
+      "title" => "Cluster regression: #{List.first(cluster["titles"]) || cluster["code"]}",
+      "suggested_check_type" => eval_check_type(%{"type" => cluster["type"]}),
+      "assertion_hint" =>
+        "Add an eval that prevents recurrence of `#{cluster["code"]}` across similar traces.",
+      "session_count" => cluster["session_count"],
+      "example_source_ids" =>
+        Enum.map(cluster["examples"] || [], & &1["source_id"]) |> Enum.reject(&is_nil/1)
+    }
+  end
+
+  defp skill_anti_pattern(cluster) do
+    %{
+      "code" => cluster["code"],
+      "type" => cluster["type"],
+      "severity" => cluster["severity"],
+      "summary" => cluster["summary"],
+      "do" => anti_pattern_do_line(cluster),
+      "avoid" => anti_pattern_avoid_line(cluster),
+      "verify" => anti_pattern_verify_line(cluster),
+      "session_count" => cluster["session_count"],
+      "count" => cluster["count"],
+      "titles" => cluster["titles"],
+      "example_source_ids" =>
+        Enum.map(cluster["examples"] || [], & &1["source_id"]) |> Enum.reject(&is_nil/1)
+    }
+  end
+
+  defp anti_pattern_do_line(%{"type" => "finding", "code" => code}) do
+    cond do
+      String.contains?(code, "sql_injection") ->
+        "Use parameterized queries and keep untrusted input out of query string assembly."
+
+      String.contains?(code, "auth") or String.contains?(code, "access") ->
+        "Make authorization checks explicit at the boundary where privileged state changes occur."
+
+      true ->
+        "Encode the guardrail for `#{code}` directly in the main workflow instead of relying on memory."
+    end
+  end
+
+  defp anti_pattern_do_line(%{"type" => "verification", "code" => code}) do
+    cond do
+      String.contains?(code, "skip") or String.contains?(code, "focused") ->
+        "Keep the full intended test surface active when validating a fix."
+
+      String.contains?(code, "assertion") ->
+        "Preserve strong assertions that prove the behavior instead of only checking execution success."
+
+      String.contains?(code, "mock") ->
+        "Use mocks as seams, not as substitutes for the behavior the change is supposed to prove."
+
+      true ->
+        "Tighten verification around `#{code}` with objective checks that are hard to game."
+    end
+  end
+
+  defp anti_pattern_do_line(%{"type" => "planning"}) do
+    "Carry design choices, rejected options, and implementation boundaries forward into execution."
+  end
+
+  defp anti_pattern_do_line(%{"type" => "regression"}) do
+    "Promote recurrent external regression failures into named flow checks owned by the main skill."
+  end
+
+  defp anti_pattern_do_line(%{"type" => "review"}) do
+    "Add explicit human-review checkpoints where the same denial pattern keeps recurring."
+  end
+
+  defp anti_pattern_do_line(%{"code" => code}) do
+    "Add an explicit workflow rule that prevents recurrence of `#{code}`."
+  end
+
+  defp anti_pattern_avoid_line(%{"type" => "finding", "code" => code}) do
+    cond do
+      String.contains?(code, "sql_injection") ->
+        "Avoid raw SQL concatenation and other string-built query paths."
+
+      true ->
+        "Avoid leaving `#{code}` prevention implicit or scattered across multiple docs."
+    end
+  end
+
+  defp anti_pattern_avoid_line(%{"type" => "verification", "code" => code}) do
+    cond do
+      String.contains?(code, "skip") or String.contains?(code, "focused") ->
+        "Avoid skipping, narrowing, or focusing tests just to get a green run."
+
+      String.contains?(code, "assertion") ->
+        "Avoid removing assertions that are carrying behavioral proof."
+
+      String.contains?(code, "mock") ->
+        "Avoid inflating mocks until the test only proves the mock."
+
+      true ->
+        "Avoid verification drift around `#{code}`."
+    end
+  end
+
+  defp anti_pattern_avoid_line(%{"type" => "planning"}) do
+    "Avoid jumping from a vague ticket to implementation without a narrowed design decision."
+  end
+
+  defp anti_pattern_avoid_line(%{"type" => "regression"}) do
+    "Avoid treating flaky or failed external runs as non-signals."
+  end
+
+  defp anti_pattern_avoid_line(%{"type" => "review"}) do
+    "Avoid repeating a denied pattern without turning it into a permanent gate."
+  end
+
+  defp anti_pattern_avoid_line(%{"code" => code}) do
+    "Avoid letting `#{code}` remain a one-off lesson."
+  end
+
+  defp anti_pattern_verify_line(%{"type" => "finding", "code" => code}) do
+    cond do
+      String.contains?(code, "sql_injection") ->
+        "Validate with deterministic query-safety checks and regression coverage on the affected path."
+
+      true ->
+        "Add a reusable eval or scanner rule for `#{code}` and keep it in the permanent suite."
+    end
+  end
+
+  defp anti_pattern_verify_line(%{"type" => "verification"}) do
+    "Review the diff for proof laundering and require assertions, active tests, and meaningful coverage to remain intact."
+  end
+
+  defp anti_pattern_verify_line(%{"type" => "planning"}) do
+    "Check that implementation and proof both reference the approved plan phase and boundary decisions."
+  end
+
+  defp anti_pattern_verify_line(%{"type" => "regression"}) do
+    "Replay the affected user flow through external regression tooling before marking the task ready."
+  end
+
+  defp anti_pattern_verify_line(%{"type" => "review"}) do
+    "Require a human-approved review artifact before rollout when this denial mode appears."
+  end
+
+  defp anti_pattern_verify_line(%{"code" => code}) do
+    "Turn `#{code}` into a durable eval candidate and keep it in the regression suite."
+  end
+
+  defp derive_reinforced_practices(packets) do
+    packets
+    |> Enum.flat_map(fn packet ->
+      verification = packet["verification_assessment"] || %{}
+      evidence_sources = get_in(verification, ["evidence", "evidence_sources"]) || []
+      status = verification["status"]
+      failures = packet["failure_patterns"] || []
+
+      []
+      |> maybe_add_reinforced_practice(
+        status == "strong" and "internal_checks" in evidence_sources,
+        "Keep internal checks as first-pass proof before escalating to richer review or regression layers."
+      )
+      |> maybe_add_reinforced_practice(
+        status == "strong" and "external_regression" in evidence_sources,
+        "Preserve external regression coverage for critical user flows once it exists."
+      )
+      |> maybe_add_reinforced_practice(
+        status == "strong" and "human_review" in evidence_sources,
+        "Retain human review as a calibrating signal on high-risk or ambiguous tasks."
+      )
+      |> maybe_add_reinforced_practice(
+        failures == [] and status in ["strong", "moderate"],
+        "Promote clean, low-drift runs into the main skill instead of leaving them as isolated successful traces."
+      )
+    end)
+    |> Enum.uniq()
+    |> Enum.map(fn summary ->
+      %{"summary" => summary}
+    end)
+  end
+
+  defp maybe_add_reinforced_practice(list, true, summary), do: [summary | list]
+  defp maybe_add_reinforced_practice(list, false, _summary), do: list
+
+  defp build_skill_guidance(anti_patterns, reinforced_practices, current_skill_content) do
+    existing = normalized_sentences(current_skill_content)
+
+    %{
+      "do" =>
+        anti_patterns
+        |> Enum.map(& &1["do"])
+        |> Kernel.++(Enum.map(reinforced_practices, & &1["summary"]))
+        |> dedupe_guidance(existing),
+      "avoid" =>
+        anti_patterns
+        |> Enum.map(& &1["avoid"])
+        |> dedupe_guidance(existing),
+      "verify" =>
+        anti_patterns
+        |> Enum.map(& &1["verify"])
+        |> dedupe_guidance(existing)
+    }
+  end
+
+  defp dedupe_guidance(lines, existing) do
+    lines
+    |> Enum.reject(&is_nil_or_blank/1)
+    |> Enum.uniq()
+    |> Enum.reject(fn line -> normalize_sentence(line) in existing end)
+  end
+
+  defp normalized_sentences(content) when is_binary(content) do
+    content
+    |> String.split(~r/[\n\r]+/, trim: true)
+    |> Enum.map(&normalize_sentence/1)
+    |> MapSet.new()
+  end
+
+  defp normalized_sentences(_), do: MapSet.new()
+
+  defp normalize_sentence(text) do
+    text
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9]+/u, " ")
+    |> String.trim()
+  end
+
+  defp render_evolved_skill_document(
+         skill_name,
+         guidance,
+         anti_patterns,
+         reinforced_practices,
+         packets,
+         clusters
+       ) do
+    description =
+      "Evolved from ControlKeel traces. Use when similar recurring failures, regressions, or planning drift patterns are present."
+
+    [
+      "---",
+      "name: #{skill_name}",
+      "description: #{description}",
+      "---",
+      "",
+      "# #{humanize_skill_name(skill_name)}",
+      "",
+      "## Instructions",
+      "",
+      "Prefer one consolidated workflow over many overlapping notes. Update this skill when new recurring failures appear instead of spawning sibling docs.",
+      "",
+      "## Do",
+      render_bullet_lines(guidance["do"]),
+      "",
+      "## Avoid",
+      render_bullet_lines(guidance["avoid"]),
+      "",
+      "## Verification",
+      render_numbered_lines(guidance["verify"]),
+      "",
+      "## Failure Patterns Observed",
+      render_cluster_lines(clusters),
+      "",
+      "## Reinforced Practices",
+      render_bullet_lines(Enum.map(reinforced_practices, & &1["summary"])),
+      "",
+      "## Trace Provenance",
+      "- Sessions analyzed: #{length(packets)}",
+      "- Recurring clusters: #{length(clusters)}",
+      "- Anti-patterns distilled: #{length(anti_patterns)}"
+    ]
+    |> Enum.join("\n")
+    |> String.trim()
+    |> Kernel.<>("\n")
+  end
+
+  defp render_bullet_lines([]), do: "- No new guidance synthesized.\n"
+  defp render_bullet_lines(lines), do: Enum.map_join(lines, "\n", &"- #{&1}")
+
+  defp render_numbered_lines([]), do: "1. Run the existing verification suite.\n"
+
+  defp render_numbered_lines(lines) do
+    lines
+    |> Enum.with_index(1)
+    |> Enum.map_join("\n", fn {line, idx} -> "#{idx}. #{line}" end)
+  end
+
+  defp render_cluster_lines([]), do: "- No recurring failure clusters detected.\n"
+
+  defp render_cluster_lines(clusters) do
+    Enum.map_join(clusters, "\n", fn cluster ->
+      title = List.first(cluster["titles"] || []) || cluster["code"]
+      "- #{title} (`#{cluster["code"]}`) across #{cluster["session_count"]} session(s)"
+    end)
+  end
+
+  defp humanize_skill_name(name) do
+    name
+    |> to_string()
+    |> String.replace("-", " ")
+    |> String.split()
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp is_nil_or_blank(nil), do: true
+  defp is_nil_or_blank(text) when is_binary(text), do: String.trim(text) == ""
+  defp is_nil_or_blank(_), do: false
+
+  defp experience_index_entry(%Session{} = session) do
+    tasks = session.tasks || []
+    findings = session.findings || []
+    reviews = session.reviews || []
+    invocations = session.invocations || []
+    latest_task = List.first(tasks)
+
+    %{
+      "session_id" => session.id,
+      "title" => session.title,
+      "inserted_at" => session.inserted_at,
+      "risk_tier" => session.risk_tier,
+      "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"]),
+      "task_count" => length(tasks),
+      "finding_count" => length(findings),
+      "review_count" => length(reviews),
+      "invocation_count" => length(invocations),
+      "latest_task" =>
+        if(latest_task,
+          do: %{
+            "task_id" => latest_task.id,
+            "title" => latest_task.title,
+            "status" => latest_task.status,
+            "proof_summary" => proof_summary_for_task(latest_task)
+          },
+          else: nil
+        ),
+      "artifacts" =>
+        [
+          %{"artifact_type" => "session_summary", "source_session_id" => session.id},
+          %{"artifact_type" => "audit_log", "source_session_id" => session.id}
+        ] ++ experience_task_artifacts(latest_task)
+    }
+  end
+
+  defp experience_task_artifacts(nil), do: []
+
+  defp experience_task_artifacts(%Task{} = task) do
+    [
+      %{
+        "artifact_type" => "trace_packet",
+        "source_session_id" => task.session_id,
+        "task_id" => task.id
+      },
+      %{
+        "artifact_type" => "proof_summary",
+        "source_session_id" => task.session_id,
+        "task_id" => task.id
+      }
+    ]
+  end
+
+  defp experience_target_session(%Session{} = source_session, opts) do
+    target_session_id = Keyword.get(opts, :source_session_id, source_session.id)
+
+    case get_session_context(target_session_id) do
+      %Session{} = target_session
+      when target_session.workspace_id == source_session.workspace_id ->
+        {:ok, target_session}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  defp experience_artifact_type(opts) do
+    case Keyword.get(opts, :artifact_type) do
+      type when type in ["session_summary", "audit_log", "trace_packet", "proof_summary"] ->
+        {:ok, type}
+
+      nil ->
+        {:error, :not_found}
+
+      _other ->
+        {:error, :not_found}
+    end
+  end
+
+  defp experience_artifact(%Session{} = session, "session_summary", _opts) do
+    {:ok, experience_index_entry(session)}
+  end
+
+  defp experience_artifact(%Session{} = session, "audit_log", _opts) do
+    audit_log(session.id)
+  end
+
+  defp experience_artifact(%Session{} = session, "trace_packet", opts) do
+    with {:ok, task_id} <- experience_task_id(session, opts) do
+      trace_improvement_packet(session.id, task_id: task_id, events_limit: 50)
+    end
+  end
+
+  defp experience_artifact(%Session{} = session, "proof_summary", opts) do
+    with {:ok, task_id} <- experience_task_id(session, opts) do
+      {:ok,
+       %{
+         "task_id" => task_id,
+         "task_title" => task_title(session.tasks || [], task_id),
+         "proof_summary" => proof_summary_for_task(task_id)
+       }}
+    end
+  end
+
+  defp experience_task_id(%Session{} = session, opts) do
+    task_id =
+      Keyword.get(opts, :task_id) ||
+        case session.tasks || [] do
+          [%Task{id: id} | _] -> id
+          _ -> nil
+        end
+
+    cond do
+      is_nil(task_id) ->
+        {:error, :not_found}
+
+      Enum.any?(session.tasks || [], &(&1.id == task_id)) ->
+        {:ok, task_id}
+
+      true ->
+        {:error, :not_found}
+    end
+  end
+
+  defp task_title(tasks, task_id) do
+    tasks
+    |> Enum.find(&(&1.id == task_id))
+    |> case do
+      %Task{title: title} -> title
+      _ -> nil
+    end
+  end
+
+  defp encode_pretty_json(data) do
+    Jason.encode!(data, pretty: true)
+  end
+
+  defp cluster_summary(rows) do
+    rows
+    |> Enum.map(& &1["summary"])
+    |> Enum.reject(&is_nil/1)
+    |> Enum.frequencies()
+    |> Enum.max_by(fn {_summary, count} -> count end, fn -> {nil, 0} end)
+    |> elem(0)
+  end
+
+  defp severity_rank("critical"), do: 4
+  defp severity_rank("high"), do: 3
+  defp severity_rank("medium"), do: 2
+  defp severity_rank("low"), do: 1
+  defp severity_rank(_other), do: 0
+
+  defp eval_title(%{"type" => "finding", "title" => title}), do: "Prevent recurrence: #{title}"
+  defp eval_title(%{"type" => "regression", "title" => title}), do: "Regression case: #{title}"
+  defp eval_title(%{"type" => "planning", "title" => title}), do: "Plan alignment: #{title}"
+  defp eval_title(%{"title" => title}), do: title
+
+  defp eval_check_type(%{"type" => "finding"}), do: "deterministic_rule"
+  defp eval_check_type(%{"type" => "verification"}), do: "trace_verification"
+  defp eval_check_type(%{"type" => "planning"}), do: "plan_alignment"
+  defp eval_check_type(%{"type" => "regression"}), do: "regression_replay"
+  defp eval_check_type(%{"type" => "review"}), do: "human_review_regression"
+  defp eval_check_type(_pattern), do: "behavior_check"
+
+  defp eval_assertion_hint(%{"type" => "finding", "code" => code}) do
+    "Ensure future runs do not reproduce finding `#{code}` on similar inputs."
+  end
+
+  defp eval_assertion_hint(%{"type" => "verification", "code" => code}) do
+    "Verify the trace does not contain suspicious verification signal `#{code}`."
+  end
+
+  defp eval_assertion_hint(%{"type" => "planning", "code" => code}) do
+    "Verify implementation traces stay aligned with approved plan constraints and avoid `#{code}`."
+  end
+
+  defp eval_assertion_hint(%{"type" => "regression", "title" => title}) do
+    "Replay the failing flow `#{title}` and require a passing outcome."
+  end
+
+  defp eval_assertion_hint(%{"type" => "review"}) do
+    "The updated run should address the denial feedback and pass human review."
+  end
+
+  defp eval_assertion_hint(_pattern), do: "Convert this failure pattern into a reusable eval."
+
   defp build_compliance_attestations(nil, _findings), do: []
 
   defp build_compliance_attestations(session, findings) do
@@ -983,8 +2017,421 @@ defmodule ControlKeel.Mission do
     outcomes = Enum.map(invocations, &get_in(&1.metadata, ["outcome"]))
     passed = Enum.count(outcomes, &(&1 == "passed"))
     failed = Enum.count(outcomes, &(&1 == "failed"))
-    %{"passed" => passed, "failed" => failed, "recorded" => length(invocations)}
+    regression_runs = Enum.filter(invocations, &regression_invocation?/1)
+
+    flaky =
+      Enum.count(regression_runs, &(get_in(&1.metadata, ["regression", "outcome"]) == "flaky"))
+
+    skipped =
+      Enum.count(regression_runs, &(get_in(&1.metadata, ["regression", "outcome"]) == "skipped"))
+
+    engines =
+      regression_runs
+      |> Enum.group_by(&(get_in(&1.metadata, ["regression", "engine"]) || "unknown"))
+      |> Enum.into(%{}, fn {engine, rows} -> {engine, length(rows)} end)
+
+    latest_failures =
+      regression_runs
+      |> Enum.filter(fn invocation ->
+        get_in(invocation.metadata, ["regression", "outcome"]) in ["failed", "flaky"]
+      end)
+      |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+      |> Enum.take(5)
+      |> Enum.map(fn invocation ->
+        regression = invocation.metadata["regression"] || %{}
+
+        %{
+          "flow_name" => regression["flow_name"],
+          "engine" => regression["engine"],
+          "outcome" => regression["outcome"],
+          "summary" => regression["summary"],
+          "commit_sha" => regression["commit_sha"],
+          "external_run_id" => regression["external_run_id"],
+          "evidence" => regression["evidence"] || %{},
+          "recorded_at" => invocation.inserted_at
+        }
+      end)
+
+    %{
+      "passed" => passed,
+      "failed" => failed,
+      "recorded" => length(invocations),
+      "external_recorded" => length(regression_runs),
+      "flaky" => flaky,
+      "skipped" => skipped,
+      "blocking_failures" => failed + flaky,
+      "engines" => engines,
+      "latest_failures" => latest_failures
+    }
   end
+
+  defp derive_verification_assessment(task, findings, invocations, reviews, test_outcomes) do
+    suspicious_test_changes = suspicious_test_changes(reviews)
+    approved_reviews = Enum.count(reviews, &(&1.status == "approved"))
+    passed_checks = Enum.count(invocations, &(get_in(&1.metadata, ["outcome"]) == "passed"))
+    external_regressions = test_outcomes["external_recorded"] || 0
+    blocking_failures = test_outcomes["blocking_failures"] || 0
+    skipped = test_outcomes["skipped"] || 0
+    open_or_blocked = Enum.count(findings, &(&1.status in ["open", "blocked"]))
+
+    evidence_sources =
+      []
+      |> maybe_add_evidence_source(passed_checks > 0, "internal_checks")
+      |> maybe_add_evidence_source(external_regressions > 0, "external_regression")
+      |> maybe_add_evidence_source(approved_reviews > 0, "human_review")
+
+    score =
+      0
+      |> maybe_add_score(task.status == "done", 10)
+      |> maybe_add_score(passed_checks > 0, 20)
+      |> maybe_add_score(external_regressions > 0 and blocking_failures == 0, 30)
+      |> maybe_add_score(approved_reviews > 0, 20)
+      |> maybe_add_score(open_or_blocked == 0, 10)
+      |> maybe_add_score(length(evidence_sources) >= 2, 10)
+      |> maybe_subtract_score(blocking_failures > 0, 35)
+      |> maybe_subtract_score(skipped > 0, 10)
+      |> maybe_subtract_score(has_suspicious_severity?(suspicious_test_changes, "high"), 30)
+      |> maybe_subtract_score(has_suspicious_severity?(suspicious_test_changes, "medium"), 10)
+      |> clamp_score()
+
+    %{
+      "score" => score,
+      "status" => verification_status(score),
+      "verification_ready" =>
+        blocking_failures == 0 and not has_suspicious_severity?(suspicious_test_changes, "high"),
+      "evidence" => %{
+        "passed_checks" => passed_checks,
+        "external_regressions" => external_regressions,
+        "approved_reviews" => approved_reviews,
+        "evidence_sources" => evidence_sources
+      },
+      "signals" =>
+        verification_signals(
+          score,
+          evidence_sources,
+          blocking_failures,
+          skipped,
+          suspicious_test_changes
+        ),
+      "suspicious_test_changes" => suspicious_test_changes
+    }
+  end
+
+  defp derive_planning_continuity(task, reviews) do
+    latest_plan = Enum.find(reviews, &(&1.review_type == "plan"))
+
+    approved_plan =
+      Enum.find(reviews, &(&1.review_type == "plan" and &1.status == "approved"))
+
+    latest_execution_review =
+      Enum.find(reviews, &(&1.review_type in ["diff", "completion"]))
+
+    approved_refinement =
+      get_in(approved_plan || %{}, [Access.key(:metadata), "plan_refinement"]) || %{}
+
+    approved_quality = approved_refinement["quality"] || %{}
+    execution_ready_plan = plan_execution_ready?(approved_refinement, approved_quality)
+
+    linked_execution_review? =
+      case {latest_execution_review, approved_plan} do
+        {%Review{} = execution_review, %Review{} = plan_review} ->
+          review_lineage_includes?(execution_review, plan_review.id, reviews)
+
+        _ ->
+          nil
+      end
+
+    drift_signals =
+      []
+      |> maybe_put_planning_signal(
+        task.status == "done" and is_nil(approved_plan),
+        "no_approved_plan",
+        "Task completed without an approved plan review."
+      )
+      |> maybe_put_planning_signal(
+        (task.status == "done" and approved_plan) && not execution_ready_plan,
+        "approved_plan_not_execution_ready",
+        "The latest approved plan did not reach an execution-ready refinement phase."
+      )
+      |> maybe_put_planning_signal(
+        latest_execution_review && approved_plan && linked_execution_review? == false,
+        "execution_review_unlinked",
+        "Later diff/completion review is not linked back to the approved plan review."
+      )
+      |> maybe_put_planning_signal(
+        match?(%Review{review_type: "plan", status: "denied"}, latest_plan),
+        "latest_plan_denied",
+        "The latest plan review was denied, so implementation drift is likely."
+      )
+
+    status =
+      cond do
+        execution_ready_plan and linked_execution_review? in [true, nil] and drift_signals == [] ->
+          "aligned"
+
+        approved_plan ->
+          "partial"
+
+        true ->
+          "missing"
+      end
+
+    %{
+      "status" => status,
+      "execution_aligned" => status == "aligned",
+      "latest_plan_review_id" => latest_plan && latest_plan.id,
+      "latest_plan_phase" =>
+        get_in(latest_plan || %{}, [Access.key(:metadata), "plan_refinement", "phase"]),
+      "latest_plan_depth" =>
+        get_in(latest_plan || %{}, [Access.key(:metadata), "plan_refinement", "depth"]),
+      "approved_plan_review_id" => approved_plan && approved_plan.id,
+      "approved_plan_phase" => approved_refinement["phase"],
+      "approved_plan_depth" => approved_refinement["depth"],
+      "approved_plan_ready" => execution_ready_plan,
+      "execution_review_id" => latest_execution_review && latest_execution_review.id,
+      "execution_review_linked" => linked_execution_review?,
+      "drift_signals" => drift_signals
+    }
+  end
+
+  defp maybe_put_planning_signal(signals, nil, _code, _summary), do: signals
+  defp maybe_put_planning_signal(signals, false, _code, _summary), do: signals
+
+  defp maybe_put_planning_signal(signals, true, code, summary) do
+    [%{"code" => code, "summary" => summary} | signals]
+  end
+
+  defp review_lineage_includes?(%Review{} = review, target_review_id, reviews) do
+    reviews_by_id = Map.new(reviews, &{&1.id, &1})
+
+    Stream.unfold(review.previous_review_id, fn
+      nil ->
+        nil
+
+      review_id ->
+        {review_id,
+         Map.get(reviews_by_id, review_id) && Map.get(reviews_by_id, review_id).previous_review_id}
+    end)
+    |> Enum.member?(target_review_id)
+  end
+
+  defp suspicious_test_changes(reviews) do
+    reviews
+    |> Enum.filter(&(&1.review_type in ["diff", "completion"]))
+    |> Enum.flat_map(fn review ->
+      review.submission_body
+      |> diff_file_changes()
+      |> Enum.flat_map(&suspicious_signals_for_file(&1, review))
+    end)
+    |> Enum.uniq_by(&Map.take(&1, ["code", "file", "line"]))
+  end
+
+  defp diff_file_changes(body) when is_binary(body) do
+    body
+    |> String.split("\n", trim: false)
+    |> Enum.reduce({nil, []}, fn line, {current_file, acc} ->
+      cond do
+        String.starts_with?(line, "diff --git ") ->
+          file = diff_file_path(line)
+          {file, maybe_start_file_entry(acc, file)}
+
+        String.starts_with?(line, "+++ b/") ->
+          file = String.replace_prefix(line, "+++ b/", "")
+          {file, maybe_start_file_entry(acc, file)}
+
+        current_file && String.starts_with?(line, "+") && not String.starts_with?(line, "+++") ->
+          {current_file,
+           update_file_entry(acc, current_file, :added, String.trim_leading(line, "+"))}
+
+        current_file && String.starts_with?(line, "-") && not String.starts_with?(line, "---") ->
+          {current_file,
+           update_file_entry(acc, current_file, :removed, String.trim_leading(line, "-"))}
+
+        true ->
+          {current_file, acc}
+      end
+    end)
+    |> elem(1)
+    |> Enum.reverse()
+    |> Enum.filter(&test_related_file?(&1["file"]))
+  end
+
+  defp diff_file_changes(_body), do: []
+
+  defp maybe_start_file_entry(entries, nil), do: entries
+
+  defp maybe_start_file_entry(entries, file) do
+    if Enum.any?(entries, &(&1["file"] == file)) do
+      entries
+    else
+      [%{"file" => file, "added" => [], "removed" => []} | entries]
+    end
+  end
+
+  defp update_file_entry(entries, file, key, line) do
+    Enum.map(entries, fn entry ->
+      if entry["file"] == file do
+        Map.update!(entry, Atom.to_string(key), &[line | &1])
+      else
+        entry
+      end
+    end)
+  end
+
+  defp suspicious_signals_for_file(file_change, review) do
+    added = Enum.reverse(file_change["added"] || [])
+    removed = Enum.reverse(file_change["removed"] || [])
+    file = file_change["file"]
+
+    []
+    |> maybe_add_suspicious_signal(
+      Enum.find(added, &skip_added?/1),
+      "test_skip_added",
+      "high",
+      file,
+      review.id,
+      "The diff adds a skipped test marker in #{file}. This can make green checks less trustworthy."
+    )
+    |> maybe_add_suspicious_signal(
+      Enum.find(added, &focus_added?/1),
+      "test_focus_added",
+      "high",
+      file,
+      review.id,
+      "The diff adds a focused test marker in #{file}. Focused tests can hide broader regressions in CI."
+    )
+    |> maybe_add_suspicious_signal(
+      Enum.find(removed, &assertion_removed?/1),
+      "assertion_removed",
+      "medium",
+      file,
+      review.id,
+      "The diff removes an assertion from #{file}. Passing tests may no longer prove the same behavior."
+    )
+    |> maybe_add_suspicious_signal(
+      Enum.find(added, &mock_heavy_added?/1),
+      "mock_intensity_increase",
+      "low",
+      file,
+      review.id,
+      "The diff increases mocks or stubs in #{file}. Check that verification still exercises real behavior."
+    )
+  end
+
+  defp maybe_add_suspicious_signal(signals, nil, _code, _severity, _file, _review_id, _summary),
+    do: signals
+
+  defp maybe_add_suspicious_signal(signals, line, code, severity, file, review_id, summary) do
+    [
+      %{
+        "code" => code,
+        "severity" => severity,
+        "file" => file,
+        "review_id" => review_id,
+        "line" => String.trim(line),
+        "summary" => summary
+      }
+      | signals
+    ]
+  end
+
+  defp diff_file_path(line) do
+    case String.split(line, " ", parts: 4) do
+      ["diff", "--git", _old, "b/" <> file] -> file
+      _other -> nil
+    end
+  end
+
+  defp test_related_file?(file) when is_binary(file) do
+    String.contains?(file, "/test/") or
+      String.contains?(file, "/tests/") or
+      String.contains?(file, "/spec/") or
+      String.contains?(file, "/__tests__/") or
+      String.ends_with?(file, "_test.exs") or
+      String.ends_with?(file, ".spec.js") or
+      String.ends_with?(file, ".spec.ts") or
+      String.ends_with?(file, ".test.js") or
+      String.ends_with?(file, ".test.ts") or
+      String.ends_with?(file, ".test.tsx") or
+      String.ends_with?(file, ".test.jsx")
+  end
+
+  defp test_related_file?(_file), do: false
+
+  defp skip_added?(line) do
+    Regex.match?(~r/\b(?:it|test|describe|context)\.skip\b/, line) or
+      Regex.match?(~r/\bx(?:it|describe|context)\b/, line) or
+      Regex.match?(~r/@tag\s+:skip\b/, line) or
+      Regex.match?(~r/@tag\s+skip:\s*true\b/, line) or
+      Regex.match?(~r/@pytest\.mark\.skip\b/, line) or
+      Regex.match?(~r/\bpending\b/, line)
+  end
+
+  defp focus_added?(line) do
+    Regex.match?(~r/\b(?:it|test|describe|context)\.only\b/, line) or
+      Regex.match?(~r/\bf(?:it|describe|context)\b/, line) or
+      Regex.match?(~r/@tag\s+:focus\b/, line) or
+      Regex.match?(~r/@tag\s+focus:\s*true\b/, line) or
+      Regex.match?(~r/\bonly:\s*true\b/, line)
+  end
+
+  defp assertion_removed?(line) do
+    Regex.match?(~r/\b(assert|refute|expect|toEqual|toBe|should)\b/, line)
+  end
+
+  defp mock_heavy_added?(line) do
+    Regex.match?(~r/\b(mock|stub|spy|fake|allow\(|double\(|patch\()\b/i, line)
+  end
+
+  defp maybe_add_evidence_source(sources, true, source), do: sources ++ [source]
+  defp maybe_add_evidence_source(sources, false, _source), do: sources
+
+  defp maybe_add_score(score, true, amount), do: score + amount
+  defp maybe_add_score(score, false, _amount), do: score
+  defp maybe_subtract_score(score, true, amount), do: score - amount
+  defp maybe_subtract_score(score, false, _amount), do: score
+  defp clamp_score(score), do: score |> max(0) |> min(100)
+
+  defp verification_status(score) when score >= 70, do: "strong"
+  defp verification_status(score) when score >= 45, do: "moderate"
+  defp verification_status(_score), do: "weak"
+
+  defp has_suspicious_severity?(signals, severity) do
+    Enum.any?(signals, &(&1["severity"] == severity))
+  end
+
+  defp verification_signals(
+         score,
+         evidence_sources,
+         blocking_failures,
+         skipped,
+         suspicious_test_changes
+       ) do
+    []
+    |> maybe_add_verification_signal(
+      score < 45,
+      "Verification evidence is weak. The task may be functionally green without strong proof."
+    )
+    |> maybe_add_verification_signal(
+      length(evidence_sources) < 2,
+      "Proof relies on a narrow evidence mix. Prefer multiple evidence sources such as regression runs, explicit checks, and review."
+    )
+    |> maybe_add_verification_signal(
+      blocking_failures > 0,
+      "Blocking verification failures were recorded for this task."
+    )
+    |> maybe_add_verification_signal(
+      skipped > 0,
+      "Some regression flows were skipped, which weakens release confidence."
+    )
+    |> maybe_add_verification_signal(
+      suspicious_test_changes != [],
+      "The submitted diff contains test-related changes that may weaken proof strength."
+    )
+  end
+
+  defp maybe_add_verification_signal(signals, true, message), do: signals ++ [message]
+  defp maybe_add_verification_signal(signals, false, _message), do: signals
 
   defp finding_bundle_entry(f) do
     %{
@@ -1136,9 +2583,19 @@ defmodule ControlKeel.Mission do
     resolved = Enum.filter(findings, &(&1.status in ["approved", "resolved", "rejected"]))
     details = Enum.map(findings, &finding_bundle_entry/1)
     risk_score = compute_risk_score(findings)
-    deploy_ready = blocked == [] and open == [] and task.status == "done"
-    compliance_attestations = build_compliance_attestations(session, findings)
     test_outcomes = derive_test_outcomes(invocations)
+    planning_continuity = derive_planning_continuity(task, reviews)
+
+    verification_assessment =
+      derive_verification_assessment(task, findings, invocations, reviews, test_outcomes)
+
+    deploy_ready =
+      blocked == [] and open == [] and task.status == "done" and
+        (test_outcomes["blocking_failures"] || 0) == 0 and
+        verification_assessment["verification_ready"] != false and
+        planning_continuity["execution_aligned"] != false
+
+    compliance_attestations = build_compliance_attestations(session, findings)
     latest_review = List.first(reviews)
 
     %{
@@ -1158,11 +2615,15 @@ defmodule ControlKeel.Mission do
         "details" => details
       },
       "test_outcomes" => test_outcomes,
+      "planning_continuity" => planning_continuity,
+      "verification_assessment" => verification_assessment,
       "diff_summary" => %{
         "agent_runs" => length(invocations),
         "findings_total" => length(findings),
         "auto_resolved" => Enum.count(details, & &1.auto_resolved),
-        "manual_review" => Enum.count(details, &(&1.status in ["approved", "rejected"]))
+        "manual_review" => Enum.count(details, &(&1.status in ["approved", "rejected"])),
+        "suspicious_test_changes" =>
+          length(verification_assessment["suspicious_test_changes"] || [])
       },
       "risk_score" => risk_score,
       "deploy_ready" => deploy_ready,
@@ -1190,6 +2651,154 @@ defmodule ControlKeel.Mission do
       "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
   end
+
+  defp normalize_regression_result(attrs) do
+    with {:ok, session_id} <- normalize_required_integer(attrs, "session_id"),
+         {:ok, task_id} <- normalize_optional_integer(attrs, "task_id"),
+         {:ok, engine} <- normalize_required_string(attrs, "engine"),
+         {:ok, flow_name} <- normalize_required_string(attrs, "flow_name"),
+         {:ok, outcome} <- normalize_regression_outcome(attrs),
+         {:ok, evidence} <- normalize_optional_map(attrs, "evidence"),
+         {:ok, metadata} <- normalize_optional_map(attrs, "metadata") do
+      {:ok,
+       %{
+         "session_id" => session_id,
+         "task_id" => task_id,
+         "engine" => engine,
+         "flow_name" => flow_name,
+         "outcome" => outcome,
+         "summary" => normalize_optional_string(attrs, "summary"),
+         "environment" => normalize_optional_string(attrs, "environment"),
+         "commit_sha" => normalize_optional_string(attrs, "commit_sha"),
+         "external_run_id" => normalize_optional_string(attrs, "external_run_id"),
+         "evidence" => evidence,
+         "metadata" => metadata
+       }}
+    end
+  end
+
+  defp normalize_required_integer(attrs, key) do
+    case fetch_known_key(attrs, key) do
+      value when is_integer(value) ->
+        {:ok, value}
+
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {parsed, ""} -> {:ok, parsed}
+          _ -> {:error, {:invalid_arguments, "`#{key}` must be an integer"}}
+        end
+
+      _ ->
+        {:error, {:invalid_arguments, "`#{key}` is required"}}
+    end
+  end
+
+  defp normalize_optional_integer(attrs, key) do
+    case fetch_known_key(attrs, key) do
+      nil ->
+        {:ok, nil}
+
+      value when is_integer(value) ->
+        {:ok, value}
+
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {parsed, ""} -> {:ok, parsed}
+          _ -> {:error, {:invalid_arguments, "`#{key}` must be an integer if provided"}}
+        end
+
+      _ ->
+        {:error, {:invalid_arguments, "`#{key}` must be an integer if provided"}}
+    end
+  end
+
+  defp normalize_required_string(attrs, key) do
+    case normalize_optional_string(attrs, key) do
+      nil -> {:error, {:invalid_arguments, "`#{key}` is required"}}
+      value -> {:ok, value}
+    end
+  end
+
+  defp normalize_optional_string(attrs, key) do
+    case fetch_known_key(attrs, key) do
+      value when is_binary(value) ->
+        case String.trim(value) do
+          "" -> nil
+          trimmed -> trimmed
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp normalize_optional_map(attrs, key) do
+    case fetch_known_key(attrs, key) do
+      nil -> {:ok, %{}}
+      value when is_map(value) -> {:ok, value}
+      _ -> {:error, {:invalid_arguments, "`#{key}` must be an object if provided"}}
+    end
+  end
+
+  defp normalize_regression_outcome(attrs) do
+    case normalize_optional_string(attrs, "outcome") do
+      value when value in ["passed", "failed", "flaky", "skipped"] ->
+        {:ok, value}
+
+      _ ->
+        {:error, {:invalid_arguments, "`outcome` must be one of passed, failed, flaky, skipped"}}
+    end
+  end
+
+  defp regression_metadata(normalized) do
+    bucket =
+      case normalized["outcome"] do
+        "passed" -> "passed"
+        "skipped" -> "passed"
+        _ -> "failed"
+      end
+
+    %{
+      "outcome" => bucket,
+      "regression" => %{
+        "engine" => normalized["engine"],
+        "flow_name" => normalized["flow_name"],
+        "outcome" => normalized["outcome"],
+        "summary" => normalized["summary"],
+        "environment" => normalized["environment"],
+        "commit_sha" => normalized["commit_sha"],
+        "external_run_id" => normalized["external_run_id"],
+        "evidence" => normalized["evidence"]
+      },
+      "external_metadata" => normalized["metadata"]
+    }
+  end
+
+  defp regression_decision("passed"), do: "allow"
+  defp regression_decision("skipped"), do: "allow"
+  defp regression_decision("flaky"), do: "warn"
+  defp regression_decision("failed"), do: "warn"
+
+  defp regression_invocation?(invocation) do
+    invocation.source == "external_qa" and invocation.tool == "regression_test"
+  end
+
+  defp fetch_known_key(attrs, key) do
+    Map.get(attrs, key) || Map.get(attrs, known_attr_key(key))
+  end
+
+  defp known_attr_key("session_id"), do: :session_id
+  defp known_attr_key("task_id"), do: :task_id
+  defp known_attr_key("engine"), do: :engine
+  defp known_attr_key("flow_name"), do: :flow_name
+  defp known_attr_key("outcome"), do: :outcome
+  defp known_attr_key("summary"), do: :summary
+  defp known_attr_key("environment"), do: :environment
+  defp known_attr_key("commit_sha"), do: :commit_sha
+  defp known_attr_key("external_run_id"), do: :external_run_id
+  defp known_attr_key("evidence"), do: :evidence
+  defp known_attr_key("metadata"), do: :metadata
+  defp known_attr_key(_key), do: nil
 
   defp build_invocation_summary(invocations, total_cost) do
     %{
@@ -1231,6 +2840,8 @@ defmodule ControlKeel.Mission do
       "open_findings_count" => proof.open_findings_count,
       "blocked_findings_count" => proof.blocked_findings_count,
       "approved_findings_count" => proof.approved_findings_count,
+      "verification_status" => get_in(proof.bundle, ["verification_assessment", "status"]),
+      "verification_score" => get_in(proof.bundle, ["verification_assessment", "score"]),
       "domain_pack" => domain_pack,
       "generated_at" => proof.generated_at
     }
@@ -1263,6 +2874,8 @@ defmodule ControlKeel.Mission do
         |> Enum.map(&finding_bundle_entry/1),
       "latest_invocations" => Enum.map(latest_invocations, &audit_invocation_entry/1),
       "proof_summary" => proof_summary(latest_proof),
+      "planning_context" => get_in(task.metadata || %{}, ["planning_context"]) || %{},
+      "review_gate" => review_gate_status(task),
       "memory_hits" => memory_hits.entries,
       "workspace_context" => workspace_context,
       "workspace_cache_key" => workspace_context["cache_key"],
@@ -1573,7 +3186,9 @@ defmodule ControlKeel.Mission do
          {:ok, previous_review} <-
            resolve_previous_review(previous_review_id, session_id, task, review_type),
          {:ok, submission_body} <-
-           required_string(Map.get(attrs, "submission_body"), "submission_body") do
+           required_string(Map.get(attrs, "submission_body"), "submission_body"),
+         {:ok, plan_refinement} <-
+           normalize_plan_refinement(attrs, review_type, task, previous_review) do
       title =
         attrs["title"] ||
           review_title(review_type, task, session_id)
@@ -1586,6 +3201,7 @@ defmodule ControlKeel.Mission do
         |> Map.put("session_id", session_id)
         |> maybe_put_map("annotations")
         |> maybe_put_map("metadata")
+        |> maybe_put_plan_refinement(plan_refinement)
         |> put_runtime_context_metadata(runtime_context)
         |> maybe_put_string("submitted_by", "agent")
         |> maybe_put_value("task_id", task && task.id)
@@ -1599,7 +3215,8 @@ defmodule ControlKeel.Mission do
          session_id: session_id,
          runtime_context: runtime_context,
          previous_review: previous_review,
-         review_type: review_type
+         review_type: review_type,
+         plan_refinement: plan_refinement
        }}
     end
   end
@@ -1621,6 +3238,16 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  defp merge_review_response_attrs(%Review{} = review, review_attrs) do
+    review_attrs
+    |> Map.update("metadata", review.metadata || %{}, fn metadata ->
+      Map.merge(review.metadata || %{}, metadata || %{})
+    end)
+    |> Map.update("annotations", review.annotations || %{}, fn annotations ->
+      Map.merge(review.annotations || %{}, annotations || %{})
+    end)
+  end
+
   defp maybe_supersede_pending_reviews(multi, normalized) do
     Multi.run(multi, :superseded_reviews, fn repo, _changes ->
       query = superseded_reviews_query(normalized)
@@ -1631,10 +3258,15 @@ defmodule ControlKeel.Mission do
 
   defp maybe_track_task_review_gate(
          multi,
-         %{task: %Task{} = task, review_type: "plan"} = _normalized
+         %{task: %Task{} = task, review_type: "plan", plan_refinement: plan_refinement} =
+           _normalized
        ) do
     Multi.update(multi, :task, fn %{review: review} ->
-      metadata = put_review_gate(task.metadata || %{}, review, "review", false)
+      metadata =
+        (task.metadata || %{})
+        |> put_review_gate(review, "review", false, plan_refinement)
+        |> put_latest_submitted_plan(review, plan_refinement)
+
       Task.changeset(task, %{metadata: metadata})
     end)
   end
@@ -1655,7 +3287,7 @@ defmodule ControlKeel.Mission do
 
   defp maybe_apply_review_response_gate(
          multi,
-         %Review{task_id: task_id, review_type: "plan"},
+         %Review{task_id: task_id, review_type: "plan"} = review,
          %{decision: decision}
        )
        when is_integer(task_id) do
@@ -1665,9 +3297,28 @@ defmodule ControlKeel.Mission do
           {:ok, nil}
 
         task ->
-          phase = if(decision == "approved", do: "execution", else: "planning")
-          execution_ready = decision == "approved"
-          metadata = put_review_gate(task.metadata || %{}, updated_review, phase, execution_ready)
+          plan_refinement =
+            get_in(updated_review.metadata || %{}, ["plan_refinement"]) ||
+              get_in(review.metadata || %{}, ["plan_refinement"]) ||
+              %{}
+
+          plan_quality = get_in(plan_refinement, ["quality"]) || %{}
+
+          execution_ready =
+            decision == "approved" and
+              plan_execution_ready?(plan_refinement, plan_quality)
+
+          phase =
+            cond do
+              decision != "approved" -> "planning"
+              execution_ready -> "execution"
+              true -> "planning"
+            end
+
+          metadata =
+            (task.metadata || %{})
+            |> put_review_gate(updated_review, phase, execution_ready, plan_refinement)
+            |> put_plan_decision(updated_review, plan_refinement, decision)
 
           task
           |> Task.changeset(%{metadata: metadata})
@@ -1808,13 +3459,490 @@ defmodule ControlKeel.Mission do
   defp normalize_review_decision(_decision),
     do: {:error, {:invalid_arguments, "`decision` must be approved or denied"}}
 
-  defp put_review_gate(metadata, review, phase, execution_ready) do
+  defp normalize_plan_refinement(_attrs, review_type, _task, _previous_review)
+       when review_type != "plan",
+       do: {:ok, nil}
+
+  defp normalize_plan_refinement(attrs, "plan", task, previous_review) do
+    metadata_refinement = get_in(attrs, ["metadata", "plan_refinement"]) || %{}
+
+    raw_refinement =
+      metadata_refinement
+      |> Map.merge(plan_refinement_overrides(attrs))
+
+    with {:ok, phase} <- normalize_plan_phase(Map.get(raw_refinement, "phase", "ticket")),
+         {:ok, research_summary} <-
+           optional_trimmed_string(
+             Map.get(raw_refinement, "research_summary"),
+             "research_summary"
+           ),
+         {:ok, codebase_findings} <-
+           optional_string_list(Map.get(raw_refinement, "codebase_findings"), "codebase_findings"),
+         {:ok, prior_art_summary} <-
+           optional_trimmed_string(
+             Map.get(raw_refinement, "prior_art_summary"),
+             "prior_art_summary"
+           ),
+         {:ok, options_considered} <-
+           optional_string_list(
+             Map.get(raw_refinement, "options_considered"),
+             "options_considered"
+           ),
+         {:ok, selected_option} <-
+           optional_trimmed_string(Map.get(raw_refinement, "selected_option"), "selected_option"),
+         {:ok, rejected_options} <-
+           optional_string_list(Map.get(raw_refinement, "rejected_options"), "rejected_options"),
+         {:ok, implementation_steps} <-
+           optional_string_list(
+             Map.get(raw_refinement, "implementation_steps"),
+             "implementation_steps"
+           ),
+         {:ok, validation_plan} <-
+           optional_string_list(Map.get(raw_refinement, "validation_plan"), "validation_plan"),
+         {:ok, code_snippets} <-
+           optional_string_list(Map.get(raw_refinement, "code_snippets"), "code_snippets"),
+         {:ok, scope_estimate} <-
+           normalize_scope_estimate(Map.get(raw_refinement, "scope_estimate")) do
+      depth = next_plan_depth(previous_review)
+
+      refinement =
+        %{
+          "phase" => phase,
+          "phase_order" => plan_phase_order(phase),
+          "depth" => depth,
+          "task_title" => task && task.title,
+          "research_summary" => research_summary,
+          "codebase_findings" => codebase_findings,
+          "prior_art_summary" => prior_art_summary,
+          "options_considered" => options_considered,
+          "selected_option" => selected_option,
+          "rejected_options" => rejected_options,
+          "implementation_steps" => implementation_steps,
+          "validation_plan" => validation_plan,
+          "code_snippets" => code_snippets,
+          "scope_estimate" => scope_estimate,
+          "previous_phase" => previous_plan_phase(previous_review)
+        }
+        |> maybe_put_value("body_length", body_length(attrs["submission_body"]))
+        |> Map.put(
+          "quality",
+          assess_plan_refinement(phase, scope_estimate, %{
+            "research_summary" => research_summary,
+            "codebase_findings" => codebase_findings,
+            "prior_art_summary" => prior_art_summary,
+            "options_considered" => options_considered,
+            "selected_option" => selected_option,
+            "rejected_options" => rejected_options,
+            "implementation_steps" => implementation_steps,
+            "validation_plan" => validation_plan,
+            "code_snippets" => code_snippets
+          })
+        )
+
+      {:ok, refinement}
+    end
+  end
+
+  defp plan_refinement_overrides(attrs) do
+    %{}
+    |> maybe_override_refinement("phase", Map.get(attrs, "plan_phase"))
+    |> maybe_override_refinement("research_summary", Map.get(attrs, "research_summary"))
+    |> maybe_override_refinement("codebase_findings", Map.get(attrs, "codebase_findings"))
+    |> maybe_override_refinement("prior_art_summary", Map.get(attrs, "prior_art_summary"))
+    |> maybe_override_refinement("options_considered", Map.get(attrs, "options_considered"))
+    |> maybe_override_refinement("selected_option", Map.get(attrs, "selected_option"))
+    |> maybe_override_refinement("rejected_options", Map.get(attrs, "rejected_options"))
+    |> maybe_override_refinement("implementation_steps", Map.get(attrs, "implementation_steps"))
+    |> maybe_override_refinement("validation_plan", Map.get(attrs, "validation_plan"))
+    |> maybe_override_refinement("code_snippets", Map.get(attrs, "code_snippets"))
+    |> maybe_override_refinement("scope_estimate", Map.get(attrs, "scope_estimate"))
+  end
+
+  defp maybe_override_refinement(refinement, _key, nil), do: refinement
+  defp maybe_override_refinement(refinement, key, value), do: Map.put(refinement, key, value)
+
+  defp normalize_plan_phase(phase) when phase in @plan_phases, do: {:ok, phase}
+
+  defp normalize_plan_phase(_phase) do
+    {:error,
+     {:invalid_arguments, "`plan_phase` must be one of: #{Enum.join(@plan_phases, ", ")}"}}
+  end
+
+  defp optional_trimmed_string(nil, _field), do: {:ok, nil}
+  defp optional_trimmed_string("", _field), do: {:ok, nil}
+
+  defp optional_trimmed_string(value, _field) when is_binary(value) do
+    case String.trim(value) do
+      "" -> {:ok, nil}
+      trimmed -> {:ok, trimmed}
+    end
+  end
+
+  defp optional_trimmed_string(_value, field),
+    do: {:error, {:invalid_arguments, "`#{field}` must be a string if provided"}}
+
+  defp optional_string_list(nil, _field), do: {:ok, []}
+
+  defp optional_string_list(values, field) when is_list(values) do
+    if Enum.all?(values, &is_binary/1) do
+      {:ok, values |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))}
+    else
+      {:error, {:invalid_arguments, "`#{field}` must be an array of strings"}}
+    end
+  end
+
+  defp optional_string_list(_value, field),
+    do: {:error, {:invalid_arguments, "`#{field}` must be an array of strings if provided"}}
+
+  defp normalize_scope_estimate(nil) do
+    {:ok,
+     %{
+       "files_touched_estimate" => nil,
+       "diff_size_estimate" => nil,
+       "architectural_scope" => false
+     }}
+  end
+
+  defp normalize_scope_estimate(scope_estimate) when is_map(scope_estimate) do
+    with {:ok, files_touched_estimate} <-
+           optional_integer(
+             Map.get(scope_estimate, "files_touched_estimate"),
+             "files_touched_estimate"
+           ),
+         {:ok, diff_size_estimate} <-
+           optional_integer(Map.get(scope_estimate, "diff_size_estimate"), "diff_size_estimate"),
+         {:ok, architectural_scope} <-
+           optional_boolean(Map.get(scope_estimate, "architectural_scope"), "architectural_scope") do
+      {:ok,
+       %{
+         "files_touched_estimate" => files_touched_estimate,
+         "diff_size_estimate" => diff_size_estimate,
+         "architectural_scope" => architectural_scope || false
+       }}
+    end
+  end
+
+  defp normalize_scope_estimate(_value),
+    do: {:error, {:invalid_arguments, "`scope_estimate` must be an object if provided"}}
+
+  defp optional_boolean(nil, _field), do: {:ok, nil}
+  defp optional_boolean(value, _field) when is_boolean(value), do: {:ok, value}
+
+  defp optional_boolean(_value, field),
+    do: {:error, {:invalid_arguments, "`#{field}` must be a boolean if provided"}}
+
+  defp assess_plan_refinement(phase, scope_estimate, fields) do
+    scope_high = high_scope_plan?(scope_estimate)
+    missing = plan_missing_fields(phase, fields, scope_high)
+    execution_ready_phase = phase in @execution_ready_plan_phases
+
+    score =
+      100
+      |> Kernel.-(length(missing) * 12)
+      |> maybe_subtract_score(scope_high and phase == "implementation_plan", 8)
+      |> maybe_subtract_score(
+        execution_ready_phase and length(fields["validation_plan"]) == 0,
+        10
+      )
+      |> clamp_score()
+
+    %{
+      "score" => score,
+      "status" => plan_quality_status(score, missing),
+      "ready" => execution_ready_phase and missing == [],
+      "execution_ready_phase" => execution_ready_phase,
+      "scope_high" => scope_high,
+      "missing" => missing,
+      "signals" => plan_quality_signals(phase, scope_high, missing),
+      "grill_questions" => plan_grill_questions(phase, scope_high, missing),
+      "next_phase" => next_plan_phase(phase)
+    }
+  end
+
+  defp plan_missing_fields(phase, fields, scope_high) do
+    missing = []
+
+    missing =
+      if phase in [
+           "research_packet",
+           "design_options",
+           "narrowed_decision",
+           "implementation_plan",
+           "code_backed_plan"
+         ] and
+           is_nil(fields["research_summary"]) and fields["codebase_findings"] == [] and
+           is_nil(fields["prior_art_summary"]) do
+        ["research_summary" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if phase in [
+           "design_options",
+           "narrowed_decision",
+           "implementation_plan",
+           "code_backed_plan"
+         ] and
+           length(fields["options_considered"]) < 2 do
+        ["options_considered" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if phase in ["narrowed_decision", "implementation_plan", "code_backed_plan"] and
+           is_nil(fields["selected_option"]) do
+        ["selected_option" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if phase in ["narrowed_decision", "implementation_plan", "code_backed_plan"] and
+           fields["rejected_options"] == [] do
+        ["rejected_options" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if phase in ["implementation_plan", "code_backed_plan"] and
+           length(fields["implementation_steps"]) < 2 do
+        ["implementation_steps" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if phase in ["implementation_plan", "code_backed_plan"] and
+           length(fields["validation_plan"]) == 0 do
+        ["validation_plan" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if phase == "code_backed_plan" and fields["code_snippets"] == [] do
+        ["code_snippets" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if scope_high and phase in @execution_ready_plan_phases and fields["rejected_options"] == [] do
+        ["rejected_options" | missing]
+      else
+        missing
+      end
+
+    missing |> Enum.reverse() |> Enum.uniq()
+  end
+
+  defp plan_quality_status(score, []), do: if(score >= 92, do: "strong", else: "moderate")
+  defp plan_quality_status(score, _missing) when score >= 70, do: "moderate"
+  defp plan_quality_status(_score, _missing), do: "weak"
+
+  defp plan_quality_signals(phase, scope_high, missing) do
+    []
+    |> maybe_add_signal(
+      scope_high,
+      "Large or architectural work needs deeper planning artifacts before execution."
+    )
+    |> maybe_add_signal(
+      phase in @execution_ready_plan_phases and missing == [],
+      "Plan is execution-ready and can unlock implementation after approval."
+    )
+    |> Enum.concat(Enum.map(missing, &"Missing planning artifact: #{&1}."))
+  end
+
+  defp plan_grill_questions(phase, scope_high, missing) do
+    base_questions =
+      missing
+      |> Enum.map(&grill_question_for_missing(&1, phase))
+      |> Enum.reject(&is_nil/1)
+
+    scoped_questions =
+      if scope_high do
+        base_questions ++
+          [
+            "Which boundaries or modules are most likely to break if this implementation choice is wrong?"
+          ]
+      else
+        base_questions
+      end
+
+    phase_questions =
+      case phase do
+        "ticket" ->
+          [
+            "What exact user-visible outcome should this task produce when it is done?"
+          ]
+
+        "research_packet" ->
+          [
+            "Which files, modules, or flows did you inspect, and what did each one tell you?"
+          ]
+
+        "design_options" ->
+          [
+            "What is the strongest alternative design here, and why are you not choosing it?"
+          ]
+
+        "narrowed_decision" ->
+          [
+            "What assumption would most likely invalidate the chosen approach?"
+          ]
+
+        "implementation_plan" ->
+          [
+            "What check would tell us early that the implementation is drifting from the plan?"
+          ]
+
+        "code_backed_plan" ->
+          [
+            "Which exact code paths or snippets prove the plan matches the current codebase?"
+          ]
+
+        _ ->
+          []
+      end
+
+    (scoped_questions ++ phase_questions)
+    |> Enum.uniq()
+    |> Enum.take(4)
+  end
+
+  defp grill_question_for_missing("research_summary", _phase) do
+    "What did you learn from the codebase or prior art that changes how this should be built?"
+  end
+
+  defp grill_question_for_missing("options_considered", _phase) do
+    "What are at least two viable approaches here, and what tradeoff separates them?"
+  end
+
+  defp grill_question_for_missing("selected_option", _phase) do
+    "Which option are you actually choosing, and what makes it the best fit for this repo?"
+  end
+
+  defp grill_question_for_missing("rejected_options", _phase) do
+    "Why are the rejected options worse in this codebase, not just in theory?"
+  end
+
+  defp grill_question_for_missing("implementation_steps", _phase) do
+    "What is the ordered implementation sequence, and where are the likely failure points?"
+  end
+
+  defp grill_question_for_missing("validation_plan", _phase) do
+    "What concrete checks, tests, or compiler signals will prove this change is correct?"
+  end
+
+  defp grill_question_for_missing("code_snippets", _phase) do
+    "What existing code paths or snippets anchor this plan in the current implementation?"
+  end
+
+  defp grill_question_for_missing(_missing, _phase), do: nil
+
+  defp maybe_add_signal(signals, true, message), do: [message | signals]
+  defp maybe_add_signal(signals, false, _message), do: signals
+
+  defp next_plan_phase("ticket"), do: "research_packet"
+  defp next_plan_phase("research_packet"), do: "design_options"
+  defp next_plan_phase("design_options"), do: "narrowed_decision"
+  defp next_plan_phase("narrowed_decision"), do: "implementation_plan"
+  defp next_plan_phase("implementation_plan"), do: "code_backed_plan"
+  defp next_plan_phase(_phase), do: nil
+
+  defp plan_phase_order(phase), do: Enum.find_index(@plan_phases, &(&1 == phase)) || 0
+
+  defp previous_plan_phase(nil), do: nil
+
+  defp previous_plan_phase(%Review{} = review) do
+    get_in(review.metadata || %{}, ["plan_refinement", "phase"])
+  end
+
+  defp next_plan_depth(nil), do: 1
+
+  defp next_plan_depth(%Review{} = previous_review) do
+    (get_in(previous_review.metadata || %{}, ["plan_refinement", "depth"]) || 0) + 1
+  end
+
+  defp high_scope_plan?(scope_estimate) when is_map(scope_estimate) do
+    (scope_estimate["files_touched_estimate"] || 0) >= 5 or
+      (scope_estimate["diff_size_estimate"] || 0) >= 300 or
+      scope_estimate["architectural_scope"] == true
+  end
+
+  defp high_scope_plan?(_scope_estimate), do: false
+
+  defp body_length(nil), do: 0
+  defp body_length(body) when is_binary(body), do: String.length(body)
+  defp body_length(_body), do: 0
+
+  defp plan_execution_ready?(plan_refinement, plan_quality) do
+    plan_refinement["phase"] in @execution_ready_plan_phases and
+      plan_quality["ready"] == true
+  end
+
+  defp put_latest_submitted_plan(metadata, _review, nil), do: metadata
+
+  defp put_latest_submitted_plan(metadata, review, plan_refinement) do
+    update_in(metadata, ["planning_context"], fn planning_context ->
+      planning_context = planning_context || %{}
+
+      Map.put(planning_context, "latest_submitted_plan", %{
+        "review_id" => review.id,
+        "phase" => plan_refinement["phase"],
+        "depth" => plan_refinement["depth"],
+        "quality" => plan_refinement["quality"]
+      })
+    end)
+  end
+
+  defp put_plan_decision(metadata, _review, nil, _decision), do: metadata
+
+  defp put_plan_decision(metadata, review, plan_refinement, decision) do
+    update_in(metadata, ["planning_context"], fn planning_context ->
+      planning_context = planning_context || %{}
+
+      planning_context =
+        Map.put(planning_context, "latest_plan_decision", %{
+          "review_id" => review.id,
+          "decision" => decision,
+          "phase" => plan_refinement["phase"],
+          "depth" => plan_refinement["depth"],
+          "quality" => plan_refinement["quality"]
+        })
+
+      if decision == "approved" do
+        Map.put(planning_context, "latest_approved_plan", %{
+          "review_id" => review.id,
+          "phase" => plan_refinement["phase"],
+          "depth" => plan_refinement["depth"],
+          "quality" => plan_refinement["quality"],
+          "selected_option" => plan_refinement["selected_option"],
+          "validation_plan" => plan_refinement["validation_plan"]
+        })
+      else
+        planning_context
+      end
+    end)
+  end
+
+  defp put_review_gate(metadata, review, phase, execution_ready, plan_refinement) do
+    plan_quality = get_in(plan_refinement || %{}, ["quality"]) || %{}
+
     Map.put(metadata || %{}, "review_gate", %{
       "phase" => phase,
       "execution_ready" => execution_ready,
       "latest_review_id" => review.id,
       "latest_review_status" => review.status,
       "latest_review_type" => review.review_type,
+      "latest_plan_phase" => plan_refinement && plan_refinement["phase"],
+      "plan_quality_status" => plan_quality["status"],
+      "plan_quality_score" => plan_quality["score"],
+      "grill_questions" => plan_quality["grill_questions"] || [],
+      "planning_depth" => plan_refinement && plan_refinement["depth"],
       "updated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
     })
   end
@@ -1830,6 +3958,14 @@ defmodule ControlKeel.Mission do
       value when is_map(value) -> attrs
       _other -> Map.put(attrs, key, %{})
     end
+  end
+
+  defp maybe_put_plan_refinement(attrs, nil), do: attrs
+
+  defp maybe_put_plan_refinement(attrs, refinement) do
+    update_in(attrs, ["metadata"], fn metadata ->
+      Map.put(metadata || %{}, "plan_refinement", refinement)
+    end)
   end
 
   defp put_runtime_context_metadata(attrs, runtime_context) when map_size(runtime_context) == 0,

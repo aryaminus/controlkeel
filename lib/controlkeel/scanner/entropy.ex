@@ -17,6 +17,7 @@ defmodule ControlKeel.Scanner.Entropy do
         |> Enum.uniq()
         |> Enum.filter(&(byte_size(&1) >= min_length))
         |> Enum.filter(&high_entropy?(&1, threshold))
+        |> Enum.reject(&inline_data_uri_payload?(content, &1))
         |> Enum.map(&finding_from_candidate(rule, input, &1))
 
       _rule ->
@@ -40,6 +41,11 @@ defmodule ControlKeel.Scanner.Entropy do
     entropy(value) >= threshold and
       String.match?(value, ~r/[A-Za-z]/) and
       String.match?(value, ~r/[0-9]/)
+  end
+
+  defp inline_data_uri_payload?(content, candidate) do
+    pattern = ~r/data:image\/[a-z0-9.+-]+;base64,#{Regex.escape(candidate)}/i
+    Regex.match?(pattern, content)
   end
 
   defp finding_from_candidate(rule, input, candidate) do

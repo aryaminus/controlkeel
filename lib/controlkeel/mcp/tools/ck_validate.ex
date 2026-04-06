@@ -6,6 +6,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
   alias ControlKeel.Mission
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.FastPath
+  alias ControlKeel.TrustBoundary
 
   @allowed_kinds ~w(code config shell text)
 
@@ -33,7 +34,15 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
       true ->
         with {:ok, session_id} <- normalize_optional_integer(arguments, "session_id"),
              {:ok, task_id} <- normalize_optional_integer(arguments, "task_id"),
-             {:ok, domain_pack} <- normalize_optional_domain_pack(arguments) do
+             {:ok, domain_pack} <- normalize_optional_domain_pack(arguments),
+             {:ok, source_type} <-
+               normalize_optional_enum(arguments, "source_type", TrustBoundary.source_types()),
+             {:ok, trust_level} <-
+               normalize_optional_enum(arguments, "trust_level", TrustBoundary.trust_levels()),
+             {:ok, intended_use} <-
+               normalize_optional_enum(arguments, "intended_use", TrustBoundary.intended_uses()),
+             {:ok, requested_capabilities} <-
+               normalize_optional_capabilities(arguments, "requested_capabilities") do
           {:ok,
            %{
              "content" => content,
@@ -41,7 +50,11 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
              "kind" => kind,
              "session_id" => session_id,
              "task_id" => task_id,
-             "domain_pack" => domain_pack
+             "domain_pack" => domain_pack,
+             "source_type" => source_type,
+             "trust_level" => trust_level,
+             "intended_use" => intended_use,
+             "requested_capabilities" => requested_capabilities
            }}
         end
     end
@@ -147,6 +160,51 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
     case Map.get(arguments, key) do
       value when is_binary(value) and value != "" -> value
       _ -> nil
+    end
+  end
+
+  defp normalize_optional_enum(arguments, key, allowed) do
+    case Map.get(arguments, key) do
+      nil ->
+        {:ok, nil}
+
+      value when is_binary(value) ->
+        if value in allowed do
+          {:ok, value}
+        else
+          {:error,
+           {:invalid_arguments, "`#{key}` must be one of #{Enum.join(allowed, ", ")} if provided"}}
+        end
+
+      _ ->
+        {:error,
+         {:invalid_arguments, "`#{key}` must be one of #{Enum.join(allowed, ", ")} if provided"}}
+    end
+  end
+
+  defp normalize_optional_capabilities(arguments, key) do
+    case Map.get(arguments, key) do
+      nil ->
+        {:ok, []}
+
+      values when is_list(values) ->
+        normalized =
+          values
+          |> Enum.map(&to_string/1)
+          |> Enum.map(&String.trim/1)
+
+        invalid = Enum.reject(normalized, &(&1 in TrustBoundary.capabilities()))
+
+        if invalid == [] do
+          {:ok, Enum.uniq(normalized)}
+        else
+          {:error,
+           {:invalid_arguments,
+            "`#{key}` contains unsupported capability values: #{Enum.join(invalid, ", ")}"}}
+        end
+
+      _ ->
+        {:error, {:invalid_arguments, "`#{key}` must be an array if provided"}}
     end
   end
 end

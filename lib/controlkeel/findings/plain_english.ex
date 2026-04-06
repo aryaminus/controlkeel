@@ -149,6 +149,60 @@ defmodule ControlKeel.Findings.PlainEnglish do
       risk_if_ignored:
         "Your build could ingest untrusted code, increasing malware, tampering, and compliance exposure in the supply chain."
     },
+    "security.trust_boundary.untrusted_instruction_content" => %{
+      title: "Untrusted content treated as instructions",
+      explanation:
+        "Text from a mixed-trust or untrusted source is being treated as authoritative instructions for the agent. That lets external content steer behavior instead of being handled as plain data or context.",
+      fix:
+        "Keep repository/web/issue/tool content as data by default. Only elevate it into instructions after trusted human or ControlKeel approval.",
+      risk_if_ignored:
+        "External text can quietly redirect the agent, bypass expected review flow, or trigger risky actions."
+    },
+    "security.trust_boundary.untrusted_skill_instruction" => %{
+      title: "Untrusted skill supply-chain risk",
+      explanation:
+        "A skill from an untrusted source is trying to shape agent behavior. Skills can carry hidden policies and execution guidance, so they should be treated like executable supply-chain inputs.",
+      fix:
+        "Require provenance, trust the project explicitly, or have a human reviewer approve the skill before it affects execution.",
+      risk_if_ignored:
+        "An attacker could smuggle behavior-changing instructions through imported skills and gain indirect control over the agent."
+    },
+    "security.trust_boundary.high_impact_action_from_untrusted_context" => %{
+      title: "High-impact action requested from untrusted context",
+      explanation:
+        "The agent is being asked to use powerful capabilities such as shell access, file writes, deployment, network calls, or secret access based on mixed-trust or untrusted content.",
+      fix:
+        "Pause and require ControlKeel review or trusted human approval before allowing the action. Verify the source and restate the intent in trusted instructions.",
+      risk_if_ignored:
+        "Untrusted content can escalate into code execution, data exfiltration, destructive edits, or unauthorized deployment."
+    },
+    "security.trust_boundary.hidden_instruction_channel" => %{
+      title: "Hidden agent-only instructions detected",
+      explanation:
+        "The content contains hidden or non-human-visible channels such as HTML comments, hidden CSS text, metadata fields, or presenter notes. Agents may read these even when humans do not.",
+      fix:
+        "Treat the content as hostile until reviewed. Strip or quarantine hidden channels and avoid letting the material directly influence instructions or high-impact actions.",
+      risk_if_ignored:
+        "Attackers can hide instructions that only the agent sees, causing behavior changes that the human operator cannot easily verify."
+    },
+    "security.trust_boundary.agent_targeted_content_branching" => %{
+      title: "Content may be targeting AI agents specifically",
+      explanation:
+        "The content appears to branch on agent behavior or fingerprinting markers such as webdriver, user-agent checks, headless detection, or model-specific keywords.",
+      fix:
+        "Require review before trusting the content. Compare agent-visible content with a human-visible view when possible and avoid automatic action-taking from the source.",
+      risk_if_ignored:
+        "A website or external system can serve safe content to humans and manipulated content to agents, creating invisible prompt injection or fraud risks."
+    },
+    "security.trust_boundary.encoded_payload_marker" => %{
+      title: "Encoded or multimodal payload marker detected",
+      explanation:
+        "The content includes markers for encoded payloads such as base64 image data, metadata blobs, QR references, or steganography-related hints. Hidden instructions may exist outside the visible text.",
+      fix:
+        "Keep the source quarantined from action planning until it is reviewed. Prefer trusted transforms that extract only the minimum human-verified data needed.",
+      risk_if_ignored:
+        "An attacker can hide instructions in images, metadata, or encoded blobs that bypass normal text-only sanitization."
+    },
     "security.weak_password_hash" => %{
       title: "Weak password storage",
       explanation:

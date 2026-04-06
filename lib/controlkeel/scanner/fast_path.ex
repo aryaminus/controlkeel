@@ -8,6 +8,7 @@ defmodule ControlKeel.Scanner.FastPath do
   alias ControlKeel.Policy.Rule
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.{Advisory, Entropy, Patterns, Semgrep}
+  alias ControlKeel.TrustBoundary
 
   @type input :: map()
 
@@ -24,6 +25,7 @@ defmodule ControlKeel.Scanner.FastPath do
       |> Kernel.++(Patterns.detect(normalized["content"], normalized, runtime_rules))
       |> Kernel.++(Entropy.detect(normalized["content"], normalized, runtime_rules))
       |> Kernel.++(budget_findings(normalized, cost_rules))
+      |> Kernel.++(trust_boundary_findings(normalized))
       |> uniq_findings()
 
     layer2 =
@@ -56,6 +58,7 @@ defmodule ControlKeel.Scanner.FastPath do
         normalize_optional_integer(Map.get(input, "task_id", Map.get(input, :task_id))),
       "domain_pack" => normalize_domain_pack(input)
     }
+    |> Map.merge(TrustBoundary.normalize_validation_context(input))
   end
 
   defp domain_rules_for(%{"domain_pack" => nil}), do: []
@@ -151,6 +154,11 @@ defmodule ControlKeel.Scanner.FastPath do
 
   defp workspace_rules_for(%{"session_id" => session_id}) do
     Platform.session_policy_rules(session_id)
+  end
+
+  defp trust_boundary_findings(normalized) do
+    {_context, findings} = TrustBoundary.findings_for_validation(normalized)
+    findings
   end
 
   defp build_result(findings, advisory)

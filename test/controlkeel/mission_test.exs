@@ -219,7 +219,15 @@ defmodule ControlKeel.MissionTest do
              Mission.submit_review(%{
                "task_id" => task.id,
                "submission_body" => "Plan v1",
-               "submitted_by" => "codex"
+               "submitted_by" => "codex",
+               "plan_phase" => "implementation_plan",
+               "research_summary" => "Mapped the first implementation pass.",
+               "codebase_findings" => ["Task execution already uses review_gate metadata."],
+               "options_considered" => ["Extend reviews", "Add planner service"],
+               "selected_option" => "Extend reviews",
+               "rejected_options" => ["Add planner service"],
+               "implementation_steps" => ["Normalize plan metadata", "Gate execution on it"],
+               "validation_plan" => ["mix test"]
              })
 
     assert first_review.status == "pending"
@@ -229,7 +237,15 @@ defmodule ControlKeel.MissionTest do
              Mission.submit_review(%{
                "task_id" => task.id,
                "submission_body" => "Plan v2",
-               "submitted_by" => "codex"
+               "submitted_by" => "codex",
+               "plan_phase" => "implementation_plan",
+               "research_summary" => "Refined the execution-ready plan after review.",
+               "codebase_findings" => ["Proof bundle already loads plan reviews."],
+               "options_considered" => ["Extend reviews", "Add planner service"],
+               "selected_option" => "Extend reviews",
+               "rejected_options" => ["Add planner service"],
+               "implementation_steps" => ["Normalize plan metadata", "Gate execution on it"],
+               "validation_plan" => ["mix test"]
              })
 
     assert second_review.previous_review_id == first_review.id
@@ -250,6 +266,83 @@ defmodule ControlKeel.MissionTest do
 
     review_memory = Memory.search("Plan v2", session_id: session.id, top_k: 10)
     assert Enum.any?(review_memory.entries, &(&1.record_type == "review"))
+  end
+
+  test "approved non-execution-ready plan phases keep the task in planning" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "queued"})
+
+    assert {:ok, review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "plan_phase" => "research_packet",
+               "research_summary" => "Mapped the parser and router entrypoints.",
+               "codebase_findings" => ["Router currently owns dispatch and auth checks."],
+               "submission_body" => "Research packet for recursive planning"
+             })
+
+    assert {:ok, _approved} =
+             Mission.respond_review(review, %{
+               "decision" => "approved",
+               "feedback_notes" => "Research looks correct"
+             })
+
+    gate = Mission.review_gate_status(Mission.get_task!(task.id))
+    assert gate["phase"] == "planning"
+    assert gate["execution_ready"] == false
+    assert gate["latest_plan_phase"] == "research_packet"
+    assert gate["planning_depth"] == 1
+    assert is_list(gate["grill_questions"])
+    assert Enum.any?(gate["grill_questions"], &String.contains?(&1, "files, modules, or flows"))
+  end
+
+  test "approved implementation plans unlock execution only when the refinement packet is strong enough" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "queued"})
+
+    assert {:ok, review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "plan_phase" => "implementation_plan",
+               "research_summary" => "Reviewed mission, MCP tools, and proof generation seams.",
+               "codebase_findings" => ["Plan reviews already gate execution in Mission."],
+               "options_considered" => [
+                 "New planner subsystem",
+                 "Extend existing review metadata"
+               ],
+               "selected_option" => "Extend existing review metadata",
+               "rejected_options" => ["New planner subsystem"],
+               "implementation_steps" => [
+                 "Add plan refinement metadata to plan reviews",
+                 "Gate execution on approved implementation-ready plans"
+               ],
+               "validation_plan" => [
+                 "mix test test/controlkeel/mission_test.exs",
+                 "mix precommit"
+               ],
+               "scope_estimate" => %{
+                 "files_touched_estimate" => 6,
+                 "diff_size_estimate" => 180,
+                 "architectural_scope" => true
+               },
+               "submission_body" => "Implementation-ready recursive plan"
+             })
+
+    assert {:ok, _approved} =
+             Mission.respond_review(review, %{
+               "decision" => "approved",
+               "feedback_notes" => "Execution-ready"
+             })
+
+    gate = Mission.review_gate_status(Mission.get_task!(task.id))
+    assert gate["phase"] == "execution"
+    assert gate["execution_ready"] == true
+    assert gate["latest_plan_phase"] == "implementation_plan"
+    assert gate["plan_quality_status"] in ["moderate", "strong"]
+    assert gate["plan_quality_score"] >= 70
+    assert is_list(gate["grill_questions"])
   end
 
   test "reviews are included in the audit log and proof bundle summary" do
@@ -347,6 +440,21 @@ defmodule ControlKeel.MissionTest do
       assert bundle["deploy_ready"] == false
     end
 
+    test "deploy_ready is false when there is no approved execution-ready plan" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+
+      assert bundle["deploy_ready"] == false
+      assert bundle["planning_continuity"]["status"] == "missing"
+
+      assert Enum.any?(
+               bundle["planning_continuity"]["drift_signals"],
+               &(&1["code"] == "no_approved_plan")
+             )
+    end
+
     test "bundle includes test_outcomes, diff_summary, and invocation summary" do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "done"})
@@ -364,10 +472,186 @@ defmodule ControlKeel.MissionTest do
                "agent_runs" => _,
                "findings_total" => _,
                "auto_resolved" => _,
-               "manual_review" => _
+               "manual_review" => _,
+               "suspicious_test_changes" => suspicious_test_changes
              } = bundle["diff_summary"]
 
+      assert is_integer(suspicious_test_changes)
       assert %{"total" => _, "cost_cents" => _} = bundle["invocation_summary"]
+      assert %{"status" => _, "score" => _, "signals" => _} = bundle["verification_assessment"]
+    end
+
+    test "external regression failures are reflected in proof bundles and disable deploy_ready" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, _result} =
+               Mission.record_regression_result(%{
+                 "session_id" => session.id,
+                 "task_id" => task.id,
+                 "engine" => "passmark",
+                 "flow_name" => "checkout happy path",
+                 "outcome" => "failed",
+                 "summary" => "Checkout button no longer completes purchase",
+                 "evidence" => %{"video_url" => "https://example.test/run.mp4"}
+               })
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+
+      assert bundle["deploy_ready"] == false
+      assert bundle["test_outcomes"]["failed"] == 1
+      assert bundle["test_outcomes"]["external_recorded"] == 1
+      assert bundle["test_outcomes"]["blocking_failures"] == 1
+      assert bundle["test_outcomes"]["engines"]["passmark"] == 1
+
+      assert [
+               %{
+                 "flow_name" => "checkout happy path",
+                 "engine" => "passmark",
+                 "outcome" => "failed"
+               }
+               | _
+             ] = bundle["test_outcomes"]["latest_failures"]
+    end
+
+    test "verification assessment becomes strong with mixed evidence" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, _} =
+               Mission.create_invocation(%{
+                 source: "test",
+                 tool: "mix_test",
+                 provider: nil,
+                 model: nil,
+                 estimated_cost_cents: 0,
+                 decision: "allow",
+                 metadata: %{"outcome" => "passed"},
+                 session_id: session.id,
+                 task_id: task.id
+               })
+
+      assert {:ok, _} =
+               Mission.record_regression_result(%{
+                 "session_id" => session.id,
+                 "task_id" => task.id,
+                 "engine" => "passmark",
+                 "flow_name" => "checkout happy path",
+                 "outcome" => "passed",
+                 "summary" => "Checkout flow completed successfully"
+               })
+
+      assert {:ok, review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "diff",
+                 "title" => "Diff review",
+                 "submission_body" => "diff --git a/lib/demo.ex b/lib/demo.ex\n+ok = true\n",
+                 "submitted_by" => "codex"
+               })
+
+      assert {:ok, _approved} =
+               Mission.respond_review(review, %{
+                 "decision" => "approved",
+                 "feedback_notes" => "Verification evidence looks good"
+               })
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+
+      assert bundle["verification_assessment"]["status"] == "strong"
+      assert bundle["verification_assessment"]["score"] >= 70
+
+      assert "external_regression" in bundle["verification_assessment"]["evidence"][
+               "evidence_sources"
+             ]
+
+      assert "human_review" in bundle["verification_assessment"]["evidence"]["evidence_sources"]
+
+      assert "internal_checks" in bundle["verification_assessment"]["evidence"][
+               "evidence_sources"
+             ]
+    end
+
+    test "suspicious test diff signals weaken verification and disable deploy_ready" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "diff",
+                 "title" => "Test weakening diff",
+                 "submission_body" => """
+                 diff --git a/test/demo_test.exs b/test/demo_test.exs
+                 --- a/test/demo_test.exs
+                 +++ b/test/demo_test.exs
+                 -    assert result == :ok
+                 +    @tag :skip
+                 +    assert true
+                 """,
+                 "submitted_by" => "codex"
+               })
+
+      assert review.review_type == "diff"
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+
+      assert bundle["deploy_ready"] == false
+      assert bundle["diff_summary"]["suspicious_test_changes"] >= 2
+
+      assert Enum.any?(
+               bundle["verification_assessment"]["suspicious_test_changes"],
+               &(&1["code"] == "test_skip_added")
+             )
+
+      assert Enum.any?(
+               bundle["verification_assessment"]["suspicious_test_changes"],
+               &(&1["code"] == "assertion_removed")
+             )
+
+      assert bundle["verification_assessment"]["verification_ready"] == false
+    end
+
+    test "planning continuity is aligned when execution reviews stay linked to an approved implementation plan" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, plan_review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Reviewed the mission control and MCP review flow.",
+                 "codebase_findings" => ["Mission already stores review metadata."],
+                 "options_considered" => ["Extend reviews", "Add new tables"],
+                 "selected_option" => "Extend reviews",
+                 "rejected_options" => ["Add new tables"],
+                 "implementation_steps" => ["Store plan metadata", "Check it in proof bundles"],
+                 "validation_plan" => ["mix test", "mix precommit"],
+                 "submission_body" => "Implementation-ready plan"
+               })
+
+      assert {:ok, _approved} =
+               Mission.respond_review(plan_review, %{
+                 "decision" => "approved",
+                 "feedback_notes" => "Approved plan"
+               })
+
+      assert {:ok, _diff_review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "diff",
+                 "previous_review_id" => plan_review.id,
+                 "submission_body" =>
+                   "diff --git a/lib/controlkeel/mission.ex b/lib/controlkeel/mission.ex\n+planning = true\n",
+                 "submitted_by" => "codex"
+               })
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+
+      assert bundle["planning_continuity"]["status"] == "aligned"
+      assert bundle["planning_continuity"]["approved_plan_phase"] == "implementation_plan"
+      assert bundle["planning_continuity"]["execution_review_linked"] == true
     end
 
     test "generating proof multiple times versions bundles" do

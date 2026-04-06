@@ -2646,75 +2646,80 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :deploy_cost, options: options}, _project_root) do
-    stack = String.to_atom(options[:stack] || "static")
-    tier = String.to_atom(options[:tier] || "free")
-    needs_db = options[:needs_db] || false
-    db_tier = String.to_atom(options[:db_tier] || "managed_small")
-    bandwidth = options[:bandwidth] || 10
-    storage = options[:storage] || 1
+    with {:ok, stack} <- parse_atom_option(options[:stack] || "static", deployment_stacks(), "stack"),
+         {:ok, tier} <- parse_atom_option(options[:tier] || "free", hosting_tiers(), "tier"),
+         {:ok, db_tier} <-
+           parse_atom_option(options[:db_tier] || "managed_small", database_tiers(), "db_tier") do
+      needs_db = options[:needs_db] || false
+      bandwidth = options[:bandwidth] || 10
+      storage = options[:storage] || 1
 
-    case HostingCost.estimate(
-           stack: stack,
-           tier: tier,
-           needs_db: needs_db,
-           db_tier: db_tier,
-           expected_bandwidth_gb: bandwidth,
-           expected_storage_gb: storage
-         ) do
-      {:ok, estimates} ->
-        lines =
-          Enum.map(estimates, fn e ->
-            fit = if e.fits_stack, do: "check", else: " "
+      case HostingCost.estimate(
+             stack: stack,
+             tier: tier,
+             needs_db: needs_db,
+             db_tier: db_tier,
+             expected_bandwidth_gb: bandwidth,
+             expected_storage_gb: storage
+           ) do
+        {:ok, estimates} ->
+          lines =
+            Enum.map(estimates, fn e ->
+              fit = if e.fits_stack, do: "check", else: " "
 
-            "$" <>
-              to_string(Float.round(e.total_monthly_usd, 2)) <>
-              " [#{fit}] " <> e.name <> " - " <> e.notes
-          end)
+              "$" <>
+                to_string(Float.round(e.total_monthly_usd, 2)) <>
+                " [#{fit}] " <> e.name <> " - " <> e.notes
+            end)
 
-        {:ok, ["Hosting cost estimates (stack: #{stack}):", "" | lines]}
+          {:ok, ["Hosting cost estimates (stack: #{stack}):", "" | lines]}
+      end
     end
   end
 
   def run_command(%{command: :deploy_dns, options: options}, _project_root) do
-    stack = String.to_atom(options[:stack] || "phoenix")
-    guide = Advisor.dns_ssl_guide(stack)
+    with {:ok, stack} <- parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
+      guide = Advisor.dns_ssl_guide(stack)
 
-    lines =
-      ["DNS Setup for #{stack}:", ""] ++
-        Enum.map(guide.dns_setup, &("  " <> &1)) ++
-        ["", "SSL Setup:", ""] ++
-        Enum.map(guide.ssl_setup, &("  " <> &1))
+      lines =
+        ["DNS Setup for #{stack}:", ""] ++
+          Enum.map(guide.dns_setup, &("  " <> &1)) ++
+          ["", "SSL Setup:", ""] ++
+          Enum.map(guide.ssl_setup, &("  " <> &1))
 
-    {:ok, lines}
+      {:ok, lines}
+    end
   end
 
   def run_command(%{command: :deploy_migration, options: options}, _project_root) do
-    stack = String.to_atom(options[:stack] || "phoenix")
-    guide = Advisor.db_migration_guide(stack)
+    with {:ok, stack} <- parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
+      guide = Advisor.db_migration_guide(stack)
 
-    lines =
-      ["Database Migration Guide for #{stack}:", ""] ++
-        Enum.map(guide.steps, &("  " <> &1)) ++
-        ["", "Rollback: #{guide.rollback}", "Backup: #{guide.backup_before}"]
+      lines =
+        ["Database Migration Guide for #{stack}:", ""] ++
+          Enum.map(guide.steps, &("  " <> &1)) ++
+          ["", "Rollback: #{guide.rollback}", "Backup: #{guide.backup_before}"]
 
-    {:ok, lines}
+      {:ok, lines}
+    end
   end
 
   def run_command(%{command: :deploy_scaling, options: options}, _project_root) do
-    stack = String.to_atom(options[:stack] || "phoenix")
-    guide = Advisor.scaling_guide(stack)
+    with {:ok, stack} <- parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
+      guide = Advisor.scaling_guide(stack)
 
-    lines = ["Scaling Guide for #{stack}:", ""]
+      lines = ["Scaling Guide for #{stack}:", ""]
 
-    lines =
-      lines ++
-        ["Vertical Scaling:", "  #{guide.vertical_scaling.description}"] ++
-        Enum.map(guide.vertical_scaling.tiers, fn t ->
-          "  #{t.users} users: #{t.tier} - #{t.cost}"
-        end) ++
-        ["", "Horizontal: #{guide.horizontal_scaling}", "", "Database: #{guide.database_scaling}"]
+      lines =
+        lines ++
+          ["Vertical Scaling:", "  #{guide.vertical_scaling.description}"] ++
+          Enum.map(guide.vertical_scaling.tiers, fn t ->
+            "  #{t.users} users: #{t.tier} - #{t.cost}"
+          end) ++
+          ["", "Horizontal: #{guide.horizontal_scaling}", "", "Database: #{guide.database_scaling}"]
 
-    {:ok, lines}
+      {:ok, lines}
+    end
   end
 
   def run_command(%{command: :cost_optimize, options: options}, _project_root) do
@@ -3024,21 +3029,28 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :outcome_record, args: [session_id, outcome]}, _project_root) do
-    {sid, _} = Integer.parse(session_id)
-    outcome_atom = String.to_atom(outcome)
+    with {sid, ""} <- Integer.parse(session_id),
+         {:ok, outcome_atom} <- parse_atom_option(outcome, OutcomeTracker.valid_outcomes(), "outcome") do
+      agent_id = "cli-session-#{sid}"
 
-    agent_id = "cli-session-#{sid}"
+      case OutcomeTracker.record(sid, outcome_atom, agent_id: agent_id) do
+        {:ok, result} ->
+          {:ok, ["Recorded #{outcome} for session ##{session_id} (reward: #{result.reward})"]}
 
-    case OutcomeTracker.record(sid, outcome_atom, agent_id: agent_id) do
-      {:ok, result} ->
-        {:ok, ["Recorded #{outcome} for session ##{session_id} (reward: #{result.reward})"]}
+        {:error, {:unknown_outcome, o}} ->
+          {:error,
+           "Unknown outcome: #{o}. Valid: #{Enum.join(OutcomeTracker.valid_outcomes(), ", ")}"}
 
-      {:error, {:unknown_outcome, o}} ->
+        {:error, reason} ->
+          {:error, "Failed: " <> inspect(reason)}
+      end
+    else
+      :error ->
+        {:error, "`session_id` must be an integer"}
+
+      {:error, _reason} ->
         {:error,
-         "Unknown outcome: #{o}. Valid: #{Enum.join(OutcomeTracker.valid_outcomes(), ", ")}"}
-
-      {:error, reason} ->
-        {:error, "Failed: " <> inspect(reason)}
+         "Unknown outcome: #{outcome}. Valid: #{Enum.join(OutcomeTracker.valid_outcomes(), ", ")}"}
     end
   end
 
@@ -3069,6 +3081,26 @@ defmodule ControlKeel.CLI do
         {:ok, ["Agent Leaderboard:", "" | lines]}
     end
   end
+
+  defp deployment_stacks, do: [:phoenix, :react, :rails, :node, :python, :static]
+  defp hosting_tiers, do: HostingCost.available_tiers() |> Map.keys()
+  defp database_tiers, do: HostingCost.available_database_tiers() |> Map.keys()
+
+  defp parse_atom_option(value, allowed, _field) when is_atom(value) do
+    if value in allowed, do: {:ok, value}, else: {:error, :invalid}
+  end
+
+  defp parse_atom_option(value, allowed, field) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    case Enum.find(allowed, &(to_string(&1) == trimmed)) do
+      nil -> {:error, "`#{field}` must be one of #{Enum.join(Enum.map(allowed, &to_string/1), ", ")}"}
+      atom -> {:ok, atom}
+    end
+  end
+
+  defp parse_atom_option(_value, allowed, field),
+    do: {:error, "`#{field}` must be one of #{Enum.join(Enum.map(allowed, &to_string/1), ", ")}"}
 
   defp watch_loop(session_id, seen, interval) do
     findings = Mission.list_session_findings(session_id)
@@ -3264,7 +3296,7 @@ defmodule ControlKeel.CLI do
   defp parse_plugin_command(command, plugin, argv) do
     allowed =
       case command do
-        :plugin_export -> ~w(codex claude copilot openclaw augment)
+        :plugin_export -> ~w(codex claude copilot openclaw augment droid)
         :plugin_install -> ~w(codex claude copilot openclaw)
       end
 
@@ -3465,6 +3497,7 @@ defmodule ControlKeel.CLI do
   defp plugin_target("copilot"), do: {:ok, "copilot-plugin"}
   defp plugin_target("openclaw"), do: {:ok, "openclaw-plugin"}
   defp plugin_target("augment"), do: {:ok, "augment-plugin"}
+  defp plugin_target("droid"), do: {:ok, "droid-plugin"}
   defp plugin_target(_plugin), do: {:error, :unknown_plugin}
 
   defp plugin_mcp_hint("hosted"), do: ".mcp.hosted.json"

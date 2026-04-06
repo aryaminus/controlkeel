@@ -7,6 +7,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
   import ControlKeel.PolicyTrainingFixtures
   import ControlKeel.PlatformFixtures
 
+  alias ControlKeel.Mission
+
   # ─── Sessions ────────────────────────────────────────────────────────────────
 
   describe "GET /api/v1/sessions" do
@@ -278,6 +280,28 @@ defmodule ControlKeelWeb.ApiControllerTest do
     test "evaluates release readiness from proof and evidence state", %{conn: conn} do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, plan_review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Reviewed the release-readiness API flow.",
+                 "codebase_findings" => ["API delegates release readiness to governance."],
+                 "options_considered" => ["Use proof bundles", "Add API-specific release state"],
+                 "selected_option" => "Use proof bundles",
+                 "rejected_options" => ["Add API-specific release state"],
+                 "implementation_steps" => ["Generate proof", "Require smoke and provenance"],
+                 "validation_plan" => ["mix test", "mix precommit"],
+                 "submission_body" => "Implementation-ready API release plan"
+               })
+
+      assert {:ok, _approved} =
+               Mission.respond_review(plan_review, %{
+                 "decision" => "approved",
+                 "feedback_notes" => "Approved plan"
+               })
+
       _proof = proof_bundle_fixture(%{task: task})
 
       conn =

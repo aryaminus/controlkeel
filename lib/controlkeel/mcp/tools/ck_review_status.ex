@@ -6,6 +6,8 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
 
   def call(arguments) when is_map(arguments) do
     with {:ok, review} <- resolve_review(arguments) do
+      plan_refinement = get_in(review.metadata || %{}, ["plan_refinement"]) || %{}
+
       {:ok,
        %{
          "review_id" => review.id,
@@ -16,6 +18,9 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
          "task_id" => review.task_id,
          "feedback_notes" => review.feedback_notes,
          "annotations" => review.annotations,
+         "plan_phase" => plan_refinement["phase"],
+         "plan_quality" => plan_refinement["quality"],
+         "grill_questions" => get_in(plan_refinement, ["quality", "grill_questions"]) || [],
          "agent_feedback" => ReviewBridge.agent_feedback(review),
          "responded_at" => review.responded_at,
          "browser_url" => ControlKeelWeb.Endpoint.url() <> "/reviews/#{review.id}"

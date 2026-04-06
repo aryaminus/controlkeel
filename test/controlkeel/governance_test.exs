@@ -62,6 +62,28 @@ defmodule ControlKeel.GovernanceTest do
   test "release_readiness requires smoke and provenance even with a deploy-ready proof" do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "done"})
+
+    assert {:ok, plan_review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "plan_phase" => "implementation_plan",
+               "research_summary" => "Reviewed the release-readiness and proof flow.",
+               "codebase_findings" => ["Governance reads the latest proof bundle."],
+               "options_considered" => ["Reuse proof bundles", "Add release-only state"],
+               "selected_option" => "Reuse proof bundles",
+               "rejected_options" => ["Add release-only state"],
+               "implementation_steps" => ["Generate proof", "Require smoke and provenance"],
+               "validation_plan" => ["mix test", "mix precommit"],
+               "submission_body" => "Implementation-ready release readiness plan"
+             })
+
+    assert {:ok, _approved} =
+             Mission.respond_review(plan_review, %{
+               "decision" => "approved",
+               "feedback_notes" => "Approved plan"
+             })
+
     _proof = proof_bundle_fixture(%{task: task})
 
     assert {:ok, readiness} = Governance.release_readiness(session_id: session.id)

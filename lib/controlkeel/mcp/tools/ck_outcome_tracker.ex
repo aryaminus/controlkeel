@@ -9,6 +9,8 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
     with {:ok, normalized} <- normalize(arguments) do
       case normalized["mode"] do
         "record" ->
+          {:ok, outcome} = parse_outcome(normalized["outcome"])
+
           opts = [
             agent_id: normalized["agent_id"],
             task_type: normalized["task_type"],
@@ -16,11 +18,7 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
             metadata: normalized["metadata"] || %{}
           ]
 
-          OutcomeTracker.record(
-            normalized["session_id"],
-            String.to_atom(normalized["outcome"]),
-            opts
-          )
+          OutcomeTracker.record(normalized["session_id"], outcome, opts)
 
         "get_session" ->
           OutcomeTracker.get_session_outcomes(normalized["session_id"])
@@ -50,6 +48,14 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
         mode == "get_session" and is_nil(Map.get(arguments, "session_id")) ->
           {:error, {:invalid_arguments, "`session_id` is required for get_session mode"}}
 
+        mode == "get_leaderboard" and is_nil(Map.get(arguments, "workspace_id")) ->
+          {:error, {:invalid_arguments, "`workspace_id` is required for get_leaderboard mode"}}
+
+        mode == "record" and parse_outcome(Map.get(arguments, "outcome")) == :error ->
+          {:error,
+           {:invalid_arguments,
+            "`outcome` must be one of #{Enum.join(Enum.map(OutcomeTracker.valid_outcomes(), &to_string/1), ", ")}"}}
+
         true ->
           {:ok,
            %{
@@ -77,4 +83,13 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
          {:invalid_arguments, "`mode` must be `record`, `get_session`, or `get_leaderboard`"}}
     end
   end
+
+  defp parse_outcome(value) when is_binary(value) do
+    case Enum.find(OutcomeTracker.valid_outcomes(), &(to_string(&1) == value)) do
+      nil -> :error
+      outcome -> {:ok, outcome}
+    end
+  end
+
+  defp parse_outcome(_value), do: :error
 end

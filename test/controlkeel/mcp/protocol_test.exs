@@ -48,10 +48,23 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert Enum.map(tools, & &1["name"]) == [
              "ck_validate",
              "ck_context",
+             "ck_experience_index",
+             "ck_experience_read",
+             "ck_trace_packet",
+             "ck_failure_clusters",
+             "ck_skill_evolution",
+             "ck_fs_ls",
+             "ck_fs_read",
+             "ck_fs_find",
+             "ck_fs_grep",
              "ck_finding",
              "ck_review_submit",
              "ck_review_status",
              "ck_review_feedback",
+             "ck_regression_result",
+             "ck_memory_search",
+             "ck_memory_record",
+             "ck_memory_archive",
              "ck_budget",
              "ck_route",
              "ck_delegate",
@@ -61,6 +74,148 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_skill_list",
              "ck_skill_load"
            ]
+  end
+
+  test "tools/list exposes trust-boundary inputs for ck_validate" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 200,
+        "method" => "tools/list"
+      })
+
+    tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_validate"))
+
+    assert get_in(tool, ["inputSchema", "properties", "source_type", "enum"]) != nil
+
+    assert get_in(tool, ["inputSchema", "properties", "trust_level", "enum"]) == [
+             "trusted",
+             "mixed",
+             "untrusted"
+           ]
+
+    assert get_in(tool, ["inputSchema", "properties", "requested_capabilities", "items", "enum"]) !=
+             nil
+  end
+
+  test "tools/list exposes experience archive inputs" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2001,
+        "method" => "tools/list"
+      })
+
+    index_tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_experience_index"))
+
+    read_tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_experience_read"))
+
+    assert get_in(index_tool, ["inputSchema", "properties", "same_domain_only", "type"]) ==
+             "boolean"
+
+    assert get_in(read_tool, ["inputSchema", "properties", "artifact_type", "enum"]) == [
+             "session_summary",
+             "audit_log",
+             "trace_packet",
+             "proof_summary"
+           ]
+  end
+
+  test "tools/list exposes recursive planning inputs for ck_review_submit" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 201,
+        "method" => "tools/list"
+      })
+
+    tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_review_submit"))
+
+    assert get_in(tool, ["inputSchema", "properties", "plan_phase", "enum"]) == [
+             "ticket",
+             "research_packet",
+             "design_options",
+             "narrowed_decision",
+             "implementation_plan",
+             "code_backed_plan"
+           ]
+
+    assert get_in(tool, [
+             "inputSchema",
+             "properties",
+             "scope_estimate",
+             "properties",
+             "architectural_scope",
+             "type"
+           ]) == "boolean"
+  end
+
+  test "tools/list exposes virtual workspace inputs for ck_fs_grep" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 202,
+        "method" => "tools/list"
+      })
+
+    tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_fs_grep"))
+
+    assert get_in(tool, ["inputSchema", "required"]) == ["session_id", "query"]
+    assert get_in(tool, ["inputSchema", "properties", "fixed_strings", "type"]) == "boolean"
+    assert get_in(tool, ["inputSchema", "properties", "ignore_case", "type"]) == "boolean"
+  end
+
+  test "tools/list exposes trace packet inputs" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2022,
+        "method" => "tools/list"
+      })
+
+    tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_trace_packet"))
+
+    assert get_in(tool, ["inputSchema", "required"]) == ["session_id"]
+
+    assert get_in(tool, ["inputSchema", "properties", "events_limit", "type"]) == [
+             "integer",
+             "string"
+           ]
+  end
+
+  test "tools/list exposes failure cluster inputs" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2024,
+        "method" => "tools/list"
+      })
+
+    tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_failure_clusters"))
+
+    assert get_in(tool, ["inputSchema", "required"]) == ["session_id"]
+    assert get_in(tool, ["inputSchema", "properties", "same_domain_only", "type"]) == "boolean"
   end
 
   test "tools/list constrains ck_skill_load names to the bound project catalog" do
@@ -151,6 +306,155 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert scanned_at =~ "T"
   end
 
+  test "tools/call virtual workspace tools browse the bound project root" do
+    session = session_fixture()
+
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-vfs-#{System.unique_integer([:positive])}"
+      )
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(Path.join(tmp_dir, "docs"))
+    File.write!(Path.join(tmp_dir, "README.md"), "# Demo\n\nOAuth lives here.\n")
+    File.write!(Path.join(tmp_dir, "docs/guide.md"), "Guide\n\nOAuth config lives here too.\n")
+
+    {:ok, _binding} =
+      ProjectBinding.write(
+        %{
+          "workspace_id" => session.workspace_id,
+          "session_id" => session.id,
+          "agent" => "claude",
+          "attached_agents" => %{}
+        },
+        tmp_dir
+      )
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    ls_response =
+      File.cd!(tmp_dir, fn ->
+        Protocol.handle_request(%{
+          "jsonrpc" => "2.0",
+          "id" => 203,
+          "method" => "tools/call",
+          "params" => %{
+            "name" => "ck_fs_ls",
+            "arguments" => %{"session_id" => session.id, "path" => "."}
+          }
+        })
+      end)
+
+    assert get_in(ls_response, ["result", "structuredContent", "tool"]) == "ls"
+
+    assert Enum.any?(
+             get_in(ls_response, ["result", "structuredContent", "entries"]),
+             &(&1["path"] == "README.md")
+           )
+
+    read_response =
+      File.cd!(tmp_dir, fn ->
+        Protocol.handle_request(%{
+          "jsonrpc" => "2.0",
+          "id" => 204,
+          "method" => "tools/call",
+          "params" => %{
+            "name" => "ck_fs_read",
+            "arguments" => %{"session_id" => session.id, "path" => "README.md"}
+          }
+        })
+      end)
+
+    assert get_in(read_response, ["result", "structuredContent", "tool"]) == "cat"
+
+    assert get_in(read_response, ["result", "structuredContent", "content"]) =~
+             "OAuth lives here."
+
+    grep_response =
+      File.cd!(tmp_dir, fn ->
+        Protocol.handle_request(%{
+          "jsonrpc" => "2.0",
+          "id" => 205,
+          "method" => "tools/call",
+          "params" => %{
+            "name" => "ck_fs_grep",
+            "arguments" => %{"session_id" => session.id, "query" => "OAuth"}
+          }
+        })
+      end)
+
+    assert get_in(grep_response, ["result", "structuredContent", "tool"]) == "grep"
+    assert get_in(grep_response, ["result", "structuredContent", "count"]) >= 2
+
+    find_response =
+      File.cd!(tmp_dir, fn ->
+        Protocol.handle_request(%{
+          "jsonrpc" => "2.0",
+          "id" => 206,
+          "method" => "tools/call",
+          "params" => %{
+            "name" => "ck_fs_find",
+            "arguments" => %{"session_id" => session.id, "query" => "guide"}
+          }
+        })
+      end)
+
+    assert get_in(find_response, ["result", "structuredContent", "tool"]) == "find"
+
+    assert Enum.any?(
+             get_in(find_response, ["result", "structuredContent", "matches"]),
+             &(&1["path"] == "docs/guide.md")
+           )
+  end
+
+  test "tools/call virtual workspace tools reject path escapes" do
+    session = session_fixture()
+
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-vfs-escape-#{System.unique_integer([:positive])}"
+      )
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(tmp_dir)
+    File.write!(Path.join(tmp_dir, "README.md"), "# Demo\n")
+
+    {:ok, _binding} =
+      ProjectBinding.write(
+        %{
+          "workspace_id" => session.workspace_id,
+          "session_id" => session.id,
+          "agent" => "claude",
+          "attached_agents" => %{}
+        },
+        tmp_dir
+      )
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    response =
+      File.cd!(tmp_dir, fn ->
+        Protocol.handle_request(%{
+          "jsonrpc" => "2.0",
+          "id" => 207,
+          "method" => "tools/call",
+          "params" => %{
+            "name" => "ck_fs_read",
+            "arguments" => %{"session_id" => session.id, "path" => "../README.md"}
+          }
+        })
+      end)
+
+    assert get_in(response, ["error", "code"]) == -32602
+    assert get_in(response, ["error", "message"]) =~ "Path escapes the bound project root"
+  end
+
   test "tools/call ck_validate accepts a direct domain pack override" do
     response =
       Protocol.handle_request(%{
@@ -224,10 +528,25 @@ defmodule ControlKeel.MCP.ProtocolTest do
                  },
                  "current_task" => %{"title" => "Implement router"},
                  "proof_summary" => %{"task_id" => _},
+                 "planning_context" => %{"review_gate" => %{}},
                  "memory_hits" => memory_hits,
                  "resume_packet" => %{"task_id" => _, "workspace_context" => %{}},
-                 "workspace_context" => %{"cache_key" => workspace_cache_key},
+                 "workspace_context" => %{
+                   "cache_key" => workspace_cache_key,
+                   "orientation" => %{"recent_commits" => recent_commits},
+                   "design_drift" => %{"summary" => design_drift_summary}
+                 },
                  "workspace_cache_key" => workspace_cache_key,
+                 "context_reacquisition" => %{
+                   "recent_commits" => reacquisition_commits,
+                   "active_assumptions" => active_assumptions,
+                   "design_drift_summary" => design_drift_summary,
+                   "high_risk_design_drift" => high_risk_design_drift
+                 },
+                 "instruction_hierarchy" => %{
+                   "trusted_sources" => %{"authority" => trusted_sources},
+                   "untrusted_sources" => %{"authority" => untrusted_sources}
+                 },
                  "recent_events" => recent_events,
                  "transcript_summary" => %{"total_events" => total_events}
                }
@@ -237,6 +556,369 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert is_list(memory_hits)
     assert is_list(recent_events)
     assert total_events >= 1
+    assert is_list(recent_commits)
+    assert is_list(reacquisition_commits)
+    assert is_list(active_assumptions)
+    assert is_boolean(high_risk_design_drift)
+    assert is_binary(design_drift_summary)
+    assert "controlkeel" in trusted_sources
+    assert "issue" in untrusted_sources
+  end
+
+  test "tools/call ck_review_submit returns plan refinement quality" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "queued"})
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 202,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_submit",
+          "arguments" => %{
+            "task_id" => task.id,
+            "review_type" => "plan",
+            "plan_phase" => "implementation_plan",
+            "research_summary" => "Reviewed existing Mission review gates and proof bundles.",
+            "codebase_findings" => ["Plan metadata can extend current review storage."],
+            "options_considered" => ["Extend review metadata", "Create planner subsystem"],
+            "selected_option" => "Extend review metadata",
+            "rejected_options" => ["Create planner subsystem"],
+            "implementation_steps" => [
+              "Normalize plan refinement",
+              "Check plan continuity in proof bundles"
+            ],
+            "validation_plan" => ["mix test", "mix precommit"],
+            "submission_body" => "Recursive implementation plan"
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "plan_phase"]) ==
+             "implementation_plan"
+
+    assert get_in(response, ["result", "structuredContent", "plan_quality", "ready"]) == true
+    assert is_list(get_in(response, ["result", "structuredContent", "grill_questions"]))
+  end
+
+  test "tools/call ck_trace_packet returns failure patterns and eval candidates" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "done"})
+
+    _finding =
+      finding_fixture(%{
+        session: session,
+        status: "blocked",
+        rule_id: "security.sql_injection",
+        title: "SQL injection risk",
+        plain_message: "Unsafe SQL concatenation was detected.",
+        metadata: %{"task_id" => task.id}
+      })
+
+    assert {:ok, _invocation} =
+             Mission.record_regression_result(%{
+               "session_id" => session.id,
+               "task_id" => task.id,
+               "engine" => "passmark",
+               "flow_name" => "checkout flow",
+               "outcome" => "failed",
+               "summary" => "Checkout never completes",
+               "external_run_id" => "run-123"
+             })
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2023,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_trace_packet",
+          "arguments" => %{
+            "session_id" => session.id,
+            "task_id" => task.id,
+            "events_limit" => 10
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "trace_summary", "findings"]) == 1
+
+    assert Enum.any?(
+             get_in(response, ["result", "structuredContent", "failure_patterns"]),
+             &(&1["code"] == "security.sql_injection")
+           )
+
+    assert Enum.any?(
+             get_in(response, ["result", "structuredContent", "eval_candidates"]),
+             &(&1["suggested_check_type"] in ["deterministic_rule", "regression_replay"])
+           )
+  end
+
+  test "tools/call ck_experience_index lists prior-run artifacts" do
+    workspace = workspace_fixture()
+
+    session_a =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    session_b =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    _task_a = task_fixture(%{session: session_a, status: "done"})
+    _task_b = task_fixture(%{session: session_b, status: "done"})
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 20231,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_experience_index",
+          "arguments" => %{
+            "session_id" => session_a.id,
+            "session_limit" => 5
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "sessions_analyzed"]) == 2
+
+    entry =
+      get_in(response, ["result", "structuredContent", "sessions"])
+      |> Enum.find(&(&1["session_id"] == session_a.id))
+
+    assert Enum.any?(entry["artifacts"], &(&1["artifact_type"] == "session_summary"))
+    assert Enum.any?(entry["artifacts"], &(&1["artifact_type"] == "audit_log"))
+  end
+
+  test "tools/call ck_experience_read returns a prior trace packet" do
+    workspace = workspace_fixture()
+
+    session =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    task = task_fixture(%{session: session, status: "done"})
+
+    _finding =
+      finding_fixture(%{
+        session: session,
+        status: "blocked",
+        rule_id: "security.sql_injection",
+        title: "SQL injection risk",
+        plain_message: "Unsafe SQL concatenation was detected.",
+        metadata: %{"task_id" => task.id}
+      })
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 20232,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_experience_read",
+          "arguments" => %{
+            "session_id" => session.id,
+            "source_session_id" => session.id,
+            "task_id" => task.id,
+            "artifact_type" => "trace_packet"
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "artifact_type"]) == "trace_packet"
+
+    assert get_in(response, ["result", "structuredContent", "structured_content", "task_id"]) ==
+             task.id
+
+    assert Enum.any?(
+             get_in(response, [
+               "result",
+               "structuredContent",
+               "structured_content",
+               "failure_patterns"
+             ]),
+             &(&1["code"] == "security.sql_injection")
+           )
+  end
+
+  test "tools/call ck_failure_clusters groups recurring failure modes across recent sessions" do
+    workspace = workspace_fixture()
+
+    session_a =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    session_b =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    task_a = task_fixture(%{session: session_a, status: "done"})
+    task_b = task_fixture(%{session: session_b, status: "done"})
+
+    _finding_a =
+      finding_fixture(%{
+        session: session_a,
+        status: "blocked",
+        rule_id: "security.sql_injection",
+        title: "SQL injection risk",
+        plain_message: "Unsafe SQL concatenation was detected.",
+        metadata: %{"task_id" => task_a.id}
+      })
+
+    _finding_b =
+      finding_fixture(%{
+        session: session_b,
+        status: "blocked",
+        rule_id: "security.sql_injection",
+        title: "SQL injection risk",
+        plain_message: "Unsafe SQL concatenation was detected again.",
+        metadata: %{"task_id" => task_b.id}
+      })
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2025,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_failure_clusters",
+          "arguments" => %{
+            "session_id" => session_a.id,
+            "session_limit" => 5
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "cluster_count"]) >= 1
+
+    sql_cluster =
+      get_in(response, ["result", "structuredContent", "clusters"])
+      |> Enum.find(&(&1["code"] == "security.sql_injection"))
+
+    assert sql_cluster["count"] == 2
+    assert sql_cluster["session_count"] == 2
+
+    assert Enum.any?(
+             get_in(response, ["result", "structuredContent", "eval_candidates"]),
+             &(&1["cluster_code"] == "security.sql_injection")
+           )
+  end
+
+  test "tools/call ck_skill_evolution returns a consolidated skill draft from traces" do
+    workspace = workspace_fixture()
+
+    session_a =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    session_b =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    task_a = task_fixture(%{session: session_a, status: "done"})
+    task_b = task_fixture(%{session: session_b, status: "done"})
+
+    _finding_a =
+      finding_fixture(%{
+        session: session_a,
+        status: "blocked",
+        rule_id: "security.sql_injection",
+        title: "SQL injection risk",
+        plain_message: "Unsafe SQL concatenation was detected.",
+        metadata: %{"task_id" => task_a.id}
+      })
+
+    _finding_b =
+      finding_fixture(%{
+        session: session_b,
+        status: "blocked",
+        rule_id: "security.sql_injection",
+        title: "SQL injection risk",
+        plain_message: "Unsafe SQL concatenation was detected again.",
+        metadata: %{"task_id" => task_b.id}
+      })
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2026,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_skill_evolution",
+          "arguments" => %{
+            "session_id" => session_a.id,
+            "session_limit" => 5,
+            "current_skill_name" => "secure-sql-review",
+            "current_skill_content" => """
+            ## Avoid
+            - Avoid raw SQL concatenation and other string-built query paths.
+            """
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "sessions_analyzed"]) == 2
+
+    assert Enum.any?(
+             get_in(response, ["result", "structuredContent", "anti_patterns"]),
+             &(&1["code"] == "security.sql_injection")
+           )
+
+    refute Enum.any?(
+             get_in(response, ["result", "structuredContent", "guidance", "avoid"]),
+             &String.contains?(&1, "raw SQL concatenation")
+           )
+
+    assert get_in(response, ["result", "structuredContent", "suggested_skill_document"]) =~
+             "name: secure-sql-review"
+  end
+
+  test "tools/call ck_review_submit returns grill questions for weak planning packets" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "queued"})
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2021,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_submit",
+          "arguments" => %{
+            "task_id" => task.id,
+            "review_type" => "plan",
+            "plan_phase" => "design_options",
+            "submission_body" => "Rough draft only"
+          }
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "plan_quality", "status"]) in [
+             "weak",
+             "moderate"
+           ]
+
+    assert Enum.any?(
+             get_in(response, ["result", "structuredContent", "grill_questions"]),
+             &String.contains?(&1, "viable approaches")
+           )
   end
 
   test "tools/call ck_finding persists a governed finding" do
@@ -271,6 +953,150 @@ defmodule ControlKeel.MCP.ProtocolTest do
            } = response
 
     assert Mission.get_finding!(finding_id).status == "escalated"
+  end
+
+  test "tools/call ck_regression_result records external regression evidence" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "done"})
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 206,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_regression_result",
+          "arguments" => %{
+            "session_id" => session.id,
+            "task_id" => task.id,
+            "engine" => "bug0",
+            "flow_name" => "login flow",
+            "outcome" => "failed",
+            "summary" => "SSO redirect never returns",
+            "external_run_id" => "run-123",
+            "evidence" => %{"video_url" => "https://example.test/login.mp4"}
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "recorded" => true,
+                 "session_id" => session_id,
+                 "task_id" => task_id,
+                 "engine" => "bug0",
+                 "flow_name" => "login flow",
+                 "outcome" => "failed"
+               }
+             }
+           } = response
+
+    assert session_id == session.id
+    assert task_id == task.id
+
+    assert {:ok, bundle} = Mission.proof_bundle(task.id)
+    assert bundle["test_outcomes"]["engines"]["bug0"] == 1
+    assert bundle["deploy_ready"] == false
+  end
+
+  test "tools/call ck_memory_record and ck_memory_search expose explicit typed memory" do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    record_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 207,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_memory_record",
+          "arguments" => %{
+            "session_id" => session.id,
+            "task_id" => task.id,
+            "memory" => "Prefer explicit decision records before major API changes.",
+            "record_type" => "decision",
+            "tags" => ["architecture", "decision"]
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "recorded" => true,
+                 "memory_id" => memory_id,
+                 "record_type" => "decision"
+               }
+             }
+           } = record_response
+
+    search_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 208,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_memory_search",
+          "arguments" => %{
+            "session_id" => session.id,
+            "query" => "major API changes",
+            "record_type" => "decision",
+            "top_k" => 3
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "count" => count,
+                 "records" => records,
+                 "semantic_available" => semantic_available
+               }
+             }
+           } = search_response
+
+    assert count >= 1
+    assert semantic_available in [true, false]
+    assert Enum.any?(records, &(&1["id"] == memory_id))
+  end
+
+  test "tools/call ck_memory_archive archives an existing memory record" do
+    session = session_fixture()
+
+    record =
+      memory_record_fixture(%{
+        session: session,
+        title: "Archive me",
+        summary: "Superseded guidance"
+      })
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 209,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_memory_archive",
+          "arguments" => %{
+            "session_id" => session.id,
+            "memory_id" => record.id
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "archived" => true,
+                 "memory_id" => archived_id
+               }
+             }
+           } = response
+
+    assert archived_id == record.id
+    assert ControlKeel.Memory.get_record!(record.id).archived_at != nil
   end
 
   test "review tools submit, inspect, and respond to plan reviews" do

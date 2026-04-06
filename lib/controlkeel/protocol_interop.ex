@@ -7,16 +7,31 @@ defmodule ControlKeel.ProtocolInterop do
   alias ControlKeel.ProtocolAccess
   alias ControlKeelWeb.Endpoint
 
-  @tool_scope_map %{
+  @hosted_tool_scope_map %{
     "ck_context" => ["mcp:access", "context:read"],
+    "ck_experience_index" => ["mcp:access", "context:read"],
+    "ck_experience_read" => ["mcp:access", "context:read"],
+    "ck_trace_packet" => ["mcp:access", "context:read"],
+    "ck_failure_clusters" => ["mcp:access", "context:read"],
+    "ck_skill_evolution" => ["mcp:access", "context:read"],
+    "ck_fs_ls" => ["mcp:access", "context:read"],
+    "ck_fs_read" => ["mcp:access", "context:read"],
+    "ck_fs_find" => ["mcp:access", "context:read"],
+    "ck_fs_grep" => ["mcp:access", "context:read"],
     "ck_validate" => ["mcp:access", "validate:run"],
     "ck_finding" => ["mcp:access", "finding:write"],
     "ck_review_submit" => ["mcp:access", "review:write"],
     "ck_review_status" => ["mcp:access", "review:read"],
     "ck_review_feedback" => ["mcp:access", "review:respond"],
+    "ck_regression_result" => ["mcp:access", "regression:write"],
+    "ck_memory_search" => ["mcp:access", "memory:read"],
+    "ck_memory_record" => ["mcp:access", "memory:write"],
+    "ck_memory_archive" => ["mcp:access", "memory:write"],
     "ck_budget" => ["mcp:access", "budget:write"],
     "ck_route" => ["mcp:access", "route:read"],
     "ck_delegate" => ["mcp:access", "delegate:run"],
+    "ck_cost_optimizer" => ["mcp:access", "cost:read"],
+    "ck_outcome_tracker" => ["mcp:access", "outcome:read", "outcome:write"],
     "ck_skill_list" => ["mcp:access", "skills:read"],
     "ck_skill_load" => ["mcp:access", "skills:read"]
   }
@@ -34,10 +49,22 @@ defmodule ControlKeel.ProtocolInterop do
 
   def handle_mcp_request(request, auth_context) when is_map(request) do
     Protocol.handle_request(request,
+      tool_names: hosted_tool_names(),
       authorize: fn tool_name, arguments ->
         authorize_hosted_tool_call(auth_context, tool_name, arguments, "mcp")
       end
     )
+  end
+
+  def hosted_mcp_scopes do
+    @hosted_tool_scope_map
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.uniq()
+  end
+
+  def hosted_tool_names do
+    Map.keys(@hosted_tool_scope_map)
   end
 
   def authorize_hosted_tool_call(auth_context, tool_name, arguments, resource_id)
@@ -118,22 +145,16 @@ defmodule ControlKeel.ProtocolInterop do
   end
 
   defp verify_tool_scopes(scopes, tool_name, resource_id) do
-    required =
-      case resource_id do
-        "a2a" ->
-          @tool_scope_map
-          |> Map.get(tool_name, [])
-          |> Enum.reject(&(&1 == "mcp:access"))
-          |> Kernel.++(["a2a:access"])
+    case required_tool_scopes(tool_name, resource_id) do
+      {:ok, required} ->
+        if Enum.all?(required, &(&1 in scopes)) do
+          :ok
+        else
+          {:error, {:forbidden, "Access token is missing the required scopes for #{tool_name}."}}
+        end
 
-        _ ->
-          Map.get(@tool_scope_map, tool_name, [])
-      end
-
-    if Enum.all?(required, &(&1 in scopes)) do
-      :ok
-    else
-      {:error, {:forbidden, "Access token is missing the required scopes for #{tool_name}."}}
+      {:error, :unsupported_tool} ->
+        {:error, {:invalid_arguments, "Unsupported hosted tool"}}
     end
   end
 
@@ -141,7 +162,8 @@ defmodule ControlKeel.ProtocolInterop do
        when is_map(arguments) do
     with :ok <- maybe_verify_session_workspace(service_account, Map.get(arguments, "session_id")),
          :ok <- maybe_verify_task_workspace(service_account, Map.get(arguments, "task_id")),
-         :ok <- maybe_verify_review_workspace(service_account, Map.get(arguments, "review_id")) do
+         :ok <- maybe_verify_review_workspace(service_account, Map.get(arguments, "review_id")),
+         :ok <- maybe_verify_workspace_argument(service_account, Map.get(arguments, "workspace_id")) do
       :ok
     end
   end
@@ -193,6 +215,35 @@ defmodule ControlKeel.ProtocolInterop do
     else
       {:error, reason} -> {:error, reason}
       nil -> :ok
+    end
+  end
+
+  defp maybe_verify_workspace_argument(_service_account, nil), do: :ok
+
+  defp maybe_verify_workspace_argument(%ServiceAccount{} = service_account, workspace_id) do
+    with {:ok, parsed_id} <- parse_integer(workspace_id, "workspace_id") do
+      if parsed_id == service_account.workspace_id do
+        :ok
+      else
+        {:error, {:forbidden, "Workspace access is outside the service account workspace."}}
+      end
+    end
+  end
+
+  defp required_tool_scopes(tool_name, "a2a") do
+    case Map.fetch(@hosted_tool_scope_map, tool_name) do
+      {:ok, scopes} ->
+        {:ok, scopes |> Enum.reject(&(&1 == "mcp:access")) |> Kernel.++(["a2a:access"])}
+
+      :error ->
+        {:error, :unsupported_tool}
+    end
+  end
+
+  defp required_tool_scopes(tool_name, _resource_id) do
+    case Map.fetch(@hosted_tool_scope_map, tool_name) do
+      {:ok, scopes} -> {:ok, scopes}
+      :error -> {:error, :unsupported_tool}
     end
   end
 

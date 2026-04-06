@@ -3,16 +3,30 @@ defmodule ControlKeel.MCP.Protocol do
 
   alias ControlKeel.Intent.Domains
   alias ControlKeel.Skills.Registry
+  alias ControlKeel.TrustBoundary
 
   alias ControlKeel.MCP.Tools.{
     CkBudget,
     CkContext,
     CkDelegate,
+    CkExperienceIndex,
+    CkExperienceRead,
+    CkFsFind,
+    CkFsGrep,
+    CkFsLs,
+    CkFsRead,
+    CkFailureClusters,
     CkFinding,
+    CkMemoryArchive,
+    CkMemoryRecord,
+    CkMemorySearch,
+    CkSkillEvolution,
     CkReviewFeedback,
+    CkRegressionResult,
     CkReviewStatus,
     CkReviewSubmit,
     CkRoute,
+    CkTracePacket,
     CkSkillList,
     CkSkillLoad,
     CkValidate,
@@ -46,8 +60,8 @@ defmodule ControlKeel.MCP.Protocol do
   def handle_request(%{"jsonrpc" => "2.0", "method" => "notifications/initialized"}, _opts),
     do: :no_response
 
-  def handle_request(%{"jsonrpc" => "2.0", "method" => "tools/list", "id" => id}, _opts) do
-    ok_response(id, %{"tools" => tool_schemas()})
+  def handle_request(%{"jsonrpc" => "2.0", "method" => "tools/list", "id" => id}, opts) do
+    ok_response(id, %{"tools" => tool_schemas(opts)})
   end
 
   def handle_request(
@@ -84,14 +98,27 @@ defmodule ControlKeel.MCP.Protocol do
     error_response(nil, -32600, "Invalid Request")
   end
 
-  def tool_schemas do
+  def tool_schemas(opts \\ []) do
     base = [
       ck_validate_tool(),
       ck_context_tool(),
+      ck_experience_index_tool(),
+      ck_experience_read_tool(),
+      ck_trace_packet_tool(),
+      ck_failure_clusters_tool(),
+      ck_skill_evolution_tool(),
+      ck_fs_ls_tool(),
+      ck_fs_read_tool(),
+      ck_fs_find_tool(),
+      ck_fs_grep_tool(),
       ck_finding_tool(),
       ck_review_submit_tool(),
       ck_review_status_tool(),
       ck_review_feedback_tool(),
+      ck_regression_result_tool(),
+      ck_memory_search_tool(),
+      ck_memory_record_tool(),
+      ck_memory_archive_tool(),
       ck_budget_tool(),
       ck_route_tool(),
       ck_delegate_tool(),
@@ -100,19 +127,38 @@ defmodule ControlKeel.MCP.Protocol do
       ck_outcome_tracker_tool()
     ]
 
-    if current_skill_names() == [] do
-      base
-    else
-      base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
+    tools =
+      if current_skill_names() == [] do
+        base
+      else
+        base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
+      end
+
+    case Keyword.get(opts, :tool_names) do
+      names when is_list(names) -> Enum.filter(tools, &(&1["name"] in names))
+      _ -> tools
     end
   end
 
   def dispatch_tool("ck_validate", arguments), do: CkValidate.call(arguments)
   def dispatch_tool("ck_context", arguments), do: CkContext.call(arguments)
+  def dispatch_tool("ck_experience_index", arguments), do: CkExperienceIndex.call(arguments)
+  def dispatch_tool("ck_experience_read", arguments), do: CkExperienceRead.call(arguments)
+  def dispatch_tool("ck_trace_packet", arguments), do: CkTracePacket.call(arguments)
+  def dispatch_tool("ck_failure_clusters", arguments), do: CkFailureClusters.call(arguments)
+  def dispatch_tool("ck_skill_evolution", arguments), do: CkSkillEvolution.call(arguments)
+  def dispatch_tool("ck_fs_ls", arguments), do: CkFsLs.call(arguments)
+  def dispatch_tool("ck_fs_read", arguments), do: CkFsRead.call(arguments)
+  def dispatch_tool("ck_fs_find", arguments), do: CkFsFind.call(arguments)
+  def dispatch_tool("ck_fs_grep", arguments), do: CkFsGrep.call(arguments)
   def dispatch_tool("ck_finding", arguments), do: CkFinding.call(arguments)
   def dispatch_tool("ck_review_submit", arguments), do: CkReviewSubmit.call(arguments)
   def dispatch_tool("ck_review_status", arguments), do: CkReviewStatus.call(arguments)
   def dispatch_tool("ck_review_feedback", arguments), do: CkReviewFeedback.call(arguments)
+  def dispatch_tool("ck_regression_result", arguments), do: CkRegressionResult.call(arguments)
+  def dispatch_tool("ck_memory_search", arguments), do: CkMemorySearch.call(arguments)
+  def dispatch_tool("ck_memory_record", arguments), do: CkMemoryRecord.call(arguments)
+  def dispatch_tool("ck_memory_archive", arguments), do: CkMemoryArchive.call(arguments)
   def dispatch_tool("ck_budget", arguments), do: CkBudget.call(arguments)
   def dispatch_tool("ck_route", arguments), do: CkRoute.call(arguments)
   def dispatch_tool("ck_delegate", arguments), do: CkDelegate.call(arguments)
@@ -128,7 +174,8 @@ defmodule ControlKeel.MCP.Protocol do
   def ck_validate_tool do
     %{
       "name" => "ck_validate",
-      "description" => "Validate proposed code, config, shell, or text content before execution.",
+      "description" =>
+        "Validate proposed code, config, shell, or text content before execution, including trust-boundary checks for untrusted instructions and high-impact actions.",
       "inputSchema" => %{
         "type" => "object",
         "required" => ["content"],
@@ -138,7 +185,14 @@ defmodule ControlKeel.MCP.Protocol do
           "kind" => %{"type" => "string", "enum" => ["code", "config", "shell", "text"]},
           "domain_pack" => %{"type" => "string", "enum" => Domains.supported_packs()},
           "session_id" => %{"type" => ["integer", "string"]},
-          "task_id" => %{"type" => ["integer", "string"]}
+          "task_id" => %{"type" => ["integer", "string"]},
+          "source_type" => %{"type" => "string", "enum" => TrustBoundary.source_types()},
+          "trust_level" => %{"type" => "string", "enum" => TrustBoundary.trust_levels()},
+          "intended_use" => %{"type" => "string", "enum" => TrustBoundary.intended_uses()},
+          "requested_capabilities" => %{
+            "type" => "array",
+            "items" => %{"type" => "string", "enum" => TrustBoundary.capabilities()}
+          }
         }
       }
     }
@@ -148,13 +202,51 @@ defmodule ControlKeel.MCP.Protocol do
     %{
       "name" => "ck_context",
       "description" =>
-        "Fetch current mission state, governed findings, budget, proof summary, workspace snapshot, recent transcript events, and resume context for a session.",
+        "Fetch current mission state, governed findings, budget, proof summary, planning context, workspace snapshot, reacquisition/drift signals, recent transcript events, resume context, and ControlKeel instruction hierarchy for a session.",
       "inputSchema" => %{
         "type" => "object",
         "required" => ["session_id"],
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
           "task_id" => %{"type" => ["integer", "string"]}
+        }
+      }
+    }
+  end
+
+  def ck_experience_index_tool do
+    %{
+      "name" => "ck_experience_index",
+      "description" =>
+        "List recent prior sessions in the same workspace and the read-only experience artifacts available for each run.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "session_limit" => %{"type" => ["integer", "string"]},
+          "same_domain_only" => %{"type" => "boolean"}
+        }
+      }
+    }
+  end
+
+  def ck_experience_read_tool do
+    %{
+      "name" => "ck_experience_read",
+      "description" =>
+        "Read one prior-run artifact such as a session summary, audit log, trace packet, or proof summary from the workspace experience archive.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "artifact_type"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "source_session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "artifact_type" => %{
+            "type" => "string",
+            "enum" => ["session_summary", "audit_log", "trace_packet", "proof_summary"]
+          }
         }
       }
     }
@@ -185,11 +277,136 @@ defmodule ControlKeel.MCP.Protocol do
     }
   end
 
+  def ck_trace_packet_tool do
+    %{
+      "name" => "ck_trace_packet",
+      "description" =>
+        "Export a structured session or task trace packet with failure patterns and eval candidates for trace-centered improvement loops.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "events_limit" => %{"type" => ["integer", "string"]}
+        }
+      }
+    }
+  end
+
+  def ck_failure_clusters_tool do
+    %{
+      "name" => "ck_failure_clusters",
+      "description" =>
+        "Cluster recurring failure modes across recent session traces in the same workspace and return reusable eval candidates.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "session_limit" => %{"type" => ["integer", "string"]},
+          "same_domain_only" => %{"type" => "boolean"}
+        }
+      }
+    }
+  end
+
+  def ck_skill_evolution_tool do
+    %{
+      "name" => "ck_skill_evolution",
+      "description" =>
+        "Synthesize a deduplicated skill-evolution packet from recent traces and recurring failure clusters, including anti-patterns, reinforced practices, and a ready-to-merge skill draft.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "session_limit" => %{"type" => ["integer", "string"]},
+          "same_domain_only" => %{"type" => "boolean"},
+          "current_skill_name" => %{"type" => "string"},
+          "current_skill_content" => %{"type" => "string"}
+        }
+      }
+    }
+  end
+
+  def ck_fs_ls_tool do
+    %{
+      "name" => "ck_fs_ls",
+      "description" =>
+        "List files and directories inside the bound project root through a read-only virtual workspace surface.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "path" => %{"type" => "string"}
+        }
+      }
+    }
+  end
+
+  def ck_fs_read_tool do
+    %{
+      "name" => "ck_fs_read",
+      "description" =>
+        "Read a file from the bound project root through the read-only virtual workspace without using a sandbox.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "path"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "path" => %{"type" => "string"},
+          "start_line" => %{"type" => ["integer", "string"]},
+          "max_lines" => %{"type" => ["integer", "string"]}
+        }
+      }
+    }
+  end
+
+  def ck_fs_find_tool do
+    %{
+      "name" => "ck_fs_find",
+      "description" =>
+        "Find files or directories by path fragment inside the bound project root through the read-only virtual workspace.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "query"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "path" => %{"type" => "string"},
+          "query" => %{"type" => "string"},
+          "limit" => %{"type" => ["integer", "string"]}
+        }
+      }
+    }
+  end
+
+  def ck_fs_grep_tool do
+    %{
+      "name" => "ck_fs_grep",
+      "description" =>
+        "Search file contents inside the bound project root through the read-only virtual workspace using grep-style semantics.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "query"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "path" => %{"type" => "string"},
+          "query" => %{"type" => "string"},
+          "limit" => %{"type" => ["integer", "string"]},
+          "ignore_case" => %{"type" => "boolean"},
+          "fixed_strings" => %{"type" => "boolean"}
+        }
+      }
+    }
+  end
+
   def ck_review_submit_tool do
     %{
       "name" => "ck_review_submit",
       "description" =>
-        "Submit a governed plan, diff, or completion packet for browser review and execution gating.",
+        "Submit a governed plan, diff, or completion packet for browser review and execution gating, including recursive plan-refinement metadata for larger tasks.",
       "inputSchema" => %{
         "type" => "object",
         "required" => ["submission_body"],
@@ -203,7 +420,35 @@ defmodule ControlKeel.MCP.Protocol do
           "feedback_notes" => %{"type" => "string"},
           "submitted_by" => %{"type" => "string"},
           "metadata" => %{"type" => "object"},
-          "previous_review_id" => %{"type" => ["integer", "string"]}
+          "previous_review_id" => %{"type" => ["integer", "string"]},
+          "plan_phase" => %{
+            "type" => "string",
+            "enum" => [
+              "ticket",
+              "research_packet",
+              "design_options",
+              "narrowed_decision",
+              "implementation_plan",
+              "code_backed_plan"
+            ]
+          },
+          "research_summary" => %{"type" => "string"},
+          "codebase_findings" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "prior_art_summary" => %{"type" => "string"},
+          "options_considered" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "selected_option" => %{"type" => "string"},
+          "rejected_options" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "implementation_steps" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "validation_plan" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "code_snippets" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "scope_estimate" => %{
+            "type" => "object",
+            "properties" => %{
+              "files_touched_estimate" => %{"type" => ["integer", "string"]},
+              "diff_size_estimate" => %{"type" => ["integer", "string"]},
+              "architectural_scope" => %{"type" => "boolean"}
+            }
+          }
         }
       }
     }
@@ -237,6 +482,99 @@ defmodule ControlKeel.MCP.Protocol do
           "feedback_notes" => %{"type" => "string"},
           "annotations" => %{"type" => "object"},
           "reviewed_by" => %{"type" => "string"}
+        }
+      }
+    }
+  end
+
+  def ck_regression_result_tool do
+    %{
+      "name" => "ck_regression_result",
+      "description" =>
+        "Record external regression-test evidence from systems such as Bug0 or Passmark so proof bundles and release readiness can account for it.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "engine", "flow_name", "outcome"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "engine" => %{"type" => "string"},
+          "flow_name" => %{"type" => "string"},
+          "outcome" => %{
+            "type" => "string",
+            "enum" => ["passed", "failed", "flaky", "skipped"]
+          },
+          "summary" => %{"type" => "string"},
+          "environment" => %{"type" => "string"},
+          "commit_sha" => %{"type" => "string"},
+          "external_run_id" => %{"type" => "string"},
+          "evidence" => %{"type" => "object"},
+          "metadata" => %{"type" => "object"}
+        }
+      }
+    }
+  end
+
+  def ck_memory_search_tool do
+    %{
+      "name" => "ck_memory_search",
+      "description" =>
+        "Search governed typed memory for the current session so agents can recover prior decisions, findings, and proof context explicitly.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "query"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "query" => %{"type" => "string"},
+          "record_type" => %{"type" => "string", "enum" => ControlKeel.Memory.record_types()},
+          "top_k" => %{"type" => ["integer", "string"]}
+        }
+      }
+    }
+  end
+
+  def ck_memory_record_tool do
+    %{
+      "name" => "ck_memory_record",
+      "description" =>
+        "Record a governed memory note or decision for the current session so future agents can explicitly retrieve it.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "memory"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "memory" => %{"type" => "string"},
+          "title" => %{"type" => "string"},
+          "summary" => %{"type" => "string"},
+          "body" => %{"type" => "string"},
+          "record_type" => %{"type" => "string", "enum" => ControlKeel.Memory.record_types()},
+          "tags" => %{
+            "oneOf" => [
+              %{"type" => "array", "items" => %{"type" => "string"}},
+              %{"type" => "string"}
+            ]
+          },
+          "source_type" => %{"type" => "string"},
+          "source_id" => %{"type" => "string"},
+          "metadata" => %{"type" => "object"}
+        }
+      }
+    }
+  end
+
+  def ck_memory_archive_tool do
+    %{
+      "name" => "ck_memory_archive",
+      "description" =>
+        "Archive a memory record when it is stale, superseded, or no longer safe to surface to future agents.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "memory_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "memory_id" => %{"type" => ["integer", "string"]}
         }
       }
     }
@@ -378,7 +716,7 @@ defmodule ControlKeel.MCP.Protocol do
           "outcome" => %{"type" => "string"},
           "agent_id" => %{"type" => "string"},
           "task_type" => %{"type" => "string"},
-          "workspace_id" => %{"type" => "string"},
+          "workspace_id" => %{"type" => ["integer", "string"]},
           "limit" => %{"type" => "integer"},
           "window" => %{"type" => "integer"}
         }

@@ -186,6 +186,30 @@ defmodule ControlKeel.AnalyticsTest do
         title: "Escalated critical finding"
       })
 
+    assert {:ok, ready_plan_review} =
+             Mission.submit_review(%{
+               "task_id" => done_ready.id,
+               "review_type" => "plan",
+               "plan_phase" => "implementation_plan",
+               "research_summary" => "Reviewed the analytics funnel and proof generation path.",
+               "codebase_findings" => ["Deploy readiness is derived from proof bundles."],
+               "options_considered" => [
+                 "Use proof bundle state",
+                 "Track a separate analytics flag"
+               ],
+               "selected_option" => "Use proof bundle state",
+               "rejected_options" => ["Track a separate analytics flag"],
+               "implementation_steps" => ["Generate proof bundle", "Aggregate deploy-ready tasks"],
+               "validation_plan" => ["mix test", "mix precommit"],
+               "submission_body" => "Implementation-ready analytics plan"
+             })
+
+    assert {:ok, _approved_ready_plan} =
+             Mission.respond_review(ready_plan_review, %{
+               "decision" => "approved",
+               "feedback_notes" => "Approved plan"
+             })
+
     {:ok, ready_proof} = Mission.generate_proof_bundle(done_ready.id)
 
     Repo.update_all(

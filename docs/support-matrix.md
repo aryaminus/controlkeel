@@ -139,7 +139,7 @@ Runtime transport truth for those first-class hosts:
 | `aider` | attach_client | `controlkeel attach aider` | `local_mcp`, `commands` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |
 | `hermes-agent` | attach_client | `controlkeel attach hermes-agent` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `native` | `hermes-native` |
 | `openclaw` | attach_client | `controlkeel attach openclaw` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `plugin_bundle` | `openclaw-native` |
-| `droid` | attach_client | `controlkeel attach droid` | `local_mcp` | `handoff` | `handoff` | `gateway_base_url` / `native` | `droid-bundle` |
+| `droid` | attach_client | `controlkeel attach droid` | `local_mcp`, `native_skills`, `commands`, `plugin` | `handoff` | `handoff` | `gateway_base_url` / `native` | `droid-bundle`, `droid-plugin` |
 | `forge` | attach_client | `controlkeel attach forge` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `acp_session` / `instructions_only` | `forge-acp` |
 | `devin` | headless_runtime | `controlkeel runtime export devin` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `devin-runtime` |
 | `open-swe` | headless_runtime | `controlkeel runtime export open-swe` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `ck_owned` / `instructions_only` | `open-swe-runtime` |
@@ -147,7 +147,8 @@ Runtime transport truth for those first-class hosts:
 | `gepa` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `deepagents` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `fastmcp` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
-| `conductor` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
+| `conductor` | framework_adapter | use Claude Code repo-local surfaces inside Conductor | `local_mcp`, `native_skills`, `commands` | `none` | `inbound_only` | `heuristic` / `native` | `claude-standalone`, `claude-plugin`, `instructions-only` |
+| `paperclip` | framework_adapter | use CK-native attach surfaces inside Paperclip agent adapters | `local_mcp`, `native_skills`, `commands`, `plugin` | `none` | `inbound_only` | `config_reference` / `native` | `framework-adapter` |
 | `augment-intent` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
 | `codestral` | provider_only | provider template only | none | `none` | `inbound_only` | `ck_owned` / `none` | `provider-profile` |
 | `ollama-runtime` | provider_only | provider template only | none | `none` | `inbound_only` | `local` / `none` | `provider-profile` |
@@ -162,7 +163,7 @@ Runtime transport truth for those first-class hosts:
 | `copilot-cli` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
 | `copilot-web` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
 | `cursor-web` | alias | use `cursor` | same as `cursor` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
-| `conductor-web` | alias | use `conductor` | same as `conductor` | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
+| `conductor-web` | alias | use `conductor` | same as `conductor` | `none` | `inbound_only` | `heuristic` / `native` | `claude-standalone`, `claude-plugin`, `instructions-only` |
 | `augment-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
 | `auggie-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
 | `kimi-cli` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
@@ -234,10 +235,18 @@ Hosted MCP tool authorization uses these protocol scopes:
 | `ck_review_submit` | `mcp:access`, `review:write` |
 | `ck_review_status` | `mcp:access`, `review:read` |
 | `ck_review_feedback` | `mcp:access`, `review:respond` |
+| `ck_context`, `ck_experience_index`, `ck_experience_read`, `ck_trace_packet`, `ck_failure_clusters`, `ck_skill_evolution`, `ck_fs_ls`, `ck_fs_read`, `ck_fs_find`, `ck_fs_grep` | `mcp:access`, `context:read` |
+| `ck_regression_result` | `mcp:access`, `regression:write` |
+| `ck_memory_search` | `mcp:access`, `memory:read` |
+| `ck_memory_record`, `ck_memory_archive` | `mcp:access`, `memory:write` |
 | `ck_budget` | `mcp:access`, `budget:write` |
 | `ck_route` | `mcp:access`, `route:read` |
 | `ck_delegate` | `mcp:access`, `delegate:run` |
+| `ck_cost_optimizer` | `mcp:access`, `cost:read` |
+| `ck_outcome_tracker` | `mcp:access`, `outcome:read`, `outcome:write` |
 | `ck_skill_list`, `ck_skill_load` | `mcp:access`, `skills:read` |
+
+`ck_deployment_advisor` is intentionally not exposed through hosted MCP yet because its current contract operates on an arbitrary `project_root` path rather than a session-bound workspace root.
 
 Service-account responses in the CLI and `/api/v1/workspaces/:id/service-accounts` include the derived `oauth_client_id` for this flow.
 
@@ -282,16 +291,29 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | Tool | Purpose |
 | ------ | --------- |
 | `ck_validate` | Run FastPath scan (patterns, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present. |
-| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, recent transcript events, transcript summary, resume packet, and provider status. Requires `session_id`. |
+| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, reacquisition signals, design-drift summary, recent transcript events, transcript summary, resume packet, and provider status. Requires `session_id`. |
+| `ck_experience_index` | List recent prior sessions in the same workspace plus the read-only experience artifacts available for each run. |
+| `ck_experience_read` | Read one prior-run artifact such as a session summary, audit log, trace packet, or proof summary. |
+| `ck_trace_packet` | Export a structured session or task trace packet with failure patterns and eval candidates so teams can turn real runs into reusable improvement cases. |
+| `ck_failure_clusters` | Cluster recurring failure modes across recent workspace traces and return reusable eval candidates for the highest-frequency patterns. |
+| `ck_skill_evolution` | Synthesize one deduplicated skill-evolution packet from recent traces and failure clusters, including anti-patterns, reinforced practices, merged Do/Avoid/Verification guidance, and a ready-to-merge skill draft. |
+| `ck_fs_ls` | List files and directories inside the bound project root through a read-only virtual workspace surface. |
+| `ck_fs_read` | Read a text file from the bound project root without provisioning a sandbox. |
+| `ck_fs_find` | Find files or directories by path fragment inside the bound project root. |
+| `ck_fs_grep` | Search file contents inside the bound project root with grep-style semantics over the read-only virtual workspace. |
 | `ck_finding` | Record a governed finding for a session (and optional task). |
 | `ck_review_submit` | Submit a plan, diff, or completion packet for browser review and execution gating. |
 | `ck_review_status` | Fetch latest review status, notes, and browser URL by `review_id` or `task_id`. |
 | `ck_review_feedback` | Approve or deny a submitted review and persist feedback notes or annotations. |
+| `ck_regression_result` | Record external regression-test evidence from systems like Bug0 or Passmark so proof bundles and release readiness can account for browser/UI failures. |
+| `ck_memory_search` | Search typed memory explicitly for prior decisions, findings, proofs, and checkpoints within the current session scope. |
+| `ck_memory_record` | Persist an explicit memory note or decision for later agent retrieval. |
+| `ck_memory_archive` | Archive a stale or superseded memory record so it stops surfacing in retrieval. |
 | `ck_budget` | Budget estimate or commit (`mode`: `estimate` \| `commit`). |
 | `ck_route` | Agent routing recommendation from `AgentRouter` (`task`, optional `risk_tier`, `budget_remaining_cents`, `allowed_agents`). |
 | `ck_delegate` | Ask ControlKeel to run or hand off another agent for a task or session under the current policy gates. |
 | `ck_cost_optimizer` | Recommend spend reductions and lower-cost agent/model alternatives for current work context. |
-| `ck_deployment_advisor` | Analyze deployment posture and return stack-aware deployment guidance. |
+| `ck_deployment_advisor` | Analyze deployment posture and return stack-aware deployment guidance. Local/stdio MCP only for now; not advertised on hosted MCP. |
 | `ck_outcome_tracker` | Record or query execution outcomes used for quality and routing feedback loops. |
 | `ck_skill_list` | List AgentSkills from the registry (optional `project_root`, `target`, `format`). **Only registered when skills exist.** |
 | `ck_skill_load` | Load `SKILL.md` for a named skill with optional target-family rendering. **Only registered when skills exist.** |

@@ -2,6 +2,7 @@ defmodule ControlKeel.Learning.OutcomeTracker do
   @moduledoc false
 
   alias ControlKeel.Memory
+  alias ControlKeel.Mission
 
   @outcomes %{
     deploy_success: %{reward: 1.0, label: "Deploy Succeeded"},
@@ -24,7 +25,7 @@ defmodule ControlKeel.Learning.OutcomeTracker do
       outcome_def ->
         agent_id = Keyword.get(opts, :agent_id)
         task_type = Keyword.get(opts, :task_type)
-        workspace_id = Keyword.get(opts, :workspace_id, 1)
+        workspace_id = Keyword.get(opts, :workspace_id) || workspace_id_for_session(session_id)
         metadata = Keyword.get(opts, :metadata, %{})
 
         attrs = %{
@@ -62,7 +63,11 @@ defmodule ControlKeel.Learning.OutcomeTracker do
   end
 
   def get_session_outcomes(session_id) do
-    case Memory.search("outcome session:#{session_id}", session_id: session_id, top_k: 200) do
+    case Memory.search("outcome session:#{session_id}",
+           session_id: session_id,
+           workspace_id: workspace_id_for_session(session_id),
+           top_k: 200
+         ) do
       %{entries: entries} ->
         outcomes =
           entries
@@ -115,8 +120,9 @@ defmodule ControlKeel.Learning.OutcomeTracker do
   def get_leaderboard(opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
     window = Keyword.get(opts, :window, 30)
+    workspace_id = Keyword.get(opts, :workspace_id)
 
-    case Memory.search("outcome agent:", top_k: 1000) do
+    case Memory.search("outcome agent:", top_k: 1000, workspace_id: workspace_id) do
       %{entries: entries} ->
         cutoff = DateTime.utc_now() |> DateTime.add(-window * 24 * 60 * 60, :second)
 
@@ -171,6 +177,13 @@ defmodule ControlKeel.Learning.OutcomeTracker do
 
   def valid_outcomes do
     Map.keys(@outcomes)
+  end
+
+  defp workspace_id_for_session(session_id) do
+    case Mission.get_session(session_id) do
+      %{workspace_id: workspace_id} -> workspace_id
+      _ -> nil
+    end
   end
 
   defp within_window?(iso_datetime, cutoff) do

@@ -19,6 +19,18 @@ defmodule ControlKeel.Learning.OutcomeTrackerTest do
     assert result.reward == 1.0
   end
 
+  test "record infers workspace from the session when omitted" do
+    session = session_fixture()
+
+    assert {:ok, result} =
+             OutcomeTracker.record(session.id, :deploy_success,
+               agent_id: "claude",
+               task_type: "deployment"
+             )
+
+    assert result.outcome == :deploy_success
+  end
+
   test "record rejects unknown outcome" do
     session = session_fixture()
 
@@ -76,7 +88,7 @@ defmodule ControlKeel.Learning.OutcomeTrackerTest do
       workspace_id: workspace.workspace_id
     )
 
-    assert {:ok, leaderboard} = OutcomeTracker.get_leaderboard()
+    assert {:ok, leaderboard} = OutcomeTracker.get_leaderboard(workspace_id: workspace.workspace_id)
     assert is_list(leaderboard)
   end
 
