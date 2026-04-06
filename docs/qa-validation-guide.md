@@ -613,6 +613,8 @@ controlkeel service-account create --workspace-id 1 --name "qa-mcp" --scopes "mc
 controlkeel service-account list --workspace-id 1
 ```
 
+This is the minimal hosted-MCP example used for validation. The broader hosted scope map is documented in [support-matrix.md](support-matrix.md#hosted-mcp).
+
 Expected:
 
 - service account is created
@@ -620,7 +622,7 @@ Expected:
 
 ### 13.2 Hosted MCP
 
-Mint a token and call hosted MCP:
+Mint a token and call hosted MCP with that same minimal scope set:
 
 ```bash
 curl -X POST http://localhost:4000/oauth/token \

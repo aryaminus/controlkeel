@@ -5,6 +5,7 @@ defmodule ControlKeel.SetupAdvisor do
   alias ControlKeel.AgentIntegration
   alias ControlKeel.ProjectBinding
   alias ControlKeel.ProjectRoot
+  alias ControlKeel.ProtocolInterop
   alias ControlKeel.ProviderBroker
 
   @preferred_attach_order [
@@ -86,7 +87,7 @@ defmodule ControlKeel.SetupAdvisor do
         workspace_id = binding["workspace_id"]
 
         if is_integer(workspace_id) do
-          "Hosted MCP: controlkeel service-account create --workspace-id #{workspace_id} --name runtime-mcp --scopes \"mcp:access context:read validate:run\""
+          "Hosted MCP: controlkeel service-account create --workspace-id #{workspace_id} --name runtime-mcp --scopes \"#{Enum.join(ProtocolInterop.hosted_mcp_scopes(), " ")}\""
         end
 
       _ ->

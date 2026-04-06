@@ -185,7 +185,7 @@ The repo-local default is still:
 
 Hosted protocol access is for service-account-driven machines and remote clients.
 
-Create a service account with protocol scopes:
+Create a service account with protocol scopes. The example below is a minimal hosted-MCP token for context and validation; the full hosted scope matrix lives in [support-matrix.md](support-matrix.md#hosted-mcp).
 
 ```bash
 controlkeel service-account create --workspace-id 1 --name "ci-mcp" --scopes "mcp:access context:read validate:run"
@@ -193,7 +193,7 @@ controlkeel service-account create --workspace-id 1 --name "ci-mcp" --scopes "mc
 
 The create and list commands print the derived OAuth client id, for example `ck-sa-123`.
 
-Mint a short-lived bearer token:
+Mint a short-lived bearer token for the same minimal scope set:
 
 ```bash
 curl -X POST http://localhost:4000/oauth/token \

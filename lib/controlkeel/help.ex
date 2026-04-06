@@ -2,6 +2,7 @@ defmodule ControlKeel.Help do
   @moduledoc false
 
   alias ControlKeel.AgentIntegration
+  alias ControlKeel.ProtocolInterop
 
   @topics [
     %{
@@ -265,7 +266,7 @@ defmodule ControlKeel.Help do
       phrases: ["run mcp", "hosted mcp", "remote client"],
       commands: [
         "controlkeel mcp --project-root /abs/path",
-        "controlkeel service-account create --workspace-id 1 --name ci-mcp --scopes \"mcp:access context:read validate:run\"",
+        "controlkeel service-account create --workspace-id 1 --name ci-mcp --scopes \"#{Enum.join(ProtocolInterop.hosted_mcp_scopes(), " ")}\"",
         "controlkeel registry status acp",
         "controlkeel help attach"
       ],
