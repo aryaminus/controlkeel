@@ -76,6 +76,10 @@ These are real shipped surfaces, but they are not all published marketplaces or 
 
 The same distinction applies to the broader `skills.sh` ecosystem. Some names there map directly to shipped CK targets such as `codex` -> `codex-cli`, `gemini` -> `gemini-cli`, `kiro-cli` -> `kiro`, `kilo` -> `kilo`, and `roo` -> `roo-code`. Other names such as `antigravity`, `clawdbot`, `nous-research`, and `trae` are currently skills-compatible only through open-standard AgentSkills installs, not through a native CK attach/runtime contract.
 
+Conductor sits between those buckets. Its official docs say it runs bundled Claude Code and Codex, uses Claude Code MCP config, maps project instructions to `CLAUDE.md`, and reads Claude slash commands from `.claude/commands`. In practice that means CK support inside Conductor is real, but it is inherited from the Claude Code repo-local surfaces rather than from a dedicated `controlkeel attach conductor` command.
+
+Paperclip is one layer higher again: an orchestration plane that schedules and supervises external agents through documented adapters such as Claude Local, Codex Local, Gemini Local, OpenClaw Gateway, Hermes Local, Pi Local, and Cursor Local, with instance config under `~/.paperclip/instances/default/config.json`. CK therefore models Paperclip as an orchestration adapter, not as a native attach target. The practical integration path is to attach CK to the underlying runtime each Paperclip agent uses.
+
 ## Protocol interop
 
 ControlKeel exposes three protocol surfaces around the integration catalog:
@@ -166,7 +170,7 @@ The catalog also includes rows that are intentionally not marketed as attach tar
 | Support class | What it means |
 | --- | --- |
 | Headless runtime | `controlkeel runtime export <target>` writes governed runtime bundles for systems such as Devin and Open SWE |
-| Framework adapter | surfaced through benchmark, policy, or runtime-harness adapter exports rather than host attach |
+| Framework adapter | surfaced through benchmark, policy, or runtime-harness adapter exports rather than host attach; this is where orchestration layers such as Conductor and Paperclip sit |
 | Provider-only | CK provider profiles and OpenAI-compatible backend guidance for systems such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints |
 | Alias | maps ecosystem names back to the canonical shipped target |
 | Unverified | visible for research honesty, but not marketed as shipped support |
@@ -181,3 +185,9 @@ Unsupported tools still have a truthful recovery path:
 4. use proxy mode when the tool can target OpenAI- or Anthropic-compatible endpoints
 
 That keeps the support story honest: not every tool gets a first-class attach command, but unsupported tools can still participate in the governance loop.
+
+For Conductor specifically, the practical recommendation is:
+
+1. run `controlkeel attach claude-code` in the repository you open in Conductor
+2. let Conductor consume the resulting `.mcp.json`, `CLAUDE.md`, and `.claude/commands`
+3. use Conductor workspaces as isolated branches/worktrees while CK stays the governance layer

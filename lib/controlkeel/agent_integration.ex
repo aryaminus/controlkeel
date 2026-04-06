@@ -548,12 +548,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Factory Droid",
         category: "native-first",
         description:
-          "Generates `.factory` skills, droids, commands, and MCP config aligned with Droid's user/project hierarchy.",
+          "Generates repo-local `.factory` skills, droids, commands, and MCP config aligned with Droid's user/project hierarchy, and can also export a shareable Factory plugin bundle.",
         attach_command: "controlkeel attach droid",
         config_location:
           "Factory settings live in `~/.factory/settings.json` or `<repo>/.factory/settings.local.json`; MCP config is layered through `~/.factory/mcp.json` and `<repo>/.factory/mcp.json`.",
         companion_delivery:
-          "Installs `.factory/skills`, `.factory/droids`, `.factory/commands`, and `.factory/mcp.json` bundles for user or project scope.",
+          "Installs `.factory/skills`, `.factory/droids`, `.factory/commands`, and `.factory/mcp.json` bundles for user or project scope, and can export a `.factory-plugin` bundle for Droid's marketplace/plugin flow.",
         preferred_target: "droid-bundle",
         default_scope: "project",
         router_agent_id: "droid",
@@ -569,7 +569,7 @@ defmodule ControlKeel.AgentIntegration do
           config_paths: ["~/.factory/settings.json", "<repo>/.factory/settings.local.json"]
         },
         supported_scopes: ["user", "project"],
-        export_targets: ["droid-bundle"]
+        export_targets: ["droid-bundle", "droid-plugin"]
       }),
       attach_client(%{
         id: "forge",
@@ -723,19 +723,66 @@ defmodule ControlKeel.AgentIntegration do
         label: "Conductor",
         category: "framework-adapter",
         description:
-          "Multi-agent workflow orchestration layer (CLI/web surfaces) treated as an adapter path for governed worktree and routing flows, not a first-class local attach target.",
+          "Desktop orchestration app that runs bundled Claude Code and Codex in isolated workspaces. Not a first-class `controlkeel attach` target, but it can consume the same repo-local Claude Code MCP, `CLAUDE.md`, and slash-command surfaces that CK already ships.",
         companion_delivery:
-          "Appears in orchestration/export guidance rather than `controlkeel attach`.",
+          "Use the Claude Code CK attach/install surfaces inside repositories opened by Conductor. The same `.mcp.json`, `CLAUDE.md`, and `.claude/commands` assets are what Conductor documents today.",
+        preferred_target: "claude-standalone",
+        default_scope: "project",
+        auth_mode: "heuristic",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "conductor/build",
+        upstream_docs_url: "https://docs.conductor.build/",
+        provider_bridge: %{
+          supported: true,
+          provider: "anthropic",
+          mode: "env_bridge",
+          owner: "agent"
+        },
+        supported_scopes: ["user", "project"],
+        export_targets: ["claude-standalone", "claude-plugin", "instructions-only"],
+        agent_uses_ck_via: ["local_mcp", "native_skills", "commands"],
+        artifact_surfaces: [".mcp.json", "CLAUDE.md", ".claude/commands"],
+        review_experience: "browser_review",
+        submission_mode: "command",
+        feedback_mode: "command_reply",
+        install_experience: "guided",
+        confidence_level: "experimental",
+        phase_model: "host_plan_mode",
+        browser_embed: "external",
+        subagent_visibility: "primary_only",
+        execution_support: "inbound_only",
+        ck_runs_agent_via: "none"
+      }),
+      framework_adapter(%{
+        id: "paperclip",
+        label: "Paperclip",
+        category: "framework-adapter",
+        description:
+          "Multi-agent orchestration control plane that runs CK-enabled local agents through adapter configs and heartbeats, not through a native `controlkeel attach` path.",
+        companion_delivery:
+          "Use CK's native attach/install surfaces inside the underlying Paperclip agent runtimes such as Claude, Codex, Gemini, OpenClaw, Hermes, Pi, and Cursor. Paperclip itself is modeled as an orchestration adapter with its own config, plugin, and skills-manager layers.",
         preferred_target: "framework-adapter",
-        default_scope: "export",
-        auth_mode: "none",
-        mcp_mode: "none",
-        skills_mode: "none",
-        upstream_slug: "microsoft/conductor",
-        upstream_docs_url: "https://www.conductor.build",
+        default_scope: "project",
+        auth_mode: "config_reference",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "paperclipai/paperclip",
+        upstream_docs_url: "https://docs.paperclip.ing/adapters/overview",
         provider_bridge: %{supported: false, mode: "none", owner: "none"},
-        supported_scopes: ["export"],
-        export_targets: ["framework-adapter"]
+        supported_scopes: ["project", "export"],
+        export_targets: ["framework-adapter"],
+        agent_uses_ck_via: ["local_mcp", "native_skills", "commands", "plugin"],
+        artifact_surfaces: [
+          "~/.paperclip/instances/default/config.json",
+          "Paperclip adapter config",
+          "Paperclip plugins",
+          "AGENTS.md"
+        ],
+        install_experience: "guided",
+        confidence_level: "experimental",
+        execution_support: "inbound_only",
+        ck_runs_agent_via: "none"
       }),
       framework_adapter(%{
         id: "augment-intent",
@@ -1015,16 +1062,14 @@ defmodule ControlKeel.AgentIntegration do
         label: "Conductor web",
         category: "alias",
         description:
-          "Alias for Conductor web surface. CK resolves this to the Conductor adapter row rather than a direct attach target.",
+          "Alias for the Conductor app/web surface. CK resolves this to the Conductor compatibility row rather than a direct attach target.",
         alias_of: "conductor",
-        auth_mode: "none",
-        mcp_mode: "none",
-        skills_mode: "none",
+        auth_mode: "heuristic",
         upstream_slug: "conductor/build-web",
-        upstream_docs_url: "https://www.conductor.build",
-        supported_scopes: ["export"],
-        preferred_target: "framework-adapter",
-        export_targets: ["framework-adapter"]
+        upstream_docs_url: "https://docs.conductor.build/",
+        supported_scopes: ["user", "project"],
+        preferred_target: "claude-standalone",
+        export_targets: ["claude-standalone", "claude-plugin", "instructions-only"]
       }),
       alias_entry(%{
         id: "gemini",
@@ -1557,6 +1602,9 @@ defmodule ControlKeel.AgentIntegration do
       id when id in ["hermes-agent", "openclaw"] ->
         ["local_mcp", "plugin", "native_skills"]
 
+      "droid" ->
+        ["local_mcp", "native_skills", "commands", "plugin"]
+
       "kiro" ->
         ["local_mcp", "native_skills", "hooks", "rules", "commands"]
 
@@ -2052,6 +2100,18 @@ defmodule ControlKeel.AgentIntegration do
 
   defp default_artifact_surfaces(%{id: "aider"}),
     do: ["AGENTS.md", "AIDER.md", ".aider.conf.yml", ".aider/commands"]
+
+  defp default_artifact_surfaces(%{id: "droid"}),
+    do: [
+      ".factory/skills",
+      ".factory/droids",
+      ".factory/commands",
+      ".factory/mcp.json",
+      ".factory-plugin/plugin.json",
+      "mcp.json",
+      "README.md",
+      "AGENTS.md"
+    ]
 
   defp default_artifact_surfaces(%{support_class: "headless_runtime"}),
     do: ["AGENTS.md", ".mcp.hosted.json", "runtime export bundle"]

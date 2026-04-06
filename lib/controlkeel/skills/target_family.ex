@@ -15,7 +15,7 @@ defmodule ControlKeel.Skills.TargetFamily do
     "open-standard" => ["open-standard"],
     "openclaw" => ["openclaw", "openclaw-native", "openclaw-plugin"],
     "hermes" => ["hermes-agent", "hermes-native"],
-    "droid" => ["droid", "droid-bundle"],
+    "droid" => ["droid", "droid-bundle", "droid-plugin"],
     "forge" => ["forge", "forge-acp"]
   }
 

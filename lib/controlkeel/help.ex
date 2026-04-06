@@ -316,7 +316,7 @@ defmodule ControlKeel.Help do
                                       Check proof-backed release readiness for a session
       controlkeel govern install github
                                       Scaffold repo-native GitHub governance workflows
-      controlkeel plugin export codex|claude|copilot|openclaw|augment
+      controlkeel plugin export codex|claude|copilot|openclaw|augment|droid
                                       Export a first-class plugin bundle for a supported agent
       controlkeel plugin install codex|claude|copilot|openclaw [--scope user|project] [--mode local|hosted]
                                       Install a plugin bundle with local and hosted MCP templates

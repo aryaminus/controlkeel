@@ -59,6 +59,7 @@ The [skills.sh](https://skills.sh/) agent list is broader than CK's native attac
 | Augment / Auggie CLI | `auggie --plugin-dir ./controlkeel/dist/augment-plugin` | Loads the local Augment plugin bundle with hook-native review interception, MCP, rules, subagent, and command prompts. Export it first or use the release artifact. |
 | Amp | `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance` | Installs the native CK skill bundle directly into Amp. Use alongside the exported `.amp/plugins/` directory when you want event hooks and custom tools too. |
 | OpenClaw | `controlkeel plugin install openclaw` | Installs the local OpenClaw plugin bundle and MCP manifest. |
+| Factory Droid | `controlkeel plugin export droid` | Exports a local Factory plugin bundle with `.factory-plugin/plugin.json`, `skills/`, `commands/`, `droids/`, `hooks/hooks.json`, and `mcp.json`. Install it by adding `./controlkeel/dist/droid-plugin` as a local Droid marketplace, then install `controlkeel@droid-plugin`. |
 
 ## Attach-first native installs
 
@@ -78,8 +79,24 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | Aider | `controlkeel attach aider` |
 | Hermes Agent | `controlkeel attach hermes-agent` |
 | OpenClaw | `controlkeel attach openclaw` |
-| Factory Droid | `controlkeel attach droid` |
 | Forge | `controlkeel attach forge` |
+
+## Conductor compatibility
+
+Conductor is not a separate CK attach target, but its own docs make it a real compatibility path because it reuses Claude Code surfaces:
+
+- project MCP config through `.mcp.json`
+- project instructions through `CLAUDE.md`
+- Claude slash commands through `.claude/commands/`
+- isolated per-feature workspaces/branches for parallel agent runs
+
+So the practical CK install path for repositories used in Conductor is:
+
+| Host | Direct install path today |
+| --- | --- |
+| Conductor | `controlkeel attach claude-code` |
+
+That gives Conductor the CK repo-local MCP wiring and instruction surfaces it already knows how to consume, while keeping the support claim honest: CK is not launching the Conductor app itself.
 
 ## Why some hosts stay attach-first
 

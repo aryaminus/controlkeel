@@ -232,6 +232,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "droid-plugin",
+        "Factory Droid plugin bundle",
+        "Shareable Factory plugin bundle with plugin manifest, skills, commands, droids, hooks, and MCP config.",
+        true,
+        "export",
+        ["export"],
+        true
+      ),
+      target(
         "forge-acp",
         "Forge ACP bundle",
         "ACP companion bundle plus portable MCP fallback files for Forge.",

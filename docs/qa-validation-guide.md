@@ -566,7 +566,7 @@ If the host is **not** installed, validate export/install artifacts and mark run
 | Aider | `controlkeel attach aider` | `AIDER.md`, `.aider.conf.yml`, `.aider/commands/controlkeel-review.md` |
 | Hermes Agent | `controlkeel attach hermes-agent` | `.hermes/skills`, `.hermes/mcp.json` |
 | OpenClaw | `controlkeel attach openclaw` | workspace or managed skills plus OpenClaw config |
-| Factory Droid | `controlkeel attach droid` | `.factory/skills`, `.factory/droids`, `.factory/commands` |
+| Factory Droid | `controlkeel attach droid` | `.factory/skills`, `.factory/droids`, `.factory/commands`, `.factory/mcp.json` |
 | Forge | `controlkeel attach forge` | ACP companion plus MCP fallback files |
 
 ### 12.3 Direct install paths
@@ -586,6 +586,7 @@ Validate these separately from `attach`:
 | Copilot plugin install | `controlkeel plugin install copilot` |
 | Codex plugin install | `controlkeel plugin install codex` |
 | OpenClaw plugin install | `controlkeel plugin install openclaw` |
+| Factory Droid plugin export | `controlkeel plugin export droid` |
 | Augment local plugin bundle | `auggie --plugin-dir ./controlkeel/dist/augment-plugin` |
 | Amp skill install | `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance` |
 

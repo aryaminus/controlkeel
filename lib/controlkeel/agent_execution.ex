@@ -29,20 +29,7 @@ defmodule ControlKeel.AgentExecution do
     "gemini-cli" => ["gemini", "gemini-cli"]
   }
 
-  @hosted_scopes [
-    "mcp:access",
-    "a2a:access",
-    "context:read",
-    "validate:run",
-    "finding:write",
-    "budget:write",
-    "review:read",
-    "review:write",
-    "review:respond",
-    "route:read",
-    "skills:read",
-    "delegate:run"
-  ]
+  @hosted_scopes ["a2a:access" | ControlKeel.ProtocolInterop.hosted_mcp_scopes()]
 
   def list_agents(project_root \\ File.cwd!()) do
     project_root = ProjectRoot.resolve(project_root)

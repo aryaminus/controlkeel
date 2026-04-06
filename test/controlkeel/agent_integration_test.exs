@@ -47,6 +47,8 @@ defmodule ControlKeel.AgentIntegrationTest do
     amp = AgentIntegration.get("amp")
     augment = AgentIntegration.get("augment")
     aider = AgentIntegration.get("aider")
+    conductor = AgentIntegration.get("conductor")
+    conductor_web = AgentIntegration.get("conductor-web")
 
     assert claude.label == "Claude Code"
     assert claude.support_class == "attach_client"
@@ -219,6 +221,52 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert aider.phase_model == "review_only"
     assert aider.submission_mode == "command"
     assert "AIDER.md" in aider.artifact_surfaces
+
+    droid = AgentIntegration.get("droid")
+    assert droid.preferred_target == "droid-bundle"
+    assert "droid-plugin" in droid.export_targets
+    assert "native_skills" in droid.agent_uses_ck_via
+    assert "commands" in droid.agent_uses_ck_via
+    assert "plugin" in droid.agent_uses_ck_via
+    assert ".factory/skills" in droid.artifact_surfaces
+    assert ".factory/droids" in droid.artifact_surfaces
+    assert ".factory/commands" in droid.artifact_surfaces
+    assert ".factory-plugin/plugin.json" in droid.artifact_surfaces
+    assert "mcp.json" in droid.artifact_surfaces
+
+    assert conductor.support_class == "framework_adapter"
+    assert conductor.preferred_target == "claude-standalone"
+    assert conductor.mcp_mode == "native"
+    assert conductor.skills_mode == "native"
+    assert conductor.agent_uses_ck_via == ["local_mcp", "native_skills", "commands"]
+    assert ".mcp.json" in conductor.artifact_surfaces
+    assert "CLAUDE.md" in conductor.artifact_surfaces
+    assert ".claude/commands" in conductor.artifact_surfaces
+    assert conductor.execution_support == "inbound_only"
+    assert conductor.ck_runs_agent_via == "none"
+
+    assert conductor.provider_bridge == %{
+             supported: true,
+             provider: "anthropic",
+             mode: "env_bridge",
+             owner: "agent"
+           }
+
+    paperclip = AgentIntegration.get("paperclip")
+
+    assert paperclip.support_class == "framework_adapter"
+    assert paperclip.agent_uses_ck_via == ["local_mcp", "native_skills", "commands", "plugin"]
+    assert "~/.paperclip/instances/default/config.json" in paperclip.artifact_surfaces
+    assert paperclip.mcp_mode == "native"
+    assert paperclip.skills_mode == "native"
+    assert paperclip.execution_support == "inbound_only"
+    assert paperclip.ck_runs_agent_via == "none"
+    assert paperclip.preferred_target == "framework-adapter"
+    assert paperclip.provider_bridge == %{supported: false, mode: "none", owner: "none"}
+
+    assert conductor_web.support_class == "alias"
+    assert conductor_web.alias_of == "conductor"
+    assert conductor_web.preferred_target == "claude-standalone"
 
     openclaw = AgentIntegration.get("openclaw")
 

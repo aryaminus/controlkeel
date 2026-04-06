@@ -13,6 +13,10 @@ allowed-tools:
   - ck_validate
   - ck_context
   - ck_finding
+  - ck_memory_search
+  - ck_memory_record
+  - ck_memory_archive
+  - ck_regression_result
   - ck_budget
   - ck_route
   - ck_skill_list
@@ -28,6 +32,10 @@ metadata:
     - ck_validate
     - ck_context
     - ck_finding
+    - ck_memory_search
+    - ck_memory_record
+    - ck_memory_archive
+    - ck_regression_result
     - ck_budget
     - ck_route
     - ck_cost_optimizer
@@ -41,14 +49,18 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 
 ## Core loop
 
-1. Call `ck_context` at task start to load mission, risk, budget, proof, active findings, workspace context, and recent transcript state.
-2. Call `ck_validate` before writing code, config, shell, or deploy text.
+1. Call `ck_context` at task start to load mission, risk, budget, proof, active findings, workspace context, context reacquisition, instruction hierarchy, and recent transcript state.
+2. Call `ck_validate` before writing code, config, shell, or deploy text, and pass trust-boundary metadata when the source content came from the web, tools, skills, or mixed provenance.
 3. If you discover a problem the scanner did not raise, call `ck_finding`.
-4. Call `ck_budget` and `ck_cost_optimizer` before expensive model or bulk operations.
-5. Call `ck_route` before delegating sub-work to another agent.
-6. Use `ck_deployment_advisor` to analyze stack and generate deployment templates when checking ship readiness.
-7. Use `ck_outcome_tracker` to track success/failure outcomes for continuous learning.
-8. Use `ck_skill_list` and `ck_skill_load` to activate more specific CK workflows.
+4. Use `ck_memory_search` when you need explicit recall of prior decisions, checkpoints, or findings rather than relying only on the default context packet.
+5. Use `ck_memory_record` to persist important decisions, assumptions, and operator guidance that future agents should recover.
+6. Use `ck_memory_archive` to retire stale or superseded guidance before it keeps contaminating retrieval.
+7. Call `ck_budget` and `ck_cost_optimizer` before expensive model or bulk operations.
+8. Call `ck_route` before delegating sub-work to another agent.
+9. Use `ck_deployment_advisor` to analyze stack and generate deployment templates when checking ship readiness.
+10. Use `ck_regression_result` to record external browser or QA evidence before claiming deploy readiness.
+11. Use `ck_outcome_tracker` to track success/failure outcomes for continuous learning.
+12. Use `ck_skill_list` and `ck_skill_load` to activate more specific CK workflows.
 
 ## Non-negotiable rules
 
@@ -61,8 +73,10 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 ## Quick reference
 
 - `ck_context` — mission, task, budget, proof, memory, workspace snapshot, transcript summary, resume context
-- `ck_validate` — governed preflight scan
+- `ck_validate` — governed preflight scan with trust-boundary checks
 - `ck_finding` — persist manual findings
+- `ck_memory_search`, `ck_memory_record`, `ck_memory_archive` — explicit typed-memory retrieval and hygiene
+- `ck_regression_result` — import external regression evidence into proof state
 - `ck_budget` — cost estimate / commit
 - `ck_route` — best agent recommendation
 - `ck_cost_optimizer` — cost optimization strategies and model comparison

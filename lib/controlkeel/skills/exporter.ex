@@ -1135,9 +1135,18 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(droid_path))
     File.write!(droid_path, droid_profile_contents())
 
-    command_path = Path.join(root, ".factory/commands/controlkeel-review.md")
-    File.mkdir_p!(Path.dirname(command_path))
-    File.write!(command_path, droid_command_contents())
+    review_command_path = Path.join(root, ".factory/commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(review_command_path))
+    File.write!(review_command_path, droid_review_command_contents())
+
+    submit_command_path = Path.join(root, ".factory/commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, droid_submit_plan_command_contents())
+
+    annotate_command_path = Path.join(root, ".factory/commands/controlkeel-annotate.md")
+    File.write!(annotate_command_path, droid_annotate_command_contents())
+
+    last_command_path = Path.join(root, ".factory/commands/controlkeel-last.md")
+    File.write!(last_command_path, droid_last_command_contents())
 
     mcp_path = Path.join(root, ".factory/mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
@@ -1152,13 +1161,74 @@ defmodule ControlKeel.Skills.Exporter do
       [
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => droid_path, "kind" => "agent"},
-        %{"path" => command_path, "kind" => "command"},
+        %{"path" => review_command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
         "Copy `.factory/` into the repo or your user Factory config directory.",
-        "Use the generated droid profile and command as the governed ControlKeel entry point."
+        "Use the generated droid profile plus the review, submit-plan, annotate, and last commands as the governed ControlKeel entry point."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "droid-plugin"}, root, project_root, skills, opts) do
+    skill_root = Path.join(root, "skills")
+    write_skill_tree(skills, skill_root)
+
+    droid_path = Path.join(root, "droids/controlkeel.md")
+    File.mkdir_p!(Path.dirname(droid_path))
+    File.write!(droid_path, droid_profile_contents())
+
+    review_command_path = Path.join(root, "commands/controlkeel-review.md")
+    File.mkdir_p!(Path.dirname(review_command_path))
+    File.write!(review_command_path, droid_review_command_contents())
+
+    submit_command_path = Path.join(root, "commands/controlkeel-submit-plan.md")
+    File.write!(submit_command_path, droid_submit_plan_command_contents())
+
+    annotate_command_path = Path.join(root, "commands/controlkeel-annotate.md")
+    File.write!(annotate_command_path, droid_annotate_command_contents())
+
+    last_command_path = Path.join(root, "commands/controlkeel-last.md")
+    File.write!(last_command_path, droid_last_command_contents())
+
+    manifest_path = Path.join(root, ".factory-plugin/plugin.json")
+    File.mkdir_p!(Path.dirname(manifest_path))
+    File.write!(manifest_path, Jason.encode!(droid_plugin_manifest(), pretty: true) <> "\n")
+
+    hooks_path = Path.join(root, "hooks/hooks.json")
+    File.mkdir_p!(Path.dirname(hooks_path))
+    File.write!(hooks_path, Jason.encode!(empty_hooks_manifest(), pretty: true) <> "\n")
+
+    mcp_path = Path.join(root, "mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    readme_path = Path.join(root, "README.md")
+    File.write!(readme_path, droid_plugin_readme_contents())
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => manifest_path, "kind" => "manifest"},
+        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => droid_path, "kind" => "agent"},
+        %{"path" => review_command_path, "kind" => "command"},
+        %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => annotate_command_path, "kind" => "command"},
+        %{"path" => last_command_path, "kind" => "command"},
+        %{"path" => hooks_path, "kind" => "hooks"},
+        %{"path" => mcp_path, "kind" => "mcp"},
+        %{"path" => readme_path, "kind" => "instructions"}
+      ],
+      [
+        "Use `controlkeel plugin export droid` to produce this shareable Factory plugin bundle.",
+        "Install it through Droid's plugin marketplace flow, for example by adding the exported directory as a local marketplace and then installing `controlkeel@droid-plugin`."
       ]
     )
   end
@@ -2042,19 +2112,7 @@ defmodule ControlKeel.Skills.Exporter do
             "client_secret_env" => "CONTROLKEEL_SERVICE_ACCOUNT_SECRET",
             "resource" => "#{base_url}/mcp",
             "scope" =>
-              Enum.join(
-                [
-                  "mcp:access",
-                  "context:read",
-                  "validate:run",
-                  "finding:write",
-                  "budget:write",
-                  "route:read",
-                  "skills:read",
-                  "delegate:run"
-                ],
-                " "
-              )
+              Enum.join(ControlKeel.ProtocolInterop.hosted_mcp_scopes(), " ")
           }
         }
       }
@@ -2311,6 +2369,19 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
+  defp droid_plugin_manifest do
+    %{
+      "name" => "controlkeel",
+      "description" =>
+        "ControlKeel governance skills, droids, commands, and MCP bridge for Factory Droid.",
+      "version" => app_version(),
+      "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
+      "homepage" => "https://github.com/aryaminus/controlkeel",
+      "repository" => "https://github.com/aryaminus/controlkeel",
+      "license" => "Apache-2.0"
+    }
+  end
+
   defp kilo_command_contents do
     """
     # ControlKeel review
@@ -2324,6 +2395,12 @@ defmodule ControlKeel.Skills.Exporter do
 
   defp droid_profile_contents do
     """
+    ---
+    name: controlkeel
+    description: Govern risky code and release work through ControlKeel validation, proofs, and browser review.
+    model: inherit
+    ---
+
     # ControlKeel Droid
 
     Use ControlKeel governance, findings, proofs, budgets, and benchmark workflows before making risky code or deployment changes.
@@ -2332,13 +2409,88 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  defp droid_command_contents do
+  defp droid_review_command_contents do
     """
+    ---
+    description: Run a governed ControlKeel review for the current Droid task
+    disable-model-invocation: true
+    ---
+
     # ControlKeel review
 
-    1. Review the current task or PR goal.
-    2. Call ControlKeel context and validation surfaces.
-    3. Summarize findings, risk, and next steps before execution.
+    Review the current task or PR goal through ControlKeel before risky work or final completion.
+
+    1. Read `AGENTS.md` and any repo-local context first.
+    2. Call `ck_context` for mission, workspace, memory, and review state.
+    3. Call `ck_validate` before and after risky changes.
+    4. Summarize findings, verification strength, risk, and next steps before continuing.
+    """
+  end
+
+  defp droid_submit_plan_command_contents do
+    """
+    ---
+    description: Submit the current Droid plan to ControlKeel and wait for approval
+    disable-model-invocation: true
+    ---
+
+    # ControlKeel submit-plan
+
+    1. Save the current implementation plan to `.factory/review-plan.md`.
+    2. Run `controlkeel review plan submit --body-file .factory/review-plan.md --submitted-by droid --json`.
+    3. Wait with `controlkeel review plan wait --id <review_id> --json`.
+    4. Do not begin implementation until the review is approved.
+    """
+  end
+
+  defp droid_annotate_command_contents do
+    """
+    ---
+    description: Submit focused file-risk notes to ControlKeel before risky Droid edits
+    disable-model-invocation: true
+    ---
+
+    # ControlKeel annotate
+
+    1. Save the target file path, risks, and focused notes to `.factory/annotate.md`.
+    2. Run `controlkeel review plan submit --title "File annotation review" --body-file .factory/annotate.md --submitted-by droid --json`.
+    3. Wait for the response before applying risky edits.
+    """
+  end
+
+  defp droid_last_command_contents do
+    """
+    ---
+    description: Re-open the latest ControlKeel review tracked in Droid
+    disable-model-invocation: true
+    ---
+
+    # ControlKeel last
+
+    1. Read the last stored review id from your notes or prior command output.
+    2. Run `controlkeel review plan open --id <review_id> --json`.
+    3. If the review is still pending, run `controlkeel review plan wait --id <review_id> --json`.
+    """
+  end
+
+  defp droid_plugin_readme_contents do
+    """
+    # ControlKeel Factory Plugin
+
+    This bundle packages ControlKeel for Factory Droid as a shareable plugin.
+
+    It ships:
+    - `skills/` for governed ControlKeel skills
+    - `droids/` for a reusable `controlkeel` droid
+    - `commands/` for review, submit-plan, annotate, and last flows
+    - `mcp.json` for the local ControlKeel MCP bridge
+    - `hooks/hooks.json` as the plugin hook entrypoint
+
+    Local testing flow:
+
+    1. `controlkeel plugin export droid`
+    2. `droid plugin marketplace add ./controlkeel/dist/droid-plugin`
+    3. `droid plugin install controlkeel@droid-plugin`
     """
   end
 

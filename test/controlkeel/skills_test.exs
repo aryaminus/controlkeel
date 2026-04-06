@@ -355,6 +355,46 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.exists?(Path.join(droid_plan.output_dir, ".factory/droids/controlkeel.md"))
 
+    assert File.exists?(
+             Path.join(droid_plan.output_dir, ".factory/commands/controlkeel-review.md")
+           )
+
+    assert File.exists?(
+             Path.join(droid_plan.output_dir, ".factory/commands/controlkeel-submit-plan.md")
+           )
+
+    assert File.exists?(
+             Path.join(droid_plan.output_dir, ".factory/commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(Path.join(droid_plan.output_dir, ".factory/commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(droid_plan.output_dir, ".factory/mcp.json"))
+
+    assert {:ok, droid_plugin_plan} = Skills.export("droid-plugin", tmp_dir, scope: "export")
+
+    assert File.exists?(Path.join(droid_plugin_plan.output_dir, ".factory-plugin/plugin.json"))
+
+    assert File.exists?(
+             Path.join(droid_plugin_plan.output_dir, "skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(Path.join(droid_plugin_plan.output_dir, "droids/controlkeel.md"))
+
+    assert File.exists?(Path.join(droid_plugin_plan.output_dir, "commands/controlkeel-review.md"))
+
+    assert File.exists?(
+             Path.join(droid_plugin_plan.output_dir, "commands/controlkeel-submit-plan.md")
+           )
+
+    assert File.exists?(
+             Path.join(droid_plugin_plan.output_dir, "commands/controlkeel-annotate.md")
+           )
+
+    assert File.exists?(Path.join(droid_plugin_plan.output_dir, "commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(droid_plugin_plan.output_dir, "hooks/hooks.json"))
+    assert File.exists?(Path.join(droid_plugin_plan.output_dir, "mcp.json"))
+    assert File.exists?(Path.join(droid_plugin_plan.output_dir, "README.md"))
+
     assert {:ok, provider_plan} = Skills.export("provider-profile", tmp_dir, scope: "export")
     assert File.exists?(Path.join(provider_plan.output_dir, "provider-profiles/vllm.json"))
     assert File.exists?(Path.join(provider_plan.output_dir, "provider-profiles/sglang.json"))

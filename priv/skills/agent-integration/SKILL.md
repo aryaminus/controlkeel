@@ -26,8 +26,8 @@ Use this skill when the task is attaching or distributing ControlKeel across age
 2. Prefer native install where supported, with CK MCP as the transport for governance tools.
 3. Export plugin bundles when the user wants a shareable package.
 4. For MCP-only tools, generate the instruction bundle and installation guidance.
+5. For Conductor, prefer the Claude Code install path because Conductor documents support for `.mcp.json`, `CLAUDE.md`, and `.claude/commands`.
 
 ## Additional resources
 
 - [Target matrix](references/target-matrix.md)
-
