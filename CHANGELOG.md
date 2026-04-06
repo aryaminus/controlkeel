@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.24 — 2026-04-06
+
+### What's changed
+
+- Refactor research note and submission payload for clarity and accuracy
+- Add research note and benchmark details for ControlKeel governance
+- Add ControlKeel benchmarking artifacts and analysis scripts
+
 ## v0.1.23 — 2026-04-05
 
 ### What's changed
