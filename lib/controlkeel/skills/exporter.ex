@@ -2111,8 +2111,7 @@ defmodule ControlKeel.Skills.Exporter do
             "client_id" => client_id,
             "client_secret_env" => "CONTROLKEEL_SERVICE_ACCOUNT_SECRET",
             "resource" => "#{base_url}/mcp",
-            "scope" =>
-              Enum.join(ControlKeel.ProtocolInterop.hosted_mcp_scopes(), " ")
+            "scope" => Enum.join(ControlKeel.ProtocolInterop.hosted_mcp_scopes(), " ")
           }
         }
       }

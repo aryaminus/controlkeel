@@ -88,7 +88,9 @@ defmodule ControlKeel.Learning.OutcomeTrackerTest do
       workspace_id: workspace.workspace_id
     )
 
-    assert {:ok, leaderboard} = OutcomeTracker.get_leaderboard(workspace_id: workspace.workspace_id)
+    assert {:ok, leaderboard} =
+             OutcomeTracker.get_leaderboard(workspace_id: workspace.workspace_id)
+
     assert is_list(leaderboard)
   end
 

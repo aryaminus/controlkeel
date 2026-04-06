@@ -2646,7 +2646,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :deploy_cost, options: options}, _project_root) do
-    with {:ok, stack} <- parse_atom_option(options[:stack] || "static", deployment_stacks(), "stack"),
+    with {:ok, stack} <-
+           parse_atom_option(options[:stack] || "static", deployment_stacks(), "stack"),
          {:ok, tier} <- parse_atom_option(options[:tier] || "free", hosting_tiers(), "tier"),
          {:ok, db_tier} <-
            parse_atom_option(options[:db_tier] || "managed_small", database_tiers(), "db_tier") do
@@ -2678,7 +2679,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :deploy_dns, options: options}, _project_root) do
-    with {:ok, stack} <- parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
+    with {:ok, stack} <-
+           parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
       guide = Advisor.dns_ssl_guide(stack)
 
       lines =
@@ -2692,7 +2694,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :deploy_migration, options: options}, _project_root) do
-    with {:ok, stack} <- parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
+    with {:ok, stack} <-
+           parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
       guide = Advisor.db_migration_guide(stack)
 
       lines =
@@ -2705,7 +2708,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :deploy_scaling, options: options}, _project_root) do
-    with {:ok, stack} <- parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
+    with {:ok, stack} <-
+           parse_atom_option(options[:stack] || "phoenix", deployment_stacks(), "stack") do
       guide = Advisor.scaling_guide(stack)
 
       lines = ["Scaling Guide for #{stack}:", ""]
@@ -2716,7 +2720,12 @@ defmodule ControlKeel.CLI do
           Enum.map(guide.vertical_scaling.tiers, fn t ->
             "  #{t.users} users: #{t.tier} - #{t.cost}"
           end) ++
-          ["", "Horizontal: #{guide.horizontal_scaling}", "", "Database: #{guide.database_scaling}"]
+          [
+            "",
+            "Horizontal: #{guide.horizontal_scaling}",
+            "",
+            "Database: #{guide.database_scaling}"
+          ]
 
       {:ok, lines}
     end
@@ -3030,7 +3039,8 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :outcome_record, args: [session_id, outcome]}, _project_root) do
     with {sid, ""} <- Integer.parse(session_id),
-         {:ok, outcome_atom} <- parse_atom_option(outcome, OutcomeTracker.valid_outcomes(), "outcome") do
+         {:ok, outcome_atom} <-
+           parse_atom_option(outcome, OutcomeTracker.valid_outcomes(), "outcome") do
       agent_id = "cli-session-#{sid}"
 
       case OutcomeTracker.record(sid, outcome_atom, agent_id: agent_id) do
@@ -3094,8 +3104,11 @@ defmodule ControlKeel.CLI do
     trimmed = String.trim(value)
 
     case Enum.find(allowed, &(to_string(&1) == trimmed)) do
-      nil -> {:error, "`#{field}` must be one of #{Enum.join(Enum.map(allowed, &to_string/1), ", ")}"}
-      atom -> {:ok, atom}
+      nil ->
+        {:error, "`#{field}` must be one of #{Enum.join(Enum.map(allowed, &to_string/1), ", ")}"}
+
+      atom ->
+        {:ok, atom}
     end
   end
 

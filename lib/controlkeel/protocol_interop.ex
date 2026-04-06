@@ -163,7 +163,8 @@ defmodule ControlKeel.ProtocolInterop do
     with :ok <- maybe_verify_session_workspace(service_account, Map.get(arguments, "session_id")),
          :ok <- maybe_verify_task_workspace(service_account, Map.get(arguments, "task_id")),
          :ok <- maybe_verify_review_workspace(service_account, Map.get(arguments, "review_id")),
-         :ok <- maybe_verify_workspace_argument(service_account, Map.get(arguments, "workspace_id")) do
+         :ok <-
+           maybe_verify_workspace_argument(service_account, Map.get(arguments, "workspace_id")) do
       :ok
     end
   end
