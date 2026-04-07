@@ -123,53 +123,206 @@ defmodule ControlKeel.VirtualWorkspace do
     with {:ok, root} <- resolve_root(session_id),
          {:ok, scope_path, scope_relative_path} <- safe_path(root, Keyword.get(opts, :path, ".")),
          {:ok, limit} <- normalize_positive_integer(Keyword.get(opts, :limit, 50), "limit") do
-      args =
-        [
-          "--json",
-          "--line-number",
-          "--hidden",
-          "--glob",
-          "!.git"
-        ]
-        |> maybe_add_arg(Keyword.get(opts, :ignore_case, false), "-i")
-        |> maybe_add_arg(Keyword.get(opts, :fixed_strings, true), "-F")
-        |> Kernel.++([query, scope_path])
+      max_matches = min(limit, @max_grep_matches)
 
-      case System.cmd("rg", args, stderr_to_stdout: true) do
-        {output, exit_code} when exit_code in [0, 1] ->
-          matches =
-            output
-            |> String.split("\n", trim: true)
-            |> Enum.reduce([], fn line, acc ->
-              case Jason.decode(line) do
-                {:ok, %{"type" => "match", "data" => data}} ->
-                  [grep_match(root, data) | acc]
-
-                _ ->
-                  acc
-              end
-            end)
-            |> Enum.reverse()
-            |> Enum.take(min(limit, @max_grep_matches))
-
-          {:ok,
-           %{
-             "project_root" => root,
-             "path" => scope_relative_path,
-             "query" => query,
-             "matches" => matches,
-             "count" => length(matches),
-             "limited" => length(matches) == min(limit, @max_grep_matches),
-             "read_only" => true,
-             "virtual_filesystem" => true,
-             "tool" => "grep"
-           }}
-
-        {output, _exit_code} ->
-          {:error, {:invalid_arguments, String.trim(output)}}
+      with {:ok, matches} <- grep_matches(root, scope_path, query, opts, max_matches) do
+        {:ok,
+         %{
+           "project_root" => root,
+           "path" => scope_relative_path,
+           "query" => query,
+           "matches" => matches,
+           "count" => length(matches),
+           "limited" => length(matches) == max_matches,
+           "read_only" => true,
+           "virtual_filesystem" => true,
+           "tool" => "grep"
+         }}
       end
     end
   end
+
+  defp grep_matches(root, scope_path, query, opts, max_matches) do
+    if rg = System.find_executable("rg") do
+      grep_with_rg(rg, root, scope_path, query, opts, max_matches)
+    else
+      grep_with_elixir(root, scope_path, query, opts, max_matches)
+    end
+  end
+
+  defp grep_with_rg(rg, root, scope_path, query, opts, max_matches) do
+    args =
+      [
+        "--json",
+        "--line-number",
+        "--hidden",
+        "--glob",
+        "!.git"
+      ]
+      |> maybe_add_arg(Keyword.get(opts, :ignore_case, false), "-i")
+      |> maybe_add_arg(Keyword.get(opts, :fixed_strings, true), "-F")
+      |> Kernel.++([query, scope_path])
+
+    case System.cmd(rg, args, stderr_to_stdout: true) do
+      {output, exit_code} when exit_code in [0, 1] ->
+        matches =
+          output
+          |> String.split("\n", trim: true)
+          |> Enum.reduce([], fn line, acc ->
+            case Jason.decode(line) do
+              {:ok, %{"type" => "match", "data" => data}} ->
+                [grep_match(root, data) | acc]
+
+              _ ->
+                acc
+            end
+          end)
+          |> Enum.reverse()
+          |> Enum.take(max_matches)
+
+        {:ok, matches}
+
+      {output, _exit_code} ->
+        {:error, {:invalid_arguments, String.trim(output)}}
+    end
+  end
+
+  defp grep_with_elixir(root, scope_path, query, opts, max_matches) do
+    with {:ok, matcher} <- line_matcher(query, opts) do
+      matches =
+        scope_path
+        |> walk_children()
+        |> Stream.reject(&path_within_git?/1)
+        |> Stream.filter(&File.regular?/1)
+        |> Stream.transform(0, fn path, count ->
+          if count >= max_matches do
+            {:halt, count}
+          else
+            case grep_file(root, path, matcher, count, max_matches) do
+              [] ->
+                {[], count}
+
+              file_matches ->
+                {file_matches, count + length(file_matches)}
+            end
+          end
+        end)
+        |> Enum.to_list()
+
+      {:ok, matches}
+    end
+  end
+
+  defp grep_file(root, path, matcher, offset, max_matches) do
+    case File.read(path) do
+      {:ok, contents} ->
+        case ensure_text(contents) do
+          :ok ->
+            contents
+            |> String.split("\n", trim: false)
+            |> Enum.with_index(1)
+            |> Enum.reduce_while([], fn {line, line_number}, acc ->
+              case matcher.(line) do
+                [] ->
+                  {:cont, acc}
+
+                submatches ->
+                  match = %{
+                    "path" => Path.relative_to(path, root),
+                    "line_number" => line_number,
+                    "line" => line,
+                    "submatches" => submatches
+                  }
+
+                  if offset + length(acc) + 1 >= max_matches do
+                    {:halt, [match | acc]}
+                  else
+                    {:cont, [match | acc]}
+                  end
+              end
+            end)
+            |> Enum.reverse()
+
+          _ ->
+            []
+        end
+
+      _ ->
+        []
+    end
+  end
+
+  defp line_matcher(query, opts) do
+    ignore_case? = Keyword.get(opts, :ignore_case, false)
+    fixed_strings? = Keyword.get(opts, :fixed_strings, true)
+
+    if fixed_strings? do
+      needle = maybe_downcase(query, ignore_case?)
+      needle_length = String.length(query)
+
+      {:ok,
+       fn line ->
+         normalized_line = maybe_downcase(line, ignore_case?)
+
+         normalized_line
+         |> collect_fixed_string_matches(needle, 0, [])
+         |> Enum.map(fn start ->
+           %{
+             "match" => String.slice(line, start, needle_length),
+             "start" => start,
+             "end" => start + needle_length
+           }
+         end)
+       end}
+    else
+      options = if ignore_case?, do: [:caseless], else: []
+
+      case Regex.compile(query, options) do
+        {:ok, regex} ->
+          {:ok,
+           fn line ->
+             Regex.scan(regex, line, return: :index)
+             |> Enum.map(fn
+               [{start, length} | _rest] ->
+                 %{
+                   "match" => String.slice(line, start, length),
+                   "start" => start,
+                   "end" => start + length
+                 }
+             end)
+           end}
+
+        {:error, reason} ->
+          {:error, {:invalid_arguments, "Invalid regex query: #{inspect(reason)}"}}
+      end
+    end
+  end
+
+  defp collect_fixed_string_matches(_line, "", _offset, acc), do: Enum.reverse(acc)
+
+  defp collect_fixed_string_matches(line, needle, offset, acc) do
+    case :binary.match(line, needle) do
+      {position, _length} ->
+        next_offset = offset + position + max(byte_size(needle), 1)
+
+        remainder =
+          binary_part(
+            line,
+            position + byte_size(needle),
+            byte_size(line) - position - byte_size(needle)
+          )
+
+        collect_fixed_string_matches(remainder, needle, next_offset, [offset + position | acc])
+
+      :nomatch ->
+        Enum.reverse(acc)
+    end
+  end
+
+  defp maybe_downcase(value, true), do: String.downcase(value)
+  defp maybe_downcase(value, false), do: value
+
+  defp path_within_git?(path), do: ".git" in Path.split(path)
 
   defp safe_path(root, path) do
     candidate =
