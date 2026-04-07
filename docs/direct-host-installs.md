@@ -155,6 +155,8 @@ ControlKeel does not silently rewrite repo files or host plugin directories when
   - VS Code marketplace installs can auto-update through VS Code itself; sideloaded `.vsix` installs still require a newer package to be installed.
   - Local `--plugin-dir` installs do not auto-update; rebuild or reinstall the bundle.
 
+For public, network-visible drift checks across docs URLs, npm packages, and installer endpoints, run `mix ck.host_audit`.
+
 ## Remote and browser behavior
 
 CK also pulls a few practical host patterns from Plannotator for direct-install flows:

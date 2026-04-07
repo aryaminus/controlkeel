@@ -13,6 +13,7 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 - IDE/agent path: GitHub Copilot in VS Code (repo-native companion)
 - Agent path: OpenCode (native companion + MCP)
 - Catalog truth audit: alias/framework/unverified inventory
+- Public host/package drift audit: `mix ck.host_audit`
 
 ## Validation Summary (2026-04-01)
 
@@ -98,6 +99,27 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
 
 - [ ] Add a CLI self-check command to detect binary ownership conflict (`brew` vs `npm`) and print remediation guidance
 - [ ] Add a small docs/code consistency test for support-matrix claims vs `AgentIntegration.catalog/0`
+- [x] Add a public host/package drift audit command for network-visible surfaces
+
+## Public drift audit
+
+Run this before or after a release when you want a quick public-surface check:
+
+```bash
+mix ck.host_audit
+```
+
+What it verifies today:
+
+- upstream docs URLs from the typed integration catalog
+- npm registry presence for `@aryaminus/controlkeel`, `@aryaminus/controlkeel-opencode`, and `@aryaminus/controlkeel-pi-extension`
+- public release installer URLs
+
+What it does not verify from this environment:
+
+- authenticated marketplace installs inside host apps
+- proprietary in-app extension update flows
+- local `--plugin-dir` installs that depend on a specific host binary being present
 
 ## Operator runbook
 

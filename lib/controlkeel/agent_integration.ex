@@ -482,7 +482,7 @@ defmodule ControlKeel.AgentIntegration do
         mcp_mode: "native",
         skills_mode: "native",
         upstream_slug: "block/goose",
-        upstream_docs_url: "https://block.github.io/goose/docs/getting-started/using-extensions/",
+        upstream_docs_url: "https://github.com/block/goose",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
         export_targets: ["goose-native"]
@@ -1080,7 +1080,7 @@ defmodule ControlKeel.AgentIntegration do
         alias_of: "gemini-cli",
         auth_mode: "ck_owned",
         upstream_slug: "google-gemini/gemini-cli",
-        upstream_docs_url: "https://gemini.google.com",
+        upstream_docs_url: "https://github.com/google-gemini/gemini-cli",
         supported_scopes: ["project", "export"],
         preferred_target: "gemini-cli-native",
         export_targets: ["gemini-cli-native", "instructions-only"]
