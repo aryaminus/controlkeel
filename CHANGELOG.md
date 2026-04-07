@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.35 — 2026-04-07
+
+### What's changed
+
+- Harden agent-facing validation and context resolution
+
 ## v0.1.34 — 2026-04-07
 
 ### What's changed
