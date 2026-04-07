@@ -708,6 +708,7 @@ defmodule ControlKeel.CLI do
              "scope" => scope,
              "target" => "codex",
              "destination" => install_result && install_result[:destination],
+             "compat_destination" => install_result && install_result[:compat_destination],
              "agents_destination" => install_result && install_result[:agent_destination],
              "commands_destination" => install_result && install_result[:commands_destination],
              "config_destination" => config_path,
@@ -4073,11 +4074,24 @@ defmodule ControlKeel.CLI do
   defp codex_attach_install_lines(nil), do: []
 
   defp codex_attach_install_lines(install_result) do
-    [
+    lines = [
       "Installed Codex skills at #{install_result[:destination]}.",
       "Installed Codex companion agent at #{install_result[:agent_destination]}.",
       "Installed Codex review commands at #{install_result[:commands_destination]}."
     ]
+
+    compat_destination = install_result[:compat_destination]
+
+    cond do
+      is_nil(compat_destination) ->
+        lines
+
+      compat_destination == install_result[:destination] ->
+        lines
+
+      true ->
+        lines ++ ["Installed open-standard compatibility skills at #{compat_destination}."]
+    end
   end
 
   defp attach_scope("claude-code", options), do: options[:scope] || "user"

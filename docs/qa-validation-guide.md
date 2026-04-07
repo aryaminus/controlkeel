@@ -548,7 +548,7 @@ If the host is **not** installed, validate export/install artifacts and mark run
 | Augment / Auggie CLI | `controlkeel attach augment` | `.augment/skills`, `.augment/agents`, `.augment/commands`, `.augment/rules`, `.augment/mcp.json`, local plugin bundle |
 | Pi | `controlkeel attach pi` | `.pi/controlkeel.json`, `.pi/commands`, `.pi/mcp.json`, `pi-extension.json`, `PI.md` |
 | VS Code | `controlkeel attach vscode` | `.github/skills`, `.github/agents`, `.vscode/mcp.json`, `.vscode/extensions.json`, companion `.vsix` path |
-| Codex CLI | `controlkeel attach codex-cli` | `.agents/skills`, `.codex/config.toml`, `.codex/agents`, `.codex/commands` |
+| Codex CLI | `controlkeel attach codex-cli` | `.codex/skills`, `.agents/skills`, `.codex/config.toml`, `.codex/agents`, `.codex/commands` |
 
 ### 12.2 Broader attach targets
 

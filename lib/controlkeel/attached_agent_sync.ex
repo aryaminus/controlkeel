@@ -103,6 +103,7 @@ defmodule ControlKeel.AttachedAgentSync do
   defp merge_install_result(attrs, result) when is_map(result) do
     attrs
     |> maybe_put("destination", Map.get(result, :destination))
+    |> maybe_put("compat_destination", Map.get(result, :compat_destination))
     |> maybe_put("skills_destination", Map.get(result, :skills_destination))
     |> maybe_put("agents_destination", Map.get(result, :agents_destination))
     |> maybe_put("commands_destination", Map.get(result, :commands_destination))

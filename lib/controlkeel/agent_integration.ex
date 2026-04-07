@@ -92,12 +92,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Codex CLI",
         category: "native-first",
         description:
-          "Writes MCP config, installs open-standard skills plus a Codex operator agent, and ships review, annotate, and last command aliases.",
+          "Writes MCP config, installs native Codex skills plus open-standard compatibility skills, adds a Codex operator agent, and ships review, annotate, and last command aliases.",
         attach_command: "controlkeel attach codex-cli",
         config_location:
           "Codex MCP config (`~/.codex/config.toml` or `<project>/.codex/config.toml`).",
         companion_delivery:
-          "Installs `.agents/skills`, `.codex/config.toml`, `.codex/agents`, and `.codex/commands`; can also export portable Codex bundles or a Codex plugin.",
+          "Installs `.codex/skills`, `.agents/skills`, `.codex/config.toml`, `.codex/agents`, and `.codex/commands`; can also export portable Codex bundles or a Codex plugin.",
         preferred_target: "codex",
         default_scope: "user",
         router_agent_id: "codex-cli",
@@ -1965,6 +1965,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_artifact_surfaces(%{id: "codex-cli"}),
     do: [
       ".agents/skills",
+      ".codex/skills",
       ".codex/config.toml",
       ".codex/agents",
       ".codex/commands"

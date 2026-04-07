@@ -116,6 +116,26 @@ defmodule ControlKeel.SkillsTest do
     assert Enum.any?(trusted.skills, &(&1.name == "project-only"))
   end
 
+  test "registry discovers codex-native project skills when trusted", %{tmp_dir: tmp_dir} do
+    project_root = Path.join(tmp_dir, "project")
+    skill_dir = Path.join(project_root, ".codex/skills/codex-native")
+    File.mkdir_p!(skill_dir)
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      """
+      ---
+      name: codex-native
+      description: Native Codex skill
+      ---
+      # Codex native
+      """
+    )
+
+    analysis = Skills.analyze(project_root, trust_project_skills: true)
+    assert Enum.any?(analysis.skills, &(&1.name == "codex-native"))
+  end
+
   test "renderer applies target-family metadata from agents yaml", %{tmp_dir: tmp_dir} do
     skill_dir = Path.join(tmp_dir, "render-skill")
     File.mkdir_p!(Path.join(skill_dir, "agents"))
@@ -200,6 +220,10 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.exists?(
              Path.join(codex_plan.output_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(
+             Path.join(codex_plan.output_dir, ".codex/skills/controlkeel-governance/SKILL.md")
            )
 
     assert File.exists?(Path.join(codex_plan.output_dir, "AGENTS.md"))
@@ -635,7 +659,10 @@ defmodule ControlKeel.SkillsTest do
     tmp_dir: tmp_dir
   } do
     assert {:ok, codex_install} = Skills.install("codex", tmp_dir, scope: "project")
-    assert codex_install.destination == Path.join(tmp_dir, ".agents/skills")
+    assert codex_install.destination == Path.join(tmp_dir, ".codex/skills")
+    assert codex_install.compat_destination == Path.join(tmp_dir, ".agents/skills")
+    assert File.exists?(Path.join(tmp_dir, ".codex/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
     assert File.exists?(Path.join(tmp_dir, ".codex/config.toml"))
     assert File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-review.md"))

@@ -56,8 +56,10 @@ defmodule ControlKeel.Skills.Exporter do
   end
 
   defp write_target(%SkillTarget{id: "codex"}, root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".agents/skills")
-    write_skill_tree(skills, skill_root)
+    compat_skill_root = Path.join(root, ".agents/skills")
+    native_skill_root = Path.join(root, ".codex/skills")
+    write_skill_tree(skills, compat_skill_root)
+    write_skill_tree(skills, native_skill_root)
 
     config_path = Path.join(root, ".codex/config.toml")
     File.mkdir_p!(Path.dirname(config_path))
@@ -100,7 +102,8 @@ defmodule ControlKeel.Skills.Exporter do
       project_root,
       opts,
       [
-        %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => compat_skill_root, "kind" => "skills"},
+        %{"path" => native_skill_root, "kind" => "skills"},
         %{"path" => config_path, "kind" => "config"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => diff_command_path, "kind" => "command"},
@@ -112,7 +115,7 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
       [
-        "Copy .agents/skills into your repo or user skill folder.",
+        "Use .codex/skills for Codex-native skill loading and keep .agents/skills for open-standard compatibility.",
         "Use .codex/config.toml to register the ControlKeel MCP server and operator role with Codex.",
         "Copy .codex/agents/controlkeel-operator.toml into your Codex agents directory if you want a preconfigured operator.",
         "Use .codex/commands/ for browser-reviewed review, annotate, last, diff, and completion approval flows.",

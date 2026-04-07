@@ -13,6 +13,7 @@ defmodule ControlKeel.Skills.Registry do
 
   @project_skill_dirs [
     ".agents/skills",
+    ".codex/skills",
     ".claude/skills",
     ".github/skills",
     ".cline/skills",
@@ -210,6 +211,7 @@ defmodule ControlKeel.Skills.Registry do
     skill_locations = [
       Path.join(export_root, "skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".agents/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".codex/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".claude/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".github/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".cline/skills/#{skill.name}/SKILL.md"),
@@ -237,6 +239,7 @@ defmodule ControlKeel.Skills.Registry do
 
     [
       Path.join(root, ".agents/skills/#{name}/SKILL.md"),
+      Path.join(root, ".codex/skills/#{name}/SKILL.md"),
       Path.join(root, ".claude/skills/#{name}/SKILL.md"),
       Path.join(root, ".github/skills/#{name}/SKILL.md"),
       Path.join(root, ".cline/skills/#{name}/SKILL.md"),
@@ -250,6 +253,7 @@ defmodule ControlKeel.Skills.Registry do
   defp user_locations(name) do
     [
       user_location(".agents/skills/#{name}/SKILL.md"),
+      user_location(".codex/skills/#{name}/SKILL.md"),
       user_location(".claude/skills/#{name}/SKILL.md"),
       user_location(".copilot/skills/#{name}/SKILL.md"),
       user_location(".cline/skills/#{name}/SKILL.md"),
@@ -309,6 +313,7 @@ defmodule ControlKeel.Skills.Registry do
     Enum.map(
       [
         ".agents/skills",
+        ".codex/skills",
         ".claude/skills",
         ".copilot/skills",
         ".cline/skills",

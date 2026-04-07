@@ -65,6 +65,8 @@ These are the first-class host adapters that currently implement the richer revi
 
 Everything else in the catalog remains supported according to its own typed row, but is not marketed as a first-class host adapter unless it has a real install surface plus a defined review path.
 
+For Codex specifically, CK now installs native `.codex/skills` alongside `.agents/skills` compatibility copies so the governed skill set works in the current Codex home/project model without dropping the open-standard AgentSkills path.
+
 Use [direct-host-installs.md](direct-host-installs.md) for the exact companion package names, install commands, and current package-manager truth.
 
 For the broader `skills.sh` agent list, CK currently splits support into:

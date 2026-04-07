@@ -264,7 +264,12 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert codex_output =~ "Companion target: codex."
     assert codex_output =~ "@aryaminus/controlkeel"
+    assert codex_output =~ "Installed Codex skills at "
+    assert codex_output =~ ".codex/skills."
+    assert codex_output =~ "Installed open-standard compatibility skills at "
+    assert codex_output =~ ".agents/skills."
     assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
     assert File.exists?(project_codex_config_path(tmp_dir))
     refute File.exists?(user_codex_config_path())

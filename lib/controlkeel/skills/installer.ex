@@ -48,17 +48,23 @@ defmodule ControlKeel.Skills.Installer do
 
   defp do_install(%SkillTarget{id: "codex"}, scope, project_root, skills, _opts)
        when scope in ["user", "project"] do
-    skill_root =
+    compat_skill_root =
       if scope == "user",
         do: Path.join(user_home(), ".agents/skills"),
         else: Path.join(project_root, ".agents/skills")
+
+    native_skill_root =
+      if scope == "user",
+        do: Path.join(user_home(), ".codex/skills"),
+        else: Path.join(project_root, ".codex/skills")
 
     agent_root =
       if scope == "user",
         do: Path.join(user_home(), ".codex/agents"),
         else: Path.join(project_root, ".codex/agents")
 
-    copy_skills(skills, skill_root)
+    copy_skills(skills, compat_skill_root)
+    copy_skills(skills, native_skill_root)
     File.mkdir_p!(agent_root)
 
     {:ok, plan} = Exporter.export("codex", project_root, scope: scope)
@@ -93,7 +99,8 @@ defmodule ControlKeel.Skills.Installer do
      %{
        target: "codex",
        scope: scope,
-       destination: skill_root,
+       destination: native_skill_root,
+       compat_destination: compat_skill_root,
        agent_destination: agent_root,
        commands_destination: commands_root,
        config_destination: Path.join(config_root, "config.toml")
