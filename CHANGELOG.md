@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.28 — 2026-04-07
+
+### What's changed
+
+- Improve OpenCode plan review integration
+- Add .copilot/skills to project skill directories
+
 ## v0.1.27 — 2026-04-07
 
 ### What's changed
