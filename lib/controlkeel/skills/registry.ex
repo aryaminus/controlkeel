@@ -15,6 +15,7 @@ defmodule ControlKeel.Skills.Registry do
     ".agents/skills",
     ".codex/skills",
     ".claude/skills",
+    ".copilot/skills",
     ".github/skills",
     ".cline/skills",
     ".roo/skills",
@@ -227,12 +228,12 @@ defmodule ControlKeel.Skills.Registry do
       Path.join(export_root, ".agents/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".codex/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".claude/skills/#{skill.name}/SKILL.md"),
+      Path.join(export_root, ".copilot/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".github/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".cline/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".roo/skills/#{skill.name}/SKILL.md"),
       Path.join(export_root, ".hermes/skills/#{skill.name}/SKILL.md"),
-      Path.join(export_root, ".factory/skills/#{skill.name}/SKILL.md"),
-      Path.join(export_root, "skills/#{skill.name}/SKILL.md")
+      Path.join(export_root, ".factory/skills/#{skill.name}/SKILL.md")
     ]
 
     if Enum.any?(skill_locations, &File.exists?/1), do: targets ++ [target], else: targets
@@ -255,6 +256,7 @@ defmodule ControlKeel.Skills.Registry do
       Path.join(root, ".agents/skills/#{name}/SKILL.md"),
       Path.join(root, ".codex/skills/#{name}/SKILL.md"),
       Path.join(root, ".claude/skills/#{name}/SKILL.md"),
+      Path.join(root, ".copilot/skills/#{name}/SKILL.md"),
       Path.join(root, ".github/skills/#{name}/SKILL.md"),
       Path.join(root, ".cline/skills/#{name}/SKILL.md"),
       Path.join(root, ".roo/skills/#{name}/SKILL.md"),
