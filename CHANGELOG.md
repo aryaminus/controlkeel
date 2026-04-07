@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.32 — 2026-04-07
+
+### What's changed
+
+- Use canonical docs for wrapper aliases
+- Add public host drift audit
+- Make runtime recommendations availability-aware
+
 ## v0.1.31 — 2026-04-07
 
 ### What's changed
