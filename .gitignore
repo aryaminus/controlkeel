@@ -74,6 +74,9 @@ session-ses_*.md
 /AUGMENT.md
 /PI.md
 /plugins/
+/README.gemini-controlkeel.md
+/skills/
+/.vscode/extensions.json
 /.vscode/mcp.json
 /.github/agents/
 /.github/skills/
