@@ -30,6 +30,8 @@ The governed delivery lifecycle is:
 
 The main stewardship surfaces for that lifecycle are `/ship` and `/benchmarks`.
 
+If you are using CK for defensive security work, start with the `security` domain pack. That gives you the defender mission template, structured vulnerability lifecycle metadata, disclosure-aware proof bundles, and cyber access mode defaults. The dedicated guide is [defensive-security-with-controlkeel.md](defensive-security-with-controlkeel.md).
+
 Execution posture is how CK keeps the harness honest:
 
 - use the read-only virtual workspace for repo exploration before provisioning execution

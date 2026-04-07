@@ -7,6 +7,7 @@ defmodule ControlKeel.Governance do
   alias ControlKeel.Mission.ProofBundle
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.FastPath
+  alias ControlKeel.SecurityWorkflow
 
   @config_extensions ~w(.conf .config .env .ini .json .lock .toml .xml .yaml .yml)
   @shell_extensions ~w(.bash .ps1 .sh .zsh)
@@ -141,6 +142,7 @@ defmodule ControlKeel.Governance do
         blocking_findings = Enum.filter(findings, &blocking_release_finding?/1)
         open_findings = Enum.filter(findings, &(&1.status in ["open", "blocked", "escalated"]))
         latest_proof = latest_release_candidate_proof(session)
+        security_blockers = Enum.filter(findings, &SecurityWorkflow.security_release_blocker?/1)
         smoke = normalize_map(opts["smoke"] || opts[:smoke])
         provenance = normalize_map(opts["provenance"] || opts[:provenance])
         smoke_ready? = smoke_ready?(smoke)
@@ -149,6 +151,10 @@ defmodule ControlKeel.Governance do
 
         reasons =
           []
+          |> maybe_add_reason(
+            security_blockers != [],
+            "#{length(security_blockers)} critical vulnerability case(s) still require validated patching or disclosure coordination."
+          )
           |> maybe_add_reason(
             blocking_findings != [],
             blocking_findings_reason(blocking_findings)
@@ -173,6 +179,9 @@ defmodule ControlKeel.Governance do
 
         status =
           cond do
+            security_blockers != [] ->
+              "blocked"
+
             blocking_findings != [] ->
               "blocked"
 
@@ -206,7 +215,8 @@ defmodule ControlKeel.Governance do
              "blocked" => Enum.count(open_findings, &(&1.status == "blocked")),
              "escalated" => Enum.count(open_findings, &(&1.status == "escalated")),
              "high_or_critical" =>
-               Enum.count(open_findings, &(&1.severity in ["high", "critical"]))
+               Enum.count(open_findings, &(&1.severity in ["high", "critical"])),
+             "critical_vulnerability_cases" => length(security_blockers)
            },
            "reasons" => reasons,
            "smoke" => release_evidence_summary(smoke, smoke_ready?),

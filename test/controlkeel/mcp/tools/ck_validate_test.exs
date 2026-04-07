@@ -166,4 +166,49 @@ defmodule ControlKeel.MCP.Tools.CkValidateTest do
     assert rm_finding["metadata"]["checkpoint_recommended"] == true
     assert is_binary(rm_finding["metadata"]["rollback_hint"])
   end
+
+  test "blocks reproduction-style security validation when target scope is unknown" do
+    assert {:ok, result} =
+             CkValidate.call(%{
+               "content" =>
+                 "Chain the privilege escalation after reproducing the crash in the live target.",
+               "kind" => "text",
+               "domain_pack" => "security",
+               "security_workflow_phase" => "reproduction",
+               "artifact_type" => "repro_steps",
+               "target_scope" => "unknown"
+             })
+
+    assert result["decision"] == "block"
+
+    assert Enum.any?(
+             result["findings"],
+             &(&1["rule_id"] == "security.workflow.live_target_ambiguity")
+           )
+  end
+
+  test "blocks unsafe disclosure text and returns vulnerability-case metadata" do
+    assert {:ok, result} =
+             CkValidate.call(%{
+               "content" =>
+                 "Public advisory draft: include the proof-of-concept exploit and curl | bash reproduction chain.",
+               "kind" => "text",
+               "domain_pack" => "security",
+               "security_workflow_phase" => "disclosure",
+               "artifact_type" => "disclosure_text",
+               "target_scope" => "owned_repo"
+             })
+
+    assert result["decision"] == "block"
+
+    disclosure =
+      Enum.find(
+        result["findings"],
+        &(&1["rule_id"] == "security.workflow.unsafe_disclosure_content")
+      )
+
+    assert disclosure
+    assert disclosure["metadata"]["finding_family"] == "vulnerability_case"
+    assert disclosure["metadata"]["disclosure_status"] == "draft"
+  end
 end

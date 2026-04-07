@@ -6,6 +6,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
   alias ControlKeel.Mission
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.FastPath
+  alias ControlKeel.SecurityWorkflow
   alias ControlKeel.TrustBoundary
 
   @allowed_kinds ~w(code config shell text)
@@ -42,7 +43,25 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
              {:ok, intended_use} <-
                normalize_optional_enum(arguments, "intended_use", TrustBoundary.intended_uses()),
              {:ok, requested_capabilities} <-
-               normalize_optional_capabilities(arguments, "requested_capabilities") do
+               normalize_optional_capabilities(arguments, "requested_capabilities"),
+             {:ok, security_workflow_phase} <-
+               normalize_optional_enum(
+                 arguments,
+                 "security_workflow_phase",
+                 SecurityWorkflow.phases()
+               ),
+             {:ok, artifact_type} <-
+               normalize_optional_enum(
+                 arguments,
+                 "artifact_type",
+                 SecurityWorkflow.artifact_types()
+               ),
+             {:ok, target_scope} <-
+               normalize_optional_enum(
+                 arguments,
+                 "target_scope",
+                 SecurityWorkflow.target_scopes()
+               ) do
           {:ok,
            %{
              "content" => content,
@@ -54,7 +73,10 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
              "source_type" => source_type,
              "trust_level" => trust_level,
              "intended_use" => intended_use,
-             "requested_capabilities" => requested_capabilities
+             "requested_capabilities" => requested_capabilities,
+             "security_workflow_phase" => security_workflow_phase,
+             "artifact_type" => artifact_type,
+             "target_scope" => target_scope
            }}
         end
     end
@@ -101,7 +123,16 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
   defp maybe_persist(%{"session_id" => _session_id}, []), do: :ok
 
   defp maybe_persist(
-         %{"session_id" => session_id, "path" => path, "kind" => kind, "task_id" => task_id},
+         %{
+           "session_id" => session_id,
+           "path" => path,
+           "kind" => kind,
+           "task_id" => task_id,
+           "domain_pack" => domain_pack,
+           "security_workflow_phase" => security_workflow_phase,
+           "artifact_type" => artifact_type,
+           "target_scope" => target_scope
+         },
          findings
        ) do
     _ =
@@ -109,7 +140,11 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
         session_id: session_id,
         task_id: task_id,
         path: path,
-        kind: kind
+        kind: kind,
+        domain_pack: domain_pack,
+        security_workflow_phase: security_workflow_phase,
+        artifact_type: artifact_type,
+        target_scope: target_scope
       )
 
     :ok

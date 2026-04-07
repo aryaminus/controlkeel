@@ -11,6 +11,7 @@ defmodule ControlKeel.AgentExecution do
   alias ControlKeel.ProjectRoot
   alias ControlKeel.ProjectBinding
   alias ControlKeel.ProtocolAccess
+  alias ControlKeel.SecurityWorkflow
   alias ControlKeel.SessionTranscript
   alias ControlKeel.Skills
 
@@ -289,7 +290,7 @@ defmodule ControlKeel.AgentExecution do
   end
 
   defp maybe_policy_gate(task, session, service_account, claim_metadata) do
-    case policy_gate_reason(session) do
+    case security_policy_gate_reason(task, session, claim_metadata) || policy_gate_reason(session) do
       nil ->
         :ok
 
@@ -331,6 +332,25 @@ defmodule ControlKeel.AgentExecution do
           {:error, reason} ->
             {:error, reason}
         end
+    end
+  end
+
+  defp security_policy_gate_reason(task, session, claim_metadata) do
+    if SecurityWorkflow.security_domain?(session) and
+         SecurityWorkflow.task_requires_verified_research?(task) do
+      access_mode = SecurityWorkflow.session_cyber_access_mode(session)
+
+      cond do
+        access_mode != "verified_research" ->
+          "Reproduction-phase security work requires verified_research mode."
+
+        SecurityWorkflow.isolated_runtime_required?(task) and
+            not SecurityWorkflow.isolated_runtime_path?(claim_metadata) ->
+          "Reproduction-phase security work must run through an isolated runtime path."
+
+        true ->
+          nil
+      end
     end
   end
 
@@ -551,7 +571,10 @@ defmodule ControlKeel.AgentExecution do
     with {:ok, %{service_account: account, token: token}} <-
            Platform.create_service_account(session.workspace_id, %{
              "name" => "executor-#{mode}-session-#{session.id}",
-             "scopes" => Enum.join(@hosted_scopes, " ")
+             "scopes" => Enum.join(@hosted_scopes, " "),
+             "metadata" => %{
+               "cyber_access_mode" => SecurityWorkflow.session_cyber_access_mode(session)
+             }
            }) do
       {:ok,
        %{

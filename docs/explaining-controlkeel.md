@@ -66,6 +66,13 @@ The main value is:
 - **Production orientation**: CK is about shipping safely, not just generating code quickly.
 - **Recovery path**: even if another tool already changed the repo, CK can bootstrap into the project and bring the work back into a governed loop.
 
+For defensive security teams, the same value proposition becomes:
+
+- CK keeps vulnerability work inside an explicit detect-triage-patch-validate-disclose loop.
+- CK defaults to redacted disclosure and proof-backed patch validation.
+- CK distinguishes normal governed coding from higher-risk reproduction work with cyber access modes.
+- CK stays defense-first; it does not present itself as a generic exploit automation product.
+
 ## What ControlKeel is not
 
 ControlKeel is not:
@@ -150,6 +157,15 @@ At a high level, CK runs a governed lifecycle around agent work:
 
 9. **Ship metrics and benchmarks**
    CK tracks readiness, outcomes, and comparative evidence.
+
+For `security` sessions, CK makes that lifecycle explicit:
+
+- discovery
+- triage
+- reproduction
+- patch planning
+- patch validation
+- disclosure and release readiness
 
 ## What the agent actually sees
 

@@ -5,6 +5,7 @@ defmodule ControlKeel.ProtocolInterop do
   alias ControlKeel.Mission
   alias ControlKeel.Platform.ServiceAccount
   alias ControlKeel.ProtocolAccess
+  alias ControlKeel.SecurityWorkflow
   alias ControlKeelWeb.Endpoint
 
   @hosted_tool_scope_map %{
@@ -71,7 +72,8 @@ defmodule ControlKeel.ProtocolInterop do
       when is_map(auth_context) and is_binary(tool_name) and is_map(arguments) do
     with :ok <- verify_resource_access(auth_context, resource_id),
          :ok <- verify_tool_scopes(auth_context.scopes, tool_name, resource_id),
-         :ok <- verify_workspace_scope(auth_context.service_account, arguments) do
+         :ok <- verify_workspace_scope(auth_context.service_account, arguments),
+         :ok <- verify_cyber_access(auth_context.service_account, tool_name, arguments) do
       :ok
     end
   end
@@ -125,10 +127,72 @@ defmodule ControlKeel.ProtocolInterop do
 
   defp authorize_a2a_tool_call(auth_context, tool_name, arguments) do
     with :ok <- verify_tool_scopes(auth_context.scopes, tool_name, "a2a"),
-         :ok <- verify_workspace_scope(auth_context.service_account, arguments) do
+         :ok <- verify_workspace_scope(auth_context.service_account, arguments),
+         :ok <- verify_cyber_access(auth_context.service_account, tool_name, arguments) do
       :ok
     end
   end
+
+  defp verify_cyber_access(%ServiceAccount{} = service_account, "ck_validate", arguments) do
+    access_mode = SecurityWorkflow.service_account_cyber_access_mode(service_account)
+    phase = Map.get(arguments, "security_workflow_phase")
+    artifact_type = Map.get(arguments, "artifact_type")
+    target_scope = Map.get(arguments, "target_scope")
+
+    cond do
+      SecurityWorkflow.reproduction_like?(phase, artifact_type) and
+          access_mode != "verified_research" ->
+        {:error,
+         {:forbidden, "Reproduction-style security validation requires verified_research mode."}}
+
+      SecurityWorkflow.reproduction_like?(phase, artifact_type) and
+          target_scope in [nil, "unknown"] ->
+        {:error,
+         {:forbidden,
+          "Reproduction-style security validation requires an owned or authorized target scope."}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp verify_cyber_access(%ServiceAccount{} = service_account, "ck_delegate", arguments) do
+    access_mode = SecurityWorkflow.service_account_cyber_access_mode(service_account)
+
+    with {:ok, task} <- delegated_task(arguments),
+         true <- SecurityWorkflow.task_requires_verified_research?(task) || :skip do
+      cond do
+        access_mode != "verified_research" ->
+          {:error,
+           {:forbidden,
+            "Delegating reproduction-phase security work requires verified_research mode."}}
+
+        Map.get(arguments, "mode") != "runtime" ->
+          {:error,
+           {:forbidden, "Delegated reproduction-phase security work must use runtime mode."}}
+
+        true ->
+          :ok
+      end
+    else
+      :skip -> :ok
+      {:error, _reason} -> :ok
+      nil -> :ok
+    end
+  end
+
+  defp verify_cyber_access(_service_account, _tool_name, _arguments), do: :ok
+
+  defp delegated_task(%{"task_id" => task_id}) do
+    with {:ok, parsed_id} <- parse_integer(task_id, "task_id"),
+         %{} = task <- Mission.get_task(parsed_id) do
+      {:ok, task}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp delegated_task(_arguments), do: {:error, :not_found}
 
   defp verify_resource_access(%{scopes: scopes}, resource_id) do
     access_scope =

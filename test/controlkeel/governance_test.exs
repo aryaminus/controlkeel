@@ -119,4 +119,53 @@ defmodule ControlKeel.GovernanceTest do
     assert File.read!(release_workflow) =~ "controlkeel release-ready"
     assert File.read!(scorecards) =~ "ossf/scorecard-action"
   end
+
+  test "release_readiness blocks unresolved critical vulnerability cases" do
+    session =
+      session_fixture(%{
+        execution_brief: %{"domain_pack" => "security", "occupation" => "security_researcher"},
+        metadata: %{
+          "mission_template" => "security_defender_v1",
+          "cyber_access_mode" => "verified_research"
+        }
+      })
+
+    task =
+      task_fixture(%{
+        session: session,
+        status: "done",
+        metadata: %{"track" => "release", "security_workflow_phase" => "disclosure"}
+      })
+
+    _finding =
+      finding_fixture(%{
+        session: session,
+        severity: "critical",
+        category: "security",
+        rule_id: "security.workflow.scope_authorization",
+        status: "open",
+        metadata: %{
+          "finding_family" => "vulnerability_case",
+          "affected_component" => "kernel/subsystem",
+          "evidence_type" => "source",
+          "exploitability_status" => "reproduced",
+          "patch_status" => "drafted",
+          "disclosure_status" => "reported",
+          "maintainer_scope" => "open_source",
+          "cwe_ids" => ["CWE-284"]
+        }
+      })
+
+    _proof = proof_bundle_fixture(%{task: task})
+
+    assert {:ok, readiness} =
+             Governance.release_readiness(%{
+               session_id: session.id,
+               smoke: %{"status" => "success"},
+               provenance: %{"verified" => true}
+             })
+
+    assert readiness["status"] == "blocked"
+    assert readiness["findings"]["critical_vulnerability_cases"] == 1
+  end
 end

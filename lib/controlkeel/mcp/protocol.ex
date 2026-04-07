@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Protocol do
   @moduledoc false
 
   alias ControlKeel.Intent.Domains
+  alias ControlKeel.SecurityWorkflow
   alias ControlKeel.Skills.Registry
   alias ControlKeel.TrustBoundary
 
@@ -189,6 +190,18 @@ defmodule ControlKeel.MCP.Protocol do
           "source_type" => %{"type" => "string", "enum" => TrustBoundary.source_types()},
           "trust_level" => %{"type" => "string", "enum" => TrustBoundary.trust_levels()},
           "intended_use" => %{"type" => "string", "enum" => TrustBoundary.intended_uses()},
+          "security_workflow_phase" => %{
+            "type" => "string",
+            "enum" => SecurityWorkflow.phases()
+          },
+          "artifact_type" => %{
+            "type" => "string",
+            "enum" => SecurityWorkflow.artifact_types()
+          },
+          "target_scope" => %{
+            "type" => "string",
+            "enum" => SecurityWorkflow.target_scopes()
+          },
           "requested_capabilities" => %{
             "type" => "array",
             "items" => %{"type" => "string", "enum" => TrustBoundary.capabilities()}

@@ -31,6 +31,8 @@ CK does this by adding five things most agent hosts do not provide as one portab
 4. durable evidence and resumable task state
 5. a typed integration model across many hosts and runtimes
 
+It now also has a first-class **defensive security workflow** layered on top of that same chassis. CK does not create a separate security product surface. It reuses the same sessions, tasks, findings, proofs, validation, delegation, and release gates, but gives `security` sessions explicit phase structure and dual-use controls.
+
 ## The full lifecycle
 
 In current product terms, CK runs this lifecycle:
@@ -44,6 +46,15 @@ In current product terms, CK runs this lifecycle:
 7. proof capture
 8. ship metrics
 9. comparative benchmark evidence
+
+For `security` domain work, the lifecycle becomes:
+
+1. discovery
+2. triage
+3. reproduction
+4. patch
+5. validation
+6. disclosure and release readiness
 
 That lifecycle is not just a pitch. It maps directly to the code-backed architecture and the main product surfaces.
 
@@ -99,6 +110,14 @@ The brief is later consumed by:
 - routing
 
 This matters because CK keeps the **boundary** explicit instead of letting it stay hidden in a prompt.
+
+For security work, the execution brief also carries:
+
+- the `security` domain pack
+- a defender-oriented mission template
+- the default `cyber_access_mode`
+- disclosure redaction defaults
+- explicit release gating for vulnerability cases
 
 ## Step 3: execution posture compilation
 

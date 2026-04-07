@@ -78,7 +78,8 @@ defmodule ControlKeel.MissionTest do
       "ecommerce" => "E-commerce / Retail",
       "logistics" => "Logistics / Supply Chain",
       "manufacturing" => "Manufacturing / Quality",
-      "nonprofit" => "Nonprofit / Grants"
+      "nonprofit" => "Nonprofit / Grants",
+      "security" => "Security / Defensive AppSec"
     }
 
     Enum.each(ControlKeel.Intent.supported_packs(), fn pack ->
@@ -108,6 +109,61 @@ defmodule ControlKeel.MissionTest do
       assert session.execution_brief["domain_pack"] == pack
       assert session.workspace.industry
     end)
+  end
+
+  test "create_launch_from_brief/2 builds the security mission template and cyber access mode" do
+    brief =
+      execution_brief_fixture(
+        payload: %{
+          "project_name" => "Kernel triage loop",
+          "occupation" => "Security Researcher",
+          "domain_pack" => "security",
+          "risk_tier" => "critical",
+          "compliance" => [
+            "Coordinated disclosure",
+            "Authorized target scope",
+            "Patch validation evidence"
+          ],
+          "recommended_stack" => "Repo-local triage + isolated runtime exports",
+          "data_summary" => "Kernel source, repro artifacts, and disclosure drafts",
+          "key_features" => [
+            "Discovery",
+            "Triage",
+            "Reproduction",
+            "Patch validation",
+            "Disclosure packet"
+          ]
+        },
+        compiler: %{
+          "occupation" => "security_researcher",
+          "domain_pack" => "security"
+        }
+      )
+
+    assert {:ok, session} =
+             Mission.create_launch_from_brief(
+               %{"agent" => "codex", "project_root" => "/tmp/controlkeel-security"},
+               brief
+             )
+
+    assert session.workspace.industry == "security"
+    assert session.execution_brief["domain_pack"] == "security"
+    assert session.metadata["mission_template"] == "security_defender_v1"
+    assert session.metadata["cyber_access_mode"] == "verified_research"
+
+    assert Enum.map(session.tasks, & &1.metadata["security_workflow_phase"]) == [
+             "discovery",
+             "triage",
+             "reproduction",
+             "patch",
+             "validation",
+             "disclosure"
+           ]
+
+    assert Enum.any?(session.findings, fn finding ->
+             finding.rule_id == "security.workflow.scope_authorization" and
+               finding.metadata["finding_family"] == "vulnerability_case"
+           end)
   end
 
   test "basic CRUD keeps session association valid" do

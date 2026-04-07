@@ -58,6 +58,13 @@ The intent layer now consumes this same catalog for runtime recommendation. In p
 - exported runtime bundles are treated as the strongest signal that a headless runtime path is already available in the workspace
 - recommendation payloads now label availability as `attached`, `configured`, or `catalog`
 
+For defensive-security sessions, CK layers additional behavior on top of the same catalog instead of inventing a separate host matrix:
+
+- reproduction-phase work requires `verified_research` and isolated runtime execution
+- disclosure artifacts default to redaction and proof references
+- release readiness can block on unresolved critical vulnerability cases
+- the dedicated behavior guide is [defensive-security-with-controlkeel.md](defensive-security-with-controlkeel.md)
+
 ## Host parity classes
 
 These are the first-class host adapters that currently implement the richer review transport instead of a generic support claim:

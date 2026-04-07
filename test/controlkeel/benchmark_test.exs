@@ -99,6 +99,26 @@ defmodule ControlKeel.BenchmarkTest do
            end)
   end
 
+  test "loads the defensive security benchmark suites" do
+    assert Enum.sort([
+             benchmark_suite_fixture("vuln_patch_loop_v1").slug,
+             benchmark_suite_fixture("detection_rule_gen_v1").slug,
+             benchmark_suite_fixture("supply_chain_triage_v1").slug
+           ]) == ["detection_rule_gen_v1", "supply_chain_triage_v1", "vuln_patch_loop_v1"]
+
+    assert Enum.all?(
+             ["vuln_patch_loop_v1", "detection_rule_gen_v1", "supply_chain_triage_v1"],
+             fn slug ->
+               suite = benchmark_suite_fixture(slug)
+
+               Enum.all?(
+                 suite.scenarios,
+                 &(get_in(&1.metadata || %{}, ["domain_pack"]) == "security")
+               )
+             end
+           )
+  end
+
   test "classification metrics return TPR 1.0 for vulnerable-only suites" do
     {:ok, run} =
       Benchmark.run_suite(%{

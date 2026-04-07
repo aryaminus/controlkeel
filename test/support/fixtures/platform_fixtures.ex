@@ -11,7 +11,8 @@ defmodule ControlKeel.PlatformFixtures do
         workspace_id,
         %{
           "name" => Map.get(attrs, :name, "worker"),
-          "scopes" => Map.get(attrs, :scopes, "admin")
+          "scopes" => Map.get(attrs, :scopes, "admin"),
+          "metadata" => Map.get(attrs, :metadata, %{})
         }
       )
 

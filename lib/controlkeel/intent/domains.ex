@@ -120,6 +120,38 @@ defmodule ControlKeel.Intent.Domains do
       domain_pack: "nonprofit",
       industry: "nonprofit",
       description: "Donor records, grant reporting, volunteer operations, and service delivery"
+    },
+    %{
+      id: "appsec_engineer",
+      label: "AppSec Engineer",
+      domain_pack: "security",
+      industry: "security",
+      description:
+        "Defensive code review, triage, patch validation, and secure release governance"
+    },
+    %{
+      id: "security_researcher",
+      label: "Security Researcher",
+      domain_pack: "security",
+      industry: "security",
+      description:
+        "Authorized reproduction, exploit-chain review, isolated runtime testing, and disclosure"
+    },
+    %{
+      id: "open_source_maintainer",
+      label: "Open Source Maintainer",
+      domain_pack: "security",
+      industry: "security",
+      description:
+        "Defender workflows for advisories, supply-chain triage, patches, and coordinated disclosure"
+    },
+    %{
+      id: "security_operations",
+      label: "Security Operations",
+      domain_pack: "security",
+      industry: "security",
+      description:
+        "Detection engineering, telemetry workflows, endpoint validation, and incident-driven hardening"
     }
   ]
 
@@ -139,7 +171,8 @@ defmodule ControlKeel.Intent.Domains do
     "ecommerce" => "E-commerce / Retail",
     "logistics" => "Logistics / Supply Chain",
     "manufacturing" => "Manufacturing / Quality",
-    "nonprofit" => "Nonprofit / Grants"
+    "nonprofit" => "Nonprofit / Grants",
+    "security" => "Security / Defensive AppSec"
   }
 
   @packs %{
@@ -748,6 +781,53 @@ defmodule ControlKeel.Intent.Domains do
             "No donor card data in logs, grant approval before reallocation, beneficiary export locked down..."
         }
       ]
+    },
+    "security" => %{
+      industry: "security",
+      compliance: [
+        "Coordinated disclosure",
+        "Authorized target scope",
+        "Patch validation evidence",
+        "Supply-chain review"
+      ],
+      stack_guidance:
+        "Prefer repo-local discovery, typed validation artifacts, isolated runtimes for reproduction, and proof-backed patching. Treat disclosure state, authorization scope, and rollback evidence as first-class constraints.",
+      validation_language:
+        "This is a defender workflow, not an offensive automation track. Require explicit scope, artifact references, redaction by default, and release readiness that accounts for unresolved vulnerability cases.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who owns this workflow?",
+          prompt:
+            "Which defenders, maintainers, or responders use this first, and what defensive security job are they trying to complete?",
+          placeholder:
+            "AppSec engineers triaging code, maintainers fixing advisories, detection engineers writing rules..."
+        },
+        %{
+          id: "data_involved",
+          label: "What assets are in scope?",
+          prompt:
+            "What repositories, binaries, telemetry, advisories, or evidence artifacts does the first workflow touch?",
+          placeholder:
+            "Source repo, SBOM, binary crash report, detection telemetry, disclosure draft..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt:
+            "List the 3-5 defensive workflow steps that must work in the first governed version.",
+          placeholder:
+            "Discovery, triage, patch planning, validation, disclosure packet, release gate..."
+        },
+        %{
+          id: "constraints",
+          label: "What safety limits apply?",
+          prompt:
+            "What matters most around authorization scope, isolated runtimes, disclosure timing, proof, or review requirements?",
+          placeholder:
+            "Owned repo only, isolated runtime for repro, redacted proofs, maintainer sign-off before disclosure..."
+        }
+      ]
     }
   }
 
@@ -1042,6 +1122,25 @@ defmodule ControlKeel.Intent.Domains do
       String.contains?(content, ["donor card", "beneficiary", "minor", "tax receipt"]) -> "high"
       String.contains?(content, ["grant", "donor", "volunteer", "program"]) -> "moderate"
       true -> "moderate"
+    end
+  end
+
+  def preliminary_risk_tier("security", content) do
+    cond do
+      String.contains?(content, [
+        "exploit",
+        "reproduction",
+        "kernel",
+        "binary",
+        "privilege escalation"
+      ]) ->
+        "critical"
+
+      String.contains?(content, ["triage", "patch", "disclosure", "detection", "advisory"]) ->
+        "high"
+
+      true ->
+        "high"
     end
   end
 

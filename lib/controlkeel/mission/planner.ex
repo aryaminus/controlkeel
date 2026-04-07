@@ -2,6 +2,7 @@ defmodule ControlKeel.Mission.Planner do
   @moduledoc false
 
   alias ControlKeel.Intent.{Domains, ExecutionBrief}
+  alias ControlKeel.SecurityWorkflow
 
   @industry_profiles %{
     "web" => %{
@@ -89,6 +90,17 @@ defmodule ControlKeel.Mission.Planner do
       label: "IoT / Hardware",
       compliance: ["NIST", "Safety standards", "OWASP Top 10"],
       stack: "Phoenix API + event ingestion + device audit trails"
+    },
+    "security" => %{
+      label: "Defensive Security",
+      compliance: [
+        "Coordinated disclosure",
+        "Authorized target scope",
+        "Patch validation evidence",
+        "OWASP Top 10"
+      ],
+      stack:
+        "Repo-local triage + typed evidence artifacts + isolated runtime exports for authorized reproduction"
     },
     "general" => %{
       label: "Other / General",
@@ -255,6 +267,9 @@ defmodule ControlKeel.Mission.Planner do
       |> ExecutionBrief.to_map()
       |> Map.put("agent", Map.get(@agent_labels, agent, "Generic Agent"))
 
+    security_workflow? = brief.domain_pack == SecurityWorkflow.domain_pack()
+    session_metadata = session_metadata_for_brief(brief)
+
     %{
       workspace: %{
         name: title,
@@ -273,21 +288,30 @@ defmodule ControlKeel.Mission.Planner do
         budget_cents: budget_cents,
         daily_budget_cents: daily_budget_cents(budget_cents),
         spent_cents: estimated_spend(budget_cents),
-        execution_brief: execution_brief
+        execution_brief: execution_brief,
+        metadata: session_metadata
       },
       tasks:
-        build_tasks(
-          features,
-          blank_fallback(brief.recommended_stack, "Phoenix + LiveView"),
-          brief.risk_tier
+        if(security_workflow?,
+          do: build_security_tasks(brief),
+          else:
+            build_tasks(
+              features,
+              blank_fallback(brief.recommended_stack, "Phoenix + LiveView"),
+              brief.risk_tier
+            )
         ),
       findings:
-        build_findings(
-          industry,
-          Enum.join([brief.objective, brief.next_step], " "),
-          brief.data_summary,
-          features ++ normalize_list(brief.open_questions),
-          budget_cents
+        if(security_workflow?,
+          do: build_security_findings(brief, budget_cents),
+          else:
+            build_findings(
+              industry,
+              Enum.join([brief.objective, brief.next_step], " "),
+              brief.data_summary,
+              features ++ normalize_list(brief.open_questions),
+              budget_cents
+            )
         )
     }
   end
@@ -364,6 +388,9 @@ defmodule ControlKeel.Mission.Planner do
     content = Enum.join([idea, data | features], " ") |> String.downcase()
 
     cond do
+      industry == "security" ->
+        "critical"
+
       industry in ["health", "finance", "legal", "government", "insurance"] ->
         "critical"
 
@@ -590,6 +617,182 @@ defmodule ControlKeel.Mission.Planner do
       auto_resolved: false,
       metadata: %{industry: industry}
     })
+  end
+
+  defp build_security_tasks(%ExecutionBrief{} = brief) do
+    occupation = security_occupation_id(brief)
+    isolation_required? = occupation == "security_researcher"
+
+    [
+      security_task(1, "discovery", "Discover and bound the vulnerability surface",
+        status: "in_progress",
+        track: "discovery",
+        artifact_type: "source",
+        validation_gate: "Authorized scope and discovery notes captured"
+      ),
+      security_task(2, "triage", "Triage severity, scope, and maintainer ownership",
+        track: "triage",
+        artifact_type: "source",
+        validation_gate: "Severity and affected component reviewed"
+      ),
+      security_task(3, "reproduction", "Reproduce safely in an isolated runtime",
+        track: "reproduction",
+        artifact_type:
+          if(occupation == "security_operations", do: "binary_report", else: "repro_steps"),
+        validation_gate: "Verified research mode and isolated runtime required",
+        requires_isolated_runtime: isolation_required? or occupation == "security_researcher"
+      ),
+      security_task(4, "patch", "Plan and draft the defensive patch",
+        track: "feature",
+        artifact_type: "diff",
+        validation_gate: "Patch plan must preserve rollback and scope constraints"
+      ),
+      security_task(5, "validation", "Validate patch, regression coverage, and proof bundle",
+        track: "verify",
+        artifact_type: "diff",
+        validation_gate: "Patch validation evidence and proof bundle required"
+      ),
+      security_task(6, "disclosure", "Prepare disclosure packet and release readiness",
+        track: "release",
+        artifact_type: "disclosure_text",
+        validation_gate: "Disclosure state, release gate, and redaction policy reviewed"
+      )
+    ]
+  end
+
+  defp security_task(position, phase, title, opts) do
+    status = Keyword.get(opts, :status, "queued")
+    track = Keyword.get(opts, :track, phase)
+    artifact_type = Keyword.fetch!(opts, :artifact_type)
+    requires_isolated_runtime = Keyword.get(opts, :requires_isolated_runtime, false)
+
+    %{
+      title: title,
+      status: status,
+      estimated_cost_cents: 30,
+      validation_gate: Keyword.fetch!(opts, :validation_gate),
+      position: position,
+      metadata: %{
+        track: track,
+        security_workflow_phase: phase,
+        artifact_type: artifact_type,
+        requires_isolated_runtime: requires_isolated_runtime,
+        mission_template: "security_defender_v1"
+      },
+      confidence_score: task_confidence("feature", "critical"),
+      rollback_boundary: security_task_rollback(phase)
+    }
+  end
+
+  defp security_task_rollback("discovery"),
+    do: "No rollback - discovery only; preserve evidence and notes."
+
+  defp security_task_rollback("triage"),
+    do: "No rollback - triage only; update severity or ownership assessment in place."
+
+  defp security_task_rollback("reproduction"),
+    do: "Destroy isolated runtime artifacts and retain only redacted evidence references."
+
+  defp security_task_rollback("patch"),
+    do: "git revert HEAD~1  # revert the drafted remediation diff if validation fails"
+
+  defp security_task_rollback("validation"),
+    do: "No rollback - validation only; keep the proof and regression evidence."
+
+  defp security_task_rollback("disclosure"),
+    do: "Retract the draft packet, preserve hashes only, and wait for maintainer sign-off."
+
+  defp build_security_findings(%ExecutionBrief{} = brief, budget_cents) do
+    occupation = security_occupation_id(brief)
+
+    budget_findings =
+      build_findings(
+        "security",
+        brief.objective,
+        brief.data_summary,
+        brief.key_features,
+        budget_cents
+      )
+
+    base_metadata = %{
+      finding_family: "vulnerability_case",
+      affected_component: "authorization_scope",
+      evidence_type: "source",
+      exploitability_status: "suspected",
+      patch_status: "none",
+      disclosure_status: "draft",
+      cwe_ids: [],
+      maintainer_scope: maintainer_scope_for(occupation)
+    }
+
+    budget_findings ++
+      [
+        %{
+          title: "Authorize the target scope before security work proceeds",
+          severity: "critical",
+          category: "security",
+          rule_id: "security.workflow.scope_authorization",
+          plain_message:
+            "Security workflows must declare owned or authorized scope before discovery, reproduction, or disclosure artifacts move forward.",
+          status: "open",
+          auto_resolved: false,
+          metadata: Map.merge(base_metadata, %{affected_component: "target_scope"})
+        },
+        %{
+          title: "Patch validation evidence is required before release",
+          severity: "high",
+          category: "security",
+          rule_id: "security.workflow.patch_validation",
+          plain_message:
+            "A vulnerability case is not release-ready until the remediation diff has proof-backed validation evidence.",
+          status: "open",
+          auto_resolved: false,
+          metadata:
+            Map.merge(base_metadata, %{
+              affected_component: "patch_validation",
+              evidence_type: "diff"
+            })
+        },
+        %{
+          title: "Disclosure defaults to redaction and evidence references",
+          severity: "high",
+          category: "security",
+          rule_id: "security.workflow.disclosure_redaction",
+          plain_message:
+            "ControlKeel should keep disclosure packets high-level by default, referencing evidence artifacts without embedding dangerous exploit details.",
+          status: "open",
+          auto_resolved: false,
+          metadata:
+            Map.merge(base_metadata, %{
+              affected_component: "disclosure_packet",
+              evidence_type: "diff",
+              patch_status: "drafted"
+            })
+        }
+      ]
+  end
+
+  defp session_metadata_for_brief(%ExecutionBrief{} = brief) do
+    if brief.domain_pack == SecurityWorkflow.domain_pack() do
+      occupation = security_occupation_id(brief)
+
+      %{
+        "mission_template" => "security_defender_v1",
+        "cyber_access_mode" => SecurityWorkflow.default_cyber_access_mode(occupation),
+        "security_workflow_phases" => SecurityWorkflow.phases(),
+        "proof_redaction_policy" => "security_default"
+      }
+    else
+      %{}
+    end
+  end
+
+  defp maintainer_scope_for("open_source_maintainer"), do: "open_source"
+  defp maintainer_scope_for("security_operations"), do: "third_party_vendor"
+  defp maintainer_scope_for(_occupation), do: "first_party"
+
+  defp security_occupation_id(%ExecutionBrief{} = brief) do
+    brief.compiler["occupation"] || brief.occupation
   end
 
   defp validation_gate("critical"), do: "Security scan, human approval, and rollback plan"

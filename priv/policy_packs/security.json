@@ -1,0 +1,44 @@
+[
+  {
+    "id": "security.scope_authorization_required",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Security workflows must not proceed with reproduction or disclosure content unless the owned or authorized target scope is explicit.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(live target|production target|customer environment).*(reproduce|exploit|chain)",
+        "(?i)(reproduce|exploit).*(unknown target|unverified target)"
+      ]
+    }
+  },
+  {
+    "id": "security.disclosure_oversharing",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Disclosure drafts should not embed proof-of-concept payloads, shellcode, or exploit instructions by default.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(proof[- ]of[- ]concept|reverse shell|shellcode|curl.+(bash|sh))",
+        "(?i)(disclosure|advisory|report).*(exploit|payload|shellcode)"
+      ]
+    }
+  },
+  {
+    "id": "security.patch_validation_evidence",
+    "category": "security",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Patch-oriented security work should include explicit validation evidence such as tests, regression references, or proof bundle notes.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(patch|fix|mitigation).*(without tests|no tests|skip validation)",
+        "(?i)(validation|proof|regression).*(missing|todo|later)"
+      ]
+    }
+  }
+]

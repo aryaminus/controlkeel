@@ -10,6 +10,7 @@ defmodule ControlKeel.Mission do
   alias ControlKeel.Notifications.Webhook
   alias ControlKeel.Platform
   alias ControlKeel.SessionTranscript
+  alias ControlKeel.SecurityWorkflow
   alias ControlKeel.Repo
   alias ControlKeel.WorkspaceContext
 
@@ -2434,7 +2435,7 @@ defmodule ControlKeel.Mission do
   defp maybe_add_verification_signal(signals, false, _message), do: signals
 
   defp finding_bundle_entry(f) do
-    %{
+    entry = %{
       id: f.id,
       rule_id: f.rule_id,
       severity: f.severity,
@@ -2443,6 +2444,12 @@ defmodule ControlKeel.Mission do
       plain_message: f.plain_message,
       auto_resolved: f.auto_resolved
     }
+
+    if SecurityWorkflow.vulnerability_case?(f) do
+      Map.put(entry, :security_lifecycle, SecurityWorkflow.vulnerability_case_summary(f))
+    else
+      entry
+    end
   end
 
   defp audit_invocation_entry(i) do
@@ -2597,6 +2604,11 @@ defmodule ControlKeel.Mission do
 
     compliance_attestations = build_compliance_attestations(session, findings)
     latest_review = List.first(reviews)
+    security_workflow? = SecurityWorkflow.security_domain?(session)
+    security_summary = SecurityWorkflow.proof_summary(findings)
+
+    security_release_ready? =
+      not security_workflow? or security_summary["critical_unresolved"] == 0
 
     %{
       "task_id" => task.id,
@@ -2648,8 +2660,22 @@ defmodule ControlKeel.Mission do
         "open" => length(open),
         "blocked" => length(blocked)
       },
+      "security_workflow" =>
+        if(security_workflow?,
+          do: %{
+            "mission_template" => get_in(session.metadata || %{}, ["mission_template"]),
+            "cyber_access_mode" => SecurityWorkflow.session_cyber_access_mode(session),
+            "phases" => get_in(session.metadata || %{}, ["security_workflow_phases"]) || [],
+            "vulnerability_summary" => security_summary,
+            "release_gate_decision" => if(security_release_ready?, do: "ready", else: "blocked"),
+            "redaction_policy" =>
+              get_in(session.metadata || %{}, ["proof_redaction_policy"]) || "security_default"
+          },
+          else: nil
+        ),
       "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
+    |> Map.update!("deploy_ready", fn deploy_ready -> deploy_ready and security_release_ready? end)
   end
 
   defp normalize_regression_result(attrs) do
@@ -4251,10 +4277,14 @@ defmodule ControlKeel.Mission do
         "kind" => opts[:kind],
         "task_id" => opts[:task_id],
         "source" => opts[:source],
-        "phase" => opts[:phase]
+        "phase" => opts[:phase],
+        "security_workflow_phase" => opts[:security_workflow_phase],
+        "artifact_type" => opts[:artifact_type],
+        "target_scope" => opts[:target_scope]
       })
       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
       |> Map.new()
+      |> maybe_add_vulnerability_metadata(finding, opts)
 
     %{
       title: finding_title(finding),
@@ -4268,6 +4298,27 @@ defmodule ControlKeel.Mission do
       session_id: opts[:session_id]
     }
   end
+
+  defp maybe_add_vulnerability_metadata(metadata, finding, opts) do
+    if finding.category == "security" and
+         (opts[:domain_pack] == SecurityWorkflow.domain_pack() or
+            opts[:security_workflow_phase] != nil or
+            Map.get(metadata, "finding_family") == "vulnerability_case") do
+      SecurityWorkflow.ensure_vulnerability_metadata(metadata, %{
+        affected_component: opts[:path] || "session_artifact",
+        evidence_type:
+          Map.get(metadata, "evidence_type") || evidence_type_for_artifact(opts[:artifact_type]),
+        maintainer_scope: opts[:maintainer_scope]
+      })
+    else
+      metadata
+    end
+  end
+
+  defp evidence_type_for_artifact("binary_report"), do: "binary_report"
+  defp evidence_type_for_artifact("telemetry_rule"), do: "telemetry"
+  defp evidence_type_for_artifact("diff"), do: "diff"
+  defp evidence_type_for_artifact(_artifact_type), do: "source"
 
   defp finding_title(%Scanner.Finding{rule_id: "cost.budget_guard"}), do: "Budget cap reached"
 

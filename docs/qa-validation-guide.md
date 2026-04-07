@@ -167,6 +167,7 @@ Use this as the top-level checklist.
 - release readiness
 - progress
 - pause and resume
+- defensive-security workflow phases, disclosure redaction, and cyber access mode gating
 
 ### Bundle and integration delivery
 

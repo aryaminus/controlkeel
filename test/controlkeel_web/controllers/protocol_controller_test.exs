@@ -226,6 +226,48 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
       assert conn.status == 403
       assert %{"error" => %{"code" => -32001}} = json_response(conn, 403)
     end
+
+    test "blocks reproduction-style hosted validation outside verified research", %{conn: conn} do
+      workspace = workspace_fixture()
+
+      %{service_account: account, token: secret} =
+        service_account_fixture(%{
+          workspace_id: workspace.id,
+          scopes: "mcp:access validate:run",
+          metadata: %{"cyber_access_mode" => "defensive_security"}
+        })
+
+      token =
+        request_access_token(
+          ProtocolAccess.oauth_client_id(account),
+          secret,
+          "mcp",
+          "mcp:access validate:run"
+        )
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 9,
+          method: "tools/call",
+          params: %{
+            name: "ck_validate",
+            arguments: %{
+              content: "Reproduce the exploit chain against the live target.",
+              kind: "text",
+              domain_pack: "security",
+              security_workflow_phase: "reproduction",
+              artifact_type: "repro_steps",
+              target_scope: "owned_repo"
+            }
+          }
+        })
+
+      assert conn.status == 403
+      assert %{"error" => %{"code" => -32001}} = json_response(conn, 403)
+    end
   end
 
   describe "A2A" do

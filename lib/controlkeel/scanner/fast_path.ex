@@ -8,6 +8,7 @@ defmodule ControlKeel.Scanner.FastPath do
   alias ControlKeel.Policy.Rule
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.{Advisory, Entropy, Patterns, Semgrep}
+  alias ControlKeel.SecurityWorkflow
   alias ControlKeel.TrustBoundary
 
   @type input :: map()
@@ -70,6 +71,7 @@ defmodule ControlKeel.Scanner.FastPath do
       |> Kernel.++(budget_findings(normalized, cost_rules))
       |> Kernel.++(destructive_shell_findings(normalized))
       |> Kernel.++(trust_boundary_findings(normalized))
+      |> Kernel.++(security_workflow_findings(normalized))
       |> uniq_findings()
 
     layer2 =
@@ -100,7 +102,22 @@ defmodule ControlKeel.Scanner.FastPath do
         normalize_optional_integer(Map.get(input, "session_id", Map.get(input, :session_id))),
       "task_id" =>
         normalize_optional_integer(Map.get(input, "task_id", Map.get(input, :task_id))),
-      "domain_pack" => normalize_domain_pack(input)
+      "domain_pack" => normalize_domain_pack(input),
+      "security_workflow_phase" =>
+        normalize_optional_string_enum(
+          Map.get(input, "security_workflow_phase", Map.get(input, :security_workflow_phase)),
+          SecurityWorkflow.phases()
+        ),
+      "artifact_type" =>
+        normalize_optional_string_enum(
+          Map.get(input, "artifact_type", Map.get(input, :artifact_type)),
+          SecurityWorkflow.artifact_types()
+        ),
+      "target_scope" =>
+        normalize_optional_string_enum(
+          Map.get(input, "target_scope", Map.get(input, :target_scope)),
+          SecurityWorkflow.target_scopes()
+        )
     }
     |> Map.merge(TrustBoundary.normalize_validation_context(input))
   end
@@ -229,6 +246,81 @@ defmodule ControlKeel.Scanner.FastPath do
 
   defp destructive_shell_findings(_normalized), do: []
 
+  defp security_workflow_findings(normalized) do
+    if SecurityWorkflow.security_validation_requested?(normalized) do
+      build_security_workflow_findings(normalized)
+    else
+      []
+    end
+  end
+
+  defp build_security_workflow_findings(normalized) do
+    phase = normalized["security_workflow_phase"]
+    artifact_type = normalized["artifact_type"]
+    target_scope = normalized["target_scope"] || "unknown"
+    content = normalized["content"] || ""
+    access_mode = cyber_access_mode(normalized)
+    location = %{"path" => normalized["path"], "kind" => normalized["kind"]}
+
+    []
+    |> maybe_append_security_finding(
+      SecurityWorkflow.reproduction_like?(phase, artifact_type) and target_scope == "unknown",
+      "security.workflow.live_target_ambiguity",
+      "critical",
+      "block",
+      "Reproduction-style security work requires an owned or authorized target scope; `unknown` is not allowed.",
+      location,
+      %{"target_scope" => target_scope, "phase" => phase, "artifact_type" => artifact_type}
+    )
+    |> maybe_append_security_finding(
+      SecurityWorkflow.reproduction_like?(phase, artifact_type) and
+        access_mode != "verified_research",
+      "security.workflow.access_mode_reproduction",
+      "critical",
+      "block",
+      "Reproduction-style workflows require `verified_research` mode and should stay on isolated runtime paths.",
+      location,
+      %{"cyber_access_mode" => access_mode, "phase" => phase, "artifact_type" => artifact_type}
+    )
+    |> maybe_append_security_finding(
+      artifact_type == "disclosure_text" and SecurityWorkflow.sensitive_disclosure?(content),
+      "security.workflow.unsafe_disclosure_content",
+      "critical",
+      "block",
+      "Disclosure artifacts should reference evidence and patches without embedding dangerous exploit details.",
+      location,
+      %{"artifact_type" => artifact_type, "redaction_required" => true}
+    )
+    |> maybe_append_security_finding(
+      SecurityWorkflow.exploit_chain_indicators?(content),
+      "security.workflow.exploit_chain_escalation",
+      "high",
+      if(access_mode == "standard", do: "block", else: "warn"),
+      "Exploit-chain or escalation language requires tighter review and may exceed the allowed defensive workflow mode.",
+      location,
+      %{"cyber_access_mode" => access_mode, "phase" => phase}
+    )
+    |> maybe_append_security_finding(
+      phase in ["patch", "validation"] and
+        not SecurityWorkflow.validation_evidence_present?(content),
+      "security.workflow.missing_patch_validation_evidence",
+      "medium",
+      "warn",
+      "Patch and validation phases should include explicit tests, proof references, or regression evidence.",
+      location,
+      %{"phase" => phase, "artifact_type" => artifact_type}
+    )
+    |> maybe_append_security_finding(
+      target_scope == "authorized_third_party" and access_mode == "standard",
+      "security.workflow.unsupported_authorization_claim",
+      "high",
+      "block",
+      "Third-party authorized testing claims require a defensive-security or verified-research mode with stronger review.",
+      location,
+      %{"cyber_access_mode" => access_mode, "target_scope" => target_scope}
+    )
+  end
+
   defp destructive_shell_finding(rule_id, message, matched_command, normalized, recovery) do
     %Scanner.Finding{
       id: shell_fingerprint(rule_id, normalized["path"], matched_command),
@@ -251,6 +343,57 @@ defmodule ControlKeel.Scanner.FastPath do
           "Use a dry-run and an explicit path instead of a repo-wide destructive command."
       }
     }
+  end
+
+  defp maybe_append_security_finding(
+         findings,
+         false,
+         _rule_id,
+         _severity,
+         _decision,
+         _message,
+         _location,
+         _metadata
+       ),
+       do: findings
+
+  defp maybe_append_security_finding(
+         findings,
+         true,
+         rule_id,
+         severity,
+         decision,
+         message,
+         location,
+         metadata
+       ) do
+    [
+      %Scanner.Finding{
+        id: shell_fingerprint(rule_id, location["path"], "#{decision}:#{message}"),
+        severity: severity,
+        category: "security",
+        rule_id: rule_id,
+        decision: decision,
+        plain_message: message,
+        location: location,
+        metadata:
+          SecurityWorkflow.ensure_vulnerability_metadata(
+            Map.merge(
+              %{
+                "scanner" => "fast_path",
+                "matcher" => "security_workflow"
+              },
+              metadata
+            ),
+            %{
+              affected_component: location["path"] || "security_workflow",
+              evidence_type: evidence_type_for_artifact(metadata["artifact_type"]),
+              maintainer_scope: "first_party"
+            }
+          )
+      }
+      | findings
+    ]
   end
 
   defp build_result(findings, advisory)
@@ -326,6 +469,24 @@ defmodule ControlKeel.Scanner.FastPath do
 
   defp normalize_optional_integer(_value), do: nil
 
+  defp normalize_optional_string_enum(nil, _allowed), do: nil
+
+  defp normalize_optional_string_enum(value, allowed) when is_binary(value) do
+    trimmed = String.trim(value)
+    if trimmed in allowed, do: trimmed, else: nil
+  end
+
+  defp normalize_optional_string_enum(_value, _allowed), do: nil
+
+  defp cyber_access_mode(%{"session_id" => session_id}) when is_integer(session_id) do
+    case Mission.get_session(session_id) do
+      nil -> "standard"
+      session -> SecurityWorkflow.session_cyber_access_mode(session)
+    end
+  end
+
+  defp cyber_access_mode(_normalized), do: "standard"
+
   defp scanned_at do
     DateTime.utc_now()
     |> DateTime.truncate(:second)
@@ -341,6 +502,11 @@ defmodule ControlKeel.Scanner.FastPath do
     seed = "#{rule_id}:#{path}:#{matched_command}"
     "fp_" <> (:crypto.hash(:sha256, seed) |> Base.encode16(case: :lower) |> binary_part(0, 12))
   end
+
+  defp evidence_type_for_artifact("binary_report"), do: "binary_report"
+  defp evidence_type_for_artifact("telemetry_rule"), do: "telemetry"
+  defp evidence_type_for_artifact("diff"), do: "diff"
+  defp evidence_type_for_artifact(_artifact_type), do: "source"
 
   defp action_to_decision("block"), do: "block"
   defp action_to_decision("warn"), do: "warn"
