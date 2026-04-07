@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.37 — 2026-04-07
+
+### What's changed
+
+- Tighten security workflow proof gating
+
 ## v0.1.36 — 2026-04-07
 
 ### What's changed
