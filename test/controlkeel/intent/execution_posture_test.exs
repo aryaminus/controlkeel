@@ -10,6 +10,7 @@ defmodule ControlKeel.Intent.ExecutionPostureTest do
     posture = Intent.execution_posture(brief)
 
     assert posture["exploration_surface"] == "virtual_workspace"
+    assert posture["state_surface"] == "typed_storage"
     assert posture["api_execution_surface"] == "typed_runtime"
     assert posture["mutation_surface"] == "shell_sandbox"
     assert posture["shell_role"] == "broad_fallback_only"
@@ -36,6 +37,7 @@ defmodule ControlKeel.Intent.ExecutionPostureTest do
     posture = Intent.execution_posture(brief)
 
     assert posture["exploration_surface"] == "virtual_workspace"
+    assert posture["state_surface"] == "typed_storage"
     assert posture["api_execution_surface"] == "typed_runtime_or_shell"
     assert posture["shell_role"] == "repo_local_fallback"
     assert posture["clearance_focus"] == ["file_write", "network", "deploy", "secrets"]

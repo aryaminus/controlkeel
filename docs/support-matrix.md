@@ -289,6 +289,7 @@ These reuse the existing task-run, findings, proofs, and policy-gate primitives 
 CK now makes the execution posture explicit in the brief and context layer:
 
 - `virtual_workspace` is the default read path for discovery (`ck_fs_ls`, `ck_fs_read`, `ck_fs_find`, `ck_fs_grep`)
+- `typed_storage` is the durable state path for proofs, memory, traces, and outcome tracking
 - `typed_runtime` is the preferred path for large API or MCP-style tool surfaces when the host can offer code-mode execution
 - `shell_sandbox` remains the broad fallback path for repo mutation, package management, and test execution, with the strongest approval pressure
 

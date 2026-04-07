@@ -33,6 +33,7 @@ The main stewardship surfaces for that lifecycle are `/ship` and `/benchmarks`.
 Execution posture is how CK keeps the harness honest:
 
 - use the read-only virtual workspace for repo exploration before provisioning execution
+- keep durable state in typed CK surfaces such as memory, proofs, traces, and outcomes instead of treating files as the only durable interface
 - prefer typed or code-mode execution for large API and MCP-style tool surfaces when the host supports it
 - keep shell as the broad fallback surface for repo mutation, package commands, and test runs
 

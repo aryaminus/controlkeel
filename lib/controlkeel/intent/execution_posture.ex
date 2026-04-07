@@ -8,12 +8,13 @@ defmodule ControlKeel.Intent.ExecutionPosture do
 
   @default_posture %{
     "exploration_surface" => "virtual_workspace",
+    "state_surface" => "typed_storage",
     "api_execution_surface" => "typed_runtime_or_shell",
     "mutation_surface" => "shell_sandbox",
     "shell_role" => "fallback",
     "clearance_focus" => @default_clearance_focus,
     "rationale" =>
-      "Prefer read-only discovery first, keep large tool and API interactions in typed runtimes when available, and treat shell as the broad fallback surface for mutation and execution."
+      "Prefer read-only discovery first, keep durable state in typed storage surfaces, use typed runtimes for large tool and API interactions when available, and treat shell as the broad fallback surface for mutation and execution."
   }
 
   def build(%ExecutionBrief{} = brief), do: build(ExecutionBrief.to_map(brief))
@@ -29,6 +30,7 @@ defmodule ControlKeel.Intent.ExecutionPosture do
 
     %{
       "exploration_surface" => "virtual_workspace",
+      "state_surface" => "typed_storage",
       "api_execution_surface" =>
         if(regulated?, do: "typed_runtime", else: "typed_runtime_or_shell"),
       "mutation_surface" => "shell_sandbox",
@@ -53,11 +55,11 @@ defmodule ControlKeel.Intent.ExecutionPosture do
         items -> "compliance pressure (#{Enum.join(items, ", ")})"
       end
 
-    "This brief is #{risk_label} risk or carries #{compliance_label}, so CK should favor read-only exploration plus typed execution for tool and API work before granting broad shell authority."
+    "This brief is #{risk_label} risk or carries #{compliance_label}, so CK should favor read-only exploration, typed storage-backed state, and typed execution for tool and API work before granting broad shell authority."
   end
 
   defp rationale(false, _risk_tier, _compliance) do
-    "This brief can stay hybrid: use the virtual workspace for discovery, prefer typed execution when it reduces context and side effects, and keep shell focused on repo-local mutation and test flows."
+    "This brief can stay hybrid: use the virtual workspace for discovery, keep state in typed storage-backed surfaces, prefer typed execution when it reduces context and side effects, and keep shell focused on repo-local mutation and test flows."
   end
 
   defp external_or_sensitive_data?(brief) do

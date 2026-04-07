@@ -25,6 +25,7 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
              "Lock the architecture, hosting boundary, and approval flow before code generation."
 
     assert summary["execution_posture"]["exploration_surface"] == "virtual_workspace"
+    assert summary["execution_posture"]["state_surface"] == "typed_storage"
     assert summary["execution_posture"]["api_execution_surface"] == "typed_runtime"
     assert summary["execution_posture"]["shell_role"] == "broad_fallback_only"
   end
@@ -62,12 +63,13 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
              "next_step" => nil,
              "execution_posture" => %{
                "exploration_surface" => "virtual_workspace",
+               "state_surface" => "typed_storage",
                "api_execution_surface" => "typed_runtime_or_shell",
                "mutation_surface" => "shell_sandbox",
                "shell_role" => "fallback",
                "clearance_focus" => ["file_write", "network", "deploy", "secrets"],
                "rationale" =>
-                 "Prefer read-only discovery first, keep large tool and API interactions in typed runtimes when available, and treat shell as the broad fallback surface for mutation and execution."
+                 "Prefer read-only discovery first, keep durable state in typed storage surfaces, use typed runtimes for large tool and API interactions when available, and treat shell as the broad fallback surface for mutation and execution."
              }
            }
 
