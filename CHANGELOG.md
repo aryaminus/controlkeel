@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.26 — 2026-04-07
+
+### What's changed
+
+- Align Codex integration with native skills
+
 ## v0.1.25 — 2026-04-07
 
 ### What's changed
