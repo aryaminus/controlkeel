@@ -5,6 +5,9 @@ defmodule ControlKeel.Skills.Installer do
   alias ControlKeel.Skills.Registry
   alias ControlKeel.Skills.SkillTarget
 
+  @managed_agents_start "<!-- controlkeel:start -->"
+  @managed_agents_end "<!-- controlkeel:end -->"
+
   def install(target_id, project_root, opts \\ []) do
     with %SkillTarget{} = target <- SkillTarget.get(target_id),
          scope <- normalize_scope(target, Keyword.get(opts, :scope, target.default_scope)),
@@ -92,7 +95,7 @@ defmodule ControlKeel.Skills.Installer do
 
     if scope == "project" do
       File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
-      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+      install_project_agents_md!(plan.output_dir, project_root)
     end
 
     {:ok,
@@ -235,7 +238,7 @@ defmodule ControlKeel.Skills.Installer do
           Path.join(project_root, ".cline/hooks")
         )
 
-        File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+        install_project_agents_md!(plan.output_dir, project_root)
 
         {:ok,
          %{
@@ -254,7 +257,7 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
     copy_tree_contents(Path.join(plan.output_dir, ".cursor"), Path.join(project_root, ".cursor"))
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -275,7 +278,7 @@ defmodule ControlKeel.Skills.Installer do
       Path.join(project_root, ".windsurf")
     )
 
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -296,7 +299,7 @@ defmodule ControlKeel.Skills.Installer do
       Path.join(project_root, ".continue")
     )
 
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -338,7 +341,7 @@ defmodule ControlKeel.Skills.Installer do
     copy_tree_contents(Path.join(plan.output_dir, ".roo"), roo_root)
     File.cp!(Path.join(plan.output_dir, ".roomodes"), Path.join(project_root, ".roomodes"))
     File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -359,7 +362,7 @@ defmodule ControlKeel.Skills.Installer do
     copy_tree_contents(Path.join(plan.output_dir, "goose"), Path.join(project_root, "goose"))
     File.cp!(Path.join(plan.output_dir, ".goosehints"), Path.join(project_root, ".goosehints"))
     File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -392,7 +395,7 @@ defmodule ControlKeel.Skills.Installer do
       Path.join(opencode_root, "mcp.json")
     )
 
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -468,7 +471,7 @@ defmodule ControlKeel.Skills.Installer do
       Path.join(kiro_root, "mcp.json")
     )
 
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -500,7 +503,7 @@ defmodule ControlKeel.Skills.Installer do
       Path.join(kilo_root, "kilo.json")
     )
 
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -523,7 +526,7 @@ defmodule ControlKeel.Skills.Installer do
     copy_tree_contents(Path.join(plan.output_dir, ".amp"), amp_root)
     copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), skill_root)
     File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
      %{
@@ -543,7 +546,7 @@ defmodule ControlKeel.Skills.Installer do
     File.mkdir_p!(augment_root)
 
     copy_tree_contents(Path.join(plan.output_dir, ".augment"), augment_root)
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
     File.cp!(Path.join(plan.output_dir, "AUGMENT.md"), Path.join(project_root, "AUGMENT.md"))
 
     {:ok,
@@ -561,7 +564,7 @@ defmodule ControlKeel.Skills.Installer do
   defp do_install(%SkillTarget{id: "instructions-only"}, "project", project_root, _skills, _opts) do
     {:ok, plan} = Exporter.export("instructions-only", project_root, scope: "project")
 
-    File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+    install_project_agents_md!(plan.output_dir, project_root)
     File.cp!(Path.join(plan.output_dir, "CLAUDE.md"), Path.join(project_root, "CLAUDE.md"))
 
     File.cp!(
@@ -602,7 +605,7 @@ defmodule ControlKeel.Skills.Installer do
     copy_tree_contents(Path.join(plan.output_dir, ".hermes"), base)
 
     if scope == "project" do
-      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+      install_project_agents_md!(plan.output_dir, project_root)
     end
 
     {:ok,
@@ -629,7 +632,7 @@ defmodule ControlKeel.Skills.Installer do
     )
 
     if scope == "project" do
-      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+      install_project_agents_md!(plan.output_dir, project_root)
     end
 
     {:ok,
@@ -686,7 +689,7 @@ defmodule ControlKeel.Skills.Installer do
     copy_tree_contents(Path.join(plan.output_dir, ".factory"), base)
 
     if scope == "project" do
-      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+      install_project_agents_md!(plan.output_dir, project_root)
     end
 
     {:ok,
@@ -718,7 +721,7 @@ defmodule ControlKeel.Skills.Installer do
 
     if scope == "project" do
       File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
-      File.cp!(Path.join(plan.output_dir, "AGENTS.md"), Path.join(project_root, "AGENTS.md"))
+      install_project_agents_md!(plan.output_dir, project_root)
     end
 
     {:ok,
@@ -788,6 +791,72 @@ defmodule ControlKeel.Skills.Installer do
       end)
 
     File.write!(destination_path, Jason.encode!(updated, pretty: true) <> "\n")
+  end
+
+  defp install_project_agents_md!(plan_output_dir, project_root) do
+    generated_path = Path.join(plan_output_dir, "AGENTS.md")
+    destination_path = Path.join(project_root, "AGENTS.md")
+    generated = File.read!(generated_path) |> String.trim()
+
+    destination =
+      case File.read(destination_path) do
+        {:ok, contents} -> contents
+        {:error, _reason} -> nil
+      end
+
+    updated =
+      cond do
+        generated == "" ->
+          destination
+
+        destination in [nil, ""] ->
+          generated <> "\n"
+
+        String.trim(destination) == generated ->
+          destination
+
+        true ->
+          upsert_managed_block(destination, generated)
+      end
+
+    if updated do
+      File.write!(destination_path, updated)
+    end
+  end
+
+  defp upsert_managed_block(existing, generated) do
+    block = Enum.join([@managed_agents_start, generated, @managed_agents_end], "\n")
+
+    case split_managed_block(existing) do
+      {prefix, _existing_block, suffix} ->
+        join_sections(prefix, block, suffix)
+
+      nil ->
+        [String.trim_trailing(existing), block]
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.join("\n\n")
+        |> Kernel.<>("\n")
+    end
+  end
+
+  defp split_managed_block(existing) do
+    with {start_index, _} <- :binary.match(existing, @managed_agents_start),
+         {end_index, _} <- :binary.match(existing, @managed_agents_end) do
+      prefix = String.slice(existing, 0, start_index) |> String.trim_trailing()
+      suffix_start = end_index + byte_size(@managed_agents_end)
+      suffix = String.slice(existing, suffix_start..-1//1) |> String.trim_leading()
+      block = String.slice(existing, start_index, suffix_start - start_index)
+      {prefix, block, suffix}
+    else
+      _ -> nil
+    end
+  end
+
+  defp join_sections(prefix, block, suffix) do
+    [prefix, block, suffix]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+    |> Kernel.<>("\n")
   end
 
   defp same_path?(left, right) do

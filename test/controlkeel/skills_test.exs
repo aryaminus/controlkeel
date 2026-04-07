@@ -136,6 +136,31 @@ defmodule ControlKeel.SkillsTest do
     assert Enum.any?(analysis.skills, &(&1.name == "codex-native"))
   end
 
+  test "registry does not warn when codex and open-standard copies mirror each other", %{
+    tmp_dir: tmp_dir
+  } do
+    project_root = Path.join(tmp_dir, "project")
+    codex_dir = Path.join(project_root, ".codex/skills/mirrored-skill")
+    compat_dir = Path.join(project_root, ".agents/skills/mirrored-skill")
+    File.mkdir_p!(codex_dir)
+    File.mkdir_p!(compat_dir)
+
+    skill_contents = """
+    ---
+    name: mirrored-skill
+    description: Mirrored skill copy
+    ---
+    # Mirrored
+    """
+
+    File.write!(Path.join(codex_dir, "SKILL.md"), skill_contents)
+    File.write!(Path.join(compat_dir, "SKILL.md"), skill_contents)
+
+    analysis = Skills.analyze(project_root, trust_project_skills: true)
+    assert Enum.count(analysis.skills, &(&1.name == "mirrored-skill")) == 1
+    refute Enum.any?(analysis.diagnostics, &(&1.code == "shadowed_skill"))
+  end
+
   test "renderer applies target-family metadata from agents yaml", %{tmp_dir: tmp_dir} do
     skill_dir = Path.join(tmp_dir, "render-skill")
     File.mkdir_p!(Path.join(skill_dir, "agents"))
@@ -848,5 +873,35 @@ defmodule ControlKeel.SkillsTest do
     assert {:ok, codex_plugin_install} = Skills.install("codex-plugin", tmp_dir, scope: "project")
     assert File.exists?(Path.join(codex_plugin_install.destination, ".codex-plugin/plugin.json"))
     assert File.exists?(Path.join(tmp_dir, ".agents/plugins/marketplace.json"))
+  end
+
+  test "installer preserves existing AGENTS instructions and manages the CK block", %{
+    tmp_dir: tmp_dir
+  } do
+    repo_instructions = """
+    # Repo Instructions
+
+    Keep Phoenix guidance here.
+    """
+
+    File.write!(Path.join(tmp_dir, "AGENTS.md"), repo_instructions)
+
+    assert {:ok, _install} = Skills.install("codex", tmp_dir, scope: "project")
+
+    agents_path = Path.join(tmp_dir, "AGENTS.md")
+    agents_contents = File.read!(agents_path)
+
+    assert agents_contents =~ "# Repo Instructions"
+    assert agents_contents =~ "<!-- controlkeel:start -->"
+    assert agents_contents =~ "Primary CK loop:"
+    assert agents_contents =~ "<!-- controlkeel:end -->"
+
+    assert {:ok, _install} = Skills.install("cline-native", tmp_dir, scope: "project")
+
+    updated_contents = File.read!(agents_path)
+
+    assert updated_contents =~ "# Repo Instructions"
+    assert String.split(updated_contents, "<!-- controlkeel:start -->") |> length() == 2
+    assert String.split(updated_contents, "<!-- controlkeel:end -->") |> length() == 2
   end
 end

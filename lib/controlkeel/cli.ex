@@ -601,7 +601,7 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: ["claude-code"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => "claude-code"}),
+           ensure_attach_project(project_root, %{"agent" => "claude-code"}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached_agent} <-
            ClaudeCLI.attach_local(
@@ -638,7 +638,7 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: ["cursor"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => "cursor"}),
+           ensure_attach_project(project_root, %{"agent" => "cursor"}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_cursor(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "cursor", attached),
@@ -665,7 +665,7 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: ["windsurf"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => "windsurf"}),
+           ensure_attach_project(project_root, %{"agent" => "windsurf"}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_windsurf(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "windsurf", attached),
@@ -695,7 +695,7 @@ defmodule ControlKeel.CLI do
     scope = attach_scope("codex-cli", options)
 
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => "codex-cli"}),
+           ensure_attach_project(project_root, %{"agent" => "codex-cli"}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          config_path <- CodexConfig.path_for_scope(project_root, scope),
          {:ok, _} <- CodexConfig.write(config_path, command_spec),
@@ -761,7 +761,7 @@ defmodule ControlKeel.CLI do
     }
 
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => agent}),
+           ensure_attach_project(project_root, %{"agent" => agent}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          config_path <- config_path_fn[agent].(),
          {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", command_spec, agent),
@@ -794,7 +794,7 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: ["goose"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => "goose"}),
+           ensure_attach_project(project_root, %{"agent" => "goose"}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_goose(command_spec, project_root),
          updated <- ProjectBinding.update_attached_agent(binding, "goose", attached),
@@ -822,7 +822,7 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: ["continue"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => "continue"}),
+           ensure_attach_project(project_root, %{"agent" => "continue"}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <-
            write_continue_mcp_config(continue_config_path(), "controlkeel", command_spec),
@@ -851,7 +851,7 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: ["aider"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => "aider"}),
+           ensure_attach_project(project_root, %{"agent" => "aider"}),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_aider(command_spec, project_root),
          updated <- ProjectBinding.update_attached_agent(binding, "aider", attached),
@@ -891,7 +891,7 @@ defmodule ControlKeel.CLI do
     scope = attach_scope(agent, options)
 
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => agent}),
+           ensure_attach_project(project_root, %{"agent" => agent}),
          {:ok, result} <- attach_bundle_target(target, project_root, scope, options),
          attached_agent <- bundled_attached_agent(agent, target, scope, result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
@@ -915,7 +915,7 @@ defmodule ControlKeel.CLI do
     scope = attach_scope(agent, options)
 
     with {:ok, binding, _session, _mode} <-
-           ensure_local_project(project_root, %{"agent" => agent}),
+           ensure_attach_project(project_root, %{"agent" => agent}),
          {:ok, install_result} <- Skills.install("github-repo", project_root, scope: scope),
          attached_agent <- github_repo_attached_agent(agent, scope, install_result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
@@ -3793,14 +3793,24 @@ defmodule ControlKeel.CLI do
 
   defp selected_base_url(_status), do: "default"
 
-  defp ensure_local_project(project_root, overrides \\ %{}) do
+  defp ensure_attach_project(project_root, overrides) do
+    ensure_local_project(project_root, overrides, sync_attached_agents: false)
+  end
+
+  defp ensure_local_project(project_root, overrides \\ %{}, opts \\ []) do
     project_root = ProjectRoot.resolve(project_root)
+    sync_attached_agents? = Keyword.get(opts, :sync_attached_agents, true)
 
     with {:ok, binding, session, mode} <-
-           LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: true),
-         {:ok, synced_binding, _changes} <-
-           AttachedAgentSync.sync(binding, project_root, mode: mode) do
-      {:ok, synced_binding, session, mode}
+           LocalProject.load_or_bootstrap(project_root, overrides, ephemeral_ok: true) do
+      if sync_attached_agents? do
+        case AttachedAgentSync.sync(binding, project_root, mode: mode) do
+          {:ok, synced_binding, _changes} -> {:ok, synced_binding, session, mode}
+          {:error, reason} -> {:error, reason}
+        end
+      else
+        {:ok, binding, session, mode}
+      end
     end
   end
 

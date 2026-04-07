@@ -169,25 +169,39 @@ defmodule ControlKeel.Skills.Registry do
   defp dir_entry(path, scope), do: %{path: path, scope: scope}
 
   defp deduplicate_by_name(skills) do
-    Enum.reduce(skills, {[], MapSet.new(), []}, fn skill, {kept, seen, diagnostics} ->
-      if MapSet.member?(seen, skill.name) do
-        diagnostic = %SkillDiagnostic{
-          level: "warn",
-          code: "shadowed_skill",
-          message:
-            "A higher-precedence skill with the same name already exists. This copy was ignored.",
-          path: skill.path,
-          skill_name: skill.name
-        }
+    Enum.reduce(skills, {[], %{}, []}, fn skill, {kept, seen, diagnostics} ->
+      case Map.fetch(seen, skill.name) do
+        {:ok, existing} ->
+          if identical_skill_copy?(existing, skill) do
+            {kept, seen, diagnostics}
+          else
+            diagnostic = %SkillDiagnostic{
+              level: "warn",
+              code: "shadowed_skill",
+              message:
+                "A higher-precedence skill with the same name already exists. This copy was ignored.",
+              path: skill.path,
+              skill_name: skill.name
+            }
 
-        {kept, seen, [diagnostic | diagnostics]}
-      else
-        {[skill | kept], MapSet.put(seen, skill.name), diagnostics}
+            {kept, seen, [diagnostic | diagnostics]}
+          end
+
+        :error ->
+          {[skill | kept], Map.put(seen, skill.name, skill), diagnostics}
       end
     end)
     |> then(fn {skills, _seen, diagnostics} ->
       {Enum.reverse(skills), Enum.reverse(diagnostics)}
     end)
+  end
+
+  defp identical_skill_copy?(first, second) do
+    first.path != second.path and
+      case {File.read(first.path), File.read(second.path)} do
+        {{:ok, first_contents}, {:ok, second_contents}} -> first_contents == second_contents
+        _ -> false
+      end
   end
 
   defp install_state(skill, project_root) do

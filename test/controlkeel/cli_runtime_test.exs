@@ -444,6 +444,47 @@ defmodule ControlKeel.CLIRuntimeTest do
     refute File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-review.md"))
   end
 
+  test "user-scoped codex attach does not sync stale project-native agents", %{tmp_dir: tmp_dir} do
+    assert {:ok, init} = CLI.parse(["init", "--no-attach"])
+    assert 0 == CLI.execute(init, project_root: tmp_dir)
+
+    {:ok, binding} = ProjectBinding.read(tmp_dir)
+
+    {:ok, _binding} =
+      ProjectBinding.write(
+        put_in(binding, ["attached_agents", "opencode"], %{
+          "ide" => "opencode",
+          "target" => "opencode-native",
+          "scope" => "project",
+          "controlkeel_version" => "0.0.1"
+        }),
+        tmp_dir
+      )
+
+    File.write!(Path.join(tmp_dir, "AGENTS.md"), "# Repo instructions\n")
+
+    assert {:ok, codex_attach} = CLI.parse(["attach", "codex-cli", "--scope", "user"])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(codex_attach, project_root: tmp_dir)
+      end)
+
+    assert output =~ "Attached ControlKeel to Codex CLI."
+    assert output =~ "MCP server written to #{user_codex_config_path()}."
+
+    assert File.exists?(user_codex_config_path())
+    refute File.exists?(Path.join(tmp_dir, ".opencode"))
+    refute File.exists?(Path.join(tmp_dir, ".codex"))
+    refute File.exists?(Path.join(tmp_dir, ".agents"))
+    refute File.exists?(Path.join(tmp_dir, ".mcp.json"))
+    assert File.read!(Path.join(tmp_dir, "AGENTS.md")) == "# Repo instructions\n"
+
+    {:ok, updated_binding} = ProjectBinding.read(tmp_dir)
+    refute get_in(updated_binding, ["attached_agents", "opencode", "synced_at"])
+    assert get_in(updated_binding, ["attached_agents", "codex-cli", "scope"]) == "user"
+  end
+
   test "bootstrap and provider commands work without manual init", %{tmp_dir: tmp_dir} do
     assert {:ok, provider_list} = CLI.parse(["provider", "list", "--project-root", tmp_dir])
 
