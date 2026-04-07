@@ -1,6 +1,7 @@
 defmodule ControlKeel.SecurityWorkflow do
   @moduledoc false
 
+  alias ControlKeel.Intent.Domains
   alias ControlKeel.Mission.Session
   alias ControlKeel.Platform.ServiceAccount
 
@@ -84,6 +85,7 @@ defmodule ControlKeel.SecurityWorkflow do
       security_domain?(session) ->
         (session.execution_brief || %{})
         |> Map.get("occupation")
+        |> normalize_security_occupation()
         |> default_cyber_access_mode()
 
       true ->
@@ -221,14 +223,17 @@ defmodule ControlKeel.SecurityWorkflow do
   end
 
   def proof_summary(findings) when is_list(findings) do
+    vulnerability_findings =
+      Enum.filter(findings, &vulnerability_case?/1)
+
     cases =
-      findings
-      |> Enum.filter(&vulnerability_case?/1)
+      vulnerability_findings
       |> Enum.map(&case_proof_entry/1)
 
     %{
       "case_count" => length(cases),
-      "critical_unresolved" => Enum.count(cases, &(&1["release_gate_decision"] == "blocked")),
+      "unresolved" => Enum.count(cases, &(&1["release_gate_decision"] == "blocked")),
+      "critical_unresolved" => Enum.count(vulnerability_findings, &security_release_blocker?(&1)),
       "cases" => cases
     }
   end
@@ -293,6 +298,23 @@ defmodule ControlKeel.SecurityWorkflow do
   defp stringify_keys(map) do
     Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
   end
+
+  defp normalize_security_occupation(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    cond do
+      trimmed in @security_occupations ->
+        trimmed
+
+      true ->
+        case Enum.find(Domains.occupation_profiles(), &(&1.label == trimmed)) do
+          %{id: id} when id in @security_occupations -> id
+          _ -> trimmed
+        end
+    end
+  end
+
+  defp normalize_security_occupation(value), do: value
 
   defp normalize_enum(value, allowed, default) when is_binary(value) do
     trimmed = String.trim(value)

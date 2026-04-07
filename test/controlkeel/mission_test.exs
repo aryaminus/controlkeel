@@ -496,6 +496,59 @@ defmodule ControlKeel.MissionTest do
       assert bundle["deploy_ready"] == false
     end
 
+    test "deploy_ready is false for unresolved non-critical vulnerability cases" do
+      session =
+        session_fixture(%{
+          execution_brief: %{
+            "domain_pack" => "security",
+            "occupation" => "Open Source Maintainer"
+          },
+          metadata: %{}
+        })
+
+      task =
+        task_fixture(%{
+          session: session,
+          status: "done",
+          metadata: %{"track" => "release", "security_workflow_phase" => "disclosure"}
+        })
+
+      _open =
+        finding_fixture(%{
+          session: session,
+          severity: "high",
+          category: "security",
+          status: "open",
+          metadata: %{
+            "finding_family" => "vulnerability_case",
+            "affected_component" => "ffmpeg/parser",
+            "evidence_type" => "source",
+            "exploitability_status" => "validated",
+            "patch_status" => "drafted",
+            "disclosure_status" => "triaged",
+            "maintainer_scope" => "open_source",
+            "cwe_ids" => ["CWE-787"]
+          }
+        })
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+      assert bundle["deploy_ready"] == false
+      assert bundle["security_workflow"]["vulnerability_summary"]["unresolved"] == 1
+    end
+
+    test "security workflow falls back from label occupation names when metadata is absent" do
+      session =
+        session_fixture(%{
+          execution_brief: %{"domain_pack" => "security", "occupation" => "Security Researcher"},
+          metadata: %{}
+        })
+
+      task = task_fixture(%{session: session, status: "done"})
+
+      assert {:ok, bundle} = Mission.proof_bundle(task.id)
+      assert bundle["security_workflow"]["cyber_access_mode"] == "verified_research"
+    end
+
     test "deploy_ready is false when there is no approved execution-ready plan" do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "done"})

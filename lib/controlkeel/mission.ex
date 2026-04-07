@@ -2608,7 +2608,7 @@ defmodule ControlKeel.Mission do
     security_summary = SecurityWorkflow.proof_summary(findings)
 
     security_release_ready? =
-      not security_workflow? or security_summary["critical_unresolved"] == 0
+      not security_workflow? or security_summary["unresolved"] == 0
 
     %{
       "task_id" => task.id,
