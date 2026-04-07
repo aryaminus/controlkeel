@@ -21,6 +21,7 @@ The governed delivery lifecycle is:
 
 - intent intake
 - execution brief
+- execution posture
 - task graph and routing
 - validation and findings
 - proof bundles
@@ -28,6 +29,12 @@ The governed delivery lifecycle is:
 - benchmarks
 
 The main stewardship surfaces for that lifecycle are `/ship` and `/benchmarks`.
+
+Execution posture is how CK keeps the harness honest:
+
+- use the read-only virtual workspace for repo exploration before provisioning execution
+- prefer typed or code-mode execution for large API and MCP-style tool surfaces when the host supports it
+- keep shell as the broad fallback surface for repo mutation, package commands, and test runs
 
 If you want the architecture map behind that lifecycle, read [control-plane-architecture.md](control-plane-architecture.md).
 

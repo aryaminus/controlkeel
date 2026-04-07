@@ -1,7 +1,7 @@
 defmodule ControlKeel.Intent.BoundarySummary do
   @moduledoc false
 
-  alias ControlKeel.Intent.ExecutionBrief
+  alias ControlKeel.Intent.{ExecutionBrief, ExecutionPosture}
 
   @empty_summary %{
     "risk_tier" => nil,
@@ -11,7 +11,8 @@ defmodule ControlKeel.Intent.BoundarySummary do
     "constraints" => [],
     "open_questions" => [],
     "launch_window" => nil,
-    "next_step" => nil
+    "next_step" => nil,
+    "execution_posture" => ExecutionPosture.build(nil)
   }
 
   def build(%ExecutionBrief{} = brief), do: build(ExecutionBrief.to_map(brief))
@@ -30,7 +31,8 @@ defmodule ControlKeel.Intent.BoundarySummary do
       "open_questions" =>
         normalize_list(Map.get(brief, "open_questions") || Map.get(brief, :open_questions)),
       "launch_window" => optional_string(brief, "launch_window"),
-      "next_step" => optional_string(brief, "next_step")
+      "next_step" => optional_string(brief, "next_step"),
+      "execution_posture" => ExecutionPosture.build(brief)
     }
   end
 

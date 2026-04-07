@@ -12,7 +12,7 @@ The older strategy split the product into seven pillars. In current ControlKeel 
 
 - **Harness**: typed integrations, attach flows, runtime export, provider broker, and project bootstrap
 - **Tools**: MCP runtime, skills, generated plugin bundles, and governed proxy endpoints
-- **Context**: execution brief, typed memory, proof bundles, workspace snapshots, clipped session transcript events, resume packets, and current mission state
+- **Context**: execution brief, execution posture, typed memory, proof bundles, workspace snapshots, clipped session transcript events, resume packets, and current mission state
 - **Orchestration**: planner, task graph, router, Mission Control, and agent recommendations
 - **Invocation**: provider resolution, budget checks, governed forwarding, and no-key fallback behavior
 - **Validation**: FastPath, Semgrep, optional advisory review, findings, and guided auto-fix
@@ -24,11 +24,19 @@ The live governed lifecycle is:
 
 1. intent intake
 2. execution brief compilation
-3. task graph and routing
-4. validation and findings
-5. proof capture
-6. ship metrics
-7. comparative benchmark evidence
+3. execution posture compilation
+4. task graph and routing
+5. validation and findings
+6. proof capture
+7. ship metrics
+8. comparative benchmark evidence
+
+The execution posture is the part of the brief that tells CK how to treat the runtime surface:
+
+- use the read-only virtual workspace first for discovery and context gathering
+- prefer typed or code-mode execution for large API and tool surfaces when available
+- keep shell as the broad fallback surface for repo mutation, test runs, and package commands
+- escalate approval pressure as work moves from read-only exploration to high-impact execution
 
 That is why the main surfaces stay grouped as:
 

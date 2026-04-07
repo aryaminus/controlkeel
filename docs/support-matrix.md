@@ -286,6 +286,12 @@ Bidirectional execution surfaces in the product now include:
 
 These reuse the existing task-run, findings, proofs, and policy-gate primitives rather than inventing a second execution model.
 
+CK now makes the execution posture explicit in the brief and context layer:
+
+- `virtual_workspace` is the default read path for discovery (`ck_fs_ls`, `ck_fs_read`, `ck_fs_find`, `ck_fs_grep`)
+- `typed_runtime` is the preferred path for large API or MCP-style tool surfaces when the host can offer code-mode execution
+- `shell_sandbox` remains the broad fallback path for repo mutation, package management, and test execution, with the strongest approval pressure
+
 ## MCP runtime tools
 
 Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/). The MCP server advertises the core and extended governance tools, and adds `ck_skill_list` and `ck_skill_load` when the runtime has a non-empty skill catalog (see `protocol.ex` `tool_schemas/0`).

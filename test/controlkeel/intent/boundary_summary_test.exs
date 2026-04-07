@@ -23,6 +23,10 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
 
     assert summary["next_step"] ==
              "Lock the architecture, hosting boundary, and approval flow before code generation."
+
+    assert summary["execution_posture"]["exploration_surface"] == "virtual_workspace"
+    assert summary["execution_posture"]["api_execution_surface"] == "typed_runtime"
+    assert summary["execution_posture"]["shell_role"] == "broad_fallback_only"
   end
 
   test "normalizes blank or comma-separated constraints into a short list" do
@@ -55,7 +59,16 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
              "constraints" => [],
              "open_questions" => [],
              "launch_window" => nil,
-             "next_step" => nil
+             "next_step" => nil,
+             "execution_posture" => %{
+               "exploration_surface" => "virtual_workspace",
+               "api_execution_surface" => "typed_runtime_or_shell",
+               "mutation_surface" => "shell_sandbox",
+               "shell_role" => "fallback",
+               "clearance_focus" => ["file_write", "network", "deploy", "secrets"],
+               "rationale" =>
+                 "Prefer read-only discovery first, keep large tool and API interactions in typed runtimes when available, and treat shell as the broad fallback surface for mutation and execution."
+             }
            }
 
     assert Intent.boundary_summary(%{"risk_tier" => "high"})["constraints"] == []
