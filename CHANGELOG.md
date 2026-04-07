@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.34 — 2026-04-07
+
+### What's changed
+
+- Align web project-root context with CLI
+
 ## v0.1.33 — 2026-04-07
 
 ### What's changed

@@ -1,6 +1,6 @@
 {
   "name": "@aryaminus/controlkeel",
-  "version": "0.1.33",
+  "version": "0.1.34",
   "description": "Bootstrap installer for the ControlKeel native CLI.",
   "license": "Apache-2.0",
   "repository": {
