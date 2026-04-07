@@ -4054,10 +4054,14 @@ defmodule ControlKeel.Mission do
   end
 
   defp maybe_update_runtime_task_context(multi, %Task{} = task, runtime_context) do
-    Multi.update(multi, :runtime_task, fn _changes ->
-      Task.changeset(task, %{
-        metadata: merge_runtime_context(task.metadata || %{}, runtime_context)
+    Multi.run(multi, :runtime_task, fn repo, changes ->
+      task_for_update = Map.get(changes, :task, task)
+
+      task_for_update
+      |> Task.changeset(%{
+        metadata: merge_runtime_context(task_for_update.metadata || %{}, runtime_context)
       })
+      |> repo.update()
     end)
   end
 

@@ -495,6 +495,65 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_manifest["version"] == ControlKeel.CLI.version()
     assert opencode_manifest["publishConfig"]["access"] == "public"
     assert opencode_manifest["exports"]["."] == "./index.js"
+    assert opencode_manifest["dependencies"]["@opencode-ai/plugin"] == "1.3.13"
+
+    opencode_plugin =
+      Path.join(opencode_plan.output_dir, ".opencode/plugins/controlkeel-governance.ts")
+      |> File.read!()
+
+    assert opencode_plugin =~ "tool: {"
+    assert opencode_plugin =~ "submit_plan\": tool("
+    assert opencode_plugin =~ "--body-file"
+    assert opencode_plugin =~ "submitArgs.push(\"--title\", title)"
+    assert opencode_plugin =~ "controlkeel version"
+    assert opencode_plugin =~ "submitArgs.push(\"--task-id\", envTaskId)"
+    assert opencode_plugin =~ "submitArgs.push(\"--session-id\", envSessionId)"
+    assert opencode_plugin =~ "CONTROLKEEL_TASK_ID"
+    assert opencode_plugin =~ "CONTROLKEEL_SESSION_ID"
+    assert opencode_plugin =~ "CONTROLKEEL_REVIEW_WAIT_TIMEOUT"
+    assert opencode_plugin =~ "String(waitTimeoutSecondsSafe)"
+    assert opencode_plugin =~ "Bun.spawn"
+    refute opencode_plugin =~ "submitCommand.text(body)"
+    assert opencode_plugin =~ "wait_timeout_seconds"
+    assert opencode_plugin =~ "Install >= 0.1.26"
+
+    opencode_agent =
+      Path.join(opencode_plan.output_dir, ".opencode/agents/controlkeel-operator.md")
+      |> File.read!()
+
+    assert opencode_agent =~ "`ck_context`"
+    assert opencode_agent =~ "`ck_validate`"
+    assert opencode_agent =~ "`ck_review_submit`"
+    refute opencode_agent =~ "`ck_findings`"
+    refute opencode_agent =~ "`ck_approve`"
+
+    opencode_review_command =
+      Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-review.md")
+      |> File.read!()
+
+    assert opencode_review_command =~ "`ck_validate`"
+    refute opencode_review_command =~ "`ck-validate`"
+
+    opencode_submit_plan_command =
+      Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-submit-plan.md")
+      |> File.read!()
+
+    assert opencode_submit_plan_command =~ "6. Do not execute until the review is approved"
+    assert opencode_submit_plan_command =~ "controlkeel version"
+    assert opencode_submit_plan_command =~ "--task-id <task_id>"
+    assert opencode_submit_plan_command =~ "--session-id <session_id>"
+    assert opencode_submit_plan_command =~ "--timeout 30"
+
+    opencode_mcp =
+      Path.join(opencode_plan.output_dir, ".opencode/mcp.json")
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert get_in(opencode_mcp, ["mcp", "controlkeel", "type"]) == "local"
+
+    opencode_mcp_command = get_in(opencode_mcp, ["mcp", "controlkeel", "command"])
+    assert is_list(opencode_mcp_command)
+    assert length(opencode_mcp_command) >= 1
 
     assert {:ok, gemini_plan} = Skills.export("gemini-cli-native", tmp_dir, scope: "export")
     assert File.exists?(Path.join(gemini_plan.output_dir, "gemini-extension.json"))

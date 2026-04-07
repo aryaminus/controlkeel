@@ -168,13 +168,18 @@ controlkeel status
 
 This writes the MCP configuration into the OpenCode config location and also generates the portable instruction bundle ControlKeel uses for MCP-plus-instructions targets.
 
-OpenCode now has a native-first integration that writes `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, and `.opencode/mcp.json`. However, it does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options for CK model work are:
+OpenCode now has a native-first integration that writes `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, and `.opencode/mcp.json` (using OpenCode's `mcp.controlkeel` local command-array shape). However, it does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options for CK model work are:
 
 - keep using heuristic mode for governance-only flows
 - add a CK-owned provider profile
 - point ControlKeel at a local Ollama model
 
 If you prefer the direct host package path, OpenCode also has a published npm companion. Use [direct-host-installs.md](direct-host-installs.md) for the exact package name and command. `controlkeel attach opencode` remains the recommended path when you want the repo-local MCP wiring, commands, and agent bundle too.
+
+Plan-review tip for OpenCode:
+
+- when using the `submit_plan` tool directly, prefer `submit_plan({ plan: "...", wait_timeout_seconds: 30 })` for predictable wait behavior
+- the same timeout can be set globally with `CONTROLKEEL_REVIEW_WAIT_TIMEOUT`
 
 ## 3b. Hosted MCP or A2A access for headless clients
 

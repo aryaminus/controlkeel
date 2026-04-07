@@ -67,7 +67,7 @@ ControlKeel has one primary CLI and a smaller set of published companion package
 | --- | --- | --- |
 | ControlKeel CLI bootstrap | [![npm bootstrap](https://img.shields.io/npm/v/%40aryaminus/controlkeel.svg)](https://www.npmjs.com/package/@aryaminus/controlkeel) | `npm i -g @aryaminus/controlkeel` |
 | Skills.sh / AgentSkills install | [Skills docs](https://skills.sh/docs) | `npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance` |
-| OpenCode companion package | [![npm opencode](https://img.shields.io/npm/v/%40aryaminus/controlkeel-opencode.svg)](https://www.npmjs.com/package/@aryaminus/controlkeel-opencode) | Add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json` |
+| OpenCode companion package | [![npm opencode](https://img.shields.io/npm/v/%40aryaminus/controlkeel-opencode.svg)](https://www.npmjs.com/package/@aryaminus/controlkeel-opencode) | Add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json`; MCP uses `mcp.controlkeel` local command-array config |
 | Pi companion package | [![npm pi](https://img.shields.io/npm/v/%40aryaminus/controlkeel-pi-extension.svg)](https://www.npmjs.com/package/@aryaminus/controlkeel-pi-extension) | `pi install npm:@aryaminus/controlkeel-pi-extension` |
 | Release bundles and VSIX | [![GitHub release](https://img.shields.io/github/v/release/aryaminus/controlkeel.svg?label=release%20bundles)](https://github.com/aryaminus/controlkeel/releases/latest) | Tagged releases include platform binaries, plugin tarballs, exported native bundles, and `controlkeel-vscode-companion.vsix` |
 

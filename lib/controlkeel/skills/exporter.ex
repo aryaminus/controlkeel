@@ -1302,7 +1302,11 @@ defmodule ControlKeel.Skills.Exporter do
 
     # 4. MCP config — opencode-format mcp.json
     mcp_path = Path.join(root, ".opencode/mcp.json")
-    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    File.write!(
+      mcp_path,
+      Jason.encode!(opencode_mcp_payload(project_root, opts), pretty: true) <> "\n"
+    )
 
     package_json_path = Path.join(root, "package.json")
 
@@ -2094,6 +2098,17 @@ defmodule ControlKeel.Skills.Exporter do
         "controlkeel" => %{
           "command" => mcp_command(project_root, opts),
           "args" => mcp_args(project_root, opts)
+        }
+      }
+    }
+  end
+
+  defp opencode_mcp_payload(project_root, opts) do
+    %{
+      "mcp" => %{
+        "controlkeel" => %{
+          "type" => "local",
+          "command" => [mcp_command(project_root, opts) | mcp_args(project_root, opts)]
         }
       }
     }
@@ -3539,29 +3554,151 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
-      const submitPlan = async (body: string, submittedBy: string) => {
-        const result = await $`controlkeel review plan submit --stdin --submitted-by ${submittedBy} --json`
-          .text(body)
-        const submitPayload = parseJson(result)
-        const reviewId = submitPayload?.review?.id
-        if (!reviewId) {
-          throw new Error("ControlKeel did not return a review id")
+      const toText = async (output: unknown) => {
+        if (typeof output === "string") {
+          return output
         }
-        const waitPayload = parseJson(await $`controlkeel review plan wait --id ${reviewId} --json`)
+
+        if (output == null) {
+          return ""
+        }
+
+        if (typeof output === "object") {
+          const stdout = (output as { stdout?: unknown }).stdout
+          if (typeof stdout === "string") {
+            return stdout
+          }
+
+          if (stdout && typeof (stdout as { text?: unknown }).text === "function") {
+            try {
+              const streamed = await (stdout as { text: () => Promise<string> }).text()
+              if (typeof streamed === "string") {
+                return streamed
+              }
+            } catch (_error) {
+            }
+          }
+        }
+
+        return String(output)
+      }
+
+      const parseVersion = (output: string) => {
+        const match = output.match(/(\d+)\.(\d+)\.(\d+)/)
+        if (!match) {
+          return null
+        }
+
         return {
-          reviewId,
-          submitPayload,
-          waitPayload,
-          browserUrl: submitPayload?.browser_url,
-          status: waitPayload?.review?.status,
-          feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+          major: Number(match[1]),
+          minor: Number(match[2]),
+          patch: Number(match[3]),
+        }
+      }
+
+      const versionAtLeast = (
+        current: { major: number; minor: number; patch: number },
+        required: { major: number; minor: number; patch: number }
+      ) => {
+        if (current.major !== required.major) {
+          return current.major > required.major
+        }
+
+        if (current.minor !== required.minor) {
+          return current.minor > required.minor
+        }
+
+        return current.patch >= required.patch
+      }
+
+      const ensurePlanSubmitSupport = async () => {
+        let versionOutput = ""
+
+        try {
+          versionOutput = await toText(await $`controlkeel version`)
+        } catch (error) {
+          throw new Error(
+            "Failed to run `controlkeel version`. Install ControlKeel >= 0.1.26 and ensure `controlkeel` is on PATH."
+          )
+        }
+
+        const parsed = parseVersion(versionOutput)
+        const required = { major: 0, minor: 1, patch: 26 }
+
+        if (!parsed || !versionAtLeast(parsed, required)) {
+          throw new Error(
+            `ControlKeel CLI ${versionOutput.trim() || "unknown"} is too old for plan-review submit. Install >= 0.1.26.`
+          )
+        }
+      }
+
+      const submitPlan = async (
+        body: string,
+        submittedBy: string,
+        title?: string,
+        waitTimeoutSeconds?: number
+      ) => {
+        await ensurePlanSubmitSupport()
+
+        const envTaskId = process.env.CONTROLKEEL_TASK_ID
+        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+        const waitTimeout = Number(waitTimeoutSeconds ?? process.env.CONTROLKEEL_REVIEW_WAIT_TIMEOUT ?? 30)
+        const waitTimeoutSecondsSafe = Number.isFinite(waitTimeout) && waitTimeout > 0 ? waitTimeout : 30
+
+        // Write body to temp file to avoid stdin piping issues
+        const tmpFile = `${directory}/.opencode/review-plan-${Date.now()}.md`
+        await Bun.write(tmpFile, body)
+
+        try {
+          const submitArgs = ["controlkeel", "review", "plan", "submit", "--body-file", tmpFile, "--submitted-by", submittedBy, "--json"]
+          if (title) submitArgs.push("--title", title)
+          if (envTaskId) submitArgs.push("--task-id", envTaskId)
+          else if (envSessionId) submitArgs.push("--session-id", envSessionId)
+
+          const submitProc = Bun.spawn(submitArgs, { stdout: "pipe", stderr: "pipe" })
+          const submitOut = await new Response(submitProc.stdout).text()
+          await submitProc.exited
+
+          const submitPayload = parseJson(submitOut)
+
+          if (typeof submitPayload?.error === "string" && submitPayload.error.includes("session_id")) {
+            throw new Error(
+              "ControlKeel plan submission requires review context. Set CONTROLKEEL_TASK_ID (preferred) or CONTROLKEEL_SESSION_ID, or pass --task-id/--session-id manually."
+            )
+          }
+
+          const reviewId = submitPayload?.review?.id
+          if (!reviewId) {
+            throw new Error("ControlKeel did not return a review id")
+          }
+
+          const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], { stdout: "pipe", stderr: "pipe" })
+          const waitOut = await new Response(waitProc.stdout).text()
+          await waitProc.exited
+
+          const waitPayload = parseJson(waitOut)
+          return {
+            reviewId,
+            submitPayload,
+            waitPayload,
+            browserUrl: submitPayload?.browser_url,
+            status: waitPayload?.review?.status,
+            feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+          }
+        } finally {
+          // Clean up temp file
+          try { await Bun.file(tmpFile).unlink?.() ?? (await $`rm -f ${tmpFile}`.quiet()) } catch {}
         }
       }
 
       return {
-        "shell.env": async (_input, output) => {
+        "shell.env": async (input, output) => {
           output.env.CONTROLKEEL_PROJECT_ROOT = directory
           output.env.CONTROLKEEL_AGENT_ID = "opencode"
+
+          if (input.sessionID) {
+            output.env.CONTROLKEEL_THREAD_ID = input.sessionID
+          }
         },
 
         config: async (config) => {
@@ -3594,9 +3731,15 @@ defmodule ControlKeel.Skills.Exporter do
             args: {
               plan: tool.schema.string().describe("Markdown plan body to submit for review."),
               title: tool.schema.string().optional(),
+              wait_timeout_seconds: tool.schema.number().int().positive().optional(),
             },
             async execute(args) {
-              const result = await submitPlan(args.plan, "opencode")
+              const result = await submitPlan(
+                args.plan,
+                "opencode",
+                args.title,
+                args.wait_timeout_seconds
+              )
               return JSON.stringify(result, null, 2)
             },
           }),
@@ -3621,7 +3764,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     ## Instructions
 
-    1. Use the `ck-validate` tool to run governance checks before providing feedback.
+    1. Use `ck_context` first, then `ck_validate` before providing feedback.
     2. Report findings by severity: critical > high > medium > low.
     3. Never approve changes that have unresolved critical or high findings.
     4. Reference specific policy rules when flagging issues.
@@ -3629,10 +3772,13 @@ defmodule ControlKeel.Skills.Exporter do
 
     ## Available MCP Tools
 
+    - `ck_context` — Load mission, findings, budget, and proof context
     - `ck_validate` — Run full governance validation
+    - `ck_finding` — Record a governed finding when you detect a missed issue
+    - `ck_review_submit` — Submit review material for human approval
+    - `ck_review_status` — Check review status before execution
     - `ck_budget` — Check remaining budget and spend history
-    - `ck_findings` — List open findings for the current session
-    - `ck_approve` — Approve a finding (requires operator confirmation)
+    - `ck_route` — Ask ControlKeel for the recommended specialist route
     """
   end
 
@@ -3643,7 +3789,7 @@ defmodule ControlKeel.Skills.Exporter do
     agent: controlkeel-operator
     ---
 
-    Review the current project for governance compliance. Run `ck-validate` to check
+    Review the current project for governance compliance. Run `ck_validate` to check
     for security findings, budget status, and proof readiness. Summarize the results
     and highlight any blockers that need attention before shipping.
 
@@ -3665,10 +3811,11 @@ defmodule ControlKeel.Skills.Exporter do
 
     Recommended flow:
     1. Save the plan to `.opencode/review-plan.md`
-    2. Run `controlkeel review plan submit --body-file .opencode/review-plan.md --submitted-by opencode --json`
-    3. Read the returned `review.id` and `browser_url`
-    4. Wait with `controlkeel review plan wait --id <review_id> --json`
-    4. Do not execute until the review is approved
+    2. Ensure `controlkeel version` reports `>= 0.1.26`
+    3. Run `controlkeel review plan submit --body-file .opencode/review-plan.md --submitted-by opencode --task-id <task_id> --json` (or use `--session-id <session_id>`)
+    4. Read the returned `review.id` and `browser_url`
+    5. Wait with `controlkeel review plan wait --id <review_id> --timeout 30 --json`
+    6. Do not execute until the review is approved
     """
   end
 
@@ -3690,6 +3837,9 @@ defmodule ControlKeel.Skills.Exporter do
         "./plugin" => "./index.js"
       },
       "main" => "./index.js",
+      "dependencies" => %{
+        "@opencode-ai/plugin" => "1.3.13"
+      },
       "files" => [".opencode", "AGENTS.md", "README.md", "index.js"],
       "publishConfig" => %{"access" => "public"},
       "license" => "Apache-2.0"
@@ -3698,6 +3848,8 @@ defmodule ControlKeel.Skills.Exporter do
 
   defp opencode_package_entry_contents do
     ~S"""
+    import { tool } from "@opencode-ai/plugin"
+
     /**
      * Published OpenCode package entrypoint for ControlKeel.
      *
@@ -3713,29 +3865,143 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
-      const submitPlan = async (body, submittedBy) => {
-        const result = await $`controlkeel review plan submit --stdin --submitted-by ${submittedBy} --json`
-          .text(body)
-        const submitPayload = parseJson(result)
-        const reviewId = submitPayload?.review?.id
-        if (!reviewId) {
-          throw new Error("ControlKeel did not return a review id")
+      const toText = async (output) => {
+        if (typeof output === "string") {
+          return output
         }
-        const waitPayload = parseJson(await $`controlkeel review plan wait --id ${reviewId} --json`)
+
+        if (output == null) {
+          return ""
+        }
+
+        if (typeof output === "object") {
+          const stdout = output.stdout
+          if (typeof stdout === "string") {
+            return stdout
+          }
+
+          if (stdout && typeof stdout.text === "function") {
+            try {
+              const streamed = await stdout.text()
+              if (typeof streamed === "string") {
+                return streamed
+              }
+            } catch (_error) {
+            }
+          }
+        }
+
+        return String(output)
+      }
+
+      const parseVersion = (output) => {
+        const match = output.match(/(\d+)\.(\d+)\.(\d+)/)
+        if (!match) {
+          return null
+        }
+
         return {
-          reviewId,
-          submitPayload,
-          waitPayload,
-          browserUrl: submitPayload?.browser_url,
-          status: waitPayload?.review?.status,
-          feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+          major: Number(match[1]),
+          minor: Number(match[2]),
+          patch: Number(match[3]),
+        }
+      }
+
+      const versionAtLeast = (current, required) => {
+        if (current.major !== required.major) {
+          return current.major > required.major
+        }
+
+        if (current.minor !== required.minor) {
+          return current.minor > required.minor
+        }
+
+        return current.patch >= required.patch
+      }
+
+      const ensurePlanSubmitSupport = async () => {
+        let versionOutput = ""
+
+        try {
+          versionOutput = await toText(await $`controlkeel version`)
+        } catch (_error) {
+          throw new Error(
+            "Failed to run `controlkeel version`. Install ControlKeel >= 0.1.26 and ensure `controlkeel` is on PATH."
+          )
+        }
+
+        const parsed = parseVersion(versionOutput)
+        const required = { major: 0, minor: 1, patch: 26 }
+
+        if (!parsed || !versionAtLeast(parsed, required)) {
+          throw new Error(
+            `ControlKeel CLI ${versionOutput.trim() || "unknown"} is too old for plan-review submit. Install >= 0.1.26.`
+          )
+        }
+      }
+
+      const submitPlan = async (body, submittedBy, title, waitTimeoutSeconds) => {
+        await ensurePlanSubmitSupport()
+
+        const envTaskId = process.env.CONTROLKEEL_TASK_ID
+        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+        const waitTimeout = Number(waitTimeoutSeconds ?? process.env.CONTROLKEEL_REVIEW_WAIT_TIMEOUT ?? 30)
+        const waitTimeoutSecondsSafe = Number.isFinite(waitTimeout) && waitTimeout > 0 ? waitTimeout : 30
+
+        // Write body to temp file to avoid stdin piping issues
+        const tmpFile = `${directory}/.opencode/review-plan-${Date.now()}.md`
+        await Bun.write(tmpFile, body)
+
+        try {
+          const submitArgs = ["controlkeel", "review", "plan", "submit", "--body-file", tmpFile, "--submitted-by", submittedBy, "--json"]
+          if (title) submitArgs.push("--title", title)
+          if (envTaskId) submitArgs.push("--task-id", envTaskId)
+          else if (envSessionId) submitArgs.push("--session-id", envSessionId)
+
+          const submitProc = Bun.spawn(submitArgs, { stdout: "pipe", stderr: "pipe" })
+          const submitOut = await new Response(submitProc.stdout).text()
+          await submitProc.exited
+
+          const submitPayload = parseJson(submitOut)
+
+          if (typeof submitPayload?.error === "string" && submitPayload.error.includes("session_id")) {
+            throw new Error(
+              "ControlKeel plan submission requires review context. Set CONTROLKEEL_TASK_ID (preferred) or CONTROLKEEL_SESSION_ID, or pass --task-id/--session-id manually."
+            )
+          }
+
+          const reviewId = submitPayload?.review?.id
+          if (!reviewId) {
+            throw new Error("ControlKeel did not return a review id")
+          }
+
+          const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], { stdout: "pipe", stderr: "pipe" })
+          const waitOut = await new Response(waitProc.stdout).text()
+          await waitProc.exited
+
+          const waitPayload = parseJson(waitOut)
+          return {
+            reviewId,
+            submitPayload,
+            waitPayload,
+            browserUrl: submitPayload?.browser_url,
+            status: waitPayload?.review?.status,
+            feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+          }
+        } finally {
+          // Clean up temp file
+          try { await Bun.file(tmpFile).unlink?.() ?? (await $`rm -f ${tmpFile}`.quiet()) } catch {}
         }
       }
 
       return {
-        "shell.env": async (_input, output) => {
+        "shell.env": async (input, output) => {
           output.env.CONTROLKEEL_PROJECT_ROOT = directory
           output.env.CONTROLKEEL_AGENT_ID = "opencode"
+
+          if (input.sessionID) {
+            output.env.CONTROLKEEL_THREAD_ID = input.sessionID
+          }
         },
 
         config: async (config) => {
@@ -3755,37 +4021,32 @@ defmodule ControlKeel.Skills.Exporter do
           }
         },
 
-        "tool.execute": async (input, output) => {
-          if (input.toolID !== "submit_plan") {
-            return
-          }
-
-          const planBody = typeof input.args?.plan === "string" ? input.args.plan : ""
-          const review = await submitPlan(planBody, "opencode")
-          output.metadata = {
-            reviewId: review.reviewId,
-            browserUrl: review.browserUrl,
-            status: review.status,
-            feedbackNotes: review.feedbackNotes,
-          }
-          output.result = JSON.stringify(output.metadata, null, 2)
+        "experimental.chat.system.transform": async (_input, output) => {
+          output.system.push(
+            "Use submit_plan when you are ready for human review. Do not proceed with implementation until ControlKeel approves the plan."
+          )
         },
 
-        tools: async () => ({
-          submit_plan: {
-            description: "Submit the current plan to ControlKeel and wait for browser review approval.",
-            parameters: {
-              type: "object",
-              properties: {
-                plan: {
-                  type: "string",
-                  description: "Markdown plan body to submit to ControlKeel review.",
-                },
-              },
-              required: ["plan"],
+        tool: {
+          "submit_plan": tool({
+            description:
+              "Submit a plan to ControlKeel for browser review. The tool waits for approval before execution continues.",
+            args: {
+              plan: tool.schema.string().describe("Markdown plan body to submit for review."),
+              title: tool.schema.string().optional(),
+              wait_timeout_seconds: tool.schema.number().int().positive().optional(),
             },
-          },
-        }),
+            async execute(args) {
+              const result = await submitPlan(
+                args.plan,
+                "opencode",
+                args.title,
+                args.wait_timeout_seconds
+              )
+              return JSON.stringify(result, null, 2)
+            },
+          }),
+        },
       }
     }
 

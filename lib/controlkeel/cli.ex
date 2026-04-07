@@ -3396,7 +3396,7 @@ defmodule ControlKeel.CLI do
         end
 
       Keyword.get(options, :stdin, false) ->
-        {:ok, IO.read(:stdio, :all)}
+        {:ok, IO.read(:stdio, :eof)}
 
       true ->
         {:error, "Provide --patch <file> or --stdin."}
@@ -3412,7 +3412,7 @@ defmodule ControlKeel.CLI do
         end
 
       Keyword.get(options, :stdin, false) ->
-        {:ok, IO.read(:stdio, :all)}
+        {:ok, IO.read(:stdio, :eof)}
 
       true ->
         {:error, "Provide --body-file <file> or --stdin."}
@@ -3490,7 +3490,7 @@ defmodule ControlKeel.CLI do
         end
 
       Keyword.get(options, :stdin, false) ->
-        case Jason.decode(IO.read(:stdio, :all)) do
+        case Jason.decode(IO.read(:stdio, :eof)) do
           {:ok, %{} = payload} ->
             {:ok, payload}
 
