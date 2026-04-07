@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.29 — 2026-04-07
+
+### What's changed
+
+- Ignore generated editor companion artifacts
+- Harden OpenCode submit_plan execution
+
 ## v0.1.28 — 2026-04-07
 
 ### What's changed
