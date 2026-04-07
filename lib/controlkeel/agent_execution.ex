@@ -498,7 +498,7 @@ defmodule ControlKeel.AgentExecution do
       ])
 
     brief = session.execution_brief || %{}
-    boundary_summary = Intent.boundary_summary(brief)
+    boundary_summary = Intent.boundary_summary(brief, project_root: project_root)
     workspace_context = Mission.workspace_context(session, fallback_root: project_root)
     recent_events = Mission.list_session_events(session.id)
 

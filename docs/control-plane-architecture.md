@@ -25,11 +25,12 @@ The live governed lifecycle is:
 1. intent intake
 2. execution brief compilation
 3. execution posture compilation
-4. task graph and routing
-5. validation and findings
-6. proof capture
-7. ship metrics
-8. comparative benchmark evidence
+4. runtime recommendation compilation
+5. task graph and routing
+6. validation and findings
+7. proof capture
+8. ship metrics
+9. comparative benchmark evidence
 
 The execution posture is the part of the brief that tells CK how to treat the runtime surface:
 
@@ -38,6 +39,13 @@ The execution posture is the part of the brief that tells CK how to treat the ru
 - prefer typed or code-mode execution for large API and tool surfaces when available
 - keep shell as the broad fallback surface for repo mutation, test runs, and package commands
 - escalate approval pressure as work moves from read-only exploration to high-impact execution
+
+CK now also derives a runtime recommendation from that posture:
+
+- approval-heavy or regulated briefs bias toward attach-first hosts with stronger review surfaces
+- API-heavy briefs that benefit from code-mode or sandboxed typed execution can bias toward a headless runtime export
+- the recommendation stays grounded in the typed integration catalog so CK suggests a real attach command or runtime export path instead of a generic “use a sandbox” note
+- when CK can see attached agents or already exported runtime bundles for the current workspace, it now biases the recommendation toward those live surfaces first
 
 That is why the main surfaces stay grouped as:
 

@@ -1,7 +1,7 @@
 defmodule ControlKeel.Intent.BoundarySummary do
   @moduledoc false
 
-  alias ControlKeel.Intent.{ExecutionBrief, ExecutionPosture}
+  alias ControlKeel.Intent.{ExecutionBrief, ExecutionPosture, RuntimeRecommendation}
 
   @empty_summary %{
     "risk_tier" => nil,
@@ -12,12 +12,15 @@ defmodule ControlKeel.Intent.BoundarySummary do
     "open_questions" => [],
     "launch_window" => nil,
     "next_step" => nil,
-    "execution_posture" => ExecutionPosture.build(nil)
+    "execution_posture" => ExecutionPosture.build(nil),
+    "runtime_recommendation" => RuntimeRecommendation.build(nil)
   }
 
-  def build(%ExecutionBrief{} = brief), do: build(ExecutionBrief.to_map(brief))
+  def build(brief, opts \\ [])
 
-  def build(brief) when is_map(brief) do
+  def build(%ExecutionBrief{} = brief, opts), do: build(ExecutionBrief.to_map(brief), opts)
+
+  def build(brief, opts) when is_map(brief) do
     compiler = nested_map(brief, "compiler")
     answers = nested_map(compiler, "interview_answers")
 
@@ -32,11 +35,12 @@ defmodule ControlKeel.Intent.BoundarySummary do
         normalize_list(Map.get(brief, "open_questions") || Map.get(brief, :open_questions)),
       "launch_window" => optional_string(brief, "launch_window"),
       "next_step" => optional_string(brief, "next_step"),
-      "execution_posture" => ExecutionPosture.build(brief)
+      "execution_posture" => ExecutionPosture.build(brief),
+      "runtime_recommendation" => RuntimeRecommendation.build(brief, opts)
     }
   end
 
-  def build(_brief), do: @empty_summary
+  def build(_brief, _opts), do: @empty_summary
 
   defp nested_map(map, key) do
     case fetch_key(map, key) do

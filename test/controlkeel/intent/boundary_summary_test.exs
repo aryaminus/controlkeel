@@ -7,7 +7,17 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
 
   test "builds a production boundary summary from the execution brief and compiler answers" do
     brief = execution_brief_fixture()
-    summary = Intent.boundary_summary(brief)
+
+    summary =
+      Intent.boundary_summary(
+        brief,
+        provider_status: %{
+          "selected_source" => "agent_bridge",
+          "selected_provider" => "anthropic",
+          "attached_agents" => [%{"id" => "claude-code"}],
+          "runtime_hints" => [%{"agent_id" => "claude-code"}]
+        }
+      )
 
     assert summary["risk_tier"] == "critical"
     assert summary["budget_note"] == "$40/month to start"
@@ -28,6 +38,14 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
     assert summary["execution_posture"]["state_surface"] == "typed_storage"
     assert summary["execution_posture"]["api_execution_surface"] == "typed_runtime"
     assert summary["execution_posture"]["shell_role"] == "broad_fallback_only"
+    assert summary["runtime_recommendation"]["strategy"] == "attach_client"
+    assert summary["runtime_recommendation"]["recommended_integration"]["id"] == "claude-code"
+
+    assert summary["runtime_recommendation"]["recommended_integration"]["availability"] ==
+             "attached"
+
+    assert summary["runtime_recommendation"]["recommended_integration"]["attach_command"] ==
+             "controlkeel attach claude-code"
   end
 
   test "normalizes blank or comma-separated constraints into a short list" do
@@ -70,6 +88,13 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                "clearance_focus" => ["file_write", "network", "deploy", "secrets"],
                "rationale" =>
                  "Prefer read-only discovery first, keep durable state in typed storage surfaces, use typed runtimes for large tool and API interactions when available, and treat shell as the broad fallback surface for mutation and execution."
+             },
+             "runtime_recommendation" => %{
+               "strategy" => "undecided",
+               "recommended_integration" => nil,
+               "alternatives" => [],
+               "rationale" =>
+                 "CK needs a populated execution brief before it can recommend a concrete host or runtime path."
              }
            }
 

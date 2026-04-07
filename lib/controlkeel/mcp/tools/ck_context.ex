@@ -30,7 +30,8 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "compliance_profile" => session.workspace.compliance_profile,
          "active_findings" => active_findings_summary(session.findings),
          "budget_summary" => budget_summary(session),
-         "boundary_summary" => Intent.boundary_summary(session.execution_brief || %{}),
+         "boundary_summary" =>
+           Intent.boundary_summary(session.execution_brief || %{}, project_root: File.cwd!()),
          "current_task" => task_summary(task),
          "past_patterns" => past_patterns(session),
          "proof_summary" => Mission.proof_summary_for_task(task),

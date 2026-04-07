@@ -757,7 +757,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       session_metrics:
         Analytics.session_metrics(session.id) || default_session_metrics(session.id),
       brief: brief,
-      boundary_summary: Intent.boundary_summary(brief),
+      boundary_summary: Intent.boundary_summary(brief, project_root: File.cwd!()),
       compiler: compiler,
       current_task: current_task(session.tasks),
       selected_finding: selected_finding,

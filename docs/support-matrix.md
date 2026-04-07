@@ -49,6 +49,15 @@ Every shipped row also carries the stricter parity contract exposed in `/skills`
 
 Attachable and runtime integrations use the same governed MCP surface. Core routing/governance tools are always present, extended governance tools are currently enabled in protocol responses, and `ck_skill_list` / `ck_skill_load` are included when skills are available.
 
+The intent layer now consumes this same catalog for runtime recommendation. In practice:
+
+- approval-heavy or regulated briefs usually recommend an `attach_client` row with stronger review transport
+- API-heavy briefs that look like code-mode or typed-runtime work can recommend a `headless_runtime` export such as `cloudflare-workers`
+- the resulting recommendation is exposed through `ControlKeel.Intent.runtime_recommendation/1` and embedded in `boundary_summary`
+- if CK can see attached agents through provider status, those attached hosts are preferred over equally good catalog-only options
+- exported runtime bundles are treated as the strongest signal that a headless runtime path is already available in the workspace
+- recommendation payloads now label availability as `attached`, `configured`, or `catalog`
+
 ## Host parity classes
 
 These are the first-class host adapters that currently implement the richer review transport instead of a generic support claim:
