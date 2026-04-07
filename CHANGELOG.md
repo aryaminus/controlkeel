@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.30 — 2026-04-07
+
+### What's changed
+
+- Add execution posture guidance to intent context
+
 ## v0.1.29 — 2026-04-07
 
 ### What's changed
