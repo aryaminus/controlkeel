@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.33 — 2026-04-07
+
+### What's changed
+
+- Harden Codex dogfooding surfaces
+
 ## v0.1.32 — 2026-04-07
 
 ### What's changed
