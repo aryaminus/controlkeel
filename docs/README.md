@@ -12,6 +12,7 @@ Use this page to decide where to read next.
 ## Start here
 
 - [explaining-controlkeel.md](explaining-controlkeel.md): the plain-English "what CK is, why it exists, how it works, and what makes it different" explainer
+- [how-controlkeel-works.md](how-controlkeel-works.md): the detailed implementation-level walkthrough of CK's control loop, runtime model, validation path, and evidence model
 - [getting-started.md](getting-started.md): first install, first attach, provider setup, and hosted protocol basics
 - [direct-host-installs.md](direct-host-installs.md): package, plugin, skills.sh, VSIX, and attach-first host install paths
 - [support-matrix.md](support-matrix.md): canonical code-aligned inventory of hosts, transport modes, exports, and protocol tools
