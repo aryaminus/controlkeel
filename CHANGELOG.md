@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.31 — 2026-04-07
+
+### What's changed
+
+- Make typed storage explicit in execution posture
+
 ## v0.1.30 — 2026-04-07
 
 ### What's changed
