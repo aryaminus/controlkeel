@@ -3559,14 +3559,40 @@ defmodule ControlKeel.Skills.Exporter do
           return output
         }
 
+        if (output instanceof Uint8Array) {
+          return new TextDecoder().decode(output)
+        }
+
+        if (output instanceof ArrayBuffer) {
+          return new TextDecoder().decode(new Uint8Array(output))
+        }
+
         if (output == null) {
           return ""
         }
 
         if (typeof output === "object") {
+          if (typeof (output as { text?: unknown }).text === "function") {
+            try {
+              const direct = await (output as { text: () => Promise<string> }).text()
+              if (typeof direct === "string") {
+                return direct
+              }
+            } catch (_error) {
+            }
+          }
+
           const stdout = (output as { stdout?: unknown }).stdout
           if (typeof stdout === "string") {
             return stdout
+          }
+
+          if (stdout instanceof Uint8Array) {
+            return new TextDecoder().decode(stdout)
+          }
+
+          if (stdout instanceof ArrayBuffer) {
+            return new TextDecoder().decode(new Uint8Array(stdout))
           }
 
           if (stdout && typeof (stdout as { text?: unknown }).text === "function") {
@@ -3615,7 +3641,15 @@ defmodule ControlKeel.Skills.Exporter do
         let versionOutput = ""
 
         try {
-          versionOutput = await toText(await $`controlkeel version`)
+          const versionProc = Bun.spawn(["controlkeel", "version"], {
+            stdout: "pipe",
+            stderr: "pipe",
+          })
+          versionOutput = await new Response(versionProc.stdout).text()
+          const versionExit = await versionProc.exited
+          if (versionExit !== 0) {
+            throw new Error(`controlkeel version exited with code ${versionExit}`)
+          }
         } catch (error) {
           throw new Error(
             "Failed to run `controlkeel version`. Install ControlKeel >= 0.1.26 and ensure `controlkeel` is on PATH."
@@ -3816,6 +3850,10 @@ defmodule ControlKeel.Skills.Exporter do
     4. Read the returned `review.id` and `browser_url`
     5. Wait with `controlkeel review plan wait --id <review_id> --timeout 30 --json`
     6. Do not execute until the review is approved
+
+    Fallback when the `submit_plan` tool is stale in a long-running OpenCode session:
+    - If the tool returns an error like `ControlKeel CLI [object Object] is too old`, run the CLI flow above directly.
+    - Restart OpenCode after plugin updates so `.opencode/plugins/controlkeel-governance.ts` is reloaded.
     """
   end
 
@@ -3870,14 +3908,40 @@ defmodule ControlKeel.Skills.Exporter do
           return output
         }
 
+        if (output instanceof Uint8Array) {
+          return new TextDecoder().decode(output)
+        }
+
+        if (output instanceof ArrayBuffer) {
+          return new TextDecoder().decode(new Uint8Array(output))
+        }
+
         if (output == null) {
           return ""
         }
 
         if (typeof output === "object") {
+          if (typeof output.text === "function") {
+            try {
+              const direct = await output.text()
+              if (typeof direct === "string") {
+                return direct
+              }
+            } catch (_error) {
+            }
+          }
+
           const stdout = output.stdout
           if (typeof stdout === "string") {
             return stdout
+          }
+
+          if (stdout instanceof Uint8Array) {
+            return new TextDecoder().decode(stdout)
+          }
+
+          if (stdout instanceof ArrayBuffer) {
+            return new TextDecoder().decode(new Uint8Array(stdout))
           }
 
           if (stdout && typeof stdout.text === "function") {
@@ -3923,7 +3987,15 @@ defmodule ControlKeel.Skills.Exporter do
         let versionOutput = ""
 
         try {
-          versionOutput = await toText(await $`controlkeel version`)
+          const versionProc = Bun.spawn(["controlkeel", "version"], {
+            stdout: "pipe",
+            stderr: "pipe",
+          })
+          versionOutput = await new Response(versionProc.stdout).text()
+          const versionExit = await versionProc.exited
+          if (versionExit !== 0) {
+            throw new Error(`controlkeel version exited with code ${versionExit}`)
+          }
         } catch (_error) {
           throw new Error(
             "Failed to run `controlkeel version`. Install ControlKeel >= 0.1.26 and ensure `controlkeel` is on PATH."

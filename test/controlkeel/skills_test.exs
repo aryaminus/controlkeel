@@ -543,6 +543,8 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_submit_plan_command =~ "--task-id <task_id>"
     assert opencode_submit_plan_command =~ "--session-id <session_id>"
     assert opencode_submit_plan_command =~ "--timeout 30"
+    assert opencode_submit_plan_command =~ "ControlKeel CLI [object Object] is too old"
+    assert opencode_submit_plan_command =~ "Restart OpenCode"
 
     opencode_mcp =
       Path.join(opencode_plan.output_dir, ".opencode/mcp.json")
