@@ -11,6 +11,9 @@ defmodule ControlKeel.HostAuditTest do
       {:npm_package, _package} ->
         %{status: :warn, detail: "rate limited"}
 
+      {:repo_slug, _slug} ->
+        %{status: :ok, detail: "HTTP 200"}
+
       {:url, url} ->
         if String.contains?(url, "anthropic"),
           do: %{status: :error, detail: "HTTP 404"},
@@ -25,6 +28,10 @@ defmodule ControlKeel.HostAuditTest do
 
     assert Enum.any?(report.checks, fn check ->
              check.type == :npm_package and check.id == "@aryaminus/controlkeel"
+           end)
+
+    assert Enum.any?(report.checks, fn check ->
+             check.type == :repo_slug and check.url == "https://github.com/openai/codex"
            end)
   end
 end

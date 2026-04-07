@@ -268,6 +268,8 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert codex_output =~ ".codex/skills."
     assert codex_output =~ "Installed open-standard compatibility skills at "
     assert codex_output =~ ".agents/skills."
+    assert codex_output =~ "Auth mode: agent_runtime."
+    assert codex_output =~ "Provider bridge: agent_runtime: openai."
     assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))

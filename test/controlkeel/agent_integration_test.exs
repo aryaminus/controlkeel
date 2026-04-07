@@ -97,6 +97,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert codex.submission_mode == "command"
     assert codex.runtime_transport == "codex_sdk"
     assert codex.runtime_auth_owner == "agent"
+    assert codex.auth_mode == "agent_runtime"
     assert ".codex/skills" in codex.artifact_surfaces
     assert ".codex/config.toml" in codex.artifact_surfaces
     assert ".codex/commands/controlkeel-review.md" in codex.artifact_surfaces
@@ -105,7 +106,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert codex.provider_bridge == %{
              supported: true,
              provider: "openai",
-             mode: "env_bridge",
+             mode: "agent_runtime",
              owner: "agent"
            }
 
@@ -283,6 +284,7 @@ defmodule ControlKeel.AgentIntegrationTest do
 
     assert codex_alias.support_class == "alias"
     assert codex_alias.alias_of == "codex-cli"
+    assert codex_alias.auth_mode == "agent_runtime"
     assert codex_alias.preferred_target == "codex"
 
     assert gemini_alias.support_class == "alias"

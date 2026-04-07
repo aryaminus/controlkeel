@@ -131,7 +131,7 @@ Runtime transport truth for those first-class hosts:
 | ID | Support class | Action | Agent uses CK via | CK runs agent via | Execution support | Auth / skills | Preferred export / bundle |
 | ---- | --------------- | -------- | ------------------- | ------------------- | ------------------ | --------------- | --------------------------- |
 | `claude-code` | attach_client | `controlkeel attach claude-code` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `env_bridge` / `native` | `claude-standalone` |
-| `codex-cli` | attach_client | `controlkeel attach codex-cli` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
+| `codex-cli` | attach_client | `controlkeel attach codex-cli` | `local_mcp`, `plugin`, `native_skills` | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
 | `cline` | attach_client | `controlkeel attach cline` | `local_mcp`, `native_skills`, `rules`, `workflows`, `hooks`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `cline-native` |
 | `roo-code` | attach_client | `controlkeel attach roo-code` | `local_mcp`, `native_skills`, `rules`, `workflows`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `roo-native` |
 | `goose` | attach_client | `controlkeel attach goose` | `local_mcp`, `workflows`, `hooks`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `goose-native` |
@@ -169,7 +169,7 @@ Runtime transport truth for those first-class hosts:
 | `huggingface` | provider_only | provider template only | none | `none` | `inbound_only` | `ck_owned` / `none` | `provider-profile` |
 | `claude-dispatch` | alias | use `claude-code` | same as `claude-code` | `embedded` | `direct` | `env_bridge` / `native` | `claude-standalone` |
 | `cognition` | alias | use `devin` | same as `devin` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `devin-runtime` |
-| `codex-app-server` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
+| `codex-app-server` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
 | `cursor-agent` | alias | use `cursor` | same as `cursor` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
 | `copilot-cli` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
 | `copilot-web` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
@@ -177,8 +177,8 @@ Runtime transport truth for those first-class hosts:
 | `conductor-web` | alias | use `conductor` | same as `conductor` | `none` | `inbound_only` | `heuristic` / `native` | `claude-standalone`, `claude-plugin`, `instructions-only` |
 | `augment-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
 | `auggie-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
-| `kimi-cli` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
-| `t3code` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `env_bridge` / `native` | `codex` |
+| `kimi-cli` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
+| `t3code` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
 | `rlm-agent` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `slate` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `retune` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |

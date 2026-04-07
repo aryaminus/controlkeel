@@ -101,15 +101,15 @@ defmodule ControlKeel.AgentIntegration do
         preferred_target: "codex",
         default_scope: "user",
         router_agent_id: "codex-cli",
-        auth_mode: "env_bridge",
+        auth_mode: "agent_runtime",
         mcp_mode: "native",
         skills_mode: "native",
-        upstream_slug: "openai/codex-cli",
+        upstream_slug: "openai/codex",
         upstream_docs_url: "https://github.com/openai/codex",
         provider_bridge: %{
           supported: true,
           provider: "openai",
-          mode: "env_bridge",
+          mode: "agent_runtime",
           owner: "agent"
         },
         supported_scopes: ["user", "project"],
@@ -966,7 +966,7 @@ defmodule ControlKeel.AgentIntegration do
         description:
           "Alias to the shipped Codex CLI integration for ecosystems that label the terminal agent simply as Codex.",
         alias_of: "codex-cli",
-        auth_mode: "env_bridge",
+        auth_mode: "agent_runtime",
         upstream_slug: "openai/codex",
         upstream_docs_url: "https://openai.com/codex",
         supported_scopes: ["user", "project"],
@@ -980,7 +980,7 @@ defmodule ControlKeel.AgentIntegration do
         description:
           "Alias to the shipped Codex CLI path; ControlKeel currently supports Codex through the documented Codex CLI / shared MCP config surface.",
         alias_of: "codex-cli",
-        auth_mode: "env_bridge",
+        auth_mode: "agent_runtime",
         upstream_slug: "openai/codex",
         upstream_docs_url: "https://github.com/openai/codex",
         supported_scopes: ["user", "project"],
@@ -1106,7 +1106,7 @@ defmodule ControlKeel.AgentIntegration do
         description:
           "Alias path for Kimi Code CLI through CK's canonical terminal-agent companion flow until a dedicated native CK target is validated.",
         alias_of: "codex-cli",
-        auth_mode: "env_bridge",
+        auth_mode: "agent_runtime",
         upstream_slug: "MoonshotAI/kimi-cli",
         upstream_docs_url:
           "https://www.kimi.com/code/docs/en/kimi-cli/guides/getting-started.html",
@@ -1135,8 +1135,8 @@ defmodule ControlKeel.AgentIntegration do
         description:
           "Wrapper/alias path until a stable native integration surface exists. Prefer Codex CLI or Claude Code underneath.",
         alias_of: "codex-cli",
-        auth_mode: "env_bridge",
-        upstream_slug: "t3chat/t3-code",
+        auth_mode: "agent_runtime",
+        upstream_slug: "openai/codex",
         upstream_docs_url: "https://github.com/openai/codex",
         supported_scopes: ["user", "project"],
         preferred_target: "codex",
@@ -1831,6 +1831,8 @@ defmodule ControlKeel.AgentIntegration do
 
   defp default_direct_install_methods(%{id: "codex-cli"}) do
     [
+      direct_install("npm_cli", "Codex via npm", "npm install -g @openai/codex"),
+      direct_install("brew_cli", "Codex via Homebrew", "brew install --cask codex"),
       direct_install("ck_attach", "CK attach", "controlkeel attach codex-cli"),
       direct_install("local_plugin", "Codex plugin", "controlkeel plugin install codex")
     ]

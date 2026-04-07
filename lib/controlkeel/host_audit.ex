@@ -24,6 +24,20 @@ defmodule ControlKeel.HostAudit do
       |> Enum.map(fn integration -> {integration.id, integration.upstream_docs_url} end)
       |> Enum.reject(fn {_id, url} -> is_nil(url) or String.trim(url) == "" end)
 
+    repo_slug_checks =
+      AgentIntegration.catalog()
+      |> Enum.reject(&(not include_unverified? and &1.support_class == "unverified"))
+      |> Enum.filter(&repo_slug_checkable?/1)
+      |> Enum.uniq_by(& &1.upstream_slug)
+      |> Enum.map(fn integration ->
+        %{
+          type: :repo_slug,
+          id: integration.id,
+          url: "https://github.com/#{integration.upstream_slug}",
+          result: fetcher.({:repo_slug, integration.upstream_slug})
+        }
+      end)
+
     url_checks =
       integration_urls
       |> Enum.map(fn {id, url} ->
@@ -55,7 +69,7 @@ defmodule ControlKeel.HostAudit do
         }
       end)
 
-    all_checks = url_checks ++ npm_checks ++ release_checks
+    all_checks = repo_slug_checks ++ url_checks ++ npm_checks ++ release_checks
 
     %{
       checks: all_checks,
@@ -101,6 +115,10 @@ defmodule ControlKeel.HostAudit do
     end
   end
 
+  defp default_fetch({:repo_slug, slug}) do
+    default_fetch({:url, "https://github.com/#{slug}"})
+  end
+
   defp default_fetch({:npm_package, package}) do
     url = "https://registry.npmjs.org/#{URI.encode(package)}"
 
@@ -134,6 +152,13 @@ defmodule ControlKeel.HostAudit do
   defp classify_http(status) when status in 400..499, do: :error
   defp classify_http(status) when status in 500..599, do: :error
   defp classify_http(_status), do: :warn
+
+  defp repo_slug_checkable?(integration) do
+    is_binary(integration.upstream_slug) and
+      Regex.match?(~r/^[^\/]+\/[^\/]+$/, integration.upstream_slug) and
+      is_binary(integration.upstream_docs_url) and
+      String.starts_with?(integration.upstream_docs_url, "https://github.com/")
+  end
 
   defp status_label(:ok), do: "OK"
   defp status_label(:warn), do: "WARN"
