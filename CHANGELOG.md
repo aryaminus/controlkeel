@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.27 — 2026-04-07
+
+### What's changed
+
+- Ignore local attach artifacts in repo
+- Fix Codex self-hosting attach and install paths
+
 ## v0.1.26 — 2026-04-07
 
 ### What's changed
