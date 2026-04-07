@@ -208,7 +208,8 @@ defmodule ControlKeel.MCP.Protocol do
         "required" => ["session_id"],
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
-          "task_id" => %{"type" => ["integer", "string"]}
+          "task_id" => %{"type" => ["integer", "string"]},
+          "project_root" => %{"type" => "string"}
         }
       }
     }

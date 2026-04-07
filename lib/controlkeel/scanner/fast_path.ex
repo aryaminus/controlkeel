@@ -11,6 +11,49 @@ defmodule ControlKeel.Scanner.FastPath do
   alias ControlKeel.TrustBoundary
 
   @type input :: map()
+  @destructive_shell_patterns [
+    %{
+      id: "destructive.shell.git_checkout_repo_wide",
+      regex: ~r/\bgit\s+checkout\s+--\s+\./,
+      message:
+        "Repo-wide `git checkout -- .` can discard tracked work across the entire project.",
+      recovery:
+        "Scope the checkout to an explicit path, create a checkpoint first, and capture a diff before mutating files."
+    },
+    %{
+      id: "destructive.shell.git_restore_repo_wide",
+      regex: ~r/\bgit\s+restore(?:\s+--(?:source|staged)\b[^\n;|&]*)?\s+\./,
+      message: "Repo-wide `git restore .` can discard tracked work across the entire project.",
+      recovery:
+        "Restore only the file or directory you intend to reset, and checkpoint uncommitted work first."
+    },
+    %{
+      id: "destructive.shell.git_reset_hard",
+      regex: ~r/\bgit\s+reset\s+--hard(?:\s+\S+)?/,
+      message: "`git reset --hard` can irreversibly discard both index and working tree changes.",
+      recovery:
+        "Prefer a checkpoint or `git diff` capture first, and limit reset operations to a reviewed recovery path."
+    },
+    %{
+      id: "destructive.shell.git_clean_force",
+      regex: ~r/\bgit\s+clean\b(?=[^\n;|&]*-f)(?=[^\n;|&]*d)[^\n;|&]*/,
+      message:
+        "`git clean -fd` style cleanup can delete untracked files and generated artifacts with no rollback.",
+      recovery:
+        "Use `git clean -nd` first, checkpoint untracked files, and scope cleanup paths explicitly."
+    },
+    %{
+      id: "destructive.shell.rm_rf_repo_scope",
+      regex:
+        Regex.compile!(
+          "\\brm\\s+-rf\\b[^\\n;|&]*(?:\\s+\\*|\\s+\\./|\\s+\\.\\b|\\s+\\.[/][^;\\n|&]*|\\s+/)"
+        ),
+      message:
+        "Broad `rm -rf` scope can remove large parts of the repo or filesystem in a single step.",
+      recovery:
+        "Delete only the reviewed path, prefer dry-run listing first, and checkpoint before destructive cleanup."
+    }
+  ]
 
   def scan(input, _opts \\ []) when is_map(input) do
     normalized = normalize_input(input)
@@ -25,6 +68,7 @@ defmodule ControlKeel.Scanner.FastPath do
       |> Kernel.++(Patterns.detect(normalized["content"], normalized, runtime_rules))
       |> Kernel.++(Entropy.detect(normalized["content"], normalized, runtime_rules))
       |> Kernel.++(budget_findings(normalized, cost_rules))
+      |> Kernel.++(destructive_shell_findings(normalized))
       |> Kernel.++(trust_boundary_findings(normalized))
       |> uniq_findings()
 
@@ -161,6 +205,54 @@ defmodule ControlKeel.Scanner.FastPath do
     findings
   end
 
+  defp destructive_shell_findings(%{"kind" => "shell", "content" => content} = normalized)
+       when is_binary(content) do
+    @destructive_shell_patterns
+    |> Enum.flat_map(fn pattern ->
+      case Regex.run(pattern.regex, content) do
+        nil ->
+          []
+
+        [match | _rest] ->
+          [
+            destructive_shell_finding(
+              pattern.id,
+              pattern.message,
+              match,
+              normalized,
+              pattern.recovery
+            )
+          ]
+      end
+    end)
+  end
+
+  defp destructive_shell_findings(_normalized), do: []
+
+  defp destructive_shell_finding(rule_id, message, matched_command, normalized, recovery) do
+    %Scanner.Finding{
+      id: shell_fingerprint(rule_id, normalized["path"], matched_command),
+      severity: "critical",
+      category: "destructive_operation",
+      rule_id: rule_id,
+      decision: "block",
+      plain_message: message,
+      location: %{"path" => normalized["path"], "kind" => normalized["kind"]},
+      metadata: %{
+        "scanner" => "fast_path",
+        "matcher" => "destructive_shell",
+        "matched_text_redacted" => "[redacted]",
+        "checkpoint_recommended" => true,
+        "requires_human_review" => true,
+        "recovery_guidance" => recovery,
+        "rollback_hint" =>
+          "Pause, create a checkpoint or proof-backed snapshot, and prefer an explicit path-scoped revert over repo-wide cleanup.",
+        "safe_alternative" =>
+          "Use a dry-run and an explicit path instead of a repo-wide destructive command."
+      }
+    }
+  end
+
   defp build_result(findings, advisory)
 
   defp build_result([], advisory) do
@@ -242,6 +334,11 @@ defmodule ControlKeel.Scanner.FastPath do
 
   defp budget_fingerprint(rule_id, session_id, spent_cents, budget_cents) do
     seed = "#{rule_id}:#{session_id}:#{spent_cents}:#{budget_cents}"
+    "fp_" <> (:crypto.hash(:sha256, seed) |> Base.encode16(case: :lower) |> binary_part(0, 12))
+  end
+
+  defp shell_fingerprint(rule_id, path, matched_command) do
+    seed = "#{rule_id}:#{path}:#{matched_command}"
     "fp_" <> (:crypto.hash(:sha256, seed) |> Base.encode16(case: :lower) |> binary_part(0, 12))
   end
 

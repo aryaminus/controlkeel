@@ -9,6 +9,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
   alias ControlKeel.TrustBoundary
+  alias ControlKeel.WorkspaceContext
   import Ecto.Query, warn: false
 
   def call(arguments) when is_map(arguments) do
@@ -16,8 +17,9 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          {:ok, task_id} <- optional_integer(arguments, "task_id"),
          {:ok, session} <- fetch_session(session_id),
          {:ok, task} <- resolve_task(session, task_id) do
-      provider_status = ProviderBroker.status(File.cwd!())
-      workspace_context = workspace_context(session)
+      project_root = project_root(arguments, session)
+      provider_status = ProviderBroker.status(project_root)
+      workspace_context = workspace_context(session, project_root)
       transcript_summary = Mission.transcript_summary(session.id)
       recent_events = Mission.list_session_events(session.id)
       context_reacquisition = context_reacquisition(workspace_context)
@@ -25,13 +27,14 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       {:ok,
        %{
          "session_id" => session.id,
+         "project_root" => project_root,
          "session_title" => session.title,
          "risk_tier" => session.risk_tier,
          "compliance_profile" => session.workspace.compliance_profile,
          "active_findings" => active_findings_summary(session.findings),
          "budget_summary" => budget_summary(session),
          "boundary_summary" =>
-           Intent.boundary_summary(session.execution_brief || %{}, project_root: File.cwd!()),
+           Intent.boundary_summary(session.execution_brief || %{}, project_root: project_root),
          "current_task" => task_summary(task),
          "past_patterns" => past_patterns(session),
          "proof_summary" => Mission.proof_summary_for_task(task),
@@ -148,8 +151,18 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     end
   end
 
-  defp workspace_context(session) do
-    Mission.workspace_context(session)
+  defp workspace_context(session, project_root) do
+    Mission.workspace_context(session, fallback_root: project_root)
+  end
+
+  defp project_root(arguments, session) do
+    fallback_root =
+      case Map.get(arguments, "project_root") do
+        value when is_binary(value) and value != "" -> Path.expand(value)
+        _ -> File.cwd!()
+      end
+
+    WorkspaceContext.resolve_project_root(session, fallback_root) || fallback_root
   end
 
   defp context_reacquisition(workspace_context) do

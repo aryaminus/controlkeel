@@ -565,6 +565,38 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert "issue" in untrusted_sources
   end
 
+  test "tools/call ck_context prefers governed runtime project root over caller cwd" do
+    tmp_dir =
+      Path.join(System.tmp_dir!(), "controlkeel-ck-context-#{System.unique_integer([:positive])}")
+
+    project_root = Path.join(tmp_dir, "project")
+    other_root = Path.join(tmp_dir, "other")
+    File.mkdir_p!(project_root)
+    File.mkdir_p!(other_root)
+
+    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+    session = session_fixture()
+    task_fixture(%{session: session, status: "in_progress"})
+
+    assert {:ok, _session} =
+             Mission.attach_session_runtime_context(session.id, %{"project_root" => project_root})
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 401,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_context",
+          "arguments" => %{"session_id" => session.id, "project_root" => other_root}
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "project_root"]) == project_root
+    assert get_in(response, ["result", "structuredContent", "provider_status", "source"]) != nil
+  end
+
   test "tools/call ck_review_submit returns plan refinement quality" do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "queued"})

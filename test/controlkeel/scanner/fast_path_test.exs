@@ -71,4 +71,39 @@ defmodule ControlKeel.Scanner.FastPathTest do
     assert Enum.any?(result.findings, &(&1.rule_id == "ecommerce.payment_logging"))
     assert result.decision == "block"
   end
+
+  test "blocks destructive repo-wide shell cleanup commands with recovery guidance" do
+    result =
+      FastPath.scan(%{
+        "content" => "git checkout -- . && git clean -fd",
+        "path" => "scripts/cleanup.sh",
+        "kind" => "shell"
+      })
+
+    assert result.decision == "block"
+
+    assert Enum.any?(
+             result.findings,
+             &(&1.rule_id == "destructive.shell.git_checkout_repo_wide")
+           )
+
+    clean_finding =
+      Enum.find(result.findings, &(&1.rule_id == "destructive.shell.git_clean_force"))
+
+    assert clean_finding
+    assert clean_finding.category == "destructive_operation"
+    assert clean_finding.metadata["checkpoint_recommended"] == true
+    assert is_binary(clean_finding.metadata["recovery_guidance"])
+  end
+
+  test "does not flag path-scoped git restore commands as repo-wide destructive cleanup" do
+    result =
+      FastPath.scan(%{
+        "content" => "git restore lib/controlkeel/scanner/fast_path.ex",
+        "path" => "scripts/recover.sh",
+        "kind" => "shell"
+      })
+
+    refute Enum.any?(result.findings, &String.starts_with?(&1.rule_id, "destructive.shell."))
+  end
 end

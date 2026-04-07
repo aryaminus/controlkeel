@@ -308,8 +308,8 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 
 | Tool | Purpose |
 | ------ | --------- |
-| `ck_validate` | Run FastPath scan (patterns, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present. |
-| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, reacquisition signals, design-drift summary, recent transcript events, transcript summary, resume packet, and provider status. Requires `session_id`. |
+| `ck_validate` | Run FastPath scan (patterns, destructive shell tripwires, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present plus recovery guidance for destructive shell findings. |
+| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, reacquisition signals, design-drift summary, recent transcript events, transcript summary, resume packet, and provider status. Requires `session_id`; accepts optional `project_root`, but governed runtime context wins when CK already knows the workspace root. |
 | `ck_experience_index` | List recent prior sessions in the same workspace plus the read-only experience artifacts available for each run. |
 | `ck_experience_read` | Read one prior-run artifact such as a session summary, audit log, trace packet, or proof summary. |
 | `ck_trace_packet` | Export a structured session or task trace packet with failure patterns and eval candidates so teams can turn real runs into reusable improvement cases. |

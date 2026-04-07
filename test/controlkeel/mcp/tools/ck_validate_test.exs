@@ -143,4 +143,27 @@ defmodule ControlKeel.MCP.Tools.CkValidateTest do
              &(&1["rule_id"] == "security.trust_boundary.encoded_payload_marker")
            )
   end
+
+  test "blocks destructive shell cleanup commands and returns recovery metadata" do
+    assert {:ok, result} =
+             CkValidate.call(%{
+               "content" => "git reset --hard HEAD && rm -rf ./tmp",
+               "path" => "scripts/reset.sh",
+               "kind" => "shell"
+             })
+
+    assert result["decision"] == "block"
+
+    assert Enum.any?(
+             result["findings"],
+             &(&1["rule_id"] == "destructive.shell.git_reset_hard")
+           )
+
+    rm_finding =
+      Enum.find(result["findings"], &(&1["rule_id"] == "destructive.shell.rm_rf_repo_scope"))
+
+    assert rm_finding
+    assert rm_finding["metadata"]["checkpoint_recommended"] == true
+    assert is_binary(rm_finding["metadata"]["rollback_hint"])
+  end
 end
