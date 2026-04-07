@@ -1137,7 +1137,7 @@ defmodule ControlKeel.AgentIntegration do
         alias_of: "codex-cli",
         auth_mode: "env_bridge",
         upstream_slug: "t3chat/t3-code",
-        upstream_docs_url: "https://t3.chat",
+        upstream_docs_url: "https://github.com/openai/codex",
         supported_scopes: ["user", "project"],
         preferred_target: "codex",
         export_targets: ["codex", "codex-plugin", "open-standard"]
