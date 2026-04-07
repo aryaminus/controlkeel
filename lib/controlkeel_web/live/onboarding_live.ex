@@ -9,11 +9,13 @@ defmodule ControlKeelWeb.OnboardingLive do
   def mount(_params, _session, socket) do
     occupation = default_occupation()
     attrs = default_attrs(occupation)
-    provider_status = ProviderBroker.status()
+    project_root = socket.endpoint.config(:project_root) || File.cwd!()
+    provider_status = ProviderBroker.status(project_root)
 
     {:ok,
      socket
      |> assign(:page_title, "Start a mission")
+     |> assign(:project_root, project_root)
      |> assign(:occupation_profiles, Intent.occupation_profiles())
      |> assign(:agent_options, Intent.agent_options())
      |> assign(:step, 1)
@@ -490,7 +492,7 @@ defmodule ControlKeelWeb.OnboardingLive do
          |> assign(:compiled_brief, brief)
          |> assign(
            :compiled_boundary_summary,
-           Intent.boundary_summary(brief, project_root: File.cwd!())
+           Intent.boundary_summary(brief, project_root: socket.assigns.project_root)
          )
          |> assign(:step, 4)
          |> assign_form()}

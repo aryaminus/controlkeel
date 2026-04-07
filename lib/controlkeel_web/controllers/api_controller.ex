@@ -1259,13 +1259,15 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
-  def list_skill_targets(conn, _params) do
+  def list_skill_targets(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+
     json(conn, %{
       targets: Enum.map(Skills.targets(), &skill_target_summary/1),
       agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1),
       registry_status: ACPRegistry.status(),
       installation_channels: Distribution.install_channels(),
-      provider_status: ProviderBroker.status(File.cwd!())
+      provider_status: ProviderBroker.status(project_root)
     })
   end
 

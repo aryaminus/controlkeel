@@ -514,6 +514,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
                &(&1["command"] == "claude --plugin-dir ./controlkeel/dist/claude-plugin")
              )
 
+      assert Map.has_key?(response["provider_status"], "project_root")
+
       open_swe =
         Enum.find(agents, fn agent ->
           agent["id"] == "open-swe"
@@ -586,6 +588,37 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert cline["preferred_target"] == "cline-native"
       assert cline["skills_mode"] == "native"
       assert cline["auth_owner"] == "controlkeel"
+    end
+
+    test "list skill targets uses the requested project root for provider status", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("skills-targets")
+      home_dir = Path.join(tmp_dir, "home")
+      project_root = Path.join(tmp_dir, "project")
+
+      File.mkdir_p!(home_dir)
+      File.mkdir_p!(project_root)
+
+      restore = set_provider_home(home_dir)
+
+      on_exit(fn ->
+        restore.()
+        File.rm_rf!(tmp_dir)
+      end)
+
+      assert {:ok, _config} =
+               ControlKeel.ProviderBroker.set_base_url("openai", "http://127.0.0.1:1234/v1")
+
+      assert {:ok, _config} =
+               ControlKeel.ProviderBroker.set_model("openai", "local-model")
+
+      assert {:ok, _config} = ControlKeel.ProviderBroker.set_default_source("openai")
+
+      conn = get(conn, ~p"/api/v1/skills/targets?project_root=#{project_root}")
+      body = json_response(conn, 200)
+
+      assert body["provider_status"]["project_root"] == project_root
+      assert body["provider_status"]["selected_source"] == "user_default_profile"
+      assert body["provider_status"]["selected_provider"] == "openai"
     end
 
     test "gets skill detail and exports and installs bundles", %{conn: conn} do
