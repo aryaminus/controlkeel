@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.1.36 — 2026-04-07
+
+### What's changed
+
+- Add defensive security workflow to ControlKeel
+- Add detailed ControlKeel architecture walkthrough
+- Add plain-English ControlKeel explainer
+
 ## v0.1.35 — 2026-04-07
 
 ### What's changed
