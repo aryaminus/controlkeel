@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.25 — 2026-04-07
+
+### What's changed
+
+- Handle virtual workspace grep without ripgrep
+- Clarify hosted MCP scope guidance
+- Apply formatting after precommit
+- Refresh integrations and export Droid plugin bundles
+- Add governed MCP control-plane surfaces
+
 ## v0.1.24 — 2026-04-06
 
 ### What's changed
