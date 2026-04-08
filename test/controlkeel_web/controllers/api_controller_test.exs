@@ -132,6 +132,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Map.has_key?(body["context"], "autonomy_profile")
       assert Map.has_key?(body["context"], "outcome_profile")
       assert Map.has_key?(body["context"], "improvement_loop")
+      assert Map.has_key?(body["context"], "task_augmentation")
+      assert body["context"]["task_augmentation"]["available"] == true
       assert body["context"]["boundary_summary"]["risk_tier"] == "critical"
 
       assert body["context"]["boundary_summary"]["constraints"] == [
@@ -147,6 +149,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert post_body["context"]["session_id"] == session.id
       assert post_body["context"]["current_task"]["id"] == task.id
       assert Map.has_key?(post_body["context"], "boundary_summary")
+      assert Map.has_key?(post_body["context"], "task_augmentation")
     end
 
     test "returns validation error when session_id is missing", %{conn: conn} do

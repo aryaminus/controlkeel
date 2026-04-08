@@ -242,6 +242,16 @@ This makes the agent’s context:
 
 That is very different from letting an agent infer the state of the world from raw chat history or from repeated shell exploration alone.
 
+CK now also derives a **task augmentation** artifact inside `ck_context`. It is not a separate execution engine. It is a derived contextual brief built from:
+
+- the current task and session objective
+- workspace context and repo instruction files
+- recent hotspots and large-file signals
+- active findings
+- boundary constraints
+
+The point is to make vague work more executable before the main run loop starts, without stuffing the entire repo into model context.
+
 ## How CK keeps context grounded
 
 CK resolves workspace context from governed state, not only from process-local assumptions.

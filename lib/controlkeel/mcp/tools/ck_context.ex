@@ -9,6 +9,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   alias ControlKeel.Mission.{Finding, Session}
   alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
+  alias ControlKeel.TaskAugmentation
   alias ControlKeel.TrustBoundary
   alias ControlKeel.WorkspaceContext
   import Ecto.Query, warn: false
@@ -44,6 +45,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "past_patterns" => past_patterns(session),
          "proof_summary" => Mission.proof_summary_for_task(task),
          "planning_context" => planning_context(task),
+         "task_augmentation" => TaskAugmentation.build(session, task, workspace_context),
          "memory_hits" => memory_hits(session, task),
          "resume_packet" => resume_packet(task),
          "workspace_context" => workspace_context,

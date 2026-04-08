@@ -556,6 +556,11 @@ defmodule ControlKeel.MCP.ProtocolTest do
                  "current_task" => %{"title" => "Implement router"},
                  "proof_summary" => %{"task_id" => _},
                  "planning_context" => %{"review_gate" => %{}},
+                 "task_augmentation" => %{
+                   "available" => true,
+                   "augmented_brief" => augmented_brief,
+                   "search_terms" => search_terms
+                 },
                  "memory_hits" => memory_hits,
                  "resume_packet" => %{"task_id" => _, "workspace_context" => %{}},
                  "workspace_context" => %{
@@ -581,6 +586,8 @@ defmodule ControlKeel.MCP.ProtocolTest do
            } = response
 
     assert is_list(memory_hits)
+    assert is_binary(augmented_brief)
+    assert is_list(search_terms)
     assert autonomy_mode in ["supervised_execute", "guarded_autonomy", "long_running_autonomy"]
     assert goal_type in ["delivery", "kpi"]
     assert is_list(recent_events)
