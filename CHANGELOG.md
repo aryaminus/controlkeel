@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.40 — 2026-04-08
+
+### What's changed
+
+- Add derived task augmentation context
+
 ## v0.1.39 — 2026-04-08
 
 ### What's changed
