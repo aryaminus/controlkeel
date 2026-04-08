@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.38 — 2026-04-08
+
+### What's changed
+
+- Surface security case triage summaries
+
 ## v0.1.37 — 2026-04-07
 
 ### What's changed
