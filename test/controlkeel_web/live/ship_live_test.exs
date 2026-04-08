@@ -34,6 +34,8 @@ defmodule ControlKeelWeb.ShipLiveTest do
     assert html =~ "Funnel speed"
     assert html =~ "Governance effectiveness"
     assert html =~ "Benchmark evidence"
+    assert html =~ "Autonomy and outcomes"
+    assert html =~ "Recommended focus"
     assert html =~ "Proof-backed done tasks"
     assert html =~ "Task completion by agent"
     assert html =~ "Proof console loop"

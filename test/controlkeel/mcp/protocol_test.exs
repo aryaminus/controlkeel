@@ -539,6 +539,11 @@ defmodule ControlKeel.MCP.ProtocolTest do
                    "patch_status" => %{"drafted" => 1},
                    "disclosure_status" => %{"triaged" => 1}
                  },
+                 "autonomy_profile" => %{"mode" => autonomy_mode},
+                 "outcome_profile" => %{"goal_type" => goal_type},
+                 "improvement_loop" => %{
+                   "loop" => ["run", "observe", "evaluate", "improve", "rerun"]
+                 },
                  "budget_summary" => %{
                    "spent_cents" => 250,
                    "session_budget_cents" => 1_500,
@@ -576,6 +581,8 @@ defmodule ControlKeel.MCP.ProtocolTest do
            } = response
 
     assert is_list(memory_hits)
+    assert autonomy_mode in ["supervised_execute", "guarded_autonomy", "long_running_autonomy"]
+    assert goal_type in ["delivery", "kpi"]
     assert is_list(recent_events)
     assert total_events >= 1
     assert is_list(recent_commits)

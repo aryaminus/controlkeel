@@ -23,6 +23,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       body = json_response(conn, 200)
       assert length(body["sessions"]) == 1
       assert hd(body["sessions"])["id"] == session.id
+      assert Map.has_key?(hd(body["sessions"]), "autonomy_profile")
+      assert Map.has_key?(hd(body["sessions"]), "outcome_profile")
     end
   end
 
@@ -39,12 +41,17 @@ defmodule ControlKeelWeb.ApiControllerTest do
           budget_cents: 3000,
           daily_budget_cents: 1000,
           spent_cents: 0,
+          autonomy_mode: "long_running_autonomy",
+          outcome_target: "Ship zero critical findings",
+          outcome_metric: "critical findings resolved",
           execution_brief: %{"recommended_stack" => "Phoenix"},
           workspace_id: workspace.id
         })
 
       assert %{"session" => session} = json_response(conn, 201)
       assert session["title"] == "Test Mission"
+      assert session["autonomy_profile"]["mode"] == "long_running_autonomy"
+      assert session["outcome_profile"]["goal_type"] == "kpi"
     end
 
     test "returns error with missing required fields", %{conn: conn} do
@@ -61,6 +68,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert detail["id"] == session.id
       assert Map.has_key?(detail, "tasks")
       assert Map.has_key?(detail, "findings")
+      assert Map.has_key?(detail, "improvement_loop")
+      assert Map.has_key?(detail, "session_metrics")
     end
 
     test "returns 404 for unknown session", %{conn: conn} do
@@ -120,6 +129,9 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert body["context"]["current_task"]["id"] == task.id
       assert Map.has_key?(body["context"], "provider_status")
       assert Map.has_key?(body["context"], "bootstrap_status")
+      assert Map.has_key?(body["context"], "autonomy_profile")
+      assert Map.has_key?(body["context"], "outcome_profile")
+      assert Map.has_key?(body["context"], "improvement_loop")
       assert body["context"]["boundary_summary"]["risk_tier"] == "critical"
 
       assert body["context"]["boundary_summary"]["constraints"] == [
@@ -140,6 +152,43 @@ defmodule ControlKeelWeb.ApiControllerTest do
     test "returns validation error when session_id is missing", %{conn: conn} do
       conn = get(conn, ~p"/api/v1/context")
       assert %{"error" => "`session_id` is required"} = json_response(conn, 422)
+    end
+  end
+
+  describe "GET /api/v1/improvement" do
+    test "returns workspace-level improvement summary and session loop data", %{conn: conn} do
+      session =
+        session_fixture(%{
+          metadata: %{
+            "autonomy_mode" => "long_running_autonomy",
+            "outcome_target" => "Reduce critical backlog"
+          }
+        })
+
+      task = task_fixture(%{session: session, status: "done"})
+      finding_fixture(%{session: session, status: "blocked"})
+      assert {:ok, _proof} = Mission.generate_proof_bundle(task.id)
+
+      conn = get(conn, ~p"/api/v1/improvement")
+      body = json_response(conn, 200)
+
+      assert body["summary"]["recent_session_count"] >= 1
+      assert Map.has_key?(body["summary"], "autonomy_mix")
+      assert Map.has_key?(body["summary"], "goal_type_mix")
+      assert Map.has_key?(body, "benchmark_summary")
+      assert is_list(body["sessions"])
+      assert Enum.any?(body["sessions"], &(&1["id"] == session.id))
+
+      improved = Enum.find(body["sessions"], &(&1["id"] == session.id))
+      assert improved["autonomy_profile"]["mode"] == "long_running_autonomy"
+
+      assert improved["improvement_loop"]["loop"] == [
+               "run",
+               "observe",
+               "evaluate",
+               "improve",
+               "rerun"
+             ]
     end
   end
 

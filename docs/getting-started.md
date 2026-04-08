@@ -29,6 +29,7 @@ The governed delivery lifecycle is:
 - benchmarks
 
 The main stewardship surfaces for that lifecycle are `/ship` and `/benchmarks`.
+`/ship` now also surfaces autonomy mix, outcome shape, and the current improvement-loop focus across recent governed sessions.
 
 If you are using CK for defensive security work, start with the `security` domain pack. That gives you the defender mission template, structured vulnerability lifecycle metadata, disclosure-aware proof bundles, and cyber access mode defaults. The dedicated guide is [defensive-security-with-controlkeel.md](defensive-security-with-controlkeel.md).
 

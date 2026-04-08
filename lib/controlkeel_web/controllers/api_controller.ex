@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.ACPRegistry
   alias ControlKeel.AgentExecution
   alias ControlKeel.AgentRouter
+  alias ControlKeel.AutonomyLoop
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.Distribution
@@ -111,11 +112,7 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   def create_session(conn, params) do
-    attrs =
-      Map.take(
-        params,
-        ~w(title objective occupation domain_pack budget_cents daily_budget_cents risk_tier status spent_cents execution_brief workspace_id)
-      )
+    attrs = session_create_attrs(params)
 
     case Mission.create_session(attrs) do
       {:ok, session} ->
@@ -186,6 +183,28 @@ defmodule ControlKeelWeb.ApiController do
       {:error, {:invalid_arguments, message}} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: message})
     end
+  end
+
+  def improvement_summary(conn, params) do
+    limit =
+      case parse_integer_param(Map.get(params, "limit", "10")) do
+        {:ok, parsed} -> parsed
+        {:error, :invalid_integer} -> 10
+      end
+
+    sessions = Mission.list_recent_sessions(limit)
+    benchmark_summary = Benchmark.benchmark_summary()
+
+    json(conn, %{
+      summary: AutonomyLoop.workspace_improvement_summary(sessions),
+      benchmark_summary: benchmark_summary_payload(benchmark_summary),
+      sessions:
+        Enum.map(sessions, fn session ->
+          Map.merge(session_summary(session), %{
+            improvement_loop: AutonomyLoop.session_improvement_loop(session)
+          })
+        end)
+    })
   end
 
   # ─── Tasks ───────────────────────────────────────────────────────────────────
@@ -1478,7 +1497,9 @@ defmodule ControlKeelWeb.ApiController do
       spent_cents: session.spent_cents,
       budget_cents: session.budget_cents,
       inserted_at: session.inserted_at,
-      runtime_context: get_in(session.metadata || %{}, ["runtime_context"])
+      runtime_context: get_in(session.metadata || %{}, ["runtime_context"]),
+      autonomy_profile: AutonomyLoop.session_autonomy_profile(session),
+      outcome_profile: AutonomyLoop.session_outcome_profile(session)
     }
   end
 
@@ -1487,10 +1508,36 @@ defmodule ControlKeelWeb.ApiController do
 
     Map.merge(base, %{
       execution_brief: session.execution_brief,
+      session_metrics: ControlKeel.Analytics.session_metrics(session.id),
+      improvement_loop: AutonomyLoop.session_improvement_loop(session),
       tasks: Enum.map(Map.get(session, :tasks, []), &task_summary/1),
       findings: Enum.map(Map.get(session, :findings, []), &finding_summary/1)
     })
   end
+
+  defp session_create_attrs(params) do
+    metadata =
+      params
+      |> Map.get("metadata", %{})
+      |> normalize_session_metadata()
+      |> maybe_put_string("autonomy_mode", Map.get(params, "autonomy_mode"))
+      |> maybe_put_string("outcome_target", Map.get(params, "outcome_target"))
+      |> maybe_put_string("outcome_metric", Map.get(params, "outcome_metric"))
+      |> maybe_put_string("outcome_window", Map.get(params, "outcome_window"))
+
+    params
+    |> Map.take(
+      ~w(title objective occupation domain_pack budget_cents daily_budget_cents risk_tier status spent_cents execution_brief workspace_id)
+    )
+    |> Map.put("metadata", metadata)
+  end
+
+  defp normalize_session_metadata(value) when is_map(value), do: value
+  defp normalize_session_metadata(_value), do: %{}
+
+  defp maybe_put_string(map, _key, nil), do: map
+  defp maybe_put_string(map, _key, ""), do: map
+  defp maybe_put_string(map, key, value), do: Map.put(map, key, value)
 
   defp task_summary(task) do
     %{
@@ -1588,6 +1635,13 @@ defmodule ControlKeelWeb.ApiController do
       started_at: run.started_at,
       finished_at: run.finished_at
     }
+  end
+
+  defp benchmark_summary_payload(summary) do
+    Map.update(summary, :latest_run, nil, fn
+      nil -> nil
+      run -> benchmark_run_summary(run)
+    end)
   end
 
   defp benchmark_run_detail(run) do

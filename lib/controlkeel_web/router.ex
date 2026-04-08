@@ -67,6 +67,7 @@ defmodule ControlKeelWeb.Router do
     get "/domains", ApiController, :list_domains
     get "/context", ApiController, :context
     post "/context", ApiController, :context
+    get "/improvement", ApiController, :improvement_summary
     get "/sessions/:id/audit-log", ApiController, :audit_log
     get "/sessions/:id/graph", ApiController, :session_graph
     post "/sessions/:id/execute", ApiController, :execute_session

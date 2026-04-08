@@ -46,6 +46,7 @@ In current product terms, CK runs this lifecycle:
 7. proof capture
 8. ship metrics
 9. comparative benchmark evidence
+10. autonomy and improvement loop summaries
 
 For `security` domain work, the lifecycle becomes:
 
@@ -679,6 +680,31 @@ These expose the agent-facing governed tool contract.
 ### Generated assets
 
 CK also ships generated host-native assets such as:
+
+## Step 11: autonomy and improvement loop summaries
+
+CK does not treat every session as the same kind of "agent run." It now derives three additional views from the same governed session record:
+
+- **autonomy profile**: whether the session is effectively advise-only, supervised execute, guarded autonomy, or long-running autonomy
+- **outcome profile**: whether the work is aimed at task delivery or an explicit KPI / longer-horizon outcome
+- **improvement loop**: whether CK has enough evidence from traces, failure clusters, proofs, and benchmark coverage to recommend the next loop-closing move
+
+Those views are derived, not magical. They come from:
+
+- session metadata and execution brief
+- risk tier and approval-heavy constraints
+- cyber access mode for security work
+- current task / proof state
+- trace packet and failure-cluster availability
+- benchmark suite availability for the current domain
+
+That means CK can say something operationally useful like:
+
+- "this is supervised execute, not long-running autonomy"
+- "this mission has an explicit KPI"
+- "the next leverage point is turning failure clusters into evals"
+
+without inventing a second workflow engine or pretending it has unrestricted autonomy.
 
 - plugin bundles
 - MCP config

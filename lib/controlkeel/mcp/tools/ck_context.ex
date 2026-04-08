@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   @moduledoc false
 
   alias ControlKeel.Budget
+  alias ControlKeel.AutonomyLoop
   alias ControlKeel.Intent
   alias ControlKeel.Memory
   alias ControlKeel.Mission
@@ -33,6 +34,9 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "compliance_profile" => session.workspace.compliance_profile,
          "active_findings" => active_findings_summary(session.findings),
          "security_case_summary" => Mission.security_case_summary(session.findings),
+         "autonomy_profile" => AutonomyLoop.session_autonomy_profile(session),
+         "outcome_profile" => AutonomyLoop.session_outcome_profile(session),
+         "improvement_loop" => AutonomyLoop.session_improvement_loop(session),
          "budget_summary" => budget_summary(session),
          "boundary_summary" =>
            Intent.boundary_summary(session.execution_brief || %{}, project_root: project_root),
