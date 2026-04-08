@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.39 — 2026-04-08
+
+### What's changed
+
+- Add autonomy and improvement loop summaries
+
 ## v0.1.38 — 2026-04-08
 
 ### What's changed
