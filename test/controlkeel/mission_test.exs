@@ -259,6 +259,65 @@ defmodule ControlKeel.MissionTest do
     assert length(second_page.entries) == 3
   end
 
+  test "browse_findings/1 filters vulnerability lifecycle metadata and summarizes filtered cases" do
+    session = session_fixture(%{title: "Security triage"})
+
+    matched =
+      finding_fixture(%{
+        session: session,
+        title: "Patch pending SQL injection",
+        category: "security",
+        severity: "high",
+        status: "open",
+        metadata: %{
+          "finding_family" => "vulnerability_case",
+          "affected_component" => "accounts",
+          "evidence_type" => "source",
+          "exploitability_status" => "reproduced",
+          "patch_status" => "drafted",
+          "disclosure_status" => "triaged",
+          "maintainer_scope" => "first_party",
+          "cwe_ids" => ["CWE-89"]
+        }
+      })
+
+    _non_match =
+      finding_fixture(%{
+        session: session,
+        title: "Validated XSS fix",
+        category: "security",
+        severity: "medium",
+        status: "open",
+        metadata: %{
+          "finding_family" => "vulnerability_case",
+          "affected_component" => "admin",
+          "evidence_type" => "diff",
+          "exploitability_status" => "validated",
+          "patch_status" => "validated",
+          "disclosure_status" => "patched",
+          "maintainer_scope" => "open_source",
+          "cwe_ids" => ["CWE-79"]
+        }
+      })
+
+    browser =
+      Mission.browse_findings(%{
+        "session_id" => Integer.to_string(session.id),
+        "finding_family" => "vulnerability_case",
+        "patch_status" => "drafted",
+        "disclosure_status" => "triaged",
+        "maintainer_scope" => "first_party"
+      })
+
+    assert Enum.map(browser.entries, & &1.id) == [matched.id]
+    assert browser.security_summary["case_count"] == 1
+    assert browser.security_summary["unresolved"] == 1
+    assert browser.security_summary["patch_status"] == %{"drafted" => 1}
+    assert browser.security_summary["disclosure_status"] == %{"triaged" => 1}
+    assert browser.security_summary["maintainer_scope"] == %{"first_party" => 1}
+    assert browser.filters.finding_family == "vulnerability_case"
+  end
+
   test "task and finding fixtures build through the real associations" do
     task = task_fixture()
     finding = finding_fixture()

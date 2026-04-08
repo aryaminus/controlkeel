@@ -285,13 +285,17 @@ defmodule ControlKeelWeb.ApiController do
   def list_findings(conn, params) do
     opts =
       params
-      |> Map.take(~w(session_id severity status category))
+      |> Map.take(
+        ~w(session_id severity status category finding_family patch_status disclosure_status maintainer_scope)
+      )
       |> Enum.into(%{})
 
     page = Mission.browse_findings(opts)
 
     json(conn, %{
       findings: Enum.map(page.entries, &finding_summary/1),
+      security_summary: page.security_summary,
+      filters: page.filters,
       total: page.total_count,
       page: page.page,
       total_pages: page.total_pages
@@ -1502,7 +1506,7 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   defp finding_summary(finding) do
-    %{
+    summary = %{
       id: Map.get(finding, :id),
       rule_id: finding.rule_id,
       category: finding.category,
@@ -1511,6 +1515,16 @@ defmodule ControlKeelWeb.ApiController do
       plain_message: finding.plain_message,
       auto_fix_available: Map.get(finding, :auto_fix_available, false)
     }
+
+    if ControlKeel.SecurityWorkflow.vulnerability_case?(finding) do
+      Map.put(
+        summary,
+        :security_lifecycle,
+        ControlKeel.SecurityWorkflow.vulnerability_case_summary(finding)
+      )
+    else
+      summary
+    end
   end
 
   defp proof_summary(proof) do

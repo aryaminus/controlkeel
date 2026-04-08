@@ -601,6 +601,21 @@ defmodule ControlKeel.Mission do
     |> Repo.all()
   end
 
+  def security_case_summary(findings) when is_list(findings) do
+    cases = Enum.filter(findings, &SecurityWorkflow.vulnerability_case?/1)
+    proof = SecurityWorkflow.proof_summary(cases)
+
+    %{
+      "case_count" => length(cases),
+      "unresolved" => proof["unresolved"],
+      "critical_unresolved" => proof["critical_unresolved"],
+      "patch_status" => count_by_metadata(cases, "patch_status"),
+      "disclosure_status" => count_by_metadata(cases, "disclosure_status"),
+      "maintainer_scope" => count_by_metadata(cases, "maintainer_scope"),
+      "exploitability_status" => count_by_metadata(cases, "exploitability_status")
+    }
+  end
+
   def list_findings_browser_sessions do
     Session
     |> order_by(desc: :inserted_at)
@@ -622,6 +637,7 @@ defmodule ControlKeel.Mission do
     total_count = Repo.aggregate(base_query, :count, :id)
     total_pages = max(div(total_count + @findings_page_size - 1, @findings_page_size), 1)
     page = min(filters.page, total_pages)
+    security_summary = base_query |> Repo.all() |> security_case_summary()
 
     entries =
       base_query
@@ -633,6 +649,7 @@ defmodule ControlKeel.Mission do
     %{
       entries: entries,
       filters: %{filters | page: page},
+      security_summary: security_summary,
       total_count: total_count,
       total_pages: total_pages,
       page: page,
@@ -4368,6 +4385,10 @@ defmodule ControlKeel.Mission do
     |> maybe_filter_finding(:severity, filters.severity)
     |> maybe_filter_finding(:status, filters.status)
     |> maybe_filter_finding(:category, filters.category)
+    |> maybe_filter_finding_metadata("finding_family", filters.finding_family)
+    |> maybe_filter_finding_metadata("patch_status", filters.patch_status)
+    |> maybe_filter_finding_metadata("disclosure_status", filters.disclosure_status)
+    |> maybe_filter_finding_metadata("maintainer_scope", filters.maintainer_scope)
     |> maybe_filter_session(filters.session_id)
   end
 
@@ -4394,6 +4415,10 @@ defmodule ControlKeel.Mission do
       severity: normalize_filter_value(opts["severity"]),
       status: normalize_filter_value(opts["status"]),
       category: normalize_filter_value(opts["category"]),
+      finding_family: normalize_filter_value(opts["finding_family"]),
+      patch_status: normalize_filter_value(opts["patch_status"]),
+      disclosure_status: normalize_filter_value(opts["disclosure_status"]),
+      maintainer_scope: normalize_filter_value(opts["maintainer_scope"]),
       session_id: normalize_session_filter(opts["session_id"]),
       page: normalize_page(opts["page"])
     }
@@ -4497,6 +4522,15 @@ defmodule ControlKeel.Mission do
     from(f in query, where: field(f, ^field_name) == ^value)
   end
 
+  defp maybe_filter_finding_metadata(query, _key, nil), do: query
+  defp maybe_filter_finding_metadata(query, _key, ""), do: query
+
+  defp maybe_filter_finding_metadata(query, key, value) do
+    from([f, _s, _w] in query,
+      where: fragment("json_extract(?, ?)", f.metadata, ^"$.#{key}") == ^value
+    )
+  end
+
   defp maybe_filter_session(query, nil), do: query
 
   defp maybe_filter_session(query, session_id) do
@@ -4532,4 +4566,12 @@ defmodule ControlKeel.Mission do
 
   defp maybe_put_metadata(metadata, _key, nil), do: metadata
   defp maybe_put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
+
+  defp count_by_metadata(findings, key) do
+    findings
+    |> Enum.reduce(%{}, fn finding, acc ->
+      value = get_in(finding.metadata || %{}, [key]) || "unknown"
+      Map.update(acc, value, 1, &(&1 + 1))
+    end)
+  end
 end

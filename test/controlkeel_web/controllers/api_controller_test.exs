@@ -444,6 +444,78 @@ defmodule ControlKeelWeb.ApiControllerTest do
       body = json_response(conn, 200)
       assert Enum.all?(body["findings"], fn f -> f["id"] != nil end)
     end
+
+    test "returns security lifecycle filters and summaries for vulnerability cases", %{conn: conn} do
+      session = session_fixture()
+
+      matching =
+        finding_fixture(%{
+          session: session,
+          title: "Pending disclosure case",
+          category: "security",
+          severity: "critical",
+          status: "open",
+          metadata: %{
+            "finding_family" => "vulnerability_case",
+            "affected_component" => "ffmpeg-importer",
+            "evidence_type" => "source",
+            "exploitability_status" => "reproduced",
+            "patch_status" => "drafted",
+            "disclosure_status" => "triaged",
+            "maintainer_scope" => "open_source",
+            "cwe_ids" => ["CWE-787"]
+          }
+        })
+
+      _ignored =
+        finding_fixture(%{
+          session: session,
+          title: "Already patched case",
+          category: "security",
+          severity: "medium",
+          status: "approved",
+          metadata: %{
+            "finding_family" => "vulnerability_case",
+            "affected_component" => "api",
+            "evidence_type" => "diff",
+            "exploitability_status" => "validated",
+            "patch_status" => "validated",
+            "disclosure_status" => "patched",
+            "maintainer_scope" => "first_party",
+            "cwe_ids" => ["CWE-79"]
+          }
+        })
+
+      conn =
+        get(
+          conn,
+          ~p"/api/v1/findings?session_id=#{session.id}&finding_family=vulnerability_case&patch_status=drafted&disclosure_status=triaged&maintainer_scope=open_source"
+        )
+
+      body = json_response(conn, 200)
+
+      assert body["total"] == 1
+      assert body["filters"]["finding_family"] == "vulnerability_case"
+      assert body["filters"]["patch_status"] == "drafted"
+      assert body["security_summary"]["case_count"] == 1
+      assert body["security_summary"]["patch_status"] == %{"drafted" => 1}
+      assert body["security_summary"]["disclosure_status"] == %{"triaged" => 1}
+
+      assert [
+               %{
+                 "id" => finding_id,
+                 "security_lifecycle" => %{
+                   "affected_component" => "ffmpeg-importer",
+                   "patch_status" => "drafted",
+                   "disclosure_status" => "triaged",
+                   "maintainer_scope" => "open_source",
+                   "sensitive_artifacts_redacted" => true
+                 }
+               }
+             ] = body["findings"]
+
+      assert finding_id == matching.id
+    end
   end
 
   describe "skills API" do

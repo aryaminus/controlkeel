@@ -495,7 +495,23 @@ defmodule ControlKeel.MCP.ProtocolTest do
 
     session_id = session.id
     task = task_fixture(%{session: session, status: "in_progress", title: "Implement router"})
-    finding_fixture(%{session: session, status: "blocked", category: "security"})
+
+    finding_fixture(%{
+      session: session,
+      status: "blocked",
+      category: "security",
+      metadata: %{
+        "finding_family" => "vulnerability_case",
+        "affected_component" => "router",
+        "evidence_type" => "source",
+        "exploitability_status" => "reproduced",
+        "patch_status" => "drafted",
+        "disclosure_status" => "triaged",
+        "maintainer_scope" => "first_party",
+        "cwe_ids" => ["CWE-601"]
+      }
+    })
+
     assert {:ok, _proof} = Mission.generate_proof_bundle(task.id)
 
     response =
@@ -517,6 +533,12 @@ defmodule ControlKeel.MCP.ProtocolTest do
                  "risk_tier" => _,
                  "compliance_profile" => _,
                  "active_findings" => %{"count" => 1, "blocked" => 1},
+                 "security_case_summary" => %{
+                   "case_count" => 1,
+                   "unresolved" => 1,
+                   "patch_status" => %{"drafted" => 1},
+                   "disclosure_status" => %{"triaged" => 1}
+                 },
                  "budget_summary" => %{
                    "spent_cents" => 250,
                    "session_budget_cents" => 1_500,

@@ -32,6 +32,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
          "risk_tier" => session.risk_tier,
          "compliance_profile" => session.workspace.compliance_profile,
          "active_findings" => active_findings_summary(session.findings),
+         "security_case_summary" => Mission.security_case_summary(session.findings),
          "budget_summary" => budget_summary(session),
          "boundary_summary" =>
            Intent.boundary_summary(session.execution_brief || %{}, project_root: project_root),
