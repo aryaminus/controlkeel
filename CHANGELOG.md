@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.42 — 2026-04-09
+
+### What's changed
+
+- Improve CLI proofs progress and benchmark ergonomics
+
 ## v0.1.41 — 2026-04-09
 
 ### What's changed
