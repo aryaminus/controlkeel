@@ -1485,14 +1485,24 @@ defmodule ControlKeel.CLI do
           })
 
         if browser.entries == [] do
-          {:ok, ["No proof bundles matched the current filters."]}
+          {:ok,
+           [
+             "Proof bundles: 0 matched#{proofs_filter_summary(options)}",
+             "Session proof bundles: #{browser.total_count}",
+             "Deploy-ready in view: 0"
+           ] ++ proofs_help_lines([], options)}
         else
           {:ok,
-           Enum.map(browser.entries, fn proof ->
-             deploy = if proof.deploy_ready, do: "deploy-ready", else: "review-required"
+           [
+             "Proof bundles: #{length(browser.entries)} matched#{proofs_filter_summary(options)}",
+             "Session proof bundles: #{browser.total_count}",
+             "Deploy-ready in view: #{Enum.count(browser.entries, & &1.deploy_ready)}"
+           ] ++
+             Enum.map(browser.entries, fn proof ->
+               deploy = if proof.deploy_ready, do: "deploy-ready", else: "review-required"
 
-             "##{proof.id} v#{proof.version} [#{proof.status}] #{proof.task.title} (risk #{proof.risk_score}, #{deploy})"
-           end)}
+               "##{proof.id} v#{proof.version} [#{proof.status}] #{proof.task.title} (risk #{proof.risk_score}, #{deploy})"
+             end) ++ proofs_help_lines(browser.entries, options)}
         end
 
       {:error, reason} ->
@@ -1565,9 +1575,16 @@ defmodule ControlKeel.CLI do
 
     suite_lines =
       if suites == [] do
-        ["No benchmark suites are available."]
+        [
+          "Benchmark suites: 0#{benchmark_filter_summary(options)}",
+          "Available subjects: #{length(subjects)}",
+          "Recent runs: #{length(runs)}"
+        ]
       else
         [
+          "Benchmark suites: #{length(suites)}#{benchmark_filter_summary(options)}",
+          "Available subjects: #{length(subjects)}",
+          "Recent runs: #{length(runs)}",
           "Benchmark suites:"
           | Enum.map(suites, fn suite ->
               packs = Benchmark.domain_packs_for_suite(suite)
@@ -1599,7 +1616,9 @@ defmodule ControlKeel.CLI do
         ]
       end
 
-    {:ok, suite_lines ++ subject_lines ++ run_lines}
+    {:ok,
+     suite_lines ++
+       subject_lines ++ run_lines ++ benchmark_list_help_lines(suites, runs, subjects)}
   end
 
   def run_command(%{command: :benchmark_run, options: options}, project_root) do
@@ -1664,7 +1683,7 @@ defmodule ControlKeel.CLI do
          "Average overhead: #{format_percent(run.average_overhead_percent)}",
          "Subjects:"
          | subject_lines
-       ]}
+       ] ++ benchmark_show_help_lines(run)}
     else
       {:error, :invalid_id} ->
         {:error, "Benchmark run id must be an integer."}
@@ -2910,13 +2929,16 @@ defmodule ControlKeel.CLI do
     else
       case ControlKeel.Mission.Progress.compute(session_id) do
         {:ok, progress} ->
+          current_task = progress.tasks.current_task
+
           lines = [
             "Session ##{session_id} Progress: #{progress.overall_percent}%",
             "",
             "Tasks: #{progress.tasks.done}/#{progress.tasks.total} done (#{progress.tasks.in_progress} in progress, #{progress.tasks.blocked} blocked)",
             "Findings: #{progress.findings.resolved}/#{progress.findings.total} resolved (#{progress.findings.critical_open} critical open)",
             "Budget: $#{progress.budget.spent_cents / 100} / $#{progress.budget.budget_cents / 100} (#{progress.budget.percent}%) [#{progress.budget.status}]",
-            "Estimated effort: #{progress.estimated_effort.estimated_hours}h (#{progress.estimated_effort.estimated_days} days)"
+            "Estimated effort: #{progress.estimated_effort.estimated_hours}h (#{progress.estimated_effort.estimated_days} days)",
+            "Current task: #{(current_task && current_task.title) || "No task in progress"}"
           ]
 
           remaining =
@@ -2938,7 +2960,7 @@ defmodule ControlKeel.CLI do
               lines
             end
 
-          {:ok, lines}
+          {:ok, lines ++ progress_help_lines(progress, current_task)}
 
         {:error, :session_not_found} ->
           {:error, "Session ##{session_id} not found."}
@@ -3655,6 +3677,26 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp proofs_filter_summary(options) do
+    filters =
+      []
+      |> maybe_add_filter("task_id", options[:task_id])
+      |> maybe_add_filter("deploy_ready", options[:deploy_ready])
+
+    case filters do
+      [] -> ""
+      values -> " (" <> Enum.join(values, ", ") <> ")"
+    end
+  end
+
+  defp benchmark_filter_summary(options) do
+    case options[:domain_pack] do
+      nil -> ""
+      "" -> ""
+      domain_pack -> " (domain_pack=#{domain_pack})"
+    end
+  end
+
   defp maybe_add_filter(filters, _label, nil), do: filters
   defp maybe_add_filter(filters, _label, ""), do: filters
   defp maybe_add_filter(filters, label, value), do: filters ++ ["#{label}=#{value}"]
@@ -3663,6 +3705,87 @@ defmodule ControlKeel.CLI do
     Enum.find(session.tasks, &(&1.status == "in_progress")) ||
       Enum.find(session.tasks, &(&1.status == "queued")) ||
       List.first(session.tasks)
+  end
+
+  defp proofs_help_lines(proofs, options) do
+    help_lines =
+      []
+      |> maybe_add_help_line(
+        proofs != [],
+        "Next: controlkeel proof <proof_id>"
+      )
+      |> maybe_add_help_line(
+        proofs != [] and is_nil(options[:deploy_ready]),
+        "Next: controlkeel proofs --deploy-ready true"
+      )
+      |> maybe_add_help_line(
+        proofs == [],
+        "Next: controlkeel status"
+      )
+
+    case help_lines do
+      [] -> []
+      lines -> ["Suggested next steps:" | Enum.map(lines, &"  #{&1}")]
+    end
+  end
+
+  defp progress_help_lines(progress, current_task) do
+    help_lines =
+      []
+      |> maybe_add_help_line(
+        progress.findings.critical_open > 0 or progress.findings.blocked > 0,
+        "Next: controlkeel findings --status blocked"
+      )
+      |> maybe_add_help_line(maybe_task_proof_hint(current_task))
+      |> maybe_add_help_line(
+        progress.tasks.queued > 0,
+        "Next: controlkeel run task <task_id>"
+      )
+
+    case help_lines do
+      [] -> []
+      lines -> ["", "Suggested next steps:" | Enum.map(lines, &"  #{&1}")]
+    end
+  end
+
+  defp benchmark_list_help_lines(suites, runs, subjects) do
+    help_lines =
+      []
+      |> maybe_add_help_line(
+        suites != [],
+        "Next: controlkeel benchmark run --suite <suite_slug> --subjects <subject_ids>"
+      )
+      |> maybe_add_help_line(
+        runs != [],
+        "Next: controlkeel benchmark show <run_id>"
+      )
+      |> maybe_add_help_line(
+        subjects == [],
+        "Next: controlkeel benchmark import <run_id> <subject> <file>"
+      )
+
+    case help_lines do
+      [] -> []
+      lines -> ["", "Suggested next steps:" | Enum.map(lines, &"  #{&1}")]
+    end
+  end
+
+  defp benchmark_show_help_lines(run) do
+    help_lines =
+      []
+      |> maybe_add_help_line(
+        true,
+        "Next: controlkeel benchmark export #{run.id} --format csv"
+      )
+      |> maybe_add_help_line(
+        run.status != "completed",
+        "Next: controlkeel benchmark import #{run.id} <subject> <file>"
+      )
+
+    case help_lines do
+      [] -> []
+      lines -> ["Suggested next steps:" | Enum.map(lines, &"  #{&1}")]
+    end
   end
 
   defp session_workspace_context(session, project_root) do

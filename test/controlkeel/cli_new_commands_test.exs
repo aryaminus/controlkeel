@@ -494,7 +494,7 @@ defmodule ControlKeel.CLI.NewCommandsTest do
   describe "progress command" do
     test "progress with session id shows progress", %{tmp_dir: tmp_dir} do
       session = session_fixture(%{budget_cents: 5000, spent_cents: 1000})
-      _task = task_fixture(%{session: session, status: "done", title: "Done task"})
+      _task = task_fixture(%{session: session, status: "in_progress", title: "Live task"})
 
       write_binding(tmp_dir, session)
 
@@ -514,6 +514,8 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert output =~ "Session ##{session.id} Progress"
       assert output =~ "Tasks:"
       assert output =~ "Budget:"
+      assert output =~ "Current task:"
+      assert output =~ "Suggested next steps:"
     end
 
     test "progress without session returns error" do

@@ -782,7 +782,10 @@ defmodule ControlKeel.CLIRuntimeTest do
                  CLI.execute(%{command: :proofs, options: %{}, args: []}, project_root: tmp_dir)
       end)
 
+    assert proofs_output =~ "Proof bundles: 1 matched"
+    assert proofs_output =~ "Deploy-ready in view:"
     assert proofs_output =~ "CLI proof task"
+    assert proofs_output =~ "Suggested next steps:"
 
     memory_output =
       capture_io(fn ->
@@ -837,8 +840,12 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert list_output =~ "Benchmark suites:"
+    assert list_output =~ "Available subjects:"
+    assert list_output =~ "Recent runs:"
+    assert list_output =~ "Benchmark suites:"
     assert list_output =~ "manual_subject"
     assert list_output =~ "domain_expansion_v1"
+    assert list_output =~ "Suggested next steps:"
     refute list_output =~ "vibe_failures_v1"
 
     assert {:ok, run_command} =
@@ -875,6 +882,7 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert show_output =~ "Benchmark run ##{run.id}"
     assert show_output =~ "Catch rate:"
+    assert show_output =~ "Suggested next steps:"
 
     assert {:ok, export} =
              CLI.parse(["benchmark", "export", Integer.to_string(run.id), "--format", "csv"])
