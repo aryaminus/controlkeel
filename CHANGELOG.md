@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.43 — 2026-04-09
+
+### What's changed
+
+- Add JSON output mode for core CLI reads
+
 ## v0.1.42 — 2026-04-09
 
 ### What's changed
