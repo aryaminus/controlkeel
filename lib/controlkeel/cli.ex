@@ -60,9 +60,15 @@ defmodule ControlKeel.CLI do
     with_skills: :boolean,
     scope: :string
   ]
-  @findings_switches [severity: :string, status: :string]
+  @status_switches [format: :string]
+  @findings_switches [severity: :string, status: :string, format: :string]
   @findings_translate_switches [session_id: :integer, severity: :string]
-  @proofs_switches [session_id: :integer, task_id: :integer, deploy_ready: :boolean]
+  @proofs_switches [
+    session_id: :integer,
+    task_id: :integer,
+    deploy_ready: :boolean,
+    format: :string
+  ]
   @mcp_switches [project_root: :string]
   @memory_search_switches [session_id: :integer, type: :string]
   @deploy_analyze_switches [project_root: :string]
@@ -77,7 +83,7 @@ defmodule ControlKeel.CLI do
   @cost_optimize_switches [session_id: :integer, provider: :string, model: :string]
   @cost_compare_switches [tokens: :integer]
   @precommit_check_switches [project_root: :string, domain_pack: :string, enforce: :boolean]
-  @progress_switches [session_id: :integer]
+  @progress_switches [session_id: :integer, format: :string]
   @circuit_breaker_switches [agent_id: :string]
   @skills_list_switches [project_root: :string, target: :string]
   @skills_validate_switches [project_root: :string]
@@ -91,7 +97,7 @@ defmodule ControlKeel.CLI do
     scenario_slugs: :string,
     domain_pack: :string
   ]
-  @benchmark_list_switches [domain_pack: :string]
+  @benchmark_list_switches [domain_pack: :string, format: :string]
   @benchmark_export_switches [format: :string]
   @policy_train_switches [type: :string]
   @watch_switches [interval: :integer]
@@ -276,8 +282,8 @@ defmodule ControlKeel.CLI do
       ["sandbox", "config"] ->
         {:ok, %{command: :sandbox_status, options: %{}, args: []}}
 
-      ["status"] ->
-        {:ok, %{command: :status, options: %{}, args: []}}
+      ["status" | rest] ->
+        parse_with_switches(:status, rest, @status_switches)
 
       ["findings", "translate" | rest] ->
         parse_with_switches(:findings_translate, rest, @findings_translate_switches)
@@ -1354,58 +1360,120 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :status}, project_root) do
-    case ensure_local_project(project_root) do
-      {:ok, binding, session, _mode} ->
-        metrics = Analytics.session_metrics(session.id) || %{}
-        rolling_24h = Budget.rolling_24h_spend_cents(session.id)
-        provider_status = ProviderBroker.status(project_root)
-        autonomy = AutonomyLoop.session_autonomy_profile(session)
-        outcome = AutonomyLoop.session_outcome_profile(session)
-        improvement = AutonomyLoop.session_improvement_loop(session)
-        active_task = current_session_task(session)
-        workspace_context = session_workspace_context(session, project_root)
-        augmentation = TaskAugmentation.build(session, active_task, workspace_context)
-        security_summary = Mission.security_case_summary(session.findings)
+  def run_command(%{command: :status, options: options}, project_root) do
+    with {:ok, format} <- cli_output_format(options),
+         {:ok, binding, session, _mode} <- ensure_local_project(project_root) do
+      metrics = Analytics.session_metrics(session.id) || %{}
+      rolling_24h = Budget.rolling_24h_spend_cents(session.id)
+      provider_status = ProviderBroker.status(project_root)
+      autonomy = AutonomyLoop.session_autonomy_profile(session)
+      outcome = AutonomyLoop.session_outcome_profile(session)
+      improvement = AutonomyLoop.session_improvement_loop(session)
+      active_task = current_session_task(session)
+      workspace_context = session_workspace_context(session, project_root)
+      augmentation = TaskAugmentation.build(session, active_task, workspace_context)
+      security_summary = Mission.security_case_summary(session.findings)
 
-        active_findings =
-          Enum.count(session.findings, &(&1.status in ["open", "blocked", "escalated"]))
+      active_findings =
+        Enum.count(session.findings, &(&1.status in ["open", "blocked", "escalated"]))
 
-        active_tasks = Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"]))
+      active_tasks = Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"]))
 
-        {:ok,
-         [
-           "Session: #{session.title} (##{session.id})",
-           "Risk tier: #{session.risk_tier}",
-           "Budget: #{format_money(session.spent_cents)} / #{format_money(session.budget_cents)} used",
-           "Rolling 24h: #{format_money(rolling_24h)} / #{format_money(session.daily_budget_cents)}",
-           "Active findings: #{active_findings}",
-           "Active tasks: #{active_tasks}",
-           "Autonomy: #{autonomy["label"]}",
-           "Outcome: #{outcome["label"]} · #{outcome["metric"]}",
-           "Current task: #{(active_task && active_task.title) || "No active task"}",
-           "Task augmentation: #{augmentation_status_line(augmentation)}",
-           "Security cases: #{security_case_status_line(security_summary)}",
-           "Funnel stage: #{Analytics.stage_label(metrics[:funnel_stage])}",
-           "Time to first finding: #{format_duration(metrics[:time_to_first_finding_seconds])}",
-           "Total findings: #{metrics[:total_findings] || 0}",
-           "Blocked findings: #{metrics[:blocked_findings_total] || 0}",
-           "Bootstrap mode: #{provider_status["bootstrap"]["mode"]}",
-           "Provider source: #{provider_status["selected_source"]}",
-           "Provider: #{provider_status["selected_provider"]}",
-           "Auth mode: #{provider_status["selected_auth_mode"]}",
-           "Auth owner: #{provider_status["selected_auth_owner"]}",
-           "Execution sandbox: #{ExecutionSandbox.adapter_name([])}",
-           "OpenAI responses: #{Proxy.url(session, :openai, "/v1/responses")}",
-           "OpenAI chat: #{Proxy.url(session, :openai, "/v1/chat/completions")}",
-           "OpenAI completions: #{Proxy.url(session, :openai, "/v1/completions")}",
-           "OpenAI embeddings: #{Proxy.url(session, :openai, "/v1/embeddings")}",
-           "OpenAI models: #{Proxy.url(session, :openai, "/v1/models")}",
-           "OpenAI realtime: #{Proxy.realtime_url(session, :openai, "/v1/realtime")}",
-           "Anthropic messages: #{Proxy.url(session, :anthropic, "/v1/messages")}"
-         ] ++
-           attached_agent_status_lines(binding) ++
-           contextual_status_help_lines(session, active_task, active_findings, improvement)}
+      help_lines =
+        contextual_status_help_lines(session, active_task, active_findings, improvement)
+
+      payload = %{
+        "session" => %{
+          "id" => session.id,
+          "title" => session.title,
+          "risk_tier" => session.risk_tier,
+          "active_findings" => active_findings,
+          "active_tasks" => active_tasks
+        },
+        "budget" => %{
+          "spent" => format_money(session.spent_cents),
+          "session_budget" => format_money(session.budget_cents),
+          "rolling_24h" => format_money(rolling_24h),
+          "daily_budget" => format_money(session.daily_budget_cents)
+        },
+        "autonomy_profile" => autonomy,
+        "outcome_profile" => outcome,
+        "current_task" => current_task_payload(active_task),
+        "task_augmentation" => %{
+          "status" => augmentation_status_line(augmentation),
+          "available" => augmentation["available"] == true,
+          "likely_paths" => augmentation["likely_paths"] || [],
+          "search_terms" => augmentation["search_terms"] || []
+        },
+        "security_case_summary" => security_summary,
+        "metrics" => %{
+          "funnel_stage" => Analytics.stage_label(metrics[:funnel_stage]),
+          "time_to_first_finding" => format_duration(metrics[:time_to_first_finding_seconds]),
+          "total_findings" => metrics[:total_findings] || 0,
+          "blocked_findings" => metrics[:blocked_findings_total] || 0
+        },
+        "provider_status" => %{
+          "bootstrap_mode" => provider_status["bootstrap"]["mode"],
+          "provider_source" => provider_status["selected_source"],
+          "provider" => provider_status["selected_provider"],
+          "auth_mode" => provider_status["selected_auth_mode"],
+          "auth_owner" => provider_status["selected_auth_owner"],
+          "execution_sandbox" => ExecutionSandbox.adapter_name([])
+        },
+        "proxy_urls" => %{
+          "openai_responses" => Proxy.url(session, :openai, "/v1/responses"),
+          "openai_chat" => Proxy.url(session, :openai, "/v1/chat/completions"),
+          "openai_completions" => Proxy.url(session, :openai, "/v1/completions"),
+          "openai_embeddings" => Proxy.url(session, :openai, "/v1/embeddings"),
+          "openai_models" => Proxy.url(session, :openai, "/v1/models"),
+          "openai_realtime" => Proxy.realtime_url(session, :openai, "/v1/realtime"),
+          "anthropic_messages" => Proxy.url(session, :anthropic, "/v1/messages")
+        },
+        "attached_agents" => attached_agent_status_payload(binding),
+        "suggested_next_steps" => help_lines_to_values(help_lines)
+      }
+
+      case format do
+        "json" ->
+          {:ok, [Jason.encode!(payload)]}
+
+        _ ->
+          {:ok,
+           [
+             "Session: #{session.title} (##{session.id})",
+             "Risk tier: #{session.risk_tier}",
+             "Budget: #{format_money(session.spent_cents)} / #{format_money(session.budget_cents)} used",
+             "Rolling 24h: #{format_money(rolling_24h)} / #{format_money(session.daily_budget_cents)}",
+             "Active findings: #{active_findings}",
+             "Active tasks: #{active_tasks}",
+             "Autonomy: #{autonomy["label"]}",
+             "Outcome: #{outcome["label"]} · #{outcome["metric"]}",
+             "Current task: #{(active_task && active_task.title) || "No active task"}",
+             "Task augmentation: #{augmentation_status_line(augmentation)}",
+             "Security cases: #{security_case_status_line(security_summary)}",
+             "Funnel stage: #{Analytics.stage_label(metrics[:funnel_stage])}",
+             "Time to first finding: #{format_duration(metrics[:time_to_first_finding_seconds])}",
+             "Total findings: #{metrics[:total_findings] || 0}",
+             "Blocked findings: #{metrics[:blocked_findings_total] || 0}",
+             "Bootstrap mode: #{provider_status["bootstrap"]["mode"]}",
+             "Provider source: #{provider_status["selected_source"]}",
+             "Provider: #{provider_status["selected_provider"]}",
+             "Auth mode: #{provider_status["selected_auth_mode"]}",
+             "Auth owner: #{provider_status["selected_auth_owner"]}",
+             "Execution sandbox: #{ExecutionSandbox.adapter_name([])}",
+             "OpenAI responses: #{Proxy.url(session, :openai, "/v1/responses")}",
+             "OpenAI chat: #{Proxy.url(session, :openai, "/v1/chat/completions")}",
+             "OpenAI completions: #{Proxy.url(session, :openai, "/v1/completions")}",
+             "OpenAI embeddings: #{Proxy.url(session, :openai, "/v1/embeddings")}",
+             "OpenAI models: #{Proxy.url(session, :openai, "/v1/models")}",
+             "OpenAI realtime: #{Proxy.realtime_url(session, :openai, "/v1/realtime")}",
+             "Anthropic messages: #{Proxy.url(session, :anthropic, "/v1/messages")}"
+           ] ++
+             attached_agent_status_lines(binding) ++ help_lines}
+      end
+    else
+      {:error, {:invalid_output_format, message}} ->
+        {:error, message}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -1413,39 +1481,69 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :findings, options: options}, project_root) do
-    case ensure_local_project(project_root) do
-      {:ok, _binding, session, _mode} ->
-        findings =
-          Mission.list_session_findings(session.id, %{
-            severity: options[:severity],
-            status: options[:status]
-          })
+    with {:ok, format} <- cli_output_format(options),
+         {:ok, _binding, session, _mode} <- ensure_local_project(project_root) do
+      findings =
+        Mission.list_session_findings(session.id, %{
+          severity: options[:severity],
+          status: options[:status]
+        })
 
-        security_summary = Mission.security_case_summary(findings)
+      security_summary = Mission.security_case_summary(findings)
 
-        active_total =
-          Enum.count(session.findings, &(&1.status in ["open", "blocked", "escalated"]))
+      active_total =
+        Enum.count(session.findings, &(&1.status in ["open", "blocked", "escalated"]))
 
-        filter_summary = findings_filter_summary(options)
+      filter_summary = findings_filter_summary(options)
+      help_lines = findings_help_lines(findings, options)
 
-        if findings == [] do
-          {:ok,
-           [
-             "Findings: 0 matched#{filter_summary}",
-             "Active findings in session: #{active_total}",
-             "Security cases: #{security_case_status_line(security_summary)}"
-           ] ++ findings_help_lines([], options)}
-        else
-          {:ok,
-           [
-             "Findings: #{length(findings)} matched#{filter_summary}",
-             "Active findings in session: #{active_total}",
-             "Security cases: #{security_case_status_line(security_summary)}"
-           ] ++
-             Enum.map(findings, fn finding ->
-               "##{finding.id} [#{finding.severity}/#{finding.status}] #{finding.title} (#{finding.rule_id})"
-             end) ++ findings_help_lines(findings, options)}
-        end
+      payload = %{
+        "summary" => %{
+          "matched" => length(findings),
+          "active_findings_in_session" => active_total,
+          "filter_summary" => filter_summary,
+          "security_case_summary" => security_summary
+        },
+        "entries" =>
+          Enum.map(findings, fn finding ->
+            %{
+              "id" => finding.id,
+              "severity" => finding.severity,
+              "status" => finding.status,
+              "title" => finding.title,
+              "rule_id" => finding.rule_id
+            }
+          end),
+        "suggested_next_steps" => help_lines_to_values(help_lines)
+      }
+
+      case format do
+        "json" ->
+          {:ok, [Jason.encode!(payload)]}
+
+        _ ->
+          if findings == [] do
+            {:ok,
+             [
+               "Findings: 0 matched#{filter_summary}",
+               "Active findings in session: #{active_total}",
+               "Security cases: #{security_case_status_line(security_summary)}"
+             ] ++ help_lines}
+          else
+            {:ok,
+             [
+               "Findings: #{length(findings)} matched#{filter_summary}",
+               "Active findings in session: #{active_total}",
+               "Security cases: #{security_case_status_line(security_summary)}"
+             ] ++
+               Enum.map(findings, fn finding ->
+                 "##{finding.id} [#{finding.severity}/#{finding.status}] #{finding.title} (#{finding.rule_id})"
+               end) ++ help_lines}
+          end
+      end
+    else
+      {:error, {:invalid_output_format, message}} ->
+        {:error, message}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -1475,35 +1573,68 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :proofs, options: options}, project_root) do
-    case ensure_local_project(project_root) do
-      {:ok, _binding, session, _mode} ->
-        browser =
-          Mission.browse_proof_bundles(%{
-            session_id: options[:session_id] || session.id,
-            task_id: options[:task_id],
-            deploy_ready: options[:deploy_ready]
-          })
+    with {:ok, format} <- cli_output_format(options),
+         {:ok, _binding, session, _mode} <- ensure_local_project(project_root) do
+      browser =
+        Mission.browse_proof_bundles(%{
+          session_id: options[:session_id] || session.id,
+          task_id: options[:task_id],
+          deploy_ready: options[:deploy_ready]
+        })
 
-        if browser.entries == [] do
-          {:ok,
-           [
-             "Proof bundles: 0 matched#{proofs_filter_summary(options)}",
-             "Session proof bundles: #{browser.total_count}",
-             "Deploy-ready in view: 0"
-           ] ++ proofs_help_lines([], options)}
-        else
-          {:ok,
-           [
-             "Proof bundles: #{length(browser.entries)} matched#{proofs_filter_summary(options)}",
-             "Session proof bundles: #{browser.total_count}",
-             "Deploy-ready in view: #{Enum.count(browser.entries, & &1.deploy_ready)}"
-           ] ++
-             Enum.map(browser.entries, fn proof ->
-               deploy = if proof.deploy_ready, do: "deploy-ready", else: "review-required"
+      help_lines = proofs_help_lines(browser.entries, options)
 
-               "##{proof.id} v#{proof.version} [#{proof.status}] #{proof.task.title} (risk #{proof.risk_score}, #{deploy})"
-             end) ++ proofs_help_lines(browser.entries, options)}
-        end
+      payload = %{
+        "summary" => %{
+          "matched" => length(browser.entries),
+          "session_proof_bundles" => browser.total_count,
+          "deploy_ready_in_view" => Enum.count(browser.entries, & &1.deploy_ready),
+          "filter_summary" => proofs_filter_summary(options)
+        },
+        "entries" =>
+          Enum.map(browser.entries, fn proof ->
+            %{
+              "id" => proof.id,
+              "version" => proof.version,
+              "status" => proof.status,
+              "task_id" => proof.task_id,
+              "task_title" => proof.task.title,
+              "risk_score" => proof.risk_score,
+              "deploy_ready" => proof.deploy_ready
+            }
+          end),
+        "suggested_next_steps" => help_lines_to_values(help_lines)
+      }
+
+      case format do
+        "json" ->
+          {:ok, [Jason.encode!(payload)]}
+
+        _ ->
+          if browser.entries == [] do
+            {:ok,
+             [
+               "Proof bundles: 0 matched#{proofs_filter_summary(options)}",
+               "Session proof bundles: #{browser.total_count}",
+               "Deploy-ready in view: 0"
+             ] ++ help_lines}
+          else
+            {:ok,
+             [
+               "Proof bundles: #{length(browser.entries)} matched#{proofs_filter_summary(options)}",
+               "Session proof bundles: #{browser.total_count}",
+               "Deploy-ready in view: #{Enum.count(browser.entries, & &1.deploy_ready)}"
+             ] ++
+               Enum.map(browser.entries, fn proof ->
+                 deploy = if proof.deploy_ready, do: "deploy-ready", else: "review-required"
+
+                 "##{proof.id} v#{proof.version} [#{proof.status}] #{proof.task.title} (risk #{proof.risk_score}, #{deploy})"
+               end) ++ help_lines}
+          end
+      end
+    else
+      {:error, {:invalid_output_format, message}} ->
+        {:error, message}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -1568,57 +1699,107 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :benchmark_list, options: options}, project_root) do
-    filter_opts = benchmark_filter_opts(options[:domain_pack])
-    suites = Benchmark.list_suites(filter_opts)
-    runs = Benchmark.list_recent_runs(filter_opts)
-    subjects = Benchmark.available_subjects(project_root)
+    with {:ok, format} <- cli_output_format(options) do
+      filter_opts = benchmark_filter_opts(options[:domain_pack])
+      suites = Benchmark.list_suites(filter_opts)
+      runs = Benchmark.list_recent_runs(filter_opts)
+      subjects = Benchmark.available_subjects(project_root)
+      help_lines = benchmark_list_help_lines(suites, runs, subjects)
 
-    suite_lines =
-      if suites == [] do
-        [
-          "Benchmark suites: 0#{benchmark_filter_summary(options)}",
-          "Available subjects: #{length(subjects)}",
-          "Recent runs: #{length(runs)}"
-        ]
-      else
-        [
-          "Benchmark suites: #{length(suites)}#{benchmark_filter_summary(options)}",
-          "Available subjects: #{length(subjects)}",
-          "Recent runs: #{length(runs)}",
-          "Benchmark suites:"
-          | Enum.map(suites, fn suite ->
-              packs = Benchmark.domain_packs_for_suite(suite)
+      payload = %{
+        "summary" => %{
+          "suite_count" => length(suites),
+          "subject_count" => length(subjects),
+          "recent_run_count" => length(runs),
+          "filter_summary" => benchmark_filter_summary(options)
+        },
+        "suites" =>
+          Enum.map(suites, fn suite ->
+            packs = Benchmark.domain_packs_for_suite(suite)
 
-              "  #{suite.slug} v#{suite.version} — #{suite.name} (#{length(suite.scenarios)} scenarios; domains: #{format_domain_packs(packs)})"
-            end)
-        ]
-      end
+            %{
+              "slug" => suite.slug,
+              "version" => suite.version,
+              "name" => suite.name,
+              "scenario_count" => length(suite.scenarios),
+              "domains" => format_domain_packs(packs)
+            }
+          end),
+        "subjects" =>
+          Enum.map(subjects, fn subject ->
+            %{
+              "id" => subject["id"],
+              "type" => subject["type"],
+              "label" => subject["label"]
+            }
+          end),
+        "recent_runs" =>
+          Enum.map(runs, fn run ->
+            %{
+              "id" => run.id,
+              "suite_slug" => run.suite.slug,
+              "status" => run.status,
+              "catch_rate" => run.catch_rate,
+              "baseline_subject" => run.baseline_subject
+            }
+          end),
+        "suggested_next_steps" => help_lines_to_values(help_lines)
+      }
 
-    subject_lines =
-      [
-        "",
-        "Available subjects:"
-        | Enum.map(subjects, fn subject ->
-            "  #{subject["id"]} [#{subject["type"]}] #{subject["label"]}"
-          end)
-      ]
+      suite_lines =
+        if suites == [] do
+          [
+            "Benchmark suites: 0#{benchmark_filter_summary(options)}",
+            "Available subjects: #{length(subjects)}",
+            "Recent runs: #{length(runs)}"
+          ]
+        else
+          [
+            "Benchmark suites: #{length(suites)}#{benchmark_filter_summary(options)}",
+            "Available subjects: #{length(subjects)}",
+            "Recent runs: #{length(runs)}",
+            "Benchmark suites:"
+            | Enum.map(suites, fn suite ->
+                packs = Benchmark.domain_packs_for_suite(suite)
 
-    run_lines =
-      if runs == [] do
-        ["", "No benchmark runs recorded yet."]
-      else
+                "  #{suite.slug} v#{suite.version} — #{suite.name} (#{length(suite.scenarios)} scenarios; domains: #{format_domain_packs(packs)})"
+              end)
+          ]
+        end
+
+      subject_lines =
         [
           "",
-          "Recent runs:"
-          | Enum.map(runs, fn run ->
-              "  ##{run.id} #{run.suite.slug} [#{run.status}] catch #{run.catch_rate}% baseline #{run.baseline_subject}"
+          "Available subjects:"
+          | Enum.map(subjects, fn subject ->
+              "  #{subject["id"]} [#{subject["type"]}] #{subject["label"]}"
             end)
         ]
-      end
 
-    {:ok,
-     suite_lines ++
-       subject_lines ++ run_lines ++ benchmark_list_help_lines(suites, runs, subjects)}
+      run_lines =
+        if runs == [] do
+          ["", "No benchmark runs recorded yet."]
+        else
+          [
+            "",
+            "Recent runs:"
+            | Enum.map(runs, fn run ->
+                "  ##{run.id} #{run.suite.slug} [#{run.status}] catch #{run.catch_rate}% baseline #{run.baseline_subject}"
+              end)
+          ]
+        end
+
+      case format do
+        "json" ->
+          {:ok, [Jason.encode!(payload)]}
+
+        _ ->
+          {:ok, suite_lines ++ subject_lines ++ run_lines ++ help_lines}
+      end
+    else
+      {:error, {:invalid_output_format, message}} ->
+        {:error, message}
+    end
   end
 
   def run_command(%{command: :benchmark_run, options: options}, project_root) do
@@ -2929,38 +3110,63 @@ defmodule ControlKeel.CLI do
     else
       case ControlKeel.Mission.Progress.compute(session_id) do
         {:ok, progress} ->
-          current_task = progress.tasks.current_task
+          with {:ok, format} <- cli_output_format(options) do
+            current_task = progress.tasks.current_task
 
-          lines = [
-            "Session ##{session_id} Progress: #{progress.overall_percent}%",
-            "",
-            "Tasks: #{progress.tasks.done}/#{progress.tasks.total} done (#{progress.tasks.in_progress} in progress, #{progress.tasks.blocked} blocked)",
-            "Findings: #{progress.findings.resolved}/#{progress.findings.total} resolved (#{progress.findings.critical_open} critical open)",
-            "Budget: $#{progress.budget.spent_cents / 100} / $#{progress.budget.budget_cents / 100} (#{progress.budget.percent}%) [#{progress.budget.status}]",
-            "Estimated effort: #{progress.estimated_effort.estimated_hours}h (#{progress.estimated_effort.estimated_days} days)",
-            "Current task: #{(current_task && current_task.title) || "No task in progress"}"
-          ]
+            lines = [
+              "Session ##{session_id} Progress: #{progress.overall_percent}%",
+              "",
+              "Tasks: #{progress.tasks.done}/#{progress.tasks.total} done (#{progress.tasks.in_progress} in progress, #{progress.tasks.blocked} blocked)",
+              "Findings: #{progress.findings.resolved}/#{progress.findings.total} resolved (#{progress.findings.critical_open} critical open)",
+              "Budget: $#{progress.budget.spent_cents / 100} / $#{progress.budget.budget_cents / 100} (#{progress.budget.percent}%) [#{progress.budget.status}]",
+              "Estimated effort: #{progress.estimated_effort.estimated_hours}h (#{progress.estimated_effort.estimated_days} days)",
+              "Current task: #{(current_task && current_task.title) || "No task in progress"}"
+            ]
 
-          remaining =
-            Enum.map(progress.remaining_items, fn item ->
-              prefix =
-                case item.type do
-                  :blocker -> "BLOCKER"
-                  :warning -> "WARN"
-                  _ -> "INFO"
-                end
+            remaining =
+              Enum.map(progress.remaining_items, fn item ->
+                prefix =
+                  case item.type do
+                    :blocker -> "BLOCKER"
+                    :warning -> "WARN"
+                    _ -> "INFO"
+                  end
 
-              "  #{prefix}: #{item.message}"
-            end)
+                "  #{prefix}: #{item.message}"
+              end)
 
-          lines =
-            if remaining != [] do
-              lines ++ ["", "Remaining:"] ++ remaining
-            else
-              lines
+            lines =
+              if remaining != [] do
+                lines ++ ["", "Remaining:"] ++ remaining
+              else
+                lines
+              end
+
+            help_lines = progress_help_lines(progress, current_task)
+
+            payload = %{
+              "session_id" => session_id,
+              "overall_percent" => progress.overall_percent,
+              "tasks" => progress.tasks,
+              "findings" => progress.findings,
+              "budget" => progress.budget,
+              "estimated_effort" => progress.estimated_effort,
+              "current_task" => current_task_payload(current_task),
+              "remaining_items" => progress.remaining_items,
+              "suggested_next_steps" => help_lines_to_values(help_lines)
+            }
+
+            case format do
+              "json" ->
+                {:ok, [Jason.encode!(payload)]}
+
+              _ ->
+                {:ok, lines ++ help_lines}
             end
-
-          {:ok, lines ++ progress_help_lines(progress, current_task)}
+          else
+            {:error, {:invalid_output_format, message}} ->
+              {:error, message}
+          end
 
         {:error, :session_not_found} ->
           {:error, "Session ##{session_id} not found."}
@@ -3677,6 +3883,40 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp cli_output_format(options) when is_list(options) do
+    case options[:format] do
+      nil ->
+        {:ok, "text"}
+
+      "text" ->
+        {:ok, "text"}
+
+      "json" ->
+        {:ok, "json"}
+
+      other ->
+        {:error, {:invalid_output_format, "Output format must be text or json, got #{other}."}}
+    end
+  end
+
+  defp cli_output_format(options) when is_map(options) do
+    case Map.get(options, :format) || Map.get(options, "format") do
+      nil ->
+        {:ok, "text"}
+
+      "text" ->
+        {:ok, "text"}
+
+      "json" ->
+        {:ok, "json"}
+
+      other ->
+        {:error, {:invalid_output_format, "Output format must be text or json, got #{other}."}}
+    end
+  end
+
+  defp cli_output_format(_options), do: {:ok, "text"}
+
   defp proofs_filter_summary(options) do
     filters =
       []
@@ -3705,6 +3945,16 @@ defmodule ControlKeel.CLI do
     Enum.find(session.tasks, &(&1.status == "in_progress")) ||
       Enum.find(session.tasks, &(&1.status == "queued")) ||
       List.first(session.tasks)
+  end
+
+  defp current_task_payload(nil), do: nil
+
+  defp current_task_payload(task) do
+    %{
+      "id" => task.id,
+      "title" => task.title,
+      "status" => task.status
+    }
   end
 
   defp proofs_help_lines(proofs, options) do
@@ -3837,6 +4087,24 @@ defmodule ControlKeel.CLI do
   end
 
   defp truncate_cli(text, _limit), do: text
+
+  defp attached_agent_status_payload(binding) do
+    binding
+    |> Map.get("attached_agents", %{})
+    |> Enum.sort_by(fn {agent, _attrs} -> agent end)
+    |> Enum.map(fn {agent, attrs} ->
+      %{
+        "agent" => agent,
+        "controlkeel_version" => attrs["controlkeel_version"] || "unknown"
+      }
+    end)
+  end
+
+  defp help_lines_to_values(lines) do
+    lines
+    |> Enum.reject(&(&1 == "Suggested next steps:" or &1 == ""))
+    |> Enum.map(&String.trim/1)
+  end
 
   defp maybe_add_help_line(lines, true, line), do: lines ++ [line]
   defp maybe_add_help_line(lines, false, _line), do: lines

@@ -144,6 +144,18 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert status_output =~ "Blocked findings:"
     assert status_output =~ "Suggested next steps:"
     assert status_output =~ "controlkeel proofs --task-id #{task.id}"
+
+    assert {:ok, status_json} = CLI.parse(["status", "--format", "json"])
+
+    status_json_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(status_json, project_root: tmp_dir)
+      end)
+
+    assert {:ok, status_payload} = Jason.decode(String.trim(status_json_output))
+    assert get_in(status_payload, ["session", "title"]) == "Runtime CLI session"
+    assert get_in(status_payload, ["autonomy_profile", "mode"])
+    assert is_list(status_payload["suggested_next_steps"])
   end
 
   test "findings output includes aggregates, filters, and next steps", %{tmp_dir: tmp_dir} do
@@ -187,6 +199,18 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert findings_output =~ "Patch validation missing"
     assert findings_output =~ "Suggested next steps:"
     assert findings_output =~ "controlkeel approve <finding_id>"
+
+    assert {:ok, findings_json} =
+             CLI.parse(["findings", "--severity", "high", "--status", "open", "--format", "json"])
+
+    findings_json_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(findings_json, project_root: tmp_dir)
+      end)
+
+    assert {:ok, findings_payload} = Jason.decode(String.trim(findings_json_output))
+    assert get_in(findings_payload, ["summary", "matched"]) == 1
+    assert [%{"title" => "Patch validation missing"}] = findings_payload["entries"]
   end
 
   test "mcp accepts --project-root explicitly", %{tmp_dir: tmp_dir} do
@@ -787,6 +811,19 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert proofs_output =~ "CLI proof task"
     assert proofs_output =~ "Suggested next steps:"
 
+    proofs_json_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{command: :proofs, options: %{format: "json"}, args: []},
+                   project_root: tmp_dir
+                 )
+      end)
+
+    assert {:ok, proofs_payload} = Jason.decode(String.trim(proofs_json_output))
+    assert get_in(proofs_payload, ["summary", "matched"]) == 1
+    assert [%{"task_title" => "CLI proof task"}] = proofs_payload["entries"]
+
     memory_output =
       capture_io(fn ->
         assert 0 ==
@@ -847,6 +884,18 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert list_output =~ "domain_expansion_v1"
     assert list_output =~ "Suggested next steps:"
     refute list_output =~ "vibe_failures_v1"
+
+    assert {:ok, list_json} =
+             CLI.parse(["benchmark", "list", "--domain-pack", "hr", "--format", "json"])
+
+    list_json_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(list_json, project_root: tmp_dir)
+      end)
+
+    assert {:ok, list_payload} = Jason.decode(String.trim(list_json_output))
+    assert get_in(list_payload, ["summary", "suite_count"]) >= 1
+    assert Enum.any?(list_payload["subjects"], &(&1["id"] == "manual_subject"))
 
     assert {:ok, run_command} =
              CLI.parse([

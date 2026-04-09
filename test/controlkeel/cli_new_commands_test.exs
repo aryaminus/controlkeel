@@ -516,6 +516,23 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert output =~ "Budget:"
       assert output =~ "Current task:"
       assert output =~ "Suggested next steps:"
+
+      json_output =
+        capture_io(fn ->
+          assert 0 ==
+                   CLI.execute(
+                     %{
+                       command: :progress,
+                       options: %{session_id: session.id, format: "json"},
+                       args: []
+                     },
+                     project_root: tmp_dir
+                   )
+        end)
+
+      assert {:ok, payload} = Jason.decode(String.trim(json_output))
+      assert payload["session_id"] == session.id
+      assert get_in(payload, ["current_task", "title"]) == "Live task"
     end
 
     test "progress without session returns error" do
@@ -537,6 +554,9 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
       assert {:ok, parsed} = CLI.parse(["progress", "--session-id", "42"])
       assert parsed.options[:session_id] == 42
+
+      assert {:ok, parsed_json} = CLI.parse(["progress", "--format", "json"])
+      assert parsed_json.options[:format] == "json"
     end
   end
 
