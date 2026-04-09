@@ -6,6 +6,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.AgentIntegration
   alias ControlKeel.AttachedAgentSync
   alias ControlKeel.Analytics
+  alias ControlKeel.AutonomyLoop
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.Budget.CostOptimizer
@@ -38,6 +39,8 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.RuntimePaths
   alias ControlKeel.SetupAdvisor
   alias ControlKeel.Skills
+  alias ControlKeel.TaskAugmentation
+  alias ControlKeel.WorkspaceContext
   alias ControlKeelWeb.Endpoint
 
   @init_switches [
@@ -1357,6 +1360,13 @@ defmodule ControlKeel.CLI do
         metrics = Analytics.session_metrics(session.id) || %{}
         rolling_24h = Budget.rolling_24h_spend_cents(session.id)
         provider_status = ProviderBroker.status(project_root)
+        autonomy = AutonomyLoop.session_autonomy_profile(session)
+        outcome = AutonomyLoop.session_outcome_profile(session)
+        improvement = AutonomyLoop.session_improvement_loop(session)
+        active_task = current_session_task(session)
+        workspace_context = session_workspace_context(session, project_root)
+        augmentation = TaskAugmentation.build(session, active_task, workspace_context)
+        security_summary = Mission.security_case_summary(session.findings)
 
         active_findings =
           Enum.count(session.findings, &(&1.status in ["open", "blocked", "escalated"]))
@@ -1371,6 +1381,11 @@ defmodule ControlKeel.CLI do
            "Rolling 24h: #{format_money(rolling_24h)} / #{format_money(session.daily_budget_cents)}",
            "Active findings: #{active_findings}",
            "Active tasks: #{active_tasks}",
+           "Autonomy: #{autonomy["label"]}",
+           "Outcome: #{outcome["label"]} · #{outcome["metric"]}",
+           "Current task: #{(active_task && active_task.title) || "No active task"}",
+           "Task augmentation: #{augmentation_status_line(augmentation)}",
+           "Security cases: #{security_case_status_line(security_summary)}",
            "Funnel stage: #{Analytics.stage_label(metrics[:funnel_stage])}",
            "Time to first finding: #{format_duration(metrics[:time_to_first_finding_seconds])}",
            "Total findings: #{metrics[:total_findings] || 0}",
@@ -1388,7 +1403,9 @@ defmodule ControlKeel.CLI do
            "OpenAI models: #{Proxy.url(session, :openai, "/v1/models")}",
            "OpenAI realtime: #{Proxy.realtime_url(session, :openai, "/v1/realtime")}",
            "Anthropic messages: #{Proxy.url(session, :anthropic, "/v1/messages")}"
-         ] ++ attached_agent_status_lines(binding)}
+         ] ++
+           attached_agent_status_lines(binding) ++
+           contextual_status_help_lines(session, active_task, active_findings, improvement)}
 
       {:error, reason} ->
         {:error, "Failed to load local project: #{inspect(reason)}"}
@@ -1404,13 +1421,30 @@ defmodule ControlKeel.CLI do
             status: options[:status]
           })
 
+        security_summary = Mission.security_case_summary(findings)
+
+        active_total =
+          Enum.count(session.findings, &(&1.status in ["open", "blocked", "escalated"]))
+
+        filter_summary = findings_filter_summary(options)
+
         if findings == [] do
-          {:ok, ["No findings matched the current filters."]}
+          {:ok,
+           [
+             "Findings: 0 matched#{filter_summary}",
+             "Active findings in session: #{active_total}",
+             "Security cases: #{security_case_status_line(security_summary)}"
+           ] ++ findings_help_lines([], options)}
         else
           {:ok,
-           Enum.map(findings, fn finding ->
-             "##{finding.id} [#{finding.severity}/#{finding.status}] #{finding.title} (#{finding.rule_id})"
-           end)}
+           [
+             "Findings: #{length(findings)} matched#{filter_summary}",
+             "Active findings in session: #{active_total}",
+             "Security cases: #{security_case_status_line(security_summary)}"
+           ] ++
+             Enum.map(findings, fn finding ->
+               "##{finding.id} [#{finding.severity}/#{finding.status}] #{finding.title} (#{finding.rule_id})"
+             end) ++ findings_help_lines(findings, options)}
         end
 
       {:error, reason} ->
@@ -3564,6 +3598,130 @@ defmodule ControlKeel.CLI do
         ]
     end
   end
+
+  defp contextual_status_help_lines(_session, task, active_findings, improvement) do
+    recommended_next_step =
+      if is_map(improvement), do: improvement["recommended_next_step"], else: nil
+
+    help_lines =
+      []
+      |> maybe_add_help_line(
+        active_findings > 0,
+        "Next: controlkeel findings --status open"
+      )
+      |> maybe_add_help_line(maybe_task_proof_hint(task))
+      |> maybe_add_help_line(
+        true,
+        "Loop focus: #{recommended_next_step || "observe and rerun the governed loop"}"
+      )
+
+    case help_lines do
+      [] -> []
+      lines -> ["Suggested next steps:" | Enum.map(lines, &"  #{&1}")]
+    end
+  end
+
+  defp findings_help_lines(findings, options) do
+    help_lines =
+      []
+      |> maybe_add_help_line(
+        findings != [],
+        "Next: controlkeel approve <finding_id>"
+      )
+      |> maybe_add_help_line(
+        findings != [] and is_nil(options[:status]),
+        "Next: controlkeel findings --status blocked"
+      )
+      |> maybe_add_help_line(
+        findings == [],
+        "Next: controlkeel status"
+      )
+
+    case help_lines do
+      [] -> []
+      lines -> ["Suggested next steps:" | Enum.map(lines, &"  #{&1}")]
+    end
+  end
+
+  defp findings_filter_summary(options) do
+    filters =
+      []
+      |> maybe_add_filter("severity", options[:severity])
+      |> maybe_add_filter("status", options[:status])
+
+    case filters do
+      [] -> ""
+      values -> " (" <> Enum.join(values, ", ") <> ")"
+    end
+  end
+
+  defp maybe_add_filter(filters, _label, nil), do: filters
+  defp maybe_add_filter(filters, _label, ""), do: filters
+  defp maybe_add_filter(filters, label, value), do: filters ++ ["#{label}=#{value}"]
+
+  defp current_session_task(session) do
+    Enum.find(session.tasks, &(&1.status == "in_progress")) ||
+      Enum.find(session.tasks, &(&1.status == "queued")) ||
+      List.first(session.tasks)
+  end
+
+  defp session_workspace_context(session, project_root) do
+    session
+    |> WorkspaceContext.resolve_project_root(project_root)
+    |> case do
+      nil -> ProjectRoot.resolve(project_root)
+      resolved -> resolved
+    end
+    |> WorkspaceContext.build()
+  end
+
+  defp augmentation_status_line(%{"available" => true} = augmentation) do
+    likely_paths = augmentation["likely_paths"] |> List.wrap() |> Enum.take(3)
+    search_terms = augmentation["search_terms"] |> List.wrap() |> Enum.take(3)
+
+    summary =
+      [
+        truncate_cli(augmentation["objective"], 90),
+        list_hint("paths", likely_paths),
+        list_hint("terms", search_terms)
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" · ")
+
+    if summary == "", do: "available", else: summary
+  end
+
+  defp augmentation_status_line(_augmentation), do: "not available yet"
+
+  defp security_case_status_line(%{"case_count" => 0}), do: "0 tracked"
+
+  defp security_case_status_line(%{"case_count" => case_count} = summary) do
+    unresolved = summary["unresolved"] || 0
+    critical = summary["critical_unresolved"] || 0
+
+    "#{case_count} tracked · #{unresolved} unresolved · #{critical} critical unresolved"
+  end
+
+  defp security_case_status_line(_summary), do: "not recorded"
+
+  defp list_hint(_label, []), do: nil
+  defp list_hint(label, values), do: "#{label}: #{Enum.join(values, ", ")}"
+
+  defp truncate_cli(nil, _limit), do: nil
+
+  defp truncate_cli(text, limit) when is_binary(text) and byte_size(text) > limit do
+    "#{binary_part(text, 0, limit)}... (#{byte_size(text)} chars)"
+  end
+
+  defp truncate_cli(text, _limit), do: text
+
+  defp maybe_add_help_line(lines, true, line), do: lines ++ [line]
+  defp maybe_add_help_line(lines, false, _line), do: lines
+  defp maybe_add_help_line(lines, nil), do: lines
+  defp maybe_add_help_line(lines, line) when is_binary(line), do: lines ++ [line]
+
+  defp maybe_task_proof_hint(%{id: id}), do: "Next: controlkeel proofs --task-id #{id}"
+  defp maybe_task_proof_hint(_task), do: nil
 
   defp agent_execution_lines(result) do
     [

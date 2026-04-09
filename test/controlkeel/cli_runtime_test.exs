@@ -95,6 +95,7 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert {:ok, _binding} = ProjectBinding.read(tmp_dir)
 
     session = session_fixture(%{title: "Runtime CLI session"})
+    task = task_fixture(%{session: session, title: "Patch auth flow", status: "queued"})
 
     {:ok, _binding} =
       ProjectBinding.write(
@@ -107,7 +108,19 @@ defmodule ControlKeel.CLIRuntimeTest do
         tmp_dir
       )
 
-    finding_fixture(%{session: session, status: "blocked", title: "Runtime blocked finding"})
+    finding_fixture(%{
+      session: session,
+      status: "blocked",
+      title: "Runtime blocked finding",
+      metadata: %{
+        "finding_family" => "vulnerability_case",
+        "affected_component" => "auth",
+        "patch_status" => "drafted",
+        "disclosure_status" => "triaged",
+        "exploitability_status" => "suspected",
+        "maintainer_scope" => "first_party"
+      }
+    })
 
     assert {:ok, _} =
              Analytics.record(%{
@@ -125,7 +138,55 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert status_output =~ "Runtime CLI session"
+    assert status_output =~ "Autonomy:"
+    assert status_output =~ "Task augmentation:"
+    assert status_output =~ "Security cases: 1 tracked"
     assert status_output =~ "Blocked findings:"
+    assert status_output =~ "Suggested next steps:"
+    assert status_output =~ "controlkeel proofs --task-id #{task.id}"
+  end
+
+  test "findings output includes aggregates, filters, and next steps", %{tmp_dir: tmp_dir} do
+    session = session_fixture(%{title: "Findings CLI session"})
+
+    {:ok, _binding} =
+      ProjectBinding.write(
+        %{
+          "workspace_id" => session.workspace_id,
+          "session_id" => session.id,
+          "agent" => "codex-cli",
+          "attached_agents" => %{}
+        },
+        tmp_dir
+      )
+
+    finding_fixture(%{
+      session: session,
+      severity: "high",
+      status: "open",
+      title: "Patch validation missing",
+      metadata: %{
+        "finding_family" => "vulnerability_case",
+        "affected_component" => "ci",
+        "patch_status" => "drafted",
+        "disclosure_status" => "triaged",
+        "exploitability_status" => "suspected",
+        "maintainer_scope" => "first_party"
+      }
+    })
+
+    assert {:ok, findings} = CLI.parse(["findings", "--severity", "high", "--status", "open"])
+
+    findings_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(findings, project_root: tmp_dir)
+      end)
+
+    assert findings_output =~ "Findings: 1 matched (severity=high, status=open)"
+    assert findings_output =~ "Security cases: 1 tracked"
+    assert findings_output =~ "Patch validation missing"
+    assert findings_output =~ "Suggested next steps:"
+    assert findings_output =~ "controlkeel approve <finding_id>"
   end
 
   test "mcp accepts --project-root explicitly", %{tmp_dir: tmp_dir} do
