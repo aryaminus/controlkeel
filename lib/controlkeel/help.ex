@@ -374,7 +374,7 @@ defmodule ControlKeel.Help do
       controlkeel provider list|show|default|set-key|set-base-url|set-model|doctor
                                       Inspect and configure CK provider brokerage
       controlkeel runtime export <id> [--project-root /abs/path]
-                                      Export headless/runtime bundles such as Open SWE
+                                      Export headless/runtime bundles such as Devin, Executor, or virtual-bash
       controlkeel bootstrap [--project-root /abs/path] [--ephemeral-ok]
                                       Auto-create project or ephemeral binding on first use
       controlkeel watch [--interval N]

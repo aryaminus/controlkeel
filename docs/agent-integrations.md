@@ -16,7 +16,7 @@ ControlKeel supports agent ecosystems through a few distinct mechanisms:
 - **Native attach**: `controlkeel attach <host>` installs MCP config plus the strongest repo-native companion CK can truthfully ship.
 - **Direct host install**: some hosts also expose a package, plugin, VSIX, or extension-link path.
 - **Hosted protocol access**: remote clients can use hosted MCP and minimal A2A instead of repo-local stdio MCP.
-- **Runtime export**: headless runtimes such as Devin and Open SWE get governed runtime bundles rather than fake attach commands.
+- **Runtime export**: headless runtimes and governed outer-loop recipes such as Devin, Open SWE, Executor, and `virtual-bash` get runtime bundles rather than fake attach commands.
 - **Provider-only and fallback governance**: unsupported tools can still be governed through bootstrap, findings, proofs, provider profiles, and validation APIs.
 
 That mechanism split is intentionally simpler than the full catalog, but it should always match the canonical [support-matrix.md](support-matrix.md).

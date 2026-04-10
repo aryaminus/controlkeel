@@ -499,6 +499,8 @@ controlkeel plugin export openclaw
 controlkeel plugin export augment
 controlkeel runtime export devin
 controlkeel runtime export open-swe
+controlkeel runtime export executor
+controlkeel runtime export virtual-bash
 ```
 
 Expected:
@@ -722,12 +724,15 @@ Validate:
 ```bash
 controlkeel runtime export devin
 controlkeel runtime export open-swe
+controlkeel runtime export executor
+controlkeel runtime export virtual-bash
 ```
 
 Expected:
 
 - runtime bundles are created
 - bundle docs explain how the runtime should use ControlKeel
+- runtime manifests or bootstrap examples match the runtime shape they claim to support
 
 ### 14.4 Governed execution
 

@@ -152,7 +152,7 @@ You can also understand support by **integration mechanism**, not only by client
 
 - **Native attach** for clients with first-class MCP config and companion installs
 - **Governed proxy** for tools that can point at OpenAI- or Anthropic-compatible endpoints
-- **Runtime export** for headless systems such as Devin and Open SWE
+- **Runtime export** for headless or governed outer-loop systems such as Devin, Open SWE, Executor, and the CK-owned `virtual-bash` recipe
 - **Provider-only** for CK-owned or local backends such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints
 - **Fallback governance** for unsupported tools after bootstrap using `controlkeel watch`, `controlkeel findings`, proof flows, and `ck_validate`
 
@@ -200,6 +200,16 @@ The repo-local default is still:
 - native `controlkeel attach ...` flows for supported clients
 
 Hosted protocol access is for service-account-driven machines and remote clients.
+
+For headless or asynchronous runtimes, the same governed repo can also export runtime bundles directly:
+
+```bash
+controlkeel runtime export devin
+controlkeel runtime export executor
+controlkeel runtime export virtual-bash
+```
+
+Use the support matrix for the full shipped runtime catalog. The important distinction is that runtime exports are not fake attach commands: they emit the files and guidance a headless runtime or governed outer loop actually needs.
 
 Create a service account with protocol scopes. The example below is a minimal hosted-MCP token for context and validation; the full hosted scope matrix lives in [support-matrix.md](support-matrix.md#hosted-mcp).
 

@@ -606,6 +606,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(agents, &(&1["id"] == "cursor"))
       assert Enum.any?(agents, &(&1["id"] == "open-swe"))
       assert Enum.any?(agents, &(&1["id"] == "devin"))
+      assert Enum.any?(agents, &(&1["id"] == "executor"))
+      assert Enum.any?(agents, &(&1["id"] == "virtual-bash"))
       assert Enum.any?(agents, &(&1["id"] == "vllm"))
       assert is_map(registry_status)
       assert Map.has_key?(registry_status, "stale")
@@ -655,6 +657,22 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert devin["support_class"] == "headless_runtime"
       assert devin["runtime_export_command"] == "controlkeel runtime export devin"
+
+      executor =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "executor"
+        end)
+
+      assert executor["support_class"] == "headless_runtime"
+      assert executor["runtime_export_command"] == "controlkeel runtime export executor"
+
+      virtual_bash =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "virtual-bash"
+        end)
+
+      assert virtual_bash["support_class"] == "headless_runtime"
+      assert virtual_bash["runtime_export_command"] == "controlkeel runtime export virtual-bash"
 
       opencode =
         Enum.find(agents, fn agent ->
