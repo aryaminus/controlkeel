@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.1 — 2026-04-10
+
+### What's changed
+
+- Add Letta Code native attach support
+
 ## v0.2.0 — 2026-04-10
 
 ### What's changed
