@@ -43,7 +43,7 @@ The execution posture is the part of the brief that tells CK how to treat the ru
 CK now also derives a runtime recommendation from that posture:
 
 - approval-heavy or regulated briefs bias toward attach-first hosts with stronger review surfaces
-- API-heavy briefs that benefit from code-mode or sandboxed typed execution can bias toward a headless runtime export
+- API-heavy briefs that benefit from code-mode or sandboxed typed execution can bias toward a headless runtime export such as Cloudflare Workers or Executor
 - the recommendation stays grounded in the typed integration catalog so CK suggests a real attach command or runtime export path instead of a generic “use a sandbox” note
 - when CK can see attached agents or already exported runtime bundles for the current workspace, it now biases the recommendation toward those live surfaces first
 

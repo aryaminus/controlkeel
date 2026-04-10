@@ -161,6 +161,7 @@ Runtime transport truth for those first-class hosts:
 | `forge` | attach_client | `controlkeel attach forge` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `acp_session` / `instructions_only` | `forge-acp` |
 | `devin` | headless_runtime | `controlkeel runtime export devin` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `devin-runtime` |
 | `open-swe` | headless_runtime | `controlkeel runtime export open-swe` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `ck_owned` / `instructions_only` | `open-swe-runtime` |
+| `executor` | headless_runtime | `controlkeel runtime export executor` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `executor-runtime` |
 | `dspy` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `gepa` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `deepagents` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |

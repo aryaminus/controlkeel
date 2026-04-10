@@ -7,7 +7,7 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
   alias ControlKeel.ProviderBroker
 
   @approval_keywords ~w(approval approvals review reviewed reviewer human manual signoff)
-  @api_runtime_keywords ~w(api apis mcp tool tools integration integrations webhook webhooks oauth queue queues sync async cloudflare worker workers d1 r2 kv edge)
+  @api_runtime_keywords ~w(api apis mcp tool tools integration integrations webhook webhooks oauth queue queues sync async cloudflare worker workers d1 r2 kv edge openapi graphql discovery schema typed typescript javascript executor)
 
   @undecided %{
     "strategy" => "undecided",
@@ -52,6 +52,9 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
 
   defp strategy(brief, posture) do
     cond do
+      explicit_runtime_intent?(brief) and typed_runtime_candidate?(brief, posture) ->
+        "headless_runtime"
+
       approval_heavy?(brief) ->
         "attach_client"
 
@@ -183,6 +186,7 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
     base_score =
       case integration.id do
         "cloudflare-workers" -> 8
+        "executor" -> 4
         "open-swe" -> 5
         "devin" -> 4
         _ -> 1
@@ -195,6 +199,18 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
         do: 3,
         else: 0
 
+    executor_bonus =
+      if integration.id == "executor" and
+           mentions?(brief, ["executor"]),
+         do: 6,
+         else: 0
+
+    executor_discovery_bonus =
+      if integration.id == "executor" and
+           mentions?(brief, ["openapi", "graphql", "discovery", "schema"]),
+         do: 2,
+         else: 0
+
     approval_penalty = if approval_heavy?(brief), do: -4, else: 0
 
     config_score =
@@ -203,16 +219,21 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
         _ -> 0
       end
 
-    base_score + api_score + cloudflare_bonus + approval_penalty + config_score
+    base_score + api_score + cloudflare_bonus + executor_bonus + executor_discovery_bonus +
+      approval_penalty + config_score
   end
 
   defp typed_runtime_candidate?(brief, posture) do
     posture["api_execution_surface"] in ["typed_runtime", "typed_runtime_or_shell"] and
       api_runtime_candidate?(brief) and
-      not approval_heavy?(brief)
+      (explicit_runtime_intent?(brief) or not approval_heavy?(brief))
   end
 
   defp api_runtime_candidate?(brief), do: mentions?(brief, @api_runtime_keywords)
+
+  defp explicit_runtime_intent?(brief),
+    do: mentions?(brief, ~w(runtime runtimes export exported cloudflare workers executor))
+
   defp approval_heavy?(brief), do: mentions?(brief, @approval_keywords)
 
   defp mentions?(brief, terms) do

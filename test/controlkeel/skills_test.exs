@@ -455,6 +455,13 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/README.md"))
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/controlkeel-mcp.json"))
 
+    assert {:ok, executor_plan} = Skills.export("executor-runtime", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(executor_plan.output_dir, "executor/README.md"))
+
+    assert File.exists?(
+             Path.join(executor_plan.output_dir, "executor/controlkeel-sources.example.ts")
+           )
+
     assert {:ok, opencode_plan} = Skills.export("opencode-native", tmp_dir, scope: "export")
     assert File.exists?(Path.join(opencode_plan.output_dir, "package.json"))
 

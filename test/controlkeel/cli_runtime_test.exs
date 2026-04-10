@@ -679,6 +679,32 @@ defmodule ControlKeel.CLIRuntimeTest do
            )
   end
 
+  test "runtime export emits the Executor headless bundle", %{tmp_dir: tmp_dir} do
+    assert {:ok, export} = CLI.parse(["runtime", "export", "executor", "--project-root", tmp_dir])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(export, project_root: tmp_dir)
+      end)
+
+    resolved_root = ProjectRoot.resolve(tmp_dir)
+
+    assert output =~ "Prepared Executor runtime export."
+    assert output =~ "Project root: #{resolved_root}"
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/executor-runtime/AGENTS.md"))
+
+    assert File.exists?(
+             Path.join(tmp_dir, "controlkeel/dist/executor-runtime/executor/README.md")
+           )
+
+    assert File.exists?(
+             Path.join(
+               tmp_dir,
+               "controlkeel/dist/executor-runtime/executor/controlkeel-sources.example.ts"
+             )
+           )
+  end
+
   test "repo governance commands review patches, check release readiness, and scaffold github", %{
     tmp_dir: tmp_dir
   } do

@@ -642,6 +642,28 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["project", "export"],
         export_targets: ["open-swe-runtime"]
       }),
+      headless_runtime(%{
+        id: "executor",
+        label: "Executor",
+        category: "headless-runtime",
+        description:
+          "Typed integration runtime for OpenAPI, GraphQL, MCP, Google Discovery, and custom JS functions with auth/approval resume flows.",
+        runtime_export_command: "controlkeel runtime export executor",
+        config_location:
+          "Executor runs as a hosted or local runtime/UI surface rather than a repo-local native attach target.",
+        companion_delivery:
+          "Emits repo `AGENTS.md`, an Executor runtime README, source/bootstrap snippets, and approval/webhook guidance instead of a local attach target.",
+        preferred_target: "executor-runtime",
+        default_scope: "project",
+        auth_mode: "oauth_runtime",
+        mcp_mode: "export_only",
+        skills_mode: "instructions_only",
+        upstream_slug: "RhysSullivan/executor",
+        upstream_docs_url: "https://github.com/RhysSullivan/executor",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["executor-runtime"]
+      }),
       framework_adapter(%{
         id: "dspy",
         label: "DSPy",

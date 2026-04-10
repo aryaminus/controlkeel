@@ -1826,6 +1826,58 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "executor-runtime"}, root, project_root, _skills, opts) do
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("executor", project_root, opts))
+
+    readme_path = Path.join(root, "executor/README.md")
+    File.mkdir_p!(Path.dirname(readme_path))
+    File.write!(readme_path, executor_runtime_contents(project_root, opts))
+
+    sources_path = Path.join(root, "executor/controlkeel-sources.example.ts")
+
+    File.write!(sources_path, """
+    // Executor bootstrap example
+    // Run with: executor call --file controlkeel-sources.example.ts
+    return await tools.executor.sources.add({
+      kind: "mcp",
+      name: "ControlKeel",
+      command: "#{mcp_command(project_root, opts)}",
+      args: #{Jason.encode!(mcp_args(project_root, opts))}
+    })
+    """)
+
+    webhook_path = Path.join(root, "executor/controlkeel-webhook.json")
+
+    File.write!(
+      webhook_path,
+      Jason.encode!(
+        %{
+          "events" => ["task.completed", "task.failed", "finding.created", "proof.generated"],
+          "note" =>
+            "Use this when syncing paused approvals, auth resumes, and governed runtime completions back into ControlKeel."
+        },
+        pretty: true
+      ) <> "\n"
+    )
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => agents_path, "kind" => "instructions"},
+        %{"path" => readme_path, "kind" => "runtime"},
+        %{"path" => sources_path, "kind" => "runtime"},
+        %{"path" => webhook_path, "kind" => "runtime"}
+      ],
+      [
+        "Place `AGENTS.md` at the repo root so Executor-driven runs inherit ControlKeel workflow guidance.",
+        "Use the runtime README and source example when wiring OpenAPI, GraphQL, MCP, and custom JS integrations into Executor."
+      ]
+    )
+  end
+
   defp write_target(
          %SkillTarget{id: "cloudflare-workers-runtime"},
          root,
@@ -2566,6 +2618,37 @@ defmodule ControlKeel.Skills.Exporter do
     - Use Devin's custom MCP flow and point it at the bundled `devin/controlkeel-mcp.json`
     - Prefer service accounts or shared runtime secrets for any OAuth-backed MCPs you add in Devin
     - Use webhook events such as `finding.created`, `task.completed`, `task.failed`, and `proof.generated` to sync governance state into CI or issue workflows
+    """
+  end
+
+  defp executor_runtime_contents(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    """
+    # Executor + ControlKeel
+
+    Use this runtime export when you want a typed integration layer for OpenAPI, GraphQL, MCP, Google Discovery, or custom JS functions instead of pushing tool schemas and results directly through transcript context.
+
+    ## Repo context
+
+    - Repo root: `#{project_root}`
+    - Keep `AGENTS.md` at the repo root so Executor-driven runs inherit ControlKeel governance context.
+
+    ## Recommended Executor setup
+
+    - Start Executor with its local web/runtime flow or run `executor call --file ...` in the governed project root
+    - Add ControlKeel as an MCP-backed source using the bundled `executor/controlkeel-sources.example.ts`
+    - Let Executor handle auth or approval pauses, then sync final task/finding/proof outcomes back through CK webhooks
+    - Prefer Executor for large integration surfaces where typed discovery and execution are better than broad shell usage
+
+    ## ControlKeel fit
+
+    - Typed discovery: use Executor to discover and describe tools by intent before execution
+    - Governed execution: keep CK as the approval, findings, budget, and proof authority around the runtime
+    - Runtime boundary: use shell only for repo mutation, package commands, and tests that do not fit the typed runtime
     """
   end
 

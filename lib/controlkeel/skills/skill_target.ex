@@ -295,6 +295,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "executor-runtime",
+        "Executor runtime export",
+        "Typed integration-runtime export for OpenAPI, GraphQL, MCP, and custom JS functions through Executor.",
+        false,
+        "export",
+        ["project", "export"],
+        true
+      ),
+      target(
         "framework-adapter",
         "Framework adapter template",
         "Adapter/export scaffold for framework-backed integrations such as DSPy, GEPA, and DeepAgents.",

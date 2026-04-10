@@ -382,6 +382,7 @@ defmodule ControlKeel.AgentIntegrationTest do
 
   test "typed runtime, provider, and alias rows stay truthful" do
     devin = AgentIntegration.get("devin")
+    executor = AgentIntegration.get("executor")
     codex_app = AgentIntegration.get("codex-app-server")
     vllm = AgentIntegration.get("vllm")
     vscode = AgentIntegration.get("vscode")
@@ -391,6 +392,9 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert devin.support_class == "headless_runtime"
     assert devin.runtime_export_command == "controlkeel runtime export devin"
     assert devin.preferred_target == "devin-runtime"
+    assert executor.support_class == "headless_runtime"
+    assert executor.runtime_export_command == "controlkeel runtime export executor"
+    assert executor.preferred_target == "executor-runtime"
 
     assert codex_app.support_class == "alias"
     assert codex_app.alias_of == "codex-cli"

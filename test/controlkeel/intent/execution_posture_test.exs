@@ -91,6 +91,39 @@ defmodule ControlKeel.Intent.ExecutionPostureTest do
     assert recommendation["recommended_integration"]["availability"] == "catalog"
   end
 
+  test "prefers executor when the brief emphasizes typed integration discovery" do
+    brief =
+      execution_brief_fixture(
+        payload: %{
+          "project_name" => "Executor Tool Router",
+          "idea" =>
+            "Use Executor as a typed integration runtime to discover OpenAPI and GraphQL tools, describe schemas, and execute them outside transcript context.",
+          "domain_pack" => "software",
+          "occupation" => "Software",
+          "risk_tier" => "moderate",
+          "compliance" => [],
+          "data_summary" => "OpenAPI specs, GraphQL schemas, and MCP tool descriptions only.",
+          "recommended_stack" => "Executor typed runtime for integration discovery and execution"
+        },
+        compiler: %{
+          "occupation" => "software",
+          "domain_pack" => "software",
+          "provider" => "openai",
+          "interview_answers" => %{
+            "constraints" => "Executor-style typed discovery for OpenAPI, GraphQL, and MCP"
+          }
+        }
+      )
+
+    recommendation = Intent.runtime_recommendation(brief)
+
+    assert recommendation["strategy"] == "headless_runtime"
+    assert recommendation["recommended_integration"]["id"] == "executor"
+
+    assert recommendation["recommended_integration"]["runtime_export_command"] ==
+             "controlkeel runtime export executor"
+  end
+
   test "prefers an already attached host when the brief needs review-first execution" do
     brief = execution_brief_fixture()
 
