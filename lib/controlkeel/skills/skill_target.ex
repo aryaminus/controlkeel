@@ -88,6 +88,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "letta-code-native",
+        "Letta Code native bundle",
+        "Letta Code-native skills, checked-in hook settings, MCP registration helpers, and headless/remote guidance.",
+        true,
+        "project",
+        ["project", "export"],
+        true
+      ),
+      target(
         "pi-native",
         "Pi native bundle",
         "Pi-native command bundle, review extension manifest, MCP companion config, and browser review instructions.",

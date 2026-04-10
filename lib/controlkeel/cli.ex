@@ -886,7 +886,7 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["roo-code", "hermes-agent", "openclaw", "droid", "forge", "pi"] do
+      when agent in ["roo-code", "hermes-agent", "openclaw", "droid", "forge", "pi", "letta-code"] do
     target =
       %{
         "roo-code" => "roo-native",
@@ -894,7 +894,8 @@ defmodule ControlKeel.CLI do
         "openclaw" => "openclaw-native",
         "droid" => "droid-bundle",
         "forge" => "forge-acp",
-        "pi" => "pi-native"
+        "pi" => "pi-native",
+        "letta-code" => "letta-code-native"
       }[agent]
 
     scope = attach_scope(agent, options)

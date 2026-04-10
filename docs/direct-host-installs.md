@@ -31,7 +31,7 @@ This works today because the `skills` CLI already discovers the CK skill set in 
 The [skills.sh](https://skills.sh/) agent list is broader than CK's native attach catalog. Treat those names in three buckets:
 
 - Native CK support already exists:
-  `amp`, `claude-code`, `cline`, `codex` via `codex-cli`, `cursor`, `droid`, `gemini` via `gemini-cli`, `copilot`, `goose`, `kiro` / `kiro-cli`, `kilo`, `opencode`, `roo` / `roo-code`, `vscode`, `windsurf`
+  `amp`, `claude-code`, `cline`, `codex` via `codex-cli`, `cursor`, `droid`, `gemini` via `gemini-cli`, `copilot`, `goose`, `kiro` / `kiro-cli`, `kilo`, `letta-code`, `opencode`, `roo` / `roo-code`, `vscode`, `windsurf`
 - Skills-only compatibility currently exists through the `skills.sh` install path:
   `antigravity`, `clawdbot`, `nous-research`, `trae`
 - Not every skills.sh logo implies a native CK MCP/plugin/hook/extension contract.
@@ -47,6 +47,7 @@ The [skills.sh](https://skills.sh/) agent list is broader than CK's native attac
 | VS Code | `code --install-extension controlkeel-vscode-companion.vsix` | Installs the CK browser-review companion from a packaged VSIX. |
 | Gemini CLI | `gemini extensions link ./controlkeel/dist/gemini-cli-native` | Direct extension-link flow for the exported Gemini companion bundle. |
 | Augment / Auggie CLI | `npm install -g @augmentcode/auggie` | Installs the host CLI so CK’s Augment-native workspace bundle and plugin bundle can be used locally. |
+| Letta Code | `npm install -g @letta-ai/letta-code` | Installs the Letta CLI. Use `controlkeel attach letta-code` after that to add repo-local skills, hooks, and MCP registration helpers. |
 
 ## Direct local plugin or bundle installs
 
@@ -69,6 +70,7 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | --- | --- |
 | Windsurf | `controlkeel attach windsurf` |
 | Continue | `controlkeel attach continue` |
+| Letta Code | `controlkeel attach letta-code` |
 | Cline | `controlkeel attach cline` |
 | Goose | `controlkeel attach goose` |
 | Kiro | `controlkeel attach kiro` |
@@ -106,6 +108,7 @@ For those hosts, CK now installs stronger native assets than before:
 
 - Windsurf: hooks, canonical `hooks.json`, workflows, commands, MCP config
 - Continue: prompts, command prompts, headless review prompts, MCP server config
+- Letta Code: `.agents/skills`, `.letta/settings.json`, `.letta/hooks`, `/mcp add` helper script, and repo-local remote/headless guidance
 - Cline: hooks, commands, rules, workflows
 - Goose: commands, workflow recipes, extension YAML
 - Kiro: hooks, steering, tool policy settings, commands

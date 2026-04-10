@@ -309,6 +309,26 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
+  defp do_install(%SkillTarget{id: "letta-code-native"}, "project", project_root, skills, _opts) do
+    {:ok, plan} = Exporter.export("letta-code-native", project_root, scope: "project")
+
+    skill_root = Path.join(project_root, ".agents/skills")
+    letta_root = Path.join(project_root, ".letta")
+
+    copy_skills(skills, skill_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".letta"), letta_root)
+    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+    install_project_agents_md!(plan.output_dir, project_root)
+
+    {:ok,
+     %{
+       target: "letta-code-native",
+       scope: "project",
+       destination: letta_root,
+       skill_destination: skill_root
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "pi-native"}, "project", project_root, skills, _opts) do
     {:ok, plan} = Exporter.export("pi-native", project_root, scope: "project")
 

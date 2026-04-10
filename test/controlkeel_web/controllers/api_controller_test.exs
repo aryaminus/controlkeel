@@ -608,6 +608,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(agents, &(&1["id"] == "devin"))
       assert Enum.any?(agents, &(&1["id"] == "executor"))
       assert Enum.any?(agents, &(&1["id"] == "virtual-bash"))
+      assert Enum.any?(agents, &(&1["id"] == "letta-code"))
       assert Enum.any?(agents, &(&1["id"] == "vllm"))
       assert is_map(registry_status)
       assert Map.has_key?(registry_status, "stale")
@@ -730,6 +731,22 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert cline["preferred_target"] == "cline-native"
       assert cline["skills_mode"] == "native"
       assert cline["auth_owner"] == "controlkeel"
+
+      letta =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "letta-code"
+        end)
+
+      assert letta["preferred_target"] == "letta-code-native"
+      assert letta["review_experience"] == "native_review"
+      assert "hooks" in letta["agent_uses_ck_via"]
+      assert ".letta/settings.json" in letta["artifact_surfaces"]
+      assert ".letta/controlkeel-mcp.sh" in letta["artifact_surfaces"]
+
+      assert Enum.any?(
+               letta["direct_install_methods"],
+               &(&1["command"] == "npm install -g @letta-ai/letta-code")
+             )
     end
 
     test "list skill targets uses the requested project root for provider status", %{conn: conn} do

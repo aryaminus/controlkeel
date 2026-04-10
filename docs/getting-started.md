@@ -162,7 +162,7 @@ In that mode, model-backed features such as advisory review and intent compilati
 
 The LLM **advisory** layer (extra review beyond pattern matchers) only runs when a provider is available. The HTTP validate API and MCP validate tool include an **`advisory`** field describing whether advisory ran or was skipped—see [autonomy-and-findings.md](autonomy-and-findings.md) for how findings relate to human review.
 
-Other common attach targets include `claude-code`, `codex-cli`, `cline`, `cursor`, `windsurf`, `continue`, `kiro`, `amp`, `gemini-cli`, `copilot`, `vscode`, `goose`, `roo-code`, `hermes-agent`, `openclaw`, `droid`, and `forge`.
+Other common attach targets include `claude-code`, `codex-cli`, `cline`, `cursor`, `windsurf`, `continue`, `letta-code`, `kiro`, `amp`, `gemini-cli`, `copilot`, `vscode`, `goose`, `roo-code`, `hermes-agent`, `openclaw`, `droid`, and `forge`.
 
 For the full host truth, use the canonical [support-matrix.md](support-matrix.md), the install-focused [direct-host-installs.md](direct-host-installs.md), the behavior model in [agent-integrations.md](agent-integrations.md), or the docs map in [README.md](README.md). You can also open `/skills` in the local app.
 

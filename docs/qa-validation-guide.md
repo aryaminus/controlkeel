@@ -561,6 +561,7 @@ If the host is **not** installed, validate export/install artifacts and mark run
 | Cursor | `controlkeel attach cursor` | `.agents/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, `.cursor/mcp.json` |
 | Windsurf | `controlkeel attach windsurf` | `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks`, `.windsurf/hooks.json`, `.windsurf/mcp.json` |
 | Continue | `controlkeel attach continue` | `.continue/prompts`, `.continue/commands`, `.continue/mcpServers/controlkeel.yaml`, `.continue/mcp.json` |
+| Letta Code | `controlkeel attach letta-code` | `.agents/skills`, `.letta/settings.json`, `.letta/hooks`, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, `.mcp.json` |
 | Roo Code | `controlkeel attach roo-code` | `.roo/skills`, `.roo/rules`, `.roo/commands`, `.roo/guidance`, `.roomodes` |
 | Goose | `controlkeel attach goose` | `.goosehints`, workflow recipes, Goose commands, extension config |
 | Kiro | `controlkeel attach kiro` | `.kiro/hooks`, `.kiro/steering`, `.kiro/settings`, `.kiro/commands`, `.kiro/mcp.json` |

@@ -89,6 +89,7 @@ Common attach targets today:
 - Plugin-native: `opencode`, `amp`
 - File-plan-mode: `pi`
 - Prompt or command-native: `continue`, `gemini-cli`, `goose`, `roo-code`
+- Hook, skill, and MCP-native with headless/remote support: `letta-code`
 - Browser or embed companion: `vscode`
 - Review-only or command-driven: `codex-cli`, `aider`
 

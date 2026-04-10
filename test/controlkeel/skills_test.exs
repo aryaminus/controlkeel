@@ -471,6 +471,20 @@ defmodule ControlKeel.SkillsTest do
              Path.join(virtual_bash_plan.output_dir, "virtual-bash/controlkeel-runtime.json")
            )
 
+    assert {:ok, letta_plan} = Skills.export("letta-code-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(letta_plan.output_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(Path.join(letta_plan.output_dir, ".letta/settings.json"))
+    assert File.exists?(Path.join(letta_plan.output_dir, ".letta/settings.local.example.json"))
+    assert File.exists?(Path.join(letta_plan.output_dir, ".letta/hooks/controlkeel-findings.sh"))
+    assert File.exists?(Path.join(letta_plan.output_dir, ".letta/controlkeel-mcp.sh"))
+    assert File.exists?(Path.join(letta_plan.output_dir, ".letta/README.md"))
+    assert File.exists?(Path.join(letta_plan.output_dir, ".mcp.json"))
+    assert File.exists?(Path.join(letta_plan.output_dir, "AGENTS.md"))
+
     assert {:ok, opencode_plan} = Skills.export("opencode-native", tmp_dir, scope: "export")
     assert File.exists?(Path.join(opencode_plan.output_dir, "package.json"))
 
@@ -938,6 +952,16 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".continue/commands/controlkeel-last.prompt"))
     assert File.exists?(Path.join(tmp_dir, ".continue/mcpServers/controlkeel.yaml"))
     assert File.exists?(Path.join(tmp_dir, ".continue/mcp.json"))
+
+    assert {:ok, letta_install} = Skills.install("letta-code-native", tmp_dir, scope: "project")
+    assert letta_install.destination == Path.join(tmp_dir, ".letta")
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".letta/settings.json"))
+    assert File.exists?(Path.join(tmp_dir, ".letta/settings.local.example.json"))
+    assert File.exists?(Path.join(tmp_dir, ".letta/hooks/controlkeel-session-start.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".letta/controlkeel-mcp.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".letta/README.md"))
+    assert File.exists?(Path.join(tmp_dir, ".mcp.json"))
 
     assert {:ok, aider_install} = Skills.install("instructions-only", tmp_dir, scope: "project")
     assert aider_install.destination == tmp_dir

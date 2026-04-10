@@ -397,6 +397,29 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["continue-native", "instructions-only"]
       }),
       attach_client(%{
+        id: "letta-code",
+        label: "Letta Code",
+        category: "native-first",
+        description:
+          "Prepares Letta Code skills, checked-in hook settings, MCP registration helpers, and remote/headless guidance for governed repo work.",
+        attach_command: "controlkeel attach letta-code",
+        config_location:
+          "Letta project config lives in `.letta/settings.json` with optional local overrides in `.letta/settings.local.json`; MCP servers are added through Letta's `/mcp` flow and skills load from `.agents/skills`.",
+        companion_delivery:
+          "Installs `.agents/skills`, `.letta/settings.json`, `.letta/hooks`, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, and portable `.mcp.json` guidance for Letta-native MCP, hooks, remote, and headless use.",
+        preferred_target: "letta-code-native",
+        default_scope: "project",
+        router_agent_id: "letta-code",
+        auth_mode: "ck_owned",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "letta-ai/letta-code",
+        upstream_docs_url: "https://docs.letta.com/letta-code/cli-reference",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["letta-code-native", "instructions-only"]
+      }),
+      attach_client(%{
         id: "aider",
         label: "Aider",
         category: "mcp-plus-instructions",
@@ -1638,6 +1661,9 @@ defmodule ControlKeel.AgentIntegration do
       id when id in ["cline", "continue", "roo-code"] ->
         ["local_mcp", "native_skills", "rules", "workflows", "commands"]
 
+      "letta-code" ->
+        ["local_mcp", "native_skills", "hooks"]
+
       "goose" ->
         ["local_mcp", "workflows", "hooks", "commands"]
 
@@ -1693,6 +1719,7 @@ defmodule ControlKeel.AgentIntegration do
              "copilot-cli",
              "cline",
              "continue",
+             "letta-code",
              "aider",
              "augment",
              "opencode",
@@ -1758,7 +1785,16 @@ defmodule ControlKeel.AgentIntegration do
   defp default_review_experience(%{support_class: "framework_adapter"}), do: "feedback_only"
 
   defp default_review_experience(%{id: id})
-       when id in ["claude-code", "opencode", "windsurf", "cline", "kiro", "amp", "augment"] do
+       when id in [
+              "claude-code",
+              "opencode",
+              "windsurf",
+              "cline",
+              "kiro",
+              "amp",
+              "augment",
+              "letta-code"
+            ] do
     "native_review"
   end
 
@@ -1776,7 +1812,7 @@ defmodule ControlKeel.AgentIntegration do
   end
 
   defp default_submission_mode(%{id: id})
-       when id in ["vscode", "copilot", "windsurf", "cline", "kiro", "augment"] do
+       when id in ["vscode", "copilot", "windsurf", "cline", "kiro", "augment", "letta-code"] do
     "hook"
   end
 
@@ -1804,6 +1840,7 @@ defmodule ControlKeel.AgentIntegration do
               "windsurf",
               "continue",
               "cline",
+              "letta-code",
               "goose",
               "kiro",
               "augment",
@@ -1963,6 +2000,13 @@ defmodule ControlKeel.AgentIntegration do
     ]
   end
 
+  defp default_direct_install_methods(%{id: "letta-code"}) do
+    [
+      direct_install("npm_cli", "Letta Code via npm", "npm install -g @letta-ai/letta-code"),
+      direct_install("ck_attach", "CK attach", "controlkeel attach letta-code")
+    ]
+  end
+
   defp default_direct_install_methods(%{id: "openclaw"}) do
     [
       direct_install("ck_attach", "CK attach", "controlkeel attach openclaw"),
@@ -2056,6 +2100,17 @@ defmodule ControlKeel.AgentIntegration do
       ".continue/commands",
       ".continue/mcpServers/controlkeel.yaml",
       ".continue/mcp.json",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "letta-code"}),
+    do: [
+      ".agents/skills",
+      ".letta/settings.json",
+      ".letta/hooks",
+      ".letta/controlkeel-mcp.sh",
+      ".letta/README.md",
+      ".mcp.json",
       "AGENTS.md"
     ]
 

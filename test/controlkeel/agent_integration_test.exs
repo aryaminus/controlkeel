@@ -156,6 +156,22 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert continue.submission_mode == "command"
     assert ".continue/mcpServers/controlkeel.yaml" in continue.artifact_surfaces
 
+    letta = AgentIntegration.get("letta-code")
+    assert letta.support_class == "attach_client"
+    assert letta.preferred_target == "letta-code-native"
+    assert letta.skills_mode == "native"
+    assert letta.mcp_mode == "native"
+    assert letta.review_experience == "native_review"
+    assert "hooks" in letta.agent_uses_ck_via
+    assert ".letta/settings.json" in letta.artifact_surfaces
+    assert ".letta/controlkeel-mcp.sh" in letta.artifact_surfaces
+    assert ".agents/skills" in letta.artifact_surfaces
+
+    assert Enum.any?(
+             letta.direct_install_methods,
+             &(&1["command"] == "npm install -g @letta-ai/letta-code")
+           )
+
     assert cursor.submission_mode == "command"
     assert ".cursor/background-agents" in cursor.artifact_surfaces
 
@@ -400,6 +416,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert virtual_bash.support_class == "headless_runtime"
     assert virtual_bash.runtime_export_command == "controlkeel runtime export virtual-bash"
     assert virtual_bash.preferred_target == "virtual-bash-runtime"
+    assert AgentIntegration.get("letta-code").execution_support == "direct"
 
     assert codex_app.support_class == "alias"
     assert codex_app.alias_of == "codex-cli"

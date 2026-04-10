@@ -97,6 +97,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | ---- | ---------------------------------- |
 | `windsurf` | Cascade hooks, workflows, commands, and MCP config |
 | `continue` | prompts, command prompts, headless guidance, and `.continue/mcpServers/controlkeel.yaml` |
+| `letta-code` | `.agents/skills`, `.letta/settings.json` hooks, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, and portable `.mcp.json` guidance |
 | `cline` | rules, workflows, commands, hook scripts, and CLI MCP config |
 | `goose` | repo hints, workflow recipes, commands, and Goose extension YAML |
 | `kiro` | hooks, steering, tool-policy settings, commands, and MCP config |
@@ -152,6 +153,7 @@ Runtime transport truth for those first-class hosts:
 | `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `agent_runtime` / `native` | `opencode-native` |
 | `gemini-cli` | attach_client | `controlkeel attach gemini-cli` | `local_mcp`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `gemini-cli-native` |
 | `continue` | attach_client | `controlkeel attach continue` | `local_mcp`, `native_skills`, `rules`, `workflows`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `continue-native` |
+| `letta-code` | attach_client | `controlkeel attach letta-code` | `local_mcp`, `native_skills`, `hooks` | `embedded` | `direct` | `ck_owned` / `native` | `letta-code-native` |
 | `kilo` | attach_client | `controlkeel attach kilo` | `local_mcp`, `native_skills`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `kilo-native` |
 | `pi` | attach_client | `controlkeel attach pi` | `local_mcp`, `native_skills`, `commands`, `rules` | `handoff` | `handoff` | `agent_runtime` / `native` | `pi-native` |
 | `aider` | attach_client | `controlkeel attach aider` | `local_mcp`, `commands` | `embedded` | `direct` | `ck_owned` / `instructions_only` | `instructions-only` |

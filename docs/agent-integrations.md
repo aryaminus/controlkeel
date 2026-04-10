@@ -62,6 +62,7 @@ Current examples:
 
 - Windsurf: hooks, workflows, commands, and MCP config
 - Continue: prompts, command prompts, headless guidance, and MCP server config
+- Letta Code: project skills, checked-in hook settings, `/mcp add` helper script, and remote/headless guidance
 - Cline: hooks, commands, rules, and workflow guidance
 - Goose: hints, workflow recipes, commands, and extension YAML
 - Kiro: hooks, steering, tool policy settings, and commands
