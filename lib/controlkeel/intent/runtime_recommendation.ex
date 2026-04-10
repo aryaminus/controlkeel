@@ -8,6 +8,7 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
 
   @approval_keywords ~w(approval approvals review reviewed reviewer human manual signoff)
   @api_runtime_keywords ~w(api apis mcp tool tools integration integrations webhook webhooks oauth queue queues sync async cloudflare worker workers d1 r2 kv edge openapi graphql discovery schema typed typescript javascript executor)
+  @virtual_workspace_keywords ~w(virtual workspace filesystem file tree repo search grep find cat bash shell read-only discovery sandbox)
 
   @undecided %{
     "strategy" => "undecided",
@@ -53,6 +54,9 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
   defp strategy(brief, posture) do
     cond do
       explicit_runtime_intent?(brief) and typed_runtime_candidate?(brief, posture) ->
+        "headless_runtime"
+
+      explicit_runtime_intent?(brief) and virtual_workspace_runtime_candidate?(brief, posture) ->
         "headless_runtime"
 
       approval_heavy?(brief) ->
@@ -187,6 +191,7 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
       case integration.id do
         "cloudflare-workers" -> 8
         "executor" -> 4
+        "virtual-bash" -> 4
         "open-swe" -> 5
         "devin" -> 4
         _ -> 1
@@ -211,6 +216,17 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
          do: 2,
          else: 0
 
+    virtual_bash_bonus =
+      if integration.id == "virtual-bash" and
+           mentions?(brief, ["bash", "virtual workspace", "filesystem", "repo", "grep", "find"]),
+         do: 6,
+         else: 0
+
+    virtual_bash_discovery_bonus =
+      if integration.id == "virtual-bash" and virtual_workspace_candidate?(brief),
+        do: 2,
+        else: 0
+
     approval_penalty = if approval_heavy?(brief), do: -4, else: 0
 
     config_score =
@@ -220,7 +236,7 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
       end
 
     base_score + api_score + cloudflare_bonus + executor_bonus + executor_discovery_bonus +
-      approval_penalty + config_score
+      virtual_bash_bonus + virtual_bash_discovery_bonus + approval_penalty + config_score
   end
 
   defp typed_runtime_candidate?(brief, posture) do
@@ -229,10 +245,21 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
       (explicit_runtime_intent?(brief) or not approval_heavy?(brief))
   end
 
+  defp virtual_workspace_runtime_candidate?(brief, posture) do
+    posture["exploration_surface"] == "virtual_workspace" and
+      posture["shell_role"] in ["repo_local_fallback", "broad_fallback_only"] and
+      virtual_workspace_candidate?(brief)
+  end
+
   defp api_runtime_candidate?(brief), do: mentions?(brief, @api_runtime_keywords)
+  defp virtual_workspace_candidate?(brief), do: mentions?(brief, @virtual_workspace_keywords)
 
   defp explicit_runtime_intent?(brief),
-    do: mentions?(brief, ~w(runtime runtimes export exported cloudflare workers executor))
+    do:
+      mentions?(
+        brief,
+        ~w(runtime runtimes export exported cloudflare workers executor virtual bash workspace sandbox)
+      )
 
   defp approval_heavy?(brief), do: mentions?(brief, @approval_keywords)
 

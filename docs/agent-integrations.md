@@ -169,7 +169,7 @@ The catalog also includes rows that are intentionally not marketed as attach tar
 
 | Support class | What it means |
 | --- | --- |
-| Headless runtime | `controlkeel runtime export <target>` writes governed runtime bundles for systems such as Devin, Open SWE, and Executor |
+| Headless runtime | `controlkeel runtime export <target>` writes governed runtime bundles for systems such as Devin, Open SWE, Executor, and CK-owned virtual runtime recipes |
 | Framework adapter | surfaced through benchmark, policy, or runtime-harness adapter exports rather than host attach; this is where orchestration layers such as Conductor and Paperclip sit |
 | Provider-only | CK provider profiles and OpenAI-compatible backend guidance for systems such as Ollama, vLLM, SGLang, LM Studio, Hugging Face, and Codestral-compatible endpoints |
 | Alias | maps ecosystem names back to the canonical shipped target |

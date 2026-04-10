@@ -462,6 +462,15 @@ defmodule ControlKeel.SkillsTest do
              Path.join(executor_plan.output_dir, "executor/controlkeel-sources.example.ts")
            )
 
+    assert {:ok, virtual_bash_plan} =
+             Skills.export("virtual-bash-runtime", tmp_dir, scope: "export")
+
+    assert File.exists?(Path.join(virtual_bash_plan.output_dir, "virtual-bash/README.md"))
+
+    assert File.exists?(
+             Path.join(virtual_bash_plan.output_dir, "virtual-bash/controlkeel-runtime.json")
+           )
+
     assert {:ok, opencode_plan} = Skills.export("opencode-native", tmp_dir, scope: "export")
     assert File.exists?(Path.join(opencode_plan.output_dir, "package.json"))
 

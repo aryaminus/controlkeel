@@ -664,6 +664,26 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["project", "export"],
         export_targets: ["executor-runtime"]
       }),
+      headless_runtime(%{
+        id: "virtual-bash",
+        label: "Virtual Bash Runtime",
+        category: "headless-runtime",
+        description:
+          "CK-owned virtual-workspace runtime for just-bash-style discovery, repo search, and governed shell fallback through configured sandbox adapters.",
+        runtime_export_command: "controlkeel runtime export virtual-bash",
+        config_location:
+          "Runs as a repo-local or hosted outer loop around CK virtual-workspace MCP tools plus sandboxed shell execution, not a local attach target.",
+        companion_delivery:
+          "Emits repo `AGENTS.md`, a virtual-runtime README, a machine-readable runtime manifest, and shell bootstrap guidance instead of a host-specific attach file.",
+        preferred_target: "virtual-bash-runtime",
+        default_scope: "project",
+        auth_mode: "ck_owned",
+        mcp_mode: "export_only",
+        skills_mode: "instructions_only",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["virtual-bash-runtime"]
+      }),
       framework_adapter(%{
         id: "dspy",
         label: "DSPy",

@@ -1878,6 +1878,79 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "virtual-bash-runtime"}, root, project_root, _skills, opts) do
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("virtual-bash", project_root, opts))
+
+    readme_path = Path.join(root, "virtual-bash/README.md")
+    File.mkdir_p!(Path.dirname(readme_path))
+    File.write!(readme_path, virtual_bash_runtime_contents(project_root, opts))
+
+    manifest_path = Path.join(root, "virtual-bash/controlkeel-runtime.json")
+
+    File.write!(
+      manifest_path,
+      Jason.encode!(
+        %{
+          "mode" => "virtual_workspace_runtime",
+          "discovery" => %{
+            "transport" => "mcp",
+            "command" => mcp_command(project_root, opts),
+            "args" => mcp_args(project_root, opts),
+            "tools" => ["ck_fs_ls", "ck_fs_read", "ck_fs_find", "ck_fs_grep"]
+          },
+          "mutation" => %{
+            "surface" => "shell_fallback",
+            "approved_for" => ["repo mutation", "package commands", "test execution"],
+            "sandbox_adapters" =>
+              Enum.map(ControlKeel.ExecutionSandbox.supported_adapters(), fn adapter ->
+                Map.take(adapter, [:id, :name, :available])
+              end)
+          },
+          "note" =>
+            "Use the virtual workspace first for discovery. Treat shell as a governed fallback, not the primary context surface."
+        },
+        pretty: true
+      ) <> "\n"
+    )
+
+    shell_path = Path.join(root, "virtual-bash/controlkeel-shell.example.sh")
+
+    File.write!(shell_path, """
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    PROJECT_ROOT="#{Path.expand(project_root)}"
+
+    echo "ControlKeel virtual-bash runtime bootstrap"
+    echo "Project root: ${PROJECT_ROOT}"
+    echo "Discovery first: use ck_fs_ls, ck_fs_read, ck_fs_find, and ck_fs_grep over MCP."
+    echo "Shell fallback: use ControlKeel's configured sandbox for repo mutation, package commands, and tests."
+    echo
+    echo "MCP server:"
+    echo "  #{mcp_command(project_root, opts)} #{Enum.join(mcp_args(project_root, opts), " ")}"
+    echo
+    echo "Sandbox adapters:"
+    controlkeel sandbox status
+    """)
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => agents_path, "kind" => "instructions"},
+        %{"path" => readme_path, "kind" => "runtime"},
+        %{"path" => manifest_path, "kind" => "runtime"},
+        %{"path" => shell_path, "kind" => "runtime"}
+      ],
+      [
+        "Place `AGENTS.md` at the repo root so virtual-bash loops inherit ControlKeel workflow guidance.",
+        "Use the runtime manifest for discovery-first orchestration and the shell example when you need governed fallback execution."
+      ]
+    )
+  end
+
   defp write_target(
          %SkillTarget{id: "cloudflare-workers-runtime"},
          root,
@@ -2649,6 +2722,37 @@ defmodule ControlKeel.Skills.Exporter do
     - Typed discovery: use Executor to discover and describe tools by intent before execution
     - Governed execution: keep CK as the approval, findings, budget, and proof authority around the runtime
     - Runtime boundary: use shell only for repo mutation, package commands, and tests that do not fit the typed runtime
+    """
+  end
+
+  defp virtual_bash_runtime_contents(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    """
+    # Virtual Bash Runtime + ControlKeel
+
+    Use this runtime export when you want a just-bash-style outer loop, but you want ControlKeel to keep discovery on the read-only virtual workspace and reserve shell for governed fallback only.
+
+    ## Repo context
+
+    - Repo root: `#{project_root}`
+    - Keep `AGENTS.md` at the repo root so the runtime inherits ControlKeel workflow guidance.
+
+    ## Recommended runtime shape
+
+    - Discovery first: browse the repo with `ck_fs_ls`, `ck_fs_read`, `ck_fs_find`, and `ck_fs_grep`
+    - Use the bundled `virtual-bash/controlkeel-runtime.json` as the machine-readable contract for the loop
+    - Use shell only for repo mutation, package commands, and tests that do not fit the virtual workspace
+    - Prefer a configured sandbox adapter such as `nono`, `docker`, or `e2b` when broader shell authority is needed
+
+    ## ControlKeel fit
+
+    - Honest scope: this is a governed virtual-workspace recipe, not a magical universal host
+    - Context hygiene: filesystem discovery stays outside the transcript until the agent asks for specific content
+    - Fallback boundary: shell remains broad fallback only, with stronger approval pressure than read-only discovery
     """
   end
 

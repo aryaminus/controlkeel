@@ -124,6 +124,42 @@ defmodule ControlKeel.Intent.ExecutionPostureTest do
              "controlkeel runtime export executor"
   end
 
+  test "prefers virtual bash when the brief emphasizes virtual workspace discovery" do
+    brief =
+      execution_brief_fixture(
+        payload: %{
+          "project_name" => "Repo Discovery Loop",
+          "idea" =>
+            "Use a virtual bash runtime to search the repo with a read-only virtual workspace, grep files, and keep shell as a sandboxed fallback for package commands and tests.",
+          "domain_pack" => "software",
+          "occupation" => "Software",
+          "risk_tier" => "moderate",
+          "compliance" => [],
+          "data_summary" => "Source code, fixture files, and build scripts only.",
+          "recommended_stack" =>
+            "Virtual workspace discovery plus governed bash runtime export for repo-local execution",
+          "next_step" =>
+            "Export the runtime, use filesystem search first, and only drop to sandboxed shell when mutation is required."
+        },
+        compiler: %{
+          "occupation" => "software",
+          "domain_pack" => "software",
+          "provider" => "openai",
+          "interview_answers" => %{
+            "constraints" => "Just-bash-style repo search with sandboxed shell fallback"
+          }
+        }
+      )
+
+    recommendation = Intent.runtime_recommendation(brief)
+
+    assert recommendation["strategy"] == "headless_runtime"
+    assert recommendation["recommended_integration"]["id"] == "virtual-bash"
+
+    assert recommendation["recommended_integration"]["runtime_export_command"] ==
+             "controlkeel runtime export virtual-bash"
+  end
+
   test "prefers an already attached host when the brief needs review-first execution" do
     brief = execution_brief_fixture()
 

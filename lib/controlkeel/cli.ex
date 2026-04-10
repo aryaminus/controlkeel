@@ -1022,6 +1022,31 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  def run_command(
+        %{command: :runtime_export, args: ["virtual-bash"], options: options},
+        project_root
+      ) do
+    root = resolve_project_root(options, project_root)
+    snapshot = SetupAdvisor.snapshot(root)
+
+    case Skills.export("virtual-bash-runtime", root, scope: "export") do
+      {:ok, plan} ->
+        {:ok,
+         [
+           "Prepared virtual bash runtime export.",
+           "Project root: #{snapshot["project_root"]}",
+           SetupAdvisor.detected_hosts_line(snapshot),
+           "Output: #{plan.output_dir}",
+           "Core loop: #{SetupAdvisor.core_loop()}"
+         ] ++
+           Enum.map(plan.instructions, &"  #{&1}") ++
+           maybe_line(SetupAdvisor.service_account_hint(snapshot), "  ")}
+
+      {:error, reason} ->
+        {:error, "Failed to export virtual bash runtime bundle: #{inspect(reason)}"}
+    end
+  end
+
   def run_command(%{command: :runtime_export, args: [runtime_id]}, _project_root) do
     {:error, "Unknown runtime export target: #{runtime_id}"}
   end

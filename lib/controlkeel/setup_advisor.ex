@@ -74,11 +74,11 @@ defmodule ControlKeel.SetupAdvisor do
           ]
       end
 
-    attach_lines ++
-      [
-        "Runtime export: controlkeel runtime export open-swe",
-        "Runtime export: controlkeel runtime export devin"
-      ]
+    runtime_lines =
+      AgentIntegration.runtime_export_catalog()
+      |> Enum.map(&"Runtime export: #{&1.runtime_export_command}")
+
+    attach_lines ++ runtime_lines
   end
 
   def service_account_hint(snapshot) do

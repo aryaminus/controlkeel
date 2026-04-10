@@ -304,6 +304,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "virtual-bash-runtime",
+        "Virtual bash runtime export",
+        "CK-owned virtual-workspace runtime export for just-bash-style discovery with governed shell fallback.",
+        false,
+        "export",
+        ["project", "export"],
+        true
+      ),
+      target(
         "framework-adapter",
         "Framework adapter template",
         "Adapter/export scaffold for framework-backed integrations such as DSPy, GEPA, and DeepAgents.",

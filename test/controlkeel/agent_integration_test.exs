@@ -19,6 +19,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert "augment" in ids
     assert "pi" in ids
     assert "devin" in ids
+    assert "virtual-bash" in ids
     assert "vllm" in ids
     assert "huggingface" in ids
     assert "codex" in ids
@@ -383,6 +384,7 @@ defmodule ControlKeel.AgentIntegrationTest do
   test "typed runtime, provider, and alias rows stay truthful" do
     devin = AgentIntegration.get("devin")
     executor = AgentIntegration.get("executor")
+    virtual_bash = AgentIntegration.get("virtual-bash")
     codex_app = AgentIntegration.get("codex-app-server")
     vllm = AgentIntegration.get("vllm")
     vscode = AgentIntegration.get("vscode")
@@ -395,6 +397,9 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert executor.support_class == "headless_runtime"
     assert executor.runtime_export_command == "controlkeel runtime export executor"
     assert executor.preferred_target == "executor-runtime"
+    assert virtual_bash.support_class == "headless_runtime"
+    assert virtual_bash.runtime_export_command == "controlkeel runtime export virtual-bash"
+    assert virtual_bash.preferred_target == "virtual-bash-runtime"
 
     assert codex_app.support_class == "alias"
     assert codex_app.alias_of == "codex-cli"

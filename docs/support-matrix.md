@@ -162,6 +162,7 @@ Runtime transport truth for those first-class hosts:
 | `devin` | headless_runtime | `controlkeel runtime export devin` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `devin-runtime` |
 | `open-swe` | headless_runtime | `controlkeel runtime export open-swe` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `ck_owned` / `instructions_only` | `open-swe-runtime` |
 | `executor` | headless_runtime | `controlkeel runtime export executor` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `executor-runtime` |
+| `virtual-bash` | headless_runtime | `controlkeel runtime export virtual-bash` | `hosted_mcp`, `commands` | `runtime` | `runtime` | `ck_owned` / `instructions_only` | `virtual-bash-runtime` |
 | `dspy` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `gepa` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
 | `deepagents` | framework_adapter | adapter only | none | `none` | `inbound_only` | `ck_owned` / `none` | `framework-adapter` |
