@@ -22,7 +22,7 @@ defmodule ControlKeel.AttachedAgentSyncTest do
   test "sync refreshes stale repo-native attachments to the current CK version", %{
     tmp_dir: tmp_dir
   } do
-    current_version = to_string(Application.spec(:controlkeel, :vsn) || "0.1.0")
+    current_version = to_string(Application.spec(:controlkeel, :vsn) || "0.2.0")
 
     binding = %{
       "workspace_id" => 1,
@@ -49,7 +49,7 @@ defmodule ControlKeel.AttachedAgentSyncTest do
   end
 
   test "sync skips agents already on the current version", %{tmp_dir: tmp_dir} do
-    current_version = to_string(Application.spec(:controlkeel, :vsn) || "0.1.0")
+    current_version = to_string(Application.spec(:controlkeel, :vsn) || "0.2.0")
 
     binding = %{
       "workspace_id" => 1,

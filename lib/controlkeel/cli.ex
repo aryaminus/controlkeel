@@ -721,7 +721,7 @@ defmodule ControlKeel.CLI do
              "agents_destination" => install_result && install_result[:agent_destination],
              "commands_destination" => install_result && install_result[:commands_destination],
              "config_destination" => config_path,
-             "controlkeel_version" => to_string(Application.spec(:controlkeel, :vsn) || "0.1.0"),
+             "controlkeel_version" => to_string(Application.spec(:controlkeel, :vsn) || "0.2.0"),
              "attached_at" =>
                DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
            },

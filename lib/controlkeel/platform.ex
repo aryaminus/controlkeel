@@ -572,7 +572,7 @@ defmodule ControlKeel.Platform do
                body: body,
                headers: [
                  {"content-type", "application/json"},
-                 {"user-agent", "ControlKeel/#{Application.spec(:controlkeel, :vsn) || "0.1.0"}"},
+                 {"user-agent", "ControlKeel/#{Application.spec(:controlkeel, :vsn) || "0.2.0"}"},
                  {"x-controlkeel-event", delivery.event},
                  {"x-controlkeel-signature", signature}
                ],

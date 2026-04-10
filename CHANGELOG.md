@@ -1,10 +1,12 @@
 # Changelog
 
-## v0.1.44 — 2026-04-10
+## v0.2.0 — 2026-04-10
 
 ### What's changed
 
 - Add Executor runtime export support
+- Add virtual bash runtime export
+- Align runtime export docs and API metadata
 
 ## v0.1.43 — 2026-04-09
 

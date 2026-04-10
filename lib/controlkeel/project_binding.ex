@@ -298,6 +298,6 @@ defmodule ControlKeel.ProjectBinding do
   end
 
   defp controlkeel_version do
-    to_string(Application.spec(:controlkeel, :vsn) || "0.1.0")
+    to_string(Application.spec(:controlkeel, :vsn) || "0.2.0")
   end
 end

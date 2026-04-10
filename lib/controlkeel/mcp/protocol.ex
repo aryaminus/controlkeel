@@ -38,7 +38,7 @@ defmodule ControlKeel.MCP.Protocol do
 
   @server_info %{
     "name" => "controlkeel",
-    "version" => to_string(Application.spec(:controlkeel, :vsn) || "0.1.0")
+    "version" => to_string(Application.spec(:controlkeel, :vsn) || "0.2.0")
   }
 
   def handle_json(payload, opts \\ []) when is_binary(payload) do

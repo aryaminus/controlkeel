@@ -113,7 +113,7 @@ defmodule ControlKeel.ProtocolInterop do
       "description" =>
         "Hosted governance agent for ControlKeel context, validation, findings, budgets, routing, and delegated execution.",
       "protocolVersion" => "0.3.0",
-      "version" => to_string(Application.spec(:controlkeel, :vsn) || "0.1.0"),
+      "version" => to_string(Application.spec(:controlkeel, :vsn) || "0.2.0"),
       "url" => base <> "/a2a",
       "skills" => Enum.map(@a2a_skill_ids, &a2a_skill/1),
       "capabilities" => %{"pushNotifications" => false},
