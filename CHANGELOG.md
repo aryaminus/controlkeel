@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.44 — 2026-04-10
+
+### What's changed
+
+- Add Executor runtime export support
+
 ## v0.1.43 — 2026-04-09
 
 ### What's changed
