@@ -2395,6 +2395,8 @@ defmodule ControlKeel.CLI do
        "Project root: #{status["project_root"]}",
        "Selected source: #{status["selected_source"]}",
        "Selected provider: #{status["selected_provider"]}",
+       "Trust boundary: #{get_in(status, ["selected_trust_profile", "trust_boundary"]) || "unknown"}",
+       "Intermediary risk: #{get_in(status, ["selected_trust_profile", "intermediary_risk"]) || "unknown"}",
        "Auth mode: #{status["selected_auth_mode"]}",
        "Auth owner: #{status["selected_auth_owner"]}",
        "Bootstrap mode: #{status["bootstrap"]["mode"]}",
@@ -2493,13 +2495,16 @@ defmodule ControlKeel.CLI do
        "Selected provider: #{status["selected_provider"]}",
        "Selected model: #{status["selected_model"] || "n/a"}",
        "Selected base URL: #{selected_base_url(status)}",
+       "Trust boundary: #{get_in(status, ["selected_trust_profile", "trust_boundary"]) || "unknown"}",
+       "Intermediary risk: #{get_in(status, ["selected_trust_profile", "intermediary_risk"]) || "unknown"}",
+       "Integrity posture: #{get_in(status, ["selected_trust_profile", "integrity_posture"]) || "unknown"}",
        "Auth mode: #{status["selected_auth_mode"]}",
        "Auth owner: #{status["selected_auth_owner"]}",
        "Reason: #{status["reason"]}",
        "Fallback chain: #{Enum.join(status["fallback_chain"], " -> ")}"
      ] ++
        Enum.map(status["provider_chain"], fn resolution ->
-         "  #{resolution["source"]}: #{resolution["provider"]} (#{resolution["model"] || "default"}) base_url=#{resolution["base_url"] || "default"} [#{resolution["auth_mode"]}/#{resolution["auth_owner"]}]"
+         "  #{resolution["source"]}: #{resolution["provider"]} (#{resolution["model"] || "default"}) base_url=#{resolution["base_url"] || "default"} [#{resolution["auth_mode"]}/#{resolution["auth_owner"]}] trust=#{get_in(resolution, ["trust_profile", "trust_boundary"]) || "unknown"} risk=#{get_in(resolution, ["trust_profile", "intermediary_risk"]) || "unknown"}"
        end)}
   end
 
@@ -2513,6 +2518,8 @@ defmodule ControlKeel.CLI do
        "Provider doctor for #{status["project_root"]}",
        "Selected source: #{status["selected_source"]}",
        "Selected provider: #{status["selected_provider"]}",
+       "Trust boundary: #{get_in(status, ["selected_trust_profile", "trust_boundary"]) || "unknown"}",
+       "Intermediary risk: #{get_in(status, ["selected_trust_profile", "intermediary_risk"]) || "unknown"}",
        "Auth mode: #{status["selected_auth_mode"]}",
        "Auth owner: #{status["selected_auth_owner"]}",
        "Bootstrap mode: #{status["bootstrap"]["mode"]}"

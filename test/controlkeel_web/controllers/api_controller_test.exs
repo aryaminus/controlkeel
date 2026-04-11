@@ -778,6 +778,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert body["provider_status"]["project_root"] == project_root
       assert body["provider_status"]["selected_source"] == "user_default_profile"
       assert body["provider_status"]["selected_provider"] == "openai"
+
+      assert get_in(body, ["provider_status", "selected_trust_profile", "trust_boundary"]) ==
+               "openai_compatible_gateway"
+
+      assert get_in(body, ["provider_status", "selected_trust_profile", "intermediary_risk"]) ==
+               "high"
     end
 
     test "gets skill detail and exports and installs bundles", %{conn: conn} do

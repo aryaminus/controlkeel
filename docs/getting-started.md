@@ -141,6 +141,18 @@ controlkeel provider default openai
 
 This is the path for vLLM, SGLang, LM Studio, Hugging Face Inference Providers, and Codestral-compatible endpoints. CK accepts base URLs with or without a trailing `/v1`.
 
+CK now treats routed and custom gateway paths as explicit trust boundaries rather than transparent drop-ins. `controlkeel provider show` and `controlkeel provider doctor` report:
+
+- trust boundary, such as `direct_provider`, `openai_compatible_gateway`, `api_router_intermediary`, or `host_managed_agent_bridge`
+- intermediary risk, such as `low`, `medium`, or `high`
+- integrity posture, which helps explain whether CK is talking to a direct provider path or to something that can observe and rewrite tool-call payloads in the middle
+
+For high-risk or routed paths, prefer:
+
+- fail-closed validation for shell, installer, and package-execution work
+- append-only request and response evidence logging
+- direct provider paths for sensitive coding, deploy, and security sessions when possible
+
 If you do not have keys and are not running a local model, ControlKeel still works for:
 
 - MCP tools and governed attachments

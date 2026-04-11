@@ -31,6 +31,7 @@ defmodule ControlKeel.ProviderBroker do
       "selected_model" => selected.model,
       "selected_auth_mode" => selected.auth_mode,
       "selected_auth_owner" => selected.auth_owner,
+      "selected_trust_profile" => trust_profile_summary(selected),
       "reason" => selected.reason,
       "fallback_chain" => Enum.map(broker_chain, & &1.source),
       "provider_chain" => Enum.map(broker_chain, &resolution_summary/1),
@@ -141,12 +142,17 @@ defmodule ControlKeel.ProviderBroker do
           ]
 
         {source, provider, _} ->
+          trust_profile = trust_profile_summary(selected_resolution(status))
+
           [
             "Current provider source: #{source}.",
             "Current provider: #{provider}.",
             "Auth mode: #{status["selected_auth_mode"]}.",
-            "Auth owner: #{status["selected_auth_owner"]}."
-          ]
+            "Auth owner: #{status["selected_auth_owner"]}.",
+            "Trust boundary: #{trust_profile["trust_boundary"]}.",
+            "Intermediary risk: #{trust_profile["intermediary_risk"]}.",
+            "Integrity posture: #{trust_profile["integrity_posture"]}."
+          ] ++ trust_profile_suggestions(trust_profile)
       end
 
     %{
@@ -528,6 +534,14 @@ defmodule ControlKeel.ProviderBroker do
     profile = ProviderConfig.profile(config, provider)
     env_key = Map.get(@hosted_provider_envs, provider)
 
+    profile_resolution =
+      resolution(
+        "stored_profile",
+        provider,
+        effective_profile(provider, profile, []),
+        "Stored profile summary."
+      )
+
     %{
       "provider" => provider,
       "configured" => configured_profile?(effective_profile(provider, profile, [])),
@@ -536,7 +550,8 @@ defmodule ControlKeel.ProviderBroker do
       "default" => config["default_source"] == provider,
       "model" => profile["model"] || default_model(provider, []),
       "base_url" => profile["base_url"],
-      "source_hint" => profile_source_hint(provider, profile)
+      "source_hint" => profile_source_hint(provider, profile),
+      "trust_hint" => trust_profile_summary(profile_resolution)
     }
   end
 
@@ -841,9 +856,134 @@ defmodule ControlKeel.ProviderBroker do
       "base_url" => resolution.config["base_url"] || resolution.config[:base_url],
       "reason" => resolution.reason,
       "auth_mode" => resolution.auth_mode,
-      "auth_owner" => resolution.auth_owner
+      "auth_owner" => resolution.auth_owner,
+      "trust_profile" => trust_profile_summary(resolution)
     }
   end
+
+  defp selected_resolution(%{"provider_chain" => [resolution | _]}), do: resolution
+
+  defp selected_resolution(_status),
+    do: %{source: "heuristic", provider: "heuristic", config: %{}}
+
+  defp trust_profile_summary(%{} = resolution) do
+    source = resolution[:source] || resolution["source"]
+    provider = resolution[:provider] || resolution["provider"]
+    config = resolution[:config] || resolution["config"] || %{}
+
+    base_url =
+      config["base_url"] || config[:base_url] || resolution[:base_url] || resolution["base_url"]
+
+    cond do
+      provider == "heuristic" ->
+        %{
+          "trust_boundary" => "no_provider_selected",
+          "intermediary_risk" => "unknown",
+          "integrity_posture" => "none",
+          "transparency_recommended" => false,
+          "recommended_controls" => []
+        }
+
+      provider == "ollama" ->
+        %{
+          "trust_boundary" => "local_runtime",
+          "intermediary_risk" => "low",
+          "integrity_posture" => "local_only",
+          "transparency_recommended" => false,
+          "recommended_controls" => []
+        }
+
+      provider == "openrouter" ->
+        %{
+          "trust_boundary" => "api_router_intermediary",
+          "intermediary_risk" => "high",
+          "integrity_posture" => "router_visible_plaintext",
+          "transparency_recommended" => true,
+          "recommended_controls" => [
+            "prefer_fail_closed_high_risk_tool_gates",
+            "enable_append_only_request_response_logging",
+            "prefer_direct_provider_paths_for_sensitive_sessions"
+          ]
+        }
+
+      provider == "openai" and custom_openai_base_url?(base_url) ->
+        %{
+          "trust_boundary" => "openai_compatible_gateway",
+          "intermediary_risk" => "high",
+          "integrity_posture" => "custom_gateway_no_upstream_attestation",
+          "transparency_recommended" => true,
+          "recommended_controls" => [
+            "prefer_fail_closed_high_risk_tool_gates",
+            "enable_append_only_request_response_logging",
+            "treat_gateway_as_full_trust_boundary"
+          ]
+        }
+
+      source == "agent_bridge" ->
+        %{
+          "trust_boundary" => "host_managed_agent_bridge",
+          "intermediary_risk" => "medium",
+          "integrity_posture" => "host_bridge_not_provider_signed",
+          "transparency_recommended" => true,
+          "recommended_controls" => [
+            "log_provider_and_bridge_resolution_per_session",
+            "prefer_fail_closed_high_risk_tool_gates"
+          ]
+        }
+
+      provider in ["anthropic", "openai"] ->
+        %{
+          "trust_boundary" => "direct_provider",
+          "intermediary_risk" => "low",
+          "integrity_posture" => "direct_tls_without_response_attestation",
+          "transparency_recommended" => false,
+          "recommended_controls" => []
+        }
+
+      true ->
+        %{
+          "trust_boundary" => "unknown_provider_path",
+          "intermediary_risk" => "medium",
+          "integrity_posture" => "unknown",
+          "transparency_recommended" => true,
+          "recommended_controls" => [
+            "review_provider_path_before_sensitive_work",
+            "enable_append_only_request_response_logging"
+          ]
+        }
+    end
+  end
+
+  defp trust_profile_suggestions(%{"recommended_controls" => controls})
+       when is_list(controls) and controls != [] do
+    controls
+    |> Enum.map(fn control ->
+      case control do
+        "prefer_fail_closed_high_risk_tool_gates" ->
+          "Prefer fail-closed validation for high-risk shell, installer, and package commands on this provider path."
+
+        "enable_append_only_request_response_logging" ->
+          "Keep append-only request/response logging enabled so CK can scope exposure if a router or gateway becomes suspect."
+
+        "prefer_direct_provider_paths_for_sensitive_sessions" ->
+          "Prefer direct provider paths over routed intermediaries for sensitive coding, deploy, or security work."
+
+        "treat_gateway_as_full_trust_boundary" ->
+          "Treat the configured gateway as a full trust boundary because it can observe and rewrite tool-call payloads."
+
+        "log_provider_and_bridge_resolution_per_session" ->
+          "Record the selected bridge and provider resolution in session evidence before approving sensitive work."
+
+        "review_provider_path_before_sensitive_work" ->
+          "Review the provider path before running sensitive or autonomous sessions."
+
+        other ->
+          other
+      end
+    end)
+  end
+
+  defp trust_profile_suggestions(_trust_profile), do: []
 
   defp sanitize_runtime_hint(nil), do: nil
 

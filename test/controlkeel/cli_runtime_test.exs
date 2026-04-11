@@ -590,6 +590,7 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert provider_list_output =~ "Selected source: heuristic"
+    assert provider_list_output =~ "Trust boundary: no_provider_selected"
 
     assert {:ok, set_key} =
              CLI.parse(["provider", "set-key", "openai", "--value", "sk-cli-openai"])
@@ -626,6 +627,8 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert provider_show_output =~ "Selected source: user_default_profile"
     assert provider_show_output =~ "Selected provider: openai"
     assert provider_show_output =~ "Selected base URL: http://127.0.0.1:1234/v1"
+    assert provider_show_output =~ "Trust boundary: openai_compatible_gateway"
+    assert provider_show_output =~ "Intermediary risk: high"
 
     assert {:ok, attach} = CLI.parse(["attach", "cursor"])
 

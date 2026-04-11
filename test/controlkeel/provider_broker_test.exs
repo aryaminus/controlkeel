@@ -49,6 +49,7 @@ defmodule ControlKeel.ProviderBrokerTest do
 
     assert status["selected_source"] == "heuristic"
     assert status["selected_provider"] == "heuristic"
+    assert get_in(status, ["selected_trust_profile", "trust_boundary"]) == "no_provider_selected"
     assert status["bootstrap"]["mode"] == "none"
     assert Enum.any?(status["provider_chain"], &(&1["source"] == "heuristic"))
   end
@@ -62,6 +63,9 @@ defmodule ControlKeel.ProviderBrokerTest do
 
     assert status["selected_source"] == "user_default_profile"
     assert status["selected_provider"] == "openai"
+    assert get_in(status, ["selected_trust_profile", "trust_boundary"]) == "direct_provider"
+    assert get_in(status, ["selected_trust_profile", "intermediary_risk"]) == "low"
+
     assert Enum.at(status["fallback_chain"], 0) == "user_default_profile"
     assert "ollama" in status["fallback_chain"]
   end
@@ -78,9 +82,13 @@ defmodule ControlKeel.ProviderBrokerTest do
     assert status["selected_source"] == "user_default_profile"
     assert status["selected_provider"] == "openai"
 
+    assert get_in(status, ["selected_trust_profile", "trust_boundary"]) ==
+             "openai_compatible_gateway"
+
     openai_profile = Enum.find(status["profiles"], &(&1["provider"] == "openai"))
     assert openai_profile["configured"] == true
     assert openai_profile["base_url"] == "http://127.0.0.1:1234/v1"
+    assert get_in(openai_profile, ["trust_hint", "intermediary_risk"]) == "high"
   end
 
   test "environment override beats stored profile for hosted providers", %{
@@ -120,6 +128,10 @@ defmodule ControlKeel.ProviderBrokerTest do
 
     assert status["selected_source"] == "agent_bridge"
     assert status["selected_provider"] == "anthropic"
+
+    assert get_in(status, ["selected_trust_profile", "trust_boundary"]) ==
+             "host_managed_agent_bridge"
+
     assert Enum.at(status["attached_agents"], 0)["provider_bridge_supported"] == true
   end
 
