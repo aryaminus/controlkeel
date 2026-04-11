@@ -198,6 +198,91 @@ defmodule ControlKeel.SkillsTest do
     assert rendered.content =~ "Finish with ControlKeel validation."
   end
 
+  test "parser warns when a custom skill lacks trigger boundaries, workflow, and examples", %{
+    tmp_dir: tmp_dir
+  } do
+    skill_dir = Path.join(tmp_dir, "fragile-skill")
+    File.mkdir_p!(skill_dir)
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      """
+      ---
+      name: fragile-skill
+      description: Helps with proposals
+      ---
+      # Fragile Skill
+
+      Write something helpful for the user.
+      """
+    )
+
+    assert {:ok, skill} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+
+    codes = Enum.map(skill.diagnostics, & &1.code)
+
+    assert "weak_trigger_description" in codes
+    assert "missing_negative_boundaries" in codes
+    assert "missing_workflow_section" in codes
+    assert "missing_output_format_section" in codes
+    assert "missing_examples_section" in codes
+    assert "missing_edge_case_guidance" in codes
+  end
+
+  test "parser accepts a well-structured custom skill without skill-quality warnings", %{
+    tmp_dir: tmp_dir
+  } do
+    skill_dir = Path.join(tmp_dir, "proposal-generator")
+    File.mkdir_p!(skill_dir)
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      """
+      ---
+      name: proposal-generator
+      description: >
+        Generates professional business proposals. Use this skill whenever the user asks to
+        write a proposal, draft a proposal, create a proposal, or prepare a client-ready
+        proposal document. Do not use for internal project plans, SOWs, or technical specs.
+      ---
+      ## Overview
+
+      Generate a client-ready proposal from project details.
+
+      ## Workflow
+
+      1. Collect the client name, scope, timeline, and pricing status.
+      2. Draft the proposal sections in order.
+      3. Review the output against the format rules below.
+
+      ## Output Format
+
+      - Markdown
+      - 500-800 words
+      - H2 headings for each main section
+
+      ## Examples
+
+      Happy path:
+      - Input: "Proposal for Acme website redesign, 3 months, $15,000"
+      - Expected behavior: produce a complete proposal with pricing.
+
+      Edge case:
+      - Input: "Proposal for a client, not sure about pricing yet"
+      - Expected behavior: omit pricing and note that pricing is pending if missing.
+      """
+    )
+
+    assert {:ok, skill} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+
+    quality_codes =
+      skill.diagnostics
+      |> Enum.map(& &1.code)
+      |> Enum.filter(&String.contains?(&1, ["trigger", "workflow", "output", "examples", "edge"]))
+
+    assert quality_codes == []
+  end
+
   test "built-in skills validate cleanly and expose the full operator catalog" do
     result = Skills.validate(nil)
 

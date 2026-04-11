@@ -41,6 +41,7 @@ defmodule ControlKeel.Skills.Parser do
           |> Kernel.++(agent_diagnostics)
           |> Kernel.++(reference_diagnostics(body, skill_dir, skill_path, name))
           |> Kernel.++(compatibility_diagnostics(meta, openai_metadata, skill_path, name))
+          |> Kernel.++(quality_diagnostics(meta, body, skill_path, name))
 
         allowed_tools = normalize_list(Map.get(meta, "allowed-tools", []))
         required_mcp_tools = normalize_required_tools(meta, allowed_tools)
@@ -286,6 +287,165 @@ defmodule ControlKeel.Skills.Parser do
         skill_name: skill_name
       }
     end)
+  end
+
+  defp quality_diagnostics(meta, body, skill_path, skill_name) do
+    if quality_lint_applicable?(meta, skill_path) do
+      description = Map.get(meta, "description", "") |> to_string() |> String.trim()
+
+      []
+      |> maybe_add_weak_trigger_warning(description, skill_path, skill_name)
+      |> maybe_add_missing_negative_boundary(description, skill_path, skill_name)
+      |> maybe_add_missing_workflow_section(body, skill_path, skill_name)
+      |> maybe_add_missing_output_format_section(body, skill_path, skill_name)
+      |> maybe_add_missing_examples_section(body, skill_path, skill_name)
+      |> maybe_add_missing_edge_case_guidance(body, skill_path, skill_name)
+    else
+      []
+    end
+  end
+
+  defp quality_lint_applicable?(meta, skill_path) do
+    user_invocable = not falsey?(Map.get(meta, "user-invocable"))
+    source = classify_source(skill_path)
+
+    user_invocable and source != "builtin"
+  end
+
+  defp maybe_add_weak_trigger_warning(diagnostics, description, skill_path, skill_name) do
+    trigger_count =
+      description
+      |> String.downcase()
+      |> then(
+        &Regex.scan(
+          ~r/\b(use this skill whenever|activate when|when the user|do not use for|whenever)\b/,
+          &1
+        )
+      )
+      |> length()
+
+    phrase_count =
+      description
+      |> String.split(~r/[,;]/, trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> length()
+
+    if trigger_count == 0 and phrase_count < 3 do
+      [
+        %SkillDiagnostic{
+          level: "warn",
+          code: "weak_trigger_description",
+          message:
+            "Description is likely too vague for reliable activation. Add explicit trigger phrases or 'use this skill whenever...' guidance.",
+          path: skill_path,
+          skill_name: skill_name
+        }
+        | diagnostics
+      ]
+    else
+      diagnostics
+    end
+  end
+
+  defp maybe_add_missing_negative_boundary(diagnostics, description, skill_path, skill_name) do
+    lowered = String.downcase(description)
+
+    if String.contains?(lowered, ["do not use for", "don't use for", "not for ", "except "]) do
+      diagnostics
+    else
+      [
+        %SkillDiagnostic{
+          level: "warn",
+          code: "missing_negative_boundaries",
+          message:
+            "Description does not define clear negative boundaries. Add 'do not use for ...' guidance to reduce false activation.",
+          path: skill_path,
+          skill_name: skill_name
+        }
+        | diagnostics
+      ]
+    end
+  end
+
+  defp maybe_add_missing_workflow_section(diagnostics, body, skill_path, skill_name) do
+    if Regex.match?(~r/^\s*##+\s+Workflow\b/im, body) and Regex.match?(~r/^\s*1\.\s+/m, body) do
+      diagnostics
+    else
+      [
+        %SkillDiagnostic{
+          level: "warn",
+          code: "missing_workflow_section",
+          message:
+            "Skill should include a numbered Workflow section with sequential, testable steps.",
+          path: skill_path,
+          skill_name: skill_name
+        }
+        | diagnostics
+      ]
+    end
+  end
+
+  defp maybe_add_missing_output_format_section(diagnostics, body, skill_path, skill_name) do
+    if Regex.match?(~r/^\s*##+\s+Output Format\b/im, body) do
+      diagnostics
+    else
+      [
+        %SkillDiagnostic{
+          level: "warn",
+          code: "missing_output_format_section",
+          message:
+            "Skill should define an Output Format section so responses stay consistent in structure, tone, and length.",
+          path: skill_path,
+          skill_name: skill_name
+        }
+        | diagnostics
+      ]
+    end
+  end
+
+  defp maybe_add_missing_examples_section(diagnostics, body, skill_path, skill_name) do
+    if Regex.match?(~r/^\s*##+\s+Examples?\b/im, body) do
+      diagnostics
+    else
+      [
+        %SkillDiagnostic{
+          level: "warn",
+          code: "missing_examples_section",
+          message:
+            "Skill should include an Examples section with at least one concrete happy-path example.",
+          path: skill_path,
+          skill_name: skill_name
+        }
+        | diagnostics
+      ]
+    end
+  end
+
+  defp maybe_add_missing_edge_case_guidance(diagnostics, body, skill_path, skill_name) do
+    lowered = String.downcase(body)
+
+    if String.contains?(lowered, [
+         "edge case",
+         "edge-case",
+         "expected behavior",
+         "if the input is missing",
+         "if missing"
+       ]) do
+      diagnostics
+    else
+      [
+        %SkillDiagnostic{
+          level: "warn",
+          code: "missing_edge_case_guidance",
+          message:
+            "Skill should document at least one edge case or missing-input behavior so it degrades predictably.",
+          path: skill_path,
+          skill_name: skill_name
+        }
+        | diagnostics
+      ]
+    end
   end
 
   defp compatibility_targets(meta, openai_metadata) do

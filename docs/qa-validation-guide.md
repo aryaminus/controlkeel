@@ -481,6 +481,7 @@ Expected:
 
 - catalog lists real targets
 - diagnostics do not contradict generated output
+- diagnostics catch weak trigger headers, missing negative boundaries, and missing workflow / output / examples sections for custom skills
 - invalid or unsupported states are explained clearly
 
 ### 11.2 Export validation
