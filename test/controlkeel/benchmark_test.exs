@@ -28,6 +28,8 @@ defmodule ControlKeel.BenchmarkTest do
     assert length(ordered) == 10
     assert hd(ordered).slug == "hardcoded_api_key_python_webhook"
     assert List.last(ordered).slug == "pickle_deserialization_rce"
+    assert Benchmark.suite_eval_profile(suite)["split_summary"]["public"] == length(ordered)
+    assert Benchmark.suite_eval_profile(suite)["behavior_tag_summary"]["security"] >= 1
   end
 
   test "loads the public domain-expansion suite with explicit metadata" do
@@ -97,6 +99,15 @@ defmodule ControlKeel.BenchmarkTest do
     assert Enum.all?(suite.scenarios, fn scenario ->
              scenario.expected_rules == []
            end)
+  end
+
+  test "suite eval profile surfaces held-out split and behavior tags" do
+    suite = benchmark_suite_fixture("policy_holdout_v1")
+    profile = Benchmark.suite_eval_profile(suite)
+
+    assert profile["split_summary"]["held_out"] == length(suite.scenarios)
+    assert profile["behavior_tag_summary"]["software"] >= 1
+    assert profile["behavior_tag_summary"]["backend"] >= 1
   end
 
   test "loads the defensive security benchmark suites" do
@@ -180,6 +191,8 @@ defmodule ControlKeel.BenchmarkTest do
     assert run.catch_rate > 0.0
     assert run.blocked_count >= 1
     assert Benchmark.run_detail_metrics(run).expected_rule_hit_rate >= 0.0
+    assert Benchmark.run_eval_profile(run)["split_summary"]["public"] == 2
+    assert Benchmark.run_eval_profile(run)["behavior_tag_summary"]["security"] >= 1
     assert Repo.aggregate(Session, :count, :id) == session_count
     assert Repo.aggregate(Event, :count, :id) == analytics_count
   end
@@ -368,6 +381,8 @@ defmodule ControlKeel.BenchmarkTest do
 
     assert decoded["run"]["id"] == run.id
     assert decoded["run"]["suite"]["slug"] == "vibe_failures_v1"
+    assert get_in(decoded, ["run", "eval_profile", "split_summary", "public"]) >= 1
+    assert get_in(decoded, ["run", "eval_profile", "behavior_tag_summary", "security"]) >= 1
     assert csv =~ "run_id,suite_slug,scenario_slug"
     assert csv =~ "hardcoded_api_key_python_webhook"
   end

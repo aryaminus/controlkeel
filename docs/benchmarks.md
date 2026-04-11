@@ -2,6 +2,13 @@
 
 ControlKeel ships a persisted benchmark engine for comparing governed subjects and external agents against the same scenario suites.
 
+CK’s benchmark model is meant to support the same harness-improvement loop people now use for agent evals:
+
+- mine production traces and failure clusters for candidate evals
+- curate small, behavior-rich suites instead of blindly growing noisy corpora
+- keep explicit split boundaries so optimization work does not quietly overfit
+- use benchmark exports as the durable evidence surface for harness changes
+
 ## Blessed external comparison
 
 The recommended first external comparison path is:
@@ -16,6 +23,32 @@ This keeps the benchmark reproducible without requiring a deep native integratio
 - `controlkeel_proxy` — ControlKeel governed proxy path
 - `manual_import` — placeholder run first, then import captured external output
 - `shell` — scriptable subject that writes stdout or files for rescoring
+
+## Split and tag discipline
+
+Benchmark scenarios already carry split-aware metadata:
+
+- `public` for normal reusable suites
+- `held_out` for reserved evaluation sets such as `policy_holdout_v1`
+
+Each scenario also carries structured metadata that acts like behavior tags, including fields such as:
+
+- `domain_pack`
+- `task_type`
+- `artifact_type`
+- `security_workflow_phase`
+- any explicit `behavior_tags`
+
+ControlKeel now exposes split summaries and behavior-tag summaries in benchmark run metadata and exports so teams can see whether a result came from optimization-friendly coverage, held-out evidence, or both.
+
+The intended operating model is:
+
+1. turn recurring production failures into trace packets and failure clusters
+2. promote the best candidates into curated benchmark scenarios
+3. keep optimization and held-out cases separate
+4. compare harness changes against both outcome quality and regression protection
+
+This is the benchmark-side equivalent of treating evals like training data for harness engineering without letting the harness overfit the visible cases.
 
 ## Web UI quick presets
 
@@ -76,3 +109,10 @@ Use benchmark results as product evidence, but keep the claim precise:
 - ControlKeel ships a blessed OpenCode comparison path
 - external subjects can be imported or scripted
 - not every external agent is zero-config or bridge-native yet
+
+When using benchmarks to improve a harness, prefer:
+
+- small hand-curated suites with strong tags over large noisy dumps
+- explicit holdout suites for promotion decisions
+- trace-derived eval candidates when failures recur across real sessions
+- regression-safe promotion, not score chasing on one visible split

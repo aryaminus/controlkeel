@@ -309,6 +309,58 @@ defmodule ControlKeel.Benchmark do
     |> Enum.uniq()
   end
 
+  def suite_eval_profile(%Suite{} = suite) do
+    scenarios = suite.scenarios || []
+
+    %{
+      "scenario_count" => length(scenarios),
+      "split_summary" => count_by(scenarios, &scenario_split/1),
+      "category_summary" => count_by(scenarios, & &1.category),
+      "behavior_tag_summary" =>
+        scenarios
+        |> Enum.flat_map(&scenario_behavior_tags/1)
+        |> Enum.frequencies(),
+      "curation_mode" =>
+        get_in(suite.metadata || %{}, ["curation_mode"]) || "hand_curated_plus_trace_promoted"
+    }
+  end
+
+  def run_eval_profile(%Run{} = run) do
+    scenarios =
+      run.results
+      |> Enum.map(& &1.scenario)
+      |> Enum.uniq_by(& &1.id)
+
+    %{
+      "scenario_count" => length(scenarios),
+      "split_summary" => count_by(scenarios, &scenario_split/1),
+      "category_summary" => count_by(scenarios, & &1.category),
+      "behavior_tag_summary" =>
+        scenarios
+        |> Enum.flat_map(&scenario_behavior_tags/1)
+        |> Enum.frequencies(),
+      "holdout_present" => Enum.any?(scenarios, &(scenario_split(&1) == "held_out"))
+    }
+  end
+
+  def scenario_behavior_tags(%Scenario{} = scenario) do
+    metadata = scenario.metadata || %{}
+
+    [
+      scenario.category,
+      metadata["domain_pack"],
+      metadata["task_type"],
+      metadata["artifact_type"],
+      metadata["security_workflow_phase"]
+      | List.wrap(metadata["behavior_tags"])
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&to_string/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
+
   defp ensure_builtin_suites do
     Enum.each(BuiltinSuites.list(), &ensure_builtin_suite/1)
   end
@@ -569,6 +621,7 @@ defmodule ControlKeel.Benchmark do
       "domain_pack_filter" => domain_pack,
       "subject_config_hash" => SubjectLoader.subject_config_hash(subjects),
       "project_root" => Path.expand(project_root),
+      "eval_profile" => suite_eval_profile(suite),
       "subjects" =>
         Enum.map(subjects, &Map.take(&1, ["id", "label", "type", "configured", "output_mode"]))
     }
@@ -615,6 +668,7 @@ defmodule ControlKeel.Benchmark do
         classification: detail_metrics.classification,
         median_latency_ms: run.median_latency_ms,
         average_overhead_percent: run.average_overhead_percent,
+        eval_profile: run_eval_profile(run),
         metadata: run.metadata
       },
       results:
@@ -673,6 +727,15 @@ defmodule ControlKeel.Benchmark do
 
   defp percentage(_count, 0), do: 0.0
   defp percentage(count, total), do: Float.round(count / total * 100, 1)
+
+  defp count_by(values, mapper) do
+    values
+    |> Enum.group_by(mapper)
+    |> Enum.reject(fn {key, _rows} -> is_nil(key) end)
+    |> Enum.into(%{}, fn {key, rows} -> {key, length(rows)} end)
+  end
+
+  defp scenario_split(%Scenario{} = scenario), do: scenario.split || "public"
 
   defp average([]), do: nil
   defp average(values), do: Float.round(Enum.sum(values) / length(values), 1)
