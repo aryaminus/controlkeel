@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.2 — 2026-04-11
+
+### What's changed
+
+- Expose skills as MCP resources
+- Add provider trust-boundary reporting
+- Add split-aware eval profiles to benchmarks
+- Quiet CLI smoke output in test runs
+- Add governed decomposition summaries to mission state
+
 ## v0.2.1 — 2026-04-10
 
 ### What's changed
