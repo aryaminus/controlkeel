@@ -726,6 +726,7 @@ Validate:
 ```bash
 controlkeel runtime export devin
 controlkeel runtime export open-swe
+controlkeel runtime export cloudflare-workers
 controlkeel runtime export executor
 controlkeel runtime export virtual-bash
 ```

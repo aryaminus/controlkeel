@@ -757,6 +757,39 @@ defmodule ControlKeel.CLIRuntimeTest do
            )
   end
 
+  test "runtime export emits the Cloudflare Workers headless bundle", %{tmp_dir: tmp_dir} do
+    assert {:ok, export} =
+             CLI.parse(["runtime", "export", "cloudflare-workers", "--project-root", tmp_dir])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(export, project_root: tmp_dir)
+      end)
+
+    resolved_root = ProjectRoot.resolve(tmp_dir)
+
+    assert output =~ "Prepared Cloudflare Workers runtime export."
+    assert output =~ "Project root: #{resolved_root}"
+
+    assert File.exists?(
+             Path.join(tmp_dir, "controlkeel/dist/cloudflare-workers-runtime/AGENTS.md")
+           )
+
+    assert File.exists?(
+             Path.join(
+               tmp_dir,
+               "controlkeel/dist/cloudflare-workers-runtime/cloudflare-workers/README.md"
+             )
+           )
+
+    assert File.exists?(
+             Path.join(
+               tmp_dir,
+               "controlkeel/dist/cloudflare-workers-runtime/cloudflare-workers/wrangler.toml"
+             )
+           )
+  end
+
   test "runtime export emits the virtual bash headless bundle", %{tmp_dir: tmp_dir} do
     assert {:ok, export} =
              CLI.parse(["runtime", "export", "virtual-bash", "--project-root", tmp_dir])
