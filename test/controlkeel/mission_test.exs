@@ -766,6 +766,8 @@ defmodule ControlKeel.MissionTest do
 
       assert bundle["deploy_ready"] == false
       assert bundle["diff_summary"]["suspicious_test_changes"] >= 2
+      assert bundle["decomposition"]["session"]["strategy"] == "bounded_recursive_delivery_v1"
+      assert bundle["decomposition"]["task"]["node_type"] in ["synthesize", "implement"]
 
       assert Enum.any?(
                bundle["verification_assessment"]["suspicious_test_changes"],
@@ -857,6 +859,8 @@ defmodule ControlKeel.MissionTest do
       assert is_binary(packet["workspace_cache_key"])
       assert is_list(packet["recent_events"])
       assert is_map(packet["transcript_summary"])
+      assert packet["decomposition"]["session"]["strategy"] == "bounded_recursive_delivery_v1"
+      assert is_map(packet["decomposition"]["task"])
 
       assert {:ok, %{task: resumed, checkpoint: resumed_checkpoint}} =
                Mission.resume_task(paused, "test")

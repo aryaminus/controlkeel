@@ -90,9 +90,20 @@ defmodule ControlKeel.PlatformTest do
     assert %{edges: edges} = Platform.ensure_session_graph(session.id)
     assert length(edges) == 3
 
+    assert get_in(Platform.ensure_session_graph(session.id), [:decomposition, "strategy"]) ==
+             "bounded_recursive_delivery_v1"
+
     assert {:ok, graph} = Platform.execute_session(session.id)
     assert feature.id in graph.ready_task_ids
     refute release.id in graph.ready_task_ids
+    assert graph.decomposition["node_types"]["implement"] >= 1
+
+    feature_summary = Enum.find(graph.tasks, &(&1.id == feature.id))
+    release_edge = Enum.find(graph.edges, &(&1.to_task_id == release.id))
+
+    assert feature_summary.decomposition["node_type"] == "implement"
+    assert is_integer(feature_summary.decomposition["depth"])
+    assert release_edge.decomposition["relation"] in ["sequence", "review_gate"]
 
     %{service_account: account} =
       service_account_fixture(%{

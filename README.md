@@ -11,6 +11,8 @@
 
 It does not replace the coding model underneath. It governs the delivery layer around that model: routing, review, findings, proofs, policy, budgets, deployment readiness, and the governed context agents need to keep work grounded in the repo and session state.
 
+CK also treats decomposition as a first-class governed surface. It does not just store tasks. It records how work is being split, where review gates sit, how context should be partitioned, and which parts of a session are effectively recursive, delegated, or release-gated.
+
 ## Quick start
 
 ### Install ControlKeel

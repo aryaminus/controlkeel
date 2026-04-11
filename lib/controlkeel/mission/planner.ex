@@ -2,6 +2,7 @@ defmodule ControlKeel.Mission.Planner do
   @moduledoc false
 
   alias ControlKeel.Intent.{Domains, ExecutionBrief}
+  alias ControlKeel.Mission.Decomposition
   alias ControlKeel.SecurityWorkflow
 
   @industry_profiles %{
@@ -239,7 +240,8 @@ defmodule ControlKeel.Mission.Planner do
           agent: Map.get(@agent_labels, agent, "Generic Agent"),
           launch_window: launch_window(risk_tier),
           next_step: next_step(risk_tier)
-        }
+        },
+        metadata: default_session_metadata()
       },
       tasks: build_tasks(features, stack, risk_tier),
       findings: build_findings(industry, idea, data, features, budget_cents)
@@ -495,7 +497,11 @@ defmodule ControlKeel.Mission.Planner do
           estimated_cost_cents: 35,
           validation_gate: validation_gate(risk_tier),
           position: index,
-          metadata: %{track: "feature", stack: stack},
+          metadata: %{
+            "track" => "feature",
+            "stack" => stack,
+            "decomposition" => Decomposition.default_metadata_for_task("feature", nil)
+          },
           confidence_score: task_confidence("feature", risk_tier),
           rollback_boundary: task_rollback("feature", feature)
         }
@@ -508,7 +514,11 @@ defmodule ControlKeel.Mission.Planner do
         estimated_cost_cents: 15,
         validation_gate: "Decision brief approved",
         position: 1,
-        metadata: %{track: "architecture", stack: stack},
+        metadata: %{
+          "track" => "architecture",
+          "stack" => stack,
+          "decomposition" => Decomposition.default_metadata_for_task("architecture", nil)
+        },
         confidence_score: task_confidence("arch", risk_tier),
         rollback_boundary:
           task_rollback("arch", "Lock the architecture, data model, and deploy plan")
@@ -522,7 +532,11 @@ defmodule ControlKeel.Mission.Planner do
           estimated_cost_cents: 20,
           validation_gate: "Tests, scans, and rollback notes complete",
           position: length(feature_tasks) + 2,
-          metadata: %{track: "release", stack: stack},
+          metadata: %{
+            "track" => "release",
+            "stack" => stack,
+            "decomposition" => Decomposition.default_metadata_for_task("release", nil)
+          },
           confidence_score: task_confidence("verify", risk_tier),
           rollback_boundary:
             task_rollback("verify", "Run verification, proof bundle, and release checklist")
@@ -673,11 +687,12 @@ defmodule ControlKeel.Mission.Planner do
       validation_gate: Keyword.fetch!(opts, :validation_gate),
       position: position,
       metadata: %{
-        track: track,
-        security_workflow_phase: phase,
-        artifact_type: artifact_type,
-        requires_isolated_runtime: requires_isolated_runtime,
-        mission_template: "security_defender_v1"
+        "track" => track,
+        "security_workflow_phase" => phase,
+        "artifact_type" => artifact_type,
+        "requires_isolated_runtime" => requires_isolated_runtime,
+        "mission_template" => "security_defender_v1",
+        "decomposition" => Decomposition.default_metadata_for_task(track, phase)
       },
       confidence_score: task_confidence("feature", "critical"),
       rollback_boundary: security_task_rollback(phase)
@@ -776,15 +791,29 @@ defmodule ControlKeel.Mission.Planner do
     if brief.domain_pack == SecurityWorkflow.domain_pack() do
       occupation = security_occupation_id(brief)
 
-      %{
+      default_session_metadata()
+      |> Map.merge(%{
         "mission_template" => "security_defender_v1",
         "cyber_access_mode" => SecurityWorkflow.default_cyber_access_mode(occupation),
         "security_workflow_phases" => SecurityWorkflow.phases(),
         "proof_redaction_policy" => "security_default"
-      }
+      })
     else
-      %{}
+      default_session_metadata()
     end
+  end
+
+  defp default_session_metadata do
+    %{
+      "decomposition_strategy" => "bounded_recursive_delivery_v1",
+      "decomposition_primitives" => [
+        "task_graph",
+        "dependency_edges",
+        "review_gates",
+        "resume_packets",
+        "proof_bundles"
+      ]
+    }
   end
 
   defp maintainer_scope_for("open_source_maintainer"), do: "open_source"

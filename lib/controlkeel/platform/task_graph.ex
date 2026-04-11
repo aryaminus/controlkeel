@@ -1,6 +1,8 @@
 defmodule ControlKeel.Platform.TaskGraph do
   @moduledoc false
 
+  alias ControlKeel.Mission.Decomposition
+
   def build_edges(tasks) when is_list(tasks) do
     architecture =
       Enum.find(tasks, &(track(&1) == "architecture"))
@@ -63,7 +65,19 @@ defmodule ControlKeel.Platform.TaskGraph do
       from_task_id: from_task.id,
       to_task_id: to_task.id,
       dependency_type: dependency_type,
-      metadata: %{"from_track" => track(from_task), "to_track" => track(to_task)}
+      metadata: %{
+        "from_track" => track(from_task),
+        "to_track" => track(to_task),
+        "decomposition" =>
+          Decomposition.edge_summary(
+            %{
+              from_task_id: from_task.id,
+              to_task_id: to_task.id,
+              dependency_type: dependency_type
+            },
+            [from_task, to_task]
+          )
+      }
     }
   end
 

@@ -186,6 +186,7 @@ This includes:
 - tasks
 - task status
 - task graph state
+- decomposition summaries
 - review state
 - checkpoints
 - resume packets
@@ -199,6 +200,7 @@ The practical effect is:
 - progress becomes inspectable
 - review can happen against task state, not just raw diffs
 - agents can reacquire context without pretending they remember everything
+- recursive or delegated slices can be understood as governed nodes, not invisible prompt tricks
 
 Mission Control is the UI expression of this layer, but the underlying state also feeds:
 

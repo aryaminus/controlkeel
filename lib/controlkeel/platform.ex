@@ -5,6 +5,7 @@ defmodule ControlKeel.Platform do
 
   alias Ecto.Multi
   alias ControlKeel.{AuditExports, Bus, Mission, Repo}
+  alias ControlKeel.Mission.Decomposition
   alias ControlKeel.Mission.{ProofBundle, Session, Task}
 
   alias ControlKeel.Platform.{
@@ -325,7 +326,8 @@ defmodule ControlKeel.Platform do
             status: task.status,
             position: task.position,
             incoming_count: length(Map.get(incoming, task.id, [])),
-            outgoing_count: length(Map.get(outgoing, task.id, []))
+            outgoing_count: length(Map.get(outgoing, task.id, [])),
+            decomposition: Decomposition.task_summary(task, tasks, edges)
           }
         end),
       edges:
@@ -334,9 +336,11 @@ defmodule ControlKeel.Platform do
             id: edge.id,
             from_task_id: edge.from_task_id,
             to_task_id: edge.to_task_id,
-            dependency_type: edge.dependency_type
+            dependency_type: edge.dependency_type,
+            decomposition: Decomposition.edge_summary(edge, tasks)
           }
         end),
+      decomposition: Decomposition.session_summary(tasks, edges),
       ready_task_ids: ready_ids,
       task_runs: Enum.map(list_task_runs(%{session_id: session_id}), &task_run_summary/1)
     }

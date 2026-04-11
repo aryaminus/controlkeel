@@ -65,6 +65,7 @@ The main value is:
 - **Cross-host consistency**: CK gives a stable governance loop across hosts like Claude Code, Codex CLI, OpenCode, Copilot, Cline, Windsurf, Continue, and others.
 - **Production orientation**: CK is about shipping safely, not just generating code quickly.
 - **Recovery path**: even if another tool already changed the repo, CK can bootstrap into the project and bring the work back into a governed loop.
+- **Managed decomposition**: CK keeps the manager layer explicit by recording how work is split, where review gates sit, and which steps are effectively delegated, recursive, or evidence-gated.
 
 For defensive security teams, the same value proposition becomes:
 
@@ -148,6 +149,8 @@ At a high level, CK runs a governed lifecycle around agent work:
 
 5. **Task graph and routing**
    CK turns work into task state, routing hints, and reviewable progress.
+
+   CK also derives a decomposition layer for that graph: node type, context strategy, depth, and review requirements. That gives both humans and hosts a shared view of how the work is being managed, not only what the task titles happen to be.
 
 6. **Validation**
    CK validates code, config, shell, and text through `ck_validate`, FastPath, Semgrep, optional advisory review, trust-boundary checks, and destructive-operation tripwires.

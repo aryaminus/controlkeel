@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Intent
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
+  alias ControlKeel.Mission.Decomposition
   alias ControlKeel.MCP.Tools.CkContext
   alias ControlKeel.Mission
   alias ControlKeel.Platform
@@ -1498,6 +1499,7 @@ defmodule ControlKeelWeb.ApiController do
       budget_cents: session.budget_cents,
       inserted_at: session.inserted_at,
       runtime_context: get_in(session.metadata || %{}, ["runtime_context"]),
+      decomposition_strategy: get_in(session.metadata || %{}, ["decomposition_strategy"]),
       autonomy_profile: AutonomyLoop.session_autonomy_profile(session),
       outcome_profile: AutonomyLoop.session_outcome_profile(session)
     }
@@ -1548,6 +1550,7 @@ defmodule ControlKeelWeb.ApiController do
       estimated_cost_cents: task.estimated_cost_cents,
       validation_gate: task.validation_gate,
       runtime_context: get_in(task.metadata || %{}, ["runtime_context"]),
+      decomposition: Decomposition.task_summary(task),
       latest_proof: Mission.proof_summary_for_task(task)
     }
   end

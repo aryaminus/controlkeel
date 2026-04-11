@@ -1085,6 +1085,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Map.has_key?(proof, "deploy_ready")
       assert Map.has_key?(proof, "security_findings")
       assert Map.has_key?(proof, "compliance_attestations")
+      assert proof["decomposition"]["session"]["strategy"] == "bounded_recursive_delivery_v1"
     end
 
     test "returns 404 for unknown task", %{conn: conn} do
@@ -1119,6 +1120,9 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Map.has_key?(body["resume_packet"], "memory_hits")
       assert Map.has_key?(body["resume_packet"], "workspace_context")
       assert Map.has_key?(body["resume_packet"], "recent_events")
+
+      assert body["resume_packet"]["decomposition"]["session"]["strategy"] ==
+               "bounded_recursive_delivery_v1"
 
       conn = post(recycle(conn), ~p"/api/v1/tasks/#{task.id}/resume")
       body = json_response(conn, 200)

@@ -7,6 +7,7 @@ defmodule ControlKeel.Mission do
   alias ControlKeel.AutoFix
   alias ControlKeel.Intent.ExecutionBrief
   alias ControlKeel.Memory
+  alias ControlKeel.Mission.Decomposition
   alias ControlKeel.Notifications.Webhook
   alias ControlKeel.Platform
   alias ControlKeel.SessionTranscript
@@ -419,6 +420,7 @@ defmodule ControlKeel.Mission do
         Repo.preload(session, [
           :workspace,
           tasks: from(t in Task, order_by: t.position),
+          task_edges: from(edge in ControlKeel.Platform.TaskEdge, order_by: edge.id),
           findings: from(f in Finding, order_by: [desc: f.inserted_at]),
           invocations: from(i in Invocation, order_by: [desc: i.inserted_at]),
           reviews: from(r in Review, order_by: [desc: r.inserted_at, desc: r.id])
@@ -959,6 +961,7 @@ defmodule ControlKeel.Mission do
     with %Session{} = session <- get_session_context(session_id) do
       task_id = Keyword.get(opts, :task_id)
       task = trace_packet_task(session, task_id)
+      graph = session_task_graph(session.id)
 
       if is_nil(task) and is_integer(task_id) do
         {:error, {:invalid_arguments, "`task_id` must belong to the current session"}}
@@ -1011,7 +1014,12 @@ defmodule ControlKeel.Mission do
              "reviews" => length(reviews),
              "findings" => length(findings),
              "recent_events" => length(recent_events),
-             "proof_available" => not is_nil(latest_proof)
+             "proof_available" => not is_nil(latest_proof),
+             "decomposition_depth" =>
+               if(task,
+                 do: Decomposition.task_summary(task, session.tasks, session.task_edges)["depth"],
+                 else: nil
+               )
            },
            "trace" => %{
              "invocations" => Enum.map(invocations, &trace_invocation_entry/1),
@@ -1019,6 +1027,14 @@ defmodule ControlKeel.Mission do
              "findings" => Enum.map(findings, &trace_finding_entry/1),
              "recent_events" => recent_events,
              "transcript_summary" => transcript
+           },
+           "decomposition" => %{
+             "session" => graph[:decomposition] || graph["decomposition"],
+             "task" =>
+               if(task,
+                 do: Decomposition.task_summary(task, session.tasks, session.task_edges),
+                 else: nil
+               )
            },
            "verification_assessment" => verification_assessment,
            "planning_continuity" => planning_continuity,
@@ -2623,6 +2639,10 @@ defmodule ControlKeel.Mission do
     latest_review = List.first(reviews)
     security_workflow? = SecurityWorkflow.security_domain?(session)
     security_summary = SecurityWorkflow.proof_summary(findings)
+    tasks = session.tasks || [task]
+    task_edges = session.task_edges || []
+    decomposition_summary = Decomposition.session_summary(tasks, task_edges)
+    task_decomposition = Decomposition.task_summary(task, tasks, task_edges)
 
     security_release_ready? =
       not security_workflow? or security_summary["unresolved"] == 0
@@ -2661,6 +2681,10 @@ defmodule ControlKeel.Mission do
       "compliance_attestations" => compliance_attestations,
       "validation_gate" => task.validation_gate,
       "invocation_summary" => build_invocation_summary(invocations, total_cost),
+      "decomposition" => %{
+        "session" => decomposition_summary,
+        "task" => task_decomposition
+      },
       "review_summary" => %{
         "total" => length(reviews),
         "pending" => Enum.count(reviews, &(&1.status == "pending")),
@@ -2885,6 +2909,11 @@ defmodule ControlKeel.Mission do
       "approved_findings_count" => proof.approved_findings_count,
       "verification_status" => get_in(proof.bundle, ["verification_assessment", "status"]),
       "verification_score" => get_in(proof.bundle, ["verification_assessment", "score"]),
+      "decomposition" => %{
+        "strategy" => get_in(proof.bundle, ["decomposition", "session", "strategy"]),
+        "node_type" => get_in(proof.bundle, ["decomposition", "task", "node_type"]),
+        "depth" => get_in(proof.bundle, ["decomposition", "task", "depth"])
+      },
       "domain_pack" => domain_pack,
       "generated_at" => proof.generated_at
     }
@@ -2917,6 +2946,10 @@ defmodule ControlKeel.Mission do
         |> Enum.map(&finding_bundle_entry/1),
       "latest_invocations" => Enum.map(latest_invocations, &audit_invocation_entry/1),
       "proof_summary" => proof_summary(latest_proof),
+      "decomposition" => %{
+        "session" => Decomposition.session_summary(session.tasks, session.task_edges),
+        "task" => Decomposition.task_summary(task, session.tasks, session.task_edges)
+      },
       "planning_context" => get_in(task.metadata || %{}, ["planning_context"]) || %{},
       "review_gate" => review_gate_status(task),
       "memory_hits" => memory_hits.entries,
