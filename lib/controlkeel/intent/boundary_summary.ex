@@ -1,7 +1,12 @@
 defmodule ControlKeel.Intent.BoundarySummary do
   @moduledoc false
 
-  alias ControlKeel.Intent.{ExecutionBrief, ExecutionPosture, RuntimeRecommendation}
+  alias ControlKeel.Intent.{
+    ExecutionBrief,
+    ExecutionPosture,
+    HarnessPolicy,
+    RuntimeRecommendation
+  }
 
   @empty_summary %{
     "risk_tier" => nil,
@@ -13,6 +18,7 @@ defmodule ControlKeel.Intent.BoundarySummary do
     "launch_window" => nil,
     "next_step" => nil,
     "execution_posture" => ExecutionPosture.build(nil),
+    "harness_policy" => HarnessPolicy.build(nil),
     "runtime_recommendation" => RuntimeRecommendation.build(nil)
   }
 
@@ -36,6 +42,7 @@ defmodule ControlKeel.Intent.BoundarySummary do
       "launch_window" => optional_string(brief, "launch_window"),
       "next_step" => optional_string(brief, "next_step"),
       "execution_posture" => ExecutionPosture.build(brief),
+      "harness_policy" => HarnessPolicy.build(brief),
       "runtime_recommendation" => RuntimeRecommendation.build(brief, opts)
     }
   end

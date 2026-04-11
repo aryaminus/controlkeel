@@ -6,6 +6,7 @@ defmodule ControlKeel.Intent do
     Domains,
     ExecutionBrief,
     ExecutionPosture,
+    HarnessPolicy,
     Router,
     RuntimeRecommendation
   }
@@ -25,6 +26,7 @@ defmodule ControlKeel.Intent do
   def to_brief_map(%ExecutionBrief{} = brief), do: ExecutionBrief.to_map(brief)
   def boundary_summary(brief_or_map, opts \\ []), do: BoundarySummary.build(brief_or_map, opts)
   def execution_posture(brief_or_map), do: ExecutionPosture.build(brief_or_map)
+  def harness_policy(brief_or_map), do: HarnessPolicy.build(brief_or_map)
 
   def runtime_recommendation(brief_or_map, opts \\ []),
     do: RuntimeRecommendation.build(brief_or_map, opts)

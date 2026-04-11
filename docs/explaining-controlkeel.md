@@ -66,6 +66,7 @@ The main value is:
 - **Production orientation**: CK is about shipping safely, not just generating code quickly.
 - **Recovery path**: even if another tool already changed the repo, CK can bootstrap into the project and bring the work back into a governed loop.
 - **Managed decomposition**: CK keeps the manager layer explicit by recording how work is split, where review gates sit, and which steps are effectively delegated, recursive, or evidence-gated.
+- **Explicit harness policy**: CK derives the operational policy around the work too: which tool classes can run concurrently, how compaction should step down, which failures need in-loop recovery paths, and what isolation delegated mutation should require.
 
 For defensive security teams, the same value proposition becomes:
 

@@ -176,6 +176,31 @@ It can say:
 
 This is a practical difference from many systems that only reason in the abstract.
 
+CK now also derives a harness policy layer alongside that recommendation.
+
+That policy makes the control-plane assumptions explicit:
+
+- read-only discovery tools can be parallelized
+- mutations stay serialized
+- tool execution is expected to happen inside the main loop, not as an untracked afterthought
+- context compaction should run hierarchically, cheapest first
+- major error classes need named in-loop recovery paths
+- delegated mutation should prefer isolated worktrees or equivalent governed runtimes
+
+This is important because “posture” and “policy” are different things.
+
+Posture answers:
+
+- which surfaces should this session prefer?
+
+Policy answers:
+
+- how should the loop behave when it is under pressure?
+- what can run concurrently?
+- what gets compacted first?
+- what recovery path is expected when things fail?
+- what isolation standard should delegated work meet?
+
 ## Step 5: task graph and routing
 
 Once the work is understood, CK turns it into governed task state.

@@ -38,6 +38,14 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
     assert summary["execution_posture"]["state_surface"] == "typed_storage"
     assert summary["execution_posture"]["api_execution_surface"] == "typed_runtime"
     assert summary["execution_posture"]["shell_role"] == "broad_fallback_only"
+    assert summary["harness_policy"]["tool_execution"]["read_only_concurrency"] == "parallel"
+    assert summary["harness_policy"]["tool_execution"]["write_concurrency"] == "serial"
+    assert summary["harness_policy"]["compaction"]["strategy"] == "hierarchical"
+    assert summary["harness_policy"]["recovery"]["mode"] == "in_loop_state_machine"
+
+    assert summary["harness_policy"]["delegation"]["isolated_worktree"] ==
+             "required_for_mutating_subagents"
+
     assert summary["runtime_recommendation"]["strategy"] == "attach_client"
     assert summary["runtime_recommendation"]["recommended_integration"]["id"] == "claude-code"
 
@@ -88,6 +96,49 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                "clearance_focus" => ["file_write", "network", "deploy", "secrets"],
                "rationale" =>
                  "Prefer read-only discovery first, keep durable state in typed storage surfaces, use typed runtimes for large tool and API interactions when available, and treat shell as the broad fallback surface for mutation and execution."
+             },
+             "harness_policy" => %{
+               "tool_execution" => %{
+                 "read_only_concurrency" => "parallel",
+                 "write_concurrency" => "serial",
+                 "execution_timing" => "in_loop",
+                 "result_budgeting" => "budget_then_reference",
+                 "rationale" =>
+                   "Run read-only discovery concurrently when possible, serialize mutations, and keep tool execution inside the main agent loop so results and failures stay governable."
+               },
+               "compaction" => %{
+                 "strategy" => "hierarchical",
+                 "order" => [
+                   "result_budget",
+                   "tail_preserving_snip",
+                   "summary_compact",
+                   "context_collapse"
+                 ],
+                 "protected_tail" => true,
+                 "cheapest_first" => true,
+                 "rationale" =>
+                   "Compact the cheapest artifacts first, preserve the active tail of the session, and only pay for expensive summarization or collapse when lighter strategies fail."
+               },
+               "recovery" => %{
+                 "mode" => "in_loop_state_machine",
+                 "error_classes" => [
+                   "rate_limit",
+                   "context_overflow",
+                   "auth_refresh",
+                   "network_retry",
+                   "tool_failure"
+                 ],
+                 "requires_recovery_path" => true,
+                 "rationale" =>
+                   "Every major failure class should have a named recovery path inside the loop so the agent can retry, compact, refresh, or escalate without dropping session state."
+               },
+               "delegation" => %{
+                 "isolated_context" => true,
+                 "isolated_worktree" => "preferred_for_mutating_subagents",
+                 "authority_model" => "bounded_subtree",
+                 "rationale" =>
+                   "Delegated slices should carry isolated context and bounded authority; mutating subagents should prefer isolated worktrees or equivalent runtime sandboxes."
+               }
              },
              "runtime_recommendation" => %{
                "strategy" => "undecided",
