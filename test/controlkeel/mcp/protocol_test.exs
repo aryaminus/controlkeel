@@ -29,7 +29,10 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "id" => 1,
              "result" => %{
                "protocolVersion" => _,
-               "capabilities" => %{"tools" => %{"listChanged" => false}},
+               "capabilities" => %{
+                 "tools" => %{"listChanged" => false},
+                 "resources" => %{"subscribe" => false, "listChanged" => false}
+               },
                "serverInfo" => %{"name" => "controlkeel"}
              }
            } = response
@@ -71,9 +74,42 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_cost_optimizer",
              "ck_deployment_advisor",
              "ck_outcome_tracker",
+             "ck_load_resources",
              "ck_skill_list",
              "ck_skill_load"
            ]
+  end
+
+  test "resources/list exposes skills as MCP resources" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2010,
+        "method" => "resources/list"
+      })
+
+    assert %{"result" => %{"resources" => resources}} = response
+    assert is_list(resources)
+    assert Enum.any?(resources, &String.starts_with?(&1["uri"], "skills://"))
+
+    governance = Enum.find(resources, &(&1["uri"] == "skills://controlkeel-governance"))
+    assert governance["mimeType"] == "text/markdown"
+    assert is_binary(governance["description"])
+  end
+
+  test "resources/read returns rendered skill content for a skills uri" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2011,
+        "method" => "resources/read",
+        "params" => %{"uri" => "skills://controlkeel-governance", "session_id" => 123}
+      })
+
+    assert %{"result" => %{"contents" => [content]}} = response
+    assert content["uri"] == "skills://controlkeel-governance"
+    assert content["mimeType"] == "text/markdown"
+    assert content["text"] =~ "<skill_content"
   end
 
   test "tools/list exposes trust-boundary inputs for ck_validate" do
@@ -1378,5 +1414,28 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert get_in(second, ["result", "structuredContent", "activation"]) == "duplicate"
     assert get_in(first, ["result", "structuredContent", "content"]) =~ "<skill_content"
     assert is_list(get_in(first, ["result", "structuredContent", "resources"]))
+  end
+
+  test "tools/call ck_load_resources loads skill resources for tool-only clients" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 64,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_load_resources",
+          "arguments" => %{
+            "uris" => ["skills://controlkeel-governance"],
+            "session_id" => 123
+          }
+        }
+      })
+
+    assert %{"result" => %{"structuredContent" => %{"resources" => [resource], "total" => 1}}} =
+             response
+
+    assert resource["uri"] == "skills://controlkeel-governance"
+    assert resource["text"] =~ "<skill_content"
+    assert is_list(resource["resources"])
   end
 end

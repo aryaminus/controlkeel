@@ -18,6 +18,7 @@ defmodule ControlKeel.MCP.Protocol do
     CkFsRead,
     CkFailureClusters,
     CkFinding,
+    CkLoadResources,
     CkMemoryArchive,
     CkMemoryRecord,
     CkMemorySearch,
@@ -53,7 +54,10 @@ defmodule ControlKeel.MCP.Protocol do
   def handle_request(%{"jsonrpc" => "2.0", "method" => "initialize", "id" => id}, _opts) do
     ok_response(id, %{
       "protocolVersion" => "2025-03-26",
-      "capabilities" => %{"tools" => %{"listChanged" => false}},
+      "capabilities" => %{
+        "tools" => %{"listChanged" => false},
+        "resources" => %{"subscribe" => false, "listChanged" => false}
+      },
       "serverInfo" => @server_info
     })
   end
@@ -63,6 +67,23 @@ defmodule ControlKeel.MCP.Protocol do
 
   def handle_request(%{"jsonrpc" => "2.0", "method" => "tools/list", "id" => id}, opts) do
     ok_response(id, %{"tools" => tool_schemas(opts)})
+  end
+
+  def handle_request(%{"jsonrpc" => "2.0", "method" => "resources/list", "id" => id}, opts) do
+    ok_response(id, %{"resources" => resource_schemas(opts)})
+  end
+
+  def handle_request(
+        %{"jsonrpc" => "2.0", "method" => "resources/read", "id" => id, "params" => params},
+        _opts
+      ) do
+    case params do
+      %{"uri" => uri} ->
+        resource_response(id, load_resource(uri, params))
+
+      _ ->
+        error_response(id, -32602, "resources/read requires a resource uri")
+    end
   end
 
   def handle_request(
@@ -125,7 +146,8 @@ defmodule ControlKeel.MCP.Protocol do
       ck_delegate_tool(),
       ck_cost_optimizer_tool(),
       ck_deployment_advisor_tool(),
-      ck_outcome_tracker_tool()
+      ck_outcome_tracker_tool(),
+      ck_load_resources_tool()
     ]
 
     tools =
@@ -165,6 +187,7 @@ defmodule ControlKeel.MCP.Protocol do
   def dispatch_tool("ck_delegate", arguments), do: CkDelegate.call(arguments)
   def dispatch_tool("ck_skill_list", arguments), do: CkSkillList.call(arguments)
   def dispatch_tool("ck_skill_load", arguments), do: CkSkillLoad.call(arguments)
+  def dispatch_tool("ck_load_resources", arguments), do: CkLoadResources.call(arguments)
   def dispatch_tool("ck_cost_optimizer", arguments), do: CkCostOptimizer.call(arguments)
   def dispatch_tool("ck_deployment_advisor", arguments), do: CkDeploymentAdvisor.call(arguments)
   def dispatch_tool("ck_outcome_tracker", arguments), do: CkOutcomeTracker.call(arguments)
@@ -801,8 +824,55 @@ defmodule ControlKeel.MCP.Protocol do
     }
   end
 
+  defp ck_load_resources_tool do
+    %{
+      "name" => "ck_load_resources",
+      "description" =>
+        "Fallback for clients that do not support MCP resources. Load one or more CK resource URIs such as skills://<name>.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["uris"],
+        "properties" => %{
+          "uris" => %{
+            "type" => "array",
+            "items" => %{"type" => "string"},
+            "description" => "Resource URIs to load, for example skills://controlkeel-governance"
+          },
+          "project_root" => %{"type" => "string"},
+          "target" => %{"type" => "string"},
+          "session_id" => %{"type" => ["integer", "string"]}
+        }
+      }
+    }
+  end
+
   defp current_skill_names do
     Registry.names(File.cwd!(), trust_project_skills: true)
+  end
+
+  defp current_skills do
+    Registry.catalog(File.cwd!(), trust_project_skills: true)
+  end
+
+  defp resource_schemas(_opts) do
+    Enum.map(current_skills(), fn skill ->
+      %{
+        "uri" => "skills://#{skill.name}",
+        "name" => skill.name,
+        "title" => skill.name,
+        "description" => skill.description,
+        "mimeType" => "text/markdown"
+      }
+    end)
+  end
+
+  defp load_resource(uri, params) do
+    CkLoadResources.load_resource_uri(
+      uri,
+      Map.get(params, "project_root"),
+      Map.get(params, "target"),
+      Map.get(params, "session_id")
+    )
   end
 
   defp tool_response(id, {:ok, result}) do
@@ -816,6 +886,23 @@ defmodule ControlKeel.MCP.Protocol do
     do: error_response(id, -32602, reason)
 
   defp tool_response(id, {:error, reason}), do: error_response(id, -32000, inspect(reason))
+
+  defp resource_response(id, {:ok, result}) do
+    ok_response(id, %{
+      "contents" => [
+        %{
+          "uri" => result["uri"],
+          "mimeType" => result["mimeType"],
+          "text" => result["text"]
+        }
+      ]
+    })
+  end
+
+  defp resource_response(id, {:error, {:invalid_arguments, reason}}),
+    do: error_response(id, -32602, reason)
+
+  defp resource_response(id, {:error, reason}), do: error_response(id, -32000, inspect(reason))
 
   defp ok_response(id, result) do
     %{"jsonrpc" => "2.0", "id" => id, "result" => result}

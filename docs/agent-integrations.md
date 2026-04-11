@@ -115,6 +115,12 @@ It advertises the current governed capabilities only:
 - `ck_route`
 - `ck_delegate`
 
+For skills, CK now supports both discovery patterns:
+
+- MCP `resources/list` and `resources/read` expose skills as `skills://<name>` resources for clients that support MCP resources
+- `ck_load_resources` is the tool fallback for clients that only support tool calls
+- `ck_skill_list` and `ck_skill_load` remain the explicit skill-catalog surfaces and are still useful when the client wants typed compatibility metadata before loading content
+
 In practice, `ck_context` is the main continuity surface across those transports. It returns current mission state plus a bounded workspace snapshot, a deterministic workspace cache key, recent CK-visible transcript events, transcript summaries, and resumable task context for the active session.
 
 ACP registry support is supplemental only:
