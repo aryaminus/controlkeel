@@ -44,6 +44,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeelWeb.Endpoint
 
   @init_switches [
+    project_root: :string,
     industry: :string,
     agent: :string,
     idea: :string,
@@ -55,6 +56,7 @@ defmodule ControlKeel.CLI do
     no_attach: :boolean
   ]
   @attach_switches [
+    project_root: :string,
     mcp_only: :boolean,
     no_native: :boolean,
     with_skills: :boolean,

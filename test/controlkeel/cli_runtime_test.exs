@@ -219,6 +219,44 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert parsed.options[:project_root] == tmp_dir
   end
 
+  test "init and project-scoped codex attach accept --project-root explicitly", %{
+    tmp_dir: tmp_dir
+  } do
+    assert {:ok, init} = CLI.parse(["init", "--project-root", tmp_dir, "--no-attach"])
+    assert init.command == :init
+    assert init.options[:project_root] == tmp_dir
+
+    init_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(init, project_root: tmp_dir)
+      end)
+
+    assert init_output =~ "Initialized ControlKeel"
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/project.json"))
+
+    assert {:ok, attach} =
+             CLI.parse([
+               "attach",
+               "codex-cli",
+               "--project-root",
+               tmp_dir,
+               "--scope",
+               "project"
+             ])
+
+    assert attach.command == :attach
+    assert attach.options[:project_root] == tmp_dir
+    assert attach.options[:scope] == "project"
+
+    attach_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(attach, project_root: tmp_dir)
+      end)
+
+    assert attach_output =~ "Attached ControlKeel to Codex CLI."
+    assert File.exists?(Path.join(tmp_dir, ".codex/config.toml"))
+  end
+
   test "setup bootstraps from a nested directory and reports detected hosts", %{tmp_dir: tmp_dir} do
     File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Demo.MixProject do\nend\n")
 
