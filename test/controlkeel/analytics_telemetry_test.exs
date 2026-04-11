@@ -2,6 +2,7 @@ defmodule ControlKeel.AnalyticsTelemetryTest do
   use ControlKeel.DataCase
 
   import ControlKeel.MissionFixtures
+  import ExUnit.CaptureIO
 
   alias ControlKeel.Analytics.Event
   alias ControlKeel.Mission
@@ -39,7 +40,7 @@ defmodule ControlKeel.AnalyticsTelemetryTest do
   test "local init records project_initialized", %{tmp_dir: tmp_dir} do
     with_project(tmp_dir, fn ->
       rerun_task("ck.init")
-      Mix.Tasks.Ck.Init.run([])
+      capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
     end)
 
     assert {:ok, binding} = ProjectBinding.read(tmp_dir)
@@ -56,13 +57,13 @@ defmodule ControlKeel.AnalyticsTelemetryTest do
 
     with_project(tmp_dir, fn ->
       rerun_task("ck.init")
-      Mix.Tasks.Ck.Init.run([])
+      capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
     end)
 
     with_env("CONTROLKEEL_CLAUDE_BIN", Path.join(tmp_dir, "claude"), fn ->
       with_project(tmp_dir, fn ->
         rerun_task("ck.attach")
-        Mix.Tasks.Ck.Attach.run(["claude-code"])
+        capture_io(fn -> Mix.Tasks.Ck.Attach.run(["claude-code"]) end)
       end)
     end)
 

@@ -338,7 +338,10 @@ defmodule ControlKeel.CLIRuntimeTest do
 
   test "attach writes companion artifacts and prints install guidance", %{tmp_dir: tmp_dir} do
     assert {:ok, init} = CLI.parse(["init", "--no-attach"])
-    assert 0 == CLI.execute(init, project_root: tmp_dir)
+
+    capture_io(fn ->
+      assert 0 == CLI.execute(init, project_root: tmp_dir)
+    end)
 
     assert {:ok, codex_attach} = CLI.parse(["attach", "codex-cli", "--scope", "project"])
 
@@ -513,7 +516,10 @@ defmodule ControlKeel.CLIRuntimeTest do
 
   test "codex attach supports mcp-only mode without native bundle install", %{tmp_dir: tmp_dir} do
     assert {:ok, init} = CLI.parse(["init", "--no-attach"])
-    assert 0 == CLI.execute(init, project_root: tmp_dir)
+
+    capture_io(fn ->
+      assert 0 == CLI.execute(init, project_root: tmp_dir)
+    end)
 
     assert {:ok, codex_attach} =
              CLI.parse(["attach", "codex-cli", "--scope", "project", "--mcp-only"])
@@ -533,7 +539,10 @@ defmodule ControlKeel.CLIRuntimeTest do
 
   test "user-scoped codex attach does not sync stale project-native agents", %{tmp_dir: tmp_dir} do
     assert {:ok, init} = CLI.parse(["init", "--no-attach"])
-    assert 0 == CLI.execute(init, project_root: tmp_dir)
+
+    capture_io(fn ->
+      assert 0 == CLI.execute(init, project_root: tmp_dir)
+    end)
 
     {:ok, binding} = ProjectBinding.read(tmp_dir)
 
@@ -600,10 +609,12 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert {:ok, provider_default} =
              CLI.parse(["provider", "default", "openai", "--project-root", tmp_dir])
 
-    assert 0 == CLI.execute(set_key, project_root: tmp_dir)
-    assert 0 == CLI.execute(set_base_url, project_root: tmp_dir)
-    assert 0 == CLI.execute(set_model, project_root: tmp_dir)
-    assert 0 == CLI.execute(provider_default, project_root: tmp_dir)
+    capture_io(fn ->
+      assert 0 == CLI.execute(set_key, project_root: tmp_dir)
+      assert 0 == CLI.execute(set_base_url, project_root: tmp_dir)
+      assert 0 == CLI.execute(set_model, project_root: tmp_dir)
+      assert 0 == CLI.execute(provider_default, project_root: tmp_dir)
+    end)
 
     assert {:ok, provider_show} = CLI.parse(["provider", "show", "--project-root", tmp_dir])
 
@@ -1352,12 +1363,13 @@ defmodule ControlKeel.CLIRuntimeTest do
     end
 
     test "sandbox config rejects unknown adapter", %{tmp_dir: tmp_dir} do
-      exit_code =
-        CLI.execute(%{command: :sandbox_config, options: %{adapter: "firecracker"}, args: []},
-          project_root: tmp_dir
-        )
-
-      assert exit_code == 1
+      capture_io(:stderr, fn ->
+        assert 1 ==
+                 CLI.execute(
+                   %{command: :sandbox_config, options: %{adapter: "firecracker"}, args: []},
+                   project_root: tmp_dir
+                 )
+      end)
     end
   end
 end

@@ -112,7 +112,7 @@ defmodule ControlKeel.CLITasksTest do
 
     with_project(tmp_dir, fn ->
       rerun_task("ck.init")
-      Mix.Tasks.Ck.Init.run([])
+      capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
     end)
 
     output =
@@ -139,14 +139,14 @@ defmodule ControlKeel.CLITasksTest do
   } do
     with_project(tmp_dir, fn ->
       rerun_task("ck.init")
-      Mix.Tasks.Ck.Init.run([])
+      capture_io(fn -> Mix.Tasks.Ck.Init.run([]) end)
     end)
 
     assert_raise Mix.Error, ~r/Claude Code CLI was not found/, fn ->
       with_env("CONTROLKEEL_CLAUDE_BIN", Path.join(tmp_dir, "missing-claude"), fn ->
         with_project(tmp_dir, fn ->
           rerun_task("ck.attach")
-          Mix.Tasks.Ck.Attach.run(["claude-code"])
+          capture_io(fn -> Mix.Tasks.Ck.Attach.run(["claude-code"]) end)
         end)
       end)
     end
