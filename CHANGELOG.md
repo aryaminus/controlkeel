@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.4 — 2026-04-12
+
+### What's changed
+
+- Improve Codex install surfaces and governance docs
+
 ## v0.2.3 — 2026-04-11
 
 ### What's changed
