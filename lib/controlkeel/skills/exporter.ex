@@ -2832,6 +2832,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     - Repo root: `#{project_root}`
     - Use for DSPy benchmark subjects, GEPA optimizer/policy-training artifacts, and DeepAgents runtime harness adapters.
+    - GEPA fits here as an outer-loop optimizer for prompts, instructions, and other text parameters; CK remains the governed benchmark, evidence, and promotion surface.
     - ControlKeel still owns governance, proofs, benchmark orchestration, and provider brokerage around these frameworks.
     """
   end
@@ -2897,8 +2898,8 @@ defmodule ControlKeel.Skills.Exporter do
 
   defp codex_marketplace_manifest do
     %{
-      "name" => "controlkeel-local",
-      "interface" => %{"displayName" => "ControlKeel Local"},
+      "name" => "controlkeel",
+      "interface" => %{"displayName" => "ControlKeel"},
       "plugins" => [
         %{
           "name" => "controlkeel",
@@ -3616,7 +3617,7 @@ defmodule ControlKeel.Skills.Exporter do
   end
 
   defp codex_agent_contents(project_root, skills, opts) do
-    project_root =
+    _project_root =
       if portable_project_root?(opts),
         do: Distribution.portable_project_root(),
         else: Path.expand(project_root)
@@ -3626,14 +3627,8 @@ defmodule ControlKeel.Skills.Exporter do
     description = "Operate inside a ControlKeel-governed project with CK skills and MCP tools."
     model = "gpt-5.4-mini"
 
-    [mcp]
-    servers = ["controlkeel"]
-
     [skills]
     preload = [#{Enum.map_join(skills, ", ", &~s("#{&1.name}"))}]
-
-    [context]
-    project_root = "#{project_root}"
     """
   end
 

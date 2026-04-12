@@ -351,7 +351,9 @@ defmodule ControlKeel.Benchmark do
       metadata["domain_pack"],
       metadata["task_type"],
       metadata["artifact_type"],
-      metadata["security_workflow_phase"]
+      metadata["security_workflow_phase"],
+      metadata["memory_sharing_strategy"],
+      metadata["compaction_strategy"]
       | List.wrap(metadata["behavior_tags"])
     ]
     |> Enum.reject(&is_nil/1)

@@ -183,6 +183,7 @@ That policy makes the control-plane assumptions explicit:
 - read-only discovery tools can be parallelized
 - mutations stay serialized
 - tool execution is expected to happen inside the main loop, not as an untracked afterthought
+- durable memory should stay in CK-controlled typed surfaces, not disappear into opaque provider-managed state
 - context compaction should run hierarchically, cheapest first
 - major error classes need named in-loop recovery paths
 - delegated mutation should prefer isolated worktrees or equivalent governed runtimes
@@ -197,6 +198,7 @@ Policy answers:
 
 - how should the loop behave when it is under pressure?
 - what can run concurrently?
+- who owns durable memory, and how portable is it across hosts?
 - what gets compacted first?
 - what recovery path is expected when things fail?
 - what isolation standard should delegated work meet?

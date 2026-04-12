@@ -56,7 +56,7 @@ The [skills.sh](https://skills.sh/) agent list is broader than CK's native attac
 | Claude Code | `controlkeel plugin install claude` | Installs the local Claude plugin bundle with hooks, MCP config, and command prompts. |
 | Claude Code | `claude --plugin-dir ./controlkeel/dist/claude-plugin` | Local plugin-dir install for the exported Claude plugin bundle, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
 | GitHub Copilot | `controlkeel plugin install copilot` | Installs the local Copilot plugin bundle and hooks into the project, plus `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. |
-| Codex CLI | `controlkeel plugin install codex` | Installs the local Codex plugin bundle and marketplace manifest, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. For native skill loading, `controlkeel attach codex-cli` also writes `.codex/skills` plus `.agents/skills` compatibility copies. Install Codex itself via `npm install -g @openai/codex` or `brew install --cask codex`, matching the current upstream release channels. |
+| Codex CLI | `controlkeel plugin install codex` | Installs the local Codex plugin bundle and local marketplace manifest, including `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last`. Project scope writes `plugins/controlkeel` plus `.agents/plugins/marketplace.json`; user scope writes `~/plugins/controlkeel` plus `~/.agents/plugins/marketplace.json`. For native skill loading, `controlkeel attach codex-cli` instead writes `.codex/skills`, `.codex/agents`, `.codex/commands`, and `.codex/config.toml`. Install Codex itself via `npm install -g @openai/codex` or `brew install --cask codex`, matching the current upstream release channels. Local marketplace registration is not the same thing as being listed in OpenAI's curated Codex plugin catalog. |
 | Augment / Auggie CLI | `auggie --plugin-dir ./controlkeel/dist/augment-plugin` | Loads the local Augment plugin bundle with hook-native review interception, MCP, rules, subagent, and command prompts. Export it first or use the release artifact. |
 | Amp | `amp skill add ./controlkeel/dist/amp-native/.agents/skills/controlkeel-governance` | Installs the native CK skill bundle directly into Amp. Use alongside the exported `.amp/plugins/` directory when you want event hooks and custom tools too. |
 | OpenClaw | `controlkeel plugin install openclaw` | Installs the local OpenClaw plugin bundle and MCP manifest. |
@@ -82,6 +82,19 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | Hermes Agent | `controlkeel attach hermes-agent` |
 | OpenClaw | `controlkeel attach openclaw` |
 | Forge | `controlkeel attach forge` |
+
+## Codex-specific note
+
+Codex currently has three distinct CK stories, and mixing them together causes most of the confusion:
+
+1. Native local attach: `controlkeel attach codex-cli`
+   This is the strongest day-to-day path when you want `.codex/skills`, `.codex/agents`, `.codex/commands`, and local MCP wiring.
+2. Local plugin bundle plus local marketplace registration: `controlkeel plugin install codex`
+   This writes the plugin bundle and a local marketplace manifest for repo-local or home-local discovery.
+3. Curated remote catalog visibility inside Codex product surfaces
+   That is a separate distribution track controlled by OpenAI product surfaces, not something CK can force by writing local repo files.
+
+If a user does not see CK in a Codex plugins page, first verify the local install artifacts above before assuming the plugin install failed.
 
 ## Conductor compatibility
 

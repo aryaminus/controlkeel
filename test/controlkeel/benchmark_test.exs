@@ -5,6 +5,7 @@ defmodule ControlKeel.BenchmarkTest do
 
   alias ControlKeel.Analytics.Event
   alias ControlKeel.Benchmark
+  alias ControlKeel.Benchmark.{Scenario, Suite}
   alias ControlKeel.Mission.Session
   alias ControlKeel.Repo
 
@@ -108,6 +109,32 @@ defmodule ControlKeel.BenchmarkTest do
     assert profile["split_summary"]["held_out"] == length(suite.scenarios)
     assert profile["behavior_tag_summary"]["software"] >= 1
     assert profile["behavior_tag_summary"]["backend"] >= 1
+  end
+
+  test "eval profiles surface multi-agent memory-sharing and compaction strategies" do
+    suite = %Suite{
+      metadata: %{},
+      scenarios: [
+        %Scenario{
+          id: -1,
+          slug: "latent-briefing-case",
+          name: "Latent briefing case",
+          category: "research",
+          split: "public",
+          metadata: %{
+            "domain_pack" => "software",
+            "task_type" => "analysis",
+            "memory_sharing_strategy" => "latent_briefing",
+            "compaction_strategy" => "attention_guided_kv_compaction"
+          }
+        }
+      ]
+    }
+
+    profile = Benchmark.suite_eval_profile(suite)
+
+    assert profile["behavior_tag_summary"]["latent_briefing"] == 1
+    assert profile["behavior_tag_summary"]["attention_guided_kv_compaction"] == 1
   end
 
   test "loads the defensive security benchmark suites" do

@@ -482,6 +482,7 @@ Expected:
 - catalog lists real targets
 - diagnostics do not contradict generated output
 - diagnostics catch weak trigger headers, missing negative boundaries, and missing workflow / output / examples sections for custom skills
+- diagnostics warn when a custom skill becomes a large monolith without routing detailed material through `references/` or companion files
 - invalid or unsupported states are explained clearly
 
 ### 11.2 Export validation

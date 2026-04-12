@@ -93,7 +93,7 @@ Common attach targets today:
 - Prompt or command-native: `continue`, `gemini-cli`, `goose`, `roo-code`
 - Hook, skill, and MCP-native with headless/remote support: `letta-code`
 - Browser or embed companion: `vscode`
-- Review-only or command-driven: `codex-cli`, `aider`
+- Review-only, command-driven, or local-plugin-capable: `codex-cli`, `aider`
 
 Use the docs below for the precise truth per host:
 
@@ -124,6 +124,13 @@ controlkeel plugin install codex
 controlkeel run task <id>
 controlkeel help
 ```
+
+For Codex there are two different CK install paths:
+
+- `controlkeel attach codex-cli` installs the native `.codex/` companion files, skills, commands, agents, and local MCP wiring.
+- `controlkeel plugin install codex` installs a local plugin bundle plus a local marketplace manifest for repo-local or home-local discovery.
+
+That local marketplace path is not the same thing as being listed in OpenAI's curated Codex plugin catalog.
 
 Full command coverage is available in the CLI itself through `controlkeel help`.
 

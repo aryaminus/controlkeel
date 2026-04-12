@@ -283,6 +283,44 @@ defmodule ControlKeel.SkillsTest do
     assert quality_codes == []
   end
 
+  test "parser warns when a custom skill becomes monolithic without linked references", %{
+    tmp_dir: tmp_dir
+  } do
+    skill_dir = Path.join(tmp_dir, "mega-operator")
+    File.mkdir_p!(skill_dir)
+
+    long_sections =
+      1..6
+      |> Enum.map_join("\n\n", fn index ->
+        """
+        ## Section #{index}
+
+        #{String.duplicate("Detailed instruction block for repeated operator behavior.\n", 18)}
+        """
+      end)
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      """
+      ---
+      name: mega-operator
+      description: >
+        Use this skill whenever the user asks for a multi-step repository workflow, repo analysis,
+        release prep, or recurring operator task. Do not use for simple one-off edits or isolated
+        questions.
+      ---
+      ## Overview
+
+      This skill handles a large recurring operator workflow.
+
+      #{long_sections}
+      """
+    )
+
+    assert {:ok, skill} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+    assert Enum.any?(skill.diagnostics, &(&1.code == "monolithic_skill_body"))
+  end
+
   test "built-in skills validate cleanly and expose the full operator catalog" do
     result = Skills.validate(nil)
 
@@ -876,6 +914,10 @@ defmodule ControlKeel.SkillsTest do
     assert codex_config =~ "[mcp_servers.controlkeel]"
     assert codex_config =~ ~s(config_file = "./agents/controlkeel-operator.toml")
 
+    codex_agent = File.read!(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
+    refute codex_agent =~ "[context]"
+    refute codex_agent =~ "[mcp]"
+
     assert {:ok, claude_install} = Skills.install("claude-standalone", tmp_dir, scope: "project")
     assert claude_install.destination == Path.join(tmp_dir, ".claude/skills")
     assert File.exists?(Path.join(tmp_dir, ".claude/skills/controlkeel-governance/SKILL.md"))
@@ -1089,5 +1131,31 @@ defmodule ControlKeel.SkillsTest do
     assert updated_contents =~ "# Repo Instructions"
     assert String.split(updated_contents, "<!-- controlkeel:start -->") |> length() == 2
     assert String.split(updated_contents, "<!-- controlkeel:end -->") |> length() == 2
+  end
+
+  test "codex plugin install writes a local marketplace entry and plugin bundle", %{
+    tmp_dir: tmp_dir
+  } do
+    assert {:ok, codex_plugin_install} = Skills.install("codex-plugin", tmp_dir, scope: "project")
+
+    assert codex_plugin_install.destination == Path.join(tmp_dir, "plugins/controlkeel")
+
+    assert codex_plugin_install.marketplace_destination ==
+             Path.join(tmp_dir, ".agents/plugins/marketplace.json")
+
+    assert File.exists?(Path.join(tmp_dir, "plugins/controlkeel/.codex-plugin/plugin.json"))
+
+    marketplace =
+      Path.join(tmp_dir, ".agents/plugins/marketplace.json")
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert marketplace["name"] == "controlkeel"
+    assert get_in(marketplace, ["interface", "displayName"]) == "ControlKeel"
+
+    [plugin] = marketplace["plugins"]
+    assert plugin["name"] == "controlkeel"
+    assert get_in(plugin, ["source", "source"]) == "local"
+    assert get_in(plugin, ["source", "path"]) == "./plugins/controlkeel"
   end
 end

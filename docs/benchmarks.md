@@ -9,6 +9,13 @@ CK’s benchmark model is meant to support the same harness-improvement loop peo
 - keep explicit split boundaries so optimization work does not quietly overfit
 - use benchmark exports as the durable evidence surface for harness changes
 
+That also makes it the right outer loop for GEPA-style optimization work:
+
+- use CK scenarios and split discipline as the scored signal
+- let GEPA-style search mutate prompts, text configs, or harness instructions outside CK
+- bring the candidate back through CK benchmark and policy-training surfaces
+- promote only when the candidate improves held-out evidence, not just the visible optimization split
+
 ## Blessed external comparison
 
 The recommended first external comparison path is:
@@ -37,6 +44,8 @@ Each scenario also carries structured metadata that acts like behavior tags, inc
 - `task_type`
 - `artifact_type`
 - `security_workflow_phase`
+- `memory_sharing_strategy`
+- `compaction_strategy`
 - any explicit `behavior_tags`
 
 ControlKeel now exposes split summaries and behavior-tag summaries in benchmark run metadata and exports so teams can see whether a result came from optimization-friendly coverage, held-out evidence, or both.
@@ -49,6 +58,17 @@ The intended operating model is:
 4. compare harness changes against both outcome quality and regression protection
 
 This is the benchmark-side equivalent of treating evals like training data for harness engineering without letting the harness overfit the visible cases.
+
+For multi-agent memory experiments, use metadata to describe the strategy honestly rather than claiming native support CK does not implement itself. Examples:
+
+- `memory_sharing_strategy: "summary"`
+- `memory_sharing_strategy: "rag_retrieval"`
+- `memory_sharing_strategy: "full_pass_through"`
+- `memory_sharing_strategy: "latent_briefing"`
+- `compaction_strategy: "llm_summary"`
+- `compaction_strategy: "attention_guided_kv_compaction"`
+
+That lets CK compare governed runs across the same suite while keeping the benchmark evidence clear about what was actually used.
 
 ## Web UI quick presets
 
@@ -116,3 +136,9 @@ When using benchmarks to improve a harness, prefer:
 - explicit holdout suites for promotion decisions
 - trace-derived eval candidates when failures recur across real sessions
 - regression-safe promotion, not score chasing on one visible split
+
+For GEPA-style text optimization specifically:
+
+- treat prompts, system instructions, and lightweight text configs as candidate artifacts
+- keep the optimizer outside the governed scoring surface
+- use CK exports and run metadata as the audit trail for what changed and why it was promoted

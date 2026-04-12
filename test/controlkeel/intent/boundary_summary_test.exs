@@ -40,6 +40,11 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
     assert summary["execution_posture"]["shell_role"] == "broad_fallback_only"
     assert summary["harness_policy"]["tool_execution"]["read_only_concurrency"] == "parallel"
     assert summary["harness_policy"]["tool_execution"]["write_concurrency"] == "serial"
+    assert summary["harness_policy"]["memory"]["ownership"] == "workspace_or_ck_controlled"
+
+    assert summary["harness_policy"]["memory"]["provider_state_posture"] ==
+             "avoid_opaque_provider_memory"
+
     assert summary["harness_policy"]["compaction"]["strategy"] == "hierarchical"
     assert summary["harness_policy"]["recovery"]["mode"] == "in_loop_state_machine"
 
@@ -105,6 +110,14 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                  "result_budgeting" => "budget_then_reference",
                  "rationale" =>
                    "Run read-only discovery concurrently when possible, serialize mutations, and keep tool execution inside the main agent loop so results and failures stay governable."
+               },
+               "memory" => %{
+                 "ownership" => "workspace_or_ck_controlled",
+                 "portability" => "typed_records_and_resume_packets",
+                 "compaction_visibility" => "explicit_summary_and_protected_tail",
+                 "provider_state_posture" => "prefer_portable_ck_state",
+                 "rationale" =>
+                   "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state."
                },
                "compaction" => %{
                  "strategy" => "hierarchical",

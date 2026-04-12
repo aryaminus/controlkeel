@@ -296,6 +296,7 @@ defmodule ControlKeel.Skills.Parser do
       []
       |> maybe_add_weak_trigger_warning(description, skill_path, skill_name)
       |> maybe_add_missing_negative_boundary(description, skill_path, skill_name)
+      |> maybe_add_monolithic_body_warning(body, skill_path, skill_name)
       |> maybe_add_missing_workflow_section(body, skill_path, skill_name)
       |> maybe_add_missing_output_format_section(body, skill_path, skill_name)
       |> maybe_add_missing_examples_section(body, skill_path, skill_name)
@@ -365,6 +366,37 @@ defmodule ControlKeel.Skills.Parser do
         }
         | diagnostics
       ]
+    end
+  end
+
+  defp maybe_add_monolithic_body_warning(diagnostics, body, skill_path, skill_name) do
+    line_count =
+      body
+      |> String.split(~r/\r?\n/, trim: true)
+      |> length()
+
+    has_reference_links? =
+      Regex.match?(~r/\[[^\]]+\]\((references\/|assets\/|scripts\/|agents\/)[^)]+\)/i, body)
+
+    heading_count =
+      body
+      |> then(&Regex.scan(~r/^\s*##+\s+/m, &1))
+      |> length()
+
+    if line_count >= 90 and heading_count >= 6 and not has_reference_links? do
+      [
+        %SkillDiagnostic{
+          level: "warn",
+          code: "monolithic_skill_body",
+          message:
+            "Skill is large and self-contained without linked references. Prefer a tighter SKILL.md that routes detailed material through references or companion files.",
+          path: skill_path,
+          skill_name: skill_name
+        }
+        | diagnostics
+      ]
+    else
+      diagnostics
     end
   end
 

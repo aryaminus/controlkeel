@@ -14,6 +14,14 @@ defmodule ControlKeel.Intent.HarnessPolicy do
       "rationale" =>
         "Run read-only discovery concurrently when possible, serialize mutations, and keep tool execution inside the main agent loop so results and failures stay governable."
     },
+    "memory" => %{
+      "ownership" => "workspace_or_ck_controlled",
+      "portability" => "typed_records_and_resume_packets",
+      "compaction_visibility" => "explicit_summary_and_protected_tail",
+      "provider_state_posture" => "prefer_portable_ck_state",
+      "rationale" =>
+        "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state."
+    },
     "compaction" => %{
       "strategy" => "hierarchical",
       "order" => ["result_budget", "tail_preserving_snip", "summary_compact", "context_collapse"],
@@ -52,6 +60,7 @@ defmodule ControlKeel.Intent.HarnessPolicy do
 
     %{
       "tool_execution" => tool_execution_policy(regulated?),
+      "memory" => memory_policy(regulated?),
       "compaction" => compaction_policy(regulated?),
       "recovery" => recovery_policy(regulated?),
       "delegation" => delegation_policy(regulated?)
@@ -72,6 +81,19 @@ defmodule ControlKeel.Intent.HarnessPolicy do
   end
 
   defp tool_execution_policy(false), do: @default_policy["tool_execution"]
+
+  defp memory_policy(true) do
+    %{
+      "ownership" => "workspace_or_ck_controlled",
+      "portability" => "typed_records_and_resume_packets",
+      "compaction_visibility" => "explicit_summary_and_protected_tail",
+      "provider_state_posture" => "avoid_opaque_provider_memory",
+      "rationale" =>
+        "High-risk work should keep durable state in CK-controlled typed memory, proofs, traces, and resume packets so evidence remains portable, reviewable, and independent of proprietary provider-side memory behavior."
+    }
+  end
+
+  defp memory_policy(false), do: @default_policy["memory"]
 
   defp compaction_policy(true) do
     %{
