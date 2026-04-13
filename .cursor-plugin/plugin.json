@@ -1,0 +1,33 @@
+{
+  "name": "controlkeel",
+  "version": "0.2.3",
+  "description": "ControlKeel governance for Cursor — validation, findings, budgets, proofs, memory, agent routing, and human review via MCP.",
+  "author": {
+    "name": "ControlKeel"
+  },
+  "homepage": "https://controlkeel.com",
+  "repository": "https://github.com/controlkeel/controlkeel",
+  "license": "Apache-2.0",
+  "keywords": [
+    "governance",
+    "security",
+    "compliance",
+    "validation",
+    "code-review",
+    "mcp",
+    "budget",
+    "proof",
+    "agent-routing"
+  ],
+  "rules": "./rules/",
+  "skills": "./skills/",
+  "agents": "./agents/",
+  "commands": "./commands/",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": {
+    "controlkeel": {
+      "command": "controlkeel",
+      "args": ["mcp"]
+    }
+  }
+}

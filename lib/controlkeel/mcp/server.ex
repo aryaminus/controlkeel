@@ -61,8 +61,9 @@ defmodule ControlKeel.MCP.Server do
   defp maybe_write_frame(:no_response, _output), do: :ok
 
   defp maybe_write_frame(response, output) do
-    payload = Jason.encode!(response)
-    IO.binwrite(output, encode_frame(payload))
+    payload = Jason.encode!(response, escape: :unicode_safe)
+    frame = encode_frame(payload)
+    write_binary(output, frame)
   end
 
   defp start_reader(input) do
@@ -151,5 +152,14 @@ defmodule ControlKeel.MCP.Server do
 
   def encode_frame(payload) when is_binary(payload) do
     "Content-Length: #{byte_size(payload)}\r\n\r\n#{payload}"
+  end
+
+  defp write_binary(:stdio, data), do: write_binary(:standard_io, data)
+
+  defp write_binary(device, data) do
+    case :file.write(device, data) do
+      :ok -> :ok
+      {:error, reason} -> {:error, reason}
+    end
   end
 end

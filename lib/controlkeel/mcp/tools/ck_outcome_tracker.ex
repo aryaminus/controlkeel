@@ -21,7 +21,18 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
           OutcomeTracker.record(normalized["session_id"], outcome, opts)
 
         "get_session" ->
-          OutcomeTracker.get_session_outcomes(normalized["session_id"])
+          case OutcomeTracker.get_session_outcomes(normalized["session_id"]) do
+            {:ok, outcomes} when is_list(outcomes) ->
+              {:ok,
+               %{
+                 "mode" => "get_session",
+                 "session_id" => normalized["session_id"],
+                 "outcomes" => outcomes
+               }}
+
+            other ->
+              other
+          end
 
         "get_leaderboard" ->
           opts = [
@@ -29,7 +40,13 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
             window: normalized["window"]
           ]
 
-          OutcomeTracker.get_leaderboard(opts)
+          case OutcomeTracker.get_leaderboard(opts) do
+            {:ok, entries} when is_list(entries) ->
+              {:ok, %{"mode" => "get_leaderboard", "entries" => entries}}
+
+            other ->
+              other
+          end
       end
     end
   end

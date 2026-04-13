@@ -26,7 +26,7 @@ defmodule ControlKeel.MCP.Tools.CkRoute do
 
     case AgentRouter.route(task, opts) do
       {:ok, recommendation} ->
-        {:ok, recommendation}
+        {:ok, stringify_keys(recommendation)}
 
       {:error, :no_suitable_agent, message} ->
         {:error, {:policy_violation, message}}
@@ -37,4 +37,14 @@ defmodule ControlKeel.MCP.Tools.CkRoute do
 
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp stringify_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), stringify_keys(v)}
+      {k, v} -> {k, stringify_keys(v)}
+    end)
+  end
+
+  defp stringify_keys(list) when is_list(list), do: Enum.map(list, &stringify_keys/1)
+  defp stringify_keys(value), do: value
 end

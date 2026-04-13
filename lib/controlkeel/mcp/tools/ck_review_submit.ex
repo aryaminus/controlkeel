@@ -4,6 +4,16 @@ defmodule ControlKeel.MCP.Tools.CkReviewSubmit do
   alias ControlKeel.Mission
 
   def call(arguments) when is_map(arguments) do
+    try do
+      do_call(arguments)
+    rescue
+      e -> {:error, "Review submission failed: #{Exception.message(e)}"}
+    end
+  end
+
+  def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
+
+  defp do_call(arguments) do
     attrs =
       Map.take(
         arguments,
@@ -14,6 +24,18 @@ defmodule ControlKeel.MCP.Tools.CkReviewSubmit do
       {:ok, review} ->
         plan_refinement = get_in(review.metadata || %{}, ["plan_refinement"]) || %{}
 
+        browser_url =
+          try do
+            ControlKeelWeb.Endpoint.url() <> "/reviews/#{review.id}"
+          rescue
+            _ -> nil
+          end
+
+        quality = plan_refinement["quality"]
+
+        quality_safe =
+          if is_map(quality), do: quality, else: nil
+
         {:ok,
          %{
            "review_id" => review.id,
@@ -23,9 +45,9 @@ defmodule ControlKeel.MCP.Tools.CkReviewSubmit do
            "session_id" => review.session_id,
            "task_id" => review.task_id,
            "plan_phase" => plan_refinement["phase"],
-           "plan_quality" => plan_refinement["quality"],
+           "plan_quality" => quality_safe,
            "grill_questions" => get_in(plan_refinement, ["quality", "grill_questions"]) || [],
-           "browser_url" => ControlKeelWeb.Endpoint.url() <> "/reviews/#{review.id}"
+           "browser_url" => browser_url
          }}
 
       {:error, {:invalid_arguments, reason}} ->
@@ -35,6 +57,4 @@ defmodule ControlKeel.MCP.Tools.CkReviewSubmit do
         {:error, reason}
     end
   end
-
-  def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
 end

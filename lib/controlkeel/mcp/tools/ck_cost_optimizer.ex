@@ -15,14 +15,29 @@ defmodule ControlKeel.MCP.Tools.CkCostOptimizer do
             top_model: normalized["top_model"]
           ]
 
-          CostOptimizer.suggest(normalized["session_id"], opts)
+          case CostOptimizer.suggest(normalized["session_id"], opts) do
+            {:ok, suggestions} when is_list(suggestions) ->
+              {:ok, %{"mode" => "suggest", "suggestions" => suggestions}}
+
+            other ->
+              other
+          end
 
         "compare" ->
           opts = [
             estimated_tokens: normalized["estimated_tokens"] || 10_000
           ]
 
-          CostOptimizer.compare_agents(normalized["task_description"] || "Unknown task", opts)
+          case CostOptimizer.compare_agents(
+                 normalized["task_description"] || "Unknown task",
+                 opts
+               ) do
+            {:ok, comparisons} when is_list(comparisons) ->
+              {:ok, %{"mode" => "compare", "comparisons" => comparisons}}
+
+            other ->
+              other
+          end
       end
     end
   end

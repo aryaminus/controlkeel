@@ -382,6 +382,9 @@ defmodule ControlKeel.Skills.Exporter do
     skill_root = Path.join(root, ".agents/skills")
     write_skill_tree(skills, skill_root)
 
+    cursor_skill_root = Path.join(root, ".cursor/skills")
+    write_cursor_skill_tree(skills, cursor_skill_root)
+
     rule_path = Path.join(root, ".cursor/rules/controlkeel.mdc")
     File.mkdir_p!(Path.dirname(rule_path))
     File.write!(rule_path, cursor_rule_contents())
@@ -393,6 +396,12 @@ defmodule ControlKeel.Skills.Exporter do
     submit_command_path = Path.join(root, ".cursor/commands/controlkeel-submit-plan.md")
     File.write!(submit_command_path, cursor_submit_plan_command_contents())
 
+    diff_command_path = Path.join(root, ".cursor/commands/controlkeel-diff-review.md")
+    File.write!(diff_command_path, cursor_diff_review_command_contents())
+
+    completion_command_path = Path.join(root, ".cursor/commands/controlkeel-completion-review.md")
+    File.write!(completion_command_path, cursor_completion_review_command_contents())
+
     annotate_command_path = Path.join(root, ".cursor/commands/controlkeel-annotate.md")
 
     File.write!(
@@ -403,13 +412,37 @@ defmodule ControlKeel.Skills.Exporter do
     last_command_path = Path.join(root, ".cursor/commands/controlkeel-last.md")
     File.write!(last_command_path, host_last_command_contents("Cursor"))
 
+    agent_path = Path.join(root, ".cursor/agents/controlkeel-governor.md")
+    File.mkdir_p!(Path.dirname(agent_path))
+    File.write!(agent_path, cursor_agent_contents())
+
     background_agent_path = Path.join(root, ".cursor/background-agents/controlkeel.md")
     File.mkdir_p!(Path.dirname(background_agent_path))
     File.write!(background_agent_path, cursor_background_agent_contents())
 
+    plugin_path = Path.join(root, ".cursor-plugin/plugin.json")
+    File.mkdir_p!(Path.dirname(plugin_path))
+    File.write!(plugin_path, Jason.encode!(cursor_plugin_manifest(opts), pretty: true) <> "\n")
+
+    hooks_path = Path.join(root, ".cursor/hooks.json")
+    File.write!(hooks_path, Jason.encode!(cursor_hooks_manifest(), pretty: true) <> "\n")
+
+    hook_dir = Path.join(root, ".cursor/hooks")
+    File.mkdir_p!(hook_dir)
+
+    for {name, contents_fn} <- cursor_hook_scripts() do
+      path = Path.join(hook_dir, name)
+      File.write!(path, contents_fn.())
+      File.chmod!(path, 0o755)
+    end
+
     mcp_path = Path.join(root, ".cursor/mcp.json")
     File.mkdir_p!(Path.dirname(mcp_path))
-    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    File.write!(
+      mcp_path,
+      Jason.encode!(cursor_mcp_payload(project_root, opts), pretty: true) <> "\n"
+    )
 
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, instructions_only_contents("cursor", project_root, opts))
@@ -420,18 +453,25 @@ defmodule ControlKeel.Skills.Exporter do
       opts,
       [
         %{"path" => skill_root, "kind" => "skills"},
+        %{"path" => cursor_skill_root, "kind" => "skills"},
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
+        %{"path" => diff_command_path, "kind" => "command"},
+        %{"path" => completion_command_path, "kind" => "command"},
         %{"path" => annotate_command_path, "kind" => "command"},
         %{"path" => last_command_path, "kind" => "command"},
+        %{"path" => agent_path, "kind" => "agent"},
         %{"path" => background_agent_path, "kind" => "workflow"},
+        %{"path" => plugin_path, "kind" => "plugin"},
+        %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.cursor/rules`, `.cursor/commands`, and `.cursor/background-agents` in the repo so Cursor loads ControlKeel guidance, review commands, and background-agent handoff notes.",
-        "Use .cursor/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+        "Keep `.cursor/rules`, `.cursor/commands`, `.cursor/hooks`, `.cursor/skills`, `.cursor/agents`, and `.cursor/background-agents` in the repo so Cursor loads ControlKeel governance.",
+        "Use .cursor/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template.",
+        "The `.cursor-plugin/plugin.json` manifest makes ControlKeel a distributable Cursor plugin."
       ]
     )
   end
@@ -3264,15 +3304,448 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp cursor_diff_review_command_contents do
+    """
+    # /controlkeel-diff-review
+
+    Use this command to submit the current diff for ControlKeel governance review before committing.
+
+    1. Capture the current diff: `git diff --staged` (or `git diff` for unstaged).
+    2. Call `ck_validate` with `content` set to the diff and `kind: "code"`.
+    3. If validation passes, call `ck_review_submit` with `review_type: "diff"`, `submission_body` set to the diff, and `submitted_by: "cursor"`.
+    4. Wait for review with `ck_review_status` or `controlkeel review plan wait --id <review_id> --json`.
+    5. Only commit after approval.
+    """
+  end
+
+  defp cursor_completion_review_command_contents do
+    """
+    # /controlkeel-completion-review
+
+    Use this command when the current task is ready for completion review.
+
+    1. Call `ck_context` to gather mission, findings, proof, and budget state.
+    2. Summarize what was accomplished, what remains, and any open findings.
+    3. Call `ck_review_submit` with `review_type: "completion"`, the summary as `submission_body`, and `submitted_by: "cursor"`.
+    4. If there are unresolved blocked findings, surface them before submitting.
+    5. Wait for review with `ck_review_status`.
+    6. After approval, call `ck_outcome_tracker` with `mode: "record"` to record the session outcome.
+    """
+  end
+
   defp cursor_background_agent_contents do
     """
-    # ControlKeel background agent guidance
+    # ControlKeel background agent governance
 
-    When Cursor background agents are enabled, use this handoff:
+    When Cursor background agents are enabled, follow this protocol:
 
-    1. Draft the plan first.
-    2. Submit the plan with ControlKeel before execution.
-    3. Return proof status, unresolved findings, and any blocked work with the final handoff.
+    ## Before execution
+    1. Call `ck_context` with `session_id: 1` to load mission state and active findings.
+    2. Draft the plan, including scope estimate and validation approach.
+    3. Call `ck_review_submit` with `review_type: "plan"` before executing.
+    4. Wait for approval via `ck_review_status` before proceeding.
+
+    ## During execution
+    5. Call `ck_validate` before every risky edit, shell command, or config change.
+    6. Use `ck_memory_record` to persist key decisions for future agents.
+    7. Call `ck_budget` before expensive operations to stay within limits.
+    8. Call `ck_finding` if you discover any unscanned issue.
+
+    ## Handoff
+    9. Call `ck_context` again to verify final state.
+    10. Return proof status, unresolved findings, budget remaining, and any blocked work.
+    11. Call `ck_outcome_tracker` with `mode: "record"` to record the session result.
+    """
+  end
+
+  defp cursor_plugin_manifest(opts) do
+    version = Keyword.get(opts, :version, app_version())
+
+    %{
+      "name" => "controlkeel",
+      "version" => version,
+      "description" =>
+        "ControlKeel governance for Cursor — validation, findings, budgets, proofs, memory, agent routing, and human review via MCP.",
+      "author" => %{"name" => "ControlKeel"},
+      "license" => "Apache-2.0",
+      "keywords" => [
+        "governance",
+        "security",
+        "compliance",
+        "validation",
+        "mcp",
+        "agent-routing"
+      ],
+      "rules" => "./rules/",
+      "skills" => "./skills/",
+      "agents" => "./agents/",
+      "commands" => "./commands/",
+      "hooks" => "./hooks/hooks.json"
+    }
+  end
+
+  defp cursor_agent_contents do
+    """
+    ---
+    name: controlkeel-governor
+    description: >-
+      A governance-focused agent that enforces ControlKeel policies, validates
+      changes, manages findings, and ensures budget compliance.
+    ---
+
+    # ControlKeel Governor Agent
+
+    You are a governance agent powered by ControlKeel. Your role is to ensure all code changes, deployments, and decisions follow the governance protocol.
+
+    ## Behavior
+
+    1. Always start by calling `ck_context` to understand the current mission state.
+    2. Validate all proposed changes with `ck_validate` before approving them.
+    3. Track findings with `ck_finding` and ensure blocked items are resolved.
+    4. Monitor budget with `ck_budget` and flag overspend risks.
+    5. Route tasks to the best-fit agent using `ck_route`.
+    6. Record decisions in governed memory via `ck_memory_record`.
+    7. Submit reviews via `ck_review_submit` for human approval gates.
+
+    ## When delegated to
+
+    If another agent delegates work to you:
+    - Load context with `ck_context`
+    - Validate the delegated task
+    - Return a governance assessment with findings, risk level, and recommendations
+    - Record the outcome via `ck_outcome_tracker`
+    """
+  end
+
+  defp cursor_mcp_payload(project_root, opts) do
+    base = mcp_payload(project_root, opts)
+
+    put_in(
+      base,
+      ["mcpServers", "controlkeel", "env"],
+      %{"CK_PROJECT_ROOT" => "${workspaceFolder}"}
+    )
+  end
+
+  defp write_cursor_skill_tree(skills, cursor_skill_root) do
+    File.mkdir_p!(cursor_skill_root)
+
+    Enum.each(skills, fn skill ->
+      destination = Path.join(cursor_skill_root, skill.name)
+
+      unless same_path?(skill.skill_dir, destination) do
+        File.rm_rf!(destination)
+        File.cp_r!(skill.skill_dir, destination)
+      end
+    end)
+  end
+
+  defp cursor_hooks_manifest do
+    %{
+      "version" => 1,
+      "hooks" => %{
+        "sessionStart" => [
+          %{
+            "command" => ".cursor/hooks/ck-session-start.sh",
+            "timeout" => 10,
+            "failClosed" => false
+          }
+        ],
+        "sessionEnd" => [
+          %{
+            "command" => ".cursor/hooks/ck-session-end.sh",
+            "timeout" => 10,
+            "failClosed" => false
+          }
+        ],
+        "beforeShellExecution" => [
+          %{
+            "command" => ".cursor/hooks/ck-validate-shell.sh",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "preToolUse" => [
+          %{
+            "command" => ".cursor/hooks/ck-validate-write.sh",
+            "matcher" => "Write|StrReplace|Delete",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "beforeMCPExecution" => [
+          %{
+            "command" => ".cursor/hooks/ck-mcp-gate.sh",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "subagentStart" => [
+          %{
+            "command" => ".cursor/hooks/ck-subagent-start.sh",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "stop" => [
+          %{
+            "command" => ".cursor/hooks/ck-stop.sh",
+            "timeout" => 10,
+            "loop_limit" => 1,
+            "failClosed" => false
+          }
+        ]
+      }
+    }
+  end
+
+  defp cursor_hook_scripts do
+    [
+      {"ck-validate-shell.sh", &cursor_validate_shell_hook_contents/0},
+      {"ck-validate-write.sh", &cursor_validate_write_hook_contents/0},
+      {"ck-session-start.sh", &cursor_session_start_hook_contents/0},
+      {"ck-session-end.sh", &cursor_session_end_hook_contents/0},
+      {"ck-subagent-start.sh", &cursor_subagent_start_hook_contents/0},
+      {"ck-mcp-gate.sh", &cursor_mcp_gate_hook_contents/0},
+      {"ck-stop.sh", &cursor_stop_hook_contents/0}
+    ]
+  end
+
+  defp cursor_validate_shell_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    command_text=""
+    if command -v jq >/dev/null 2>&1; then
+      command_text=$(printf '%s' "$input" | jq -r '.command // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      command_text=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('command',''))")
+    fi
+
+    if [ -z "$command_text" ]; then
+      printf '{"permission":"allow"}\n'
+      exit 0
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      result=$(controlkeel validate --content "$command_text" --kind shell --json 2>/dev/null || true)
+
+      if printf '%s' "$result" | grep -q '"decision":"block"'; then
+        printf '{"permission":"deny","user_message":"ControlKeel blocked this shell command.","agent_message":"CK governance blocked this shell command. Check ck_validate for details."}\n'
+        exit 0
+      fi
+
+      if printf '%s' "$result" | grep -q '"decision":"warn"'; then
+        printf '{"permission":"ask","user_message":"ControlKeel flagged this command with a warning.","agent_message":"CK flagged this command. Proceed with caution."}\n'
+        exit 0
+      fi
+    fi
+
+    printf '{"permission":"allow"}\n'
+    exit 0
+    """
+  end
+
+  defp cursor_validate_write_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    file_path=""
+    if command -v jq >/dev/null 2>&1; then
+      file_path=$(printf '%s' "$input" | jq -r '.input.path // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      file_path=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('input',{}).get('path',''))" 2>/dev/null)
+    fi
+
+    sensitive_pattern='\.env|credentials|secret|\.pem|\.key|id_rsa|token|password'
+    if printf '%s' "$file_path" | grep -qiE "$sensitive_pattern"; then
+      if command -v controlkeel >/dev/null 2>&1; then
+        result=$(controlkeel validate --content "Writing to $file_path" --kind config --json 2>/dev/null || true)
+        if printf '%s' "$result" | grep -q '"decision":"block"'; then
+          printf '{"permission":"deny","user_message":"ControlKeel blocked write to sensitive file: %s"}\n' "$file_path"
+          exit 0
+        fi
+      fi
+      printf '{"permission":"ask","user_message":"Writing to potentially sensitive file: %s"}\n' "$file_path"
+      exit 0
+    fi
+
+    printf '{"permission":"allow"}\n'
+    exit 0
+    """
+  end
+
+  defp cursor_session_start_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    session_id=""
+    if command -v jq >/dev/null 2>&1; then
+      session_id=$(printf '%s' "$input" | jq -r '.session_id // .conversation_id // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      session_id=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id', d.get('conversation_id', '')))" 2>/dev/null)
+    fi
+
+    context=""
+    if command -v controlkeel >/dev/null 2>&1; then
+      context=$(controlkeel context --session-id "${session_id:-1}" --json 2>/dev/null || true)
+    fi
+
+    if [ -n "$context" ]; then
+      printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel session active. Governance protocol: call ck_validate before risky edits, ck_budget before expensive ops, ck_route before delegation."}\n'
+    else
+      printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel available. Start with ck_context to load mission state."}\n'
+    fi
+    exit 0
+    """
+  end
+
+  defp cursor_session_end_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      session_id=""
+      if command -v jq >/dev/null 2>&1; then
+        session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+      elif command -v python3 >/dev/null 2>&1; then
+        session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+      fi
+      controlkeel context --session-id "${session_id:-1}" --json >/dev/null 2>&1 || true
+    fi
+
+    exit 0
+    """
+  end
+
+  defp cursor_subagent_start_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    subagent_type=""
+    task=""
+    if command -v jq >/dev/null 2>&1; then
+      subagent_type=$(printf '%s' "$input" | jq -r '.subagent_type // empty')
+      task=$(printf '%s' "$input" | jq -r '.task // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      subagent_type=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('subagent_type',''))" 2>/dev/null)
+      task=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('task',''))" 2>/dev/null)
+    fi
+
+    if [ -z "$subagent_type" ]; then
+      printf '{"permission":"allow"}\n'
+      exit 0
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      result=$(controlkeel validate --content "Delegating to $subagent_type subagent: $task" --kind text --json 2>/dev/null || true)
+
+      if printf '%s' "$result" | grep -q '"decision":"block"'; then
+        printf '{"permission":"deny","user_message":"ControlKeel blocked subagent delegation: %s"}\n' "$subagent_type"
+        exit 0
+      fi
+    fi
+
+    printf '{"permission":"allow"}\n'
+    exit 0
+    """
+  end
+
+  defp cursor_mcp_gate_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    tool_name=""
+    if command -v jq >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null)
+    fi
+
+    case "$tool_name" in
+      ck_*)
+        printf '{"permission":"allow"}\n'
+        exit 0
+        ;;
+    esac
+
+    if [ -z "$tool_name" ]; then
+      printf '{"permission":"allow"}\n'
+      exit 0
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      result=$(controlkeel validate --content "MCP tool call: $tool_name" --kind text --json 2>/dev/null || true)
+
+      if printf '%s' "$result" | grep -q '"decision":"block"'; then
+        printf '{"permission":"deny","user_message":"ControlKeel blocked MCP tool: %s"}\n' "$tool_name"
+        exit 0
+      fi
+
+      if printf '%s' "$result" | grep -q '"decision":"warn"'; then
+        printf '{"permission":"ask","user_message":"ControlKeel flagged MCP tool: %s"}\n' "$tool_name"
+        exit 0
+      fi
+    fi
+
+    printf '{"permission":"allow"}\n'
+    exit 0
+    """
+  end
+
+  defp cursor_stop_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    status=""
+    loop_count=""
+    if command -v jq >/dev/null 2>&1; then
+      status=$(printf '%s' "$input" | jq -r '.status // empty')
+      loop_count=$(printf '%s' "$input" | jq -r '.loop_count // "0"')
+    elif command -v python3 >/dev/null 2>&1; then
+      status=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null)
+      loop_count=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('loop_count',0))" 2>/dev/null)
+    fi
+
+    if [ "$loop_count" != "0" ]; then
+      exit 0
+    fi
+
+    if [ "$status" = "completed" ] && command -v controlkeel >/dev/null 2>&1; then
+      context=$(controlkeel context --session-id 1 --json 2>/dev/null || true)
+
+      if printf '%s' "$context" | grep -q '"findings"' 2>/dev/null; then
+        has_blocked=$(printf '%s' "$context" | grep -c '"severity":"blocked"' 2>/dev/null || echo "0")
+
+        if [ "$has_blocked" -gt 0 ] 2>/dev/null; then
+          printf '{"followup_message":"There are unresolved blocked findings from ControlKeel governance. Please call ck_context to review them before closing."}\n'
+          exit 0
+        fi
+      fi
+    fi
+
+    exit 0
     """
   end
 

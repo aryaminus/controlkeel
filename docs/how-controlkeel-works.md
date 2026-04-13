@@ -73,7 +73,7 @@ It asks:
 - what data is involved?
 - what delivery risk does this imply?
 
-That is surfaced through the intent layer. The public entry point is [intent.ex](/Users/aryaminus/Developer/idea/lib/controlkeel/intent.ex).
+That is surfaced through the intent layer. The public entry point is [intent.ex](lib/controlkeel/intent.ex).
 
 The intent layer does not directly run agents. It compiles meaning:
 
@@ -142,6 +142,13 @@ The current execution posture model is explicitly built around these principles:
 - keep shell as the fallback mutation surface
 - escalate approval pressure as work moves toward broad or destructive authority
 
+For memory specifically, CK treats two different problems separately:
+
+- retrieval: finding the most relevant prior records, proofs, transcript events, and resume context
+- integration: deciding how those retrieved artifacts should actually change the current reasoning
+
+That distinction matters because CK does not present memory as perfect recall. It can return ranked memory hits and portable typed state, but the active agent still has to reconcile those hits with the current task, recent transcript tail, and current validation state.
+
 This is one of CK’s biggest philosophical differences from many hosts:
 
 - hosts often begin from “the model has tools”
@@ -184,6 +191,8 @@ That policy makes the control-plane assumptions explicit:
 - mutations stay serialized
 - tool execution is expected to happen inside the main loop, not as an untracked afterthought
 - durable memory should stay in CK-controlled typed surfaces, not disappear into opaque provider-managed state
+- memory retrieval and memory integration are separate governed steps, not a single magical recall surface
+- high-confidence claims should prefer citable memory and proof-backed context
 - context compaction should run hierarchically, cheapest first
 - major error classes need named in-loop recovery paths
 - delegated mutation should prefer isolated worktrees or equivalent governed runtimes

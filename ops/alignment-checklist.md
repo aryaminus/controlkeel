@@ -4,7 +4,7 @@ Use this checklist to keep agent/LLM work aligned, governed, and release-safe fo
 
 ## Context
 
-- Repo: `/Users/aryaminus/Developer/idea`
+- Repo: (this repository)
 - Stack: Phoenix 1.8 + Ecto + LiveView
 - Governance runtime: ControlKeel
 - Primary quality gate: `mix precommit`

@@ -447,3 +447,32 @@ And **never** do this:
 <!-- phoenix:liveview-end -->
 
 <!-- usage-rules-end -->
+
+<!-- controlkeel:start -->
+# ControlKeel Companion Instructions
+
+This project is governed by ControlKeel. Prefer the ControlKeel MCP server for validation, findings, budgets, proof context, workspace snapshots, transcript state, and routing.
+
+Project root: (detected at runtime)
+Target: `opencode`
+Primary CK loop: `ck_context -> ck_validate -> ck_review_submit/ck_finding -> ck_budget/ck_route/ck_delegate`
+
+Required workflow:
+1. Call `ck_context` at the start of a task for mission, workspace, transcript, and resume context.
+2. Call `ck_validate` before writing code, config, shell, or deploy content.
+3. Submit plans or approval packets with `ck_review_submit` and check `ck_review_status` before execution.
+4. Record any human-review issue with `ck_finding`.
+5. Check `ck_budget` before expensive model or multi-agent work.
+6. Use `ck_route`, `ck_skill_list`, and `ck_skill_load` to delegate or activate specialized CK workflows.
+
+Install ControlKeel:
+- Homebrew: `brew tap aryaminus/controlkeel && brew install controlkeel`
+- npm bootstrap: `npm i -g @aryaminus/controlkeel`
+- Unix installer: `curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh`
+- Raw GitHub shell installer: `curl -fsSL https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.sh | sh`
+- PowerShell installer: `irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex`
+- Raw GitHub PowerShell installer: `irm https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.ps1 | iex`
+- GitHub Releases: `https://github.com/aryaminus/controlkeel/releases`
+
+ControlKeel auto-bootstraps project binding on first use. Provider access resolves through agent bridge, CK-owned provider profiles, local Ollama, then heuristic fallback.
+<!-- controlkeel:end -->

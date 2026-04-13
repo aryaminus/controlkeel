@@ -41,6 +41,13 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
     assert summary["harness_policy"]["tool_execution"]["read_only_concurrency"] == "parallel"
     assert summary["harness_policy"]["tool_execution"]["write_concurrency"] == "serial"
     assert summary["harness_policy"]["memory"]["ownership"] == "workspace_or_ck_controlled"
+    assert summary["harness_policy"]["memory"]["retrieval_mode"] == "ranked_memory_hits"
+
+    assert summary["harness_policy"]["memory"]["integration_mode"] ==
+             "agent_must_reconcile_with_active_context"
+
+    assert summary["harness_policy"]["memory"]["citation_posture"] ==
+             "cite_memory_before_claim"
 
     assert summary["harness_policy"]["memory"]["provider_state_posture"] ==
              "avoid_opaque_provider_memory"
@@ -114,10 +121,13 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                "memory" => %{
                  "ownership" => "workspace_or_ck_controlled",
                  "portability" => "typed_records_and_resume_packets",
+                 "retrieval_mode" => "ranked_memory_hits",
+                 "integration_mode" => "agent_must_reconcile_with_active_context",
+                 "citation_posture" => "cite_memory_before_claim",
                  "compaction_visibility" => "explicit_summary_and_protected_tail",
                  "provider_state_posture" => "prefer_portable_ck_state",
                  "rationale" =>
-                   "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state."
+                   "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state. Treat retrieval and integration as separate governed steps: CK can return ranked memory hits, but the agent still has to reconcile them with the active task context before making claims."
                },
                "compaction" => %{
                  "strategy" => "hierarchical",

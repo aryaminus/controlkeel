@@ -17,10 +17,13 @@ defmodule ControlKeel.Intent.HarnessPolicy do
     "memory" => %{
       "ownership" => "workspace_or_ck_controlled",
       "portability" => "typed_records_and_resume_packets",
+      "retrieval_mode" => "ranked_memory_hits",
+      "integration_mode" => "agent_must_reconcile_with_active_context",
+      "citation_posture" => "cite_memory_before_claim",
       "compaction_visibility" => "explicit_summary_and_protected_tail",
       "provider_state_posture" => "prefer_portable_ck_state",
       "rationale" =>
-        "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state."
+        "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state. Treat retrieval and integration as separate governed steps: CK can return ranked memory hits, but the agent still has to reconcile them with the active task context before making claims."
     },
     "compaction" => %{
       "strategy" => "hierarchical",
@@ -86,10 +89,13 @@ defmodule ControlKeel.Intent.HarnessPolicy do
     %{
       "ownership" => "workspace_or_ck_controlled",
       "portability" => "typed_records_and_resume_packets",
+      "retrieval_mode" => "ranked_memory_hits",
+      "integration_mode" => "agent_must_reconcile_with_active_context",
+      "citation_posture" => "cite_memory_before_claim",
       "compaction_visibility" => "explicit_summary_and_protected_tail",
       "provider_state_posture" => "avoid_opaque_provider_memory",
       "rationale" =>
-        "High-risk work should keep durable state in CK-controlled typed memory, proofs, traces, and resume packets so evidence remains portable, reviewable, and independent of proprietary provider-side memory behavior."
+        "High-risk work should keep durable state in CK-controlled typed memory, proofs, traces, and resume packets so evidence remains portable, reviewable, and independent of proprietary provider-side memory behavior. Memory retrieval should stay ranked and citable, and the final integration step should still be treated as a governed reasoning task rather than perfect recall."
     }
   end
 
