@@ -14,6 +14,7 @@ defmodule ControlKeel.Mission do
   alias ControlKeel.SecurityWorkflow
   alias ControlKeel.Repo
   alias ControlKeel.WorkspaceContext
+  alias ControlKeel.Platform.TaskCheckResult
 
   alias ControlKeel.Mission.{
     Finding,
@@ -33,6 +34,7 @@ defmodule ControlKeel.Mission do
   @proofs_page_size 20
   @plan_phases ~w(ticket research_packet design_options narrowed_decision implementation_plan code_backed_plan)
   @execution_ready_plan_phases ~w(implementation_plan code_backed_plan)
+  @verified_completion_score_threshold 45
 
   def list_sessions, do: Repo.all(Session)
   def get_session(id), do: Repo.get(Session, id)
@@ -98,6 +100,43 @@ defmodule ControlKeel.Mission do
   def list_tasks, do: Repo.all(Task)
   def get_task(id), do: Repo.get(Task, id)
   def get_task!(id), do: Repo.get!(Task, id)
+
+  def task_assurance_summary(nil), do: nil
+
+  def task_assurance_summary(%Task{} = task) do
+    checks = list_task_check_results(task.id)
+    latest_proof = latest_proof_bundle_for_task(task.id)
+
+    verification =
+      case latest_proof do
+        %ProofBundle{} = proof ->
+          %{
+            "status" => get_in(proof.bundle, ["verification_assessment", "status"]),
+            "score" => get_in(proof.bundle, ["verification_assessment", "score"]),
+            "verification_ready" =>
+              get_in(proof.bundle, ["verification_assessment", "verification_ready"]),
+            "evidence_sources" =>
+              get_in(proof.bundle, ["verification_assessment", "evidence", "evidence_sources"]) ||
+                []
+          }
+
+        nil ->
+          derive_task_check_verification(task, checks)
+      end
+
+    %{
+      "verification" => verification,
+      "check_summary" => summarize_task_checks(checks),
+      "context_integrity" => summarize_runtime_context(task.metadata || %{})
+    }
+  end
+
+  def task_assurance_summary(task_id) when is_integer(task_id) do
+    case get_task(task_id) do
+      nil -> nil
+      task -> task_assurance_summary(task)
+    end
+  end
 
   def create_task(attrs) do
     %Task{}
@@ -763,21 +802,41 @@ defmodule ControlKeel.Mission do
 
   Returns `{:error, :unresolved_findings, findings}` if any findings on the
   session are still in `open` or `blocked` status.
-  Returns `{:ok, task}` if the task is safe to mark done.
+  Returns `{:ok, task}` if the task is safe to mark done or verified.
   """
   def complete_task(%Task{} = task) do
     unresolved = unresolved_findings(task.session_id)
 
     if unresolved == [] do
       Multi.new()
-      |> Multi.update(:task, Task.changeset(task, %{status: "done"}))
-      |> Multi.run(:proof, fn repo, %{task: updated_task} ->
-        persist_proof_bundle(repo, updated_task)
+      |> Multi.run(:completion_artifacts, fn repo, _changes ->
+        {:ok, completion_artifacts(repo, task)}
+      end)
+      |> Multi.run(:task, fn repo, %{completion_artifacts: artifacts} ->
+        status =
+          task
+          |> Map.put(:status, "done")
+          |> build_proof_bundle_snapshot(
+            artifacts.session,
+            artifacts.findings,
+            artifacts.invocations,
+            artifacts.reviews,
+            artifacts.check_results
+          )
+          |> Map.get("verification_assessment")
+          |> verified_completion_status()
+
+        task
+        |> Task.changeset(%{status: status})
+        |> repo.update()
+      end)
+      |> Multi.run(:proof, fn repo, %{task: updated_task, completion_artifacts: artifacts} ->
+        persist_proof_bundle(repo, updated_task, artifacts)
       end)
       |> Repo.transaction()
       |> case do
         {:ok, %{task: updated_task, proof: proof}} ->
-          record_task_memory(:completed, updated_task,
+          record_task_memory(task_completion_memory_action(updated_task), updated_task,
             proof_id: proof.id,
             previous_status: task.status
           )
@@ -981,7 +1040,14 @@ defmodule ControlKeel.Mission do
               latest_proof.bundle["verification_assessment"]
 
             match?(%Task{}, task) ->
-              derive_verification_assessment(task, findings, invocations, reviews, test_outcomes)
+              derive_verification_assessment(
+                task,
+                findings,
+                invocations,
+                reviews,
+                test_outcomes,
+                list_task_check_results(task.id)
+              )
 
             true ->
               nil
@@ -2099,10 +2165,61 @@ defmodule ControlKeel.Mission do
     }
   end
 
-  defp derive_verification_assessment(task, findings, invocations, reviews, test_outcomes) do
+  defp completion_artifacts(repo, task) do
+    session =
+      Session
+      |> repo.get(task.session_id)
+      |> repo.preload(:workspace)
+
+    findings =
+      Finding
+      |> where([finding], finding.session_id == ^task.session_id)
+      |> order_by([finding], desc: finding.inserted_at)
+      |> repo.all()
+
+    invocations =
+      Invocation
+      |> where([invocation], invocation.task_id == ^task.id)
+      |> order_by([invocation], desc: invocation.inserted_at)
+      |> repo.all()
+
+    reviews =
+      Review
+      |> where([review], review.task_id == ^task.id)
+      |> order_by([review], desc: review.inserted_at, desc: review.id)
+      |> repo.all()
+
+    %{
+      session: session,
+      findings: findings,
+      invocations: invocations,
+      reviews: reviews,
+      check_results: list_task_check_results(repo, task.id)
+    }
+  end
+
+  defp list_task_check_results(task_id), do: list_task_check_results(Repo, task_id)
+
+  defp list_task_check_results(repo, task_id) do
+    TaskCheckResult
+    |> where([check], check.task_id == ^task_id)
+    |> order_by([check], desc: check.inserted_at, desc: check.id)
+    |> repo.all()
+  end
+
+  defp derive_verification_assessment(
+         task,
+         findings,
+         invocations,
+         reviews,
+         test_outcomes,
+         check_results
+       ) do
     suspicious_test_changes = suspicious_test_changes(reviews)
     approved_reviews = Enum.count(reviews, &(&1.status == "approved"))
     passed_checks = Enum.count(invocations, &(get_in(&1.metadata, ["outcome"]) == "passed"))
+    passed_task_checks = Enum.count(check_results, &(&1.status == "passed"))
+    failed_task_checks = Enum.count(check_results, &(&1.status == "failed"))
     external_regressions = test_outcomes["external_recorded"] || 0
     blocking_failures = test_outcomes["blocking_failures"] || 0
     skipped = test_outcomes["skipped"] || 0
@@ -2111,17 +2228,20 @@ defmodule ControlKeel.Mission do
     evidence_sources =
       []
       |> maybe_add_evidence_source(passed_checks > 0, "internal_checks")
+      |> maybe_add_evidence_source(passed_task_checks > 0, "task_checks")
       |> maybe_add_evidence_source(external_regressions > 0, "external_regression")
       |> maybe_add_evidence_source(approved_reviews > 0, "human_review")
 
     score =
       0
-      |> maybe_add_score(task.status == "done", 10)
+      |> maybe_add_score(completed_task_status?(task.status), 10)
       |> maybe_add_score(passed_checks > 0, 20)
+      |> maybe_add_score(passed_task_checks > 0, 25)
       |> maybe_add_score(external_regressions > 0 and blocking_failures == 0, 30)
       |> maybe_add_score(approved_reviews > 0, 20)
       |> maybe_add_score(open_or_blocked == 0, 10)
       |> maybe_add_score(length(evidence_sources) >= 2, 10)
+      |> maybe_subtract_score(failed_task_checks > 0, 25)
       |> maybe_subtract_score(blocking_failures > 0, 35)
       |> maybe_subtract_score(skipped > 0, 10)
       |> maybe_subtract_score(has_suspicious_severity?(suspicious_test_changes, "high"), 30)
@@ -2132,9 +2252,12 @@ defmodule ControlKeel.Mission do
       "score" => score,
       "status" => verification_status(score),
       "verification_ready" =>
-        blocking_failures == 0 and not has_suspicious_severity?(suspicious_test_changes, "high"),
+        failed_task_checks == 0 and blocking_failures == 0 and
+          not has_suspicious_severity?(suspicious_test_changes, "high"),
       "evidence" => %{
         "passed_checks" => passed_checks,
+        "passed_task_checks" => passed_task_checks,
+        "failed_task_checks" => failed_task_checks,
         "external_regressions" => external_regressions,
         "approved_reviews" => approved_reviews,
         "evidence_sources" => evidence_sources
@@ -2178,12 +2301,12 @@ defmodule ControlKeel.Mission do
     drift_signals =
       []
       |> maybe_put_planning_signal(
-        task.status == "done" and is_nil(approved_plan),
+        completed_task_status?(task.status) and is_nil(approved_plan),
         "no_approved_plan",
         "Task completed without an approved plan review."
       )
       |> maybe_put_planning_signal(
-        (task.status == "done" and approved_plan) && not execution_ready_plan,
+        (completed_task_status?(task.status) and approved_plan) && not execution_ready_plan,
         "approved_plan_not_execution_ready",
         "The latest approved plan did not reach an execution-ready refinement phase."
       )
@@ -2464,6 +2587,92 @@ defmodule ControlKeel.Mission do
     )
   end
 
+  defp summarize_task_checks(check_results) do
+    passed = Enum.count(check_results, &(&1.status == "passed"))
+    failed = Enum.count(check_results, &(&1.status == "failed"))
+    warned = Enum.count(check_results, &(&1.status == "warn"))
+
+    %{
+      "total" => length(check_results),
+      "passed" => passed,
+      "failed" => failed,
+      "warn" => warned,
+      "evidence_sources" =>
+        check_results
+        |> Enum.filter(&(&1.status == "passed"))
+        |> Enum.map(& &1.check_type)
+        |> Enum.uniq(),
+      "failing_check_types" =>
+        check_results
+        |> Enum.filter(&(&1.status == "failed"))
+        |> Enum.map(& &1.check_type)
+        |> Enum.uniq()
+    }
+  end
+
+  defp derive_task_check_verification(task, check_results) do
+    summary = summarize_task_checks(check_results)
+
+    score =
+      0
+      |> maybe_add_score(completed_task_status?(task.status), 10)
+      |> maybe_add_score(summary["passed"] > 0, 35)
+      |> maybe_add_score(summary["warn"] == 0 and summary["failed"] == 0, 15)
+      |> maybe_add_score(length(summary["evidence_sources"]) >= 2, 10)
+      |> maybe_subtract_score(summary["failed"] > 0, 35)
+      |> maybe_subtract_score(summary["warn"] > 0, 10)
+      |> clamp_score()
+
+    %{
+      "status" => verification_status(score),
+      "score" => score,
+      "verification_ready" => summary["failed"] == 0 and summary["passed"] > 0,
+      "evidence_sources" => summary["evidence_sources"]
+    }
+  end
+
+  defp summarize_runtime_context(metadata) when is_map(metadata) do
+    runtime = get_in(metadata, ["runtime_context"]) || %{}
+
+    partial_reads =
+      runtime["partial_reads"] || runtime["truncated_reads"] || runtime["read_truncations"] || []
+
+    compaction_events =
+      runtime["compaction_events"] || runtime["context_compactions"] || []
+
+    partial_read_count =
+      runtime["partial_read_count"] || runtime["truncated_read_count"] ||
+        length(List.wrap(partial_reads))
+
+    compaction_count =
+      runtime["compaction_count"] || length(List.wrap(compaction_events)) ||
+        if(runtime["context_compacted"] == true, do: 1, else: 0)
+
+    status =
+      cond do
+        partial_read_count > 0 or compaction_count > 0 -> "degraded"
+        true -> "clean"
+      end
+
+    %{
+      "status" => status,
+      "partial_read_count" => partial_read_count,
+      "compaction_count" => compaction_count,
+      "latest_partial_read_path" => latest_runtime_path(partial_reads),
+      "latest_compaction_reason" => latest_runtime_reason(compaction_events)
+    }
+  end
+
+  defp summarize_runtime_context(_metadata), do: summarize_runtime_context(%{})
+
+  defp latest_runtime_path([%{"path" => path} | _rest]) when is_binary(path), do: path
+  defp latest_runtime_path([%{path: path} | _rest]) when is_binary(path), do: path
+  defp latest_runtime_path(_other), do: nil
+
+  defp latest_runtime_reason([%{"reason" => reason} | _rest]) when is_binary(reason), do: reason
+  defp latest_runtime_reason([%{reason: reason} | _rest]) when is_binary(reason), do: reason
+  defp latest_runtime_reason(_other), do: nil
+
   defp maybe_add_verification_signal(signals, true, message), do: signals ++ [message]
   defp maybe_add_verification_signal(signals, false, _message), do: signals
 
@@ -2562,31 +2771,36 @@ defmodule ControlKeel.Mission do
   defp unwrap_proof_bundle(other), do: other
 
   defp persist_proof_bundle(repo, %Task{} = task) do
-    session =
-      Session
-      |> repo.get(task.session_id)
-      |> repo.preload(:workspace)
+    artifacts = completion_artifacts(repo, task)
 
-    findings =
-      Finding
-      |> where([finding], finding.session_id == ^task.session_id)
-      |> order_by([finding], desc: finding.inserted_at)
-      |> repo.all()
+    snapshot =
+      build_proof_bundle_snapshot(
+        task,
+        artifacts.session,
+        artifacts.findings,
+        artifacts.invocations,
+        artifacts.reviews,
+        artifacts.check_results
+      )
 
-    invocations =
-      Invocation
-      |> where([invocation], invocation.task_id == ^task.id)
-      |> order_by([invocation], desc: invocation.inserted_at)
-      |> repo.all()
+    persist_proof_bundle_from_snapshot(repo, task, snapshot)
+  end
 
-    reviews =
-      Review
-      |> where([review], review.task_id == ^task.id)
-      |> order_by([review], desc: review.inserted_at, desc: review.id)
-      |> repo.all()
+  defp persist_proof_bundle(repo, %Task{} = task, artifacts) do
+    snapshot =
+      build_proof_bundle_snapshot(
+        task,
+        artifacts.session,
+        artifacts.findings,
+        artifacts.invocations,
+        artifacts.reviews,
+        artifacts.check_results
+      )
 
-    snapshot = build_proof_bundle_snapshot(task, session, findings, invocations, reviews)
+    persist_proof_bundle_from_snapshot(repo, task, snapshot)
+  end
 
+  defp persist_proof_bundle_from_snapshot(repo, %Task{} = task, snapshot) do
     attrs = %{
       session_id: task.session_id,
       task_id: task.id,
@@ -2615,7 +2829,7 @@ defmodule ControlKeel.Mission do
     |> Kernel.+(1)
   end
 
-  defp build_proof_bundle_snapshot(task, session, findings, invocations, reviews) do
+  defp build_proof_bundle_snapshot(task, session, findings, invocations, reviews, check_results) do
     total_cost = Enum.sum(Enum.map(invocations, &(&1.estimated_cost_cents || 0)))
     blocked = Enum.filter(findings, &(&1.status == "blocked"))
     open = Enum.filter(findings, &(&1.status == "open"))
@@ -2627,10 +2841,20 @@ defmodule ControlKeel.Mission do
     planning_continuity = derive_planning_continuity(task, reviews)
 
     verification_assessment =
-      derive_verification_assessment(task, findings, invocations, reviews, test_outcomes)
+      derive_verification_assessment(
+        task,
+        findings,
+        invocations,
+        reviews,
+        test_outcomes,
+        check_results
+      )
+
+    task_check_summary = summarize_task_checks(check_results)
+    runtime_context_integrity = summarize_runtime_context(task.metadata || %{})
 
     deploy_ready =
-      blocked == [] and open == [] and task.status == "done" and
+      blocked == [] and open == [] and completed_task_status?(task.status) and
         (test_outcomes["blocking_failures"] || 0) == 0 and
         verification_assessment["verification_ready"] != false and
         planning_continuity["execution_aligned"] != false
@@ -2666,6 +2890,8 @@ defmodule ControlKeel.Mission do
       "test_outcomes" => test_outcomes,
       "planning_continuity" => planning_continuity,
       "verification_assessment" => verification_assessment,
+      "task_checks" => task_check_summary,
+      "runtime_context_integrity" => runtime_context_integrity,
       "diff_summary" => %{
         "agent_runs" => length(invocations),
         "findings_total" => length(findings),
@@ -2718,6 +2944,18 @@ defmodule ControlKeel.Mission do
     }
     |> Map.update!("deploy_ready", fn deploy_ready -> deploy_ready and security_release_ready? end)
   end
+
+  defp completed_task_status?(status) when status in ["done", "verified"], do: true
+  defp completed_task_status?(_status), do: false
+
+  defp verified_completion_status(%{"score" => score, "verification_ready" => true})
+       when is_number(score) and score >= @verified_completion_score_threshold,
+       do: "verified"
+
+  defp verified_completion_status(_assessment), do: "done"
+
+  defp task_completion_memory_action(%Task{status: "verified"}), do: :verified
+  defp task_completion_memory_action(%Task{}), do: :completed
 
   defp normalize_regression_result(attrs) do
     with {:ok, session_id} <- normalize_required_integer(attrs, "session_id"),
@@ -2909,6 +3147,8 @@ defmodule ControlKeel.Mission do
       "approved_findings_count" => proof.approved_findings_count,
       "verification_status" => get_in(proof.bundle, ["verification_assessment", "status"]),
       "verification_score" => get_in(proof.bundle, ["verification_assessment", "score"]),
+      "task_checks" => get_in(proof.bundle, ["task_checks"]) || %{},
+      "context_integrity" => get_in(proof.bundle, ["runtime_context_integrity"]) || %{},
       "decomposition" => %{
         "strategy" => get_in(proof.bundle, ["decomposition", "session", "strategy"]),
         "node_type" => get_in(proof.bundle, ["decomposition", "task", "node_type"]),
@@ -2946,6 +3186,7 @@ defmodule ControlKeel.Mission do
         |> Enum.map(&finding_bundle_entry/1),
       "latest_invocations" => Enum.map(latest_invocations, &audit_invocation_entry/1),
       "proof_summary" => proof_summary(latest_proof),
+      "assurance" => task_assurance_summary(task),
       "decomposition" => %{
         "session" => Decomposition.session_summary(session.tasks, session.task_edges),
         "task" => Decomposition.task_summary(task, session.tasks, session.task_edges)

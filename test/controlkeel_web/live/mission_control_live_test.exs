@@ -186,4 +186,32 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     render_click(element(view, "#current-task-resume-#{task.id}"))
     assert Mission.get_task!(task.id).status == "in_progress"
   end
+
+  test "mission control distinguishes verified tasks from done but unverified tasks", %{
+    conn: conn
+  } do
+    session = session_fixture()
+
+    _verified =
+      task_fixture(%{
+        session: session,
+        status: "verified",
+        title: "Verified task"
+      })
+
+    _done =
+      task_fixture(%{
+        session: session,
+        position: 2,
+        status: "done",
+        title: "Done task"
+      })
+
+    {:ok, _view, html} = live(conn, ~p"/missions/#{session.id}")
+
+    assert html =~ "Verified task"
+    assert html =~ "verified"
+    assert html =~ "Done task"
+    assert html =~ "done, unverified"
+  end
 end

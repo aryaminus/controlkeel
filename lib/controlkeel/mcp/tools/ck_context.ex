@@ -123,7 +123,8 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       "title" => task.title,
       "status" => task.status,
       "validation_gate" => task.validation_gate,
-      "metadata" => task.metadata
+      "metadata" => task.metadata,
+      "assurance" => Mission.task_assurance_summary(task)
     }
   end
 

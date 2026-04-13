@@ -502,7 +502,7 @@ defmodule ControlKeel.Platform do
 
       with {:ok, updated_run} <- run |> TaskRun.changeset(run_attrs) |> Repo.update(),
            {:ok, task} <- apply_task_report(task, requested_status, output, metadata) do
-        emit_report_event(requested_status, task)
+        emit_report_event(task.status, task)
         maybe_release_downstream(task.session_id)
         {:ok, Repo.preload(updated_run, [:service_account, :check_results])}
       end
@@ -723,6 +723,17 @@ defmodule ControlKeel.Platform do
       emit_event("task.completed", task_event_payload(task),
         workspace_id: workspace_id_for_task(task)
       )
+
+  defp emit_report_event("verified", task) do
+    :ok =
+      emit_event("task.completed", task_event_payload(task),
+        workspace_id: workspace_id_for_task(task)
+      )
+
+    emit_event("task.verified", task_event_payload(task),
+      workspace_id: workspace_id_for_task(task)
+    )
+  end
 
   defp emit_report_event("waiting_callback", task),
     do:

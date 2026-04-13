@@ -137,7 +137,7 @@ defmodule ControlKeel.AuditExports do
             <p><strong>Total tasks:</strong> #{length(graph.tasks)}</p>
             <p><strong>Total edges:</strong> #{length(graph.edges)}</p>
             <p><strong>Ready tasks:</strong> #{length(graph.ready_task_ids)}</p>
-            <p><strong>Completed tasks:</strong> #{Enum.count(graph.tasks, &(&1.status == "done"))}</p>
+            <p><strong>Completed tasks:</strong> #{Enum.count(graph.tasks, &(&1.status in ["done", "verified"]))}</p>
           </section>
         </div>
 

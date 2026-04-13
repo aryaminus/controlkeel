@@ -42,7 +42,7 @@ defmodule ControlKeel.Platform.TaskGraph do
   def ready_task_ids(tasks, edges) do
     done_ids =
       tasks
-      |> Enum.filter(&(&1.status == "done"))
+      |> Enum.filter(&(&1.status in ["done", "verified"]))
       |> Enum.map(& &1.id)
       |> MapSet.new()
 

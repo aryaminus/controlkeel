@@ -4,6 +4,7 @@ defmodule ControlKeel.MissionTest do
   alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Mission.{ProofBundle, Review}
+  alias ControlKeel.Platform
   alias ControlKeel.Repo
   import ControlKeel.MissionFixtures
   import ControlKeel.IntentFixtures
@@ -497,6 +498,31 @@ defmodule ControlKeel.MissionTest do
       assert %ProofBundle{} = Mission.latest_proof_bundle_for_task(task.id)
     end
 
+    test "marks task verified when completion has sufficient governed evidence" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      assert {:ok, _run} = Platform.claim_task(task.id)
+
+      assert {:ok, _checks} =
+               Platform.record_task_checks(task.id, nil, [
+                 %{
+                   check_type: "tests",
+                   status: "passed",
+                   summary: "All green",
+                   payload: %{"source" => "fixture"}
+                 }
+               ])
+
+      assert {:ok, verified_task} = Mission.complete_task(task)
+      assert verified_task.status == "verified"
+
+      assert Mission.proof_summary_for_task(task.id)["verification_status"] in [
+               "moderate",
+               "strong"
+             ]
+    end
+
     test "returns error with findings list when open findings exist and marks task blocked" do
       session = session_fixture()
       task = task_fixture(%{session: session})
@@ -647,6 +673,59 @@ defmodule ControlKeel.MissionTest do
       assert is_integer(suspicious_test_changes)
       assert %{"total" => _, "cost_cents" => _} = bundle["invocation_summary"]
       assert %{"status" => _, "score" => _, "signals" => _} = bundle["verification_assessment"]
+    end
+
+    test "bundle and summaries include task-check evidence and runtime integrity signals" do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+
+      assert {:ok, _run} = Platform.claim_task(task.id)
+
+      assert {:ok, _checks} =
+               Platform.record_task_checks(task.id, nil, [
+                 %{
+                   check_type: "validation",
+                   status: "passed",
+                   summary: "Validation passed",
+                   payload: %{"source" => "fixture"}
+                 },
+                 %{
+                   check_type: "verification",
+                   status: "warn",
+                   summary: "Verification was partial",
+                   payload: %{"source" => "fixture"}
+                 }
+               ])
+
+      assert {:ok, _updated} =
+               Mission.attach_task_runtime_context(task.id, %{
+                 "partial_reads" => [%{"path" => "lib/big_file.ex", "truncated_at_line" => 2000}],
+                 "compaction_events" => [%{"reason" => "token_budget"}]
+               })
+
+      assert {:ok, done_task} = Mission.update_task(Mission.get_task!(task.id), %{status: "done"})
+      assert {:ok, bundle} = Mission.proof_bundle(done_task.id)
+
+      assert bundle["task_checks"]["passed"] == 1
+      assert bundle["task_checks"]["warn"] == 1
+      assert bundle["task_checks"]["failed"] == 0
+      assert "validation" in bundle["task_checks"]["evidence_sources"]
+
+      assert bundle["runtime_context_integrity"]["status"] == "degraded"
+      assert bundle["runtime_context_integrity"]["partial_read_count"] == 1
+      assert bundle["runtime_context_integrity"]["compaction_count"] == 1
+      assert bundle["runtime_context_integrity"]["latest_partial_read_path"] == "lib/big_file.ex"
+      assert bundle["runtime_context_integrity"]["latest_compaction_reason"] == "token_budget"
+
+      assert Mission.proof_summary_for_task(done_task.id)["task_checks"]["passed"] == 1
+
+      assert Mission.proof_summary_for_task(done_task.id)["context_integrity"]["status"] ==
+               "degraded"
+
+      assurance = Mission.task_assurance_summary(done_task.id)
+      assert assurance["check_summary"]["passed"] == 1
+      assert assurance["context_integrity"]["status"] == "degraded"
+      assert "task_checks" in assurance["verification"]["evidence_sources"]
     end
 
     test "external regression failures are reflected in proof bundles and disable deploy_ready" do

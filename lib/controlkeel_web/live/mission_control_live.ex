@@ -374,6 +374,9 @@ defmodule ControlKeelWeb.MissionControlLive do
               <div class="ck-task-topline">
                 <span class={["ck-task-state", "ck-task-state-#{@current_task.status}"]}></span>
                 <strong>{@current_task.title}</strong>
+                <span class={task_status_pill_class(@current_task.status)}>
+                  {task_status_label(@current_task)}
+                </span>
               </div>
               <p class="ck-note">{@current_task.validation_gate}</p>
               <div class="ck-action-row" style="margin-top: 0.75rem;">
@@ -418,12 +421,17 @@ defmodule ControlKeelWeb.MissionControlLive do
                 <div class="ck-inline-stats" style="margin-top: 0.75rem;">
                   <span>v{@current_proof_summary["version"]}</span>
                   <span>risk {@current_proof_summary["risk_score"]}</span>
+                  <span>{task_verification_label(@current_task, @current_proof_summary)}</span>
                   <span>
                     {if @current_proof_summary["deploy_ready"],
                       do: "deploy ready",
                       else: "review required"}
                   </span>
                 </div>
+              <% else %>
+                <p :if={done_unverified?(@current_task)} class="ck-note" style="margin-top: 0.75rem;">
+                  Execution finished, but CK has not verified this task yet. Add checks or regenerate proof.
+                </p>
               <% end %>
             <% else %>
               <p class="ck-note">No active task context is available yet.</p>
@@ -470,6 +478,9 @@ defmodule ControlKeelWeb.MissionControlLive do
                     <div class="ck-task-topline">
                       <span class={["ck-task-state", "ck-task-state-#{task.status}"]}></span>
                       <strong>{task.title}</strong>
+                      <span class={task_status_pill_class(task.status)}>
+                        {task_status_label(task)}
+                      </span>
                     </div>
                     <p class="ck-note">{task.validation_gate}</p>
                     <%= if task.rollback_boundary do %>
@@ -490,12 +501,26 @@ defmodule ControlKeelWeb.MissionControlLive do
                     <% end %>
                   </div>
                   <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
-                    <span class="ck-pill ck-pill-neutral">{task.status}</span>
+                    <span class={task_status_pill_class(task.status)}>{task_status_label(task)}</span>
                     <%= if task.confidence_score do %>
                       <span class="ck-pill ck-pill-neutral" style="font-size: 0.7rem;">
                         {trunc(task.confidence_score * 100)}% confidence
                       </span>
                     <% end %>
+                    <span
+                      :if={Map.get(@latest_proofs, task.id)}
+                      class="ck-note"
+                      style="font-size: 0.75rem;"
+                    >
+                      {task_verification_label(task, Map.get(@latest_proofs, task.id))}
+                    </span>
+                    <span
+                      :if={done_unverified?(task) and is_nil(Map.get(@latest_proofs, task.id))}
+                      class="ck-note"
+                      style="font-size: 0.75rem;"
+                    >
+                      needs verification evidence
+                    </span>
                     <%= if Map.get(@latest_proofs, task.id) do %>
                       <.link
                         navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"}
@@ -827,6 +852,48 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   defp workspace_status_label(%{"available" => true}), do: "available"
   defp workspace_status_label(_context), do: "unavailable"
+
+  defp task_status_label(%{status: "verified"}), do: "verified"
+  defp task_status_label(%{status: "done"}), do: "done, unverified"
+
+  defp task_status_label(%{status: status}) when is_binary(status),
+    do: String.replace(status, "_", " ")
+
+  defp task_status_label(_task), do: "unknown"
+
+  defp task_status_pill_class("verified"), do: "ck-pill ck-pill-low"
+  defp task_status_pill_class("done"), do: "ck-pill ck-pill-warning"
+  defp task_status_pill_class(_status), do: "ck-pill ck-pill-neutral"
+
+  defp done_unverified?(%{status: "done"}), do: true
+  defp done_unverified?(_task), do: false
+
+  defp task_verification_label(_task, %{"verification_status" => "strong"}),
+    do: "verification strong"
+
+  defp task_verification_label(_task, %{"verification_status" => "moderate"}),
+    do: "verification moderate"
+
+  defp task_verification_label(_task, %{"verification_status" => "weak"}), do: "verification weak"
+
+  defp task_verification_label(_task, %{
+         bundle: %{"verification_assessment" => %{"status" => "strong"}}
+       }),
+       do: "verification strong"
+
+  defp task_verification_label(
+         _task,
+         %{bundle: %{"verification_assessment" => %{"status" => "moderate"}}}
+       ),
+       do: "verification moderate"
+
+  defp task_verification_label(_task, %{
+         bundle: %{"verification_assessment" => %{"status" => "weak"}}
+       }),
+       do: "verification weak"
+
+  defp task_verification_label(task, _proof_summary),
+    do: if(done_unverified?(task), do: "unverified", else: "verification pending")
 
   defp format_currency(cents), do: cents |> Kernel./(100) |> Float.round(2)
   defp format_duration(nil), do: "Not recorded"

@@ -299,7 +299,7 @@ defmodule ControlKeel.Analytics do
     sessions_by_id = Map.new(sessions, fn session -> {session.id, session} end)
     tasks = list_tasks_for_sessions(session_ids)
     task_ids = Enum.map(tasks, & &1.id)
-    completed_tasks = Enum.filter(tasks, &(&1.status == "done"))
+    completed_tasks = Enum.filter(tasks, &(&1.status in ["done", "verified"]))
     latest_proofs_by_task = latest_proofs_by_task(task_ids)
 
     proof_backed_completed_tasks =
@@ -448,13 +448,15 @@ defmodule ControlKeel.Analytics do
     end)
     |> Enum.map(fn {agent, agent_tasks} ->
       total = length(agent_tasks)
-      completed = Enum.count(agent_tasks, &(&1.status == "done"))
+      completed = Enum.count(agent_tasks, &(&1.status in ["done", "verified"]))
+      verified = Enum.count(agent_tasks, &(&1.status == "verified"))
       deploy_ready = Enum.count(agent_tasks, &MapSet.member?(deploy_ready_task_ids, &1.id))
 
       %{
         agent: agent,
         total_tasks: total,
         completed_tasks: completed,
+        verified_tasks: verified,
         deploy_ready_tasks: deploy_ready,
         completion_rate_percent: percent(completed, total)
       }

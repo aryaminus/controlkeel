@@ -129,7 +129,7 @@ defmodule ControlKeel.PlatformTest do
                "output" => %{"artifact" => "build.tar.gz"}
              })
 
-    assert Mission.get_task!(feature.id).status == "done"
+    assert Mission.get_task!(feature.id).status == "verified"
 
     assert {:ok, graph} = Platform.execute_session(session.id)
     assert release.id in graph.ready_task_ids

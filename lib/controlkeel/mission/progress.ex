@@ -63,7 +63,8 @@ defmodule ControlKeel.Mission.Progress do
   defp compute_task_progress(tasks) do
     total = length(tasks)
 
-    done = Enum.count(tasks, fn t -> t.status == "done" end)
+    done = Enum.count(tasks, fn t -> t.status in ["done", "verified"] end)
+    verified = Enum.count(tasks, fn t -> t.status == "verified" end)
     in_progress = Enum.count(tasks, fn t -> t.status == "in_progress" end)
     blocked = Enum.count(tasks, fn t -> t.status == "blocked" end)
     paused = Enum.count(tasks, fn t -> t.status == "paused" end)
@@ -79,6 +80,7 @@ defmodule ControlKeel.Mission.Progress do
     %{
       total: total,
       done: done,
+      verified: verified,
       in_progress: in_progress,
       blocked: blocked,
       paused: paused,

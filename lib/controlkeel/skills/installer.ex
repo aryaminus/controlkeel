@@ -820,7 +820,7 @@ defmodule ControlKeel.Skills.Installer do
 
     destination =
       case File.read(destination_path) do
-        {:ok, contents} -> contents
+        {:ok, contents} -> sanitize_agents_md(contents)
         {:error, _reason} -> nil
       end
 
@@ -877,6 +877,15 @@ defmodule ControlKeel.Skills.Installer do
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n\n")
     |> Kernel.<>("\n")
+  end
+
+  defp sanitize_agents_md(nil), do: nil
+
+  defp sanitize_agents_md(contents) do
+    contents
+    # Strip orphaned partial HTML comment prefixes left by earlier broken writes.
+    |> String.replace(~r/(?:\n[ \t]*<![ \t]*)+(?=\n[ \t]*<!-- controlkeel:start -->)/m, "\n")
+    |> String.replace(~r/\n{3,}/, "\n\n")
   end
 
   defp same_path?(left, right) do

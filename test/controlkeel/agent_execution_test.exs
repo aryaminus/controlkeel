@@ -57,7 +57,7 @@ defmodule ControlKeel.AgentExecutionTest do
     assert File.exists?(Path.join(result["package_root"], "TASK.md"))
     assert File.exists?(Path.join(result["package_root"], "workspace_context.json"))
     assert File.exists?(Path.join(result["package_root"], "recent_events.json"))
-    assert Mission.get_task(task.id).status == "done"
+    assert Mission.get_task(task.id).status == "verified"
     assert Mission.proof_summary_for_task(task.id)["deploy_ready"] in [true, false]
   end
 

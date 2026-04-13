@@ -107,12 +107,14 @@ defmodule ControlKeelWeb.ShipLive do
             <div class="ck-finding-list">
               <article class="ck-finding-item">
                 <div class="ck-finding-head">
-                  <h3>Proof-backed done tasks</h3>
+                  <h3>Proof-backed completed tasks</h3>
                   <span class="ck-pill ck-pill-neutral">
                     {format_percent(@summary.outcome_metrics.proof_backed_task_coverage_percent)}
                   </span>
                 </div>
-                <p class="ck-note">Completed tasks with at least one immutable proof bundle.</p>
+                <p class="ck-note">
+                  Done or verified tasks with at least one immutable proof bundle.
+                </p>
               </article>
               <article class="ck-finding-item">
                 <div class="ck-finding-head">
@@ -189,7 +191,7 @@ defmodule ControlKeelWeb.ShipLive do
                   </span>
                 </div>
                 <p class="ck-note">
-                  Tasks resumed from a checkpoint that still ended in <code class="font-mono text-xs">done</code>.
+                  Tasks resumed from a checkpoint that still ended in a governed completed state.
                 </p>
               </article>
               <article class="ck-finding-item">
@@ -298,6 +300,9 @@ defmodule ControlKeelWeb.ShipLive do
                     <strong>{row.completed_tasks}</strong>
                     <p class="ck-note">{row.total_tasks} total tasks</p>
                   </div>
+                </:col>
+                <:col :let={row} label="Verified">
+                  {Map.get(row, :verified_tasks, 0)}
                 </:col>
                 <:col :let={row} label="Completion rate">
                   {format_percent(row.completion_rate_percent)}

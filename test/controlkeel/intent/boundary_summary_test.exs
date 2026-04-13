@@ -122,12 +122,20 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                  "ownership" => "workspace_or_ck_controlled",
                  "portability" => "typed_records_and_resume_packets",
                  "retrieval_mode" => "ranked_memory_hits",
+                 "retrieval_strategy" => "single_vector",
+                 "supported_retrieval_strategies" => [
+                   "single_vector",
+                   "bm25",
+                   "hybrid_bm25_vector",
+                   "late_interaction",
+                   "late_interaction_rerank"
+                 ],
                  "integration_mode" => "agent_must_reconcile_with_active_context",
                  "citation_posture" => "cite_memory_before_claim",
                  "compaction_visibility" => "explicit_summary_and_protected_tail",
                  "provider_state_posture" => "prefer_portable_ck_state",
                  "rationale" =>
-                   "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state. Treat retrieval and integration as separate governed steps: CK can return ranked memory hits, but the agent still has to reconcile them with the active task context before making claims."
+                   "Keep durable agent memory in CK-controlled typed surfaces such as memory records, proofs, traces, and resume packets so context survives host changes and does not disappear into opaque provider-managed state. Treat retrieval and integration as separate governed steps: CK can return ranked memory hits, but the agent still has to reconcile them with the active task context before making claims. Current default is single-vector cosine similarity; late-interaction (multi-vector MaxSim) retrieval is a recognized future strategy for harder recall tasks."
                },
                "compaction" => %{
                  "strategy" => "hierarchical",

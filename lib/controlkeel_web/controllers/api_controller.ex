@@ -1551,7 +1551,8 @@ defmodule ControlKeelWeb.ApiController do
       validation_gate: task.validation_gate,
       runtime_context: get_in(task.metadata || %{}, ["runtime_context"]),
       decomposition: Decomposition.task_summary(task),
-      latest_proof: Mission.proof_summary_for_task(task)
+      latest_proof: Mission.proof_summary_for_task(task),
+      assurance: Mission.task_assurance_summary(task)
     }
   end
 
