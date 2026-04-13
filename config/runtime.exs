@@ -20,6 +20,10 @@ if System.get_env("PHX_SERVER") do
   config :controlkeel, ControlKeelWeb.Endpoint, server: true
 end
 
+if level = System.get_env("LOGGER_LEVEL") do
+  config :logger, level: String.to_existing_atom(level)
+end
+
 config :controlkeel, ControlKeelWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 

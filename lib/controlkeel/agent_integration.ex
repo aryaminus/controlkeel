@@ -1408,6 +1408,33 @@ defmodule ControlKeel.AgentIntegration do
         mcp_mode: "none",
         skills_mode: "none"
       }),
+      framework_adapter(%{
+        id: "open-agents",
+        label: "Open Agents (Vercel)",
+        category: "framework-adapter",
+        description:
+          "Cloud coding agent platform by Vercel Labs built on AI SDK, durable workflows, and sandboxed VMs. CK integrates via `.agents/skills/` discovery and CLI commands run through the agent's bash tool.",
+        companion_delivery:
+          "Drop `controlkeel-governance` skill into `.agents/skills/` for automatic discovery. Agent uses bash to run CK CLI. For fork-level integration, spread CK MCP tools into the agent's tool set via AI SDK.",
+        preferred_target: "open-standard",
+        default_scope: "project",
+        auth_mode: "heuristic",
+        mcp_mode: "hosted_optional",
+        skills_mode: "native",
+        upstream_slug: "vercel-labs/open-agents",
+        upstream_docs_url: "https://github.com/vercel-labs/open-agents",
+        provider_bridge: %{supported: true, mode: "byom", owner: "agent"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["open-standard", "instructions-only"],
+        dist_bundle: "controlkeel/dist/open-agents-runtime",
+        install_experience: "guided",
+        confidence_level: "experimental",
+        phase_model: "host_plan_mode",
+        browser_embed: "none",
+        subagent_visibility: "all",
+        execution_support: "inbound_only",
+        ck_runs_agent_via: "none"
+      }),
       headless_runtime(%{
         id: "cloudflare-workers",
         label: "Cloudflare Workers Agent",
@@ -1696,6 +1723,9 @@ defmodule ControlKeel.AgentIntegration do
 
       id when id in ["forge", "devin", "open-swe"] ->
         ["hosted_mcp", "a2a"]
+
+      "open-agents" ->
+        ["native_skills", "cli_bash"]
 
       _ ->
         fallback_agent_uses_ck_via(attrs)
@@ -2211,6 +2241,13 @@ defmodule ControlKeel.AgentIntegration do
       "mcp.json",
       "README.md",
       "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "open-agents"}),
+    do: [
+      ".agents/skills",
+      "AGENTS.md",
+      "controlkeel/dist/open-agents-runtime"
     ]
 
   defp default_artifact_surfaces(%{support_class: "headless_runtime"}),

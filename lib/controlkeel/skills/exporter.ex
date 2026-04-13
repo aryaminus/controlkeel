@@ -5572,10 +5572,27 @@ defmodule ControlKeel.Skills.Exporter do
     """
     ---
     name: controlkeel-governance
-    description:
-      Expertise in governance validation, security review, budget tracking,
-      and compliance auditing. Use when the user asks to "review", "validate",
-      "audit", or check "governance" status of the project.
+    description: "Operate inside a ControlKeel-governed session. Use this before code edits, shell execution, delegation, deploy work, or any task that needs CK validation, findings, budget, proof, or routing context."
+    license: Apache-2.0
+    compatibility:
+      - codex
+      - claude-standalone
+      - claude-plugin
+      - copilot-plugin
+      - github-repo
+      - open-standard
+    allowed-tools:
+      - ck_validate
+      - ck_context
+      - ck_finding
+      - ck_budget
+      - ck_route
+      - ck_skill_list
+      - ck_skill_load
+    metadata:
+      author: controlkeel
+      version: "2.0"
+      category: governance
     ---
 
     # ControlKeel Governance Operator
@@ -5686,20 +5703,50 @@ defmodule ControlKeel.Skills.Exporter do
     """
     ---
     name: controlkeel-governance
-    description: Native ControlKeel governance skill for Amp with MCP-backed review, plan gating, and finding checks.
+    description: "Operate inside a ControlKeel-governed session. Use this before code edits, shell execution, delegation, deploy work, or any task that needs CK validation, findings, budget, proof, or routing context."
+    license: Apache-2.0
+    compatibility:
+      - codex
+      - claude-standalone
+      - claude-plugin
+      - copilot-plugin
+      - github-repo
+      - open-standard
+    allowed-tools:
+      - ck_validate
+      - ck_context
+      - ck_finding
+      - ck_budget
+      - ck_route
+      - ck_skill_list
+      - ck_skill_load
+    metadata:
+      author: controlkeel
+      version: "2.0"
+      category: governance
     ---
 
     # ControlKeel Governance For Amp
 
     Prefer this skill whenever you need to review a plan, annotate risky edits, or check the latest governed state.
 
-    Primary flow:
-    1. Use `/controlkeel-submit-plan` before leaving planning for risky work.
-    2. Use `/controlkeel-review` before completion.
-    3. Use `/controlkeel-annotate` for file-specific risk notes.
-    4. Use `/controlkeel-last` to reopen the most recent active review.
+    ## Core governance loop
 
-    MCP expectations:
+    1. **Start**: Call `ck_context` with `session_id: 1` to load mission, risk, budget, proof, memory, and active findings.
+    2. **Before mutations**: Call `ck_validate` before writing code, config, shell commands, or deploy artifacts.
+    3. **Findings**: If you discover a problem, call `ck_finding` to persist it.
+    4. **Budget**: Call `ck_budget` before expensive model calls or bulk operations.
+    5. **Routing**: Call `ck_route` before delegating sub-work to another agent.
+
+    ## Commands
+
+    - `/controlkeel-submit-plan` — submit plan before risky work
+    - `/controlkeel-review` — review before completion
+    - `/controlkeel-annotate` — file-specific risk notes
+    - `/controlkeel-last` — reopen the most recent active review
+
+    ## MCP expectations
+
     - `ck_context` for task, workspace, transcript, and resume context
     - `ck_review_submit`, `ck_review_status`, and `ck_review_feedback` for review transport
     - `ck_validate` and `ck_finding` for governance results
