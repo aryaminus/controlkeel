@@ -65,10 +65,26 @@ For multi-agent memory experiments, use metadata to describe the strategy honest
 - `memory_sharing_strategy: "rag_retrieval"`
 - `memory_sharing_strategy: "full_pass_through"`
 - `memory_sharing_strategy: "latent_briefing"`
+- `memory_sharing_strategy: "late_interaction"`
+- `memory_sharing_strategy: "multi_vector_maxsim"`
+- `memory_sharing_strategy: "hybrid_late_interaction"`
 - `compaction_strategy: "llm_summary"`
 - `compaction_strategy: "attention_guided_kv_compaction"`
 
 That lets CK compare governed runs across the same suite while keeping the benchmark evidence clear about what was actually used.
+
+### Retrieval strategy metadata
+
+When benchmarking retrieval quality over CK memory, tag the retrieval backend:
+
+- `retrieval_strategy: "single_vector"` — current pgvector cosine similarity (default)
+- `retrieval_strategy: "bm25"` — keyword/lexical baseline
+- `retrieval_strategy: "hybrid_bm25_vector"` — combined lexical + dense
+- `retrieval_strategy: "late_interaction"` — multi-vector late interaction (ColBERT-style MaxSim or similar)
+- `retrieval_strategy: "cross_encoder_rerank"` — retrieve then rerank with a cross-encoder
+- `retrieval_strategy: "late_interaction_rerank"` — retrieve then rerank with late interaction scoring
+
+This vocabulary exists so future retrieval experiments can be compared fairly. See `docs/idea/2026-late-interaction-retrieval-research.md` for the research motivating multi-vector and late-interaction approaches.
 
 ## Web UI quick presets
 

@@ -56,6 +56,17 @@ config :controlkeel,
   runtime_mode: runtime_mode,
   bus: bus_mode
 
+retrieval_strategy =
+  case System.get_env("CONTROLKEEL_MEMORY_RETRIEVAL_STRATEGY", "single_vector") do
+    "late_interaction" -> :late_interaction
+    "bm25" -> :bm25
+    "hybrid_bm25_vector" -> :hybrid_bm25_vector
+    "late_interaction_rerank" -> :late_interaction_rerank
+    _ -> :single_vector
+  end
+
+config :controlkeel, :memory_retrieval_strategy, retrieval_strategy
+
 if pdf_renderer = System.get_env("CONTROLKEEL_PDF_RENDERER") do
   renderer =
     case pdf_renderer do
