@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.5 — 2026-04-13
+
+### What's changed
+
+- Add Cursor plugin, fix MCP server encoding, and expand Cursor integration surface
+
 ## v0.2.4 — 2026-04-12
 
 ### What's changed
