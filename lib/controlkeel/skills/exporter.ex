@@ -4327,18 +4327,20 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  defp instructions_only_contents(target, project_root, opts) do
-    project_root =
-      if portable_project_root?(opts),
-        do: Distribution.portable_project_root(),
-        else: Path.expand(project_root)
+  defp instructions_only_contents(target, _project_root, opts) do
+    project_root_hint =
+      if portable_project_root?(opts) do
+        "this portable ControlKeel bundle directory (`#{Distribution.portable_project_root()}`)"
+      else
+        "this repository (your IDE workspace / `CK_PROJECT_ROOT`)"
+      end
 
     """
     # ControlKeel Companion Instructions
 
     This project is governed by ControlKeel. Prefer the ControlKeel MCP server for validation, findings, budgets, proof context, workspace snapshots, transcript state, and routing.
 
-    Project root: `#{project_root}`
+    Project root: #{project_root_hint}
     Target: `#{target}`
     Primary CK loop: `#{ControlKeel.SetupAdvisor.core_loop()}`
 

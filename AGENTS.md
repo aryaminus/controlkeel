@@ -43,7 +43,6 @@ custom classes must fully style the input
 - Ensure **clean typography, spacing, and layout balance** for a refined, premium look
 - Focus on **delightful details** like hover effects, loading states, and smooth page transitions
 
-
 <!-- usage-rules-start -->
 
 <!-- phoenix:elixir-start -->
@@ -447,14 +446,13 @@ And **never** do this:
 <!-- phoenix:liveview-end -->
 
 <!-- usage-rules-end -->
-
 <!-- controlkeel:start -->
 # ControlKeel Companion Instructions
 
 This project is governed by ControlKeel. Prefer the ControlKeel MCP server for validation, findings, budgets, proof context, workspace snapshots, transcript state, and routing.
 
-Project root: `/Users/aryaminus/Developer/idea`
-Target: `windsurf`
+Project root: this repository (your IDE workspace / `CK_PROJECT_ROOT`)
+Target: `cursor`
 Primary CK loop: `ck_context -> ck_validate -> ck_review_submit/ck_finding -> ck_budget/ck_route/ck_delegate`
 
 Required workflow:

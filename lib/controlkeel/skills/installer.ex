@@ -846,6 +846,12 @@ defmodule ControlKeel.Skills.Installer do
           upsert_managed_block(destination, generated)
       end
 
+    updated =
+      case updated do
+        nil -> nil
+        contents -> sanitize_agents_md(contents)
+      end
+
     if updated do
       File.write!(destination_path, updated)
     end
@@ -892,6 +898,8 @@ defmodule ControlKeel.Skills.Installer do
     contents
     # Strip orphaned partial HTML comment prefixes left by earlier broken writes.
     |> String.replace(~r/(?:\n[ \t]*<![ \t]*)+(?=\n[ \t]*<!-- controlkeel:start -->)/m, "\n")
+    # Strip a lone "<!" line before the managed block (do not use \s* here — it would eat newlines).
+    |> String.replace(~r/\n<!\n+(?=<!-- controlkeel:start -->)/, "\n")
     |> String.replace(~r/\n{3,}/, "\n\n")
   end
 
