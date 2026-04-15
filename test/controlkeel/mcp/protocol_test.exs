@@ -97,6 +97,24 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert is_binary(governance["description"])
   end
 
+  test "resources/list is empty under CK_MCP_MODE to avoid slow Registry scans" do
+    prev = System.get_env("CK_MCP_MODE")
+    System.put_env("CK_MCP_MODE", "1")
+
+    on_exit(fn ->
+      if prev == nil, do: System.delete_env("CK_MCP_MODE"), else: System.put_env("CK_MCP_MODE", prev)
+    end)
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2012,
+        "method" => "resources/list"
+      })
+
+    assert %{"result" => %{"resources" => []}} = response
+  end
+
   test "resources/read returns rendered skill content for a skills uri" do
     response =
       Protocol.handle_request(%{

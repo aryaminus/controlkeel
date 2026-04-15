@@ -165,12 +165,10 @@ defmodule ControlKeel.MCP.Protocol do
       ck_load_resources_tool()
     ]
 
-    tools =
-      if current_skill_names() == [] do
-        base
-      else
-        base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
-      end
+    # Always expose ck_skill_list / ck_skill_load. Do not call Registry here: a full
+    # catalog walk (every agent skill dir under $HOME) can take 10–30s and blocks this
+    # process while Cursor expects tools/list under a ~20s connect budget.
+    tools = base ++ [ck_skill_list_tool(), ck_skill_load_tool()]
 
     case Keyword.get(opts, :tool_names) do
       names when is_list(names) -> Enum.filter(tools, &(&1["name"] in names))
@@ -806,7 +804,16 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   defp ck_skill_load_tool do
-    names = current_skill_names()
+    names = skill_names_for_ck_skill_load_enum()
+
+    name_schema =
+      %{
+        "type" => "string",
+        "description" =>
+          "The skill name as returned by ck_skill_list. In MCP stdio mode, call ck_skill_list first; " <>
+            "the enum is omitted so this handshake stays fast."
+      }
+      |> maybe_put_json_schema_enum(names)
 
     %{
       "name" => "ck_skill_load",
@@ -818,11 +825,7 @@ defmodule ControlKeel.MCP.Protocol do
         "type" => "object",
         "required" => ["name"],
         "properties" => %{
-          "name" => %{
-            "type" => "string",
-            "description" => "The skill name as returned by ck_skill_list",
-            "enum" => names
-          },
+          "name" => name_schema,
           "project_root" => %{
             "type" => "string",
             "description" =>
@@ -871,21 +874,48 @@ defmodule ControlKeel.MCP.Protocol do
 
   defp stdio_project_root do
     case System.get_env("CK_PROJECT_ROOT") do
-      v when is_binary(v) and v != "" -> Path.expand(v)
-      _ -> File.cwd!()
+      v when is_binary(v) and v != "" ->
+        v |> String.trim() |> Path.expand()
+
+      _ ->
+        File.cwd!()
     end
   end
 
   defp resource_schemas(_opts) do
-    Enum.map(current_skills(), fn skill ->
-      %{
-        "uri" => "skills://#{skill.name}",
-        "name" => skill.name,
-        "title" => skill.name,
-        "description" => skill.description,
-        "mimeType" => "text/markdown"
-      }
-    end)
+    if mcp_stdio_mode?() do
+      # Same Registry.catalog walk as tools/list — defer discovery to ck_skill_list /
+      # ck_load_resources so resources/list stays instant under CK_MCP_MODE.
+      []
+    else
+      Enum.map(current_skills(), fn skill ->
+        %{
+          "uri" => "skills://#{skill.name}",
+          "name" => skill.name,
+          "title" => skill.name,
+          "description" => skill.description,
+          "mimeType" => "text/markdown"
+        }
+      end)
+    end
+  end
+
+  defp mcp_stdio_mode? do
+    System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES)
+  end
+
+  defp skill_names_for_ck_skill_load_enum do
+    if mcp_stdio_mode?() do
+      []
+    else
+      current_skill_names()
+    end
+  end
+
+  defp maybe_put_json_schema_enum(schema, []), do: schema
+
+  defp maybe_put_json_schema_enum(schema, names) when is_list(names) do
+    Map.put(schema, "enum", names)
   end
 
   defp load_resource(uri, params) do
