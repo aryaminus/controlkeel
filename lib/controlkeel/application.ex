@@ -40,33 +40,43 @@ defmodule ControlKeel.Application do
   end
 
   defp late_children do
-    [
-      ControlKeel.Repo
-    ] ++
-      cloud_repo_children() ++
-      [
-        ControlKeel.Runtime.bus_module()
-      ] ++
-      analytics_children() ++
-      mcp_tail_children()
-  end
-
-  # Stdio MCP only needs Repo, bus, PubSub, skills activation, and the MCP
-  # supervisor. Starting ControlKeelWeb.Endpoint pulls in HTTP listeners,
-  # endpoint init, and DNS cluster work that can exceed client handshake timeouts.
-  defp mcp_tail_children do
-    pubsub_skills_mcp = [
-      {Phoenix.PubSub, name: ControlKeel.PubSub},
-      ControlKeel.Skills.Activation,
-      {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor}
-    ]
-
     if mcp_stdio_mode?() do
-      pubsub_skills_mcp
+      # Start the stdio MCP reader before Repo/bus so the host can complete
+      # initialize while SQLite and other children boot (Cursor ~10s abort window).
+      [
+        {ControlKeel.MCP.Server,
+         [
+           name: ControlKeel.MCP.Server.stdio_registered_name(),
+           input: :stdio,
+           output: :stdio
+         ]},
+        ControlKeel.Repo
+      ] ++
+        cloud_repo_children() ++
+        [
+          ControlKeel.Runtime.bus_module()
+        ] ++
+        analytics_children() ++
+        [
+          {Phoenix.PubSub, name: ControlKeel.PubSub},
+          ControlKeel.Skills.Activation
+        ]
     else
       [
-        {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore}
-      ] ++ pubsub_skills_mcp ++ [ControlKeelWeb.Endpoint]
+        ControlKeel.Repo
+      ] ++
+        cloud_repo_children() ++
+        [
+          ControlKeel.Runtime.bus_module()
+        ] ++
+        analytics_children() ++
+        [
+          {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
+          {Phoenix.PubSub, name: ControlKeel.PubSub},
+          ControlKeel.Skills.Activation,
+          {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor},
+          ControlKeelWeb.Endpoint
+        ]
     end
   end
 

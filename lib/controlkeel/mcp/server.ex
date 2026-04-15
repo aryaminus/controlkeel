@@ -5,8 +5,13 @@ defmodule ControlKeel.MCP.Server do
 
   alias ControlKeel.MCP.Protocol
 
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts)
+  @doc false
+  def stdio_registered_name, do: :controlkeel_mcp_stdio
+
+  def start_link(opts) when is_list(opts) do
+    {name, rest} = Keyword.pop(opts, :name)
+    gen_opts = if name, do: [name: name], else: []
+    GenServer.start_link(__MODULE__, rest, gen_opts)
   end
 
   def dispatch_request(server, request) do

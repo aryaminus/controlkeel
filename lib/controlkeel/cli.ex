@@ -2907,41 +2907,41 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :mcp, options: options}, project_root) do
     root = Path.expand(options[:project_root] || project_root)
 
-    # Start the stdio MCP server immediately so the client can finish initialize
-    # before any project bootstrap work. ensure_local_project can be slow (DB,
-    # binding, skills) and previously blocked stdin reads, causing -32001 timeouts.
-    # Skip AttachedAgentSync during bootstrap (same rationale as before).
+    # MCP.Server is supervised first when CK_MCP_MODE (see Application); stdin reads
+    # run while Repo boots. ensure_local_project stays async so binding/skills work
+    # does not block the Mix process here. Skip AttachedAgentSync during bootstrap.
     File.cd!(root, fn ->
-      {:ok, pid} =
-        DynamicSupervisor.start_child(
-          ControlKeel.MCP.Supervisor,
-          {ControlKeel.MCP.Server, input: :stdio, output: :stdio}
-        )
+      case Process.whereis(ControlKeel.MCP.Server.stdio_registered_name()) do
+        pid when is_pid(pid) ->
+          ref = Process.monitor(pid)
 
-      ref = Process.monitor(pid)
+          _ =
+            Task.start(fn ->
+              case ensure_local_project(root, %{}, sync_attached_agents: false) do
+                {:ok, _, _, _} ->
+                  :ok
 
-      _ =
-        Task.start(fn ->
-          case ensure_local_project(root, %{}, sync_attached_agents: false) do
-            {:ok, _, _, _} ->
+                {:error, reason} ->
+                  Logger.error(
+                    "[MCP] bootstrap failed (some tools may fail until fixed): #{inspect(reason)}"
+                  )
+              end
+            end)
+
+          receive do
+            {:DOWN, ^ref, :process, ^pid, :normal} ->
               :ok
 
-            {:error, reason} ->
-              Logger.error(
-                "[MCP] bootstrap failed (some tools may fail until fixed): #{inspect(reason)}"
-              )
+            {:DOWN, ^ref, :process, ^pid, :shutdown} ->
+              :ok
+
+            {:DOWN, ^ref, :process, ^pid, reason} ->
+              {:error, "MCP server stopped: #{inspect(reason)}"}
           end
-        end)
 
-      receive do
-        {:DOWN, ^ref, :process, _pid, :normal} ->
-          :ok
-
-        {:DOWN, ^ref, :process, _pid, :shutdown} ->
-          :ok
-
-        {:DOWN, ^ref, :process, _pid, reason} ->
-          {:error, "MCP server stopped: #{inspect(reason)}"}
+        nil ->
+          {:error,
+           "ControlKeel MCP stdio server is not running. Ensure CK_MCP_MODE is set before the application starts (see mix ck.mcp and bin/controlkeel-mcp)."}
       end
     end)
   end
