@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.11 — 2026-04-15
+
+### What's changed
+
+- fix(mcp): skip attached-agent sync during stdio MCP startup
+
 ## v0.2.10 — 2026-04-15
 
 ### What's changed
