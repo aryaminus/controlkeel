@@ -12,8 +12,19 @@ defmodule ControlKeel.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: mix_listeners()
     ]
+  end
+
+  # When CK_MCP_MODE is set before Mix loads the project (see bin/controlkeel-mcp),
+  # skip the Phoenix.CodeReloader listener so stdio MCP is not blocked by dev
+  # recompilation hooks on the critical path to the first JSON-RPC frame.
+  defp mix_listeners do
+    if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) do
+      []
+    else
+      [Phoenix.CodeReloader]
+    end
   end
 
   # Configuration for the OTP application.

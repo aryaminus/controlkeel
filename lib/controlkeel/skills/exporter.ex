@@ -3406,6 +3406,7 @@ defmodule ControlKeel.Skills.Exporter do
           Map.get(base_server, "env", %{}),
           %{
             "CK_PROJECT_ROOT" => "${workspaceFolder}",
+            "CK_MCP_MODE" => "1",
             "LOGGER_LEVEL" => "warning",
             "MIX_QUIET" => "1"
           }
@@ -3484,6 +3485,7 @@ defmodule ControlKeel.Skills.Exporter do
       server when is_map(server) ->
         env = %{
           "CK_PROJECT_ROOT" => "${workspaceFolder}",
+          "CK_MCP_MODE" => "1",
           "LOGGER_LEVEL" => "warning",
           "MIX_QUIET" => "1"
         }

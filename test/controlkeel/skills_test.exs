@@ -1086,6 +1086,7 @@ defmodule ControlKeel.SkillsTest do
     cursor_mcp = Jason.decode!(File.read!(Path.join(tmp_dir, ".cursor/mcp.json")))
 
     assert get_in(cursor_mcp, ["mcpServers", "controlkeel", "env", "MIX_QUIET"]) == "1"
+    assert get_in(cursor_mcp, ["mcpServers", "controlkeel", "env", "CK_MCP_MODE"]) == "1"
 
     assert File.exists?(Path.join(tmp_dir, ".cursor/hooks.json"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/hooks/ck-session-start.sh"))
