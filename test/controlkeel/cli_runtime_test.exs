@@ -156,6 +156,35 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert get_in(status_payload, ["session", "title"]) == "Runtime CLI session"
     assert get_in(status_payload, ["autonomy_profile", "mode"])
     assert is_list(status_payload["suggested_next_steps"])
+
+    assert {:ok, ctx} =
+             CLI.parse(["context", "--session-id", Integer.to_string(session.id), "--json"])
+
+    ctx_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(ctx, project_root: tmp_dir)
+      end)
+
+    assert {:ok, ctx_payload} = Jason.decode(String.trim(ctx_output))
+    assert ctx_payload["session_id"] == session.id
+
+    assert {:ok, val} =
+             CLI.parse([
+               "validate",
+               "--content",
+               "echo hello",
+               "--kind",
+               "shell",
+               "--json"
+             ])
+
+    val_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(val, project_root: tmp_dir)
+      end)
+
+    assert {:ok, val_payload} = Jason.decode(String.trim(val_output))
+    assert is_binary(val_payload["decision"])
   end
 
   test "findings output includes aggregates, filters, and next steps", %{tmp_dir: tmp_dir} do

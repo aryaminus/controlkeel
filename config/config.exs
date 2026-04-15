@@ -20,9 +20,12 @@ config :controlkeel,
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
+# Default `code_reloader` so releases match runtime MCP overrides (CK_MCP_MODE).
+# `config/dev.exs` enables reloading for local `mix phx.server` workflows.
 config :controlkeel, ControlKeelWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
+  code_reloader: false,
   render_errors: [
     formats: [html: ControlKeelWeb.ErrorHTML, json: ControlKeelWeb.ErrorJSON],
     layout: false

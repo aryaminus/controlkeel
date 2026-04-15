@@ -333,6 +333,8 @@ defmodule ControlKeel.Help do
       controlkeel registry status acp
                                       Show ACP registry cache freshness and matches
       controlkeel status              Show current session status
+      controlkeel context [options]   Show governed session context via the CK context surface
+      controlkeel validate [options]  Validate proposed content via the CK validation surface
       controlkeel findings [options]  List findings for the current session
       controlkeel approve <id>        Approve a finding in the current session
       controlkeel proofs [options]    List proof bundles for the current session

@@ -28,6 +28,8 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.Learning.OutcomeTracker
   alias ControlKeel.LocalProject
   alias ControlKeel.Memory
+  alias ControlKeel.MCP.Tools.CkContext
+  alias ControlKeel.MCP.Tools.CkValidate
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.PolicyTraining
@@ -65,6 +67,24 @@ defmodule ControlKeel.CLI do
     scope: :string
   ]
   @status_switches [format: :string]
+  @context_switches [
+    session_id: :integer,
+    task_id: :integer,
+    format: :string,
+    json: :boolean,
+    project_root: :string
+  ]
+
+  @validate_switches [
+    content: :string,
+    kind: :string,
+    path: :string,
+    session_id: :integer,
+    task_id: :integer,
+    format: :string,
+    json: :boolean,
+    project_root: :string
+  ]
   @findings_switches [severity: :string, status: :string, format: :string]
   @findings_translate_switches [session_id: :integer, severity: :string]
   @proofs_switches [
@@ -288,6 +308,12 @@ defmodule ControlKeel.CLI do
 
       ["status" | rest] ->
         parse_with_switches(:status, rest, @status_switches)
+
+      ["context" | rest] ->
+        parse_with_switches(:context, rest, @context_switches)
+
+      ["validate" | rest] ->
+        parse_with_switches(:validate, rest, @validate_switches)
 
       ["findings", "translate" | rest] ->
         parse_with_switches(:findings_translate, rest, @findings_translate_switches)
@@ -1434,6 +1460,75 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to run session: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :context, options: options}, project_root) do
+    with {:ok, format} <- effective_cli_format(options),
+         {:ok, _binding, default_session, _mode} <- ensure_local_project(project_root) do
+      session_id = options[:session_id] || default_session.id
+      project_root_resolved = options[:project_root] || project_root
+
+      args =
+        %{
+          "session_id" => session_id,
+          "project_root" => ProjectRoot.resolve(project_root_resolved)
+        }
+        |> maybe_put_tool_int("task_id", options[:task_id])
+
+      case CkContext.call(args) do
+        {:ok, payload} ->
+          case format do
+            "json" -> {:ok, [Jason.encode!(payload)]}
+            _ -> {:ok, [inspect(payload, pretty: true, limit: :infinity)]}
+          end
+
+        {:error, {:invalid_arguments, msg}} when is_binary(msg) ->
+          {:error, msg}
+
+        {:error, {:invalid_arguments, reason}} ->
+          {:error, format_cli_error(reason)}
+
+        {:error, reason} ->
+          {:error, "Failed to load context: #{format_cli_error(reason)}"}
+      end
+    end
+  end
+
+  def run_command(%{command: :validate, options: options}, project_root) do
+    with {:ok, format} <- effective_cli_format(options),
+         {:ok, _binding, default_session, _mode} <- ensure_local_project(project_root) do
+      content = options[:content]
+
+      if not is_binary(content) or String.trim(content) == "" do
+        {:error, "`--content` is required for controlkeel validate."}
+      else
+        args =
+          %{
+            "content" => content,
+            "kind" => options[:kind] || "code",
+            "session_id" => options[:session_id] || default_session.id
+          }
+          |> maybe_put_tool_int("task_id", options[:task_id])
+          |> maybe_put_tool_string("path", options[:path])
+
+        case CkValidate.call(args) do
+          {:ok, payload} ->
+            case format do
+              "json" -> {:ok, [Jason.encode!(payload)]}
+              _ -> {:ok, [inspect(payload, pretty: true, limit: :infinity)]}
+            end
+
+          {:error, {:invalid_arguments, msg}} when is_binary(msg) ->
+            {:error, msg}
+
+          {:error, {:invalid_arguments, reason}} ->
+            {:error, format_cli_error(reason)}
+
+          {:error, reason} ->
+            {:error, "Validation failed: #{format_cli_error(reason)}"}
+        end
+      end
     end
   end
 
@@ -3978,6 +4073,23 @@ defmodule ControlKeel.CLI do
       values -> " (" <> Enum.join(values, ", ") <> ")"
     end
   end
+
+  defp effective_cli_format(options) when is_list(options) do
+    if Keyword.get(options, :json) == true do
+      {:ok, "json"}
+    else
+      cli_output_format(options)
+    end
+  end
+
+  defp maybe_put_tool_int(map, _key, nil), do: map
+
+  defp maybe_put_tool_int(map, key, id) when is_integer(id), do: Map.put(map, key, id)
+
+  defp maybe_put_tool_string(map, _key, nil), do: map
+  defp maybe_put_tool_string(map, _key, ""), do: map
+
+  defp maybe_put_tool_string(map, key, path) when is_binary(path), do: Map.put(map, key, path)
 
   defp cli_output_format(options) when is_list(options) do
     case options[:format] do

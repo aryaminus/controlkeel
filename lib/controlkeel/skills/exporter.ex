@@ -3816,7 +3816,22 @@ defmodule ControlKeel.Skills.Exporter do
       context=$(controlkeel context --session-id "${session_id:-1}" --json 2>/dev/null || true)
     fi
 
+    context_ok=""
     if [ -n "$context" ]; then
+      if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$context" | jq -e '.session_id != null' >/dev/null 2>&1 && context_ok=1
+      elif command -v python3 >/dev/null 2>&1; then
+        if printf '%s' "$context" | python3 -c "import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if isinstance(d,dict) and d.get('session_id') is not None else 1)" >/dev/null 2>&1; then
+          context_ok=1
+        fi
+      else
+        case "$context" in
+          *\"session_id\":*) context_ok=1 ;;
+        esac
+      fi
+    fi
+
+    if [ -n "$context_ok" ]; then
       printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel session active. Governance protocol: call ck_validate before risky edits, ck_budget before expensive ops, ck_route before delegation."}\n'
     else
       printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel available. Start with ck_context to load mission state."}\n'
