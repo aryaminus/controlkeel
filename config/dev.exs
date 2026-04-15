@@ -4,6 +4,8 @@ import Config
 config :controlkeel, ControlKeel.Repo,
   database: Path.expand("../controlkeel_dev.db", __DIR__),
   pool_size: 5,
+  # Avoid long waits when another process (e.g. phx.server + MCP) holds SQLite.
+  busy_timeout: 15_000,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 
