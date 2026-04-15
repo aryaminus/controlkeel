@@ -44,10 +44,48 @@ defmodule ControlKeel.MCP.Protocol do
 
   def handle_json(payload, opts \\ []) when is_binary(payload) do
     case Jason.decode(payload) do
-      {:ok, request} -> handle_request(request, opts)
-      {:error, error} -> error_response(nil, -32700, "Parse error: #{Exception.message(error)}")
+      {:ok, []} ->
+        error_response(nil, -32600, "Invalid Request")
+
+      {:ok, requests} when is_list(requests) ->
+        json_rpc_batch_responses(requests, opts)
+
+      {:ok, request} when is_map(request) ->
+        handle_request(request, opts)
+
+      {:ok, _} ->
+        error_response(nil, -32600, "Invalid Request")
+
+      {:error, error} ->
+        error_response(nil, -32700, "Parse error: #{Exception.message(error)}")
     end
   end
+
+  # JSON-RPC 2.0 batch + MCP: clients MAY batch; servers MUST accept batches.
+  # A lone Array was previously routed to handle_request/2 and fell through to
+  # "Invalid Request" with id null, which breaks Cursor's handshake (20s timeout).
+  defp json_rpc_batch_responses(requests, opts) when is_list(requests) do
+    responses =
+      Enum.flat_map(requests, fn
+        %{"jsonrpc" => "2.0"} = req ->
+          if json_rpc_notification?(req) do
+            _ = handle_request(req, opts)
+            []
+          else
+            [handle_request(req, opts)]
+          end
+
+        _not_object ->
+          [error_response(nil, -32600, "Invalid Request")]
+      end)
+
+    case responses do
+      [] -> :no_response
+      list when is_list(list) -> list
+    end
+  end
+
+  defp json_rpc_notification?(req) when is_map(req), do: not Map.has_key?(req, "id")
 
   def handle_request(request, opts \\ [])
 
