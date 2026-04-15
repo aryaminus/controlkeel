@@ -257,6 +257,12 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
     copy_tree_contents(Path.join(plan.output_dir, ".cursor"), Path.join(project_root, ".cursor"))
+
+    copy_tree_contents(
+      Path.join(plan.output_dir, ".cursor-plugin"),
+      Path.join(project_root, ".cursor-plugin")
+    )
+
     install_project_agents_md!(plan.output_dir, project_root)
 
     {:ok,
@@ -264,6 +270,7 @@ defmodule ControlKeel.Skills.Installer do
        target: "cursor-native",
        scope: "project",
        destination: Path.join(project_root, ".cursor"),
+       plugin_destination: Path.join(project_root, ".cursor-plugin"),
        skill_destination: Path.join(project_root, ".agents/skills")
      }}
   end

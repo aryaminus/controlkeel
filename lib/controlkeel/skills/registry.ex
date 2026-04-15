@@ -170,31 +170,63 @@ defmodule ControlKeel.Skills.Registry do
   defp dir_entry(path, scope), do: %{path: path, scope: scope}
 
   defp deduplicate_by_name(skills) do
-    Enum.reduce(skills, {[], %{}, []}, fn skill, {kept, seen, diagnostics} ->
-      case Map.fetch(seen, skill.name) do
-        {:ok, existing} ->
-          if identical_skill_copy?(existing, skill) do
-            {kept, seen, diagnostics}
-          else
-            diagnostic = %SkillDiagnostic{
-              level: "warn",
-              code: "shadowed_skill",
-              message:
-                "A higher-precedence skill with the same name already exists. This copy was ignored.",
-              path: skill.path,
-              skill_name: skill.name
-            }
-
-            {kept, seen, [diagnostic | diagnostics]}
-          end
-
-        :error ->
-          {[skill | kept], Map.put(seen, skill.name, skill), diagnostics}
-      end
+    skills
+    |> Enum.group_by(& &1.name)
+    |> Enum.reduce({[], []}, fn {_name, group}, {kept, diagnostics} ->
+      {winner, new_diags} = resolve_duplicate_skill_group(group)
+      {[winner | kept], diagnostics ++ new_diags}
     end)
-    |> then(fn {skills, _seen, diagnostics} ->
-      {Enum.reverse(skills), Enum.reverse(diagnostics)}
+    |> then(fn {kept, diagnostics} ->
+      {Enum.reverse(kept), Enum.reverse(diagnostics)}
     end)
+  end
+
+  defp resolve_duplicate_skill_group([only]), do: {only, []}
+
+  defp resolve_duplicate_skill_group(group) do
+    preferred = preferred_skill_definition(group)
+
+    new_diags =
+      Enum.flat_map(group, fn skill ->
+        cond do
+          skill.path == preferred.path ->
+            []
+
+          identical_skill_copy?(preferred, skill) ->
+            []
+
+          true ->
+            [
+              %SkillDiagnostic{
+                level: "warn",
+                code: "shadowed_skill",
+                message:
+                  "Another skill with the same name took precedence (canonical builtin or earlier discovery path). This copy was ignored.",
+                path: skill.path,
+                skill_name: skill.name
+              }
+            ]
+        end
+      end)
+
+    {preferred, new_diags}
+  end
+
+  defp preferred_skill_definition(group) do
+    builtins = Enum.filter(group, &builtin_skill_path?/1)
+
+    case builtins do
+      [] ->
+        hd(group)
+
+      [_ | _] ->
+        Enum.min_by(builtins, & &1.path, :string)
+    end
+  end
+
+  defp builtin_skill_path?(skill) do
+    norm = skill.path |> to_string() |> String.replace("\\", "/")
+    String.contains?(norm, "/priv/skills/")
   end
 
   defp identical_skill_copy?(first, second) do

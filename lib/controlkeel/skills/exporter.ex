@@ -420,10 +420,6 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(background_agent_path))
     File.write!(background_agent_path, cursor_background_agent_contents())
 
-    plugin_path = Path.join(root, ".cursor-plugin/plugin.json")
-    File.mkdir_p!(Path.dirname(plugin_path))
-    File.write!(plugin_path, Jason.encode!(cursor_plugin_manifest(opts), pretty: true) <> "\n")
-
     hooks_path = Path.join(root, ".cursor/hooks.json")
     File.write!(hooks_path, Jason.encode!(cursor_hooks_manifest(), pretty: true) <> "\n")
 
@@ -443,6 +439,11 @@ defmodule ControlKeel.Skills.Exporter do
       mcp_path,
       Jason.encode!(cursor_mcp_payload(project_root, opts), pretty: true) <> "\n"
     )
+
+    plugin_root = Path.join(root, ".cursor-plugin")
+    plugin_path = Path.join(plugin_root, "plugin.json")
+    plugin_hooks_json = Path.join(plugin_root, "hooks/hooks.json")
+    write_cursor_plugin_bundle!(root, project_root, opts)
 
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, instructions_only_contents("cursor", project_root, opts))
@@ -464,6 +465,11 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => background_agent_path, "kind" => "workflow"},
         %{"path" => plugin_path, "kind" => "plugin"},
+        %{"path" => plugin_hooks_json, "kind" => "hooks"},
+        %{"path" => Path.join(plugin_root, "rules"), "kind" => "rules"},
+        %{"path" => Path.join(plugin_root, "skills"), "kind" => "skills"},
+        %{"path" => Path.join(plugin_root, "agents"), "kind" => "agent"},
+        %{"path" => Path.join(plugin_root, "commands"), "kind" => "command"},
         %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => agents_path, "kind" => "instructions"}
@@ -471,7 +477,7 @@ defmodule ControlKeel.Skills.Exporter do
       [
         "Keep `.cursor/rules`, `.cursor/commands`, `.cursor/hooks`, `.cursor/skills`, `.cursor/agents`, and `.cursor/background-agents` in the repo so Cursor loads ControlKeel governance.",
         "Use .cursor/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template.",
-        "The `.cursor-plugin/plugin.json` manifest makes ControlKeel a distributable Cursor plugin."
+        "The `.cursor-plugin/` directory is a distributable Cursor plugin bundle: manifest, mirrored rules/skills/agents/commands, and `hooks/hooks.json` with the same gate scripts as `.cursor/hooks/`."
       ]
     )
   end
@@ -3358,8 +3364,22 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  defp cursor_plugin_manifest(opts) do
+  defp cursor_plugin_manifest(project_root, opts) do
     version = Keyword.get(opts, :version, app_version())
+    base_server = get_in(mcp_payload(project_root, opts), ["mcpServers", "controlkeel"]) || %{}
+
+    server =
+      base_server
+      |> Map.put(
+        "env",
+        Map.merge(
+          Map.get(base_server, "env", %{}),
+          %{"CK_PROJECT_ROOT" => "${workspaceFolder}", "LOGGER_LEVEL" => "warning"}
+        )
+      )
+      |> maybe_workspace_relative_mcp_command!(project_root)
+
+    slug = Distribution.github_repo_slug()
 
     %{
       "name" => "controlkeel",
@@ -3368,19 +3388,25 @@ defmodule ControlKeel.Skills.Exporter do
         "ControlKeel governance for Cursor — validation, findings, budgets, proofs, memory, agent routing, and human review via MCP.",
       "author" => %{"name" => "ControlKeel"},
       "license" => "Apache-2.0",
+      "homepage" => "https://github.com/#{slug}",
+      "repository" => "https://github.com/#{slug}.git",
       "keywords" => [
         "governance",
         "security",
         "compliance",
         "validation",
+        "code-review",
         "mcp",
+        "budget",
+        "proof",
         "agent-routing"
       ],
       "rules" => "./rules/",
       "skills" => "./skills/",
       "agents" => "./agents/",
       "commands" => "./commands/",
-      "hooks" => "./hooks/hooks.json"
+      "hooks" => "./hooks/hooks.json",
+      "mcpServers" => %{"controlkeel" => server}
     }
   end
 
@@ -3420,10 +3446,85 @@ defmodule ControlKeel.Skills.Exporter do
   defp cursor_mcp_payload(project_root, opts) do
     base = mcp_payload(project_root, opts)
 
-    put_in(
-      base,
-      ["mcpServers", "controlkeel", "env"],
-      %{"CK_PROJECT_ROOT" => "${workspaceFolder}"}
+    case get_in(base, ["mcpServers", "controlkeel"]) do
+      server when is_map(server) ->
+        env = %{"CK_PROJECT_ROOT" => "${workspaceFolder}", "LOGGER_LEVEL" => "warning"}
+
+        server =
+          server
+          |> Map.put("env", env)
+          |> Map.update!("command", &workspace_relative_mcp_command(project_root, &1))
+
+        put_in(base, ["mcpServers", "controlkeel"], server)
+
+      _ ->
+        base
+    end
+  end
+
+  defp workspace_relative_mcp_command(project_root, command) when is_binary(command) do
+    root = Path.expand(project_root)
+
+    try do
+      expanded = Path.expand(command, root)
+
+      if command != "" and String.starts_with?(expanded, root) do
+        rel = expanded |> Path.relative_to(root) |> String.replace("\\", "/")
+        "./" <> rel
+      else
+        command
+      end
+    rescue
+      ArgumentError -> command
+    end
+  end
+
+  defp workspace_relative_mcp_command(_project_root, command), do: command
+
+  defp maybe_workspace_relative_mcp_command!(server, project_root) do
+    case Map.fetch(server, "command") do
+      {:ok, cmd} ->
+        Map.put(server, "command", workspace_relative_mcp_command(project_root, cmd))
+
+      :error ->
+        server
+    end
+  end
+
+  defp write_cursor_plugin_bundle!(root, project_root, opts) do
+    Enum.each(
+      [
+        {Path.join(root, ".cursor/rules"), Path.join(root, ".cursor-plugin/rules")},
+        {Path.join(root, ".cursor/skills"), Path.join(root, ".cursor-plugin/skills")},
+        {Path.join(root, ".cursor/agents"), Path.join(root, ".cursor-plugin/agents")},
+        {Path.join(root, ".cursor/commands"), Path.join(root, ".cursor-plugin/commands")}
+      ],
+      fn {from, to} ->
+        if File.exists?(from) do
+          File.rm_rf!(to)
+          File.mkdir_p!(Path.dirname(to))
+          File.cp_r!(from, to)
+        end
+      end
+    )
+
+    plugin_hook_dir = Path.join(root, ".cursor-plugin/hooks")
+    File.mkdir_p!(plugin_hook_dir)
+
+    File.write!(
+      Path.join(plugin_hook_dir, "hooks.json"),
+      Jason.encode!(cursor_plugin_hooks_manifest(), pretty: true) <> "\n"
+    )
+
+    for {name, contents_fn} <- cursor_hook_scripts() do
+      path = Path.join(plugin_hook_dir, name)
+      File.write!(path, contents_fn.())
+      File.chmod!(path, 0o755)
+    end
+
+    File.write!(
+      Path.join(root, ".cursor-plugin/plugin.json"),
+      Jason.encode!(cursor_plugin_manifest(project_root, opts), pretty: true) <> "\n"
     )
   end
 
@@ -3490,6 +3591,65 @@ defmodule ControlKeel.Skills.Exporter do
         "stop" => [
           %{
             "command" => ".cursor/hooks/ck-stop.sh",
+            "timeout" => 10,
+            "loop_limit" => 1,
+            "failClosed" => false
+          }
+        ]
+      }
+    }
+  end
+
+  defp cursor_plugin_hooks_manifest do
+    %{
+      "version" => 1,
+      "hooks" => %{
+        "sessionStart" => [
+          %{
+            "command" => ".cursor-plugin/hooks/ck-session-start.sh",
+            "timeout" => 10,
+            "failClosed" => false
+          }
+        ],
+        "sessionEnd" => [
+          %{
+            "command" => ".cursor-plugin/hooks/ck-session-end.sh",
+            "timeout" => 10,
+            "failClosed" => false
+          }
+        ],
+        "beforeShellExecution" => [
+          %{
+            "command" => ".cursor-plugin/hooks/ck-validate-shell.sh",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "preToolUse" => [
+          %{
+            "command" => ".cursor-plugin/hooks/ck-validate-write.sh",
+            "matcher" => "Write|StrReplace|Delete",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "beforeMCPExecution" => [
+          %{
+            "command" => ".cursor-plugin/hooks/ck-mcp-gate.sh",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "subagentStart" => [
+          %{
+            "command" => ".cursor-plugin/hooks/ck-subagent-start.sh",
+            "timeout" => 15,
+            "failClosed" => false
+          }
+        ],
+        "stop" => [
+          %{
+            "command" => ".cursor-plugin/hooks/ck-stop.sh",
             "timeout" => 10,
             "loop_limit" => 1,
             "failClosed" => false

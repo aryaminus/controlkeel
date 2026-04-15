@@ -136,6 +136,32 @@ defmodule ControlKeel.SkillsTest do
     assert Enum.any?(analysis.skills, &(&1.name == "codex-native"))
   end
 
+  test "registry prefers priv builtin when project copies the same skill name", %{
+    tmp_dir: tmp_dir
+  } do
+    project_root = Path.join(tmp_dir, "project")
+    agents_dir = Path.join(project_root, ".agents/skills/controlkeel-governance")
+    File.mkdir_p!(agents_dir)
+
+    File.write!(
+      Path.join(agents_dir, "SKILL.md"),
+      """
+      ---
+      name: controlkeel-governance
+      description: project duplicate
+      ---
+      # Project duplicate body
+      """
+    )
+
+    analysis = Skills.analyze(project_root, trust_project_skills: true)
+    skill = Enum.find(analysis.skills, &(&1.name == "controlkeel-governance"))
+    assert skill
+    assert String.contains?(skill.path, "/priv/skills/")
+    refute String.contains?(skill.body, "Project duplicate body")
+    assert Enum.any?(analysis.diagnostics, &(&1.code == "shadowed_skill"))
+  end
+
   test "registry does not warn when codex and open-standard copies mirror each other", %{
     tmp_dir: tmp_dir
   } do
@@ -1048,6 +1074,7 @@ defmodule ControlKeel.SkillsTest do
 
     assert {:ok, cursor_install} = Skills.install("cursor-native", tmp_dir, scope: "project")
     assert cursor_install.destination == Path.join(tmp_dir, ".cursor")
+    assert cursor_install.plugin_destination == Path.join(tmp_dir, ".cursor-plugin")
     assert File.exists?(Path.join(tmp_dir, ".cursor/rules/controlkeel.mdc"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-review.md"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-submit-plan.md"))
@@ -1055,6 +1082,23 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/background-agents/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/mcp.json"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/hooks.json"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor/hooks/ck-session-start.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor-plugin/plugin.json"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor-plugin/hooks/hooks.json"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor-plugin/hooks/ck-mcp-gate.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".cursor-plugin/rules/controlkeel.mdc"))
+
+    assert File.exists?(
+             Path.join(tmp_dir, ".cursor-plugin/skills/controlkeel-governance/SKILL.md")
+           )
+
+    plugin = Jason.decode!(File.read!(Path.join(tmp_dir, ".cursor-plugin/plugin.json")))
+
+    assert get_in(plugin, ["mcpServers", "controlkeel", "env", "CK_PROJECT_ROOT"]) ==
+             "${workspaceFolder}"
+
+    assert get_in(plugin, ["hooks"]) == "./hooks/hooks.json"
 
     assert {:ok, windsurf_install} = Skills.install("windsurf-native", tmp_dir, scope: "project")
     assert windsurf_install.destination == Path.join(tmp_dir, ".windsurf")

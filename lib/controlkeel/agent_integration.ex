@@ -198,7 +198,7 @@ defmodule ControlKeel.AgentIntegration do
         attach_command: "controlkeel attach cursor",
         config_location: "Cursor global MCP config file.",
         companion_delivery:
-          "Installs `.agents/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, and `.cursor/mcp.json`; can also export a portable native Cursor bundle.",
+          "Installs `.agents/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, `.cursor/hooks`, `.cursor/mcp.json`, and a distributable `.cursor-plugin/` bundle (manifest, mirrored assets, plugin hooks); can also export a portable native Cursor bundle.",
         preferred_target: "cursor-native",
         default_scope: "project",
         router_agent_id: "cursor",
@@ -2107,7 +2107,16 @@ defmodule ControlKeel.AgentIntegration do
       ".cursor/rules/controlkeel.mdc",
       ".cursor/commands",
       ".cursor/background-agents",
+      ".cursor/hooks.json",
+      ".cursor/hooks",
       ".cursor/mcp.json",
+      ".cursor-plugin/plugin.json",
+      ".cursor-plugin/hooks/hooks.json",
+      ".cursor-plugin/hooks",
+      ".cursor-plugin/rules",
+      ".cursor-plugin/skills",
+      ".cursor-plugin/agents",
+      ".cursor-plugin/commands",
       "AGENTS.md"
     ]
 

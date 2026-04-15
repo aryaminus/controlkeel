@@ -1,13 +1,12 @@
 {
-  "name": "controlkeel",
-  "version": "0.2.3",
-  "description": "ControlKeel governance for Cursor — validation, findings, budgets, proofs, memory, agent routing, and human review via MCP.",
+  "agents": "./agents/",
   "author": {
     "name": "ControlKeel"
   },
-  "homepage": "https://controlkeel.com",
-  "repository": "https://github.com/controlkeel/controlkeel",
-  "license": "Apache-2.0",
+  "commands": "./commands/",
+  "description": "ControlKeel governance for Cursor — validation, findings, budgets, proofs, memory, agent routing, and human review via MCP.",
+  "homepage": "https://github.com/aryaminus/controlkeel",
+  "hooks": "./hooks/hooks.json",
   "keywords": [
     "governance",
     "security",
@@ -19,15 +18,20 @@
     "proof",
     "agent-routing"
   ],
-  "rules": "./rules/",
-  "skills": "./skills/",
-  "agents": "./agents/",
-  "commands": "./commands/",
-  "hooks": "./hooks/hooks.json",
+  "license": "Apache-2.0",
   "mcpServers": {
     "controlkeel": {
-      "command": "controlkeel",
-      "args": ["mcp"]
+      "args": [],
+      "command": "./controlkeel/bin/controlkeel-mcp",
+      "env": {
+        "CK_PROJECT_ROOT": "${workspaceFolder}",
+        "LOGGER_LEVEL": "warning"
+      }
     }
-  }
+  },
+  "name": "controlkeel",
+  "repository": "https://github.com/aryaminus/controlkeel.git",
+  "rules": "./rules/",
+  "skills": "./skills/",
+  "version": "0.2.5"
 }
