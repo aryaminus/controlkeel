@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.8 — 2026-04-15
+
+### What's changed
+
+- chore: align Cursor plugin manifest version with app (0.2.7)
+- Fix Cursor MCP stuck on Loading tools (quiet stdout for stdio MCP)
+
 ## v0.2.7 — 2026-04-15
 
 ### What's changed
