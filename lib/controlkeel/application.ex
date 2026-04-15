@@ -10,10 +10,26 @@ defmodule ControlKeel.Application do
 
     case Supervisor.start_link(base_children(), opts) do
       {:ok, supervisor} ->
-        with :ok <- maybe_run_migrations(),
-             :ok <- start_late_children(supervisor) do
-          {:ok, supervisor}
-        else
+        # Stdio MCP must answer initialize before long work. Release migrations can
+        # take many seconds; they use Ecto.Migrator.with_repo and do not require the
+        # MCP.Server child, so defer them until after late_children when CK_MCP_MODE.
+        result =
+          if mcp_stdio_mode?() do
+            with :ok <- start_late_children(supervisor),
+                 :ok <- maybe_run_migrations() do
+              :ok
+            end
+          else
+            with :ok <- maybe_run_migrations(),
+                 :ok <- start_late_children(supervisor) do
+              :ok
+            end
+          end
+
+        case result do
+          :ok ->
+            {:ok, supervisor}
+
           {:error, reason} ->
             Supervisor.stop(supervisor)
             {:error, reason}
