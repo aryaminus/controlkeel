@@ -11,6 +11,46 @@ APP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 # Cursor passes CK_PROJECT_ROOT in MCP env; cwd may not be the governed workspace.
 PROJECT_ROOT="${CK_PROJECT_ROOT:-$(/bin/pwd -P)}"
 
+exec_mix_ck_mcp_filtered() {
+  fifo=$(mktemp "${TMPDIR:-/tmp}/controlkeel-mcp.XXXXXX")
+  rm -f "$fifo"
+  mkfifo "$fifo"
+
+  cleanup() {
+    rm -f "$fifo"
+  }
+
+  trap cleanup EXIT HUP INT TERM
+
+  mix ck.mcp --project-root "$PROJECT_ROOT" "$@" >"$fifo" &
+  mix_pid=$!
+
+  awk '
+    {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+
+      if (line ~ /^[\{\[]/) {
+        print $0
+        fflush()
+      }
+    }
+  ' <"$fifo"
+  awk_status=$?
+
+  wait "$mix_pid"
+  mix_status=$?
+
+  cleanup
+  trap - EXIT HUP INT TERM
+
+  if [ "$mix_status" -ne 0 ]; then
+    exit "$mix_status"
+  fi
+
+  exit "$awk_status"
+}
+
 # Optional: force a specific `controlkeel` executable (must support `mcp`, e.g. Burrito
 # build or a wrapper). Do **not** point at `_build/.../rel/.../bin/controlkeel` from
 # `mix release` alone — that script only knows start/eval/remote/etc., not `mcp`.
@@ -24,7 +64,7 @@ fi
 # an older Homebrew build and does not match uncommitted work.
 if [ -f "$APP_ROOT/mix.exs" ] && [ -f "$APP_ROOT/lib/controlkeel/application.ex" ]; then
   cd "$APP_ROOT"
-  exec mix ck.mcp --project-root "$PROJECT_ROOT" "$@"
+  exec_mix_ck_mcp_filtered "$@"
 fi
 
 # Governed / other projects: optional global binary, then mix from this tree.
@@ -33,4 +73,4 @@ if command -v controlkeel >/dev/null 2>&1; then
 fi
 
 cd "$APP_ROOT"
-exec mix ck.mcp --project-root "$PROJECT_ROOT" "$@"
+exec_mix_ck_mcp_filtered "$@"
