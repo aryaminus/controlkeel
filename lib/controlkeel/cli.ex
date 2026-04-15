@@ -2905,7 +2905,11 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :mcp, options: options}, project_root) do
     root = Path.expand(options[:project_root] || project_root)
 
-    with {:ok, _binding, _session, _mode} <- ensure_local_project(root) do
+    # Skip AttachedAgentSync during MCP stdio startup: sync can run many
+    # Skills.install passes (one per outdated attached agent) and blocks the
+    # process before stdin is read, which makes Cursor time out on initialize.
+    with {:ok, _binding, _session, _mode} <-
+           ensure_local_project(root, %{}, sync_attached_agents: false) do
       File.cd!(root, fn ->
         {:ok, pid} =
           DynamicSupervisor.start_child(
