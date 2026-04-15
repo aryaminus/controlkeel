@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.2.12 — 2026-04-15
+
+### What's changed
+
+- fix(mcp): stderr logging in CK_MCP_MODE; align Cursor integration docs
+- fix(mcp): stdio newline-delimited JSON-RPC per MCP spec
+- fix(mcp): handle JSON-RPC 2.0 batches (Cursor handshake)
+- fix(mcp): avoid Registry scans on tools/list and resources/list in stdio
+- chore(mcp): stderr boot timing, app.start --no-compile, SQLite busy_timeout
+- fix(mcp): defer Repo/bus boot so Cursor can finish initialize
+- fix(mcp): source-tree launcher uses mix ck.mcp, not release bin
+- fix(mcp): dogfood source tree prefers local release/mix over PATH controlkeel
+- fix(mcp): prefer local mix release binary over mix ck.mcp when present
+- fix(mcp): use IO.binwrite for stdio and binary io opts in reader
+- fix(mcp): flush stdout after each framed JSON-RPC response
+- fix(mcp): skip Phoenix CodeReloader when CK_MCP_MODE for faster Mix boot
+- fix(mcp): defer release migrations until after MCP children start
+- fix(mcp): supervise stdio server before Repo under CK_MCP_MODE
+- fix(mcp): prefer repo bin launcher for Cursor in ControlKeel source tree
+- fix(mcp): keep stdio stdout JSON-only for Cursor handshake
+
 ## v0.2.11 — 2026-04-15
 
 ### What's changed
