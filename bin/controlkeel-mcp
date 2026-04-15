@@ -7,7 +7,8 @@ export MIX_QUIET="${MIX_QUIET:-1}"
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 APP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-PROJECT_ROOT=$(/bin/pwd -P)
+# Cursor passes CK_PROJECT_ROOT in MCP env; cwd may not be the governed workspace.
+PROJECT_ROOT="${CK_PROJECT_ROOT:-$(/bin/pwd -P)}"
 
 if [ -n "${CONTROLKEEL_BIN:-}" ]; then
   exec "$CONTROLKEEL_BIN" mcp --project-root "$PROJECT_ROOT" "$@"

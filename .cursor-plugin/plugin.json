@@ -22,10 +22,11 @@
   "mcpServers": {
     "controlkeel": {
       "args": [],
-      "command": "${workspaceFolder}/controlkeel/bin/controlkeel-mcp",
+      "command": "${workspaceFolder}/bin/controlkeel-mcp",
       "env": {
         "CK_PROJECT_ROOT": "${workspaceFolder}",
-        "LOGGER_LEVEL": "warning"
+        "LOGGER_LEVEL": "warning",
+        "MIX_QUIET": "1"
       }
     }
   },
@@ -33,5 +34,5 @@
   "repository": "https://github.com/aryaminus/controlkeel.git",
   "rules": "./rules/",
   "skills": "./skills/",
-  "version": "0.2.9"
+  "version": "0.2.11"
 }

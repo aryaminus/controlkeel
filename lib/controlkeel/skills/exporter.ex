@@ -2374,8 +2374,16 @@ defmodule ControlKeel.Skills.Exporter do
     if portable_project_root?(opts) do
       "controlkeel"
     else
-      wrapper = ProjectBinding.mcp_wrapper_path(project_root)
-      if File.exists?(wrapper), do: wrapper, else: "controlkeel"
+      root = Path.expand(project_root)
+
+      case source_repo_stdio_mcp_launcher(root) do
+        {:ok, path} ->
+          path
+
+        :error ->
+          wrapper = ProjectBinding.mcp_wrapper_path(root)
+          if File.exists?(wrapper), do: wrapper, else: "controlkeel"
+      end
     end
   end
 
@@ -2383,13 +2391,35 @@ defmodule ControlKeel.Skills.Exporter do
     if portable_project_root?(opts) do
       ["mcp", "--project-root", Distribution.portable_project_root()]
     else
-      wrapper = ProjectBinding.mcp_wrapper_path(project_root)
+      root = Path.expand(project_root)
 
-      if File.exists?(wrapper) do
-        []
-      else
-        ["mcp", "--project-root", Path.expand(project_root)]
+      case source_repo_stdio_mcp_launcher(root) do
+        {:ok, _} ->
+          []
+
+        :error ->
+          wrapper = ProjectBinding.mcp_wrapper_path(root)
+
+          if File.exists?(wrapper) do
+            []
+          else
+            ["mcp", "--project-root", root]
+          end
       end
+    end
+  end
+
+  # When opening the ControlKeel *repository* as the workspace, prefer the repo
+  # `bin/controlkeel-mcp` launcher (MIX_QUIET, no per-connect `mix compile`) over
+  # `controlkeel/bin/…` wrappers that may be older Python shims from prior installs.
+  defp source_repo_stdio_mcp_launcher(root) do
+    marker = Path.join(root, "lib/controlkeel/application.ex")
+    launcher = Path.join(root, "bin/controlkeel-mcp")
+
+    if File.exists?(marker) and File.exists?(launcher) do
+      {:ok, Path.expand(launcher)}
+    else
+      :error
     end
   end
 
@@ -3374,7 +3404,11 @@ defmodule ControlKeel.Skills.Exporter do
         "env",
         Map.merge(
           Map.get(base_server, "env", %{}),
-          %{"CK_PROJECT_ROOT" => "${workspaceFolder}", "LOGGER_LEVEL" => "warning"}
+          %{
+            "CK_PROJECT_ROOT" => "${workspaceFolder}",
+            "LOGGER_LEVEL" => "warning",
+            "MIX_QUIET" => "1"
+          }
         )
       )
       |> maybe_cursor_ide_mcp_command!(project_root, opts)
@@ -3474,18 +3508,25 @@ defmodule ControlKeel.Skills.Exporter do
       "controlkeel"
     else
       root = Path.expand(project_root)
-      wrapper = ProjectBinding.mcp_wrapper_path(root)
 
-      if File.exists?(wrapper) do
-        rel =
-          wrapper
-          |> Path.expand()
-          |> Path.relative_to(root)
-          |> String.replace("\\", "/")
+      case source_repo_stdio_mcp_launcher(root) do
+        {:ok, _} ->
+          "${workspaceFolder}/bin/controlkeel-mcp"
 
-        "${workspaceFolder}/" <> rel
-      else
-        "controlkeel"
+        :error ->
+          wrapper = ProjectBinding.mcp_wrapper_path(root)
+
+          if File.exists?(wrapper) do
+            rel =
+              wrapper
+              |> Path.expand()
+              |> Path.relative_to(root)
+              |> String.replace("\\", "/")
+
+            "${workspaceFolder}/" <> rel
+          else
+            "controlkeel"
+          end
       end
     end
   end

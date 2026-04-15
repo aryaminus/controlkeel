@@ -1207,4 +1207,22 @@ defmodule ControlKeel.SkillsTest do
     assert get_in(plugin, ["source", "source"]) == "local"
     assert get_in(plugin, ["source", "path"]) == "./plugins/controlkeel"
   end
+
+  test "cursor-native MCP uses bin/controlkeel-mcp when the tree looks like the source repo", %{
+    tmp_dir: tmp_dir
+  } do
+    File.mkdir_p!(Path.join(tmp_dir, "lib/controlkeel"))
+    File.write!(Path.join(tmp_dir, "lib/controlkeel/application.ex"), "# fixture\n")
+    File.mkdir_p!(Path.join(tmp_dir, "bin"))
+    File.write!(Path.join(tmp_dir, "bin/controlkeel-mcp"), "#!/bin/sh\necho ok\n")
+
+    assert {:ok, _} = Skills.install("cursor-native", tmp_dir, scope: "project")
+
+    mcp = Jason.decode!(File.read!(Path.join(tmp_dir, ".cursor/mcp.json")))
+
+    assert get_in(mcp, ["mcpServers", "controlkeel", "command"]) ==
+             "${workspaceFolder}/bin/controlkeel-mcp"
+
+    assert get_in(mcp, ["mcpServers", "controlkeel", "args"]) == []
+  end
 end
