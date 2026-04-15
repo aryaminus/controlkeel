@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.10 — 2026-04-15
+
+### What's changed
+
+- fix(install): scrub AGENTS.md before ControlKeel block; portable project hint
+
 ## v0.2.9 — 2026-04-15
 
 ### What's changed
