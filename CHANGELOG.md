@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.9 — 2026-04-15
+
+### What's changed
+
+- fix(mcp): Cursor stdio — workspaceFolder launcher path and CK_PROJECT_ROOT scan
+
 ## v0.2.8 — 2026-04-15
 
 ### What's changed
