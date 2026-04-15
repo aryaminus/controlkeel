@@ -34,9 +34,10 @@ defmodule ControlKeel.MCP.ServerTest do
     assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1_000
 
     {_input, rendered} = StringIO.contents(output)
-    assert rendered =~ "Content-Length:"
+    assert String.ends_with?(rendered, "\n")
+    refute rendered =~ "Content-Length:"
 
-    response = decode_framed_json(rendered)
+    response = decode_stdio_jsonl(rendered)
 
     assert get_in(response, ["result", "structuredContent", "decision"]) == "block"
 
@@ -46,9 +47,11 @@ defmodule ControlKeel.MCP.ServerTest do
            )
   end
 
-  defp decode_framed_json(frame) do
-    [headers, payload] = String.split(frame, "\r\n\r\n", parts: 2)
-    assert headers =~ "Content-Length:"
-    Jason.decode!(payload)
+  defp decode_stdio_jsonl(output) do
+    output
+    |> String.trim_trailing()
+    |> String.split("\n", trim: true)
+    |> List.last()
+    |> Jason.decode!()
   end
 end

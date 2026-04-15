@@ -75,8 +75,8 @@ defmodule ControlKeel.MCP.Server do
     parent = self()
 
     Task.start_link(fn ->
-      # Match binary framing for headers + body; avoids edge cases with the
-      # default I/O server encoding on piped stdio (Cursor / Node).
+      # MCP stdio: newline-delimited JSON-RPC (modelcontextprotocol.io). Also accept
+      # legacy Content-Length framing for older clients / tests.
       _ = :io.setopts(binary: true, encoding: :utf8)
       read_loop(parent, input)
     end)
@@ -115,19 +115,45 @@ defmodule ControlKeel.MCP.Server do
   end
 
   defp read_frame(input) do
-    with {:ok, headers} <- read_headers(input),
-         {:ok, length} <- content_length(headers),
-         payload when is_binary(payload) <- IO.binread(input, length) do
-      {:ok, payload}
-    else
-      :eof -> :eof
-      {:error, reason} -> {:error, reason}
+    case IO.read(input, :line) do
+      :eof ->
+        :eof
+
+      line when is_binary(line) ->
+        line = String.trim_trailing(line, "\r")
+
+        cond do
+          line == "" or line == "\n" ->
+            read_frame(input)
+
+          line |> String.trim() |> String.downcase() |> String.starts_with?("content-length:") ->
+            read_content_length_framed(input, [String.trim(line)])
+
+          true ->
+            trimmed = String.trim(line)
+            if trimmed == "", do: read_frame(input), else: {:ok, trimmed}
+        end
     end
   end
 
-  defp read_headers(input, acc \\ [])
+  defp read_content_length_framed(input, acc) do
+    case read_headers_until_blank(input, acc) do
+      {:ok, headers} ->
+        with {:ok, length} <- content_length(headers),
+             payload when is_binary(payload) <- IO.binread(input, length) do
+          {:ok, payload}
+        else
+          :eof -> :eof
+          {:error, reason} -> {:error, reason}
+          _ -> {:error, :short_body}
+        end
 
-  defp read_headers(input, acc) do
+      other ->
+        other
+    end
+  end
+
+  defp read_headers_until_blank(input, acc) do
     case IO.read(input, :line) do
       :eof ->
         if acc == [], do: :eof, else: {:error, :unexpected_eof}
@@ -136,7 +162,7 @@ defmodule ControlKeel.MCP.Server do
         {:ok, Enum.reverse(acc)}
 
       line when is_binary(line) ->
-        read_headers(input, [String.trim(line) | acc])
+        read_headers_until_blank(input, [String.trim(line) | acc])
     end
   end
 
@@ -158,8 +184,13 @@ defmodule ControlKeel.MCP.Server do
     end
   end
 
+  @doc """
+  Encodes one MCP stdio message: JSON bytes plus a trailing newline (MCP spec).
+  Tests and legacy tools may still send Content-Length-framed input; `read_frame/1`
+  accepts both.
+  """
   def encode_frame(payload) when is_binary(payload) do
-    "Content-Length: #{byte_size(payload)}\r\n\r\n#{payload}"
+    payload <> "\n"
   end
 
   # Use IO.binwrite/2 for :stdio so data goes through the same user I/O path as
