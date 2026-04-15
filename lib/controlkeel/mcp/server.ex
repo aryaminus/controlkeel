@@ -159,7 +159,18 @@ defmodule ControlKeel.MCP.Server do
     "Content-Length: #{byte_size(payload)}\r\n\r\n#{payload}"
   end
 
-  defp write_binary(:stdio, data), do: write_binary(:standard_io, data)
+  # Pipes (Cursor stdio MCP) are often fully buffered; without an explicit sync the
+  # host can sit until the buffer fills and hit its reload/abort timeout.
+  defp write_binary(:stdio, data) do
+    case :file.write(:standard_io, data) do
+      :ok ->
+        _ = :file.sync(:standard_io)
+        :ok
+
+      {:error, _} = error ->
+        error
+    end
+  end
 
   defp write_binary(device, data) do
     case :file.write(device, data) do
