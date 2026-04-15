@@ -30,12 +30,22 @@ if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) do
   config :controlkeel, ControlKeelWeb.Endpoint,
     watchers: [],
     server: false,
-    code_reloader: false
+    code_reloader: false,
+    # Avoid Phoenix dev loggers that attach to :logger and write free-form lines to stdout;
+    # MCP stdio requires stdout to be JSON-RPC only (newline-delimited).
+    live_reload: [
+      web_console_logger: false,
+      patterns: []
+    ]
 
   # Anything on stdout after Content-Length framing corrupts the stream; clients then
   # hang and abort (~10s). Repo SQL logs default to :debug in dev and were observed on stdout.
   config :controlkeel, ControlKeel.Repo, log: false
   config :controlkeel, ControlKeel.CloudRepo, log: false
+
+  # OTP :logger default handler uses type :standard_io (stdout). Cursor parses stdout as
+  # JSON-RPC only — log lines must go to stderr (logger_std_h type :standard_error).
+  config :logger, :default_handler, config: [type: :standard_error]
 
   # If the host did not set LOGGER_LEVEL (e.g. older .cursor/mcp.json), avoid :debug noise.
   if System.get_env("LOGGER_LEVEL") in [nil, ""] do

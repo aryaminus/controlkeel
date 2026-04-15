@@ -560,7 +560,7 @@ If the host is **not** installed, validate export/install artifacts and mark run
 | Host | Primary validation command | Must generate or install |
 | --- | --- | --- |
 | Cline | `controlkeel attach cline` | `.cline/skills`, `.clinerules`, `.cline/commands`, `.cline/hooks`, MCP config |
-| Cursor | `controlkeel attach cursor` | `.agents/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, `.cursor/mcp.json` |
+| Cursor | `controlkeel attach cursor` | `.agents/skills`, `.cursor/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/agents`, `.cursor/background-agents`, `.cursor/hooks.json`, `.cursor/hooks`, `.cursor/mcp.json`, `.cursor-plugin/` |
 | Windsurf | `controlkeel attach windsurf` | `.windsurf/rules`, `.windsurf/commands`, `.windsurf/workflows`, `.windsurf/hooks`, `.windsurf/hooks.json`, `.windsurf/mcp.json` |
 | Continue | `controlkeel attach continue` | `.continue/prompts`, `.continue/commands`, `.continue/mcpServers/controlkeel.yaml`, `.continue/mcp.json` |
 | Letta Code | `controlkeel attach letta-code` | `.agents/skills`, `.letta/settings.json`, `.letta/hooks`, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, `.mcp.json` |

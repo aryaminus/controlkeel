@@ -105,7 +105,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | `amp` | TypeScript plugin, native skill bundle, custom tool/command surface, and package scaffold |
 | `augment` | workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime metadata |
 | `gemini-cli` | extension manifest, review/submit-plan commands, and skill bundle |
-| `cursor` | rules, commands, background-agent guidance, and MCP config |
+| `cursor` | rules, Agent Skills (`.cursor/skills`), slash commands, governed agent prompts, background-agent guidance, repo `hooks.json` + hook scripts, MCP config, and `.cursor-plugin/` bundle |
 | `roo-code` | rules, commands, governed modes, and cloud-agent guidance |
 | `aider` | command-driven snippets, `.aider.conf.yml`, and `AIDER.md` |
 
@@ -145,7 +145,7 @@ Runtime transport truth for those first-class hosts:
 | `goose` | attach_client | `controlkeel attach goose` | `local_mcp`, `workflows`, `hooks`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `goose-native` |
 | `vscode` | attach_client | `controlkeel attach vscode` | `local_mcp`, `plugin`, `native_skills`, `workflows`, `hooks` | `handoff` | `handoff` | `ck_owned` / `native` | `github-repo` |
 | `copilot` | attach_client | `controlkeel attach copilot` | `local_mcp`, `plugin`, `native_skills`, `workflows`, `hooks` | `embedded` | `direct` | `agent_runtime` / `native` | `github-repo` |
-| `cursor` | attach_client | `controlkeel attach cursor` | `local_mcp`, `native_skills`, `rules`, `commands`, `workflows` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
+| `cursor` | attach_client | `controlkeel attach cursor` | `local_mcp`, `native_skills`, `rules`, `commands`, `workflows`, `hooks`, `plugin` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
 | `windsurf` | attach_client | `controlkeel attach windsurf` | `local_mcp`, `native_skills`, `rules`, `hooks`, `workflows`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `windsurf-native` |
 | `kiro` | attach_client | `controlkeel attach kiro` | `local_mcp`, `native_skills`, `hooks`, `rules`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `kiro-native` |
 | `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `plugin`, `native_skills`, `commands`, `tool_call` | `handoff` | `handoff` | `ck_owned` / `native` | `amp-native` |

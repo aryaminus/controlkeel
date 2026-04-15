@@ -198,7 +198,7 @@ defmodule ControlKeel.AgentIntegration do
         attach_command: "controlkeel attach cursor",
         config_location: "Cursor global MCP config file.",
         companion_delivery:
-          "Installs `.agents/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/background-agents`, `.cursor/hooks`, `.cursor/mcp.json`, and a distributable `.cursor-plugin/` bundle (manifest, mirrored assets, plugin hooks); can also export a portable native Cursor bundle.",
+          "Installs `.agents/skills`, `.cursor/skills`, `.cursor/rules`, `.cursor/commands`, `.cursor/agents`, `.cursor/background-agents`, `.cursor/hooks.json` + `.cursor/hooks/`, `.cursor/mcp.json`, and a distributable `.cursor-plugin/` bundle (manifest, mirrored rules/skills/agents/commands, plugin `hooks/hooks.json`); can also export a portable native Cursor bundle.",
         preferred_target: "cursor-native",
         default_scope: "project",
         router_agent_id: "cursor",
@@ -1680,7 +1680,7 @@ defmodule ControlKeel.AgentIntegration do
         ["local_mcp", "plugin", "native_skills", "workflows", "hooks", "commands"]
 
       id when id in ["cursor", "cursor-agent"] ->
-        ["local_mcp", "native_skills", "rules", "commands", "workflows"]
+        ["local_mcp", "native_skills", "rules", "commands", "workflows", "hooks", "plugin"]
 
       "windsurf" ->
         ["local_mcp", "native_skills", "rules", "commands", "workflows", "hooks"]
@@ -2104,8 +2104,10 @@ defmodule ControlKeel.AgentIntegration do
   defp default_artifact_surfaces(%{id: "cursor"}),
     do: [
       ".agents/skills",
+      ".cursor/skills",
       ".cursor/rules/controlkeel.mdc",
       ".cursor/commands",
+      ".cursor/agents",
       ".cursor/background-agents",
       ".cursor/hooks.json",
       ".cursor/hooks",

@@ -417,6 +417,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert cursor["execution_support"] == "handoff"
       assert cursor["ck_runs_agent_via"] == "handoff"
       assert "local_mcp" in cursor["agent_uses_ck_via"]
+      assert "hooks" in cursor["agent_uses_ck_via"]
+      assert "plugin" in cursor["agent_uses_ck_via"]
     end
 
     test "runs a task through the handoff executor", %{conn: conn} do

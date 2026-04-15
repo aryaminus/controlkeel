@@ -102,7 +102,9 @@ defmodule ControlKeel.MCP.ProtocolTest do
     System.put_env("CK_MCP_MODE", "1")
 
     on_exit(fn ->
-      if prev == nil, do: System.delete_env("CK_MCP_MODE"), else: System.put_env("CK_MCP_MODE", prev)
+      if prev == nil,
+        do: System.delete_env("CK_MCP_MODE"),
+        else: System.put_env("CK_MCP_MODE", prev)
     end)
 
     response =

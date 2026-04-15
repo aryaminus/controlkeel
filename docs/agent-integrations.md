@@ -82,7 +82,7 @@ Current examples:
 - Kilo Code: Agent Skills, slash-command workflows, MCP config, and `AGENTS.md`
 - Amp: TypeScript plugin scaffold, native skill bundle, commands, and MCP wiring
 - Gemini CLI: extension manifest, commands, skills, and `GEMINI.md`
-- Cursor: rules, commands, background-agent guidance, and MCP config
+- Cursor: rules, Agent Skills (`.cursor/skills`), commands, governed agent prompts (`.cursor/agents`), background-agent guidance, repo hooks (`hooks.json` + scripts), MCP config, and `.cursor-plugin/` bundle
 - Roo Code: rules, commands, governed modes, and cloud-agent guidance
 - Aider: command-driven review snippets and `.aider.conf.yml`
 

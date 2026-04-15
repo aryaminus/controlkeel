@@ -185,23 +185,32 @@ Why this matters:
 
 ### Cursor
 
-Official surfaces used:
+Official surfaces used (as documented by Cursor for IDE-native agent features):
 
-- repo rules
-- background-agent workflows
-- MCP config
-- CLI-aware command helpers
+- **Rules** — repo-scoped guidance (for example `.mdc` under `.cursor/rules`)
+- **Skills** — Agent Skills under `.cursor/skills`
+- **Commands** — slash/recipe-style command markdown under `.cursor/commands`
+- **Agents** — specialized agent prompt files under `.cursor/agents` (including background-style workflows)
+- **Hooks** — workspace `hooks.json` plus executable hook scripts (session, shell, tool, MCP, subagent gates)
+- **MCP** — project `mcp.json` wiring for stdio servers
+- **Plugins** — distributable plugin bundles (manifest + mirrored assets + plugin-local hooks)
 
 What CK now exports:
 
-- `.cursor/rules`
-- `.cursor/commands`
-- `.cursor/background-agents`
-- `.cursor/mcp.json`
+- `.cursor/rules/controlkeel.mdc`
+- `.cursor/skills/*` (mirrors governed CK skills for Cursor-native discovery)
+- `.cursor/commands/*` (review, submit-plan, annotate, last, and related flows)
+- `.cursor/agents/controlkeel-governor.md`
+- `.cursor/background-agents/controlkeel.md`
+- `.cursor/hooks.json` and `.cursor/hooks/*.sh` (governance gates; includes `subagentStart`)
+- `.cursor/mcp.json` (stdio MCP; portable `${workspaceFolder}` launcher where applicable)
+- `.agents/skills/*` (open-standard AgentSkills tree; many hosts and import flows read this)
+- `.cursor-plugin/` — installable plugin bundle: `plugin.json`, mirrored `rules/`, `skills/`, `agents/`, `commands/`, `hooks/hooks.json`, and `mcpServers`
+- `AGENTS.md` — portable instruction layer for hosts that read repo root guidance
 
 Why this matters:
 
-- Cursor support stays truthful. CK does not pretend Cursor has a first-party hook SDK, but it does use the strongest official repo and background-agent surfaces Cursor documents.
+- Cursor’s **Rules / Skills / Commands / Agents / Hooks / Plugins** settings map directly to the files above. CK keeps them consistent so operators can use **attach**, **skills.sh**, or **imported plugin** flows without hand-maintaining parallel copies.
 
 ### Roo Code
 

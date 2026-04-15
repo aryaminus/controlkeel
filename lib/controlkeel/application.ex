@@ -10,6 +10,7 @@ defmodule ControlKeel.Application do
     opts = [strategy: :one_for_one, name: @supervisor_name]
 
     if mcp_stdio_mode?() do
+      mcp_stdio_detach_extra_loggers()
       :persistent_term.put(@mcp_backend_ready_key, :booting)
 
       children =
@@ -157,6 +158,24 @@ defmodule ControlKeel.Application do
 
   defp mcp_stdio_mode? do
     System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES)
+  end
+
+  # Phoenix dev helpers sometimes register extra :logger handlers that print to stdout.
+  # MCP stdio requires stdout to be JSON-RPC only; keep :default (stderr via runtime.exs)
+  # and :ssl_handler, drop the rest if present.
+  defp mcp_stdio_detach_extra_loggers do
+    allowed = MapSet.new([:default, :ssl_handler])
+
+    for hid <- :logger.get_handler_ids(),
+        not MapSet.member?(allowed, hid) do
+      _ = :logger.remove_handler(hid)
+    end
+
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
   end
 
   defp start_late_children(supervisor) do

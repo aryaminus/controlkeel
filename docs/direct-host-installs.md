@@ -128,7 +128,7 @@ For those hosts, CK now installs stronger native assets than before:
 - Kilo Code: Agent Skills, slash-command workflows, MCP config, and `AGENTS.md`
 - Augment / Auggie CLI: workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime transport
 - Amp: plugin scaffold, native skill bundle, and commands
-- Cursor: commands, background-agent guidance, rules
+- Cursor: rules, `.cursor/skills`, commands, `.cursor/agents`, background-agent guidance, `hooks.json` + hook scripts, MCP config, and `.cursor-plugin/` export
 - Roo Code: commands, guidance, `.roomodes`
 - Aider: command-driven review snippets and config
 

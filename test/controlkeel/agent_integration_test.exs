@@ -174,6 +174,10 @@ defmodule ControlKeel.AgentIntegrationTest do
 
     assert cursor.submission_mode == "command"
     assert ".cursor/background-agents" in cursor.artifact_surfaces
+    assert ".cursor/skills" in cursor.artifact_surfaces
+    assert ".cursor/agents" in cursor.artifact_surfaces
+    assert "hooks" in cursor.agent_uses_ck_via
+    assert "plugin" in cursor.agent_uses_ck_via
 
     assert gemini.phase_model == "review_only"
     assert ".gemini/commands/controlkeel" in gemini.artifact_surfaces
