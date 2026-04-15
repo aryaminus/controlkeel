@@ -75,6 +75,9 @@ defmodule ControlKeel.MCP.Server do
     parent = self()
 
     Task.start_link(fn ->
+      # Match binary framing for headers + body; avoids edge cases with the
+      # default I/O server encoding on piped stdio (Cursor / Node).
+      _ = :io.setopts(binary: true, encoding: :utf8)
       read_loop(parent, input)
     end)
     |> case do
@@ -159,16 +162,13 @@ defmodule ControlKeel.MCP.Server do
     "Content-Length: #{byte_size(payload)}\r\n\r\n#{payload}"
   end
 
-  # Pipes (Cursor stdio MCP) are often fully buffered; without an explicit sync the
-  # host can sit until the buffer fills and hit its reload/abort timeout.
+  # Use IO.binwrite/2 for :stdio so data goes through the same user I/O path as
+  # IO.read/2 in the reader task. :file.write + :file.sync on :standard_io has
+  # caused long stalls on some piped MCP hosts (Cursor ~10s abort window).
   defp write_binary(:stdio, data) do
-    case :file.write(:standard_io, data) do
-      :ok ->
-        _ = :file.sync(:standard_io)
-        :ok
-
-      {:error, _} = error ->
-        error
+    case IO.binwrite(:stdio, data) do
+      :ok -> :ok
+      {:error, _} = error -> error
     end
   end
 
