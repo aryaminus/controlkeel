@@ -1522,7 +1522,7 @@ defmodule ControlKeel.CLI do
              "Active findings: #{active_findings}",
              "Active tasks: #{active_tasks}",
              "Autonomy: #{autonomy["label"]}",
-             "Outcome: #{outcome["label"]} · #{outcome["metric"]}",
+             "Outcome: #{outcome["label"]} | #{outcome["metric"]}",
              "Current task: #{(active_task && active_task.title) || "No active task"}",
              "Task augmentation: #{augmentation_status_line(augmentation)}",
              "Security cases: #{security_case_status_line(security_summary)}",
@@ -2893,7 +2893,7 @@ defmodule ControlKeel.CLI do
       {:ok, _binding, session, _mode} ->
         IO.puts("")
         IO.puts("ControlKeel Watch — session ##{session.id}: #{session.title}")
-        IO.puts("  Polling every #{interval}ms  ·  Ctrl+C to exit")
+        IO.puts("  Polling every #{interval}ms  |  Ctrl+C to exit")
         IO.puts(String.duplicate("─", 60))
         watch_loop(session.id, MapSet.new(), interval)
 
@@ -3500,7 +3500,7 @@ defmodule ControlKeel.CLI do
       IO.puts("")
 
       IO.puts(
-        "  Budget  #{bar}  #{format_money(spent)}/#{format_money(budget)} (#{pct}%)  · rolling 24h: #{format_money(rolling)}"
+        "  Budget  #{bar}  #{format_money(spent)}/#{format_money(budget)} (#{pct}%)  | rolling 24h: #{format_money(rolling)}"
       )
 
       IO.puts(String.duplicate("─", 60))
@@ -4141,7 +4141,7 @@ defmodule ControlKeel.CLI do
         list_hint("terms", search_terms)
       ]
       |> Enum.reject(&is_nil/1)
-      |> Enum.join(" · ")
+      |> Enum.join(" | ")
 
     if summary == "", do: "available", else: summary
   end
@@ -4154,7 +4154,7 @@ defmodule ControlKeel.CLI do
     unresolved = summary["unresolved"] || 0
     critical = summary["critical_unresolved"] || 0
 
-    "#{case_count} tracked · #{unresolved} unresolved · #{critical} critical unresolved"
+    "#{case_count} tracked | #{unresolved} unresolved | #{critical} critical unresolved"
   end
 
   defp security_case_status_line(_summary), do: "not recorded"
