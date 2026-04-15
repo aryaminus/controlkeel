@@ -80,12 +80,18 @@ defmodule ControlKeel.MCP.Protocol do
         %{"jsonrpc" => "2.0", "method" => "resources/read", "id" => id, "params" => params},
         _opts
       ) do
-    case params do
-      %{"uri" => uri} ->
-        resource_response(id, load_resource(uri, params))
+    case mcp_stdio_boot_gate(id) do
+      :ok ->
+        case params do
+          %{"uri" => uri} ->
+            resource_response(id, load_resource(uri, params))
 
-      _ ->
-        error_response(id, -32602, "resources/read requires a resource uri")
+          _ ->
+            error_response(id, -32602, "resources/read requires a resource uri")
+        end
+
+      {:error, response} ->
+        response
     end
   end
 
@@ -98,20 +104,26 @@ defmodule ControlKeel.MCP.Protocol do
         },
         opts
       ) do
-    case params do
-      %{"name" => name, "arguments" => arguments} ->
-        with :ok <- authorize_tool(name, arguments, opts) do
-          tool_response(id, dispatch_tool(name, arguments))
-        else
-          {:error, {:forbidden, reason}} ->
-            error_response(id, -32001, reason)
+    case mcp_stdio_boot_gate(id) do
+      :ok ->
+        case params do
+          %{"name" => name, "arguments" => arguments} ->
+            with :ok <- authorize_tool(name, arguments, opts) do
+              tool_response(id, dispatch_tool(name, arguments))
+            else
+              {:error, {:forbidden, reason}} ->
+                error_response(id, -32001, reason)
 
-          {:error, reason} ->
-            error_response(id, -32602, inspect(reason))
+              {:error, reason} ->
+                error_response(id, -32602, inspect(reason))
+            end
+
+          _other ->
+            error_response(id, -32602, "tools/call requires a tool name and arguments")
         end
 
-      _other ->
-        error_response(id, -32602, "tools/call requires a tool name and arguments")
+      {:error, response} ->
+        response
     end
   end
 
@@ -923,6 +935,32 @@ defmodule ControlKeel.MCP.Protocol do
   defp supported_mcp_protocol_versions, do: ~w(2024-11-05 2025-03-26 2025-06-18)
 
   defp default_mcp_protocol_version, do: "2024-11-05"
+
+  defp mcp_stdio_boot_gate(id) do
+    case ControlKeel.Application.mcp_backend_boot_status() do
+      :ready ->
+        :ok
+
+      :booting ->
+        {:error,
+         error_response(
+           id,
+           -32002,
+           "ControlKeel backend is still starting (Repo and services); retry shortly."
+         )}
+
+      {:failed, reason} ->
+        {:error,
+         error_response(
+           id,
+           -32003,
+           "ControlKeel failed to boot: #{inspect(reason)}"
+         )}
+
+      _ ->
+        :ok
+    end
+  end
 
   defp ok_response(id, result) do
     %{"jsonrpc" => "2.0", "id" => id, "result" => result}

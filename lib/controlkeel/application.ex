@@ -4,49 +4,63 @@ defmodule ControlKeel.Application do
   @moduledoc false
 
   @supervisor_name ControlKeel.Supervisor
+  @mcp_backend_ready_key :controlkeel_mcp_backend_ready
 
   def start_link do
     opts = [strategy: :one_for_one, name: @supervisor_name]
 
-    case Supervisor.start_link(base_children(), opts) do
-      {:ok, supervisor} ->
-        # Stdio MCP must answer initialize before long work. Release migrations can
-        # take many seconds; they use Ecto.Migrator.with_repo and do not require the
-        # MCP.Server child, so defer them until after late_children when CK_MCP_MODE.
-        result =
-          if mcp_stdio_mode?() do
-            with :ok <- start_late_children(supervisor),
-                 :ok <- maybe_run_migrations() do
-              :ok
-            end
-          else
+    if mcp_stdio_mode?() do
+      :persistent_term.put(@mcp_backend_ready_key, :booting)
+
+      children =
+        base_children() ++ [mcp_stdio_server_child(), mcp_stdio_deferred_boot_task_child()]
+
+      case Supervisor.start_link(children, opts) do
+        {:ok, supervisor} ->
+          {:ok, supervisor}
+
+        other ->
+          maybe_clear_mcp_backend_ready_term()
+          other
+      end
+    else
+      maybe_clear_mcp_backend_ready_term()
+
+      case Supervisor.start_link(base_children(), opts) do
+        {:ok, supervisor} ->
+          result =
             with :ok <- maybe_run_migrations(),
                  :ok <- start_late_children(supervisor) do
               :ok
             end
+
+          case result do
+            :ok ->
+              {:ok, supervisor}
+
+            {:error, reason} ->
+              Supervisor.stop(supervisor)
+              {:error, reason}
+
+            other ->
+              Supervisor.stop(supervisor)
+              {:error, other}
           end
 
-        case result do
-          :ok ->
-            {:ok, supervisor}
-
-          {:error, reason} ->
-            Supervisor.stop(supervisor)
-            {:error, reason}
-
-          other ->
-            Supervisor.stop(supervisor)
-            {:error, other}
-        end
-
-      other ->
-        other
+        other ->
+          other
+      end
     end
   end
 
   def config_change(changed, _new, removed) do
     ControlKeelWeb.Endpoint.config_change(changed, removed)
     :ok
+  end
+
+  @doc false
+  def mcp_backend_boot_status do
+    :persistent_term.get(@mcp_backend_ready_key, :ready)
   end
 
   defp base_children do
@@ -56,44 +70,89 @@ defmodule ControlKeel.Application do
   end
 
   defp late_children do
-    if mcp_stdio_mode?() do
-      # Start the stdio MCP reader before Repo/bus so the host can complete
-      # initialize while SQLite and other children boot (Cursor ~10s abort window).
+    [
+      ControlKeel.Repo
+    ] ++
+      cloud_repo_children() ++
       [
-        {ControlKeel.MCP.Server,
-         [
-           name: ControlKeel.MCP.Server.stdio_registered_name(),
-           input: :stdio,
-           output: :stdio
-         ]},
-        ControlKeel.Repo
+        ControlKeel.Runtime.bus_module()
       ] ++
-        cloud_repo_children() ++
-        [
-          ControlKeel.Runtime.bus_module()
-        ] ++
-        analytics_children() ++
-        [
-          {Phoenix.PubSub, name: ControlKeel.PubSub},
-          ControlKeel.Skills.Activation
-        ]
-    else
+      analytics_children() ++
       [
-        ControlKeel.Repo
+        {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: ControlKeel.PubSub},
+        ControlKeel.Skills.Activation,
+        {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor},
+        ControlKeelWeb.Endpoint
+      ]
+  end
+
+  defp mcp_stdio_server_child do
+    {ControlKeel.MCP.Server,
+     [
+       name: ControlKeel.MCP.Server.stdio_registered_name(),
+       input: :stdio,
+       output: :stdio
+     ]}
+  end
+
+  defp mcp_stdio_rest_children do
+    [
+      ControlKeel.Repo
+    ] ++
+      cloud_repo_children() ++
+      [
+        ControlKeel.Runtime.bus_module()
       ] ++
-        cloud_repo_children() ++
-        [
-          ControlKeel.Runtime.bus_module()
-        ] ++
-        analytics_children() ++
-        [
-          {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
-          {Phoenix.PubSub, name: ControlKeel.PubSub},
-          ControlKeel.Skills.Activation,
-          {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor},
-          ControlKeelWeb.Endpoint
-        ]
+      analytics_children() ++
+      [
+        {Phoenix.PubSub, name: ControlKeel.PubSub},
+        ControlKeel.Skills.Activation
+      ]
+  end
+
+  defp mcp_stdio_deferred_boot_task_child do
+    %{
+      id: :controlkeel_mcp_deferred_boot,
+      start: {Task, :start_link, [&mcp_stdio_deferred_boot!/0]},
+      restart: :temporary
+    }
+  end
+
+  defp mcp_stdio_deferred_boot! do
+    sup = GenServer.whereis(@supervisor_name)
+
+    result =
+      Enum.reduce_while(mcp_stdio_rest_children(), :ok, fn child, :ok ->
+        case Supervisor.start_child(sup, child) do
+          {:ok, _pid} -> {:cont, :ok}
+          {:ok, _pid, _info} -> {:cont, :ok}
+          :ignore -> {:cont, :ok}
+          {:error, {:already_started, _pid}} -> {:cont, :ok}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    result =
+      case result do
+        :ok -> maybe_run_migrations()
+        {:error, _} = err -> err
+      end
+
+    case result do
+      :ok ->
+        :persistent_term.put(@mcp_backend_ready_key, :ready)
+
+      {:error, reason} ->
+        :persistent_term.put(@mcp_backend_ready_key, {:failed, reason})
+        require Logger
+        Logger.error("[MCP] deferred backend boot failed: #{inspect(reason)}")
     end
+  end
+
+  defp maybe_clear_mcp_backend_ready_term do
+    _ = :persistent_term.erase(@mcp_backend_ready_key)
+    :ok
   end
 
   defp mcp_stdio_mode? do
