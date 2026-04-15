@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.13 — 2026-04-15
+
+### What's changed
+
+- fix(mcp): filter mix stdout in bin/controlkeel-mcp for stdio JSON
+
 ## v0.2.12 — 2026-04-15
 
 ### What's changed
