@@ -18,5 +18,13 @@ if command -v controlkeel >/dev/null 2>&1; then
   exec controlkeel mcp --project-root "$PROJECT_ROOT" "$@"
 fi
 
+# Local `mix release` output: skips Mix compile on every MCP spawn. Cursor often
+# times out reloads (~10–20s) while `mix` recompiles before app.start can answer.
+MIX_ENV="${MIX_ENV:-dev}"
+REL_BIN="$APP_ROOT/_build/${MIX_ENV}/rel/controlkeel/bin/controlkeel"
+if [ -x "$REL_BIN" ]; then
+  exec "$REL_BIN" mcp --project-root "$PROJECT_ROOT" "$@"
+fi
+
 cd "$APP_ROOT"
 exec mix ck.mcp --project-root "$PROJECT_ROOT" "$@"
