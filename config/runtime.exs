@@ -31,6 +31,16 @@ if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) do
     watchers: [],
     server: false,
     code_reloader: false
+
+  # Anything on stdout after Content-Length framing corrupts the stream; clients then
+  # hang and abort (~10s). Repo SQL logs default to :debug in dev and were observed on stdout.
+  config :controlkeel, ControlKeel.Repo, log: false
+  config :controlkeel, ControlKeel.CloudRepo, log: false
+
+  # If the host did not set LOGGER_LEVEL (e.g. older .cursor/mcp.json), avoid :debug noise.
+  if System.get_env("LOGGER_LEVEL") in [nil, ""] do
+    config :logger, level: :warning
+  end
 end
 
 config :controlkeel, ControlKeelWeb.Endpoint,

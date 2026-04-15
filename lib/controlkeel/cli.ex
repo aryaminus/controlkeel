@@ -1,6 +1,8 @@
 defmodule ControlKeel.CLI do
   @moduledoc false
 
+  require Logger
+
   alias ControlKeel.ACPRegistry
   alias ControlKeel.AgentExecution
   alias ControlKeel.AgentIntegration
@@ -2905,35 +2907,43 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :mcp, options: options}, project_root) do
     root = Path.expand(options[:project_root] || project_root)
 
-    # Skip AttachedAgentSync during MCP stdio startup: sync can run many
-    # Skills.install passes (one per outdated attached agent) and blocks the
-    # process before stdin is read, which makes Cursor time out on initialize.
-    with {:ok, _binding, _session, _mode} <-
-           ensure_local_project(root, %{}, sync_attached_agents: false) do
-      File.cd!(root, fn ->
-        {:ok, pid} =
-          DynamicSupervisor.start_child(
-            ControlKeel.MCP.Supervisor,
-            {ControlKeel.MCP.Server, input: :stdio, output: :stdio}
-          )
+    # Start the stdio MCP server immediately so the client can finish initialize
+    # before any project bootstrap work. ensure_local_project can be slow (DB,
+    # binding, skills) and previously blocked stdin reads, causing -32001 timeouts.
+    # Skip AttachedAgentSync during bootstrap (same rationale as before).
+    File.cd!(root, fn ->
+      {:ok, pid} =
+        DynamicSupervisor.start_child(
+          ControlKeel.MCP.Supervisor,
+          {ControlKeel.MCP.Server, input: :stdio, output: :stdio}
+        )
 
-        ref = Process.monitor(pid)
+      ref = Process.monitor(pid)
 
-        receive do
-          {:DOWN, ^ref, :process, _pid, :normal} ->
-            :ok
+      _ =
+        Task.start(fn ->
+          case ensure_local_project(root, %{}, sync_attached_agents: false) do
+            {:ok, _, _, _} ->
+              :ok
 
-          {:DOWN, ^ref, :process, _pid, :shutdown} ->
-            :ok
+            {:error, reason} ->
+              Logger.error(
+                "[MCP] bootstrap failed (some tools may fail until fixed): #{inspect(reason)}"
+              )
+          end
+        end)
 
-          {:DOWN, ^ref, :process, _pid, reason} ->
-            {:error, "MCP server stopped: #{inspect(reason)}"}
-        end
-      end)
-    else
-      {:error, reason} ->
-        {:error, "Failed to bootstrap local project for MCP: #{inspect(reason)}"}
-    end
+      receive do
+        {:DOWN, ^ref, :process, _pid, :normal} ->
+          :ok
+
+        {:DOWN, ^ref, :process, _pid, :shutdown} ->
+          :ok
+
+        {:DOWN, ^ref, :process, _pid, reason} ->
+          {:error, "MCP server stopped: #{inspect(reason)}"}
+      end
+    end)
   end
 
   def run_command(%{command: :deploy_analyze, options: options}, project_root) do

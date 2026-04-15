@@ -1082,6 +1082,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".cursor/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/background-agents/controlkeel.md"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/mcp.json"))
+
+    cursor_mcp = Jason.decode!(File.read!(Path.join(tmp_dir, ".cursor/mcp.json")))
+
+    assert get_in(cursor_mcp, ["mcpServers", "controlkeel", "env", "MIX_QUIET"]) == "1"
+
     assert File.exists?(Path.join(tmp_dir, ".cursor/hooks.json"))
     assert File.exists?(Path.join(tmp_dir, ".cursor/hooks/ck-session-start.sh"))
     assert File.exists?(Path.join(tmp_dir, ".cursor-plugin/plugin.json"))

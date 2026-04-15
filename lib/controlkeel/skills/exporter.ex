@@ -3448,7 +3448,11 @@ defmodule ControlKeel.Skills.Exporter do
 
     case get_in(base, ["mcpServers", "controlkeel"]) do
       server when is_map(server) ->
-        env = %{"CK_PROJECT_ROOT" => "${workspaceFolder}", "LOGGER_LEVEL" => "warning"}
+        env = %{
+          "CK_PROJECT_ROOT" => "${workspaceFolder}",
+          "LOGGER_LEVEL" => "warning",
+          "MIX_QUIET" => "1"
+        }
 
         server =
           server

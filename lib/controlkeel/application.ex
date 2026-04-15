@@ -48,13 +48,30 @@ defmodule ControlKeel.Application do
         ControlKeel.Runtime.bus_module()
       ] ++
       analytics_children() ++
+      mcp_tail_children()
+  end
+
+  # Stdio MCP only needs Repo, bus, PubSub, skills activation, and the MCP
+  # supervisor. Starting ControlKeelWeb.Endpoint pulls in HTTP listeners,
+  # endpoint init, and DNS cluster work that can exceed client handshake timeouts.
+  defp mcp_tail_children do
+    pubsub_skills_mcp = [
+      {Phoenix.PubSub, name: ControlKeel.PubSub},
+      ControlKeel.Skills.Activation,
+      {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor}
+    ]
+
+    if mcp_stdio_mode?() do
+      pubsub_skills_mcp
+    else
       [
-        {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
-        {Phoenix.PubSub, name: ControlKeel.PubSub},
-        ControlKeel.Skills.Activation,
-        {DynamicSupervisor, strategy: :one_for_one, name: ControlKeel.MCP.Supervisor},
-        ControlKeelWeb.Endpoint
-      ]
+        {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore}
+      ] ++ pubsub_skills_mcp ++ [ControlKeelWeb.Endpoint]
+    end
+  end
+
+  defp mcp_stdio_mode? do
+    System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES)
   end
 
   defp start_late_children(supervisor) do

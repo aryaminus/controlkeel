@@ -9,6 +9,8 @@ defmodule Mix.Tasks.Ck.Mcp do
   def run(args) do
     # Ensure dev endpoint asset watchers stay off (see config/runtime.exs CK_MCP_MODE).
     System.put_env("CK_MCP_MODE", "1")
+    # Keep Mix.info / compile notices off stdout; MCP owns that pipe for JSON-RPC frames.
+    Mix.shell(Mix.Shell.Quiet)
 
     Mix.Task.run("app.start")
 

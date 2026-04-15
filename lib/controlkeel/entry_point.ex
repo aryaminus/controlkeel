@@ -22,6 +22,8 @@ defmodule ControlKeel.EntryPoint do
   defp start_standalone do
     case CLI.parse(CLI.standalone_argv()) do
       {:ok, parsed} ->
+        maybe_prepare_stdio_mcp!(parsed)
+
         if CLI.app_required?(parsed) do
           maybe_enable_server(parsed)
 
@@ -43,6 +45,47 @@ defmodule ControlKeel.EntryPoint do
         {:ok, self()}
     end
   end
+
+  defp maybe_prepare_stdio_mcp!(%{command: :mcp}) do
+    # Release boot evaluates config/runtime.exs before this callback; ensure MCP
+    # mode is visible to Application and mirror runtime.exs endpoint safeguards.
+    System.put_env("CK_MCP_MODE", "1")
+
+    endpoint_config = Application.get_env(:controlkeel, ControlKeelWeb.Endpoint, [])
+
+    Application.put_env(
+      :controlkeel,
+      ControlKeelWeb.Endpoint,
+      endpoint_config
+      |> Keyword.put(:watchers, [])
+      |> Keyword.put(:server, false)
+      |> Keyword.put(:code_reloader, false)
+    )
+
+    # Repo SQL and Logger default to noisy stdout in dev; stdio MCP must keep
+    # stdout JSON-only (see config/runtime.exs CK_MCP_MODE).
+    repo_cfg = Application.get_env(:controlkeel, ControlKeel.Repo) || []
+
+    Application.put_env(
+      :controlkeel,
+      ControlKeel.Repo,
+      Keyword.put(repo_cfg, :log, false)
+    )
+
+    cloud_cfg = Application.get_env(:controlkeel, ControlKeel.CloudRepo) || []
+
+    Application.put_env(
+      :controlkeel,
+      ControlKeel.CloudRepo,
+      Keyword.put(cloud_cfg, :log, false)
+    )
+
+    if System.get_env("LOGGER_LEVEL") in [nil, ""] do
+      Application.put_env(:logger, :level, :warning)
+    end
+  end
+
+  defp maybe_prepare_stdio_mcp!(_parsed), do: :ok
 
   defp maybe_enable_server(parsed) do
     endpoint_config = Application.get_env(:controlkeel, ControlKeelWeb.Endpoint, [])
