@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.14 — 2026-04-15
+
+### What's changed
+
+- feat(cli): add context and validate commands
+
 ## v0.2.13 — 2026-04-15
 
 ### What's changed
