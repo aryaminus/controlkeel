@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.15 — 2026-04-15
+
+### What's changed
+
+- feat(update): add release-aware upgrade flow
+
 ## v0.2.14 — 2026-04-15
 
 ### What's changed
