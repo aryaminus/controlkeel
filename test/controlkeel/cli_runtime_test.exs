@@ -61,6 +61,8 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert help_output =~ "ControlKeel help"
     assert help_output =~ "controlkeel help why is my task blocked"
     assert version_output =~ "ControlKeel"
+    assert {:ok, %{command: :update}} = CLI.parse(["update"])
+    assert {:ok, %{command: :update}} = CLI.parse(["upgrade", "--sync-attached"])
   end
 
   test "guided help routes attach questions to the codex topic" do

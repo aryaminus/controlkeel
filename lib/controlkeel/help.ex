@@ -333,6 +333,7 @@ defmodule ControlKeel.Help do
       controlkeel registry status acp
                                       Show ACP registry cache freshness and matches
       controlkeel status              Show current session status
+      controlkeel update [options]    Check for a newer GitHub release and refresh attached surfaces
       controlkeel context [options]   Show governed session context via the CK context surface
       controlkeel validate [options]  Validate proposed content via the CK validation surface
       controlkeel findings [options]  List findings for the current session
@@ -421,6 +422,9 @@ defmodule ControlKeel.Help do
       controlkeel help [topic or question]
                                       Show guided help for a topic or question
       controlkeel version             Show the current version
+      controlkeel update --apply      Apply a safe self update when the install channel supports it
+      controlkeel update --sync-attached
+                                      Refresh attached plugins, hooks, skills, agents, and commands
     """
   end
 

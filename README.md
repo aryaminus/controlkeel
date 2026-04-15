@@ -119,6 +119,7 @@ controlkeel attach <agent>
 controlkeel status
 controlkeel findings
 controlkeel proofs
+controlkeel update
 controlkeel skills list
 controlkeel plugin install codex
 controlkeel run task <id>

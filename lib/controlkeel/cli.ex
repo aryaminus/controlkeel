@@ -38,6 +38,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.ProjectBinding
   alias ControlKeel.ProjectRoot
   alias ControlKeel.ReviewBridge
+  alias ControlKeel.Updater
   alias ControlKeel.ExecutionSandbox
   alias ControlKeel.Proxy
   alias ControlKeel.RuntimePaths
@@ -67,6 +68,13 @@ defmodule ControlKeel.CLI do
     scope: :string
   ]
   @status_switches [format: :string]
+  @update_switches [
+    apply: :boolean,
+    sync_attached: :boolean,
+    format: :string,
+    json: :boolean,
+    project_root: :string
+  ]
   @context_switches [
     session_id: :integer,
     task_id: :integer,
@@ -516,6 +524,12 @@ defmodule ControlKeel.CLI do
       ["version"] ->
         {:ok, %{command: :version, options: %{}, args: []}}
 
+      ["update" | rest] ->
+        parse_with_switches(:update, rest, @update_switches)
+
+      ["upgrade" | rest] ->
+        parse_with_switches(:update, rest, @update_switches)
+
       _ ->
         {:error, Help.unknown_command_text(argv)}
     end
@@ -561,6 +575,22 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :serve}, _project_root), do: :ok
   def run_command(%{command: :help, args: args}, _project_root), do: {:ok, [Help.render(args)]}
   def run_command(%{command: :version}, _project_root), do: {:ok, ["ControlKeel #{version()}"]}
+
+  def run_command(%{command: :update, options: options}, project_root) do
+    project_root = options[:project_root] || project_root
+
+    {:ok, payload} =
+      Updater.apply(project_root,
+        apply: options[:apply] == true,
+        sync_attached: options[:sync_attached] == true
+      )
+
+    case effective_cli_format(options) do
+      {:ok, "json"} -> {:ok, [Jason.encode!(payload)]}
+      {:ok, _} -> {:ok, Updater.render(payload)}
+      {:error, reason} -> {:error, format_cli_error(reason)}
+    end
+  end
 
   def run_command(%{command: :init, options: options}, project_root) do
     project_root = resolve_project_root(options, project_root)

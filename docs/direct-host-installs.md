@@ -161,6 +161,10 @@ For `skills.sh`, there is no separate marketplace submission step documented tod
 
 ControlKeel does not silently rewrite repo files or host plugin directories when a new release ships.
 
+- `controlkeel update` checks the latest GitHub release, reports the current install channel, and prints the safest next upgrade command.
+- `controlkeel update --apply` can perform the upgrade directly when the install channel is safely automatable from CK.
+- `controlkeel update --sync-attached` refreshes attached repo-local or user-scope bundles, which covers MCP wrappers, native skills, hooks, commands, agents, and plugin-style install surfaces that CK manages through `attach`.
+
 - Upgrading the main `controlkeel` binary through Homebrew, npm bootstrap, or the release installers updates the CLI itself.
 - MCP registrations that call `controlkeel` directly, or call the generated `controlkeel-mcp` wrapper, start using the new binary automatically on the next host invocation.
 - CK now auto-syncs stale attached bundles on the next governed CLI load when the attachment has a real install target and scope. In practice, repo-local and user-scope `controlkeel attach <host>` installs can self-heal to the current CK version.
