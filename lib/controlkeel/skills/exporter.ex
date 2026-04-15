@@ -2451,6 +2451,10 @@ defmodule ControlKeel.Skills.Exporter do
     - `controlkeel mcp --project-root #{project_root_line}`
     - Hosted MCP alternative: use the generated `.mcp.hosted.json` template with a workspace service account (`POST /oauth/token` + `POST /mcp`)
 
+    ### Developing the ControlKeel repository (local / no GitHub release)
+
+    When your workspace is this `controlkeel` source tree, `bin/controlkeel-mcp` uses **your checkout only**: it runs `_build/$MIX_ENV/rel/controlkeel/bin/controlkeel` after `mix release`, otherwise `mix ck.mcp`. It intentionally does **not** prefer a global `controlkeel` on `PATH` before those, so you are not debugging a stale Homebrew build while iterating locally. To force a specific binary instead, set `CONTROLKEEL_BIN` in the MCP server env.
+
     ControlKeel can auto-bootstrap the governed project binding on first use. If you already ran `controlkeel init` or `controlkeel bootstrap` inside the target repository, the generated project wrapper under `controlkeel/bin/` can be used instead of the plain `controlkeel` binary.
 
     ## Provider access

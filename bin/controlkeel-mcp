@@ -10,20 +10,28 @@ APP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 # Cursor passes CK_PROJECT_ROOT in MCP env; cwd may not be the governed workspace.
 PROJECT_ROOT="${CK_PROJECT_ROOT:-$(/bin/pwd -P)}"
 
+MIX_ENV="${MIX_ENV:-dev}"
+REL_BIN="$APP_ROOT/_build/${MIX_ENV}/rel/controlkeel/bin/controlkeel"
+
 if [ -n "${CONTROLKEEL_BIN:-}" ]; then
   exec "$CONTROLKEEL_BIN" mcp --project-root "$PROJECT_ROOT" "$@"
 fi
 
-if command -v controlkeel >/dev/null 2>&1; then
-  exec controlkeel mcp --project-root "$PROJECT_ROOT" "$@"
+# ControlKeel *source* tree (this Git repo): debug the checkout you have open.
+# Prefer a local `mix release` binary, then `mix ck.mcp`. Do not use a global
+# `controlkeel` on PATH here — that is often an older install from Homebrew and
+# does not match uncommitted work (no GitHub release required for dogfood).
+if [ -f "$APP_ROOT/mix.exs" ] && [ -f "$APP_ROOT/lib/controlkeel/application.ex" ]; then
+  if [ -x "$REL_BIN" ]; then
+    exec "$REL_BIN" mcp --project-root "$PROJECT_ROOT" "$@"
+  fi
+  cd "$APP_ROOT"
+  exec mix ck.mcp --project-root "$PROJECT_ROOT" "$@"
 fi
 
-# Local `mix release` output: skips Mix compile on every MCP spawn. Cursor often
-# times out reloads (~10–20s) while `mix` recompiles before app.start can answer.
-MIX_ENV="${MIX_ENV:-dev}"
-REL_BIN="$APP_ROOT/_build/${MIX_ENV}/rel/controlkeel/bin/controlkeel"
-if [ -x "$REL_BIN" ]; then
-  exec "$REL_BIN" mcp --project-root "$PROJECT_ROOT" "$@"
+# Governed / other projects: optional global binary, then mix from this tree.
+if command -v controlkeel >/dev/null 2>&1; then
+  exec controlkeel mcp --project-root "$PROJECT_ROOT" "$@"
 fi
 
 cd "$APP_ROOT"
