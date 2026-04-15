@@ -51,9 +51,12 @@ defmodule ControlKeel.MCP.Protocol do
 
   def handle_request(request, opts \\ [])
 
-  def handle_request(%{"jsonrpc" => "2.0", "method" => "initialize", "id" => id}, _opts) do
+  def handle_request(%{"jsonrpc" => "2.0", "method" => "initialize", "id" => id} = req, _opts) do
+    requested = get_in(req, ["params", "protocolVersion"])
+    negotiated = negotiate_mcp_protocol_version(requested)
+
     ok_response(id, %{
-      "protocolVersion" => "2025-03-26",
+      "protocolVersion" => negotiated,
       "capabilities" => %{
         "tools" => %{"listChanged" => false},
         "resources" => %{"subscribe" => false, "listChanged" => false}
@@ -903,6 +906,16 @@ defmodule ControlKeel.MCP.Protocol do
     do: error_response(id, -32602, reason)
 
   defp resource_response(id, {:error, reason}), do: error_response(id, -32000, inspect(reason))
+
+  defp negotiate_mcp_protocol_version(v) when is_binary(v) and v != "" do
+    if v in supported_mcp_protocol_versions(), do: v, else: default_mcp_protocol_version()
+  end
+
+  defp negotiate_mcp_protocol_version(_), do: default_mcp_protocol_version()
+
+  defp supported_mcp_protocol_versions, do: ~w(2024-11-05 2025-03-26 2025-06-18)
+
+  defp default_mcp_protocol_version, do: "2024-11-05"
 
   defp ok_response(id, result) do
     %{"jsonrpc" => "2.0", "id" => id, "result" => result}

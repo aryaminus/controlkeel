@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
+export CK_MCP_MODE="${CK_MCP_MODE:-1}"
+
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 APP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 PROJECT_ROOT=$(/bin/pwd -P)

@@ -7,6 +7,9 @@ defmodule Mix.Tasks.Ck.Mcp do
 
   @impl true
   def run(args) do
+    # Ensure dev endpoint asset watchers stay off (see config/runtime.exs CK_MCP_MODE).
+    System.put_env("CK_MCP_MODE", "1")
+
     Mix.Task.run("app.start")
 
     parsed = parse!(["mcp" | args])

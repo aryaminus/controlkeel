@@ -24,6 +24,15 @@ if level = System.get_env("LOGGER_LEVEL") do
   config :logger, level: String.to_existing_atom(level)
 end
 
+# Stdio MCP must own stdout exclusively. Dev normally starts esbuild/tailwind watchers
+# that print build output to stdout and break JSON-RPC framing for Cursor and other hosts.
+if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) do
+  config :controlkeel, ControlKeelWeb.Endpoint,
+    watchers: [],
+    server: false,
+    code_reloader: false
+end
+
 config :controlkeel, ControlKeelWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
