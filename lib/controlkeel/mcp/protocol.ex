@@ -850,11 +850,18 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   defp current_skill_names do
-    Registry.names(File.cwd!(), trust_project_skills: true)
+    Registry.names(stdio_project_root(), trust_project_skills: true)
   end
 
   defp current_skills do
-    Registry.catalog(File.cwd!(), trust_project_skills: true)
+    Registry.catalog(stdio_project_root(), trust_project_skills: true)
+  end
+
+  defp stdio_project_root do
+    case System.get_env("CK_PROJECT_ROOT") do
+      v when is_binary(v) and v != "" -> Path.expand(v)
+      _ -> File.cwd!()
+    end
   end
 
   defp resource_schemas(_opts) do

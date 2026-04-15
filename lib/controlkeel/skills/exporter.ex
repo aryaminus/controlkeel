@@ -3377,7 +3377,7 @@ defmodule ControlKeel.Skills.Exporter do
           %{"CK_PROJECT_ROOT" => "${workspaceFolder}", "LOGGER_LEVEL" => "warning"}
         )
       )
-      |> maybe_workspace_relative_mcp_command!(project_root)
+      |> maybe_cursor_ide_mcp_command!(project_root, opts)
 
     slug = Distribution.github_repo_slug()
 
@@ -3453,7 +3453,7 @@ defmodule ControlKeel.Skills.Exporter do
         server =
           server
           |> Map.put("env", env)
-          |> Map.update!("command", &workspace_relative_mcp_command(project_root, &1))
+          |> Map.put("command", cursor_ide_mcp_command(project_root, opts))
 
         put_in(base, ["mcpServers", "controlkeel"], server)
 
@@ -3462,29 +3462,34 @@ defmodule ControlKeel.Skills.Exporter do
     end
   end
 
-  defp workspace_relative_mcp_command(project_root, command) when is_binary(command) do
-    root = Path.expand(project_root)
+  # Cursor does not guarantee cwd == workspace for stdio MCP. Prefer
+  # `${workspaceFolder}/…` (expanded by the host) over `./…` so the launcher path
+  # resolves even when the process starts outside the repo.
+  defp cursor_ide_mcp_command(project_root, opts) do
+    if portable_project_root?(opts) do
+      "controlkeel"
+    else
+      root = Path.expand(project_root)
+      wrapper = ProjectBinding.mcp_wrapper_path(root)
 
-    try do
-      expanded = Path.expand(command, root)
+      if File.exists?(wrapper) do
+        rel =
+          wrapper
+          |> Path.expand()
+          |> Path.relative_to(root)
+          |> String.replace("\\", "/")
 
-      if command != "" and String.starts_with?(expanded, root) do
-        rel = expanded |> Path.relative_to(root) |> String.replace("\\", "/")
-        "./" <> rel
+        "${workspaceFolder}/" <> rel
       else
-        command
+        "controlkeel"
       end
-    rescue
-      ArgumentError -> command
     end
   end
 
-  defp workspace_relative_mcp_command(_project_root, command), do: command
-
-  defp maybe_workspace_relative_mcp_command!(server, project_root) do
+  defp maybe_cursor_ide_mcp_command!(server, project_root, opts) do
     case Map.fetch(server, "command") do
-      {:ok, cmd} ->
-        Map.put(server, "command", workspace_relative_mcp_command(project_root, cmd))
+      {:ok, _} ->
+        Map.put(server, "command", cursor_ide_mcp_command(project_root, opts))
 
       :error ->
         server
