@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.6 — 2026-04-15
+
+### What's changed
+
+- Fix Cursor bundle: priv skill precedence, portable MCP paths
+- feat: enhance task verification and assurance features
+- feat: add retrieval strategy configuration and support for multiple strategies in ControlKeel
+- chore: update .gitignore, enhance AGENTS.md, and improve logger configuration in runtime.exs
+
 ## v0.2.5 — 2026-04-13
 
 ### What's changed
