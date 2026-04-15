@@ -2453,7 +2453,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     ### Developing the ControlKeel repository (local / no GitHub release)
 
-    When your workspace is this `controlkeel` source tree, `bin/controlkeel-mcp` uses **your checkout only**: it runs `_build/$MIX_ENV/rel/controlkeel/bin/controlkeel` after `mix release`, otherwise `mix ck.mcp`. It intentionally does **not** prefer a global `controlkeel` on `PATH` before those, so you are not debugging a stale Homebrew build while iterating locally. To force a specific binary instead, set `CONTROLKEEL_BIN` in the MCP server env.
+    When your workspace is this `controlkeel` source tree, `bin/controlkeel-mcp` uses **your checkout only** via `mix ck.mcp` (a plain `mix release` `bin/controlkeel` does not expose an `mcp` subcommand). It intentionally does **not** prefer a global `controlkeel` on `PATH`, so you are not debugging a stale Homebrew build while iterating locally. To force a different executable that implements `controlkeel mcp` (e.g. a Burrito build), set `CONTROLKEEL_BIN` in the MCP server env—do not set it to `_build/.../rel/.../bin/controlkeel` from assemble-only releases.
 
     ControlKeel can auto-bootstrap the governed project binding on first use. If you already ran `controlkeel init` or `controlkeel bootstrap` inside the target repository, the generated project wrapper under `controlkeel/bin/` can be used instead of the plain `controlkeel` binary.
 

@@ -54,13 +54,13 @@ config :controlkeel, ControlKeelWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
-      # Static assets, except user uploads
-      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
+      # Static assets, except user uploads (/E: serializable for mix release)
+      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
       # Gettext translations
-      ~r"priv/gettext/.*\.po$",
+      ~r"priv/gettext/.*\.po$"E,
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/controlkeel_web/router\.ex$",
-      ~r"lib/controlkeel_web/(controllers|live|components)/.*\.(ex|heex)$"
+      ~r"lib/controlkeel_web/router\.ex$"E,
+      ~r"lib/controlkeel_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
   ]
 

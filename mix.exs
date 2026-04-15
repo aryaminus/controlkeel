@@ -88,10 +88,19 @@ defmodule ControlKeel.MixProject do
     ]
   end
 
+  defp release_steps do
+    # Burrito needs zig + xz; CI sets CK_RELEASE_BURRITO=1. Local/Docker: assemble-only.
+    if System.get_env("CK_RELEASE_BURRITO") in ["1", "true"] do
+      [:assemble, &Burrito.wrap/1]
+    else
+      [:assemble]
+    end
+  end
+
   defp releases do
     [
       controlkeel: [
-        steps: [:assemble, &Burrito.wrap/1],
+        steps: release_steps(),
         burrito: [
           targets: [
             macos: [os: :darwin, cpu: :x86_64],
@@ -113,6 +122,10 @@ defmodule ControlKeel.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
+      # Non-interactive rebuild when rel/ already exists (plain `mix release` prompts).
+      # Must be one string: a list of strings runs each entry as a separate task, so
+      # ["release", "--overwrite"] would run `mix release` without the flag first.
+      "release.overwrite": "release --overwrite",
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],

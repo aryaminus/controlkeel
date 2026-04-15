@@ -17,6 +17,7 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   MIX_ENV: prod
+  CK_RELEASE_BURRITO: "1"
 
 jobs:
   build-unix-and-windows:
