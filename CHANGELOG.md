@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.7 — 2026-04-15
+
+### What's changed
+
+- cli: use pipe separator in status and watch output
+
 ## v0.2.6 — 2026-04-15
 
 ### What's changed
