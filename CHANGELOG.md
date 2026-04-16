@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.20 — 2026-04-16
+
+### What's changed
+
+- fix(mcp): bootstrap installs stdio launcher for CK source; track priv template
+- fix(opencode): make local MCP launcher respond under persistent stdio
+
 ## v0.2.19 — 2026-04-16
 
 ### What's changed
