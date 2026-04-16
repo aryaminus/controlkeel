@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.21 — 2026-04-16
+
+### What's changed
+
+- fix(opencode): harden submit-plan JSON handling in release flows
+- docs(opencode): document MCP enabled verification and local attach fallback
+- fix(opencode): write enabled MCP entries for local server
+
 ## v0.2.20 — 2026-04-16
 
 ### What's changed
