@@ -11,12 +11,15 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
          {:ok, _session} <- fetch_session(session_id),
          {:ok, _task_id} <- validate_task(task_id, session_id),
          {:ok, attrs} <- normalize(arguments, session_id, task_id),
+         {:ok, resolved_ids} <- resolve_matching_findings(attrs),
          {:ok, finding} <- Mission.create_finding(attrs) do
       {:ok,
        %{
          "finding_id" => finding.id,
          "status" => finding.status,
          "requires_human" => finding.status in ["blocked", "escalated"],
+         "resolved_finding_ids" => resolved_ids,
+         "resolved_findings_count" => length(resolved_ids),
          "summary" =>
            "Recorded #{finding.severity} #{finding.category} finding for #{finding.title}."
        }}
@@ -57,6 +60,30 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
        }}
     end
   end
+
+  defp resolve_matching_findings(%{session_id: session_id, status: "approved"} = attrs) do
+    query =
+      Mission.list_findings()
+      |> Enum.filter(fn finding ->
+        finding.session_id == session_id and
+          finding.rule_id == attrs.rule_id and
+          finding.category == attrs.category and
+          finding.status in ["open", "blocked", "escalated"]
+      end)
+
+    resolved_ids =
+      Enum.reduce(query, [], fn finding, acc ->
+        case Mission.approve_finding(finding) do
+          {:ok, updated} -> [updated.id | acc]
+          _ -> acc
+        end
+      end)
+      |> Enum.reverse()
+
+    {:ok, resolved_ids}
+  end
+
+  defp resolve_matching_findings(_attrs), do: {:ok, []}
 
   defp fetch_session(session_id) do
     case Mission.get_session(session_id) do

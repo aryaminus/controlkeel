@@ -1079,6 +1079,72 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert Mission.get_finding!(finding_id).status == "escalated"
   end
 
+  test "tools/call ck_finding with allow auto-resolves matching unresolved findings" do
+    session = session_fixture()
+
+    blocked_one =
+      finding_fixture(%{
+        session: session,
+        category: "security",
+        severity: "critical",
+        rule_id: "security.workflow.live_target_ambiguity",
+        status: "blocked"
+      })
+
+    blocked_two =
+      finding_fixture(%{
+        session: session,
+        category: "security",
+        severity: "critical",
+        rule_id: "security.workflow.live_target_ambiguity",
+        status: "blocked"
+      })
+
+    _different_rule =
+      finding_fixture(%{
+        session: session,
+        category: "security",
+        severity: "critical",
+        rule_id: "security.workflow.access_mode_reproduction",
+        status: "blocked"
+      })
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 205,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_finding",
+          "arguments" => %{
+            "session_id" => session.id,
+            "category" => "security",
+            "severity" => "critical",
+            "rule_id" => "security.workflow.live_target_ambiguity",
+            "plain_message" => "No live-target repro was executed in this task.",
+            "decision" => "allow"
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "finding_id" => finding_id,
+                 "status" => "approved",
+                 "requires_human" => false,
+                 "resolved_findings_count" => 2,
+                 "resolved_finding_ids" => resolved_ids
+               }
+             }
+           } = response
+
+    assert Enum.sort(resolved_ids) == Enum.sort([blocked_one.id, blocked_two.id])
+    assert Mission.get_finding!(blocked_one.id).status == "approved"
+    assert Mission.get_finding!(blocked_two.id).status == "approved"
+    assert Mission.get_finding!(finding_id).status == "approved"
+  end
+
   test "tools/call ck_regression_result records external regression evidence" do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "done"})
