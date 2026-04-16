@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "./scripts/hooks/ck_copilot_hook.sh"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "./scripts/hooks/ck_copilot_hook.sh"
+      }
+    ],
+    "SubagentStart": [
+      {
+        "type": "command",
+        "command": "./scripts/hooks/ck_copilot_hook.sh"
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "command",
+        "command": "./scripts/hooks/ck_copilot_hook.sh"
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "./scripts/hooks/ck_copilot_hook.sh"
+      }
+    ]
+  }
+}

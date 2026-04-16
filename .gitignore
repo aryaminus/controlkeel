@@ -21,6 +21,7 @@ erl_crash.dump
 
 # Temporary files, for example, from tests.
 /tmp/
+/.tmp/
 
 # Ignore package tarball (built via "mix hex.build").
 controlkeel-*.tar
@@ -39,7 +40,10 @@ npm-debug.log
 *.db
 *.db-*
 
-/controlkeel
+/controlkeel/*
+!/controlkeel/bin/
+/controlkeel/bin/*
+!/controlkeel/bin/controlkeel-mcp
 
 # Local Cursor / agent session exports (large; not part of the app)
 session-ses_*.md
@@ -53,7 +57,8 @@ session-ses_*.md
 /.openclaw/
 /.forge/
 /.cursor/
-/.cursor-plugin/
+/.cursor-plugin/*
+!/.cursor-plugin/plugin.json
 /.windsurf/
 /.continue/
 /.cline/
