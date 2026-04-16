@@ -575,6 +575,7 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert {:ok, opencode_config} = Jason.decode(File.read!(opencode_canonical_config_path()))
 
     assert get_in(opencode_config, ["mcp", "controlkeel", "type"]) == "local"
+    assert get_in(opencode_config, ["mcp", "controlkeel", "enabled"]) == true
 
     opencode_cmd = get_in(opencode_config, ["mcp", "controlkeel", "command"])
     assert is_list(opencode_cmd)
@@ -586,6 +587,7 @@ defmodule ControlKeel.CLIRuntimeTest do
     # Keep legacy config in sync when it already exists.
     assert {:ok, opencode_legacy_config} = Jason.decode(File.read!(opencode_legacy_config_path()))
     assert get_in(opencode_legacy_config, ["mcp", "controlkeel", "type"]) == "local"
+    assert get_in(opencode_legacy_config, ["mcp", "controlkeel", "enabled"]) == true
   end
 
   test "codex attach supports mcp-only mode without native bundle install", %{tmp_dir: tmp_dir} do

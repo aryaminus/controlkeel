@@ -4975,15 +4975,9 @@ defmodule ControlKeel.CLI do
 
         entry = %{
           "type" => "local",
-          "command" => [command | args]
+          "command" => [command | args],
+          "enabled" => true
         }
-
-        entry =
-          if ide_key == "kilo" do
-            Map.put(entry, "enabled", true)
-          else
-            entry
-          end
 
         Map.put(
           existing,
