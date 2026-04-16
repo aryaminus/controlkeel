@@ -9,10 +9,8 @@ defmodule ControlKeel.ClaudeCLI do
     }
 
     with :ok <- ensure_available(),
-         {:ok, _output} <-
-           run(["mcp", "add-json", server_name, Jason.encode!(config), "--scope", "local"],
-             cd: project_root
-           ),
+         :ok <-
+           ensure_server_registered(project_root, server_name, config),
          {:ok, output} <- run(["mcp", "get", server_name], cd: project_root),
          :ok <- verify_get_output(output, server_name, command) do
       {:ok,
@@ -25,6 +23,30 @@ defmodule ControlKeel.ClaudeCLI do
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
     end
+  end
+
+  defp ensure_server_registered(project_root, server_name, config) do
+    case run(["mcp", "add-json", server_name, Jason.encode!(config), "--scope", "local"],
+           cd: project_root
+         ) do
+      {:ok, _output} ->
+        :ok
+
+      {:error, output} when is_binary(output) ->
+        if already_exists_error?(output) do
+          :ok
+        else
+          {:error, output}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp already_exists_error?(output) do
+    normalized = String.downcase(output)
+    String.contains?(normalized, "already exists") and String.contains?(normalized, "mcp")
   end
 
   defp ensure_available do

@@ -3036,7 +3036,7 @@ defmodule ControlKeel.CLI do
     # run while Repo boots. ensure_local_project stays async so binding/skills work
     # does not block the Mix process here. Skip AttachedAgentSync during bootstrap.
     File.cd!(root, fn ->
-      case Process.whereis(ControlKeel.MCP.Server.stdio_registered_name()) do
+      case ensure_stdio_server_running(2_000) do
         pid when is_pid(pid) ->
           ref = Process.monitor(pid)
 
@@ -5007,6 +5007,69 @@ defmodule ControlKeel.CLI do
          "attached_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
        }}
+    end
+  end
+
+  defp ensure_stdio_server_running(timeout_ms) do
+    case wait_for_stdio_server(timeout_ms) do
+      pid when is_pid(pid) ->
+        pid
+
+      nil ->
+        _ = maybe_start_stdio_server_child()
+        wait_for_stdio_server(timeout_ms)
+    end
+  end
+
+  defp maybe_start_stdio_server_child do
+    opts = [
+      name: ControlKeel.MCP.Server.stdio_registered_name(),
+      input: :stdio,
+      output: :stdio
+    ]
+
+    case Process.whereis(ControlKeel.Supervisor) do
+      pid when is_pid(pid) ->
+        child = {ControlKeel.MCP.Server, opts}
+
+        case Supervisor.start_child(ControlKeel.Supervisor, child) do
+          {:ok, _pid} -> :ok
+          {:ok, _pid, _info} -> :ok
+          :ignore -> :ok
+          {:error, {:already_started, _pid}} -> :ok
+          {:error, _reason} -> :error
+        end
+
+      nil ->
+        case ControlKeel.MCP.Server.start_link(opts) do
+          {:ok, _pid} -> :ok
+          {:error, {:already_started, _pid}} -> :ok
+          {:error, _reason} -> :error
+        end
+    end
+  rescue
+    _ -> :error
+  catch
+    :exit, _ -> :error
+  end
+
+  defp wait_for_stdio_server(timeout_ms) when is_integer(timeout_ms) and timeout_ms >= 0 do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    wait_for_stdio_server_until(deadline)
+  end
+
+  defp wait_for_stdio_server_until(deadline_ms) do
+    case Process.whereis(ControlKeel.MCP.Server.stdio_registered_name()) do
+      pid when is_pid(pid) ->
+        pid
+
+      nil ->
+        if System.monotonic_time(:millisecond) < deadline_ms do
+          Process.sleep(25)
+          wait_for_stdio_server_until(deadline_ms)
+        else
+          nil
+        end
     end
   end
 

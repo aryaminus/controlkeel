@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.16 — 2026-04-15
+
+### What's changed
+
+- fix(claude): make `attach claude-code` idempotent when MCP server already exists
+- fix(mcp): ensure stdio server startup before MCP CLI handoff and improve launcher stdio reliability
+- chore(qa): add full Copilot parity script with bounded MCP/attach checks for deterministic audit runs
+
 ## v0.2.15 — 2026-04-15
 
 ### What's changed

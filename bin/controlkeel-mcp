@@ -22,7 +22,7 @@ exec_mix_ck_mcp_filtered() {
 
   trap cleanup EXIT HUP INT TERM
 
-  mix ck.mcp --project-root "$PROJECT_ROOT" "$@" >"$fifo" &
+  mix ck.mcp --project-root "$PROJECT_ROOT" "$@" <&0 >"$fifo" &
   mix_pid=$!
 
   awk '

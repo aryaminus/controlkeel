@@ -13,6 +13,7 @@ defmodule Mix.Tasks.Ck.Mcp do
     Mix.shell(Mix.Shell.Quiet)
 
     Mix.Task.run("app.start", app_start_cli_args())
+    ensure_controlkeel_started!()
 
     parsed = parse!(["mcp" | args])
 
@@ -43,6 +44,16 @@ defmodule Mix.Tasks.Ck.Mcp do
       []
     else
       ["--no-compile"]
+    end
+  end
+
+  defp ensure_controlkeel_started! do
+    case Application.ensure_all_started(:controlkeel) do
+      {:ok, _apps} ->
+        :ok
+
+      {:error, {app, reason}} ->
+        Mix.raise("failed to start #{inspect(app)}: #{inspect(reason)}")
     end
   end
 end
