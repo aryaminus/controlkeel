@@ -35,18 +35,6 @@
         "type": "command",
         "command": "./scripts/hooks/ck_copilot_hook.sh"
       }
-    ],
-    "SubagentStop": [
-      {
-        "type": "command",
-        "command": "./scripts/hooks/ck_copilot_hook.sh"
-      }
-    ],
-    "Stop": [
-      {
-        "type": "command",
-        "command": "./scripts/hooks/ck_copilot_hook.sh"
-      }
     ]
   }
 }
