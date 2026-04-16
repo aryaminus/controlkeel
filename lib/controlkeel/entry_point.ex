@@ -22,6 +22,7 @@ defmodule ControlKeel.EntryPoint do
   defp start_standalone do
     case CLI.parse(CLI.standalone_argv()) do
       {:ok, parsed} ->
+        ensure_standalone_logger_stderr()
         maybe_prepare_stdio_mcp!(parsed)
 
         if CLI.app_required?(parsed) do
@@ -86,6 +87,36 @@ defmodule ControlKeel.EntryPoint do
   end
 
   defp maybe_prepare_stdio_mcp!(_parsed), do: :ok
+
+  defp ensure_standalone_logger_stderr do
+    case :logger.get_handler_config(:default) do
+      {:ok, %{module: :logger_std_h} = handler} ->
+        current_type = handler.config |> Kernel.||(%{}) |> Map.get(:type)
+
+        if current_type == :standard_error do
+          :ok
+        else
+          replacement = %{
+            handler
+            | config: Map.put(handler.config || %{}, :type, :standard_error)
+          }
+
+          with :ok <- :logger.remove_handler(:default),
+               {:ok, _handler_id} <- :logger.add_handler(:default, :logger_std_h, replacement) do
+            :ok
+          else
+            _ -> :ok
+          end
+        end
+
+      _ ->
+        :ok
+    end
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
 
   defp maybe_enable_server(parsed) do
     endpoint_config = Application.get_env(:controlkeel, ControlKeelWeb.Endpoint, [])

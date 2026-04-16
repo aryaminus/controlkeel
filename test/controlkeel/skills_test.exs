@@ -714,6 +714,12 @@ defmodule ControlKeel.SkillsTest do
     refute opencode_plugin =~ "submitCommand.text(body)"
     assert opencode_plugin =~ "wait_timeout_seconds"
     assert opencode_plugin =~ "Install >= 0.1.26"
+    assert opencode_plugin =~ "extractJsonCandidate"
+    assert opencode_plugin =~ "JSON.parse(trimmed)"
+    assert opencode_plugin =~ "controlkeel review plan submit failed with exit code"
+    assert opencode_plugin =~ "controlkeel review plan wait failed with exit code"
+    assert opencode_plugin =~ "new Response(submitProc.stderr).text()"
+    assert opencode_plugin =~ "new Response(waitProc.stderr).text()"
 
     opencode_agent =
       Path.join(opencode_plan.output_dir, ".opencode/agents/controlkeel-operator.md")

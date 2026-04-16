@@ -4660,11 +4660,41 @@ defmodule ControlKeel.Skills.Exporter do
      * - routes plan submission and wait decisions through the CK CLI
      */
     export const ControlKeelGovernance: Plugin = async ({ project, client, $, directory }) => {
+      const extractJsonCandidate = (output: string) => {
+        const trimmed = output.trim()
+        if (!trimmed) {
+          return null
+        }
+
+        const lines = trimmed
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
+
+        const jsonLine = [...lines].reverse().find((line) => line.startsWith("{") || line.startsWith("["))
+        return jsonLine ?? trimmed
+      }
+
       const parseJson = (output: string) => {
+        const trimmed = output.trim()
+        if (!trimmed) {
+          throw new Error("ControlKeel returned empty output")
+        }
+
         try {
-          return JSON.parse(output)
+          return JSON.parse(trimmed)
         } catch (_error) {
-          throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          const candidate = extractJsonCandidate(trimmed)
+
+          if (!candidate || candidate === trimmed) {
+            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          }
+
+          try {
+            return JSON.parse(candidate)
+          } catch (_fallbackError) {
+            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          }
         }
       }
 
@@ -4805,9 +4835,16 @@ defmodule ControlKeel.Skills.Exporter do
 
           const submitProc = Bun.spawn(submitArgs, { stdout: "pipe", stderr: "pipe" })
           const submitOut = await new Response(submitProc.stdout).text()
-          await submitProc.exited
+          const submitErr = await new Response(submitProc.stderr).text()
+          const submitExit = await submitProc.exited
 
-          const submitPayload = parseJson(submitOut)
+          if (submitExit !== 0) {
+            throw new Error(
+              `controlkeel review plan submit failed with exit code ${submitExit}${submitErr.trim() ? `: ${submitErr.trim()}` : ""}`
+            )
+          }
+
+          const submitPayload = parseJson(submitOut || submitErr)
 
           if (typeof submitPayload?.error === "string" && submitPayload.error.includes("session_id")) {
             throw new Error(
@@ -4822,9 +4859,16 @@ defmodule ControlKeel.Skills.Exporter do
 
           const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], { stdout: "pipe", stderr: "pipe" })
           const waitOut = await new Response(waitProc.stdout).text()
-          await waitProc.exited
+          const waitErr = await new Response(waitProc.stderr).text()
+          const waitExit = await waitProc.exited
 
-          const waitPayload = parseJson(waitOut)
+          if (waitExit !== 0) {
+            throw new Error(
+              `controlkeel review plan wait failed with exit code ${waitExit}${waitErr.trim() ? `: ${waitErr.trim()}` : ""}`
+            )
+          }
+
+          const waitPayload = parseJson(waitOut || waitErr)
           return {
             reviewId,
             submitPayload,
@@ -5009,11 +5053,41 @@ defmodule ControlKeel.Skills.Exporter do
      * but ships as plain JavaScript for npm-based installs.
      */
     export const ControlKeelGovernance = async ({ $, directory }) => {
+      const extractJsonCandidate = (output) => {
+        const trimmed = output.trim()
+        if (!trimmed) {
+          return null
+        }
+
+        const lines = trimmed
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
+
+        const jsonLine = [...lines].reverse().find((line) => line.startsWith("{") || line.startsWith("["))
+        return jsonLine ?? trimmed
+      }
+
       const parseJson = (output) => {
+        const trimmed = output.trim()
+        if (!trimmed) {
+          throw new Error("ControlKeel returned empty output")
+        }
+
         try {
-          return JSON.parse(output)
+          return JSON.parse(trimmed)
         } catch (_error) {
-          throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          const candidate = extractJsonCandidate(trimmed)
+
+          if (!candidate || candidate === trimmed) {
+            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          }
+
+          try {
+            return JSON.parse(candidate)
+          } catch (_fallbackError) {
+            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          }
         }
       }
 
@@ -5146,9 +5220,16 @@ defmodule ControlKeel.Skills.Exporter do
 
           const submitProc = Bun.spawn(submitArgs, { stdout: "pipe", stderr: "pipe" })
           const submitOut = await new Response(submitProc.stdout).text()
-          await submitProc.exited
+          const submitErr = await new Response(submitProc.stderr).text()
+          const submitExit = await submitProc.exited
 
-          const submitPayload = parseJson(submitOut)
+          if (submitExit !== 0) {
+            throw new Error(
+              `controlkeel review plan submit failed with exit code ${submitExit}${submitErr.trim() ? `: ${submitErr.trim()}` : ""}`
+            )
+          }
+
+          const submitPayload = parseJson(submitOut || submitErr)
 
           if (typeof submitPayload?.error === "string" && submitPayload.error.includes("session_id")) {
             throw new Error(
@@ -5163,9 +5244,16 @@ defmodule ControlKeel.Skills.Exporter do
 
           const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], { stdout: "pipe", stderr: "pipe" })
           const waitOut = await new Response(waitProc.stdout).text()
-          await waitProc.exited
+          const waitErr = await new Response(waitProc.stderr).text()
+          const waitExit = await waitProc.exited
 
-          const waitPayload = parseJson(waitOut)
+          if (waitExit !== 0) {
+            throw new Error(
+              `controlkeel review plan wait failed with exit code ${waitExit}${waitErr.trim() ? `: ${waitErr.trim()}` : ""}`
+            )
+          }
+
+          const waitPayload = parseJson(waitOut || waitErr)
           return {
             reviewId,
             submitPayload,

@@ -6,6 +6,8 @@
 
 - fix(mcp): bootstrap installs stdio launcher for CK source; track priv template
 - fix(opencode): make local MCP launcher respond under persistent stdio
+- fix(cli): force standalone logger output to stderr so `--json` responses stay machine-readable in release flows
+- fix(opencode): harden submit-plan JSON parsing and error handling when CLI output includes non-JSON lines
 
 ## v0.2.19 — 2026-04-16
 
