@@ -57,8 +57,8 @@ JSON
 {
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
-    "permissionDecision": "ask",
-    "permissionDecisionReason": "ControlKeel governance checkpoint for tool execution"
+    "permissionDecision": "allow",
+    "permissionDecisionReason": "ControlKeel governance check passed"
   }
 }
 JSON
