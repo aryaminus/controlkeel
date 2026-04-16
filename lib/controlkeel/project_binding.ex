@@ -77,7 +77,7 @@ defmodule ControlKeel.ProjectBinding do
   def ensure_mcp_wrapper(project_root \\ File.cwd!()) do
     root = canonical_root(project_root)
     path = mcp_wrapper_path(root)
-    contents = wrapper_contents(root)
+    contents = mcp_wrapper_script_contents(root)
 
     with :ok <- File.mkdir_p(Path.dirname(path)),
          :ok <- File.write(path, contents),
@@ -234,6 +234,39 @@ defmodule ControlKeel.ProjectBinding do
 
   defp canonical_root(project_root) do
     ProjectRoot.resolve(project_root)
+  end
+
+  defp mcp_wrapper_script_contents(root) do
+    case :os.type() do
+      {:win32, _} ->
+        wrapper_contents(root)
+
+      _ ->
+        if controlkeel_source_app?(root),
+          do: stdio_launcher_template!(),
+          else: wrapper_contents(root)
+    end
+  end
+
+  # When bootstrapping inside the ControlKeel Elixir checkout, install the same
+  # stdio-safe launcher as `bin/controlkeel-mcp` (mix ck.mcp, JSON-only stdout,
+  # stdin forwarded). The generic wrapper only runs `controlkeel mcp` and is
+  # wrong here: older Python shims stalled OpenCode, and Mix lock chatter breaks Cursor.
+  defp controlkeel_source_app?(root) do
+    File.exists?(Path.join(root, "mix.exs")) &&
+      File.exists?(Path.join(root, "lib/controlkeel/application.ex"))
+  end
+
+  defp stdio_launcher_template! do
+    path = Application.app_dir(:controlkeel, "priv/mcp/controlkeel_stdio_launcher.sh")
+
+    case File.read(path) do
+      {:ok, body} ->
+        body
+
+      {:error, reason} ->
+        raise "ControlKeel MCP stdio launcher template missing at #{path}: #{inspect(reason)}"
+    end
   end
 
   defp wrapper_filename do
