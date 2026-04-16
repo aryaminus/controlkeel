@@ -1,129 +1,36 @@
-#!/usr/bin/env python3
-import os
-import shutil
-import subprocess
-import sys
-import threading
+#!/usr/bin/env sh
+set -eu
 
+export CK_MCP_MODE="${CK_MCP_MODE:-1}"
+# Suppress Mix compile / task chatter on stdout before ck.mcp runs (stdio JSON-RPC).
+export MIX_QUIET="${MIX_QUIET:-1}"
+export MIX_ENV="${MIX_ENV:-dev}"
 
-def project_root() -> str:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    default_root = os.path.abspath(os.path.join(script_dir, "..", ".."))
-    return os.environ.get("CK_PROJECT_ROOT") or os.environ.get("CURSOR_PROJECT_DIR") or default_root
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+APP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+# OpenCode may pass CK_PROJECT_ROOT; cwd may not be the governed workspace.
+PROJECT_ROOT="${CK_PROJECT_ROOT:-$(/bin/pwd -P)}"
 
+exec_mix_ck_mcp() {
+  cd "$APP_ROOT"
+  exec mix ck.mcp --project-root "$PROJECT_ROOT" "$@"
+}
 
-def resolve_command(root: str, argv: list[str]) -> list[str]:
-    source_repo = os.path.exists(os.path.join(root, "lib", "controlkeel", "application.ex"))
-    binary = os.environ.get("CONTROLKEEL_BIN", "controlkeel")
-    binary_path = shutil.which(binary)
+# Optional: force a specific controlkeel executable that supports `mcp`
+# (for example a Burrito binary).
+if [ -n "${CONTROLKEEL_BIN:-}" ]; then
+  exec "$CONTROLKEEL_BIN" mcp --project-root "$PROJECT_ROOT" "$@"
+fi
 
-    if source_repo and os.path.exists(os.path.join(root, "mix.exs")) and shutil.which("mix"):
-        quoted_root = root.replace('"', '\\"')
-        quoted_args = " ".join(subprocess.list2cmdline([arg]) for arg in argv)
-        return [
-            "sh",
-            "-lc",
-            f'cd "{quoted_root}" && mix compile --no-warnings-as-errors >/dev/null 2>/dev/null || true && exec mix ck.mcp {quoted_args}',
-        ]
+# Source tree: always run mix ck.mcp so MCP behavior matches checkout.
+if [ -f "$APP_ROOT/mix.exs" ] && [ -f "$APP_ROOT/lib/controlkeel/application.ex" ]; then
+  exec_mix_ck_mcp "$@"
+fi
 
-    if binary_path:
-        return [binary_path, "mcp", "--project-root", root, *argv]
+# Installed binary fallback.
+if command -v controlkeel >/dev/null 2>&1; then
+  exec controlkeel mcp --project-root "$PROJECT_ROOT" "$@"
+fi
 
-    if os.path.exists(os.path.join(root, "mix.exs")) and shutil.which("mix"):
-        quoted_root = root.replace('"', '\\"')
-        quoted_args = " ".join(subprocess.list2cmdline([arg]) for arg in argv)
-        return [
-            "sh",
-            "-lc",
-            f'cd "{quoted_root}" && mix compile --no-warnings-as-errors >/dev/null 2>/dev/null || true && exec mix ck.mcp {quoted_args}',
-        ]
-
-    print(
-        "controlkeel MCP launcher could not find an installed binary or mix project",
-        file=sys.stderr,
-    )
-    sys.exit(1)
-
-
-def main() -> int:
-    root = project_root()
-    env = os.environ.copy()
-    env.setdefault("MIX_ENV", "dev")
-    env["CK_MCP_MODE"] = "1"
-    env.setdefault("LOGGER_LEVEL", "warning")
-    env["CK_PROJECT_ROOT"] = root
-
-    proc = subprocess.Popen(
-        resolve_command(root, sys.argv[1:]),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        env=env,
-    )
-
-    def pump_stdin() -> None:
-        try:
-            while True:
-                chunk = os.read(sys.stdin.fileno(), 65536)
-                if not chunk:
-                    break
-                proc.stdin.write(chunk)
-                proc.stdin.flush()
-        except BrokenPipeError:
-            pass
-        finally:
-            try:
-                proc.stdin.close()
-            except Exception:
-                pass
-
-    threading.Thread(target=pump_stdin, daemon=True).start()
-
-    started = False
-    buffer = b""
-    needle = b"Content-Length:"
-
-    def write_out(data: bytes) -> bool:
-        try:
-            sys.stdout.buffer.write(data)
-            sys.stdout.buffer.flush()
-            return True
-        except BrokenPipeError:
-            return False
-
-    while True:
-        chunk = proc.stdout.read(4096)
-        if not chunk:
-            break
-
-        if started:
-            if not write_out(chunk):
-                proc.terminate()
-                return 0
-            continue
-
-        buffer += chunk
-        idx = buffer.find(needle)
-        if idx != -1:
-            started = True
-            if not write_out(buffer[idx:]):
-                proc.terminate()
-                return 0
-            buffer = b""
-            continue
-
-        # Newer MCP runtime emits newline-delimited JSON-RPC without Content-Length.
-        stripped = buffer.lstrip()
-        if stripped.startswith((b"{", b"[")):
-            started = True
-            if not write_out(buffer):
-                proc.terminate()
-                return 0
-            buffer = b""
-
-    proc.wait()
-    return proc.returncode
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+echo "controlkeel MCP launcher could not find an installed binary or mix project" >&2
+exit 1
