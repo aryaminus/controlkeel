@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.19 — 2026-04-16
+
+### What's changed
+
+- fix(opencode): align native integration with OpenCode surfaces
+- feat(hooks): update permission decision for PreToolUse event in ck_copilot_hook.sh
+
 ## v0.2.18 — 2026-04-16
 
 ### What's changed
