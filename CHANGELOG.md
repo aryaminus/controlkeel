@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.18 — 2026-04-16
+
+### What's changed
+
+- refactor(hooks): remove unused SubagentStop and Stop hooks; enhance logging in ck_copilot_hook.sh
+- feat(governance): implement ControlKeel hooks and update version to 0.2.17
+
 ## v0.2.17 — 2026-04-16
 
 ### What's changed
