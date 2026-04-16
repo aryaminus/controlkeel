@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.22 — 2026-04-16
+
+### What's changed
+
+- fix(governance): auto-resolve matching findings on allow rulings
+
 ## v0.2.21 — 2026-04-16
 
 ### What's changed
