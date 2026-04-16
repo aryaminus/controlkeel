@@ -4949,17 +4949,25 @@ defmodule ControlKeel.CLI do
     command = command_spec[:command] || command_spec["command"]
     args = command_spec[:args] || command_spec["args"] || []
 
-    existing =
-      case File.read(config_path) do
-        {:ok, contents} ->
-          case Jason.decode(contents) do
-            {:ok, %{} = decoded} -> decoded
-            _ -> %{}
+    {existing, legacy_mirror_path} =
+      if ide_key == "opencode" do
+        legacy_path = opencode_legacy_mcp_config_path()
+        canonical_existing = read_json_map(config_path)
+
+        existing =
+          if canonical_existing == %{} and legacy_path != config_path do
+            read_json_map(legacy_path)
+          else
+            canonical_existing
           end
 
-        _ ->
-          %{}
-      end || %{}
+        mirror_path =
+          if legacy_path != config_path and File.exists?(legacy_path), do: legacy_path, else: nil
+
+        {existing, mirror_path}
+      else
+        {read_json_map(config_path), nil}
+      end
 
     updated =
       if ide_key in ["opencode", "kilo"] do
@@ -4996,7 +5004,8 @@ defmodule ControlKeel.CLI do
       end
 
     with :ok <- File.mkdir_p(Path.dirname(config_path)),
-         :ok <- File.write(config_path, Jason.encode!(updated, pretty: true) <> "\n") do
+         :ok <- File.write(config_path, Jason.encode!(updated, pretty: true) <> "\n"),
+         :ok <- maybe_write_json_mirror(legacy_mirror_path, updated) do
       {:ok,
        %{
          "server_name" => server_name,
@@ -5006,9 +5015,37 @@ defmodule ControlKeel.CLI do
          "args" => args,
          "attached_at" =>
            DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
-       }}
+       }
+       |> maybe_put_legacy_config_path(legacy_mirror_path)}
     end
   end
+
+  defp read_json_map(path) do
+    case File.read(path) do
+      {:ok, contents} ->
+        case Jason.decode(contents) do
+          {:ok, %{} = decoded} -> decoded
+          _ -> %{}
+        end
+
+      _ ->
+        %{}
+    end || %{}
+  end
+
+  defp maybe_write_json_mirror(nil, _payload), do: :ok
+
+  defp maybe_write_json_mirror(path, payload) do
+    with :ok <- File.mkdir_p(Path.dirname(path)),
+         :ok <- File.write(path, Jason.encode!(payload, pretty: true) <> "\n") do
+      :ok
+    end
+  end
+
+  defp maybe_put_legacy_config_path(attached, nil), do: attached
+
+  defp maybe_put_legacy_config_path(attached, path),
+    do: Map.put(attached, "legacy_config_path", path)
 
   defp ensure_stdio_server_running(timeout_ms) do
     case wait_for_stdio_server(timeout_ms) do
@@ -5100,6 +5137,10 @@ defmodule ControlKeel.CLI do
   end
 
   defp opencode_mcp_config_path do
+    Path.join([user_home(), ".config", "opencode", "opencode.json"])
+  end
+
+  defp opencode_legacy_mcp_config_path do
     Path.join([user_home(), ".config", "opencode", "config.json"])
   end
 

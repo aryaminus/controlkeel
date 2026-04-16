@@ -661,10 +661,29 @@ defmodule ControlKeel.SkillsTest do
              Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-last.md")
            )
 
+    assert File.exists?(
+             Path.join(
+               opencode_plan.output_dir,
+               ".opencode/skills/controlkeel-governance/SKILL.md"
+             )
+           )
+
+    assert File.exists?(
+             Path.join(opencode_plan.output_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+           )
+
     assert File.exists?(Path.join(opencode_plan.output_dir, ".opencode/mcp.json"))
     assert File.exists?(Path.join(opencode_plan.output_dir, "index.js"))
     assert File.exists?(Path.join(opencode_plan.output_dir, "README.md"))
     assert File.exists?(Path.join(opencode_plan.output_dir, "AGENTS.md"))
+    assert File.exists?(Path.join(opencode_plan.output_dir, "CONTROLKEEL_INSTALL.md"))
+    assert File.exists?(Path.join(opencode_plan.output_dir, ".mcp.hosted.json"))
+
+    opencode_install_guide =
+      File.read!(Path.join(opencode_plan.output_dir, "CONTROLKEEL_INSTALL.md"))
+
+    assert opencode_install_guide =~ "controlkeel mcp --project-root"
+    assert opencode_install_guide =~ "Hosted MCP alternative"
 
     opencode_manifest =
       Path.join(opencode_plan.output_dir, "package.json")
@@ -1011,8 +1030,14 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-submit-plan.md"))
     assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-annotate.md"))
     assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(tmp_dir, ".opencode/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".opencode/mcp.json"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+    assert opencode_install.skills_destination == Path.join(tmp_dir, ".opencode/skills")
+
+    assert opencode_install.compat_skills_destination ==
+             Path.join(tmp_dir, ".agents/skills")
 
     assert {:ok, gemini_install} =
              Skills.install("gemini-cli-native", tmp_dir, scope: "project")

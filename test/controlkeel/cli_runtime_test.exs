@@ -551,9 +551,10 @@ defmodule ControlKeel.CLIRuntimeTest do
                "/controlkeel/bin/controlkeel-mcp"
              )
 
-    # Regression: attaching OpenCode should recover from malformed existing MCP config.
-    File.mkdir_p!(Path.dirname(opencode_config_path()))
-    File.write!(opencode_config_path(), "{\"mcpServers\": {\"broken\": ")
+    # Regression: attaching OpenCode should recover from malformed legacy MCP config
+    # and write the canonical OpenCode config path.
+    File.mkdir_p!(Path.dirname(opencode_legacy_config_path()))
+    File.write!(opencode_legacy_config_path(), "{\"mcpServers\": {\"broken\": ")
 
     assert {:ok, opencode_attach} = CLI.parse(["attach", "opencode"])
 
@@ -571,7 +572,7 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert File.exists?(Path.join(tmp_dir, ".opencode/commands/controlkeel-review.md"))
     assert File.exists?(Path.join(tmp_dir, ".opencode/mcp.json"))
 
-    assert {:ok, opencode_config} = Jason.decode(File.read!(opencode_config_path()))
+    assert {:ok, opencode_config} = Jason.decode(File.read!(opencode_canonical_config_path()))
 
     assert get_in(opencode_config, ["mcp", "controlkeel", "type"]) == "local"
 
@@ -581,6 +582,10 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert hd(opencode_cmd) == "controlkeel" or
              String.ends_with?(hd(opencode_cmd), "/controlkeel/bin/controlkeel-mcp")
+
+    # Keep legacy config in sync when it already exists.
+    assert {:ok, opencode_legacy_config} = Jason.decode(File.read!(opencode_legacy_config_path()))
+    assert get_in(opencode_legacy_config, ["mcp", "controlkeel", "type"]) == "local"
   end
 
   test "codex attach supports mcp-only mode without native bundle install", %{tmp_dir: tmp_dir} do
@@ -1417,7 +1422,16 @@ defmodule ControlKeel.CLIRuntimeTest do
     Path.join([System.get_env("HOME") || System.user_home!(), ".config", "goose", "config.yaml"])
   end
 
-  defp opencode_config_path do
+  defp opencode_canonical_config_path do
+    Path.join([
+      System.get_env("HOME") || System.user_home!(),
+      ".config",
+      "opencode",
+      "opencode.json"
+    ])
+  end
+
+  defp opencode_legacy_config_path do
     Path.join([
       System.get_env("HOME") || System.user_home!(),
       ".config",

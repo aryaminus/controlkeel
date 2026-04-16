@@ -96,8 +96,12 @@ defmodule ControlKeel.ReviewBridge do
         true
 
       _ ->
-        Mix.env() != :test
+        not mix_test_env?()
     end
+  end
+
+  defp mix_test_env? do
+    Code.ensure_loaded?(Mix) and function_exported?(Mix, :env, 0) and Mix.env() == :test
   end
 
   defp do_wait(review_or_id, deadline, interval_ms) do

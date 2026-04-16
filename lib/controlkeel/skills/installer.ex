@@ -401,13 +401,18 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
-  defp do_install(%SkillTarget{id: "opencode-native"}, "project", project_root, _skills, _opts) do
+  defp do_install(%SkillTarget{id: "opencode-native"}, "project", project_root, skills, _opts) do
     {:ok, plan} = Exporter.export("opencode-native", project_root, scope: "project")
 
     opencode_root = Path.join(project_root, ".opencode")
+    native_skills_root = Path.join(opencode_root, "skills")
+    compat_skills_root = Path.join(project_root, ".agents/skills")
     plugins_root = Path.join(opencode_root, "plugins")
     agents_root = Path.join(opencode_root, "agents")
     commands_root = Path.join(opencode_root, "commands")
+
+    copy_skills(skills, native_skills_root)
+    copy_skills(skills, compat_skills_root)
 
     File.mkdir_p!(plugins_root)
     File.mkdir_p!(agents_root)
@@ -429,6 +434,8 @@ defmodule ControlKeel.Skills.Installer do
        target: "opencode-native",
        scope: "project",
        destination: Path.join(project_root, ".opencode"),
+       skills_destination: native_skills_root,
+       compat_skills_destination: compat_skills_root,
        plugins_destination: plugins_root,
        agents_destination: agents_root,
        commands_destination: commands_root

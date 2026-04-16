@@ -46,7 +46,7 @@ These are the current higher-confidence host adapters where the docs, release as
 | --- | --- | --- | --- |
 | Claude Code | `controlkeel attach claude-code` | native hook review | plugin bundle plus `.claude/skills` and `.claude/agents` |
 | GitHub Copilot | `controlkeel attach copilot` | native hook and repo review | repo-native `.github/*` plus Copilot plugin bundle |
-| OpenCode | `controlkeel attach opencode` | plugin tool review | repo-native `.opencode/*` and published npm companion |
+| OpenCode | `controlkeel attach opencode` | plugin tool review | repo-native `.opencode/*`, `.agents/skills`, and published npm companion |
 | Augment / Auggie CLI | `controlkeel attach augment` | plugin and hook review | repo-native `.augment/*` plus local plugin bundle |
 | Pi | `controlkeel attach pi` | browser review with persisted plan state | file-plan bundle and published npm extension |
 | VS Code | `controlkeel attach vscode` | browser review through companion webview | companion `.vsix` plus repo-local MCP wiring |

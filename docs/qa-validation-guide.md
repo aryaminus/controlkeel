@@ -549,7 +549,7 @@ If the host is **not** installed, validate export/install artifacts and mark run
 | --- | --- | --- |
 | Claude Code | `controlkeel attach claude-code` | `.claude/skills`, `.claude/agents`, plugin bundle |
 | GitHub Copilot | `controlkeel attach copilot` | `.github/skills`, `.github/agents`, `.github/commands`, `.vscode/mcp.json` |
-| OpenCode | `controlkeel attach opencode` | `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json` |
+| OpenCode | `controlkeel attach opencode` | `.opencode/skills`, `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json`, `.agents/skills` |
 | Augment / Auggie CLI | `controlkeel attach augment` | `.augment/skills`, `.augment/agents`, `.augment/commands`, `.augment/rules`, `.augment/mcp.json`, local plugin bundle |
 | Pi | `controlkeel attach pi` | `.pi/controlkeel.json`, `.pi/commands`, `.pi/mcp.json`, `pi-extension.json`, `PI.md` |
 | VS Code | `controlkeel attach vscode` | `.github/skills`, `.github/agents`, `.vscode/mcp.json`, `.vscode/extensions.json`, companion `.vsix` path |

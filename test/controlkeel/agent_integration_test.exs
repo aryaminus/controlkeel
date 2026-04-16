@@ -156,6 +156,13 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert continue.submission_mode == "command"
     assert ".continue/mcpServers/controlkeel.yaml" in continue.artifact_surfaces
 
+    opencode = AgentIntegration.get("opencode")
+    assert opencode.support_class == "attach_client"
+    assert opencode.preferred_target == "opencode-native"
+    assert ".opencode/skills" in opencode.artifact_surfaces
+    assert ".agents/skills" in opencode.artifact_surfaces
+    assert ".opencode/plugins/controlkeel-governance.ts" in opencode.artifact_surfaces
+
     letta = AgentIntegration.get("letta-code")
     assert letta.support_class == "attach_client"
     assert letta.preferred_target == "letta-code-native"

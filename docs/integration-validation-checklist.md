@@ -54,10 +54,12 @@ For the full QA procedure and feature-by-feature test plan, use [qa-validation-g
   - malformed OpenCode config recovery + native artifact generation assertions
 - [x] Local codepath validation passed:
   - `mix ck.attach opencode`
+  - `.opencode/skills/controlkeel-governance/SKILL.md`
   - `.opencode/plugins/controlkeel-governance.ts`
   - `.opencode/agents/controlkeel-operator.md`
   - `.opencode/commands/controlkeel-review.md`
   - `.opencode/mcp.json`
+  - `.agents/skills/controlkeel-governance/SKILL.md`
 
 ### Published companion packages
 

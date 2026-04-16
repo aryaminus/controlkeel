@@ -41,7 +41,7 @@ The [skills.sh](https://skills.sh/) agent list is broader than CK's native attac
 
 | Host | Direct install | Notes |
 | --- | --- | --- |
-| OpenCode | Add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json` | Uses the published npm companion package `@aryaminus/controlkeel-opencode`. Use `controlkeel attach opencode` as well for repo-local commands, agents, and MCP config (`mcp.controlkeel` local command array). |
+| OpenCode | Add `"plugin": ["@aryaminus/controlkeel-opencode"]` to `opencode.json` | Uses the published npm companion package `@aryaminus/controlkeel-opencode`. Use `controlkeel attach opencode` as well for repo-local commands, agents, skills, and MCP config (`mcp.controlkeel` local command array). |
 | Pi | `pi install npm:@aryaminus/controlkeel-pi-extension` | Uses the published npm extension package `@aryaminus/controlkeel-pi-extension` for Pi builds that support npm-backed installs. |
 | Pi | `pi -e npm:@aryaminus/controlkeel-pi-extension` | Short form of the same published Pi extension flow. |
 | VS Code | `code --install-extension controlkeel-vscode-companion.vsix` | Installs the CK browser-review companion from a packaged VSIX. |

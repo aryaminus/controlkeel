@@ -17,6 +17,8 @@ defmodule ControlKeel.AgentAdapters.OpenCode do
   @impl true
   def artifact_manifest(_opts) do
     [
+      ".opencode/skills",
+      ".agents/skills",
       ".opencode/plugins/controlkeel-governance.ts",
       ".opencode/agents/controlkeel-operator.md",
       ".opencode/commands/controlkeel-review.md",

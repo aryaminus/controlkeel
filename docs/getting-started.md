@@ -191,7 +191,7 @@ controlkeel status
 
 This writes the MCP configuration into the OpenCode config location and also generates the portable instruction bundle ControlKeel uses for MCP-plus-instructions targets.
 
-OpenCode now has a native-first integration that writes `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, and `.opencode/mcp.json` (using OpenCode's `mcp.controlkeel` local command-array shape). However, it does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options for CK model work are:
+OpenCode now has a native-first integration that writes `.opencode/skills`, `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json`, and `.agents/skills` compatibility copies (using OpenCode's `mcp.controlkeel` local command-array shape). However, it does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options for CK model work are:
 
 - keep using heuristic mode for governance-only flows
 - add a CK-owned provider profile
