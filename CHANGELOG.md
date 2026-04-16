@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.17 — 2026-04-16
+
+### What's changed
+
+- Internal maintenance release.
+
 ## v0.2.16 — 2026-04-15
 
 ### What's changed
