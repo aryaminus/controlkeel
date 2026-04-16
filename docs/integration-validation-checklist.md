@@ -178,6 +178,7 @@ node -e 'const init=JSON.stringify({jsonrpc:"2.0",id:1,method:"initialize",param
 
 ```bash
 controlkeel attach opencode
+opencode mcp list
 ```
 
 Or from source while validating unreleased fixes:
@@ -190,4 +191,17 @@ Check generated files:
 
 ```bash
 ls .opencode/plugins .opencode/agents .opencode/commands .opencode/mcp.json
+```
+
+Confirm global OpenCode MCP config is enabled:
+
+```bash
+python3 - <<'PY'
+import json, pathlib
+cfg = pathlib.Path.home()/".config"/"opencode"/"opencode.json"
+doc = json.loads(cfg.read_text())
+entry = (((doc.get("mcp") or {}).get("controlkeel")) or {})
+print("enabled:", entry.get("enabled"))
+assert entry.get("enabled") is True
+PY
 ```
