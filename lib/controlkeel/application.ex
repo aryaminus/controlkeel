@@ -215,7 +215,12 @@ defmodule ControlKeel.Application do
   defp run_migrations do
     Application.fetch_env!(:controlkeel, :ecto_repos)
     |> Enum.reduce_while(:ok, fn repo, :ok ->
-      case Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true), pool_size: 2) do
+      case Ecto.Migrator.with_repo(
+             repo,
+             &Ecto.Migrator.run(&1, :up, all: true, log: false),
+             pool_size: 2,
+             log: false
+           ) do
         {:ok, _versions, _apps} -> {:cont, :ok}
         {:error, reason} -> {:halt, {:error, reason}}
       end

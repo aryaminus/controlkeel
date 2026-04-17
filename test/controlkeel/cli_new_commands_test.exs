@@ -263,6 +263,32 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert Enum.any?(wait_lines, &String.contains?(&1, "approved"))
     end
 
+    test "submit infers task scope from project binding when ids are missing", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+      plan_path = Path.join(tmp_dir, "plan.md")
+      File.write!(plan_path, "1. Infer scope from binding")
+      write_binding(tmp_dir, session)
+
+      assert {:ok, [submit_json]} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_submit,
+                   options: %{body_file: plan_path, json: true},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      payload = Jason.decode!(submit_json)
+      review_id = get_in(payload, ["review", "id"])
+
+      assert is_integer(review_id)
+      assert get_in(payload, ["review", "task_id"]) == task.id
+      assert get_in(payload, ["review", "session_id"]) == session.id
+      assert get_in(payload, ["review", "status"]) == "pending"
+    end
+
     test "submit supports env-inferred runtime context and json payloads", %{tmp_dir: tmp_dir} do
       session = session_fixture()
       task = task_fixture(%{session: session})

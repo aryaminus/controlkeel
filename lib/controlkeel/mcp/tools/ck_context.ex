@@ -8,6 +8,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   alias ControlKeel.Mission
   alias ControlKeel.Mission.{Finding, Session}
   alias ControlKeel.ProviderBroker
+  alias ControlKeel.LocalProject
   alias ControlKeel.Repo
   alias ControlKeel.TaskAugmentation
   alias ControlKeel.TrustBoundary
@@ -15,7 +16,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   import Ecto.Query, warn: false
 
   def call(arguments) when is_map(arguments) do
-    with {:ok, session_id} <- required_integer(arguments, "session_id"),
+    with {:ok, session_id} <- required_session_id(arguments),
          {:ok, task_id} <- optional_integer(arguments, "task_id"),
          {:ok, session} <- fetch_session(session_id),
          {:ok, task} <- resolve_task(session, task_id) do
@@ -255,10 +256,42 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     end
   end
 
-  defp required_integer(arguments, key) do
-    case Map.get(arguments, key) do
-      nil -> {:error, {:invalid_arguments, "`#{key}` is required"}}
-      value -> normalize_integer(value, key)
+  defp required_session_id(arguments) do
+    case Map.get(arguments, "session_id") do
+      nil ->
+        {:error, {:invalid_arguments, "`session_id` is required"}}
+
+      value when is_binary(value) ->
+        normalized = String.trim(value)
+
+        case String.downcase(normalized) do
+          alias_value when alias_value in ["current", "active"] ->
+            resolve_active_session_id(arguments)
+
+          _ ->
+            normalize_integer(normalized, "session_id")
+        end
+
+      value ->
+        normalize_integer(value, "session_id")
+    end
+  end
+
+  defp resolve_active_session_id(arguments) do
+    project_root =
+      case Map.get(arguments, "project_root") do
+        value when is_binary(value) and value != "" -> Path.expand(value)
+        _ -> File.cwd!()
+      end
+
+    case LocalProject.load(project_root) do
+      {:ok, _binding, session} ->
+        {:ok, session.id}
+
+      _ ->
+        {:error,
+         {:invalid_arguments,
+          "`session_id` must be an integer. For `current`, run from a bound project or pass --project-root with an active binding."}}
     end
   end
 

@@ -1178,9 +1178,9 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  def run_command(%{command: :review_plan_submit, options: options}, _project_root) do
+  def run_command(%{command: :review_plan_submit, options: options}, project_root) do
     with {:ok, submission_body} <- review_submission_input(options),
-         {:ok, attrs} <- review_submission_attrs(options, submission_body),
+         {:ok, attrs} <- review_submission_attrs(options, submission_body, project_root),
          {:ok, review} <- Mission.submit_review(attrs) do
       payload =
         review_cli_payload(review, %{
@@ -3902,20 +3902,37 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  defp review_submission_attrs(options, submission_body) do
+  defp review_submission_attrs(options, submission_body, project_root) do
     runtime_context = review_runtime_context_from_env()
+
+    inferred_scope =
+      cond do
+        is_integer(options[:task_id]) ->
+          %{task_id: options[:task_id], session_id: options[:session_id], source: "explicit"}
+
+        is_integer(options[:session_id]) ->
+          %{task_id: nil, session_id: options[:session_id], source: "explicit"}
+
+        true ->
+          infer_review_scope(runtime_context, project_root)
+      end
 
     {:ok,
      %{
-       "session_id" => options[:session_id],
-       "task_id" => options[:task_id],
+       "session_id" => options[:session_id] || inferred_scope.session_id,
+       "task_id" => options[:task_id] || inferred_scope.task_id,
        "title" => options[:title],
        "review_type" => "plan",
        "submission_body" => submission_body,
        "submitted_by" => options[:submitted_by] || runtime_context["agent_id"] || "cli",
        "metadata" => %{
          "runtime_context" => runtime_context,
-         "body_file" => options[:body_file]
+         "body_file" => options[:body_file],
+         "inferred_scope" => %{
+           "task_id" => inferred_scope.task_id,
+           "session_id" => inferred_scope.session_id,
+           "source" => inferred_scope.source
+         }
        }
      }}
   end
@@ -3928,6 +3945,51 @@ defmodule ControlKeel.CLI do
       "annotations" => parse_review_annotations(options[:annotations])
     }
   end
+
+  defp infer_review_scope(runtime_context, project_root) do
+    runtime_task_id = parse_optional_integer(runtime_context["task_id"])
+    runtime_session_id = parse_optional_integer(runtime_context["session_id"])
+
+    cond do
+      is_integer(runtime_task_id) ->
+        %{task_id: runtime_task_id, session_id: runtime_session_id, source: "runtime_context"}
+
+      is_integer(runtime_session_id) ->
+        %{task_id: nil, session_id: runtime_session_id, source: "runtime_context"}
+
+      true ->
+        infer_review_scope_from_binding(project_root)
+    end
+  end
+
+  defp infer_review_scope_from_binding(project_root) do
+    resolved_root = ProjectRoot.resolve(project_root)
+
+    case LocalProject.load(resolved_root) do
+      {:ok, _binding, session} ->
+        task = current_session_task(session)
+
+        %{
+          task_id: task && task.id,
+          session_id: session.id,
+          source: "project_binding"
+        }
+
+      _ ->
+        %{task_id: nil, session_id: nil, source: "none"}
+    end
+  end
+
+  defp parse_optional_integer(value) when is_integer(value), do: value
+
+  defp parse_optional_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {parsed, ""} -> parsed
+      _ -> nil
+    end
+  end
+
+  defp parse_optional_integer(_value), do: nil
 
   defp parse_review_annotations(nil), do: %{}
 

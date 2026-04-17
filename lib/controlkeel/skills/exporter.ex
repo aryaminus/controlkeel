@@ -4660,19 +4660,41 @@ defmodule ControlKeel.Skills.Exporter do
      * - routes plan submission and wait decisions through the CK CLI
      */
     export const ControlKeelGovernance: Plugin = async ({ project, client, $, directory }) => {
-      const extractJsonCandidate = (output: string) => {
+      const extractJsonCandidates = (output: string) => {
         const trimmed = output.trim()
         if (!trimmed) {
-          return null
+          return []
         }
 
         const lines = trimmed
           .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line.length > 0)
+          .map((line) => line.trimEnd())
+          .filter((line) => line.trim().length > 0)
 
-        const jsonLine = [...lines].reverse().find((line) => line.startsWith("{") || line.startsWith("["))
-        return jsonLine ?? trimmed
+        const candidates: string[] = []
+        const seen = new Set<string>()
+
+        const pushCandidate = (candidate: string) => {
+          const normalized = candidate.trim()
+          if (!normalized || seen.has(normalized)) {
+            return
+          }
+
+          seen.add(normalized)
+          candidates.push(normalized)
+        }
+
+        pushCandidate(trimmed)
+
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i].trimStart()
+          if (line.startsWith("{") || line.startsWith("[")) {
+            pushCandidate(line)
+            pushCandidate(lines.slice(i).join("\n"))
+          }
+        }
+
+        return candidates
       }
 
       const parseJson = (output: string) => {
@@ -4684,17 +4706,14 @@ defmodule ControlKeel.Skills.Exporter do
         try {
           return JSON.parse(trimmed)
         } catch (_error) {
-          const candidate = extractJsonCandidate(trimmed)
-
-          if (!candidate || candidate === trimmed) {
-            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          for (const candidate of extractJsonCandidates(trimmed)) {
+            try {
+              return JSON.parse(candidate)
+            } catch (_fallbackError) {
+            }
           }
 
-          try {
-            return JSON.parse(candidate)
-          } catch (_fallbackError) {
-            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
-          }
+          throw new Error(`ControlKeel returned invalid JSON: ${output}`)
         }
       }
 
@@ -4810,6 +4829,52 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
+      const resolveReviewScope = async () => {
+        const envTaskId = process.env.CONTROLKEEL_TASK_ID
+        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+
+        if (envTaskId || envSessionId) {
+          return {
+            taskId: envTaskId ?? null,
+            sessionId: envSessionId ?? null,
+            source: "env",
+          }
+        }
+
+        const contextEnv = process.env.LOGGER_LEVEL
+          ? process.env
+          : { ...process.env, LOGGER_LEVEL: "warning" }
+
+        const contextProc = Bun.spawn(["controlkeel", "context", "--json", "--project-root", directory], {
+          stdout: "pipe",
+          stderr: "pipe",
+          env: contextEnv,
+        })
+        const contextOut = await new Response(contextProc.stdout).text()
+        const contextErr = await new Response(contextProc.stderr).text()
+        const contextExit = await contextProc.exited
+
+        if (contextExit !== 0) {
+          throw new Error(
+            `controlkeel context --json failed with exit code ${contextExit}${contextErr.trim() ? `: ${contextErr.trim()}` : ""}`
+          )
+        }
+
+        const contextPayload = parseJson([contextOut, contextErr].filter(Boolean).join("\n"))
+        const contextTaskId = contextPayload?.current_task?.id
+        const contextSessionId = contextPayload?.session_id
+
+        if (!contextTaskId && !contextSessionId) {
+          throw new Error("ControlKeel context did not include a session_id or current_task.id")
+        }
+
+        return {
+          taskId: contextTaskId != null ? String(contextTaskId) : null,
+          sessionId: contextSessionId != null ? String(contextSessionId) : null,
+          source: "context",
+        }
+      }
+
       const submitPlan = async (
         body: string,
         submittedBy: string,
@@ -4818,8 +4883,7 @@ defmodule ControlKeel.Skills.Exporter do
       ) => {
         await ensurePlanSubmitSupport()
 
-        const envTaskId = process.env.CONTROLKEEL_TASK_ID
-        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+        const reviewScope = await resolveReviewScope()
         const waitTimeout = Number(waitTimeoutSeconds ?? process.env.CONTROLKEEL_REVIEW_WAIT_TIMEOUT ?? 30)
         const waitTimeoutSecondsSafe = Number.isFinite(waitTimeout) && waitTimeout > 0 ? waitTimeout : 30
 
@@ -4830,10 +4894,18 @@ defmodule ControlKeel.Skills.Exporter do
         try {
           const submitArgs = ["controlkeel", "review", "plan", "submit", "--body-file", tmpFile, "--submitted-by", submittedBy, "--json"]
           if (title) submitArgs.push("--title", title)
-          if (envTaskId) submitArgs.push("--task-id", envTaskId)
-          else if (envSessionId) submitArgs.push("--session-id", envSessionId)
+          if (reviewScope.taskId) submitArgs.push("--task-id", reviewScope.taskId)
+          else if (reviewScope.sessionId) submitArgs.push("--session-id", reviewScope.sessionId)
 
-          const submitProc = Bun.spawn(submitArgs, { stdout: "pipe", stderr: "pipe" })
+          const submitEnv = process.env.LOGGER_LEVEL
+            ? process.env
+            : { ...process.env, LOGGER_LEVEL: "warning" }
+
+          const submitProc = Bun.spawn(submitArgs, {
+            stdout: "pipe",
+            stderr: "pipe",
+            env: submitEnv,
+          })
           const submitOut = await new Response(submitProc.stdout).text()
           const submitErr = await new Response(submitProc.stderr).text()
           const submitExit = await submitProc.exited
@@ -4844,7 +4916,7 @@ defmodule ControlKeel.Skills.Exporter do
             )
           }
 
-          const submitPayload = parseJson(submitOut || submitErr)
+          const submitPayload = parseJson([submitOut, submitErr].filter(Boolean).join("\n"))
 
           if (typeof submitPayload?.error === "string" && submitPayload.error.includes("session_id")) {
             throw new Error(
@@ -4857,7 +4929,15 @@ defmodule ControlKeel.Skills.Exporter do
             throw new Error("ControlKeel did not return a review id")
           }
 
-          const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], { stdout: "pipe", stderr: "pipe" })
+          const waitEnv = process.env.LOGGER_LEVEL
+            ? process.env
+            : { ...process.env, LOGGER_LEVEL: "warning" }
+
+          const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], {
+            stdout: "pipe",
+            stderr: "pipe",
+            env: waitEnv,
+          })
           const waitOut = await new Response(waitProc.stdout).text()
           const waitErr = await new Response(waitProc.stderr).text()
           const waitExit = await waitProc.exited
@@ -4868,7 +4948,7 @@ defmodule ControlKeel.Skills.Exporter do
             )
           }
 
-          const waitPayload = parseJson(waitOut || waitErr)
+          const waitPayload = parseJson([waitOut, waitErr].filter(Boolean).join("\n"))
           return {
             reviewId,
             submitPayload,
@@ -5053,19 +5133,41 @@ defmodule ControlKeel.Skills.Exporter do
      * but ships as plain JavaScript for npm-based installs.
      */
     export const ControlKeelGovernance = async ({ $, directory }) => {
-      const extractJsonCandidate = (output) => {
+      const extractJsonCandidates = (output) => {
         const trimmed = output.trim()
         if (!trimmed) {
-          return null
+          return []
         }
 
         const lines = trimmed
           .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line.length > 0)
+          .map((line) => line.trimEnd())
+          .filter((line) => line.trim().length > 0)
 
-        const jsonLine = [...lines].reverse().find((line) => line.startsWith("{") || line.startsWith("["))
-        return jsonLine ?? trimmed
+        const candidates = []
+        const seen = new Set()
+
+        const pushCandidate = (candidate) => {
+          const normalized = candidate.trim()
+          if (!normalized || seen.has(normalized)) {
+            return
+          }
+
+          seen.add(normalized)
+          candidates.push(normalized)
+        }
+
+        pushCandidate(trimmed)
+
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i].trimStart()
+          if (line.startsWith("{") || line.startsWith("[")) {
+            pushCandidate(line)
+            pushCandidate(lines.slice(i).join("\n"))
+          }
+        }
+
+        return candidates
       }
 
       const parseJson = (output) => {
@@ -5077,17 +5179,14 @@ defmodule ControlKeel.Skills.Exporter do
         try {
           return JSON.parse(trimmed)
         } catch (_error) {
-          const candidate = extractJsonCandidate(trimmed)
-
-          if (!candidate || candidate === trimmed) {
-            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
+          for (const candidate of extractJsonCandidates(trimmed)) {
+            try {
+              return JSON.parse(candidate)
+            } catch (_fallbackError) {
+            }
           }
 
-          try {
-            return JSON.parse(candidate)
-          } catch (_fallbackError) {
-            throw new Error(`ControlKeel returned invalid JSON: ${output}`)
-          }
+          throw new Error(`ControlKeel returned invalid JSON: ${output}`)
         }
       }
 
@@ -5200,11 +5299,56 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
+      const resolveReviewScope = async () => {
+        const envTaskId = process.env.CONTROLKEEL_TASK_ID
+        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+
+        if (envTaskId || envSessionId) {
+          return {
+            taskId: envTaskId ?? null,
+            sessionId: envSessionId ?? null,
+            source: "env",
+          }
+        }
+
+        const contextEnv = process.env.LOGGER_LEVEL
+          ? process.env
+          : { ...process.env, LOGGER_LEVEL: "warning" }
+
+        const contextProc = Bun.spawn(["controlkeel", "context", "--json", "--project-root", directory], {
+          stdout: "pipe",
+          stderr: "pipe",
+          env: contextEnv,
+        })
+        const contextOut = await new Response(contextProc.stdout).text()
+        const contextErr = await new Response(contextProc.stderr).text()
+        const contextExit = await contextProc.exited
+
+        if (contextExit !== 0) {
+          throw new Error(
+            `controlkeel context --json failed with exit code ${contextExit}${contextErr.trim() ? `: ${contextErr.trim()}` : ""}`
+          )
+        }
+
+        const contextPayload = parseJson([contextOut, contextErr].filter(Boolean).join("\n"))
+        const contextTaskId = contextPayload?.current_task?.id
+        const contextSessionId = contextPayload?.session_id
+
+        if (!contextTaskId && !contextSessionId) {
+          throw new Error("ControlKeel context did not include a session_id or current_task.id")
+        }
+
+        return {
+          taskId: contextTaskId != null ? String(contextTaskId) : null,
+          sessionId: contextSessionId != null ? String(contextSessionId) : null,
+          source: "context",
+        }
+      }
+
       const submitPlan = async (body, submittedBy, title, waitTimeoutSeconds) => {
         await ensurePlanSubmitSupport()
 
-        const envTaskId = process.env.CONTROLKEEL_TASK_ID
-        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+        const reviewScope = await resolveReviewScope()
         const waitTimeout = Number(waitTimeoutSeconds ?? process.env.CONTROLKEEL_REVIEW_WAIT_TIMEOUT ?? 30)
         const waitTimeoutSecondsSafe = Number.isFinite(waitTimeout) && waitTimeout > 0 ? waitTimeout : 30
 
@@ -5215,10 +5359,18 @@ defmodule ControlKeel.Skills.Exporter do
         try {
           const submitArgs = ["controlkeel", "review", "plan", "submit", "--body-file", tmpFile, "--submitted-by", submittedBy, "--json"]
           if (title) submitArgs.push("--title", title)
-          if (envTaskId) submitArgs.push("--task-id", envTaskId)
-          else if (envSessionId) submitArgs.push("--session-id", envSessionId)
+          if (reviewScope.taskId) submitArgs.push("--task-id", reviewScope.taskId)
+          else if (reviewScope.sessionId) submitArgs.push("--session-id", reviewScope.sessionId)
 
-          const submitProc = Bun.spawn(submitArgs, { stdout: "pipe", stderr: "pipe" })
+          const submitEnv = process.env.LOGGER_LEVEL
+            ? process.env
+            : { ...process.env, LOGGER_LEVEL: "warning" }
+
+          const submitProc = Bun.spawn(submitArgs, {
+            stdout: "pipe",
+            stderr: "pipe",
+            env: submitEnv,
+          })
           const submitOut = await new Response(submitProc.stdout).text()
           const submitErr = await new Response(submitProc.stderr).text()
           const submitExit = await submitProc.exited
@@ -5229,7 +5381,7 @@ defmodule ControlKeel.Skills.Exporter do
             )
           }
 
-          const submitPayload = parseJson(submitOut || submitErr)
+          const submitPayload = parseJson([submitOut, submitErr].filter(Boolean).join("\n"))
 
           if (typeof submitPayload?.error === "string" && submitPayload.error.includes("session_id")) {
             throw new Error(
@@ -5242,7 +5394,15 @@ defmodule ControlKeel.Skills.Exporter do
             throw new Error("ControlKeel did not return a review id")
           }
 
-          const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], { stdout: "pipe", stderr: "pipe" })
+          const waitEnv = process.env.LOGGER_LEVEL
+            ? process.env
+            : { ...process.env, LOGGER_LEVEL: "warning" }
+
+          const waitProc = Bun.spawn(["controlkeel", "review", "plan", "wait", "--id", String(reviewId), "--timeout", String(waitTimeoutSecondsSafe), "--json"], {
+            stdout: "pipe",
+            stderr: "pipe",
+            env: waitEnv,
+          })
           const waitOut = await new Response(waitProc.stdout).text()
           const waitErr = await new Response(waitProc.stderr).text()
           const waitExit = await waitProc.exited
@@ -5253,7 +5413,7 @@ defmodule ControlKeel.Skills.Exporter do
             )
           }
 
-          const waitPayload = parseJson(waitOut || waitErr)
+          const waitPayload = parseJson([waitOut, waitErr].filter(Boolean).join("\n"))
           return {
             reviewId,
             submitPayload,

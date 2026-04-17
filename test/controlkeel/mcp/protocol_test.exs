@@ -117,6 +117,56 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert %{"result" => %{"resources" => []}} = response
   end
 
+  test "tools/call waits briefly for MCP backend readiness" do
+    session = session_fixture()
+
+    original = Application.get_env(:controlkeel, :mcp_boot_gate_wait_ms)
+    Application.put_env(:controlkeel, :mcp_boot_gate_wait_ms, 200)
+
+    key = :controlkeel_mcp_backend_ready
+    original_status = :persistent_term.get(key, :missing)
+    :persistent_term.put(key, :booting)
+
+    parent = self()
+
+    releaser =
+      spawn(fn ->
+        Process.sleep(50)
+        :persistent_term.put(key, :ready)
+        send(parent, :boot_released)
+      end)
+
+    on_exit(fn ->
+      if original do
+        Application.put_env(:controlkeel, :mcp_boot_gate_wait_ms, original)
+      else
+        Application.delete_env(:controlkeel, :mcp_boot_gate_wait_ms)
+      end
+
+      case original_status do
+        :missing -> :persistent_term.erase(key)
+        status -> :persistent_term.put(key, status)
+      end
+
+      if Process.alive?(releaser), do: Process.exit(releaser, :kill)
+    end)
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 991,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_context",
+          "arguments" => %{"session_id" => session.id}
+        }
+      })
+
+    assert_receive :boot_released
+    assert %{"result" => %{"structuredContent" => payload}} = response
+    assert payload["session_id"] == session.id
+  end
+
   test "resources/read returns rendered skill content for a skills uri" do
     response =
       Protocol.handle_request(%{

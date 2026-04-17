@@ -4,6 +4,7 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
   alias ControlKeel.MCP.Tools.CkContext
   alias ControlKeel.Mission
   alias ControlKeel.Platform
+  alias ControlKeel.ProjectBinding
 
   import ControlKeel.MissionFixtures
 
@@ -40,5 +41,55 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
     assert "task_checks" in result["current_task"]["assurance"]["verification"][
              "evidence_sources"
            ]
+  end
+
+  test "accepts session_id alias current in bound project" do
+    tmp_dir =
+      Path.join(System.tmp_dir!(), "ck-context-current-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    session = session_fixture()
+
+    assert {:ok, _updated} =
+             Mission.attach_session_runtime_context(session.id, %{"project_root" => tmp_dir})
+
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => session.workspace_id,
+                 "session_id" => session.id,
+                 "agent" => "opencode",
+                 "attached_agents" => %{}
+               },
+               tmp_dir
+             )
+
+    assert {:ok, result} = CkContext.call(%{"session_id" => "current", "project_root" => tmp_dir})
+    assert result["session_id"] == session.id
+  end
+
+  test "returns clear error when session_id current cannot resolve binding" do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "ck-context-current-missing-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    assert {:error, {:invalid_arguments, message}} =
+             CkContext.call(%{"session_id" => "current", "project_root" => tmp_dir})
+
+    assert message =~ "must be an integer"
+    assert message =~ "bound project"
   end
 end

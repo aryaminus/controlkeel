@@ -704,22 +704,34 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ "--body-file"
     assert opencode_plugin =~ "submitArgs.push(\"--title\", title)"
     assert opencode_plugin =~ "controlkeel version"
-    assert opencode_plugin =~ "submitArgs.push(\"--task-id\", envTaskId)"
-    assert opencode_plugin =~ "submitArgs.push(\"--session-id\", envSessionId)"
+    assert opencode_plugin =~ "submitArgs.push(\"--task-id\", reviewScope.taskId)"
+    assert opencode_plugin =~ "submitArgs.push(\"--session-id\", reviewScope.sessionId)"
     assert opencode_plugin =~ "CONTROLKEEL_TASK_ID"
     assert opencode_plugin =~ "CONTROLKEEL_SESSION_ID"
+
+    assert opencode_plugin =~
+             ~S|["controlkeel", "context", "--json", "--project-root", directory]|
+
+    assert opencode_plugin =~ "current_task?.id"
+    assert opencode_plugin =~ "reviewScope.taskId"
     assert opencode_plugin =~ "CONTROLKEEL_REVIEW_WAIT_TIMEOUT"
     assert opencode_plugin =~ "String(waitTimeoutSecondsSafe)"
     assert opencode_plugin =~ "Bun.spawn"
     refute opencode_plugin =~ "submitCommand.text(body)"
     assert opencode_plugin =~ "wait_timeout_seconds"
     assert opencode_plugin =~ "Install >= 0.1.26"
-    assert opencode_plugin =~ "extractJsonCandidate"
+    assert opencode_plugin =~ "extractJsonCandidates"
     assert opencode_plugin =~ "JSON.parse(trimmed)"
+    assert opencode_plugin =~ "const seen = new Set"
+    assert opencode_plugin =~ "pushCandidate(trimmed)"
+    assert opencode_plugin =~ "pushCandidate(line)"
     assert opencode_plugin =~ "controlkeel review plan submit failed with exit code"
     assert opencode_plugin =~ "controlkeel review plan wait failed with exit code"
     assert opencode_plugin =~ "new Response(submitProc.stderr).text()"
     assert opencode_plugin =~ "new Response(waitProc.stderr).text()"
+    assert opencode_plugin =~ "LOGGER_LEVEL: \"warning\""
+    assert opencode_plugin =~ ~S|parseJson([submitOut, submitErr].filter(Boolean).join("\n"))|
+    assert opencode_plugin =~ ~S|parseJson([waitOut, waitErr].filter(Boolean).join("\n"))|
 
     opencode_agent =
       Path.join(opencode_plan.output_dir, ".opencode/agents/controlkeel-operator.md")

@@ -24,6 +24,7 @@ defmodule ControlKeel.EntryPoint do
       {:ok, parsed} ->
         ensure_standalone_logger_stderr()
         maybe_prepare_stdio_mcp!(parsed)
+        maybe_prepare_machine_output!(parsed)
 
         if CLI.app_required?(parsed) do
           maybe_enable_server(parsed)
@@ -87,6 +88,25 @@ defmodule ControlKeel.EntryPoint do
   end
 
   defp maybe_prepare_stdio_mcp!(_parsed), do: :ok
+
+  defp maybe_prepare_machine_output!(parsed) do
+    if System.get_env("LOGGER_LEVEL") in [nil, ""] and machine_output?(parsed) do
+      Application.put_env(:logger, :level, :warning)
+    end
+  end
+
+  defp machine_output?(%{options: options}) do
+    json? = option_value(options, :json) == true
+    format = option_value(options, :format)
+
+    json? or format in ["json", :json]
+  end
+
+  defp machine_output?(_parsed), do: false
+
+  defp option_value(options, key) when is_list(options), do: Keyword.get(options, key)
+  defp option_value(options, key) when is_map(options), do: Map.get(options, key)
+  defp option_value(_options, _key), do: nil
 
   defp ensure_standalone_logger_stderr do
     case :logger.get_handler_config(:default) do

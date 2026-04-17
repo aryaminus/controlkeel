@@ -1005,7 +1005,7 @@ defmodule ControlKeel.MCP.Protocol do
   defp default_mcp_protocol_version, do: "2024-11-05"
 
   defp mcp_stdio_boot_gate(id) do
-    case ControlKeel.Application.mcp_backend_boot_status() do
+    case await_mcp_backend_ready(mcp_boot_gate_wait_ms()) do
       :ready ->
         :ok
 
@@ -1027,6 +1027,44 @@ defmodule ControlKeel.MCP.Protocol do
 
       _ ->
         :ok
+    end
+  end
+
+  defp await_mcp_backend_ready(timeout_ms) when is_integer(timeout_ms) and timeout_ms <= 0 do
+    normalize_mcp_backend_status(ControlKeel.Application.mcp_backend_boot_status())
+  end
+
+  defp await_mcp_backend_ready(timeout_ms) when is_integer(timeout_ms) do
+    deadline_ms = System.monotonic_time(:millisecond) + timeout_ms
+    await_mcp_backend_ready_until(deadline_ms)
+  end
+
+  defp await_mcp_backend_ready(_timeout_ms), do: :ready
+
+  defp await_mcp_backend_ready_until(deadline_ms) do
+    case normalize_mcp_backend_status(ControlKeel.Application.mcp_backend_boot_status()) do
+      :booting ->
+        if System.monotonic_time(:millisecond) < deadline_ms do
+          Process.sleep(25)
+          await_mcp_backend_ready_until(deadline_ms)
+        else
+          :booting
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp normalize_mcp_backend_status(:ready), do: :ready
+  defp normalize_mcp_backend_status(:booting), do: :booting
+  defp normalize_mcp_backend_status({:failed, _reason} = failed), do: failed
+  defp normalize_mcp_backend_status(_status), do: :ready
+
+  defp mcp_boot_gate_wait_ms do
+    case Application.get_env(:controlkeel, :mcp_boot_gate_wait_ms, 2000) do
+      value when is_integer(value) and value >= 0 -> value
+      _ -> 2000
     end
   end
 
