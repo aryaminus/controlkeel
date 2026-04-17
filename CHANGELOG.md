@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.25 — 2026-04-17
+
+### What's changed
+
+- fix(mcp): prevent review tool endpoint crashes
+
 ## v0.2.24 — 2026-04-17
 
 ### What's changed
