@@ -5024,7 +5024,7 @@ defmodule ControlKeel.CLI do
           end
 
         mirror_path =
-          if legacy_path != config_path and File.exists?(legacy_path), do: legacy_path, else: nil
+          if legacy_path != config_path, do: legacy_path, else: nil
 
         {existing, mirror_path}
       else

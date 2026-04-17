@@ -590,6 +590,37 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert get_in(opencode_legacy_config, ["mcp", "controlkeel", "enabled"]) == true
   end
 
+  test "attach opencode writes legacy config even when absent", %{tmp_dir: tmp_dir} do
+    assert {:ok, init} = CLI.parse(["init", "--no-attach"])
+
+    capture_io(fn ->
+      assert 0 == CLI.execute(init, project_root: tmp_dir)
+    end)
+
+    File.rm_rf!(Path.dirname(opencode_legacy_config_path()))
+    refute File.exists?(opencode_legacy_config_path())
+
+    assert {:ok, opencode_attach} = CLI.parse(["attach", "opencode"])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(opencode_attach, project_root: tmp_dir)
+      end)
+
+    assert output =~ "Attached ControlKeel to OpenCode."
+    assert File.exists?(opencode_canonical_config_path())
+    assert File.exists?(opencode_legacy_config_path())
+
+    assert {:ok, canonical} = Jason.decode(File.read!(opencode_canonical_config_path()))
+    assert {:ok, legacy} = Jason.decode(File.read!(opencode_legacy_config_path()))
+
+    assert get_in(canonical, ["mcp", "controlkeel", "type"]) == "local"
+    assert get_in(legacy, ["mcp", "controlkeel", "type"]) == "local"
+
+    assert get_in(canonical, ["mcp", "controlkeel", "command"]) ==
+             get_in(legacy, ["mcp", "controlkeel", "command"])
+  end
+
   test "codex attach supports mcp-only mode without native bundle install", %{tmp_dir: tmp_dir} do
     assert {:ok, init} = CLI.parse(["init", "--no-attach"])
 
