@@ -414,6 +414,7 @@ defmodule ControlKeel.Deployment.Advisor do
 
     # Application
     APP_NAME=#{name}
+    # Use your public domain in cloud deployments (for ControlKeel Cloud, use controlkeel.com).
     PHX_HOST=localhost
     PORT=4000
     SECRET_KEY_BASE=CHANGE_ME_GENERATE_WITH_mix_phx.gen.secret

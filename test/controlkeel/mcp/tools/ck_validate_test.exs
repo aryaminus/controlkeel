@@ -211,4 +211,23 @@ defmodule ControlKeel.MCP.Tools.CkValidateTest do
     assert disclosure["metadata"]["finding_family"] == "vulnerability_case"
     assert disclosure["metadata"]["disclosure_status"] == "draft"
   end
+
+  test "accepts legacy artifact_type aliases instruction and text" do
+    assert {:ok, result_from_instruction} =
+             CkValidate.call(%{
+               "content" => "simple text payload",
+               "kind" => "text",
+               "artifact_type" => "instruction"
+             })
+
+    assert {:ok, result_from_text_alias} =
+             CkValidate.call(%{
+               "content" => "simple text payload",
+               "kind" => "text",
+               "artifact_type" => "text"
+             })
+
+    assert result_from_instruction["allowed"] in [true, false]
+    assert result_from_text_alias["allowed"] in [true, false]
+  end
 end

@@ -89,6 +89,7 @@ session-ses_*.md
 /plugins/
 /README.gemini-controlkeel.md
 /skills/
+/packages/npm/controlkeel/vendor/
 /.vscode/extensions.json
 /.vscode/mcp.json
 /.github/agents/

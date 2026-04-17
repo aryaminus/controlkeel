@@ -3654,8 +3654,18 @@ defmodule ControlKeel.Mission do
   end
 
   defp superseded_reviews_query(%{
-         attrs: %{"session_id" => session_id, "task_id" => nil, "review_type" => review_type}
+         attrs: %{"session_id" => session_id, "review_type" => review_type, "task_id" => nil}
        }) do
+    Review
+    |> where([review], review.session_id == ^session_id and is_nil(review.task_id))
+    |> where([review], review.review_type == ^review_type)
+    |> where([review], review.status == "pending")
+  end
+
+  defp superseded_reviews_query(%{
+         attrs: %{"session_id" => session_id, "review_type" => review_type} = attrs
+       })
+       when not is_map_key(attrs, "task_id") do
     Review
     |> where([review], review.session_id == ^session_id and is_nil(review.task_id))
     |> where([review], review.review_type == ^review_type)

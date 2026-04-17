@@ -413,6 +413,31 @@ defmodule ControlKeel.MissionTest do
     assert Enum.any?(gate["grill_questions"], &String.contains?(&1, "files, modules, or flows"))
   end
 
+  test "session-scoped plan reviews without task_id key supersede previous pending review" do
+    session = session_fixture()
+
+    assert {:ok, first_review} =
+             Mission.submit_review(%{
+               "session_id" => session.id,
+               "review_type" => "plan",
+               "submission_body" => "Session-level plan v1"
+             })
+
+    assert first_review.task_id == nil
+    assert first_review.status == "pending"
+
+    assert {:ok, second_review} =
+             Mission.submit_review(%{
+               "session_id" => session.id,
+               "review_type" => "plan",
+               "submission_body" => "Session-level plan v2"
+             })
+
+    assert second_review.task_id == nil
+    assert second_review.previous_review_id == first_review.id
+    assert Mission.get_review!(first_review.id).status == "superseded"
+  end
+
   test "approved implementation plans unlock execution only when the refinement packet is strong enough" do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "queued"})

@@ -270,7 +270,9 @@ defmodule ControlKeel.MCP.Protocol do
           },
           "artifact_type" => %{
             "type" => "string",
-            "enum" => SecurityWorkflow.artifact_types()
+            "enum" => SecurityWorkflow.artifact_types() ++ ["instruction", "text"],
+            "description" =>
+              "Canonical artifact type. Compatibility aliases `instruction` and `text` are accepted and normalized to `source`."
           },
           "target_scope" => %{
             "type" => "string",

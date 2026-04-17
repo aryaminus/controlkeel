@@ -52,7 +52,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
                ),
              {:ok, artifact_type} <-
                normalize_optional_enum(
-                 arguments,
+                 normalize_artifact_type_alias(arguments),
                  "artifact_type",
                  SecurityWorkflow.artifact_types()
                ),
@@ -240,6 +240,14 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
 
       _ ->
         {:error, {:invalid_arguments, "`#{key}` must be an array if provided"}}
+    end
+  end
+
+  defp normalize_artifact_type_alias(arguments) do
+    case Map.get(arguments, "artifact_type") do
+      "instruction" -> Map.put(arguments, "artifact_type", "source")
+      "text" -> Map.put(arguments, "artifact_type", "source")
+      _ -> arguments
     end
   end
 end

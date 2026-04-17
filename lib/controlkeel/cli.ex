@@ -6,6 +6,7 @@ defmodule ControlKeel.CLI do
   alias ControlKeel.ACPRegistry
   alias ControlKeel.AgentExecution
   alias ControlKeel.AgentIntegration
+  alias ControlKeel.AgentRouter
   alias ControlKeel.AttachedAgentSync
   alias ControlKeel.Analytics
   alias ControlKeel.AutonomyLoop
@@ -191,13 +192,15 @@ defmodule ControlKeel.CLI do
     stdin: :boolean,
     title: :string,
     submitted_by: :string,
+    project_root: :string,
     json: :boolean
   ]
-  @review_plan_open_switches [id: :integer, json: :boolean]
+  @review_plan_open_switches [id: :integer, project_root: :string, json: :boolean]
   @review_plan_wait_switches [
     id: :integer,
     timeout: :integer,
     interval_ms: :integer,
+    project_root: :string,
     json: :boolean
   ]
   @review_plan_respond_switches [
@@ -205,6 +208,7 @@ defmodule ControlKeel.CLI do
     feedback_notes: :string,
     reviewed_by: :string,
     annotations: :string,
+    project_root: :string,
     json: :boolean
   ]
   @release_ready_switches [
@@ -218,6 +222,20 @@ defmodule ControlKeel.CLI do
   @govern_install_switches [project_root: :string]
   @plugin_switches [project_root: :string, scope: :string, mode: :string]
   @agents_doctor_switches [project_root: :string]
+  @agents_list_switches [project_root: :string, format: :string, json: :boolean]
+  @route_agent_switches [
+    task: :string,
+    risk_tier: :string,
+    budget_remaining_cents: :integer,
+    allowed_agents: :string,
+    domain_pack: :string,
+    format: :string,
+    json: :boolean
+  ]
+  @task_claim_switches [execution_mode: :string]
+  @task_heartbeat_switches [progress: :integer, note: :string]
+  @task_checks_switches [checks: :string]
+  @task_report_switches [status: :string, output: :string, metadata: :string]
   @agent_run_switches [project_root: :string, agent: :string, mode: :string, sandbox: :string]
 
   def standalone_argv do
@@ -292,6 +310,27 @@ defmodule ControlKeel.CLI do
 
       ["agents", "doctor" | rest] ->
         parse_with_switches(:agents_doctor, rest, @agents_doctor_switches)
+
+      ["agents", "list" | rest] ->
+        parse_with_switches(:agents_list, rest, @agents_list_switches)
+
+      ["route-agent" | rest] ->
+        parse_with_switches(:route_agent, rest, @route_agent_switches)
+
+      ["task", "complete", task_id] ->
+        {:ok, %{command: :task_complete, options: %{}, args: [task_id]}}
+
+      ["task", "claim", task_id | rest] ->
+        parse_task_command(:task_claim, task_id, rest, @task_claim_switches)
+
+      ["task", "heartbeat", task_id | rest] ->
+        parse_task_command(:task_heartbeat, task_id, rest, @task_heartbeat_switches)
+
+      ["task", "checks", task_id | rest] ->
+        parse_task_command(:task_checks, task_id, rest, @task_checks_switches)
+
+      ["task", "report", task_id | rest] ->
+        parse_task_command(:task_report, task_id, rest, @task_report_switches)
 
       ["run", "task", task_id | rest] ->
         parse_run_command(:run_task, task_id, rest)
@@ -1179,6 +1218,8 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :review_plan_submit, options: options}, project_root) do
+    project_root = resolve_project_root(options, project_root)
+
     with {:ok, submission_body} <- review_submission_input(options),
          {:ok, attrs} <- review_submission_attrs(options, submission_body, project_root),
          {:ok, review} <- Mission.submit_review(attrs) do
@@ -1290,15 +1331,34 @@ defmodule ControlKeel.CLI do
       end
     else
       {:error, {:timeout, review}} ->
-        cli_error(
-          "Timed out waiting for plan review ##{review.id}",
-          {:timeout, review},
-          options,
+        payload =
           review_cli_payload(review, %{
             "message" => "timeout",
+            "timed_out" => true,
+            "status" => review.status,
             "browser_url" => review_url(review.id)
           })
-        )
+
+        if review.status in ["pending", "superseded"] do
+          if options[:json] do
+            {:ok, [Jason.encode!(payload)]}
+          else
+            {:ok,
+             [
+               "Timed out waiting for plan review ##{review.id}.",
+               "Status: #{review.status}",
+               "Browser URL: #{review_url(review.id)}",
+               "Review is still open; keep waiting or respond in browser."
+             ]}
+          end
+        else
+          cli_error(
+            "Timed out waiting for plan review ##{review.id}",
+            {:timeout, review},
+            options,
+            payload
+          )
+        end
 
       {:error, reason} ->
         cli_error("Failed while waiting for plan review", reason, options)
@@ -1444,6 +1504,181 @@ defmodule ControlKeel.CLI do
        "Agents:"
        | agent_lines
      ]}
+  end
+
+  def run_command(%{command: :agents_list, options: options}, project_root) do
+    with {:ok, format} <- effective_cli_format(options) do
+      root = resolve_project_root(options, project_root)
+      agents = AgentExecution.list_agents(root)
+
+      case format do
+        "json" ->
+          {:ok, [Jason.encode!(%{"agents" => agents})]}
+
+        _ ->
+          lines =
+            ["Agents:"] ++
+              Enum.map(agents, fn agent ->
+                "  #{agent.id}: attached=#{if(agent.attached, do: "yes", else: "no")} runnable=#{if(agent.runnable, do: "yes", else: "no")} support=#{agent.execution_support}"
+              end)
+
+          {:ok, lines}
+      end
+    end
+  end
+
+  def run_command(%{command: :route_agent, options: options}, _project_root) do
+    with {:ok, format} <- effective_cli_format(options),
+         {:ok, task_title} <- require_string_option(options[:task], "task"),
+         {:ok, risk_tier} <- optional_risk_tier(options[:risk_tier]) do
+      router_opts =
+        []
+        |> maybe_put_cli_opt(:risk_tier, risk_tier)
+        |> maybe_put_cli_opt(:budget_remaining_cents, options[:budget_remaining_cents])
+        |> maybe_put_cli_opt(:allowed_agents, parse_allowed_agents(options[:allowed_agents]))
+        |> maybe_put_cli_opt(:domain_pack, options[:domain_pack])
+
+      case AgentRouter.route(task_title, router_opts) do
+        {:ok, recommendation} ->
+          case format do
+            "json" ->
+              {:ok, [Jason.encode!(%{"recommendation" => recommendation})]}
+
+            _ ->
+              {:ok,
+               [
+                 "Recommended agent: #{recommendation.agent}",
+                 "Task type: #{recommendation.task_type}",
+                 "Rationale: #{Enum.join(recommendation.rationale || [], " | ")}",
+                 if((recommendation.warnings || []) == [],
+                   do: "Warnings: none",
+                   else: "Warnings: #{Enum.join(recommendation.warnings, " | ")}"
+                 )
+               ]}
+          end
+
+        {:error, :no_suitable_agent, message} ->
+          {:error, message}
+      end
+    end
+  end
+
+  def run_command(%{command: :task_complete, args: [task_id]}, project_root) do
+    with {:ok, task} <- task_in_current_session(project_root, task_id),
+         {:ok, updated_task} <- Mission.complete_task(task) do
+      {:ok,
+       ["Completed task ##{updated_task.id}: #{updated_task.title} (#{updated_task.status})"]}
+    else
+      {:error, :wrong_session} ->
+        {:error, "That task does not belong to the current governed session."}
+
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Task not found."}
+
+      {:error, :unresolved_findings, findings} ->
+        {:error,
+         "Task has #{length(findings)} unresolved findings; resolve or approve them before completing."}
+
+      {:error, reason} ->
+        {:error, "Failed to complete task: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :task_claim, args: [task_id], options: options}, project_root) do
+    with {:ok, task} <- task_in_current_session(project_root, task_id),
+         {:ok, task_run} <-
+           Platform.claim_task(task.id, nil, %{
+             "execution_mode" => normalize_task_execution_mode(options[:execution_mode])
+           }) do
+      {:ok, ["Claimed task ##{task.id}: run ##{task_run.id} is #{task_run.status}."]}
+    else
+      {:error, :wrong_session} ->
+        {:error, "That task does not belong to the current governed session."}
+
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Task not found."}
+
+      {:error, reason} ->
+        {:error, "Failed to claim task: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :task_heartbeat, args: [task_id], options: options}, project_root) do
+    with {:ok, task} <- task_in_current_session(project_root, task_id),
+         {:ok, task_run} <-
+           Platform.heartbeat_task(task.id, nil, %{
+             "progress" => options[:progress],
+             "note" => options[:note]
+           }) do
+      {:ok, ["Heartbeat recorded for task ##{task.id}: run ##{task_run.id}."]}
+    else
+      {:error, :wrong_session} ->
+        {:error, "That task does not belong to the current governed session."}
+
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Task run not found; claim the task first."}
+
+      {:error, reason} ->
+        {:error, "Failed to record heartbeat: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :task_checks, args: [task_id], options: options}, project_root) do
+    with {:ok, task} <- task_in_current_session(project_root, task_id),
+         {:ok, checks} <- decode_required_json_list(options[:checks], "checks"),
+         {:ok, results} <- Platform.record_task_checks(task.id, nil, checks) do
+      {:ok, ["Recorded #{length(results)} check result(s) for task ##{task.id}."]}
+    else
+      {:error, :wrong_session} ->
+        {:error, "That task does not belong to the current governed session."}
+
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, {:missing_option, option}} ->
+        {:error, "Missing required option --#{option}"}
+
+      {:error, :not_found} ->
+        {:error, "Task run not found; claim the task first."}
+
+      {:error, reason} ->
+        {:error, "Failed to record checks: #{format_cli_error(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :task_report, args: [task_id], options: options}, project_root) do
+    with {:ok, task} <- task_in_current_session(project_root, task_id),
+         {:ok, output} <- decode_optional_json_map(options[:output], "output"),
+         {:ok, metadata} <- decode_optional_json_map(options[:metadata], "metadata"),
+         {:ok, task_run} <-
+           Platform.report_task(task.id, nil, %{
+             "status" => options[:status] || "done",
+             "output" => output,
+             "metadata" => metadata
+           }) do
+      {:ok, ["Reported task ##{task.id}: run ##{task_run.id} now #{task_run.status}."]}
+    else
+      {:error, :wrong_session} ->
+        {:error, "That task does not belong to the current governed session."}
+
+      {:error, :invalid_id} ->
+        {:error, "Task id must be an integer."}
+
+      {:error, :not_found} ->
+        {:error, "Task run not found; claim the task first."}
+
+      {:error, reason} ->
+        {:error, "Failed to report task: #{format_cli_error(reason)}"}
+    end
   end
 
   def run_command(%{command: :run_task, args: [task_id], options: options}, project_root) do
@@ -3820,6 +4055,16 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp parse_task_command(command, task_id, argv, switches) do
+    case OptionParser.parse(argv, strict: switches) do
+      {options, [], []} ->
+        {:ok, %{command: command, options: options, args: [task_id]}}
+
+      _ ->
+        {:error, usage_text()}
+    end
+  end
+
   defp required_option(options, key, flag) do
     value =
       cond do
@@ -3904,6 +4149,7 @@ defmodule ControlKeel.CLI do
 
   defp review_submission_attrs(options, submission_body, project_root) do
     runtime_context = review_runtime_context_from_env()
+    effective_project_root = review_scope_project_root(project_root, runtime_context)
 
     inferred_scope =
       cond do
@@ -3914,7 +4160,7 @@ defmodule ControlKeel.CLI do
           %{task_id: nil, session_id: options[:session_id], source: "explicit"}
 
         true ->
-          infer_review_scope(runtime_context, project_root)
+          infer_review_scope(runtime_context, effective_project_root)
       end
 
     {:ok,
@@ -3932,7 +4178,8 @@ defmodule ControlKeel.CLI do
            "task_id" => inferred_scope.task_id,
            "session_id" => inferred_scope.session_id,
            "source" => inferred_scope.source
-         }
+         },
+         "effective_project_root" => effective_project_root
        }
      }}
   end
@@ -3980,6 +4227,19 @@ defmodule ControlKeel.CLI do
     end
   end
 
+  defp review_scope_project_root(project_root, runtime_context) do
+    runtime_root = Map.get(runtime_context, "project_root")
+
+    candidate =
+      cond do
+        is_binary(runtime_root) and runtime_root != "" -> runtime_root
+        is_binary(project_root) and project_root != "" -> project_root
+        true -> File.cwd!()
+      end
+
+    ProjectRoot.resolve(candidate)
+  end
+
   defp parse_optional_integer(value) when is_integer(value), do: value
 
   defp parse_optional_integer(value) when is_binary(value) do
@@ -3990,6 +4250,83 @@ defmodule ControlKeel.CLI do
   end
 
   defp parse_optional_integer(_value), do: nil
+
+  defp task_in_current_session(project_root, task_id) do
+    with {:ok, _binding, session, _mode} <- ensure_local_project(project_root),
+         {:ok, parsed_id} <- parse_id(task_id),
+         task when not is_nil(task) <- Mission.get_task(parsed_id),
+         true <- task.session_id == session.id || {:error, :wrong_session} do
+      {:ok, task}
+    else
+      {:error, :wrong_session} -> {:error, :wrong_session}
+      {:error, :invalid_id} -> {:error, :invalid_id}
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp optional_risk_tier(nil), do: {:ok, nil}
+  defp optional_risk_tier(""), do: {:ok, nil}
+
+  defp optional_risk_tier(value) when value in ["low", "medium", "high", "critical"],
+    do: {:ok, value}
+
+  defp optional_risk_tier(_value),
+    do: {:error, "--risk-tier must be one of low, medium, high, critical"}
+
+  defp parse_allowed_agents(nil), do: nil
+  defp parse_allowed_agents(""), do: nil
+
+  defp parse_allowed_agents(value) when is_binary(value) do
+    value
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp normalize_task_execution_mode(nil), do: "local"
+  defp normalize_task_execution_mode(""), do: "local"
+  defp normalize_task_execution_mode("agent"), do: "local"
+  defp normalize_task_execution_mode("human"), do: "local"
+  defp normalize_task_execution_mode("runtime"), do: "external"
+
+  defp normalize_task_execution_mode(value) when value in ["local", "cloud", "external"],
+    do: value
+
+  defp normalize_task_execution_mode(_value), do: "local"
+
+  defp decode_required_json_list(nil, option), do: {:error, {:missing_option, option}}
+  defp decode_required_json_list("", option), do: {:error, {:missing_option, option}}
+
+  defp decode_required_json_list(value, option) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, list} when is_list(list) ->
+        {:ok, list}
+
+      {:ok, _other} ->
+        {:error, "--#{option} must decode to a JSON array"}
+
+      {:error, %Jason.DecodeError{} = error} ->
+        {:error, "--#{option} must be valid JSON: #{Exception.message(error)}"}
+    end
+  end
+
+  defp decode_optional_json_map(nil, _option), do: {:ok, %{}}
+  defp decode_optional_json_map("", _option), do: {:ok, %{}}
+
+  defp decode_optional_json_map(value, option) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, %{} = map} ->
+        {:ok, map}
+
+      {:ok, _other} ->
+        {:error, "--#{option} must decode to a JSON object"}
+
+      {:error, %Jason.DecodeError{} = error} ->
+        {:error, "--#{option} must be valid JSON: #{Exception.message(error)}"}
+    end
+  end
 
   defp parse_review_annotations(nil), do: %{}
 
@@ -4168,6 +4505,14 @@ defmodule ControlKeel.CLI do
 
   defp effective_cli_format(options) when is_list(options) do
     if Keyword.get(options, :json) == true do
+      {:ok, "json"}
+    else
+      cli_output_format(options)
+    end
+  end
+
+  defp effective_cli_format(options) when is_map(options) do
+    if Map.get(options, :json) == true or Map.get(options, "json") == true do
       {:ok, "json"}
     else
       cli_output_format(options)

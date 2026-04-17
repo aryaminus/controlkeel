@@ -4829,7 +4829,18 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
-      const resolveReviewScope = async () => {
+      const resolveReviewScope = async (
+        explicitTaskId?: string | number | null,
+        explicitSessionId?: string | number | null
+      ) => {
+        if (explicitTaskId || explicitSessionId) {
+          return {
+            taskId: explicitTaskId != null ? String(explicitTaskId) : null,
+            sessionId: explicitSessionId != null ? String(explicitSessionId) : null,
+            source: "explicit",
+          }
+        }
+
         const envTaskId = process.env.CONTROLKEEL_TASK_ID
         const envSessionId = process.env.CONTROLKEEL_SESSION_ID
 
@@ -4864,26 +4875,44 @@ defmodule ControlKeel.Skills.Exporter do
         const contextTaskId = contextPayload?.current_task?.id
         const contextSessionId = contextPayload?.session_id
 
-        if (!contextTaskId && !contextSessionId) {
-          throw new Error("ControlKeel context did not include a session_id or current_task.id")
+        if (contextTaskId || contextSessionId) {
+          return {
+            taskId: contextTaskId != null ? String(contextTaskId) : null,
+            sessionId: contextSessionId != null ? String(contextSessionId) : null,
+            source: "context",
+          }
         }
 
-        return {
-          taskId: contextTaskId != null ? String(contextTaskId) : null,
-          sessionId: contextSessionId != null ? String(contextSessionId) : null,
-          source: "context",
+        try {
+          const bindingPayload = parseJson(await Bun.file(`${directory}/controlkeel/project.json`).text())
+          const bindingSessionId = bindingPayload?.session_id
+
+          if (bindingSessionId) {
+            return {
+              taskId: null,
+              sessionId: String(bindingSessionId),
+              source: "binding",
+            }
+          }
+        } catch (_error) {
         }
+
+        throw new Error(
+          "ControlKeel could not infer review scope. Set CONTROLKEEL_TASK_ID or CONTROLKEEL_SESSION_ID, or pass task_id/session_id to submit_plan."
+        )
       }
 
       const submitPlan = async (
         body: string,
         submittedBy: string,
         title?: string,
-        waitTimeoutSeconds?: number
+        waitTimeoutSeconds?: number,
+        taskId?: string | number | null,
+        sessionId?: string | number | null
       ) => {
         await ensurePlanSubmitSupport()
 
-        const reviewScope = await resolveReviewScope()
+        const reviewScope = await resolveReviewScope(taskId, sessionId)
         const waitTimeout = Number(waitTimeoutSeconds ?? process.env.CONTROLKEEL_REVIEW_WAIT_TIMEOUT ?? 30)
         const waitTimeoutSecondsSafe = Number.isFinite(waitTimeout) && waitTimeout > 0 ? waitTimeout : 30
 
@@ -4941,19 +4970,35 @@ defmodule ControlKeel.Skills.Exporter do
           const waitOut = await new Response(waitProc.stdout).text()
           const waitErr = await new Response(waitProc.stderr).text()
           const waitExit = await waitProc.exited
+          const waitPayload = parseJson([waitOut, waitErr].filter(Boolean).join("\n"))
+          const waitMessage = typeof waitPayload?.message === "string" ? waitPayload.message.toLowerCase() : ""
+          const waitError = typeof waitPayload?.error === "string" ? waitPayload.error.toLowerCase() : ""
+          const waitTimedOut = waitMessage.includes("timeout") || waitError.includes("timed out")
+          const waitPending = waitPayload?.review?.status === "pending"
 
           if (waitExit !== 0) {
+            if (waitTimedOut && waitPending) {
+              return {
+                reviewId,
+                submitPayload,
+                waitPayload,
+                browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
+                status: "pending",
+                feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+                timedOut: true,
+              }
+            }
+
             throw new Error(
               `controlkeel review plan wait failed with exit code ${waitExit}${waitErr.trim() ? `: ${waitErr.trim()}` : ""}`
             )
           }
 
-          const waitPayload = parseJson([waitOut, waitErr].filter(Boolean).join("\n"))
           return {
             reviewId,
             submitPayload,
             waitPayload,
-            browserUrl: submitPayload?.browser_url,
+            browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
             status: waitPayload?.review?.status,
             feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
           }
@@ -5004,13 +5049,17 @@ defmodule ControlKeel.Skills.Exporter do
               plan: tool.schema.string().describe("Markdown plan body to submit for review."),
               title: tool.schema.string().optional(),
               wait_timeout_seconds: tool.schema.number().int().positive().optional(),
+              task_id: tool.schema.number().int().positive().optional(),
+              session_id: tool.schema.number().int().positive().optional(),
             },
             async execute(args) {
               const result = await submitPlan(
                 args.plan,
                 "opencode",
                 args.title,
-                args.wait_timeout_seconds
+                args.wait_timeout_seconds,
+                args.task_id,
+                args.session_id
               )
               return JSON.stringify(result, null, 2)
             },
@@ -5299,7 +5348,15 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
-      const resolveReviewScope = async () => {
+      const resolveReviewScope = async (explicitTaskId, explicitSessionId) => {
+        if (explicitTaskId || explicitSessionId) {
+          return {
+            taskId: explicitTaskId != null ? String(explicitTaskId) : null,
+            sessionId: explicitSessionId != null ? String(explicitSessionId) : null,
+            source: "explicit",
+          }
+        }
+
         const envTaskId = process.env.CONTROLKEEL_TASK_ID
         const envSessionId = process.env.CONTROLKEEL_SESSION_ID
 
@@ -5334,21 +5391,37 @@ defmodule ControlKeel.Skills.Exporter do
         const contextTaskId = contextPayload?.current_task?.id
         const contextSessionId = contextPayload?.session_id
 
-        if (!contextTaskId && !contextSessionId) {
-          throw new Error("ControlKeel context did not include a session_id or current_task.id")
+        if (contextTaskId || contextSessionId) {
+          return {
+            taskId: contextTaskId != null ? String(contextTaskId) : null,
+            sessionId: contextSessionId != null ? String(contextSessionId) : null,
+            source: "context",
+          }
         }
 
-        return {
-          taskId: contextTaskId != null ? String(contextTaskId) : null,
-          sessionId: contextSessionId != null ? String(contextSessionId) : null,
-          source: "context",
+        try {
+          const bindingPayload = parseJson(await Bun.file(`${directory}/controlkeel/project.json`).text())
+          const bindingSessionId = bindingPayload?.session_id
+
+          if (bindingSessionId) {
+            return {
+              taskId: null,
+              sessionId: String(bindingSessionId),
+              source: "binding",
+            }
+          }
+        } catch (_error) {
         }
+
+        throw new Error(
+          "ControlKeel could not infer review scope. Set CONTROLKEEL_TASK_ID or CONTROLKEEL_SESSION_ID, or pass task_id/session_id to submit_plan."
+        )
       }
 
-      const submitPlan = async (body, submittedBy, title, waitTimeoutSeconds) => {
+      const submitPlan = async (body, submittedBy, title, waitTimeoutSeconds, taskId, sessionId) => {
         await ensurePlanSubmitSupport()
 
-        const reviewScope = await resolveReviewScope()
+        const reviewScope = await resolveReviewScope(taskId, sessionId)
         const waitTimeout = Number(waitTimeoutSeconds ?? process.env.CONTROLKEEL_REVIEW_WAIT_TIMEOUT ?? 30)
         const waitTimeoutSecondsSafe = Number.isFinite(waitTimeout) && waitTimeout > 0 ? waitTimeout : 30
 
@@ -5406,19 +5479,35 @@ defmodule ControlKeel.Skills.Exporter do
           const waitOut = await new Response(waitProc.stdout).text()
           const waitErr = await new Response(waitProc.stderr).text()
           const waitExit = await waitProc.exited
+          const waitPayload = parseJson([waitOut, waitErr].filter(Boolean).join("\n"))
+          const waitMessage = typeof waitPayload?.message === "string" ? waitPayload.message.toLowerCase() : ""
+          const waitError = typeof waitPayload?.error === "string" ? waitPayload.error.toLowerCase() : ""
+          const waitTimedOut = waitMessage.includes("timeout") || waitError.includes("timed out")
+          const waitPending = waitPayload?.review?.status === "pending"
 
           if (waitExit !== 0) {
+            if (waitTimedOut && waitPending) {
+              return {
+                reviewId,
+                submitPayload,
+                waitPayload,
+                browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
+                status: "pending",
+                feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+                timedOut: true,
+              }
+            }
+
             throw new Error(
               `controlkeel review plan wait failed with exit code ${waitExit}${waitErr.trim() ? `: ${waitErr.trim()}` : ""}`
             )
           }
 
-          const waitPayload = parseJson([waitOut, waitErr].filter(Boolean).join("\n"))
           return {
             reviewId,
             submitPayload,
             waitPayload,
-            browserUrl: submitPayload?.browser_url,
+            browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
             status: waitPayload?.review?.status,
             feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
           }
@@ -5469,13 +5558,17 @@ defmodule ControlKeel.Skills.Exporter do
               plan: tool.schema.string().describe("Markdown plan body to submit for review."),
               title: tool.schema.string().optional(),
               wait_timeout_seconds: tool.schema.number().int().positive().optional(),
+              task_id: tool.schema.number().int().positive().optional(),
+              session_id: tool.schema.number().int().positive().optional(),
             },
             async execute(args) {
               const result = await submitPlan(
                 args.plan,
                 "opencode",
                 args.title,
-                args.wait_timeout_seconds
+                args.wait_timeout_seconds,
+                args.task_id,
+                args.session_id
               )
               return JSON.stringify(result, null, 2)
             },

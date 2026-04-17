@@ -36,6 +36,79 @@ defmodule ControlKeel.RuntimeDefaultsTest do
     end)
   end
 
+  test "endpoint_url_config defaults to local values" do
+    with_envs(
+      %{
+        "CONTROLKEEL_RUNTIME_MODE" => nil,
+        "PHX_HOST" => nil,
+        "PHX_URL_SCHEME" => nil,
+        "PHX_URL_PORT" => nil
+      },
+      fn ->
+        assert RuntimeDefaults.endpoint_url_config() ==
+                 [host: "localhost", scheme: "http", port: 4000]
+      end
+    )
+  end
+
+  test "endpoint_url_config defaults to cloud values" do
+    with_envs(
+      %{
+        "CONTROLKEEL_RUNTIME_MODE" => "cloud",
+        "PHX_HOST" => nil,
+        "PHX_URL_SCHEME" => nil,
+        "PHX_URL_PORT" => nil
+      },
+      fn ->
+        assert RuntimeDefaults.endpoint_url_config() ==
+                 [host: "controlkeel.com", scheme: "https", port: 443]
+      end
+    )
+  end
+
+  test "endpoint_url_config applies host, scheme, and port overrides" do
+    with_envs(
+      %{
+        "CONTROLKEEL_RUNTIME_MODE" => "local",
+        "PHX_HOST" => "example.test",
+        "PHX_URL_SCHEME" => "https",
+        "PHX_URL_PORT" => "8443"
+      },
+      fn ->
+        assert RuntimeDefaults.endpoint_url_config() ==
+                 [host: "example.test", scheme: "https", port: 8443]
+      end
+    )
+  end
+
+  test "endpoint_url_config falls back when PHX_URL_PORT is invalid" do
+    with_envs(
+      %{
+        "CONTROLKEEL_RUNTIME_MODE" => "cloud",
+        "PHX_HOST" => nil,
+        "PHX_URL_SCHEME" => nil,
+        "PHX_URL_PORT" => "not-a-number"
+      },
+      fn ->
+        assert RuntimeDefaults.endpoint_url_config() ==
+                 [host: "controlkeel.com", scheme: "https", port: 443]
+      end
+    )
+
+    with_envs(
+      %{
+        "CONTROLKEEL_RUNTIME_MODE" => "local",
+        "PHX_HOST" => nil,
+        "PHX_URL_SCHEME" => nil,
+        "PHX_URL_PORT" => "0"
+      },
+      fn ->
+        assert RuntimeDefaults.endpoint_url_config() ==
+                 [host: "localhost", scheme: "http", port: 4000]
+      end
+    )
+  end
+
   defp with_envs(changes, fun) do
     previous =
       Enum.into(changes, %{}, fn {key, _value} -> {key, System.get_env(key)} end)

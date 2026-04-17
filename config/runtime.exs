@@ -175,13 +175,12 @@ if config_env() == :prod do
   # to check this value into version control, so we use an environment
   # variable instead.
   secret_key_base = ControlKeel.RuntimeDefaults.secret_key_base()
-
-  host = System.get_env("PHX_HOST") || "example.com"
+  url = ControlKeel.RuntimeDefaults.endpoint_url_config()
 
   config :controlkeel, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :controlkeel, ControlKeelWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    url: url,
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.

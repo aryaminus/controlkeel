@@ -708,6 +708,9 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ "submitArgs.push(\"--session-id\", reviewScope.sessionId)"
     assert opencode_plugin =~ "CONTROLKEEL_TASK_ID"
     assert opencode_plugin =~ "CONTROLKEEL_SESSION_ID"
+    assert opencode_plugin =~ "--project-root"
+    assert opencode_plugin =~ "task_id: tool.schema.number().int().positive().optional()"
+    assert opencode_plugin =~ "session_id: tool.schema.number().int().positive().optional()"
 
     assert opencode_plugin =~
              ~S|["controlkeel", "context", "--json", "--project-root", directory]|
@@ -732,6 +735,11 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ "LOGGER_LEVEL: \"warning\""
     assert opencode_plugin =~ ~S|parseJson([submitOut, submitErr].filter(Boolean).join("\n"))|
     assert opencode_plugin =~ ~S|parseJson([waitOut, waitErr].filter(Boolean).join("\n"))|
+    assert opencode_plugin =~ "waitTimedOut"
+    assert opencode_plugin =~ "waitPayload?.review?.status === \"pending\""
+    assert opencode_plugin =~ "waitMessage.includes(\"timeout\")"
+    assert opencode_plugin =~ "waitError.includes(\"timed out\")"
+    assert opencode_plugin =~ "timedOut: true"
 
     opencode_agent =
       Path.join(opencode_plan.output_dir, ".opencode/agents/controlkeel-operator.md")

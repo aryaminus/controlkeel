@@ -263,6 +263,38 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert Enum.any?(wait_lines, &String.contains?(&1, "approved"))
     end
 
+    test "submit honors --project-root when cwd is elsewhere", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      _task = task_fixture(%{session: session})
+      write_binding(tmp_dir, session)
+
+      plan_path = Path.join(tmp_dir, "plan.md")
+      File.write!(plan_path, "1. Submit with explicit project root")
+
+      outside_dir = Path.join(tmp_dir, "outside")
+      File.mkdir_p!(outside_dir)
+      previous_cwd = File.cwd!()
+      File.cd!(outside_dir)
+
+      on_exit(fn ->
+        File.cd!(previous_cwd)
+      end)
+
+      assert {:ok, [submit_json]} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_submit,
+                   options: %{body_file: plan_path, project_root: tmp_dir, json: true},
+                   args: []
+                 },
+                 outside_dir
+               )
+
+      payload = Jason.decode!(submit_json)
+      assert get_in(payload, ["review", "session_id"]) == session.id
+      assert is_integer(get_in(payload, ["review", "id"]))
+    end
+
     test "submit infers task scope from project binding when ids are missing", %{tmp_dir: tmp_dir} do
       session = session_fixture()
       task = task_fixture(%{session: session})
@@ -418,6 +450,34 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert get_in(wait_payload, ["review", "status"]) == "denied"
       assert wait_payload["agent_feedback"] =~ "YOUR PLAN WAS NOT APPROVED"
       assert wait_payload["agent_feedback"] =~ "Add tests first"
+    end
+
+    test "wait timeout on pending review returns ok json payload", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      task = task_fixture(%{session: session})
+
+      assert {:ok, review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "submission_body" => "Pending review"
+               })
+
+      assert {:ok, [wait_json]} =
+               CLI.run_command(
+                 %{
+                   command: :review_plan_wait,
+                   options: %{id: review.id, timeout: 0, json: true},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      wait_payload = Jason.decode!(wait_json)
+      assert wait_payload["message"] == "timeout"
+      assert wait_payload["timed_out"] == true
+      assert wait_payload["status"] == "pending"
+      assert get_in(wait_payload, ["review", "status"]) == "pending"
+      assert wait_payload["browser_url"] =~ "/reviews/#{review.id}"
     end
   end
 
@@ -920,6 +980,128 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
       assert {:ok, parsed} = CLI.parse(["outcome", "leaderboard"])
       assert parsed.command == :outcome_leaderboard
+    end
+  end
+
+  describe "web parity commands" do
+    test "parse agents/task/router commands" do
+      assert {:ok, %{command: :agents_list}} = CLI.parse(["agents", "list"])
+
+      assert {:ok, %{command: :route_agent}} =
+               CLI.parse(["route-agent", "--task", "build intake flow"])
+
+      assert {:ok, %{command: :task_complete, args: ["42"]}} =
+               CLI.parse(["task", "complete", "42"])
+
+      assert {:ok, %{command: :task_claim, args: ["42"]}} = CLI.parse(["task", "claim", "42"])
+
+      assert {:ok, %{command: :task_heartbeat, args: ["42"]}} =
+               CLI.parse(["task", "heartbeat", "42", "--progress", "50"])
+
+      assert {:ok, %{command: :task_checks, args: ["42"]}} =
+               CLI.parse(["task", "checks", "42", "--checks", "[]"])
+
+      assert {:ok, %{command: :task_report, args: ["42"]}} =
+               CLI.parse(["task", "report", "42", "--status", "done"])
+    end
+
+    test "agents list supports json output", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      write_binding(tmp_dir, session)
+
+      assert {:ok, [payload]} =
+               CLI.run_command(
+                 %{command: :agents_list, options: %{json: true}, args: []},
+                 tmp_dir
+               )
+
+      decoded = Jason.decode!(payload)
+      assert is_list(decoded["agents"])
+      assert Enum.any?(decoded["agents"], &(&1["id"] == "opencode"))
+    end
+
+    test "route-agent returns recommendation and json", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      write_binding(tmp_dir, session)
+
+      assert {:ok, [payload]} =
+               CLI.run_command(
+                 %{
+                   command: :route_agent,
+                   options: %{task: "build secure review endpoint", risk_tier: "high", json: true},
+                   args: []
+                 },
+                 tmp_dir
+               )
+
+      decoded = Jason.decode!(payload)
+      recommendation = decoded["recommendation"]
+      assert is_binary(recommendation["agent"])
+      assert is_list(recommendation["rationale"])
+    end
+
+    test "task lifecycle commands complete claim heartbeat checks and report", %{tmp_dir: tmp_dir} do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "queued"})
+      write_binding(tmp_dir, session)
+
+      assert {:ok, claim_lines} =
+               CLI.run_command(
+                 %{
+                   command: :task_claim,
+                   options: %{execution_mode: "agent"},
+                   args: [Integer.to_string(task.id)]
+                 },
+                 tmp_dir
+               )
+
+      assert Enum.any?(claim_lines, &String.contains?(&1, "Claimed task"))
+
+      assert {:ok, heartbeat_lines} =
+               CLI.run_command(
+                 %{
+                   command: :task_heartbeat,
+                   options: %{progress: 40, note: "halfway"},
+                   args: [Integer.to_string(task.id)]
+                 },
+                 tmp_dir
+               )
+
+      assert Enum.any?(heartbeat_lines, &String.contains?(&1, "Heartbeat recorded"))
+
+      checks = ~s([{"check_type":"ci","status":"passed","summary":"ok"}])
+
+      assert {:ok, checks_lines} =
+               CLI.run_command(
+                 %{
+                   command: :task_checks,
+                   options: %{checks: checks},
+                   args: [Integer.to_string(task.id)]
+                 },
+                 tmp_dir
+               )
+
+      assert Enum.any?(checks_lines, &String.contains?(&1, "Recorded 1 check result"))
+
+      assert {:ok, report_lines} =
+               CLI.run_command(
+                 %{
+                   command: :task_report,
+                   options: %{status: "done", output: "{}", metadata: "{}"},
+                   args: [Integer.to_string(task.id)]
+                 },
+                 tmp_dir
+               )
+
+      assert Enum.any?(report_lines, &String.contains?(&1, "Reported task"))
+
+      assert {:ok, complete_lines} =
+               CLI.run_command(
+                 %{command: :task_complete, options: %{}, args: [Integer.to_string(task.id)]},
+                 tmp_dir
+               )
+
+      assert Enum.any?(complete_lines, &String.contains?(&1, "Completed task"))
     end
   end
 
