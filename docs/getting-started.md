@@ -198,6 +198,16 @@ Validation tip: in `~/.config/opencode/opencode.json`, ensure `mcp.controlkeel.e
 mix ck.attach opencode
 ```
 
+ControlKeel now mirrors MCP config to both OpenCode config paths (`~/.config/opencode/opencode.json` and `~/.config/opencode/config.json`) during attach so hosts reading either file stay in sync.
+
+If you still see transient `Not connected` messages immediately after OpenCode startup, wait 2-5 seconds and retry the tool call once. The local MCP server bootstraps Repo/services asynchronously and then stabilizes; a quick retry after startup usually resolves transient boot races.
+
+If errors persist, check the OpenCode log at `~/.local/share/opencode/log/*.log` for `service=mcp key=controlkeel` lines and rerun:
+
+```bash
+controlkeel attach opencode
+```
+
 OpenCode now has a native-first integration that writes `.opencode/skills`, `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json`, and `.agents/skills` compatibility copies (using OpenCode's `mcp.controlkeel` local command-array shape). However, it does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options for CK model work are:
 
 - keep using heuristic mode for governance-only flows

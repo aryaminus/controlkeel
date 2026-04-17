@@ -23,12 +23,22 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
          "grill_questions" => get_in(plan_refinement, ["quality", "grill_questions"]) || [],
          "agent_feedback" => ReviewBridge.agent_feedback(review),
          "responded_at" => review.responded_at,
-         "browser_url" => ControlKeelWeb.Endpoint.url() <> "/reviews/#{review.id}"
+         "browser_url" => safe_review_url(review.id)
        }}
     end
   end
 
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
+
+  defp safe_review_url(review_id) do
+    try do
+      ControlKeelWeb.Endpoint.url() <> "/reviews/#{review_id}"
+    rescue
+      _ -> nil
+    catch
+      _, _ -> nil
+    end
+  end
 
   defp resolve_review(arguments) do
     cond do

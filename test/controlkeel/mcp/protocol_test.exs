@@ -1339,6 +1339,71 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert ControlKeel.Memory.get_record!(record.id).archived_at != nil
   end
 
+  test "review tools tolerate missing endpoint persistent term" do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    submit_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 701,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_submit",
+          "arguments" => %{
+            "task_id" => task.id,
+            "submission_body" => "Plan from MCP"
+          }
+        }
+      })
+
+    review_id = get_in(submit_response, ["result", "structuredContent", "review_id"])
+    assert is_integer(review_id)
+
+    key = {Phoenix.Endpoint, ControlKeelWeb.Endpoint}
+    original = :persistent_term.get(key, :missing)
+    :persistent_term.erase(key)
+
+    on_exit(fn ->
+      case original do
+        :missing -> :ok
+        value -> :persistent_term.put(key, value)
+      end
+    end)
+
+    status_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 702,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_status",
+          "arguments" => %{"review_id" => review_id}
+        }
+      })
+
+    assert get_in(status_response, ["result", "structuredContent", "status"]) == "pending"
+    assert get_in(status_response, ["result", "structuredContent", "browser_url"]) == nil
+
+    feedback_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 703,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_feedback",
+          "arguments" => %{
+            "review_id" => review_id,
+            "decision" => "approved",
+            "feedback_notes" => "Proceed"
+          }
+        }
+      })
+
+    assert get_in(feedback_response, ["result", "structuredContent", "status"]) == "approved"
+    assert get_in(feedback_response, ["result", "structuredContent", "browser_url"]) == nil
+  end
+
   test "review tools submit, inspect, and respond to plan reviews" do
     session = session_fixture()
     task = task_fixture(%{session: session})

@@ -21,7 +21,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewFeedback do
          "feedback_notes" => updated.feedback_notes,
          "agent_feedback" => ReviewBridge.agent_feedback(updated),
          "responded_at" => updated.responded_at,
-         "browser_url" => ControlKeelWeb.Endpoint.url() <> "/reviews/#{updated.id}"
+         "browser_url" => safe_review_url(updated.id)
        }}
     else
       {:error, {:invalid_arguments, reason}} ->
@@ -33,6 +33,16 @@ defmodule ControlKeel.MCP.Tools.CkReviewFeedback do
   end
 
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
+
+  defp safe_review_url(review_id) do
+    try do
+      ControlKeelWeb.Endpoint.url() <> "/reviews/#{review_id}"
+    rescue
+      _ -> nil
+    catch
+      _, _ -> nil
+    end
+  end
 
   defp fetch_review(review_id) do
     case Mission.get_review(review_id) do
