@@ -322,6 +322,20 @@ defmodule ControlKeel.Help do
       controlkeel plugin install codex|claude|copilot|openclaw [--scope user|project] [--mode local|hosted]
                                       Install a plugin bundle with local and hosted MCP templates
       controlkeel agents doctor       Show bidirectional execution and install readiness
+      controlkeel agents list [--json]
+                                      List runnable/attached agent integrations
+      controlkeel route-agent --task "..." [--risk-tier low|medium|high|critical] [--budget-remaining-cents N] [--allowed-agents a,b] [--domain-pack software] [--json]
+                                      Ask CK router for a best-fit agent recommendation
+      controlkeel task complete <task-id>
+                                      Mark a task complete (gated by unresolved findings)
+      controlkeel task claim <task-id> [--execution-mode agent|human|runtime]
+                                      Claim a task run and mark in progress
+      controlkeel task heartbeat <task-id> [--progress N] [--note "..."]
+                                      Record task heartbeat/progress metadata
+      controlkeel task checks <task-id> --checks '[{"check_type":"ci","status":"passed"}]'
+                                      Record structured task checks for the active run
+      controlkeel task report <task-id> [--status done|failed|blocked|paused|in_progress] [--output '{...}'] [--metadata '{...}']
+                                      Report task run outcome/output metadata
       controlkeel run task <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b|nono]
                                       Run or hand off a governed task through a supported agent
       controlkeel run session <id> [--agent auto|<id>] [--mode auto|embedded|handoff|runtime] [--sandbox local|docker|e2b|nono]
