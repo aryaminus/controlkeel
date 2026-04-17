@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.24 — 2026-04-17
+
+### What's changed
+
+- fix(opencode): mirror legacy config for MCP attach
+- fix(opencode): stabilize governed plan-review transport and MCP startup
+
 ## v0.2.23 — 2026-04-16
 
 ### What's changed
