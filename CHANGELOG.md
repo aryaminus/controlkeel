@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.26 — 2026-04-17
+
+### What's changed
+
+- docs(cli): add help entries for agent routing and task lifecycle commands
+- fix(governance): harden review workflows and runtime host defaults
+
 ## v0.2.25 — 2026-04-17
 
 ### What's changed
