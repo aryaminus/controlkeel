@@ -236,7 +236,9 @@ defmodule ControlKeel.Skills.Exporter do
       ],
       [
         "Copy .claude/skills and .claude/agents into your project or home .claude directory.",
-        "Merge the generated .mcp.json into Claude's MCP configuration if needed."
+        "Merge the generated .mcp.json into Claude's MCP configuration if needed.",
+        "Use in Agent SDK: set `settingSources: [\"user\", \"project\"]` and `allowedTools: [\"Skill\", \"mcp__controlkeel__*\"]` so the SDK discovers CK skills, agents, and hooks from the filesystem.",
+        "Caution: `settingSources: []` in multi-tenant SDK deployments bypasses CK governance entirely."
       ]
     )
   end
@@ -333,7 +335,47 @@ defmodule ControlKeel.Skills.Exporter do
         "Add as a marketplace: `claude plugin marketplace add #{root}`",
         "The plugin also ships `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last` command prompts for explicit governed review passes.",
         "Use hooks/manual-settings.json when you prefer Claude's manual hook installation path.",
-        "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
+        "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template.",
+        "Load in Agent SDK: `plugins: [{ type: \"local\", path: \"#{root}\" }]` with `allowedTools: [\"Skill\", \"mcp__controlkeel__*\"]` — skills, hooks, and the operator agent are loaded from the bundle automatically."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "claude-sdk"}, root, project_root, _skills, opts) do
+    ts_dir = Path.join(root, "typescript")
+    py_dir = Path.join(root, "python")
+    File.mkdir_p!(ts_dir)
+    File.mkdir_p!(py_dir)
+
+    ts_path = Path.join(ts_dir, "ck_agent.ts")
+    ts_plugin_path = Path.join(ts_dir, "ck_plugin_agent.ts")
+    py_path = Path.join(py_dir, "ck_agent.py")
+
+    File.write!(ts_path, claude_sdk_typescript_contents())
+    File.write!(ts_plugin_path, claude_sdk_typescript_plugin_contents())
+    File.write!(py_path, claude_sdk_python_contents())
+
+    mcp_path = Path.join(root, ".mcp.json")
+    File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => ts_path, "kind" => "sdk"},
+        %{"path" => ts_plugin_path, "kind" => "sdk"},
+        %{"path" => py_path, "kind" => "sdk"},
+        %{"path" => mcp_path, "kind" => "mcp"}
+      ],
+      [
+        "Copy `typescript/ck_agent.ts` or `python/ck_agent.py` into your SDK project as a governed agent starting point.",
+        "Set `settingSources: [\"user\", \"project\"]` (TypeScript) or `setting_sources=[\"user\", \"project\"]` (Python) so the SDK discovers CK skills, agents, and hooks from the filesystem.",
+        "Add `allowedTools: [\"Skill\", \"mcp__controlkeel__*\"]` (or `\"*\"`) to enable CK MCP tools and skill invocations in the SDK.",
+        "Use `typescript/ck_plugin_agent.ts` to load the full CK claude-plugin bundle via the `plugins` option — export the claude-plugin target first.",
+        "WARNING: `settingSources: []` disables filesystem discovery and bypasses CK lifecycle hooks — avoid in governed production deployments.",
+        "The `excludeDynamicSections: true` SDK option enables prompt caching across machines; if the CK system prompt varies per session, leave it unset.",
+        "Use .mcp.json for the MCP server reference; wire it via `mcpServers` in SDK options rather than relying on a settings file in headless environments."
       ]
     )
   end
@@ -5099,6 +5141,164 @@ defmodule ControlKeel.Skills.Exporter do
     Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading.
     Always begin with the `controlkeel-governance` skill and then load domain-specific skills as needed.
     Surface findings clearly, respect blocks, and use CK proof, benchmark, and budget tooling before declaring work complete.
+    """
+  end
+
+  defp claude_sdk_typescript_contents do
+    ~S"""
+    import { query } from "@anthropic-ai/claude-agent-sdk";
+
+    const options = {
+      // Wire the ControlKeel MCP server programmatically.
+      // Alternatively, keep a .mcp.json in the project and set settingSources: ["project"].
+      mcpServers: {
+        controlkeel: {
+          command: "controlkeel",
+          args: ["mcp"],
+          env: { CK_PROJECT_ROOT: process.cwd() },
+        },
+      },
+
+      // Discover CK skills, subagents, and lifecycle hooks from .claude/ directories.
+      // WARNING: removing this or setting [] bypasses CK governance in SDK deployments.
+      settingSources: ["user", "project"],
+
+      // Allow CK MCP tools and skill invocations. Narrow this list to lock down further.
+      allowedTools: [
+        "Bash", "Read", "Write", "Edit", "Glob", "Grep", "Skill",
+        "mcp__controlkeel__ck_context",
+        "mcp__controlkeel__ck_validate",
+        "mcp__controlkeel__ck_review_submit",
+        "mcp__controlkeel__ck_review_status",
+        "mcp__controlkeel__ck_finding",
+        "mcp__controlkeel__ck_budget",
+        "mcp__controlkeel__ck_route",
+        "mcp__controlkeel__ck_skill_list",
+        "mcp__controlkeel__ck_skill_load",
+        "mcp__controlkeel__ck_trace_packet",
+      ],
+
+      // Headless: deny any tool not in allowedTools without prompting.
+      permissionMode: "dontAsk",
+
+      systemPrompt: `You are a ControlKeel-governed agent.
+    Required workflow:
+    1. Call ck_context at the start of every task.
+    2. Call ck_validate before writing code, config, shell, or deploy content.
+    3. Submit plans with ck_review_submit and check ck_review_status before execution.
+    4. Record issues with ck_finding.
+    5. Check ck_budget before expensive model or multi-agent work.
+    6. Use ck_route, ck_skill_list, and ck_skill_load to delegate.`,
+    };
+
+    for await (const message of query({ prompt: "Your task here", options })) {
+      if (message.type === "result") {
+        console.log(message.result);
+      }
+    }
+    """
+  end
+
+  defp claude_sdk_typescript_plugin_contents do
+    ~S"""
+    import { query } from "@anthropic-ai/claude-agent-sdk";
+    import path from "path";
+
+    // Load the full CK claude-plugin bundle.
+    // Export it first: `controlkeel export claude-plugin --output /path/to/dist`
+    const ckPluginDir = path.resolve("/path/to/controlkeel-dist/claude-plugin");
+
+    const options = {
+      // The plugin bundle provides CK skills, lifecycle hooks, and the
+      // controlkeel-operator agent. The MCP server still needs explicit wiring.
+      plugins: [{ type: "local", path: ckPluginDir }],
+
+      mcpServers: {
+        controlkeel: {
+          command: "controlkeel",
+          args: ["mcp"],
+          env: { CK_PROJECT_ROOT: process.cwd() },
+        },
+      },
+
+      allowedTools: ["*"],
+      permissionMode: "dontAsk",
+    };
+
+    for await (const message of query({ prompt: "Your task here", options })) {
+      if (message.type === "result") {
+        console.log(message.result);
+      }
+    }
+    """
+  end
+
+  defp claude_sdk_python_contents do
+    ~S"""
+    import asyncio
+    from pathlib import Path
+
+    from claude_agent_sdk import (
+        query,
+        ClaudeAgentOptions,
+        AssistantMessage,
+        ResultMessage,
+        TextBlock,
+    )
+
+    SYSTEM_PROMPT = """You are a ControlKeel-governed agent.
+    Required workflow:
+    1. Call ck_context at the start of every task.
+    2. Call ck_validate before writing code, config, shell, or deploy content.
+    3. Submit plans with ck_review_submit and check ck_review_status before execution.
+    4. Record issues with ck_finding.
+    5. Check ck_budget before expensive model or multi-agent work.
+    6. Use ck_route, ck_skill_list, and ck_skill_load to delegate."""
+
+
+    async def main() -> None:
+        options = ClaudeAgentOptions(
+            # Wire the ControlKeel MCP server programmatically.
+            mcp_servers={
+                "controlkeel": {
+                    "command": "controlkeel",
+                    "args": ["mcp"],
+                    "env": {"CK_PROJECT_ROOT": str(Path.cwd())},
+                }
+            },
+            # Discover CK skills, subagents, and lifecycle hooks from .claude/ directories.
+            # WARNING: removing this or setting [] bypasses CK governance in SDK deployments.
+            setting_sources=["user", "project"],
+            # Allow CK MCP tools and skill invocations.
+            allowed_tools=[
+                "Bash", "Read", "Write", "Edit", "Glob", "Grep", "Skill",
+                "mcp__controlkeel__ck_context",
+                "mcp__controlkeel__ck_validate",
+                "mcp__controlkeel__ck_review_submit",
+                "mcp__controlkeel__ck_review_status",
+                "mcp__controlkeel__ck_finding",
+                "mcp__controlkeel__ck_budget",
+                "mcp__controlkeel__ck_route",
+                "mcp__controlkeel__ck_skill_list",
+                "mcp__controlkeel__ck_skill_load",
+                "mcp__controlkeel__ck_trace_packet",
+            ],
+            # Headless: deny any tool not in allowed_tools without prompting.
+            permission_mode="dontAsk",
+            system_prompt=SYSTEM_PROMPT,
+        )
+
+        async for message in query(prompt="Your task here", options=options):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        print(block.text)
+            elif isinstance(message, ResultMessage):
+                print(f"Done: {message.subtype}")
+
+
+    if __name__ == "__main__":
+        asyncio.run(main())
     """
   end
 

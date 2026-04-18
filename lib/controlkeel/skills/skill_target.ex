@@ -52,6 +52,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "claude-sdk",
+        "Claude Agent SDK bundle",
+        "TypeScript and Python SDK starter files wiring CK MCP, skills, and lifecycle hooks for headless Agent SDK deployments.",
+        false,
+        "export",
+        ["export"],
+        true
+      ),
+      target(
         "cline-native",
         "Cline native bundle",
         "Cline-native skills, `.clinerules` guidance, workflows, and MCP companion config.",
