@@ -396,10 +396,10 @@ defmodule ControlKeel.CLI do
         parse_with_switches(:skills_validate, rest, @skills_validate_switches)
 
       ["skills", "export" | rest] ->
-        parse_with_switches(:skills_export, rest, @skills_export_switches)
+        parse_skills_subcommand(:skills_export, rest, @skills_export_switches)
 
       ["skills", "install" | rest] ->
-        parse_with_switches(:skills_install, rest, @skills_install_switches)
+        parse_skills_subcommand(:skills_install, rest, @skills_install_switches)
 
       ["skills", "doctor" | rest] ->
         parse_with_switches(:skills_doctor, rest, @skills_doctor_switches)
@@ -3882,6 +3882,18 @@ defmodule ControlKeel.CLI do
 
     Process.sleep(interval)
     watch_loop(session_id, updated_seen, interval)
+  end
+
+  defp parse_skills_subcommand(command, [target | rest] = argv, switches)
+       when byte_size(target) > 0 do
+    case target do
+      "-" <> _ -> parse_with_switches(command, argv, switches)
+      _ -> parse_with_switches(command, ["--target", target | rest], switches)
+    end
+  end
+
+  defp parse_skills_subcommand(command, argv, switches) do
+    parse_with_switches(command, argv, switches)
   end
 
   defp parse_with_switches(command, argv, switches) do
