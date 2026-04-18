@@ -1,6 +1,8 @@
 ---
 name: security-review
 description: "Run a structured security review before marking a task done. Use this for code, config, architecture, or release reviews that need OWASP, baseline pack, and domain-pack coverage."
+when_to_use: "Use before merging, deploying, or signing off on code, config, or architecture changes. Activate when reviewing auth, input handling, secrets, or third-party dependencies."
+argument-hint: "[file, PR, or area to review]"
 license: Apache-2.0
 compatibility:
   - codex

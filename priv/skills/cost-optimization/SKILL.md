@@ -1,6 +1,8 @@
 ---
 name: cost-optimization
 description: "Keep a governed session within budget. Use this before long-running agent work, bulk processing, or any task where spend pressure could change the plan."
+when_to_use: "Activate before multi-step agent loops, batch processing, large model calls, or when the user asks about cost, budget, spend, or wants to compare model options."
+argument-hint: "[task or operation to optimize]"
 license: Apache-2.0
 compatibility:
   - codex

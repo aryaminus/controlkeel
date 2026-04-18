@@ -267,6 +267,9 @@ defmodule ControlKeel.Skills.Exporter do
     File.mkdir_p!(Path.dirname(manifest_path))
     File.write!(manifest_path, Jason.encode!(claude_plugin_manifest(), pretty: true) <> "\n")
 
+    marketplace_path = Path.join(root, ".claude-plugin/marketplace.json")
+    File.write!(marketplace_path, Jason.encode!(claude_marketplace_manifest(), pretty: true) <> "\n")
+
     hooks_path = Path.join(root, "hooks/hooks.json")
     File.mkdir_p!(Path.dirname(hooks_path))
 
@@ -281,6 +284,14 @@ defmodule ControlKeel.Skills.Exporter do
 
     powershell_hook_path = Path.join(root, "hooks/controlkeel-review.ps1")
     File.write!(powershell_hook_path, review_bridge_powershell_contents("claude-code"))
+
+    lifecycle_hook_paths =
+      Enum.map(claude_plugin_hook_scripts(), fn {name, content_fn} ->
+        path = Path.join(root, "hooks/#{name}")
+        File.write!(path, content_fn.())
+        File.chmod!(path, 0o755)
+        %{"path" => path, "kind" => "hook"}
+      end)
 
     manual_hook_path = Path.join(root, "hooks/manual-settings.json")
     File.write!(manual_hook_path, Jason.encode!(claude_manual_settings(), pretty: true) <> "\n")
@@ -301,6 +312,7 @@ defmodule ControlKeel.Skills.Exporter do
       opts,
       [
         %{"path" => manifest_path, "kind" => "manifest"},
+        %{"path" => marketplace_path, "kind" => "manifest"},
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => review_command_path, "kind" => "command"},
@@ -308,13 +320,17 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => last_command_path, "kind" => "command"},
         %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => shell_hook_path, "kind" => "hook"},
-        %{"path" => powershell_hook_path, "kind" => "hook"},
+        %{"path" => powershell_hook_path, "kind" => "hook"}
+        | lifecycle_hook_paths
+      ] ++
+      [
         %{"path" => manual_hook_path, "kind" => "settings"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => settings_path, "kind" => "settings"}
       ],
       [
         "Run `claude --plugin-dir #{root}` to test the plugin locally.",
+        "Add as a marketplace: `claude plugin marketplace add #{root}`",
         "The plugin also ships `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last` command prompts for explicit governed review passes.",
         "Use hooks/manual-settings.json when you prefer Claude's manual hook installation path.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
@@ -3030,16 +3046,46 @@ defmodule ControlKeel.Skills.Exporter do
       "name" => "controlkeel",
       "description" => "ControlKeel governance skills, subagents, and MCP bridge.",
       "version" => app_version(),
-      "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
+      "author" => %{
+        "name" => "ControlKeel",
+        "email" => "opensource@controlkeel.local",
+        "url" => "https://github.com/aryaminus/controlkeel"
+      },
       "homepage" => "https://github.com/aryaminus/controlkeel",
       "repository" => "https://github.com/aryaminus/controlkeel",
       "license" => "Apache-2.0",
       "keywords" => ["governance", "mcp", "skills", "security"],
+      "category" => "governance",
       "agents" => "./agents/",
       "skills" => "./skills/",
       "commands" => "./commands/",
       "hooks" => "./hooks/hooks.json",
       "mcpServers" => "./.mcp.json"
+    }
+  end
+
+  defp claude_marketplace_manifest do
+    %{
+      "name" => "controlkeel",
+      "owner" => %{
+        "name" => "ControlKeel",
+        "email" => "opensource@controlkeel.local"
+      },
+      "metadata" => %{
+        "description" =>
+          "ControlKeel governance plugin: skills, subagents, MCP tools, and lifecycle hooks for AI agent governance.",
+        "version" => app_version()
+      },
+      "plugins" => [
+        %{
+          "name" => "controlkeel",
+          "source" => "./",
+          "description" => "ControlKeel governance skills, subagents, and MCP bridge.",
+          "version" => app_version(),
+          "category" => "governance",
+          "keywords" => ["governance", "mcp", "skills", "security"]
+        }
+      ]
     }
   end
 
@@ -3081,6 +3127,90 @@ defmodule ControlKeel.Skills.Exporter do
   defp claude_hooks_manifest do
     %{
       "hooks" => %{
+        "SessionStart" => [
+          %{
+            "matcher" => "startup|resume",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-session-start.sh",
+                "statusMessage" => "Loading ControlKeel context",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PreToolUse" => [
+          %{
+            "matcher" => "Bash",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-validate-shell.sh",
+                "statusMessage" => "Checking Bash command with ControlKeel",
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "PostToolUse" => [
+          %{
+            "matcher" => "Bash",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-post-tool-use.sh",
+                "statusMessage" => "Reviewing Bash output with ControlKeel",
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-user-prompt-submit.sh",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "Stop" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-stop.sh",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PostCompact" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-post-compact.sh",
+                "statusMessage" => "Re-initializing ControlKeel governance context",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "SessionEnd" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-session-end.sh",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
         "PermissionRequest" => [
           %{
             "matcher" => "ExitPlanMode",
@@ -3100,6 +3230,59 @@ defmodule ControlKeel.Skills.Exporter do
   defp claude_manual_settings do
     %{
       "hooks" => %{
+        "SessionStart" => [
+          %{
+            "matcher" => "startup|resume",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "controlkeel context --json >/dev/null 2>&1 || true; printf '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"ControlKeel available. Start with ck_context to load mission state.\"}}' ",
+                "statusMessage" => "Loading ControlKeel context",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PreToolUse" => [
+          %{
+            "matcher" => "Bash",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "cmd=$(cat | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"command\",\"\"))' 2>/dev/null || true); [ -z \"$cmd\" ] && exit 0; controlkeel validate --content \"$cmd\" --kind shell --json 2>/dev/null || true",
+                "statusMessage" => "Checking Bash command with ControlKeel",
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "Stop" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "blocked=$(controlkeel context --json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"active_findings\",{}).get(\"blocked\",0))' 2>/dev/null || echo 0); [ \"$blocked\" = \"0\" ] && exit 0; printf '{\"decision\":\"block\",\"reason\":\"ControlKeel has blocked findings. Call ck_context, resolve them, then complete the turn.\"}'",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PostCompact" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostCompact\",\"additionalContext\":\"Context was compacted. You are in a ControlKeel-governed session: always call ck_context before proceeding, ck_validate before code or shell changes, and ck_finding for any issues you discover.\"}}' ",
+                "statusMessage" => "Re-initializing ControlKeel governance context",
+                "timeout" => 5
+              }
+            ]
+          }
+        ],
         "PermissionRequest" => [
           %{
             "matcher" => "ExitPlanMode",
@@ -3235,6 +3418,50 @@ defmodule ControlKeel.Skills.Exporter do
       {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
       {"ck-stop.sh", &codex_stop_hook_contents/0}
     ]
+  end
+
+  defp claude_plugin_hook_scripts do
+    [
+      {"ck-session-start.sh", &codex_session_start_hook_contents/0},
+      {"ck-validate-shell.sh", &codex_validate_shell_hook_contents/0},
+      {"ck-post-tool-use.sh", &codex_post_tool_use_hook_contents/0},
+      {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
+      {"ck-stop.sh", &codex_stop_hook_contents/0},
+      {"ck-post-compact.sh", &claude_plugin_post_compact_hook_contents/0},
+      {"ck-session-end.sh", &claude_plugin_session_end_hook_contents/0}
+    ]
+  end
+
+  defp claude_plugin_post_compact_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostCompact","additionalContext":"Context was compacted. You are in a ControlKeel-governed session: always call ck_context before proceeding, ck_validate before code or shell changes, and ck_finding for any issues you discover. Resume any in-progress work only after re-loading governance state."}}'
+    exit 0
+    """
+  end
+
+  defp claude_plugin_session_end_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    session_id=""
+
+    if command -v jq >/dev/null 2>&1; then
+      session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      controlkeel context --session-id "${session_id:-1}" --save-snapshot --json >/dev/null 2>&1 || true
+    fi
+
+    exit 0
+    """
   end
 
   defp codex_session_start_hook_contents do
@@ -4690,7 +4917,12 @@ defmodule ControlKeel.Skills.Exporter do
   defp claude_agent_contents(skills) do
     """
     ---
+    name: controlkeel-operator
     description: Use ControlKeel governance, findings, proofs, budgets, and benchmarks inside this project.
+    color: cyan
+    effort: high
+    memory: project
+    initialPrompt: /controlkeel-governance
     tools: ["*"]
     mcpServers: ["controlkeel"]
     skills:

@@ -1,6 +1,8 @@
 ---
 name: controlkeel-governance
 description: "Operate inside a ControlKeel-governed session. Use this before code edits, shell execution, delegation, deploy work, or any task that needs CK validation, findings, budget, proof, or routing context."
+when_to_use: "Activate at task start, before any code edit, shell command, deploy step, or agent delegation. Also activate when the user asks about findings, budgets, proofs, compliance, or security policy."
+argument-hint: "[task description or focus area]"
 license: Apache-2.0
 compatibility:
   - codex

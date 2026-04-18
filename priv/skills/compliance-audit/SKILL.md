@@ -1,6 +1,8 @@
 ---
 name: compliance-audit
 description: "Run a structured compliance audit against active ControlKeel policy packs and domain controls. Use this before shipping regulated data flows, external integrations, or document exports."
+when_to_use: "Activate before exporting data, integrating with external services, or when the user asks about compliance, regulatory requirements, GDPR, SOC2, HIPAA, or policy packs."
+argument-hint: "[data flow, integration, or domain to audit]"
 license: Apache-2.0
 compatibility:
   - codex

@@ -1,6 +1,8 @@
 ---
 name: agent-integration
 description: "Attach ControlKeel to agents, verify MCP connectivity, confirm native skills availability, and choose the right distribution target for each client."
+when_to_use: "Activate when setting up CK with a new agent, installing the plugin, configuring MCP, or when the user asks how to attach ControlKeel to their tool."
+argument-hint: "[agent name or tool to integrate]"
 license: Apache-2.0
 compatibility:
   - codex

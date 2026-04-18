@@ -1,6 +1,8 @@
 ---
 name: proof-memory
 description: "Use ControlKeel proof bundles, typed memory, workspace snapshots, transcript summaries, and resume packets before closing or resuming work. Activate this when you need durable evidence or historical context."
+when_to_use: "Activate before closing a session, resuming previous work, or when the user says 'remember this', 'save proof', 'snapshot state', or references prior decisions."
+argument-hint: "[checkpoint label or context to preserve]"
 license: Apache-2.0
 compatibility:
   - codex

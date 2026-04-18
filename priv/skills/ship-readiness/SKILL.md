@@ -1,6 +1,8 @@
 ---
 name: ship-readiness
 description: "Check install-to-first-finding metrics, funnel stage, findings state, proofs, and approvals before calling a session ready to ship."
+when_to_use: "Use before declaring a release, PR, or feature done. Activate when the user says 'ready to ship', 'done', 'merge this', or asks to verify completeness."
+argument-hint: "[feature, PR, or release to check]"
 license: Apache-2.0
 compatibility:
   - codex
