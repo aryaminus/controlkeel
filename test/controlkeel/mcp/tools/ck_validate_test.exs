@@ -230,4 +230,19 @@ defmodule ControlKeel.MCP.Tools.CkValidateTest do
     assert result_from_instruction["allowed"] in [true, false]
     assert result_from_text_alias["allowed"] in [true, false]
   end
+
+  test "normalizes common MCP caller aliases for kind and workflow inputs" do
+    assert {:ok, result} =
+             CkValidate.call(%{
+               "content" => "Run a read-only repo audit before changing anything.",
+               "kind" => "command",
+               "intended_use" => "read-only repo audit for ck wiring",
+               "requested_capabilities" => ["file_read", "shell"],
+               "security_workflow_phase" => "preflight",
+               "artifact_type" => "instruction",
+               "target_scope" => "repo"
+             })
+
+    assert result["allowed"] in [true, false]
+  end
 end

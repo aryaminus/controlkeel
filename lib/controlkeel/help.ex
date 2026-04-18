@@ -100,7 +100,7 @@ defmodule ControlKeel.Help do
       id: "codex",
       title: "Codex CLI integration",
       summary:
-        "Codex is a review-only host in CK. CK writes `.codex/config.toml`, native `.codex/skills`, a Codex operator agent, review commands, and `.agents/skills` compatibility copies for the governed repo or user scope.",
+        "Codex is a review-only host in CK. CK writes `.codex/config.toml`, `.codex/hooks.json`, native `.codex/skills`, Codex custom agents, review commands, and `.agents/skills` compatibility copies for the governed repo or user scope.",
       keywords: ["codex", "openai", ".codex", "review-only", "operator"],
       phrases: ["codex cli", "attach codex", "codex config"],
       commands: [
@@ -110,9 +110,10 @@ defmodule ControlKeel.Help do
         "controlkeel plugin install codex --scope project"
       ],
       next_steps: [
-        "Project scope writes `.codex/config.toml`, `.codex/skills`, `.codex/agents`, `.codex/commands`, and `.agents/skills` into the repo.",
-        "User scope writes `~/.codex/config.toml`, `~/.codex/skills`, `~/.codex/agents`, `~/.codex/commands`, and `~/.agents/skills`.",
-        "Use `controlkeel plugin install codex` when you want the local plugin bundle and marketplace manifest."
+        "Project scope writes `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks`, `.codex/skills`, `.codex/agents`, `.codex/commands`, and `.agents/skills` into the repo.",
+        "User scope writes `~/.codex/config.toml`, `~/.codex/hooks.json`, `~/.codex/hooks`, `~/.codex/skills`, `~/.codex/agents`, `~/.codex/commands`, and `~/.agents/skills`.",
+        "Codex only loads repo `.codex/` layers when the project is trusted, so trust the repo if hooks or config appear to be ignored.",
+        "Restart Codex after `controlkeel attach codex-cli` or `controlkeel plugin install codex` so new hooks, custom agents, and marketplace changes are reloaded."
       ],
       related: ["attach", "review", "skills", "run"]
     },

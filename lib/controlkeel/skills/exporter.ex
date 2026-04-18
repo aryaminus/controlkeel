@@ -91,6 +91,18 @@ defmodule ControlKeel.Skills.Exporter do
     last_command_path = Path.join(root, ".codex/commands/controlkeel-last.md")
     File.write!(last_command_path, codex_last_command_contents())
 
+    hooks_path = Path.join(root, ".codex/hooks.json")
+    File.write!(hooks_path, Jason.encode!(codex_hooks_manifest(), pretty: true) <> "\n")
+
+    hook_dir = Path.join(root, ".codex/hooks")
+    File.mkdir_p!(hook_dir)
+
+    for {name, contents_fn} <- codex_hook_scripts() do
+      path = Path.join(hook_dir, name)
+      File.write!(path, contents_fn.())
+      File.chmod!(path, 0o755)
+    end
+
     mcp_path = Path.join(root, ".mcp.json")
     File.write!(mcp_path, Jason.encode!(mcp_payload(project_root, opts), pretty: true) <> "\n")
 
@@ -111,6 +123,8 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => review_command_path, "kind" => "command"},
         %{"path" => annotate_command_path, "kind" => "command"},
         %{"path" => last_command_path, "kind" => "command"},
+        %{"path" => hooks_path, "kind" => "hooks"},
+        %{"path" => hook_dir, "kind" => "hooks"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
@@ -119,6 +133,7 @@ defmodule ControlKeel.Skills.Exporter do
         "Use .codex/config.toml to register the ControlKeel MCP server and operator role with Codex.",
         "Copy .codex/agents/controlkeel-operator.toml into your Codex agents directory if you want a preconfigured operator.",
         "Use .codex/commands/ for browser-reviewed review, annotate, last, diff, and completion approval flows.",
+        "Use `.codex/hooks.json` with `.codex/hooks/` to load repo-scoped Codex lifecycle hooks for session context, Bash validation, and stop-time warnings.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )
@@ -2954,6 +2969,7 @@ defmodule ControlKeel.Skills.Exporter do
         "ControlKeel governance skills, commands, agents, and MCP bridge for Codex.",
       "author" => %{
         "name" => "ControlKeel",
+        "email" => "opensource@controlkeel.local",
         "url" => "https://github.com/aryaminus/controlkeel"
       },
       "homepage" => "https://github.com/aryaminus/controlkeel",
@@ -3137,6 +3153,258 @@ defmodule ControlKeel.Skills.Exporter do
 
   defp empty_hooks_manifest do
     %{"hooks" => %{}}
+  end
+
+  defp codex_hooks_manifest do
+    %{
+      "hooks" => %{
+        "SessionStart" => [
+          %{
+            "matcher" => "startup|resume",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/ck-session-start.sh\"",
+                "statusMessage" => "Loading ControlKeel context",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PreToolUse" => [
+          %{
+            "matcher" => "Bash",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/ck-validate-shell.sh\"",
+                "statusMessage" => "Checking Bash command with ControlKeel",
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "PostToolUse" => [
+          %{
+            "matcher" => "Bash",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/ck-post-tool-use.sh\"",
+                "statusMessage" => "Reviewing Bash output with ControlKeel",
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/ck-user-prompt-submit.sh\"",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "Stop" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "sh \"$(git rev-parse --show-toplevel)/.codex/hooks/ck-stop.sh\"",
+                "timeout" => 10
+              }
+            ]
+          }
+        ]
+      }
+    }
+  end
+
+  defp codex_hook_scripts do
+    [
+      {"ck-session-start.sh", &codex_session_start_hook_contents/0},
+      {"ck-validate-shell.sh", &codex_validate_shell_hook_contents/0},
+      {"ck-post-tool-use.sh", &codex_post_tool_use_hook_contents/0},
+      {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
+      {"ck-stop.sh", &codex_stop_hook_contents/0}
+    ]
+  end
+
+  defp codex_session_start_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      session_id=""
+
+      if command -v jq >/dev/null 2>&1; then
+        session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+      elif command -v python3 >/dev/null 2>&1; then
+        session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+      fi
+
+      controlkeel context --session-id "${session_id:-1}" --json >/dev/null 2>&1 || true
+    fi
+
+    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"ControlKeel available. Start with ck_context to load mission state, call ck_validate before risky edits, ck_budget before expensive operations, and ck_route before delegation."}}'
+    exit 0
+    """
+  end
+
+  defp codex_validate_shell_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    command_text=""
+
+    if command -v jq >/dev/null 2>&1; then
+      command_text=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      command_text=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input', {}).get('command', ''))" 2>/dev/null)
+    fi
+
+    if [ -z "$command_text" ] || ! command -v controlkeel >/dev/null 2>&1; then
+      exit 0
+    fi
+
+    result=$(controlkeel validate --content "$command_text" --kind shell --json 2>/dev/null || true)
+
+    if printf '%s' "$result" | grep -q '"decision":"block"'; then
+      printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"ControlKeel blocked this Bash command. Review ck_validate findings before retrying."}}'
+      exit 0
+    fi
+
+    if printf '%s' "$result" | grep -q '"decision":"warn"'; then
+      printf '%s\n' '{"systemMessage":"ControlKeel flagged this Bash command with a warning. Review ck_validate details before proceeding."}'
+      exit 0
+    fi
+
+    exit 0
+    """
+  end
+
+  defp codex_stop_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    blocked_count="0"
+    stop_hook_active="false"
+
+    if command -v jq >/dev/null 2>&1; then
+      stop_hook_active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false')
+    elif command -v python3 >/dev/null 2>&1; then
+      stop_hook_active=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_hook_active', False))" 2>/dev/null || printf 'false')
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      session_id=""
+
+      if command -v jq >/dev/null 2>&1; then
+        session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+      elif command -v python3 >/dev/null 2>&1; then
+        session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+      fi
+
+      context=$(controlkeel context --session-id "${session_id:-1}" --json 2>/dev/null || true)
+
+      if [ -n "$context" ]; then
+        if command -v jq >/dev/null 2>&1; then
+          blocked_count=$(printf '%s' "$context" | jq -r '.active_findings.blocked // 0')
+        elif command -v python3 >/dev/null 2>&1; then
+          blocked_count=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('active_findings', {}).get('blocked', 0))" 2>/dev/null || printf '0')
+        fi
+      fi
+    fi
+
+    if [ "${blocked_count:-0}" != "0" ]; then
+      if [ "${stop_hook_active:-false}" = "false" ]; then
+        printf '%s\n' '{"decision":"block","reason":"ControlKeel still has blocked findings in this session. Call ck_context, resolve the findings, and only then complete the turn."}'
+      else
+        printf '%s\n' '{"systemMessage":"ControlKeel still has blocked findings in this session. Call ck_context before treating the task as complete."}'
+      fi
+    fi
+
+    exit 0
+    """
+  end
+
+  defp codex_post_tool_use_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    command_text=""
+    tool_response=""
+
+    if command -v jq >/dev/null 2>&1; then
+      command_text=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
+      tool_response=$(printf '%s' "$input" | jq -r '.tool_response // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      command_text=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input', {}).get('command', ''))" 2>/dev/null)
+      tool_response=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_response', ''))" 2>/dev/null)
+    fi
+
+    message=""
+
+    if printf '%s' "$tool_response" | grep -Eiq '(^|[^A-Za-z])(FAILED|FAILURES|ERROR|Traceback|Exception)([^A-Za-z]|$)'; then
+      message="ControlKeel noticed failing shell output. Re-check the command result before continuing and run ck_validate again if the next step changes code or config."
+    elif printf '%s' "$command_text" | grep -Eq '(^|[[:space:]])(mix[[:space:]]+test|mix[[:space:]]+precommit|npm[[:space:]]+test|pnpm[[:space:]]+test|yarn[[:space:]]+test|pytest)([[:space:]]|$)'; then
+      message="ControlKeel reviewed a test-oriented shell step. Summarize failures clearly before moving on, and do not treat the task as complete if the command failed."
+    fi
+
+    if [ -n "$message" ]; then
+      printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$message"
+    fi
+
+    exit 0
+    """
+  end
+
+  defp codex_user_prompt_submit_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    prompt=""
+
+    if command -v jq >/dev/null 2>&1; then
+      prompt=$(printf '%s' "$input" | jq -r '.prompt // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      prompt=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('prompt', ''))" 2>/dev/null)
+    fi
+
+    if [ -z "$prompt" ]; then
+      exit 0
+    fi
+
+    if printf '%s' "$prompt" | grep -Eiq '(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]|BEGIN (RSA|OPENSSH|PGP) PRIVATE KEY|api[_-]?key[[:space:]]*[:=]|password[[:space:]]*[:=])'; then
+      printf '%s\n' '{"decision":"block","reason":"Potential secret material detected in the prompt. Remove credentials or private keys before continuing."}'
+      exit 0
+    fi
+
+    if printf '%s' "$prompt" | grep -Eiq '(rm[[:space:]]+-rf|drop[[:space:]]+database|delete[[:space:]]+everything|wipe[[:space:]]+the[[:space:]]+repo)'; then
+      printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"The prompt asks for destructive work. Pause to confirm scope, preserve evidence, and use ck_validate before executing risky shell or config steps."}}'
+      exit 0
+    fi
+
+    exit 0
+    """
   end
 
   defp vscode_extensions_manifest do
@@ -4408,9 +4676,11 @@ defmodule ControlKeel.Skills.Exporter do
     """
     name = "controlkeel-operator"
     description = "Operate inside a ControlKeel-governed project with CK skills and MCP tools."
+    nickname_candidates = ["Atlas", "Delta", "Echo"]
     model = "gpt-5.4-mini"
+    model_reasoning_effort = "medium"
 
-    instructions = "Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading. Start with the `controlkeel-governance` skill, then add domain-specific skills as needed."
+    developer_instructions = "Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading. Start with the `controlkeel-governance` skill, then add domain-specific skills as needed."
 
     [skills]
     preload = [#{Enum.map_join(skills, ", ", &~s("#{&1.name}"))}]

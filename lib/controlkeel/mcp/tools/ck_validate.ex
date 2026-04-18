@@ -10,6 +10,51 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
   alias ControlKeel.TrustBoundary
 
   @allowed_kinds ~w(code config shell text)
+  @kind_aliases %{
+    "bash" => "shell",
+    "command" => "shell",
+    "commands" => "shell",
+    "script" => "shell",
+    "configuration" => "config",
+    "file" => "config",
+    "message" => "text",
+    "context" => "text",
+    "source" => "text",
+    "instruction" => "text",
+    "data" => "text",
+    "review" => "text"
+  }
+  @intended_use_aliases %{
+    "audit" => "context",
+    "analysis" => "context",
+    "analyze" => "context",
+    "inspect" => "context",
+    "inspection" => "context",
+    "research" => "context",
+    "read only" => "context",
+    "readonly" => "context",
+    "review" => "review"
+  }
+  @capability_aliases %{
+    "file read" => "file_read",
+    "file write" => "file_write",
+    "read" => "file_read",
+    "repo read" => "file_read",
+    "read only" => "file_read",
+    "readonly" => "file_read",
+    "write" => "file_write",
+    "shell" => "bash",
+    "web" => "browser"
+  }
+  @workflow_phase_aliases %{"preflight" => "discovery"}
+  @target_scope_aliases %{
+    "repo" => "owned_repo",
+    "project" => "owned_repo",
+    "workspace" => "owned_repo",
+    "binary" => "owned_binary",
+    "executable" => "owned_binary",
+    "third party" => "authorized_third_party"
+  }
 
   def call(arguments) when is_map(arguments) do
     with {:ok, normalized} <- normalize(arguments) do
@@ -23,7 +68,11 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
 
   defp normalize(arguments) do
     content = Map.get(arguments, "content")
-    kind = Map.get(arguments, "kind", "code")
+
+    kind =
+      arguments
+      |> Map.get("kind", "code")
+      |> normalize_kind()
 
     cond do
       not is_binary(content) or String.trim(content) == "" ->
@@ -41,12 +90,16 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
              {:ok, trust_level} <-
                normalize_optional_enum(arguments, "trust_level", TrustBoundary.trust_levels()),
              {:ok, intended_use} <-
-               normalize_optional_enum(arguments, "intended_use", TrustBoundary.intended_uses()),
+               normalize_optional_intended_use(arguments),
              {:ok, requested_capabilities} <-
                normalize_optional_capabilities(arguments, "requested_capabilities"),
              {:ok, security_workflow_phase} <-
                normalize_optional_enum(
-                 arguments,
+                 normalize_enum_alias(
+                   arguments,
+                   "security_workflow_phase",
+                   @workflow_phase_aliases
+                 ),
                  "security_workflow_phase",
                  SecurityWorkflow.phases()
                ),
@@ -58,7 +111,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
                ),
              {:ok, target_scope} <-
                normalize_optional_enum(
-                 arguments,
+                 normalize_enum_alias(arguments, "target_scope", @target_scope_aliases),
                  "target_scope",
                  SecurityWorkflow.target_scopes()
                ) do
@@ -217,6 +270,29 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
     end
   end
 
+  defp normalize_optional_intended_use(arguments) do
+    case Map.get(arguments, "intended_use") do
+      nil ->
+        {:ok, nil}
+
+      value when is_binary(value) ->
+        normalized = normalize_intended_use(value)
+
+        if normalized in TrustBoundary.intended_uses() do
+          {:ok, normalized}
+        else
+          {:error,
+           {:invalid_arguments,
+            "`intended_use` must be one of #{Enum.join(TrustBoundary.intended_uses(), ", ")} if provided"}}
+        end
+
+      _ ->
+        {:error,
+         {:invalid_arguments,
+          "`intended_use` must be one of #{Enum.join(TrustBoundary.intended_uses(), ", ")} if provided"}}
+    end
+  end
+
   defp normalize_optional_capabilities(arguments, key) do
     case Map.get(arguments, key) do
       nil ->
@@ -227,6 +303,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
           values
           |> Enum.map(&to_string/1)
           |> Enum.map(&String.trim/1)
+          |> Enum.map(&normalize_capability/1)
 
         invalid = Enum.reject(normalized, &(&1 in TrustBoundary.capabilities()))
 
@@ -249,5 +326,56 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
       "text" -> Map.put(arguments, "artifact_type", "source")
       _ -> arguments
     end
+  end
+
+  defp normalize_enum_alias(arguments, key, aliases) do
+    case Map.get(arguments, key) do
+      value when is_binary(value) ->
+        Map.put(arguments, key, Map.get(aliases, normalize_token(value), value))
+
+      _ ->
+        arguments
+    end
+  end
+
+  defp normalize_kind(value) when is_binary(value) do
+    token = normalize_token(value)
+    Map.get(@kind_aliases, token, token)
+  end
+
+  defp normalize_intended_use(value) when is_binary(value) do
+    token = normalize_token(value)
+
+    cond do
+      token in TrustBoundary.intended_uses() ->
+        token
+
+      Map.has_key?(@intended_use_aliases, token) ->
+        @intended_use_aliases[token]
+
+      String.contains?(token, "review") ->
+        "review"
+
+      String.contains?(token, "audit") or String.contains?(token, "analysis") or
+        String.contains?(token, "inspect") or String.contains?(token, "research") or
+        String.contains?(token, "read only") or String.contains?(token, "readonly") ->
+        "context"
+
+      true ->
+        value
+    end
+  end
+
+  defp normalize_capability(value) when is_binary(value) do
+    token = normalize_token(value)
+    Map.get(@capability_aliases, token, token)
+  end
+
+  defp normalize_token(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> String.downcase()
+    |> String.replace(~r/[_-]+/, " ")
+    |> String.replace(~r/\s+/, " ")
   end
 end

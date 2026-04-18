@@ -430,10 +430,15 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks.json"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-session-start.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-validate-shell.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-stop.sh"))
     assert File.exists?(project_codex_config_path(tmp_dir))
     refute File.exists?(user_codex_config_path())
 
     codex_config = File.read!(project_codex_config_path(tmp_dir))
+    assert codex_config =~ "codex_hooks = true"
     assert codex_config =~ "[mcp_servers.controlkeel]"
     assert codex_config =~ ~s(config_file = "./agents/controlkeel-operator.toml")
 

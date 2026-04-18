@@ -391,6 +391,12 @@ defmodule ControlKeel.SkillsTest do
            )
 
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/commands/controlkeel-last.md"))
+    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks.json"))
+    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-session-start.sh"))
+    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-validate-shell.sh"))
+    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-post-tool-use.sh"))
+    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-user-prompt-submit.sh"))
+    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-stop.sh"))
 
     assert File.exists?(
              Path.join(codex_plan.output_dir, ".agents/skills/controlkeel-governance/SKILL.md")
@@ -409,6 +415,19 @@ defmodule ControlKeel.SkillsTest do
       File.read!(Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-operator.toml"))
 
     assert codex_export_agent =~ "controlkeel update --json"
+    assert codex_export_agent =~ "developer_instructions = "
+    assert codex_export_agent =~ "nickname_candidates = "
+
+    assert File.read!(Path.join(codex_plan.output_dir, ".codex/config.toml")) =~
+             "codex_hooks = true"
+
+    codex_hooks =
+      Path.join(codex_plan.output_dir, ".codex/hooks.json")
+      |> File.read!()
+      |> Jason.decode!()
+
+    assert Map.has_key?(codex_hooks["hooks"], "PostToolUse")
+    assert Map.has_key?(codex_hooks["hooks"], "UserPromptSubmit")
 
     assert {:ok, codex_plugin_plan} = Skills.export("codex-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(codex_plugin_plan.output_dir, ".codex-plugin/plugin.json"))
@@ -999,10 +1018,17 @@ defmodule ControlKeel.SkillsTest do
     assert {:ok, codex_install} = Skills.install("codex", tmp_dir, scope: "project")
     assert codex_install.destination == Path.join(tmp_dir, ".codex/skills")
     assert codex_install.compat_destination == Path.join(tmp_dir, ".agents/skills")
+    assert codex_install.hooks_destination == Path.join(tmp_dir, ".codex/hooks")
     assert File.exists?(Path.join(tmp_dir, ".codex/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
     assert File.exists?(Path.join(tmp_dir, ".codex/config.toml"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks.json"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-session-start.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-validate-shell.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-post-tool-use.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-user-prompt-submit.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-stop.sh"))
     assert File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-review.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-annotate.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/commands/controlkeel-last.md"))
@@ -1010,11 +1036,14 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
 
     codex_config = File.read!(Path.join(tmp_dir, ".codex/config.toml"))
+    assert codex_config =~ "codex_hooks = true"
     assert codex_config =~ "[mcp_servers.controlkeel]"
     assert codex_config =~ ~s(config_file = "./agents/controlkeel-operator.toml")
 
     codex_agent = File.read!(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
     assert codex_agent =~ "controlkeel update --json"
+    assert codex_agent =~ "developer_instructions = "
+    assert codex_agent =~ "nickname_candidates = "
     refute codex_agent =~ "[context]"
     refute codex_agent =~ "[mcp]"
 

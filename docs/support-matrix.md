@@ -83,7 +83,7 @@ Everything else in the catalog remains supported according to its own typed row,
 
 For OpenCode specifically, CK now installs native `.opencode/skills` alongside `.agents/skills` compatibility copies so governed skills load through OpenCode-native and AgentSkills-compatible discovery paths.
 
-For Codex specifically, CK now installs native `.codex/skills` alongside `.agents/skills` compatibility copies so the governed skill set works in the current Codex home/project model without dropping the open-standard AgentSkills path.
+For Codex specifically, CK now installs native `.codex/skills` and repo-scoped `.codex/hooks` alongside `.agents/skills` compatibility copies so the governed skill set works in the current Codex home/project model without dropping the open-standard AgentSkills path.
 
 Use [direct-host-installs.md](direct-host-installs.md) for the exact companion package names, install commands, and current package-manager truth.
 

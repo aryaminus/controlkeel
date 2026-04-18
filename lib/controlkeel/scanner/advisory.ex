@@ -49,6 +49,8 @@ defmodule ControlKeel.Scanner.Advisory do
     content = input["content"] || ""
     config = Application.get_env(:controlkeel, :advisory, [])
     explicit = Keyword.get(config, :enabled)
+    provider_status = ProviderBroker.status(project_root)
+    runtime_hints = provider_status["runtime_hints"] || []
 
     cond do
       explicit == false ->
@@ -58,10 +60,7 @@ defmodule ControlKeel.Scanner.Advisory do
         %{status: "skipped_short_content", detail: "Content shorter than advisory minimum."}
 
       ProviderBroker.advisory_chain(project_root) == [] ->
-        %{
-          status: "skipped_no_provider",
-          detail: "No LLM provider configured; pattern scanners completed."
-        }
+        skipped_no_provider_status(runtime_hints)
 
       layer3_findings != [] ->
         %{status: "ran", extra_findings: length(layer3_findings)}
@@ -70,6 +69,32 @@ defmodule ControlKeel.Scanner.Advisory do
         %{status: "ran_empty", detail: "Advisory ran; no additional issues reported."}
     end
   end
+
+  defp skipped_no_provider_status([_ | _] = runtime_hints) do
+    runtimes =
+      runtime_hints
+      |> Enum.map(fn hint ->
+        "#{hint["agent_id"]}#{transport_suffix(hint["transport"])}"
+      end)
+      |> Enum.join(", ")
+
+    %{
+      status: "skipped_no_provider",
+      detail:
+        "No CK-owned LLM provider is configured for advisory scanning; pattern scanners completed. Attached runtime-backed hosts may still run with host-managed auth (#{runtimes})."
+    }
+  end
+
+  defp skipped_no_provider_status(_runtime_hints) do
+    %{
+      status: "skipped_no_provider",
+      detail: "No LLM provider configured; pattern scanners completed."
+    }
+  end
+
+  defp transport_suffix(nil), do: ""
+  defp transport_suffix(""), do: ""
+  defp transport_suffix(transport), do: " via #{transport}"
 
   # ─── Provider dispatch ───────────────────────────────────────────────────────
 

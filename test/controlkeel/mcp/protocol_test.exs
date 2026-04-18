@@ -203,8 +203,11 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "untrusted"
            ]
 
-    assert get_in(tool, ["inputSchema", "properties", "requested_capabilities", "items", "enum"]) !=
-             nil
+    capability_enum =
+      get_in(tool, ["inputSchema", "properties", "requested_capabilities", "items", "enum"])
+
+    assert capability_enum != nil
+    assert "file_read" in capability_enum
   end
 
   test "tools/list exposes experience archive inputs" do

@@ -50,14 +50,19 @@ These are the current higher-confidence host adapters where the docs, release as
 | Augment / Auggie CLI | `controlkeel attach augment` | plugin and hook review | repo-native `.augment/*` plus local plugin bundle |
 | Pi | `controlkeel attach pi` | browser review with persisted plan state | file-plan bundle and published npm extension |
 | VS Code | `controlkeel attach vscode` | browser review through companion webview | companion `.vsix` plus repo-local MCP wiring |
-| Codex CLI | `controlkeel attach codex-cli` | browser review through native commands | `.codex/config.toml`, `.codex/agents`, `.codex/commands`, plus optional local plugin bundle via `controlkeel plugin install codex` |
+| Codex CLI | `controlkeel attach codex-cli` | browser review through native commands | `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks`, `.codex/agents`, `.codex/commands`, plus optional local plugin bundle via `controlkeel plugin install codex` |
 
 For Codex there are two supported CK delivery modes:
 
 - `controlkeel attach codex-cli`
-  Uses Codex-native MCP, skills, commands, and agent files inside `.codex/`.
+  Uses Codex-native MCP, skills, hooks, commands, and custom agent files inside `.codex/`.
 - `controlkeel plugin install codex`
   Installs a local plugin bundle plus a local marketplace manifest. This is a repo-local or home-local marketplace entry, not the same thing as appearing in Codex's curated remote plugin catalog.
+
+Two operational notes matter in practice:
+
+1. Codex only loads project-scoped `.codex/` config and hooks when the project is trusted.
+2. Restart Codex after `controlkeel attach codex-cli` or `controlkeel plugin install codex` so new hooks, custom agents, and marketplace state are reloaded.
 
 When a user says "I don't see CK in the Codex plugins page," the most likely explanation is that they are looking at the curated catalog or a workspace-managed app surface, while CK was installed as a local bundle. In that case the truthful next checks are:
 

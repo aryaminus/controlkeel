@@ -20,6 +20,8 @@ defmodule ControlKeel.AgentAdapters.CodexCLI do
       ".agents/skills",
       ".codex/skills",
       ".codex/config.toml",
+      ".codex/hooks.json",
+      ".codex/hooks",
       ".codex/agents/controlkeel-operator.toml",
       ".codex/commands/controlkeel-review.md",
       ".codex/commands/controlkeel-annotate.md",

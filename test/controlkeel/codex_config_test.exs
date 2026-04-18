@@ -43,6 +43,9 @@ defmodule ControlKeel.CodexConfigTest do
 
     first_write = File.read!(config_path)
     assert first_write =~ ~s(model = "gpt-5.4")
+    assert first_write =~ "[features]"
+    assert first_write =~ "multi_agent = true"
+    assert first_write =~ "codex_hooks = true"
     assert first_write =~ "[mcp_servers.controlkeel]"
     assert first_write =~ ~s(args = ["mcp", "--project-root", "/repo/one"])
     assert first_write =~ ~s(config_file = "./agents/controlkeel-operator.toml")
@@ -55,6 +58,7 @@ defmodule ControlKeel.CodexConfigTest do
 
     second_write = File.read!(config_path)
     assert second_write =~ ~s(model = "gpt-5.4")
+    assert second_write =~ "codex_hooks = true"
     assert second_write =~ ~s(args = ["mcp", "--project-root", "/repo/two"])
     refute second_write =~ ~s(args = ["mcp", "--project-root", "/repo/one"])
     assert length(String.split(second_write, "[mcp_servers.controlkeel]")) == 2

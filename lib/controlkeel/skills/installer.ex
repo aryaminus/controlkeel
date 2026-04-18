@@ -88,9 +88,18 @@ defmodule ControlKeel.Skills.Installer do
 
     File.mkdir_p!(config_root)
 
+    hooks_root = Path.join(config_root, "hooks")
+    File.mkdir_p!(hooks_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".codex/hooks"), hooks_root)
+
     File.cp!(
       Path.join(plan.output_dir, ".codex/config.toml"),
       Path.join(config_root, "config.toml")
+    )
+
+    File.cp!(
+      Path.join(plan.output_dir, ".codex/hooks.json"),
+      Path.join(config_root, "hooks.json")
     )
 
     if scope == "project" do
@@ -106,7 +115,8 @@ defmodule ControlKeel.Skills.Installer do
        compat_destination: compat_skill_root,
        agent_destination: agent_root,
        commands_destination: commands_root,
-       config_destination: Path.join(config_root, "config.toml")
+       config_destination: Path.join(config_root, "config.toml"),
+       hooks_destination: hooks_root
      }}
   end
 

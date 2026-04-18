@@ -36,7 +36,10 @@ defmodule ControlKeel.CodexConfig do
         _ -> ""
       end
 
-    updated = upsert_managed_block(existing, managed_block(command, args, opts))
+    updated =
+      existing
+      |> upsert_managed_block(managed_block(command, args, opts))
+      |> ensure_feature_flag("codex_hooks", "true")
 
     with :ok <- File.mkdir_p(Path.dirname(config_path)),
          :ok <- File.write(config_path, updated) do
@@ -88,6 +91,66 @@ defmodule ControlKeel.CodexConfig do
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n\n")
     |> Kernel.<>("\n")
+  end
+
+  defp ensure_feature_flag(contents, flag, value) do
+    lines = String.split(contents, "\n", trim: false)
+
+    {updated_lines, _in_features?, _found_flag?, found_features?} =
+      Enum.reduce(lines, {[], false, false, false}, fn line,
+                                                       {acc, in_features?, found_flag?,
+                                                        found_features?} ->
+        trimmed = String.trim(line)
+        table_header? = String.starts_with?(trimmed, "[") and String.ends_with?(trimmed, "]")
+        entering_features? = trimmed == "[features]"
+        leaving_features? = in_features? and table_header? and not entering_features?
+        flag_line? = in_features? and String.match?(trimmed, ~r/^#{Regex.escape(flag)}\s*=/)
+
+        acc =
+          cond do
+            leaving_features? and not found_flag? ->
+              acc ++ ["#{flag} = #{value}", line]
+
+            flag_line? ->
+              acc ++ ["#{flag} = #{value}"]
+
+            true ->
+              acc ++ [line]
+          end
+
+        in_features? =
+          cond do
+            entering_features? -> true
+            leaving_features? -> false
+            true -> in_features?
+          end
+
+        found_flag? = found_flag? or flag_line?
+        found_features? = found_features? or entering_features?
+
+        {acc, in_features?, found_flag?, found_features?}
+      end)
+      |> then(fn {acc, in_features?, found_flag?, found_features?} ->
+        acc =
+          if in_features? and not found_flag? do
+            acc ++ ["#{flag} = #{value}"]
+          else
+            acc
+          end
+
+        {acc, in_features?, found_flag?, found_features?}
+      end)
+
+    cond do
+      found_features? ->
+        Enum.join(updated_lines, "\n")
+
+      String.trim(contents) == "" ->
+        "[features]\n#{flag} = #{value}\n"
+
+      true ->
+        Enum.join(updated_lines ++ ["", "[features]", "#{flag} = #{value}"], "\n")
+    end
   end
 
   defp toml_array(values) when is_list(values) do

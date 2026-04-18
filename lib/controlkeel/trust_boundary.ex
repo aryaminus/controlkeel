@@ -22,7 +22,7 @@ defmodule ControlKeel.TrustBoundary do
   )
   @trust_levels ~w(trusted mixed untrusted)
   @intended_uses ~w(code config shell text instruction context data review)
-  @capabilities ~w(bash file_write network deploy secrets git mcp browser)
+  @capabilities ~w(file_read bash file_write network deploy secrets git mcp browser)
   @high_impact_capabilities ~w(bash file_write network deploy secrets)
 
   @prompt_override_patterns [

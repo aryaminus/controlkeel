@@ -92,12 +92,12 @@ defmodule ControlKeel.AgentIntegration do
         label: "Codex CLI",
         category: "native-first",
         description:
-          "Writes MCP config, installs native Codex skills plus open-standard compatibility skills, adds a Codex operator agent, and ships review, annotate, and last command aliases.",
+          "Writes MCP config, installs native Codex skills plus open-standard compatibility skills, adds Codex custom agents plus lifecycle hooks, and ships review, annotate, diff, completion, and last command aliases.",
         attach_command: "controlkeel attach codex-cli",
         config_location:
           "Codex MCP config (`~/.codex/config.toml` or `<project>/.codex/config.toml`).",
         companion_delivery:
-          "Installs `.codex/skills`, `.agents/skills`, `.codex/config.toml`, `.codex/agents`, and `.codex/commands`; can also export portable Codex bundles or a Codex plugin.",
+          "Installs `.codex/skills`, `.agents/skills`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks`, `.codex/agents`, and `.codex/commands`; can also export portable Codex bundles or a Codex plugin.",
         preferred_target: "codex",
         default_scope: "user",
         router_agent_id: "codex-cli",
@@ -1043,7 +1043,7 @@ defmodule ControlKeel.AgentIntegration do
         label: "Codex app / app server surface",
         category: "alias",
         description:
-          "Alias to the shipped Codex CLI path; ControlKeel currently supports Codex through the documented Codex CLI / shared MCP config surface.",
+          "Alias to the shipped Codex CLI path; ControlKeel currently supports Codex through the documented Codex CLI / shared MCP config surface, while treating Codex app-server as the same governed host family for runtime and provider reporting.",
         alias_of: "codex-cli",
         auth_mode: "agent_runtime",
         upstream_slug: "openai/codex",
@@ -2085,6 +2085,8 @@ defmodule ControlKeel.AgentIntegration do
       ".agents/skills",
       ".codex/skills",
       ".codex/config.toml",
+      ".codex/hooks.json",
+      ".codex/hooks",
       ".codex/agents",
       ".codex/commands"
     ]
