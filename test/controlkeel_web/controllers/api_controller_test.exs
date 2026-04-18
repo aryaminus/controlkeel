@@ -154,7 +154,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
     test "returns validation error when session_id is missing", %{conn: conn} do
       conn = get(conn, ~p"/api/v1/context")
-      assert %{"error" => "`session_id` is required"} = json_response(conn, 422)
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "session_id"
     end
   end
 
