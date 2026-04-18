@@ -36,3 +36,5 @@ echo "@aryaminus:registry=https://npm.pkg.github.com" >> ~/.npmrc
 echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN_WITH_READ_PACKAGES" >> ~/.npmrc
 npm i -g @aryaminus/controlkeel --registry=https://npm.pkg.github.com
 ```
+
+<!-- mcp-name: io.github.aryaminus/controlkeel -->

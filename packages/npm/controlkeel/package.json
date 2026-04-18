@@ -27,5 +27,6 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "mcpName": "io.github.aryaminus/controlkeel"
 }
