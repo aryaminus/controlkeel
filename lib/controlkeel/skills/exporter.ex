@@ -3193,6 +3193,17 @@ defmodule ControlKeel.Skills.Exporter do
                 "timeout" => 15
               }
             ]
+          },
+          %{
+            "matcher" => "Write|Edit",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-validate-write.sh",
+                "statusMessage" => "Validating file write with ControlKeel",
+                "timeout" => 10
+              }
+            ]
           }
         ],
         "PostToolUse" => [
@@ -3204,6 +3215,17 @@ defmodule ControlKeel.Skills.Exporter do
                 "command" => "./hooks/ck-post-tool-use.sh",
                 "statusMessage" => "Reviewing Bash output with ControlKeel",
                 "timeout" => 15
+              }
+            ]
+          },
+          %{
+            "matcher" => "Write|Edit",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-post-write.sh",
+                "statusMessage" => "Recording file mutation with ControlKeel",
+                "timeout" => 10
               }
             ]
           }
@@ -3343,6 +3365,18 @@ defmodule ControlKeel.Skills.Exporter do
                   "cmd=$(cat | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"command\",\"\"))' 2>/dev/null || true); [ -z \"$cmd\" ] && exit 0; controlkeel validate --content \"$cmd\" --kind shell --json 2>/dev/null || true",
                 "statusMessage" => "Checking Bash command with ControlKeel",
                 "timeout" => 15
+              }
+            ]
+          },
+          %{
+            "matcher" => "Write|Edit",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "fp=$(cat | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"file_path\",\"\"))' 2>/dev/null || true); [ -z \"$fp\" ] && exit 0; printf '%s' \"$fp\" | grep -qiE '(\\.env$|credentials|secret|\\.pem$|\\.key$|id_rsa|passw)' && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"Writing to potentially sensitive file: %s. Verify ck_validate approved this change.\"}}'\"\\n\" \"$fp\" || true",
+                "statusMessage" => "Validating file write with ControlKeel",
+                "timeout" => 10
               }
             ]
           }
@@ -3537,8 +3571,10 @@ defmodule ControlKeel.Skills.Exporter do
     [
       {"ck-session-start.sh", &codex_session_start_hook_contents/0},
       {"ck-validate-shell.sh", &codex_validate_shell_hook_contents/0},
+      {"ck-validate-write.sh", &claude_plugin_validate_write_hook_contents/0},
       {"ck-post-tool-use.sh", &codex_post_tool_use_hook_contents/0},
-      {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
+      {"ck-post-write.sh", &claude_plugin_post_write_hook_contents/0},
+      {"ck-user-prompt-submit.sh", &claude_plugin_user_prompt_submit_hook_contents/0},
       {"ck-stop.sh", &codex_stop_hook_contents/0},
       {"ck-post-compact.sh", &claude_plugin_post_compact_hook_contents/0},
       {"ck-session-end.sh", &claude_plugin_session_end_hook_contents/0},
@@ -3637,10 +3673,144 @@ defmodule ControlKeel.Skills.Exporter do
     #!/usr/bin/env sh
     set -eu
 
-    # PermissionDenied fires when the auto-mode classifier blocks a tool call.
-    # We do not retry by default — governance and safety rules should be respected.
-    # If you want to enable retries for specific denied tools, inspect the input
-    # and output '{"hookSpecificOutput":{"hookEventName":"PermissionDenied","retry":true}}'
+    input=$(cat)
+    tool_name="unknown"
+
+    if command -v jq >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | jq -r '.tool_name // "unknown"')
+    elif command -v python3 >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name','unknown'))" 2>/dev/null || echo "unknown")
+    fi
+
+    # Surface the denied tool so Claude can adjust its approach.
+    # We do not retry by default — governance rules should be respected.
+    printf '{"hookSpecificOutput":{"hookEventName":"PermissionDenied","additionalContext":"Tool call denied: %s. This is a governance or safety constraint. Do not retry the same action. If unintended, call ck_context to review active governance rules or check ck_finding for active blocks."}}\n' "$tool_name"
+    exit 0
+    """
+  end
+
+  defp claude_plugin_validate_write_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    tool_name=""
+    file_path=""
+
+    if command -v jq >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
+      file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null)
+      file_path=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))" 2>/dev/null)
+    fi
+
+    if [ -z "$file_path" ]; then
+      exit 0
+    fi
+
+    sensitive_pattern='\.env$|credentials|secret|\.pem$|\.key$|id_rsa|\.token$|passw'
+    if printf '%s' "$file_path" | grep -qiE "$sensitive_pattern"; then
+      if command -v controlkeel >/dev/null 2>&1; then
+        result=$(controlkeel validate --content "${tool_name:-Write} to ${file_path}" --kind config --json 2>/dev/null || true)
+        if printf '%s' "$result" | grep -q '"decision":"block"'; then
+          printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"ControlKeel blocked write to sensitive file: %s. Review ck_finding before retrying."}}\n' "$file_path"
+          exit 0
+        fi
+      fi
+      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"Writing to potentially sensitive file: %s. Verify this is intentional and that ck_validate was called for this change."}}\n' "$file_path"
+      exit 0
+    fi
+
+    exit 0
+    """
+  end
+
+  defp claude_plugin_post_write_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    file_path=""
+    tool_name=""
+
+    if command -v jq >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
+      file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      tool_name=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null)
+      file_path=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))" 2>/dev/null)
+    fi
+
+    if [ -z "$file_path" ]; then
+      exit 0
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      controlkeel finding --severity info --title "${tool_name:-Write}: ${file_path}" --json >/dev/null 2>&1 || true
+    fi
+
+    exit 0
+    """
+  end
+
+  defp claude_plugin_user_prompt_submit_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    prompt=""
+    session_id=""
+
+    if command -v jq >/dev/null 2>&1; then
+      prompt=$(printf '%s' "$input" | jq -r '.prompt // empty')
+      session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+    elif command -v python3 >/dev/null 2>&1; then
+      prompt=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('prompt', ''))" 2>/dev/null)
+      session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id', ''))" 2>/dev/null)
+    fi
+
+    if [ -z "$prompt" ]; then
+      exit 0
+    fi
+
+    if printf '%s' "$prompt" | grep -Eiq '(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]|BEGIN (RSA|OPENSSH|PGP) PRIVATE KEY|api[_-]?key[[:space:]]*[:=]|password[[:space:]]*[:=])'; then
+      printf '%s\n' '{"decision":"block","reason":"Potential secret material detected in the prompt. Remove credentials or private keys before continuing."}'
+      exit 0
+    fi
+
+    if printf '%s' "$prompt" | grep -Eiq '(rm[[:space:]]+-rf|drop[[:space:]]+database|delete[[:space:]]+everything|wipe[[:space:]]+the[[:space:]]+repo)'; then
+      printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"The prompt asks for destructive work. Pause to confirm scope, preserve evidence, and use ck_validate before executing risky shell or config steps."}}'
+      exit 0
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      context=$(controlkeel context --session-id "${session_id:-1}" --json 2>/dev/null || true)
+      if [ -n "$context" ]; then
+        blocked="0"
+        budget_pct="0"
+        if command -v jq >/dev/null 2>&1; then
+          blocked=$(printf '%s' "$context" | jq -r '.active_findings.blocked // 0')
+          budget_pct=$(printf '%s' "$context" | jq -r '.budget.used_pct // 0')
+        elif command -v python3 >/dev/null 2>&1; then
+          blocked=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('active_findings',{}).get('blocked',0))" 2>/dev/null || echo 0)
+          budget_pct=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('budget',{}).get('used_pct',0))" 2>/dev/null || echo 0)
+        fi
+
+        if [ "${blocked:-0}" != "0" ]; then
+          printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"WARNING: %s blocked finding(s) active in this session. Call ck_context and resolve them before proceeding with this task."}}\n' "$blocked"
+          exit 0
+        fi
+
+        if command -v awk >/dev/null 2>&1 && awk "BEGIN{exit!(${budget_pct:-0}>=80)}" 2>/dev/null; then
+          printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"NOTE: Budget at %s%% capacity. Call ck_budget before expensive model or multi-agent operations."}}\n' "$budget_pct"
+        fi
+      fi
+    fi
+
     exit 0
     """
   end
@@ -5163,19 +5333,12 @@ defmodule ControlKeel.Skills.Exporter do
       // WARNING: removing this or setting [] bypasses CK governance in SDK deployments.
       settingSources: ["user", "project"],
 
-      // Allow CK MCP tools and skill invocations. Narrow this list to lock down further.
+      // Allow all built-in tools, all CK MCP tools, and skill invocations.
+      // Narrow to explicit tool names to lock down further.
       allowedTools: [
-        "Bash", "Read", "Write", "Edit", "Glob", "Grep", "Skill",
-        "mcp__controlkeel__ck_context",
-        "mcp__controlkeel__ck_validate",
-        "mcp__controlkeel__ck_review_submit",
-        "mcp__controlkeel__ck_review_status",
-        "mcp__controlkeel__ck_finding",
-        "mcp__controlkeel__ck_budget",
-        "mcp__controlkeel__ck_route",
-        "mcp__controlkeel__ck_skill_list",
-        "mcp__controlkeel__ck_skill_load",
-        "mcp__controlkeel__ck_trace_packet",
+        "Bash", "Read", "Write", "Edit", "Glob", "Grep",
+        "WebSearch", "WebFetch", "Agent", "Skill",
+        "mcp__controlkeel__*",
       ],
 
       // Headless: deny any tool not in allowedTools without prompting.
@@ -5269,19 +5432,12 @@ defmodule ControlKeel.Skills.Exporter do
             # Discover CK skills, subagents, and lifecycle hooks from .claude/ directories.
             # WARNING: removing this or setting [] bypasses CK governance in SDK deployments.
             setting_sources=["user", "project"],
-            # Allow CK MCP tools and skill invocations.
+            # Allow all built-in tools, all CK MCP tools, and skill invocations.
+            # Narrow to explicit tool names to lock down further.
             allowed_tools=[
-                "Bash", "Read", "Write", "Edit", "Glob", "Grep", "Skill",
-                "mcp__controlkeel__ck_context",
-                "mcp__controlkeel__ck_validate",
-                "mcp__controlkeel__ck_review_submit",
-                "mcp__controlkeel__ck_review_status",
-                "mcp__controlkeel__ck_finding",
-                "mcp__controlkeel__ck_budget",
-                "mcp__controlkeel__ck_route",
-                "mcp__controlkeel__ck_skill_list",
-                "mcp__controlkeel__ck_skill_load",
-                "mcp__controlkeel__ck_trace_packet",
+                "Bash", "Read", "Write", "Edit", "Glob", "Grep",
+                "WebSearch", "WebFetch", "Agent", "Skill",
+                "mcp__controlkeel__*",
             ],
             # Headless: deny any tool not in allowed_tools without prompting.
             permission_mode="dontAsk",
