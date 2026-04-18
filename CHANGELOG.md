@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.28 — 2026-04-18
+
+### What's changed
+
+- fix(governance): keep escalated findings human-gated
+- Merge branch 'fix/ck-review-store-split'
+- fix(mcp): broaden review fallback variants for split runtime contexts
+- Merge branch 'fix/ck-review-store-split'
+- feat(harness): surface explicit harness principles
+- fix(opencode): restore linked CLI execution and tighten governance skill guardrails
+
 ## v0.2.27 — 2026-04-18
 
 ### What's changed
