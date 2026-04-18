@@ -40,6 +40,13 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
     assert summary["execution_posture"]["shell_role"] == "broad_fallback_only"
     assert summary["harness_policy"]["tool_execution"]["read_only_concurrency"] == "parallel"
     assert summary["harness_policy"]["tool_execution"]["write_concurrency"] == "serial"
+
+    assert summary["harness_policy"]["context_contract"]["system_prompt_posture"] ==
+             "minimal_and_stable"
+
+    assert summary["harness_policy"]["context_contract"]["hidden_context_mutation"] ==
+             "forbid_silent_instruction_injection"
+
     assert summary["harness_policy"]["memory"]["ownership"] == "workspace_or_ck_controlled"
     assert summary["harness_policy"]["memory"]["retrieval_mode"] == "ranked_memory_hits"
 
@@ -53,7 +60,17 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
              "avoid_opaque_provider_memory"
 
     assert summary["harness_policy"]["compaction"]["strategy"] == "hierarchical"
+
+    assert summary["harness_policy"]["observability"]["compaction_audit"] ==
+             "runtime_context_integrity"
+
     assert summary["harness_policy"]["recovery"]["mode"] == "in_loop_state_machine"
+
+    assert summary["harness_policy"]["extensibility"]["host_surface_strategy"] ==
+             "truthful_host_native_extensions"
+
+    assert summary["harness_policy"]["provider_choice"]["selection_strategy"] ==
+             "explicit_and_budget_aware"
 
     assert summary["harness_policy"]["delegation"]["isolated_worktree"] ==
              "required_for_mutating_subagents"
@@ -118,6 +135,15 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                  "rationale" =>
                    "Run read-only discovery concurrently when possible, serialize mutations, and keep tool execution inside the main agent loop so results and failures stay governable."
                },
+               "context_contract" => %{
+                 "ownership" => "operator_visible_and_ck_controlled",
+                 "system_prompt_posture" => "minimal_and_stable",
+                 "tool_schema_posture" => "versioned_and_additive",
+                 "hidden_context_mutation" => "forbid_silent_instruction_injection",
+                 "relevance_injection" => "scoped_and_attributed",
+                 "rationale" =>
+                   "The working context should belong to the operator and the governed runtime, not to silent host-side mutations. Keep the core system contract small, keep tool schemas stable and additive, and make any extra reminders or retrieved context explicit, scoped, and attributable."
+               },
                "memory" => %{
                  "ownership" => "workspace_or_ck_controlled",
                  "portability" => "typed_records_and_resume_packets",
@@ -150,6 +176,14 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                  "rationale" =>
                    "Compact the cheapest artifacts first, preserve the active tail of the session, and only pay for expensive summarization or collapse when lighter strategies fail."
                },
+               "observability" => %{
+                 "transcript_visibility" => "recent_events_and_resume_packets",
+                 "tool_result_posture" => "budget_then_reference",
+                 "compaction_audit" => "runtime_context_integrity",
+                 "mutation_audit" => "proofs_findings_and_reviews",
+                 "rationale" =>
+                   "Agents should not operate as a black box. CK keeps recent events, runtime context integrity, findings, reviews, and proofs visible so compaction, delegated work, and high-impact mutations stay inspectable after the fact."
+               },
                "recovery" => %{
                  "mode" => "in_loop_state_machine",
                  "error_classes" => [
@@ -162,6 +196,19 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                  "requires_recovery_path" => true,
                  "rationale" =>
                    "Every major failure class should have a named recovery path inside the loop so the agent can retry, compact, refresh, or escalate without dropping session state."
+               },
+               "extensibility" => %{
+                 "host_surface_strategy" => "truthful_host_native_extensions",
+                 "operator_override" => "repo_visible_configuration",
+                 "self_modification_scope" => "skills_plugins_and_runtime_bundles",
+                 "rationale" =>
+                   "Prefer small governed cores plus repo-visible extensions over monolithic hidden behavior. CK should meet hosts on their real native surfaces and let operators adapt workflows through skills, plugins, hooks, and runtime bundles that remain reviewable."
+               },
+               "provider_choice" => %{
+                 "selection_strategy" => "explicit_and_budget_aware",
+                 "model_portability" => "cross_provider_handoff_supported",
+                 "rationale" =>
+                   "Model and provider choice should stay explicit and portable. CK tracks provider selection, fallback chains, and budget pressure so teams are not locked into a single opaque host-managed runtime."
                },
                "delegation" => %{
                  "isolated_context" => true,

@@ -25,6 +25,7 @@ Use this page to decide where to read next.
 - [autonomy-and-findings.md](autonomy-and-findings.md): how findings, review state, and human approval interact
 - [benchmarks.md](benchmarks.md): benchmark and evaluation surfaces
 - [control-plane-architecture.md](control-plane-architecture.md): higher-level architecture map
+- [explaining-controlkeel.md](explaining-controlkeel.md): includes the explicit harness principles around context ownership, observability, extensibility, and provider portability
 
 ## Maintainer and release docs
 
