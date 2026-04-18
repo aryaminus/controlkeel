@@ -15,6 +15,14 @@ CK also treats decomposition as a first-class governed surface. It does not just
 
 ## Quick start
 
+### One-line setup via your agent
+
+Copy/paste this into your agent (OpenCode, Claude, Codex, etc.):
+
+```text
+Set up ControlKeel end-to-end for this repository with minimal user action: read and follow https://github.com/aryaminus/controlkeel#readme, https://github.com/aryaminus/controlkeel/blob/main/docs/getting-started.md, https://github.com/aryaminus/controlkeel/blob/main/docs/direct-host-installs.md, https://github.com/aryaminus/controlkeel/blob/main/docs/support-matrix.md, and https://github.com/aryaminus/controlkeel/blob/main/docs/agent-integrations.md; detect this host’s capabilities and choose the strongest supported integration path (plugin and/or MCP plus skills/hooks/agents); install ControlKeel if missing, run controlkeel setup in the repo, attach the correct host, complete required repo-local config, run controlkeel provider doctor, verify with controlkeel status and controlkeel findings (plus host MCP checks), and if anything fails, fix automatically and re-verify until successful; for Codex, ensure the project is trusted and restart Codex after attach/plugin changes.
+```
+
 ### Install ControlKeel
 
 ```bash
