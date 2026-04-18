@@ -1150,6 +1150,15 @@ defmodule ControlKeel.MCP.ProtocolTest do
         status: "blocked"
       })
 
+    escalated_same_rule =
+      finding_fixture(%{
+        session: session,
+        category: "security",
+        severity: "critical",
+        rule_id: "security.workflow.live_target_ambiguity",
+        status: "escalated"
+      })
+
     _different_rule =
       finding_fixture(%{
         session: session,
@@ -1190,8 +1199,10 @@ defmodule ControlKeel.MCP.ProtocolTest do
            } = response
 
     assert Enum.sort(resolved_ids) == Enum.sort([blocked_one.id, blocked_two.id])
+    refute escalated_same_rule.id in resolved_ids
     assert Mission.get_finding!(blocked_one.id).status == "approved"
     assert Mission.get_finding!(blocked_two.id).status == "approved"
+    assert Mission.get_finding!(escalated_same_rule.id).status == "escalated"
     assert Mission.get_finding!(finding_id).status == "approved"
   end
 

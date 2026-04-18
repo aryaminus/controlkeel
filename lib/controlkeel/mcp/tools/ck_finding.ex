@@ -68,7 +68,7 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
         finding.session_id == session_id and
           finding.rule_id == attrs.rule_id and
           finding.category == attrs.category and
-          finding.status in ["open", "blocked", "escalated"]
+          finding.status in ["open", "blocked"]
       end)
 
     resolved_ids =
