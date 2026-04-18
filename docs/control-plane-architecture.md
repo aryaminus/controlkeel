@@ -48,6 +48,21 @@ CK now also derives a runtime recommendation from that posture:
 - the recommendation stays grounded in the typed integration catalog so CK suggests a real attach command or runtime export path instead of a generic “use a sandbox” note
 - when CK can see attached agents or already exported runtime bundles for the current workspace, it now biases the recommendation toward those live surfaces first
 
+## Harness principles
+
+ControlKeel already had most of these behaviors in practice, but they are now an explicit harness contract too:
+
+- **Context ownership over hidden mutation**
+  CK treats the operator-visible brief, workspace snapshot, recent events, proof state, and typed memory as the real working context. It avoids treating silent host-side prompt edits or provider memory as the system of record.
+- **Minimal stable contracts**
+  CK prefers a small stable control-plane contract: bounded context, typed tools, versioned schemas, and additive integration surfaces instead of constantly reshaping the basic loop underneath the agent.
+- **Observable compaction and recovery**
+  Compaction, partial reads, findings, reviews, and delegated execution are meant to stay inspectable through runtime context integrity, recent events, resume packets, and proof bundles.
+- **Truthful extensibility**
+  CK meets each host on the native surface it actually exposes: skills, hooks, plugins, commands, runtime bundles, or protocol tools. It does not pretend every host has the same extension depth.
+- **Portable provider choice**
+  CK keeps provider selection, fallback chains, and budget pressure explicit so teams can move between hosts and providers without turning opaque host memory into a hidden dependency.
+
 That is why the main surfaces stay grouped as:
 
 - Mission Control

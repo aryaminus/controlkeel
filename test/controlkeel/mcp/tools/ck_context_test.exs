@@ -5,7 +5,9 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.ProjectBinding
+  alias ControlKeel.Intent
 
+  import ControlKeel.IntentFixtures
   import ControlKeel.MissionFixtures
 
   test "returns task assurance with verification and context integrity" do
@@ -71,6 +73,24 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
 
     assert {:ok, result} = CkContext.call(%{"session_id" => "current", "project_root" => tmp_dir})
     assert result["session_id"] == session.id
+  end
+
+  test "surfaces harness principles through boundary_summary" do
+    session =
+      session_fixture(%{execution_brief: execution_brief_fixture() |> Intent.to_brief_map()})
+
+    task = task_fixture(%{session: session})
+
+    assert {:ok, result} = CkContext.call(%{"session_id" => session.id, "task_id" => task.id})
+
+    assert result["boundary_summary"]["harness_policy"]["context_contract"]["tool_schema_posture"] ==
+             "versioned_and_additive"
+
+    assert result["boundary_summary"]["harness_policy"]["observability"]["mutation_audit"] ==
+             "proofs_findings_and_reviews"
+
+    assert result["boundary_summary"]["harness_policy"]["provider_choice"]["model_portability"] ==
+             "cross_provider_handoff_supported"
   end
 
   test "returns clear error when session_id current cannot resolve binding" do

@@ -67,8 +67,12 @@ The main value is:
 - **Recovery path**: even if another tool already changed the repo, CK can bootstrap into the project and bring the work back into a governed loop.
 - **Managed decomposition**: CK keeps the manager layer explicit by recording how work is split, where review gates sit, and which steps are effectively delegated, recursive, or evidence-gated.
 - **Explicit harness policy**: CK derives the operational policy around the work too: which tool classes can run concurrently, how compaction should step down, which failures need in-loop recovery paths, and what isolation delegated mutation should require.
+- **Stable context contract**: CK treats the working context as something operators should be able to inspect and reason about. It prefers bounded context, versioned tool contracts, and explicit retrieval over silent prompt mutation.
 - **Owned memory**: CK keeps durable state in typed memory, proofs, traces, and resume packets that you can inspect and carry across hosts instead of treating provider-managed session state as the system of record.
 - **Honest memory**: CK treats memory retrieval and memory integration as different jobs. It can return ranked, citable memory hits, but it does not pretend that retrieving a note is the same thing as correctly integrating it into the current reasoning.
+- **Observable agent work**: CK keeps recent events, runtime context integrity, findings, review packets, and proofs visible so compaction and high-impact actions do not disappear into a black box.
+- **Truthful extensibility**: CK favors real host-native surfaces such as skills, plugins, hooks, commands, and runtime bundles over shallow “universal” claims.
+- **Portable provider choice**: CK keeps provider and fallback behavior explicit so teams are not trapped inside a single host-managed runtime.
 
 For defensive security teams, the same value proposition becomes:
 
