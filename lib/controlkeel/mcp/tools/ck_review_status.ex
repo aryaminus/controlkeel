@@ -83,13 +83,35 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
       "--json"
     ]
 
-    with {:error, _reason} <-
-           run_fallback_wait(executable, args,
-             cd: resolved_project_root(),
-             stderr_to_stdout: true
-           ) do
-      run_fallback_wait(executable, args, stderr_to_stdout: true)
+    try_fallback_variants(executable, args, fallback_variants())
+  end
+
+  defp try_fallback_variants(_executable, _args, []), do: {:error, :fallback_failed}
+
+  defp try_fallback_variants(executable, args, [variant | rest]) do
+    case run_fallback_wait(executable, args, variant) do
+      {:ok, payload} -> {:ok, payload}
+      {:error, _reason} -> try_fallback_variants(executable, args, rest)
     end
+  end
+
+  defp fallback_variants do
+    root = resolved_project_root()
+
+    [
+      [cd: root, stderr_to_stdout: true],
+      [stderr_to_stdout: true],
+      [cd: root, stderr_to_stdout: true, env: fallback_env("prod")],
+      [stderr_to_stdout: true, env: fallback_env("prod")],
+      [cd: root, stderr_to_stdout: true, env: fallback_env("dev")],
+      [stderr_to_stdout: true, env: fallback_env("dev")]
+    ]
+  end
+
+  defp fallback_env(mix_env) do
+    System.get_env()
+    |> Map.put("MIX_ENV", mix_env)
+    |> Enum.into([])
   end
 
   defp run_fallback_wait(executable, args, opts) do

@@ -1503,6 +1503,59 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert get_in(response, ["result", "structuredContent", "browser_url"]) =~ "/reviews/999902"
   end
 
+  test "ck_review_status fallback tries MIX_ENV variants" do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-review-fallback-mixenv-#{System.unique_integer([:positive])}"
+      )
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(tmp_dir)
+    fake_bin = write_fake_controlkeel_cli_mixenv(tmp_dir)
+    expected_root = Path.join(tmp_dir, "expected-root")
+    File.mkdir_p!(expected_root)
+
+    previous_bin = System.get_env("CONTROLKEEL_BIN")
+    previous_project_root = System.get_env("CONTROLKEEL_PROJECT_ROOT")
+    previous_mix_env = System.get_env("MIX_ENV")
+
+    System.put_env("CONTROLKEEL_BIN", fake_bin)
+    System.put_env("CONTROLKEEL_PROJECT_ROOT", expected_root)
+    System.put_env("MIX_ENV", "dev")
+
+    on_exit(fn ->
+      if previous_bin,
+        do: System.put_env("CONTROLKEEL_BIN", previous_bin),
+        else: System.delete_env("CONTROLKEEL_BIN")
+
+      if previous_project_root,
+        do: System.put_env("CONTROLKEEL_PROJECT_ROOT", previous_project_root),
+        else: System.delete_env("CONTROLKEEL_PROJECT_ROOT")
+
+      if previous_mix_env,
+        do: System.put_env("MIX_ENV", previous_mix_env),
+        else: System.delete_env("MIX_ENV")
+
+      File.rm_rf!(tmp_dir)
+    end)
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 806,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_status",
+          "arguments" => %{"review_id" => 999_911}
+        }
+      })
+
+    assert get_in(response, ["result", "structuredContent", "review_id"]) == 999_911
+    assert get_in(response, ["result", "structuredContent", "status"]) == "approved"
+    assert get_in(response, ["result", "structuredContent", "browser_url"]) =~ "/reviews/999911"
+  end
+
   test "review tools submit, inspect, and respond to plan reviews" do
     session = session_fixture()
     task = task_fixture(%{session: session})
@@ -1761,6 +1814,50 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert resource["uri"] == "skills://controlkeel-governance"
     assert resource["text"] =~ "<skill_content"
     assert is_list(resource["resources"])
+  end
+
+  defp write_fake_controlkeel_cli_mixenv(tmp_dir) do
+    script_path = Path.join(tmp_dir, "fake-controlkeel-mixenv.sh")
+
+    File.write!(
+      script_path,
+      """
+      #!/bin/sh
+      expected_root="$CONTROLKEEL_PROJECT_ROOT"
+
+      if [ -z "$expected_root" ]; then
+        expected_root="$CK_PROJECT_ROOT"
+      fi
+
+      if [ -z "$expected_root" ]; then
+        expected_root="$(pwd)"
+      fi
+
+      expected_root="$(cd "$expected_root" 2>/dev/null && pwd -P || printf '%s' "$expected_root")"
+      cwd="$(pwd -P)"
+
+      if [ "$cwd" != "$expected_root" ]; then
+        echo "unexpected cwd: $cwd expected: $expected_root" >&2
+        exit 9
+      fi
+
+      if [ "$1" = "review" ] && [ "$2" = "plan" ] && [ "$3" = "wait" ]; then
+        if [ "${MIX_ENV:-}" = "prod" ]; then
+          echo '{"message":"wait","browser_url":"https://example.test/reviews/999911","review":{"id":999911,"title":"MIX_ENV fallback plan","status":"approved","review_type":"plan","session_id":10,"task_id":20,"feedback_notes":"from-prod","annotations":{}}}'
+          exit 0
+        fi
+
+        echo "simulated failure in non-prod mix env" >&2
+        exit 2
+      fi
+
+      echo "unsupported args" >&2
+      exit 2
+      """
+    )
+
+    File.chmod!(script_path, 0o755)
+    script_path
   end
 
   defp write_fake_controlkeel_cli(tmp_dir) do
