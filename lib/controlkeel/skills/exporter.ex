@@ -3317,6 +3317,23 @@ defmodule ControlKeel.Skills.Exporter do
     set -eu
 
     controlkeel status >/dev/null 2>&1 || true
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      update_report=$(controlkeel update --json 2>/dev/null || true)
+
+      if [ -n "$update_report" ]; then
+        update_available=$(printf '%s' "$update_report" | grep -o '"update_available":[[:space:]]*[^,}]*' | head -n1 | cut -d: -f2 | tr -d '[:space:]')
+        latest_version=$(printf '%s' "$update_report" | grep -o '"latest_version":[[:space:]]*"[^"]*"' | head -n1 | sed 's/.*"latest_version":[[:space:]]*"\([^"]*\)"/\1/')
+
+        if [ "$update_available" = "true" ]; then
+          if [ -n "$latest_version" ]; then
+            printf 'ControlKeel update available: %s. Consider `controlkeel update --sync-attached` after upgrading.\n' "$latest_version"
+          else
+            printf 'ControlKeel update available. Consider `controlkeel update --sync-attached` after upgrading.\n'
+          fi
+        fi
+      fi
+    fi
     """
   end
 
@@ -3390,21 +3407,22 @@ defmodule ControlKeel.Skills.Exporter do
     When Cursor background agents are enabled, follow this protocol:
 
     ## Before execution
-    1. Call `ck_context` with `session_id: 1` to load mission state and active findings.
-    2. Draft the plan, including scope estimate and validation approach.
-    3. Call `ck_review_submit` with `review_type: "plan"` before executing.
-    4. Wait for approval via `ck_review_status` before proceeding.
+    1. Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached`.
+    2. Call `ck_context` with `session_id: 1` to load mission state and active findings.
+    3. Draft the plan, including scope estimate and validation approach.
+    4. Call `ck_review_submit` with `review_type: "plan"` before executing.
+    5. Wait for approval via `ck_review_status` before proceeding.
 
     ## During execution
-    5. Call `ck_validate` before every risky edit, shell command, or config change.
-    6. Use `ck_memory_record` to persist key decisions for future agents.
-    7. Call `ck_budget` before expensive operations to stay within limits.
-    8. Call `ck_finding` if you discover any unscanned issue.
+    6. Call `ck_validate` before every risky edit, shell command, or config change.
+    7. Use `ck_memory_record` to persist key decisions for future agents.
+    8. Call `ck_budget` before expensive operations to stay within limits.
+    9. Call `ck_finding` if you discover any unscanned issue.
 
     ## Handoff
-    9. Call `ck_context` again to verify final state.
-    10. Return proof status, unresolved findings, budget remaining, and any blocked work.
-    11. Call `ck_outcome_tracker` with `mode: "record"` to record the session result.
+    10. Call `ck_context` again to verify final state.
+    11. Return proof status, unresolved findings, budget remaining, and any blocked work.
+    12. Call `ck_outcome_tracker` with `mode: "record"` to record the session result.
     """
   end
 
@@ -3474,13 +3492,14 @@ defmodule ControlKeel.Skills.Exporter do
 
     ## Behavior
 
-    1. Always start by calling `ck_context` to understand the current mission state.
-    2. Validate all proposed changes with `ck_validate` before approving them.
-    3. Track findings with `ck_finding` and ensure blocked items are resolved.
-    4. Monitor budget with `ck_budget` and flag overspend risks.
-    5. Route tasks to the best-fit agent using `ck_route`.
-    6. Record decisions in governed memory via `ck_memory_record`.
-    7. Submit reviews via `ck_review_submit` for human approval gates.
+    1. Always start by calling `controlkeel update --json`; if `update_available` is `true`, surface a concise CK upgrade notice and consider `controlkeel update --sync-attached` before risky work.
+    2. Always start by calling `ck_context` to understand the current mission state.
+    3. Validate all proposed changes with `ck_validate` before approving them.
+    4. Track findings with `ck_finding` and ensure blocked items are resolved.
+    5. Monitor budget with `ck_budget` and flag overspend risks.
+    6. Route tasks to the best-fit agent using `ck_route`.
+    7. Record decisions in governed memory via `ck_memory_record`.
+    8. Submit reviews via `ck_review_submit` for human approval gates.
 
     ## When delegated to
 
@@ -3841,10 +3860,37 @@ defmodule ControlKeel.Skills.Exporter do
       fi
     fi
 
+    update_available=""
+    if command -v controlkeel >/dev/null 2>&1; then
+      update_report=$(controlkeel update --json 2>/dev/null || true)
+
+      if [ -n "$update_report" ]; then
+        if command -v jq >/dev/null 2>&1; then
+          printf '%s' "$update_report" | jq -e '.update_available == true' >/dev/null 2>&1 && update_available=1
+        elif command -v python3 >/dev/null 2>&1; then
+          if printf '%s' "$update_report" | python3 -c "import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get('update_available') is True else 1)" >/dev/null 2>&1; then
+            update_available=1
+          fi
+        else
+          case "$update_report" in
+            *\"update_available\":true*) update_available=1 ;;
+          esac
+        fi
+      fi
+    fi
+
     if [ -n "$context_ok" ]; then
-      printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel session active. Governance protocol: call ck_validate before risky edits, ck_budget before expensive ops, ck_route before delegation."}\n'
+      if [ -n "$update_available" ]; then
+        printf '{"env":{"CK_SESSION_ACTIVE":"true","CK_UPDATE_AVAILABLE":"true"},"additional_context":"ControlKeel session active. Governance protocol: call ck_validate before risky edits, ck_budget before expensive ops, ck_route before delegation. A newer ControlKeel release is available; surface that proactively and consider `controlkeel update` or `controlkeel update --sync-attached` before risky work."}\n'
+      else
+        printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel session active. Governance protocol: call ck_validate before risky edits, ck_budget before expensive ops, ck_route before delegation."}\n'
+      fi
     else
-      printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel available. Start with ck_context to load mission state."}\n'
+      if [ -n "$update_available" ]; then
+        printf '{"env":{"CK_SESSION_ACTIVE":"true","CK_UPDATE_AVAILABLE":"true"},"additional_context":"ControlKeel available. Start with ck_context to load mission state. A newer ControlKeel release is available; surface that proactively and consider `controlkeel update` or `controlkeel update --sync-attached` before risky work."}\n'
+      else
+        printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel available. Start with ck_context to load mission state."}\n'
+      fi
     fi
     exit 0
     """
@@ -4237,10 +4283,33 @@ defmodule ControlKeel.Skills.Exporter do
     #!/usr/bin/env sh
     set -eu
 
+    update_notice=""
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      update_report=$(controlkeel update --json 2>/dev/null || true)
+
+      if [ -n "$update_report" ]; then
+        update_available=$(printf '%s' "$update_report" | grep -o '"update_available":[[:space:]]*[^,}]*' | head -n1 | cut -d: -f2 | tr -d '[:space:]')
+        latest_version=$(printf '%s' "$update_report" | grep -o '"latest_version":[[:space:]]*"[^"]*"' | head -n1 | sed 's/.*"latest_version":[[:space:]]*"\([^"]*\)"/\1/')
+
+        if [ "$update_available" = "true" ]; then
+          if [ -n "$latest_version" ]; then
+            update_notice="ControlKeel update available: ${latest_version}. Consider `controlkeel update --sync-attached` after upgrading."
+          else
+            update_notice="ControlKeel update available. Consider `controlkeel update --sync-attached` after upgrading."
+          fi
+        fi
+      fi
+    fi
+
     cat <<'EOF'
     ControlKeel: prefer ck_context before risky work, ck_validate before writes or shell, and ck_review_submit/ck_review_status for non-trivial plans.
     MCP registration helper: ./.letta/controlkeel-mcp.sh
     EOF
+
+    if [ -n "$update_notice" ]; then
+      printf '%s\n' "$update_notice"
+    fi
     """
   end
 
@@ -4341,6 +4410,8 @@ defmodule ControlKeel.Skills.Exporter do
     description = "Operate inside a ControlKeel-governed project with CK skills and MCP tools."
     model = "gpt-5.4-mini"
 
+    instructions = "Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading. Start with the `controlkeel-governance` skill, then add domain-specific skills as needed."
+
     [skills]
     preload = [#{Enum.map_join(skills, ", ", &~s("#{&1.name}"))}]
     """
@@ -4360,6 +4431,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     You are the specialized operator for ControlKeel-governed work.
 
+    Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading.
     Always begin with the `controlkeel-governance` skill and then load domain-specific skills as needed.
     Surface findings clearly, respect blocks, and use CK proof, benchmark, and budget tooling before declaring work complete.
     """
@@ -4374,6 +4446,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     # ControlKeel Operator
 
+    Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading.
     Start by loading the `controlkeel-governance` skill. Use these supporting skills when relevant:
 
     #{Enum.map_join(skills, "\n", &"- `#{&1.name}` — #{&1.description}")}
@@ -4394,6 +4467,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     # ControlKeel Operator
 
+    Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading.
     Start with the `controlkeel-governance` skill. Use these supporting skills when relevant:
 
     #{Enum.map_join(skills, "\n", &"- `#{&1.name}` — #{&1.description}")}
@@ -5085,11 +5159,12 @@ defmodule ControlKeel.Skills.Exporter do
 
     ## Instructions
 
-    1. Use `ck_context` first, then `ck_validate` before providing feedback.
-    2. Report findings by severity: critical > high > medium > low.
-    3. Never approve changes that have unresolved critical or high findings.
-    4. Reference specific policy rules when flagging issues.
-    5. Summarize budget impact if token/cost tracking is enabled.
+    1. Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading.
+    2. Use `ck_context` first, then `ck_validate` before providing feedback.
+    3. Report findings by severity: critical > high > medium > low.
+    4. Never approve changes that have unresolved critical or high findings.
+    5. Reference specific policy rules when flagging issues.
+    6. Summarize budget impact if token/cost tracking is enabled.
 
     ## Available MCP Tools
 

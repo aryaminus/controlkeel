@@ -405,6 +405,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(codex_plan.output_dir, ".mcp.hosted.json"))
     assert File.read!(Path.join(codex_plan.output_dir, "AGENTS.md")) =~ "Primary CK loop:"
 
+    codex_export_agent =
+      File.read!(Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-operator.toml"))
+
+    assert codex_export_agent =~ "controlkeel update --json"
+
     assert {:ok, codex_plugin_plan} = Skills.export("codex-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(codex_plugin_plan.output_dir, ".codex-plugin/plugin.json"))
     assert File.exists?(Path.join(codex_plugin_plan.output_dir, "commands/controlkeel-review.md"))
@@ -443,6 +448,11 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.read!(Path.join(claude_plan.output_dir, "CONTROLKEEL_INSTALL.md")) =~
              "@aryaminus/controlkeel"
+
+    claude_export_agent =
+      File.read!(Path.join(claude_plan.output_dir, "agents/controlkeel-operator.md"))
+
+    assert claude_export_agent =~ "controlkeel update --json"
 
     assert {:ok, openclaw_plan} = Skills.export("openclaw-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(openclaw_plan.output_dir, "openclaw.plugin.json"))
@@ -484,6 +494,13 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(
              Path.join(cline_plan.output_dir, ".cline/hooks/TaskStart/controlkeel-context.sh")
            )
+
+    cline_taskstart_hook =
+      File.read!(
+        Path.join(cline_plan.output_dir, ".cline/hooks/TaskStart/controlkeel-context.sh")
+      )
+
+    assert cline_taskstart_hook =~ "controlkeel update --json"
 
     assert File.exists?(
              Path.join(cline_plan.output_dir, ".cline/data/settings/cline_mcp_settings.json")
@@ -634,6 +651,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(letta_plan.output_dir, ".mcp.json"))
     assert File.exists?(Path.join(letta_plan.output_dir, "AGENTS.md"))
 
+    letta_session_hook =
+      File.read!(Path.join(letta_plan.output_dir, ".letta/hooks/controlkeel-session-start.sh"))
+
+    assert letta_session_hook =~ "controlkeel update --json"
+
     assert {:ok, opencode_plan} = Skills.export("opencode-native", tmp_dir, scope: "export")
     assert File.exists?(Path.join(opencode_plan.output_dir, "package.json"))
 
@@ -745,6 +767,7 @@ defmodule ControlKeel.SkillsTest do
       Path.join(opencode_plan.output_dir, ".opencode/agents/controlkeel-operator.md")
       |> File.read!()
 
+    assert opencode_agent =~ "controlkeel update --json"
     assert opencode_agent =~ "`ck_context`"
     assert opencode_agent =~ "`ck_validate`"
     assert opencode_agent =~ "`ck_review_submit`"
@@ -918,6 +941,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(augment_plan.output_dir, "AUGMENT.md"))
     assert File.exists?(Path.join(augment_plan.output_dir, "AGENTS.md"))
 
+    augment_export_agent =
+      File.read!(Path.join(augment_plan.output_dir, ".augment/agents/controlkeel-operator.md"))
+
+    assert augment_export_agent =~ "controlkeel update --json"
+
     assert {:ok, augment_plugin_plan} = Skills.export("augment-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(augment_plugin_plan.output_dir, ".augment-plugin/plugin.json"))
 
@@ -986,6 +1014,7 @@ defmodule ControlKeel.SkillsTest do
     assert codex_config =~ ~s(config_file = "./agents/controlkeel-operator.toml")
 
     codex_agent = File.read!(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
+    assert codex_agent =~ "controlkeel update --json"
     refute codex_agent =~ "[context]"
     refute codex_agent =~ "[mcp]"
 
@@ -993,6 +1022,11 @@ defmodule ControlKeel.SkillsTest do
     assert claude_install.destination == Path.join(tmp_dir, ".claude/skills")
     assert File.exists?(Path.join(tmp_dir, ".claude/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".claude/agents/controlkeel-operator.md"))
+
+    claude_install_agent =
+      File.read!(Path.join(tmp_dir, ".claude/agents/controlkeel-operator.md"))
+
+    assert claude_install_agent =~ "controlkeel update --json"
 
     assert {:ok, github_install} = Skills.install("github-repo", tmp_dir, scope: "project")
     assert github_install.destination == Path.join(tmp_dir, ".github/skills")
@@ -1023,6 +1057,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".cline/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(tmp_dir, ".cline/hooks/PreToolUse/controlkeel-review.sh"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+
+    cline_install_hook =
+      File.read!(Path.join(tmp_dir, ".cline/hooks/TaskStart/controlkeel-context.sh"))
+
+    assert cline_install_hook =~ "controlkeel update --json"
 
     assert {:ok, roo_install} = Skills.install("roo-native", tmp_dir, scope: "project")
     assert roo_install.destination == Path.join(tmp_dir, ".roo/skills")
@@ -1064,6 +1103,11 @@ defmodule ControlKeel.SkillsTest do
 
     assert opencode_install.compat_skills_destination ==
              Path.join(tmp_dir, ".agents/skills")
+
+    opencode_install_agent =
+      File.read!(Path.join(tmp_dir, ".opencode/agents/controlkeel-operator.md"))
+
+    assert opencode_install_agent =~ "controlkeel update --json"
 
     assert {:ok, gemini_install} =
              Skills.install("gemini-cli-native", tmp_dir, scope: "project")
@@ -1123,6 +1167,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, "AUGMENT.md"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
 
+    augment_install_agent =
+      File.read!(Path.join(tmp_dir, ".augment/agents/controlkeel-operator.md"))
+
+    assert augment_install_agent =~ "controlkeel update --json"
+
     assert {:ok, cursor_install} = Skills.install("cursor-native", tmp_dir, scope: "project")
     assert cursor_install.destination == Path.join(tmp_dir, ".cursor")
     assert cursor_install.plugin_destination == Path.join(tmp_dir, ".cursor-plugin")
@@ -1157,6 +1206,18 @@ defmodule ControlKeel.SkillsTest do
 
     assert get_in(plugin, ["hooks"]) == "./hooks/hooks.json"
 
+    session_start_hook = File.read!(Path.join(tmp_dir, ".cursor/hooks/ck-session-start.sh"))
+    assert session_start_hook =~ "controlkeel update --json"
+    assert session_start_hook =~ "CK_UPDATE_AVAILABLE"
+
+    cursor_agent = File.read!(Path.join(tmp_dir, ".cursor/agents/controlkeel-governor.md"))
+    assert cursor_agent =~ "controlkeel update --json"
+
+    background_agent =
+      File.read!(Path.join(tmp_dir, ".cursor/background-agents/controlkeel.md"))
+
+    assert background_agent =~ "controlkeel update --json"
+
     assert {:ok, windsurf_install} = Skills.install("windsurf-native", tmp_dir, scope: "project")
     assert windsurf_install.destination == Path.join(tmp_dir, ".windsurf")
     assert File.exists?(Path.join(tmp_dir, ".windsurf/rules/controlkeel.md"))
@@ -1190,6 +1251,11 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".letta/controlkeel-mcp.sh"))
     assert File.exists?(Path.join(tmp_dir, ".letta/README.md"))
     assert File.exists?(Path.join(tmp_dir, ".mcp.json"))
+
+    letta_install_hook =
+      File.read!(Path.join(tmp_dir, ".letta/hooks/controlkeel-session-start.sh"))
+
+    assert letta_install_hook =~ "controlkeel update --json"
 
     assert {:ok, aider_install} = Skills.install("instructions-only", tmp_dir, scope: "project")
     assert aider_install.destination == tmp_dir
