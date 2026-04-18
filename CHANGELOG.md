@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.2.31 — 2026-04-18
+
+### What's changed
+
+- feat(runtime): add codex app-server support and sqlite busy retries
+- fix(cli): accept positional target for skills export/install subcommands
+- fix(test): loosen session_id error message assertion in api_controller_test
+- fix: guard jq calls in user-prompt-submit hook against non-JSON context output
+- feat: close all Claude integration gaps — write hooks, governance injection, full tool coverage
+- feat: add claude-sdk target and SDK integration guidance for Agent SDK
+- feat: Add SubagentStart/PostToolUseFailure/ConfigChange/PermissionDenied hooks and fix plugin agent
+- feat: Enhance Claude Code integration with full lifecycle hooks, marketplace, and skill metadata
+- feat: Enhance Codex CLI integration with lifecycle hooks and configuration updates
+
 ## v0.2.30 — 2026-04-18
 
 ### What's changed
