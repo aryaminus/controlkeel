@@ -1,6 +1,8 @@
 ---
 name: policy-training
 description: "Train, inspect, promote, and archive ControlKeel router and budget-hint policy artifacts. Use this only for operator-initiated policy work."
+when_to_use: "Activate when the user explicitly requests policy training, policy promotion, or policy artifact management. Do not activate for general governance queries."
+argument-hint: "[policy artifact or training dataset]"
 license: Apache-2.0
 compatibility:
   - codex

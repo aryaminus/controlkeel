@@ -1,6 +1,8 @@
 ---
 name: domain-audit
 description: "Audit a session against its domain pack, especially the regulated and operations-heavy packs such as HR, legal, marketing, sales, real-estate, government, insurance, logistics, manufacturing, e-commerce, and nonprofit. Use this when domain-specific policy needs a manual pass."
+when_to_use: "Activate before handling data in regulated or sensitive domains, or when the user asks about HR policy, legal compliance, GDPR, healthcare, finance, or any industry-specific governance requirements."
+argument-hint: "[domain or data type to audit]"
 license: Apache-2.0
 compatibility:
   - codex

@@ -1,6 +1,8 @@
 ---
 name: benchmark-operator
 description: "Run, inspect, import, and export ControlKeel benchmark suites and multi-subject matrices. Use this when comparing governed and external agents or validating policy changes."
+when_to_use: "Activate when the user asks to benchmark, compare, or validate agent behavior, or when running regression tests after policy changes."
+argument-hint: "[benchmark suite name or agent to compare]"
 license: Apache-2.0
 compatibility:
   - codex

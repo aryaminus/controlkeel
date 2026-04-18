@@ -247,7 +247,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     agent_path = Path.join(root, "agents/controlkeel-operator.md")
     File.mkdir_p!(Path.dirname(agent_path))
-    File.write!(agent_path, claude_agent_contents(skills))
+    File.write!(agent_path, claude_plugin_agent_contents(skills))
 
     review_command_path = Path.join(root, "commands/controlkeel-review.md")
     File.mkdir_p!(Path.dirname(review_command_path))
@@ -3211,6 +3211,53 @@ defmodule ControlKeel.Skills.Exporter do
             ]
           }
         ],
+        "SubagentStart" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-subagent-start.sh",
+                "statusMessage" => "Initializing ControlKeel governance for subagent",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PostToolUseFailure" => [
+          %{
+            "matcher" => "Bash",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-post-tool-use-failure.sh",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "ConfigChange" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-config-change.sh",
+                "statusMessage" => "Auditing configuration change",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PermissionDenied" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => "./hooks/ck-permission-denied.sh",
+                "timeout" => 5
+              }
+            ]
+          }
+        ],
         "PermissionRequest" => [
           %{
             "matcher" => "ExitPlanMode",
@@ -3278,6 +3325,30 @@ defmodule ControlKeel.Skills.Exporter do
                 "command" =>
                   "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostCompact\",\"additionalContext\":\"Context was compacted. You are in a ControlKeel-governed session: always call ck_context before proceeding, ck_validate before code or shell changes, and ck_finding for any issues you discover.\"}}' ",
                 "statusMessage" => "Re-initializing ControlKeel governance context",
+                "timeout" => 5
+              }
+            ]
+          }
+        ],
+        "SubagentStart" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStart\",\"additionalContext\":\"You are in a ControlKeel-governed session. Call ck_context before proceeding with any task, ck_validate before code or shell changes, and ck_finding for issues you discover.\"}}' ",
+                "timeout" => 5
+              }
+            ]
+          }
+        ],
+        "ConfigChange" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"ConfigChange\",\"additionalContext\":\"Configuration changed. Governance constraints and hooks may have been updated. Call ck_context to refresh your governance state if needed.\"}}' ",
                 "timeout" => 5
               }
             ]
@@ -3428,7 +3499,11 @@ defmodule ControlKeel.Skills.Exporter do
       {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
       {"ck-stop.sh", &codex_stop_hook_contents/0},
       {"ck-post-compact.sh", &claude_plugin_post_compact_hook_contents/0},
-      {"ck-session-end.sh", &claude_plugin_session_end_hook_contents/0}
+      {"ck-session-end.sh", &claude_plugin_session_end_hook_contents/0},
+      {"ck-subagent-start.sh", &claude_plugin_subagent_start_hook_contents/0},
+      {"ck-post-tool-use-failure.sh", &claude_plugin_post_tool_use_failure_hook_contents/0},
+      {"ck-config-change.sh", &claude_plugin_config_change_hook_contents/0},
+      {"ck-permission-denied.sh", &claude_plugin_permission_denied_hook_contents/0}
     ]
   end
 
@@ -3460,6 +3535,70 @@ defmodule ControlKeel.Skills.Exporter do
       controlkeel context --session-id "${session_id:-1}" --save-snapshot --json >/dev/null 2>&1 || true
     fi
 
+    exit 0
+    """
+  end
+
+  defp claude_plugin_subagent_start_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"You are in a ControlKeel-governed session. Call ck_context before proceeding with any task, ck_validate before code or shell changes, and ck_finding for issues you discover. Follow all governance constraints from the parent session."}}'
+    exit 0
+    """
+  end
+
+  defp claude_plugin_post_tool_use_failure_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    tool="unknown"
+
+    if command -v jq >/dev/null 2>&1; then
+      tool=$(printf '%s' "$input" | jq -r '.tool_name // "unknown"')
+    elif command -v python3 >/dev/null 2>&1; then
+      tool=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name','unknown'))" 2>/dev/null || echo "unknown")
+    fi
+
+    if command -v controlkeel >/dev/null 2>&1; then
+      controlkeel finding --severity low --title "Tool failure: ${tool}" --json >/dev/null 2>&1 || true
+    fi
+
+    exit 0
+    """
+  end
+
+  defp claude_plugin_config_change_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    input=$(cat)
+    source="unknown"
+
+    if command -v jq >/dev/null 2>&1; then
+      source=$(printf '%s' "$input" | jq -r '.source // "unknown"')
+    elif command -v python3 >/dev/null 2>&1; then
+      source=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('source','unknown'))" 2>/dev/null || echo "unknown")
+    fi
+
+    printf '{"hookSpecificOutput":{"hookEventName":"ConfigChange","additionalContext":"Configuration changed (source: %s). Governance constraints and hooks may have been updated. Call ck_context to refresh your governance state if the change affects your current task."}}\n' "$source"
+    exit 0
+    """
+  end
+
+  defp claude_plugin_permission_denied_hook_contents do
+    ~S"""
+    #!/usr/bin/env sh
+    set -eu
+
+    # PermissionDenied fires when the auto-mode classifier blocks a tool call.
+    # We do not retry by default — governance and safety rules should be respected.
+    # If you want to enable retries for specific denied tools, inspect the input
+    # and output '{"hookSpecificOutput":{"hookEventName":"PermissionDenied","retry":true}}'
     exit 0
     """
   end
@@ -4925,6 +5064,30 @@ defmodule ControlKeel.Skills.Exporter do
     initialPrompt: /controlkeel-governance
     tools: ["*"]
     mcpServers: ["controlkeel"]
+    skills:
+    #{Enum.map_join(skills, "\n", &"  - #{&1.name}")}
+    ---
+
+    # ControlKeel Operator
+
+    You are the specialized operator for ControlKeel-governed work.
+
+    Call `controlkeel update --json` once at startup. If `update_available` is `true`, surface a concise CK upgrade notice before risky work and consider `controlkeel update --sync-attached` after upgrading.
+    Always begin with the `controlkeel-governance` skill and then load domain-specific skills as needed.
+    Surface findings clearly, respect blocks, and use CK proof, benchmark, and budget tooling before declaring work complete.
+    """
+  end
+
+  defp claude_plugin_agent_contents(skills) do
+    """
+    ---
+    name: controlkeel-operator
+    description: Use ControlKeel governance, findings, proofs, budgets, and benchmarks inside this project.
+    color: cyan
+    effort: high
+    memory: project
+    initialPrompt: /controlkeel-governance
+    tools: ["*"]
     skills:
     #{Enum.map_join(skills, "\n", &"  - #{&1.name}")}
     ---
