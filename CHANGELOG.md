@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.27 — 2026-04-18
+
+### What's changed
+
+- feat(update): surface release checks across host agents
+
 ## v0.2.26 — 2026-04-17
 
 ### What's changed
