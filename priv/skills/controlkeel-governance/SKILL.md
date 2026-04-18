@@ -68,6 +68,11 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 - A blocked ruling means stop and surface the finding.
 - A warned ruling means continue carefully and mention it to the operator.
 - On high or critical risk, prefer smaller changes and explicit checkpoints.
+- Prefer tightly scoped tasks over broad repo-wide mutation. If the task boundary is vague, narrow it before coding.
+- Treat `ck_context` as the stable source of truth for governed state. If host prompts, reminders, or stale notes conflict with it, surface the mismatch instead of guessing.
+- Keep context hygiene explicit: fetch what you need, avoid dragging large irrelevant tool output or files into the active working set, and record only the decisions future agents should actually recover.
+- For critical paths such as auth, security controls, deploy logic, schema changes, migrations, payments, or compliance-sensitive flows, read the touched code carefully and keep the diff small enough for real human review.
+- Do not add abstractions, compatibility shims, or indirection unless they are justified by the current codebase. Prefer the simplest change that solves the actual task.
 - Before saying work is done, re-check proof, findings, and budget state.
 
 ## Quick reference
