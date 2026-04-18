@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.29 — 2026-04-18
+
+### What's changed
+
+- chore(registry): prepare npm package metadata for MCP publish
+
 ## v0.2.28 — 2026-04-18
 
 ### What's changed
