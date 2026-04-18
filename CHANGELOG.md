@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.30 — 2026-04-18
+
+### What's changed
+
+- chore(registry): align server metadata with 0.2.29 publish
+
 ## v0.2.29 — 2026-04-18
 
 ### What's changed
