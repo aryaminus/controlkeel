@@ -70,9 +70,16 @@ defmodule ControlKeel.Skills.Exporter do
         args: mcp_args(project_root, opts)
       })
 
-    agent_path = Path.join(root, ".codex/agents/controlkeel-operator.toml")
-    File.mkdir_p!(Path.dirname(agent_path))
-    File.write!(agent_path, codex_agent_contents(project_root, skills, opts))
+    agent_root = Path.join(root, ".codex/agents")
+    File.mkdir_p!(agent_root)
+
+    agent_paths =
+      codex_agent_specs(project_root, skills, opts)
+      |> Enum.map(fn {filename, contents} ->
+        path = Path.join(agent_root, filename)
+        File.write!(path, contents)
+        path
+      end)
 
     diff_command_path = Path.join(root, ".codex/commands/controlkeel-diff-review.md")
     File.mkdir_p!(Path.dirname(diff_command_path))
@@ -117,7 +124,6 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => compat_skill_root, "kind" => "skills"},
         %{"path" => native_skill_root, "kind" => "skills"},
         %{"path" => config_path, "kind" => "config"},
-        %{"path" => agent_path, "kind" => "agent"},
         %{"path" => diff_command_path, "kind" => "command"},
         %{"path" => completion_command_path, "kind" => "command"},
         %{"path" => review_command_path, "kind" => "command"},
@@ -127,11 +133,11 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => hook_dir, "kind" => "hooks"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => instructions_path, "kind" => "instructions"}
-      ],
+      ] ++ Enum.map(agent_paths, &%{"path" => &1, "kind" => "agent"}),
       [
         "Use .codex/skills for Codex-native skill loading and keep .agents/skills for open-standard compatibility.",
         "Use .codex/config.toml to register the ControlKeel MCP server and operator role with Codex.",
-        "Copy .codex/agents/controlkeel-operator.toml into your Codex agents directory if you want a preconfigured operator.",
+        "Copy the generated `.codex/agents/*.toml` files into your Codex agents directory if you want preconfigured CK operator, reviewer, or docs-researcher agents.",
         "Use .codex/commands/ for browser-reviewed review, annotate, last, diff, and completion approval flows.",
         "Use `.codex/hooks.json` with `.codex/hooks/` to load repo-scoped Codex lifecycle hooks for session context, Bash validation, and stop-time warnings.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
@@ -270,7 +276,11 @@ defmodule ControlKeel.Skills.Exporter do
     File.write!(manifest_path, Jason.encode!(claude_plugin_manifest(), pretty: true) <> "\n")
 
     marketplace_path = Path.join(root, ".claude-plugin/marketplace.json")
-    File.write!(marketplace_path, Jason.encode!(claude_marketplace_manifest(), pretty: true) <> "\n")
+
+    File.write!(
+      marketplace_path,
+      Jason.encode!(claude_marketplace_manifest(), pretty: true) <> "\n"
+    )
 
     hooks_path = Path.join(root, "hooks/hooks.json")
     File.mkdir_p!(Path.dirname(hooks_path))
@@ -325,11 +335,11 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => powershell_hook_path, "kind" => "hook"}
         | lifecycle_hook_paths
       ] ++
-      [
-        %{"path" => manual_hook_path, "kind" => "settings"},
-        %{"path" => mcp_path, "kind" => "mcp"},
-        %{"path" => settings_path, "kind" => "settings"}
-      ],
+        [
+          %{"path" => manual_hook_path, "kind" => "settings"},
+          %{"path" => mcp_path, "kind" => "mcp"},
+          %{"path" => settings_path, "kind" => "settings"}
+        ],
       [
         "Run `claude --plugin-dir #{root}` to test the plugin locally.",
         "Add as a marketplace: `claude plugin marketplace add #{root}`",
@@ -3793,20 +3803,20 @@ defmodule ControlKeel.Skills.Exporter do
         blocked="0"
         budget_pct="0"
         if command -v jq >/dev/null 2>&1; then
-          blocked=$(printf '%s' "$context" | jq -r '.active_findings.blocked // 0')
-          budget_pct=$(printf '%s' "$context" | jq -r '.budget.used_pct // 0')
+          blocked=$(printf '%s' "$context" | jq -r '.active_findings.blocked // 0' 2>/dev/null || echo "0")
+          budget_pct=$(printf '%s' "$context" | jq -r '.budget.used_pct // 0' 2>/dev/null || echo "0")
         elif command -v python3 >/dev/null 2>&1; then
-          blocked=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('active_findings',{}).get('blocked',0))" 2>/dev/null || echo 0)
-          budget_pct=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('budget',{}).get('used_pct',0))" 2>/dev/null || echo 0)
+          blocked=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('active_findings',{}).get('blocked',0))" 2>/dev/null || echo "0")
+          budget_pct=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('budget',{}).get('used_pct',0))" 2>/dev/null || echo "0")
         fi
 
-        if [ "${blocked:-0}" != "0" ]; then
+        if [ "${blocked:-0}" != "0" ] && [ "${blocked:-0}" != "" ]; then
           printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"WARNING: %s blocked finding(s) active in this session. Call ck_context and resolve them before proceeding with this task."}}\n' "$blocked"
           exit 0
         fi
 
-        if command -v awk >/dev/null 2>&1 && awk "BEGIN{exit!(${budget_pct:-0}>=80)}" 2>/dev/null; then
-          printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"NOTE: Budget at %s%% capacity. Call ck_budget before expensive model or multi-agent operations."}}\n' "$budget_pct"
+        if command -v awk >/dev/null 2>&1; then
+          awk "BEGIN{exit!(${budget_pct:-0}+0>=80)}" 2>/dev/null && printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"NOTE: Budget at %s%% capacity. Call ck_budget before expensive model or multi-agent operations."}}\n' "$budget_pct" || true
         fi
       fi
     fi
@@ -5265,6 +5275,40 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
+  defp codex_agent_specs(project_root, skills, opts) do
+    [
+      {"controlkeel-operator.toml", codex_agent_contents(project_root, skills, opts)},
+      {"controlkeel-reviewer.toml", codex_reviewer_agent_contents()},
+      {"controlkeel-docs-researcher.toml", codex_docs_researcher_agent_contents()}
+    ]
+  end
+
+  defp codex_reviewer_agent_contents do
+    """
+    name = "controlkeel-reviewer"
+    description = "Review-focused Codex agent for correctness, security, regressions, and missing tests in ControlKeel-governed work."
+    nickname_candidates = ["Atlas Review", "Delta Review", "Echo Review"]
+    model = "gpt-5.4"
+    model_reasoning_effort = "high"
+    sandbox_mode = "read-only"
+
+    developer_instructions = "Stay in review mode. Prioritize correctness, security, behavioral regressions, and missing validation coverage. Lead with concrete findings, cite evidence, and avoid style-only feedback unless it hides a real bug. Use ControlKeel governance context and surface blocked findings clearly."
+    """
+  end
+
+  defp codex_docs_researcher_agent_contents do
+    """
+    name = "controlkeel-docs-researcher"
+    description = "Documentation-focused Codex agent for verifying APIs, config surfaces, and host behavior before CK integration changes land."
+    nickname_candidates = ["Atlas Docs", "Delta Docs", "Echo Docs"]
+    model = "gpt-5.4-mini"
+    model_reasoning_effort = "medium"
+    sandbox_mode = "read-only"
+
+    developer_instructions = "Use documentation and config evidence to confirm APIs, host behavior, and integration assumptions before changes land. Return concise conclusions with specific references, and do not edit application code."
+    """
+  end
+
   defp claude_agent_contents(skills) do
     """
     ---
@@ -5409,14 +5453,14 @@ defmodule ControlKeel.Skills.Exporter do
         TextBlock,
     )
 
-    SYSTEM_PROMPT = """You are a ControlKeel-governed agent.
+    SYSTEM_PROMPT = \"""You are a ControlKeel-governed agent.
     Required workflow:
     1. Call ck_context at the start of every task.
     2. Call ck_validate before writing code, config, shell, or deploy content.
     3. Submit plans with ck_review_submit and check ck_review_status before execution.
     4. Record issues with ck_finding.
     5. Check ck_budget before expensive model or multi-agent work.
-    6. Use ck_route, ck_skill_list, and ck_skill_load to delegate."""
+    6. Use ck_route, ck_skill_list, and ck_skill_load to delegate.\"""
 
 
     async def main() -> None:
