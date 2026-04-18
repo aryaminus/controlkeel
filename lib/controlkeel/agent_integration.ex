@@ -113,6 +113,9 @@ defmodule ControlKeel.AgentIntegration do
           owner: "agent"
         },
         supported_scopes: ["user", "project"],
+        submission_mode: "tool_call",
+        feedback_mode: "tool_call",
+        phase_model: "review_only",
         export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       attach_client(%{
@@ -1038,18 +1041,32 @@ defmodule ControlKeel.AgentIntegration do
         preferred_target: "codex",
         export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
-      alias_entry(%{
+      attach_client(%{
         id: "codex-app-server",
         label: "Codex app / app server surface",
-        category: "alias",
+        category: "native-first",
         description:
-          "Alias to the shipped Codex CLI path; ControlKeel currently supports Codex through the documented Codex CLI / shared MCP config surface, while treating Codex app-server as the same governed host family for runtime and provider reporting.",
-        alias_of: "codex-cli",
+          "Uses the Codex app-server / shared config surface for governed runtime control, while reusing the same repo-local Codex MCP, hooks, skills, commands, and custom agents as the CLI integration.",
+        attach_command: "controlkeel attach codex-cli",
+        config_location:
+          "Codex app-server shares Codex local config (`~/.codex/config.toml` or `<project>/.codex/config.toml`).",
+        companion_delivery:
+          "Installs `.codex/skills`, `.agents/skills`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks`, `.codex/agents`, and `.codex/commands`; use the Codex app-server protocol on top of that local surface.",
+        preferred_target: "codex",
+        default_scope: "user",
+        router_agent_id: "codex-app-server",
         auth_mode: "agent_runtime",
+        mcp_mode: "native",
+        skills_mode: "native",
         upstream_slug: "openai/codex",
         upstream_docs_url: "https://github.com/openai/codex",
+        provider_bridge: %{
+          supported: true,
+          provider: "openai",
+          mode: "agent_runtime",
+          owner: "agent"
+        },
         supported_scopes: ["user", "project"],
-        preferred_target: "codex",
         export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       alias_entry(%{
@@ -2090,6 +2107,9 @@ defmodule ControlKeel.AgentIntegration do
       ".codex/agents",
       ".codex/commands"
     ]
+
+  defp default_artifact_surfaces(%{id: "codex-app-server"}),
+    do: default_artifact_surfaces(%{id: "codex-cli"})
 
   defp default_artifact_surfaces(%{id: id}) when id in ["vscode", "copilot"] do
     [

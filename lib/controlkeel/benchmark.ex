@@ -18,6 +18,7 @@ defmodule ControlKeel.Benchmark do
   alias ControlKeel.Repo
 
   @recent_runs_limit 12
+  @busy_retry_backoff_ms [0, 1_000, 3_000, 7_000, 15_000]
 
   def list_suites(opts \\ []) do
     ensure_builtin_suites()
@@ -37,7 +38,6 @@ defmodule ControlKeel.Benchmark do
   end
 
   def list_recent_runs(opts) when is_list(opts) do
-    ensure_builtin_suites()
     limit = Keyword.get(opts, :limit, @recent_runs_limit)
     domain_pack = normalize_domain_pack_filter(Keyword.get(opts, :domain_pack))
     query_limit = if domain_pack, do: max(limit * 5, 50), else: limit
@@ -59,13 +59,13 @@ defmodule ControlKeel.Benchmark do
 
   def benchmark_summary(opts) when is_list(opts) do
     runs = list_recent_runs(opts)
-    suites = list_suites(Keyword.take(opts, [:domain_pack]))
+    total_suites = builtin_suite_count(Keyword.get(opts, :domain_pack))
 
     catch_rates = Enum.map(runs, & &1.catch_rate)
     overheads = Enum.reject(Enum.map(runs, & &1.average_overhead_percent), &is_nil/1)
 
     %{
-      total_suites: length(suites),
+      total_suites: total_suites,
       total_runs: length(runs),
       average_catch_rate: average(catch_rates),
       average_overhead_percent: average(overheads),
@@ -369,26 +369,19 @@ defmodule ControlKeel.Benchmark do
 
   defp ensure_builtin_suite(slug) do
     with {:ok, payload} <- BuiltinSuites.load(slug) do
-      Repo.transaction(fn ->
-        suite =
-          Repo.get_by(Suite, slug: slug) ||
-            %Suite{}
+      expected_scenarios = payload["scenarios"] || []
 
-        {:ok, suite} =
-          suite
-          |> Suite.changeset(%{
-            slug: payload["slug"],
-            name: payload["name"],
-            description: payload["description"],
-            version: payload["version"],
-            status: payload["status"] || "active",
-            metadata: payload["metadata"] || %{}
-          })
-          |> Repo.insert_or_update()
+      case Repo.get_by(Suite, slug: slug) |> Repo.preload(:scenarios) do
+        %Suite{} = suite ->
+          if builtin_suite_current?(suite, payload, expected_scenarios) do
+            {:ok, suite}
+          else
+            sync_builtin_suite(payload, expected_scenarios)
+          end
 
-        sync_scenarios(suite, payload["scenarios"] || [])
-        suite
-      end)
+        _suite ->
+          sync_builtin_suite(payload, expected_scenarios)
+      end
     end
   end
 
@@ -444,7 +437,128 @@ defmodule ControlKeel.Benchmark do
       catch_rate: 0.0,
       metadata: metadata
     })
-    |> Repo.insert()
+    |> insert_with_busy_retry()
+  end
+
+  defp builtin_suite_count(domain_pack) do
+    BuiltinSuites.list()
+    |> Enum.reduce(0, fn slug, count ->
+      case BuiltinSuites.load(slug) do
+        {:ok, payload} ->
+          if builtin_suite_matches_domain?(payload, domain_pack) do
+            count + 1
+          else
+            count
+          end
+
+        _error ->
+          count
+      end
+    end)
+  end
+
+  defp builtin_suite_matches_domain?(_payload, nil), do: true
+
+  defp builtin_suite_matches_domain?(payload, domain_pack) do
+    payload
+    |> Map.get("scenarios", [])
+    |> Enum.any?(fn scenario ->
+      get_in(scenario, ["metadata", "domain_pack"]) == domain_pack
+    end)
+  end
+
+  defp builtin_suite_current?(suite, payload, expected_scenarios) do
+    suite.name == payload["name"] and
+      suite.description == payload["description"] and
+      suite.version == payload["version"] and
+      suite.status == (payload["status"] || "active") and
+      suite.metadata == (payload["metadata"] || %{}) and
+      length(suite.scenarios) == length(expected_scenarios)
+  end
+
+  defp sync_builtin_suite(payload, expected_scenarios) do
+    transaction_with_busy_retry(fn ->
+      suite =
+        Repo.get_by(Suite, slug: payload["slug"]) ||
+          %Suite{}
+
+      {:ok, suite} =
+        suite
+        |> Suite.changeset(%{
+          slug: payload["slug"],
+          name: payload["name"],
+          description: payload["description"],
+          version: payload["version"],
+          status: payload["status"] || "active",
+          metadata: payload["metadata"] || %{}
+        })
+        |> Repo.insert_or_update()
+
+      sync_scenarios(suite, expected_scenarios)
+      suite
+    end)
+  end
+
+  defp transaction_with_busy_retry(operation, attempt \\ 0)
+
+  defp transaction_with_busy_retry(operation, attempt) do
+    Repo.transaction(operation)
+  rescue
+    error ->
+      if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+        Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+        transaction_with_busy_retry(operation, attempt + 1)
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp insert_with_busy_retry(changeset, attempt \\ 0)
+
+  defp insert_with_busy_retry(changeset, attempt) do
+    Repo.insert(changeset)
+  rescue
+    error ->
+      if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+        Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+        insert_with_busy_retry(changeset, attempt + 1)
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp update_with_busy_retry(changeset, attempt \\ 0)
+
+  defp update_with_busy_retry(changeset, attempt) do
+    Repo.update(changeset)
+  rescue
+    error ->
+      if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+        Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+        update_with_busy_retry(changeset, attempt + 1)
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp update_with_busy_retry!(changeset, attempt \\ 0)
+
+  defp update_with_busy_retry!(changeset, attempt) do
+    Repo.update!(changeset)
+  rescue
+    error ->
+      if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+        Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+        update_with_busy_retry!(changeset, attempt + 1)
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp busy_error?(error) do
+    error
+    |> Exception.message()
+    |> String.contains?("Database busy")
   end
 
   defp maybe_exclude_internal(suites, true), do: suites
@@ -479,7 +593,7 @@ defmodule ControlKeel.Benchmark do
         |> Map.put_new("payload", %{})
         |> Map.put_new("metadata", %{})
 
-      case %Result{} |> Result.changeset(attrs) |> Repo.insert() do
+      case %Result{} |> Result.changeset(attrs) |> insert_with_busy_retry() do
         {:ok, result} -> {:cont, {:ok, [result | acc]}}
         {:error, changeset} -> {:halt, {:error, changeset}}
       end
@@ -495,7 +609,7 @@ defmodule ControlKeel.Benchmark do
         {:ok, overhead_percent} ->
           result
           |> Result.changeset(%{overhead_percent: overhead_percent})
-          |> Repo.update!()
+          |> update_with_busy_retry!()
 
         :error ->
           :ok
@@ -507,7 +621,7 @@ defmodule ControlKeel.Benchmark do
 
     refreshed
     |> Run.changeset(aggregates)
-    |> Repo.update()
+    |> update_with_busy_retry()
   end
 
   defp aggregate_run(%Run{} = run) do
@@ -590,7 +704,7 @@ defmodule ControlKeel.Benchmark do
       payload: outcome["payload"],
       metadata: outcome["metadata"]
     })
-    |> Repo.update()
+    |> update_with_busy_retry()
   end
 
   defp maybe_filter_scenarios(scenarios, []), do: scenarios

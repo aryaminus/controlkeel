@@ -200,6 +200,33 @@ defmodule ControlKeel.ProviderBrokerTest do
     assert hint["hint"]["auth_owner"] == "agent"
   end
 
+  test "codex app-server surfaces its dedicated runtime transport", %{project_root: project_root} do
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => 1,
+                 "session_id" => 1,
+                 "agent" => "codex-app-server",
+                 "attached_agents" => %{
+                   "codex-app-server" => %{
+                     "attached_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+                   }
+                 }
+               },
+               project_root
+             )
+
+    status = ProviderBroker.status(project_root)
+
+    attached = Enum.find(status["attached_agents"], &(&1["id"] == "codex-app-server"))
+    hint = Enum.find(status["runtime_hints"], &(&1["agent_id"] == "codex-app-server"))
+
+    assert attached["runtime_transport"] == "codex_app_server_json_rpc"
+    assert attached["runtime_review_transport"] == "app_server_review"
+    assert attached["runtime_provider_hint"]["source"] == "agent_runtime"
+    assert hint["transport"] == "codex_app_server_json_rpc"
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 end

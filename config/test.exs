@@ -8,7 +8,9 @@ import Config
 config :controlkeel, ControlKeel.Repo,
   database: Path.expand("../controlkeel_test.db", __DIR__),
   busy_timeout: 15_000,
-  pool_size: 5,
+  # SQLite-backed tests are more stable with a single pooled connection because
+  # LiveView and benchmark flows can otherwise compete for overlapping write locks.
+  pool_size: 1,
   pool: Ecto.Adapters.SQL.Sandbox,
   journal_mode: :wal
 

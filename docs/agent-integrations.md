@@ -59,10 +59,18 @@ For Codex there are two supported CK delivery modes:
 - `controlkeel plugin install codex`
   Installs a local plugin bundle plus a local marketplace manifest. This is a repo-local or home-local marketplace entry, not the same thing as appearing in Codex's curated remote plugin catalog.
 
+CK also treats `codex-app-server` as a first-class runtime surface now rather than a pure alias. It still reuses the same `.codex/` local assets, but CK reports a dedicated app-server runtime transport and session/review capabilities for that host family.
+
 Two operational notes matter in practice:
 
 1. Codex only loads project-scoped `.codex/` config and hooks when the project is trusted.
 2. Restart Codex after `controlkeel attach codex-cli` or `controlkeel plugin install codex` so new hooks, custom agents, and marketplace state are reloaded.
+
+The generated Codex custom-agent set now includes:
+
+- `controlkeel-operator` for general governed execution
+- `controlkeel-reviewer` for read-only review and bug finding
+- `controlkeel-docs-researcher` for read-only API and host-behavior verification
 
 When a user says "I don't see CK in the Codex plugins page," the most likely explanation is that they are looking at the curated catalog or a workspace-managed app surface, while CK was installed as a local bundle. In that case the truthful next checks are:
 

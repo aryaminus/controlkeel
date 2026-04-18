@@ -18,7 +18,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   def call(arguments) when is_map(arguments) do
     with {:ok, session_id} <- required_session_id(arguments),
          {:ok, task_id} <- optional_integer(arguments, "task_id"),
-         {:ok, session} <- fetch_session(session_id),
+         {:ok, session} <- fetch_session(session_id, arguments),
          {:ok, task} <- resolve_task(session, task_id) do
       project_root = project_root(arguments, session)
       provider_status = ProviderBroker.status(project_root)
@@ -68,10 +68,19 @@ defmodule ControlKeel.MCP.Tools.CkContext do
 
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
 
-  defp fetch_session(session_id) do
+  defp fetch_session(session_id, arguments) do
     case Mission.get_session_context(session_id) do
-      nil -> {:error, {:invalid_arguments, "Session not found"}}
+      nil -> fallback_active_session(arguments)
       session -> {:ok, session}
+    end
+  end
+
+  defp fallback_active_session(arguments) do
+    with {:ok, active_session_id} <- resolve_active_session_id(arguments),
+         session when not is_nil(session) <- Mission.get_session_context(active_session_id) do
+      {:ok, session}
+    else
+      _ -> {:error, {:invalid_arguments, "Session not found"}}
     end
   end
 
@@ -259,7 +268,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   defp required_session_id(arguments) do
     case Map.get(arguments, "session_id") do
       nil ->
-        {:error, {:invalid_arguments, "`session_id` is required"}}
+        resolve_active_session_id(arguments)
 
       value when is_binary(value) ->
         normalized = String.trim(value)

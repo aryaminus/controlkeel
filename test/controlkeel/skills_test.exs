@@ -383,6 +383,14 @@ defmodule ControlKeel.SkillsTest do
              Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-operator.toml")
            )
 
+    assert File.exists?(
+             Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-reviewer.toml")
+           )
+
+    assert File.exists?(
+             Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-docs-researcher.toml")
+           )
+
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/config.toml"))
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/commands/controlkeel-review.md"))
 
@@ -417,6 +425,20 @@ defmodule ControlKeel.SkillsTest do
     assert codex_export_agent =~ "controlkeel update --json"
     assert codex_export_agent =~ "developer_instructions = "
     assert codex_export_agent =~ "nickname_candidates = "
+
+    codex_reviewer =
+      File.read!(Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-reviewer.toml"))
+
+    assert codex_reviewer =~ ~s(name = "controlkeel-reviewer")
+    assert codex_reviewer =~ ~s(sandbox_mode = "read-only")
+
+    codex_docs_researcher =
+      File.read!(
+        Path.join(codex_plan.output_dir, ".codex/agents/controlkeel-docs-researcher.toml")
+      )
+
+    assert codex_docs_researcher =~ ~s(name = "controlkeel-docs-researcher")
+    assert codex_docs_researcher =~ ~s(sandbox_mode = "read-only")
 
     assert File.read!(Path.join(codex_plan.output_dir, ".codex/config.toml")) =~
              "codex_hooks = true"
@@ -1022,6 +1044,8 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".codex/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-operator.toml"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-reviewer.toml"))
+    assert File.exists?(Path.join(tmp_dir, ".codex/agents/controlkeel-docs-researcher.toml"))
     assert File.exists?(Path.join(tmp_dir, ".codex/config.toml"))
     assert File.exists?(Path.join(tmp_dir, ".codex/hooks.json"))
     assert File.exists?(Path.join(tmp_dir, ".codex/hooks/ck-session-start.sh"))
@@ -1046,6 +1070,14 @@ defmodule ControlKeel.SkillsTest do
     assert codex_agent =~ "nickname_candidates = "
     refute codex_agent =~ "[context]"
     refute codex_agent =~ "[mcp]"
+
+    codex_reviewer = File.read!(Path.join(tmp_dir, ".codex/agents/controlkeel-reviewer.toml"))
+    assert codex_reviewer =~ ~s(name = "controlkeel-reviewer")
+
+    codex_docs_researcher =
+      File.read!(Path.join(tmp_dir, ".codex/agents/controlkeel-docs-researcher.toml"))
+
+    assert codex_docs_researcher =~ ~s(name = "controlkeel-docs-researcher")
 
     assert {:ok, claude_install} = Skills.install("claude-standalone", tmp_dir, scope: "project")
     assert claude_install.destination == Path.join(tmp_dir, ".claude/skills")

@@ -35,6 +35,7 @@ defmodule ControlKeel.Mission do
   @plan_phases ~w(ticket research_packet design_options narrowed_decision implementation_plan code_backed_plan)
   @execution_ready_plan_phases ~w(implementation_plan code_backed_plan)
   @verified_completion_score_threshold 45
+  @busy_retry_backoff_ms [0, 250, 750, 1_500, 3_000, 5_000]
 
   def list_sessions, do: Repo.all(Session)
   def get_session(id), do: Repo.get(Session, id)
@@ -252,7 +253,7 @@ defmodule ControlKeel.Mission do
       |> Multi.insert(:review, Review.changeset(%Review{}, normalized.attrs))
       |> maybe_track_task_review_gate(normalized)
       |> maybe_track_review_runtime_context(normalized)
-      |> Repo.transaction()
+      |> transaction_with_busy_retry()
       |> case do
         {:ok, %{review: review}} ->
           review = get_review_with_context(review.id)
@@ -281,7 +282,7 @@ defmodule ControlKeel.Mission do
       Multi.new()
       |> Multi.update(:review, Review.changeset(review, review_attrs))
       |> maybe_apply_review_response_gate(review, normalized)
-      |> Repo.transaction()
+      |> transaction_with_busy_retry()
       |> case do
         {:ok, %{review: updated}} ->
           updated = get_review_with_context(updated.id)
@@ -615,7 +616,7 @@ defmodule ControlKeel.Mission do
     |> Multi.run(:findings, fn repo, %{session: session} ->
       insert_many(repo, Finding, plan.findings, :session_id, session.id)
     end)
-    |> Repo.transaction()
+    |> transaction_with_busy_retry()
     |> case do
       {:ok, %{session: session}} ->
         emit_mission_created(plan, session)
@@ -833,7 +834,7 @@ defmodule ControlKeel.Mission do
       |> Multi.run(:proof, fn repo, %{task: updated_task, completion_artifacts: artifacts} ->
         persist_proof_bundle(repo, updated_task, artifacts)
       end)
-      |> Repo.transaction()
+      |> transaction_with_busy_retry()
       |> case do
         {:ok, %{task: updated_task, proof: proof}} ->
           record_task_memory(task_completion_memory_action(updated_task), updated_task,
@@ -903,7 +904,7 @@ defmodule ControlKeel.Mission do
   end
 
   def generate_proof_bundle(%Task{} = task) do
-    Repo.transaction(fn ->
+    transaction_with_busy_retry(fn ->
       with {:ok, proof} <- persist_proof_bundle(Repo, Repo.get!(Task, task.id)) do
         proof
       else
@@ -948,7 +949,7 @@ defmodule ControlKeel.Mission do
         created_by: created_by
       })
     end)
-    |> Repo.transaction()
+    |> transaction_with_busy_retry()
     |> case do
       {:ok, %{task: updated_task, checkpoint: checkpoint}} ->
         record_task_memory(:paused, updated_task, previous_status: task.status)
@@ -987,7 +988,7 @@ defmodule ControlKeel.Mission do
         created_by: created_by
       })
     end)
-    |> Repo.transaction()
+    |> transaction_with_busy_retry()
     |> case do
       {:ok, %{task: updated_task, checkpoint: checkpoint}} ->
         record_task_memory(:resumed, updated_task, previous_status: task.status)
@@ -4857,5 +4858,25 @@ defmodule ControlKeel.Mission do
       value = get_in(finding.metadata || %{}, [key]) || "unknown"
       Map.update(acc, value, 1, &(&1 + 1))
     end)
+  end
+
+  defp transaction_with_busy_retry(operation, attempt \\ 0)
+
+  defp transaction_with_busy_retry(operation, attempt) do
+    Repo.transaction(operation)
+  rescue
+    error ->
+      if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+        Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+        transaction_with_busy_retry(operation, attempt + 1)
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
+
+  defp busy_error?(error) do
+    error
+    |> Exception.message()
+    |> String.contains?("Database busy")
   end
 end

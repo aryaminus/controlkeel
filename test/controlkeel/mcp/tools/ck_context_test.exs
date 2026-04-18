@@ -75,6 +75,74 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
     assert result["session_id"] == session.id
   end
 
+  test "falls back to the active bound session when session_id is omitted" do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "ck-context-implicit-current-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    session = session_fixture()
+
+    assert {:ok, _updated} =
+             Mission.attach_session_runtime_context(session.id, %{"project_root" => tmp_dir})
+
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => session.workspace_id,
+                 "session_id" => session.id,
+                 "agent" => "codex-cli",
+                 "attached_agents" => %{}
+               },
+               tmp_dir
+             )
+
+    assert {:ok, result} = CkContext.call(%{"project_root" => tmp_dir})
+    assert result["session_id"] == session.id
+  end
+
+  test "falls back to the active bound session when a host passes an unmapped session id" do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "ck-context-stale-current-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    session = session_fixture()
+
+    assert {:ok, _updated} =
+             Mission.attach_session_runtime_context(session.id, %{"project_root" => tmp_dir})
+
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => session.workspace_id,
+                 "session_id" => session.id,
+                 "agent" => "codex-cli",
+                 "attached_agents" => %{}
+               },
+               tmp_dir
+             )
+
+    assert {:ok, result} =
+             CkContext.call(%{"session_id" => 999_999_999, "project_root" => tmp_dir})
+
+    assert result["session_id"] == session.id
+  end
+
   test "surfaces harness principles through boundary_summary" do
     session =
       session_fixture(%{execution_brief: execution_brief_fixture() |> Intent.to_brief_map()})

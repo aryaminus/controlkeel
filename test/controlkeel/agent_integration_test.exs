@@ -429,8 +429,11 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert virtual_bash.preferred_target == "virtual-bash-runtime"
     assert AgentIntegration.get("letta-code").execution_support == "direct"
 
-    assert codex_app.support_class == "alias"
-    assert codex_app.alias_of == "codex-cli"
+    assert codex_app.support_class == "attach_client"
+    assert codex_app.attach_command == "controlkeel attach codex-cli"
+    assert codex_app.runtime_transport == "codex_app_server_json_rpc"
+    assert codex_app.runtime_review_transport == "app_server_review"
+    assert codex_app.runtime_session_support["fork"]
 
     assert vllm.support_class == "provider_only"
     assert vllm.preferred_target == "provider-profile"

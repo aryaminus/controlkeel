@@ -6,6 +6,7 @@ defmodule ControlKeel.AgentRuntimes.Registry do
   @modules [
     ControlKeel.AgentRuntimes.Augment,
     ControlKeel.AgentRuntimes.ClaudeCode,
+    ControlKeel.AgentRuntimes.CodexAppServer,
     ControlKeel.AgentRuntimes.CodexCLI,
     ControlKeel.AgentRuntimes.Copilot,
     ControlKeel.AgentRuntimes.OpenCode,

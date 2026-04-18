@@ -88,11 +88,13 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 Codex currently has three distinct CK stories, and mixing them together causes most of the confusion:
 
 1. Native local attach: `controlkeel attach codex-cli`
-   This is the strongest day-to-day path when you want `.codex/skills`, `.codex/hooks`, `.codex/agents`, `.codex/commands`, and local MCP wiring.
+   This is the strongest day-to-day path when you want `.codex/skills`, `.codex/hooks`, `.codex/agents`, `.codex/commands`, and local MCP wiring. CK now generates multiple Codex custom agents here, including `controlkeel-operator`, `controlkeel-reviewer`, and `controlkeel-docs-researcher`.
 2. Local plugin bundle plus local marketplace registration: `controlkeel plugin install codex`
    This writes the plugin bundle and a local marketplace manifest for repo-local or home-local discovery.
 3. Curated remote catalog visibility inside Codex product surfaces
    That is a separate distribution track controlled by OpenAI product surfaces, not something CK can force by writing local repo files.
+
+Separately, CK now models `codex-app-server` as a real runtime surface for reporting and routing. It still reuses the same local `.codex/` assets, but it is no longer treated as a pure alias in CK's runtime metadata.
 
 If a user does not see CK in a Codex plugins page, first verify the local install artifacts above before assuming the plugin install failed. Also verify that the repo is trusted, because Codex ignores project-scoped `.codex/` config and hooks for untrusted projects.
 

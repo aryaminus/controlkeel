@@ -1,15 +1,24 @@
 defmodule ControlKeel.BenchmarkTest do
-  use ControlKeel.DataCase, async: false
+  use ExUnit.Case, async: false
 
   import ControlKeel.BenchmarkFixtures
 
   alias ControlKeel.Analytics.Event
   alias ControlKeel.Benchmark
-  alias ControlKeel.Benchmark.{Scenario, Suite}
+  alias ControlKeel.Benchmark.{BuiltinSuites, Scenario, Suite}
   alias ControlKeel.Mission.Session
   alias ControlKeel.Repo
 
+  setup_all do
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(ControlKeel.Repo, shared: true)
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    :ok
+  end
+
   setup do
+    Repo.delete_all(ControlKeel.Benchmark.Result)
+    Repo.delete_all(ControlKeel.Benchmark.Run)
+
     tmp_dir =
       Path.join(System.tmp_dir!(), "controlkeel-benchmark-#{System.unique_integer([:positive])}")
 
@@ -243,6 +252,21 @@ defmodule ControlKeel.BenchmarkTest do
 
     filtered_runs = Benchmark.list_recent_runs(domain_pack: "sales")
     assert Enum.any?(filtered_runs, &(&1.id == run.id))
+  end
+
+  test "benchmark summary reads builtin suite metadata without seeding persisted suites" do
+    initial_suite_count = Repo.aggregate(Suite, :count, :id)
+
+    summary = Benchmark.benchmark_summary()
+
+    assert summary.total_suites == length(BuiltinSuites.list())
+    assert Repo.aggregate(Suite, :count, :id) == initial_suite_count
+  end
+
+  test "listing recent runs does not seed persisted suites" do
+    initial_suite_count = Repo.aggregate(Suite, :count, :id)
+    _runs = Benchmark.list_recent_runs()
+    assert Repo.aggregate(Suite, :count, :id) == initial_suite_count
   end
 
   test "runs an external shell subject and normalizes generated output", %{tmp_dir: tmp_dir} do
