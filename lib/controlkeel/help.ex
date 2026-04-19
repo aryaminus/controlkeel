@@ -396,8 +396,8 @@ defmodule ControlKeel.Help do
                                       Export headless/runtime bundles such as Devin, Cloudflare Workers, Executor, or virtual-bash
       controlkeel bootstrap [--project-root /abs/path] [--ephemeral-ok]
                                       Auto-create project or ephemeral binding on first use
-      controlkeel watch [--interval N]
-                                      Stream findings and budget live (default: 2000ms)
+      controlkeel watch [--interval N] [--status]
+                                      Stream findings and budget live (default: 2000ms), or print one-shot status with --status
       controlkeel mcp [--project-root /abs/path]
                                       Run the MCP server for a project
       controlkeel deploy analyze [--project-root /abs/path]

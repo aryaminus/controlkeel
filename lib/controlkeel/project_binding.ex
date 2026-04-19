@@ -278,6 +278,7 @@ defmodule ControlKeel.ProjectBinding do
 
   defp wrapper_contents(project_root) do
     escaped_root = String.replace(project_root, "\"", "\\\"")
+    escaped_default = String.replace(default_cli_command(), "\"", "\\\"")
 
     case :os.type() do
       {:win32, _} ->
@@ -285,7 +286,7 @@ defmodule ControlKeel.ProjectBinding do
         @echo off
         setlocal
         if "%CONTROLKEEL_BIN%"=="" (
-          set "CONTROLKEEL_BIN=controlkeel.exe"
+          set "CONTROLKEEL_BIN=#{escaped_default}"
         )
         "%CONTROLKEEL_BIN%" mcp --project-root "#{escaped_root}" %*
         """
@@ -295,7 +296,7 @@ defmodule ControlKeel.ProjectBinding do
         #!/usr/bin/env sh
         set -eu
 
-        BINARY="${CONTROLKEEL_BIN:-controlkeel}"
+        BINARY="${CONTROLKEEL_BIN:-#{escaped_default}}"
         exec "$BINARY" mcp --project-root "#{escaped_root}" "$@"
         """
     end
@@ -324,10 +325,13 @@ defmodule ControlKeel.ProjectBinding do
   end
 
   defp default_cli_command do
-    case :os.type() do
-      {:win32, _} -> "controlkeel.exe"
-      _ -> "controlkeel"
-    end
+    candidate =
+      case :os.type() do
+        {:win32, _} -> "controlkeel.exe"
+        _ -> "controlkeel"
+      end
+
+    System.find_executable(candidate) || candidate
   end
 
   defp controlkeel_version do

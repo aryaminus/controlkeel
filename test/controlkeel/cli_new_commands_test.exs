@@ -146,6 +146,36 @@ defmodule ControlKeel.CLI.NewCommandsTest do
     end
   end
 
+  describe "watch command" do
+    test "watch command parses interval and status switches" do
+      assert {:ok, %{command: :watch}} = CLI.parse(["watch"])
+
+      assert {:ok, parsed} = CLI.parse(["watch", "--interval", "1500"])
+      assert parsed.options[:interval] == 1500
+
+      assert {:ok, parsed_status} = CLI.parse(["watch", "--status"])
+      assert parsed_status.options[:status] == true
+    end
+
+    test "watch --status runs one-shot status output", %{tmp_dir: tmp_dir} do
+      session = session_fixture(%{budget_cents: 2_000, daily_budget_cents: 800, spent_cents: 350})
+      write_binding(tmp_dir, session)
+
+      output =
+        capture_io(fn ->
+          assert 0 ==
+                   CLI.execute(
+                     %{command: :watch, options: %{status: true}, args: []},
+                     project_root: tmp_dir
+                   )
+        end)
+
+      assert output =~ "Session: "
+      assert output =~ "Risk tier:"
+      assert output =~ "Suggested next steps:"
+    end
+  end
+
   describe "cost commands" do
     test "cost optimize runs without session" do
       output =
@@ -196,6 +226,14 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert parsed.command == :cost_optimize
       assert parsed.options[:session_id] == 42
     end
+  end
+
+  test "top-level help and version flags parse" do
+    assert {:ok, %{command: :help}} = CLI.parse(["--help"])
+    assert {:ok, %{command: :help}} = CLI.parse(["-h"])
+    assert {:ok, %{command: :version}} = CLI.parse(["--version"])
+    assert {:ok, %{command: :version}} = CLI.parse(["-V"])
+    assert {:ok, %{command: :version}} = CLI.parse(["-v"])
   end
 
   describe "review plan commands" do

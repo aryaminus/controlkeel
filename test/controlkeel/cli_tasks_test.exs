@@ -155,6 +155,29 @@ defmodule ControlKeel.CLITasksTest do
     assert binding["attached_agents"] == %{}
   end
 
+  test "ck.attach claude-code fails clearly when claude mcp reports failed to connect", %{
+    tmp_dir: tmp_dir
+  } do
+    create_claude_stub_with_failed_connect(tmp_dir, "controlkeel")
+
+    with_project(tmp_dir, fn ->
+      rerun_task("ck.init")
+      capture_io(fn -> Mix.Tasks.Ck.Init.run(["--no-attach"]) end)
+    end)
+
+    assert_raise Mix.Error, ~r/failed to connect|registered but failed to connect/i, fn ->
+      with_env("CONTROLKEEL_CLAUDE_BIN", Path.join(tmp_dir, "claude"), fn ->
+        with_project(tmp_dir, fn ->
+          rerun_task("ck.attach")
+          capture_io(fn -> Mix.Tasks.Ck.Attach.run(["claude-code"]) end)
+        end)
+      end)
+    end
+
+    assert {:ok, binding} = ProjectBinding.read(tmp_dir)
+    assert binding["attached_agents"] == %{}
+  end
+
   test "ck.status, ck.findings, and ck.approve operate on the bound local session", %{
     tmp_dir: tmp_dir
   } do
@@ -390,6 +413,32 @@ defmodule ControlKeel.CLITasksTest do
         },
         tmp_dir
       )
+  end
+
+  defp create_claude_stub_with_failed_connect(tmp_dir, server_name) do
+    stub = Path.join(tmp_dir, "claude")
+    log = Path.join(tmp_dir, "claude.log")
+
+    File.write!(
+      stub,
+      """
+      #!/bin/sh
+      echo "$@" >> "#{log}"
+      if [ "$1" = "mcp" ] && [ "$2" = "add-json" ]; then
+        exit 0
+      fi
+      if [ "$1" = "mcp" ] && [ "$2" = "get" ]; then
+        echo "#{server_name}:"
+        echo "  Scope: Local config"
+        echo "  Status: ✗ Failed to connect"
+        exit 0
+      fi
+      echo "unsupported" >&2
+      exit 1
+      """
+    )
+
+    File.chmod!(stub, 0o755)
   end
 
   defp create_claude_stub(tmp_dir, server_name) do

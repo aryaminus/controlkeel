@@ -89,6 +89,10 @@ defmodule ControlKeel.ClaudeCLI do
     normalized = String.downcase(output)
 
     cond do
+      String.contains?(normalized, "failed to connect") ->
+        {:error,
+         "Claude MCP server '#{server_name}' is registered but failed to connect. Ensure `controlkeel` is on PATH for Claude, or set CONTROLKEEL_BIN to the absolute controlkeel binary path, then retry `controlkeel attach claude-code`."}
+
       String.contains?(normalized, String.downcase(server_name)) and
           String.contains?(output, command_path) ->
         :ok

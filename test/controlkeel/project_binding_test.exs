@@ -65,4 +65,25 @@ defmodule ControlKeel.ProjectBindingTest do
         assert body =~ "--project-root"
     end
   end
+
+  test "ensure_mcp_wrapper launcher uses resolved controlkeel path outside source tree", %{
+    tmp: tmp
+  } do
+    File.write!(Path.join(tmp, "README.md"), "not a controlkeel app")
+
+    assert :ok = ProjectBinding.ensure_mcp_wrapper(tmp)
+
+    body = File.read!(ProjectBinding.mcp_wrapper_path(tmp))
+
+    case :os.type() do
+      {:win32, _} ->
+        assert body =~ "CONTROLKEEL_BIN"
+        assert body =~ "mcp"
+
+      _ ->
+        executable = System.find_executable("controlkeel") || "controlkeel"
+        assert body =~ executable
+        assert body =~ "mcp --project-root"
+    end
+  end
 end

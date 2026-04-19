@@ -133,7 +133,7 @@ defmodule ControlKeel.CLI do
   @benchmark_list_switches [domain_pack: :string, format: :string]
   @benchmark_export_switches [format: :string]
   @policy_train_switches [type: :string]
-  @watch_switches [interval: :integer]
+  @watch_switches [interval: :integer, status: :boolean]
   @audit_log_switches [format: :string]
   @service_account_create_switches [workspace_id: :integer, name: :string, scopes: :string]
   @service_account_list_switches [workspace_id: :integer]
@@ -255,6 +255,21 @@ defmodule ControlKeel.CLI do
     case argv do
       [] ->
         {:ok, %{command: :serve, options: %{}, args: []}}
+
+      ["--help"] ->
+        {:ok, %{command: :help, options: %{}, args: []}}
+
+      ["-h"] ->
+        {:ok, %{command: :help, options: %{}, args: []}}
+
+      ["--version"] ->
+        {:ok, %{command: :version, options: %{}, args: []}}
+
+      ["-V"] ->
+        {:ok, %{command: :version, options: %{}, args: []}}
+
+      ["-v"] ->
+        {:ok, %{command: :version, options: %{}, args: []}}
 
       ["serve"] ->
         {:ok, %{command: :serve, options: %{}, args: []}}
@@ -3249,18 +3264,22 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :watch, options: options}, project_root) do
-    interval = Keyword.get(options, :interval, 2_000)
+    if options[:status] do
+      run_command(%{command: :status, options: %{}, args: []}, project_root)
+    else
+      interval = Keyword.get(options, :interval, 2_000)
 
-    case ensure_local_project(project_root) do
-      {:ok, _binding, session, _mode} ->
-        IO.puts("")
-        IO.puts("ControlKeel Watch — session ##{session.id}: #{session.title}")
-        IO.puts("  Polling every #{interval}ms  |  Ctrl+C to exit")
-        IO.puts(String.duplicate("─", 60))
-        watch_loop(session.id, MapSet.new(), interval)
+      case ensure_local_project(project_root) do
+        {:ok, _binding, session, _mode} ->
+          IO.puts("")
+          IO.puts("ControlKeel Watch — session ##{session.id}: #{session.title}")
+          IO.puts("  Polling every #{interval}ms  |  Ctrl+C to exit")
+          IO.puts(String.duplicate("─", 60))
+          watch_loop(session.id, MapSet.new(), interval)
 
-      {:error, reason} ->
-        {:error, "Failed to load local project: #{inspect(reason)}"}
+        {:error, reason} ->
+          {:error, "Failed to load local project: #{inspect(reason)}"}
+      end
     end
   end
 
