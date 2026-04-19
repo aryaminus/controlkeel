@@ -803,6 +803,15 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ "waitMessage.includes(\"timeout\")"
     assert opencode_plugin =~ "waitError.includes(\"timed out\")"
     assert opencode_plugin =~ "timedOut: true"
+    assert opencode_plugin =~ "controlkeel review plan open"
+    assert opencode_plugin =~ "waitSkipped: true"
+    assert opencode_plugin =~ "manualApprovalRequired: true"
+
+    assert opencode_plugin =~
+             ~S|reason: !browserUrl ? "browser_url_unavailable" : "browser_unreachable"|
+
+    assert opencode_plugin =~
+             "controlkeel review plan respond --id <review_id> --decision approved"
 
     opencode_agent =
       Path.join(opencode_plan.output_dir, ".opencode/agents/controlkeel-operator.md")
@@ -826,11 +835,12 @@ defmodule ControlKeel.SkillsTest do
       Path.join(opencode_plan.output_dir, ".opencode/commands/controlkeel-submit-plan.md")
       |> File.read!()
 
-    assert opencode_submit_plan_command =~ "6. Do not execute until the review is approved"
+    assert opencode_submit_plan_command =~ "7. Do not execute until the review is approved"
     assert opencode_submit_plan_command =~ "controlkeel version"
     assert opencode_submit_plan_command =~ "--task-id <task_id>"
     assert opencode_submit_plan_command =~ "--session-id <session_id>"
     assert opencode_submit_plan_command =~ "--timeout 30"
+    assert opencode_submit_plan_command =~ "`browser_url` is missing/unreachable"
     assert opencode_submit_plan_command =~ "ControlKeel CLI [object Object] is too old"
     assert opencode_submit_plan_command =~ "Restart OpenCode"
 

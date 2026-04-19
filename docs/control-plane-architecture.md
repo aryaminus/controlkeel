@@ -38,6 +38,7 @@ The execution posture is the part of the brief that tells CK how to treat the ru
 - keep durable state in typed surfaces such as memory, proofs, traces, and outcomes rather than treating the filesystem as the source of truth
 - prefer typed or code-mode execution for large API and tool surfaces when available
 - keep shell as the broad fallback surface for repo mutation, test runs, and package commands
+- treat network/egress as default-deny and grant capability access through explicit task-scoped reviewed allowlists
 - escalate approval pressure as work moves from read-only exploration to high-impact execution
 
 CK now also derives a runtime recommendation from that posture:

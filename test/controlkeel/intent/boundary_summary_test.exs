@@ -41,6 +41,11 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
     assert summary["harness_policy"]["tool_execution"]["read_only_concurrency"] == "parallel"
     assert summary["harness_policy"]["tool_execution"]["write_concurrency"] == "serial"
 
+    assert summary["harness_policy"]["capability_egress"]["network_default"] == "deny"
+
+    assert summary["harness_policy"]["capability_egress"]["grant_model"] ==
+             "explicit_task_scoped_allowlist"
+
     assert summary["harness_policy"]["context_contract"]["system_prompt_posture"] ==
              "minimal_and_stable"
 
@@ -134,6 +139,14 @@ defmodule ControlKeel.Intent.BoundarySummaryTest do
                  "result_budgeting" => "budget_then_reference",
                  "rationale" =>
                    "Run read-only discovery concurrently when possible, serialize mutations, and keep tool execution inside the main agent loop so results and failures stay governable."
+               },
+               "capability_egress" => %{
+                 "network_default" => "deny",
+                 "grant_model" => "explicit_task_scoped_allowlist",
+                 "approval_path" => "ck_review_or_trusted_human",
+                 "audit_posture" => "approved_capabilities_are_traceable",
+                 "rationale" =>
+                   "Execution should start from no implicit network or side-effect authority. Grant egress and high-impact capabilities explicitly per task through reviewed, auditable allowlists."
                },
                "context_contract" => %{
                  "ownership" => "operator_visible_and_ck_controlled",

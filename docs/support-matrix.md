@@ -323,6 +323,7 @@ CK now makes the execution posture explicit in the brief and context layer:
 - `typed_storage` is the durable state path for proofs, memory, traces, and outcome tracking
 - `typed_runtime` is the preferred path for large API or MCP-style tool surfaces when the host can offer code-mode execution
 - `shell_sandbox` remains the broad fallback path for repo mutation, package management, and test execution, with the strongest approval pressure
+- capability egress posture is default-deny; network/high-impact grants are expected to be explicit, task-scoped, and review-traceable
 
 ## MCP runtime tools
 

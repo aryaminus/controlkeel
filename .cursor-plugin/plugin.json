@@ -35,5 +35,5 @@
   "repository": "https://github.com/aryaminus/controlkeel.git",
   "rules": "./rules/",
   "skills": "./skills/",
-  "version": "0.2.31"
+  "version": "0.2.33"
 }

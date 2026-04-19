@@ -6097,6 +6097,65 @@ defmodule ControlKeel.Skills.Exporter do
             throw new Error("ControlKeel did not return a review id")
           }
 
+          const openEnv = process.env.LOGGER_LEVEL
+            ? process.env
+            : { ...process.env, LOGGER_LEVEL: "warning" }
+
+          let openPayload = null
+
+          try {
+            const openProc = Bun.spawn(["controlkeel", "review", "plan", "open", "--id", String(reviewId), "--json"], {
+              stdout: "pipe",
+              stderr: "pipe",
+              env: openEnv,
+            })
+            const openOut = await new Response(openProc.stdout).text()
+            const openErr = await new Response(openProc.stderr).text()
+            const openExit = await openProc.exited
+
+            if (openExit === 0) {
+              openPayload = parseJson([openOut, openErr].filter(Boolean).join("\n"))
+            } else {
+              openPayload = {
+                error: `controlkeel review plan open failed with exit code ${openExit}${openErr.trim() ? `: ${openErr.trim()}` : ""}`,
+              }
+            }
+          } catch (error) {
+            openPayload = { error: error instanceof Error ? error.message : String(error) }
+          }
+
+          const browserUrl =
+            openPayload?.browser_url ??
+            submitPayload?.browser_url ??
+            submitPayload?.url ??
+            submitPayload?.review?.browser_url ??
+            null
+
+          const openError = typeof openPayload?.open_error === "string" ? openPayload.open_error.trim() : ""
+          const openFailure = typeof openPayload?.error === "string" ? openPayload.error.trim() : ""
+
+          const remoteLocalhostMismatch =
+            typeof browserUrl === "string" &&
+            browserUrl.includes("localhost") &&
+            openPayload?.remote === true
+
+          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch) {
+            return {
+              reviewId,
+              submitPayload,
+              openPayload,
+              browserUrl,
+              status: submitPayload?.review?.status ?? "pending",
+              feedbackNotes: submitPayload?.review?.feedback_notes ?? null,
+              timedOut: false,
+              waitSkipped: true,
+              manualApprovalRequired: true,
+              reason: !browserUrl ? "browser_url_unavailable" : "browser_unreachable",
+              guidance:
+                "Browser review is unavailable from this environment. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
+            }
+          }
+
           const waitEnv = process.env.LOGGER_LEVEL
             ? process.env
             : { ...process.env, LOGGER_LEVEL: "warning" }
@@ -6136,10 +6195,13 @@ defmodule ControlKeel.Skills.Exporter do
           return {
             reviewId,
             submitPayload,
+            openPayload,
             waitPayload,
-            browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
+            browserUrl: waitPayload?.browser_url ?? browserUrl,
             status: waitPayload?.review?.status,
             feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+            waitSkipped: false,
+            manualApprovalRequired: false,
           }
         } finally {
           // Clean up temp file
@@ -6275,8 +6337,9 @@ defmodule ControlKeel.Skills.Exporter do
     2. Ensure `controlkeel version` reports `>= 0.1.26`
     3. Run `controlkeel review plan submit --body-file .opencode/review-plan.md --submitted-by opencode --task-id <task_id> --json` (or use `--session-id <session_id>`)
     4. Read the returned `review.id` and `browser_url`
-    5. Wait with `controlkeel review plan wait --id <review_id> --timeout 30 --json`
-    6. Do not execute until the review is approved
+    5. If `browser_url` is available, wait with `controlkeel review plan wait --id <review_id> --timeout 30 --json`
+    6. If `browser_url` is missing/unreachable, do **not** loop on wait; ask for explicit user approval in chat and record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes "User approved in chat; browser unavailable" --json` (or `ck_review_feedback`)
+    7. Do not execute until the review is approved
 
     Fallback when the `submit_plan` tool is stale in a long-running OpenCode session:
     - If the tool returns an error like `ControlKeel CLI [object Object] is too old`, run the CLI flow above directly.
@@ -6607,6 +6670,65 @@ defmodule ControlKeel.Skills.Exporter do
             throw new Error("ControlKeel did not return a review id")
           }
 
+          const openEnv = process.env.LOGGER_LEVEL
+            ? process.env
+            : { ...process.env, LOGGER_LEVEL: "warning" }
+
+          let openPayload = null
+
+          try {
+            const openProc = Bun.spawn(["controlkeel", "review", "plan", "open", "--id", String(reviewId), "--json"], {
+              stdout: "pipe",
+              stderr: "pipe",
+              env: openEnv,
+            })
+            const openOut = await new Response(openProc.stdout).text()
+            const openErr = await new Response(openProc.stderr).text()
+            const openExit = await openProc.exited
+
+            if (openExit === 0) {
+              openPayload = parseJson([openOut, openErr].filter(Boolean).join("\n"))
+            } else {
+              openPayload = {
+                error: `controlkeel review plan open failed with exit code ${openExit}${openErr.trim() ? `: ${openErr.trim()}` : ""}`,
+              }
+            }
+          } catch (error) {
+            openPayload = { error: error instanceof Error ? error.message : String(error) }
+          }
+
+          const browserUrl =
+            openPayload?.browser_url ??
+            submitPayload?.browser_url ??
+            submitPayload?.url ??
+            submitPayload?.review?.browser_url ??
+            null
+
+          const openError = typeof openPayload?.open_error === "string" ? openPayload.open_error.trim() : ""
+          const openFailure = typeof openPayload?.error === "string" ? openPayload.error.trim() : ""
+
+          const remoteLocalhostMismatch =
+            typeof browserUrl === "string" &&
+            browserUrl.includes("localhost") &&
+            openPayload?.remote === true
+
+          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch) {
+            return {
+              reviewId,
+              submitPayload,
+              openPayload,
+              browserUrl,
+              status: submitPayload?.review?.status ?? "pending",
+              feedbackNotes: submitPayload?.review?.feedback_notes ?? null,
+              timedOut: false,
+              waitSkipped: true,
+              manualApprovalRequired: true,
+              reason: !browserUrl ? "browser_url_unavailable" : "browser_unreachable",
+              guidance:
+                "Browser review is unavailable from this environment. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
+            }
+          }
+
           const waitEnv = process.env.LOGGER_LEVEL
             ? process.env
             : { ...process.env, LOGGER_LEVEL: "warning" }
@@ -6646,10 +6768,13 @@ defmodule ControlKeel.Skills.Exporter do
           return {
             reviewId,
             submitPayload,
+            openPayload,
             waitPayload,
-            browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
+            browserUrl: waitPayload?.browser_url ?? browserUrl,
             status: waitPayload?.review?.status,
             feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
+            waitSkipped: false,
+            manualApprovalRequired: false,
           }
         } finally {
           // Clean up temp file

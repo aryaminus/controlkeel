@@ -91,6 +91,35 @@ defmodule ControlKeel.Intent.ExecutionPostureTest do
     assert recommendation["recommended_integration"]["availability"] == "catalog"
   end
 
+  test "prefers headless runtime for search and execute code-mode API orchestration" do
+    brief =
+      execution_brief_fixture(
+        payload: %{
+          "project_name" => "API Control Plane",
+          "idea" =>
+            "Use a search and execute code-mode workflow to inspect an OpenAPI spec, then run a single-shot orchestration against matching endpoints.",
+          "domain_pack" => "software",
+          "occupation" => "Software",
+          "risk_tier" => "moderate",
+          "compliance" => [],
+          "data_summary" => "OpenAPI schema and API responses only.",
+          "recommended_stack" => "Typed runtime with code-mode search+execute adapter"
+        },
+        compiler: %{
+          "occupation" => "software",
+          "domain_pack" => "software",
+          "provider" => "openai",
+          "interview_answers" => %{
+            "constraints" => "Use code-mode search execute flow for API orchestration"
+          }
+        }
+      )
+
+    recommendation = Intent.runtime_recommendation(brief)
+
+    assert recommendation["strategy"] == "headless_runtime"
+  end
+
   test "prefers executor when the brief emphasizes typed integration discovery" do
     brief =
       execution_brief_fixture(

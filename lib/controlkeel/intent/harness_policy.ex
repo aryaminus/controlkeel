@@ -14,6 +14,14 @@ defmodule ControlKeel.Intent.HarnessPolicy do
       "rationale" =>
         "Run read-only discovery concurrently when possible, serialize mutations, and keep tool execution inside the main agent loop so results and failures stay governable."
     },
+    "capability_egress" => %{
+      "network_default" => "deny",
+      "grant_model" => "explicit_task_scoped_allowlist",
+      "approval_path" => "ck_review_or_trusted_human",
+      "audit_posture" => "approved_capabilities_are_traceable",
+      "rationale" =>
+        "Execution should start from no implicit network or side-effect authority. Grant egress and high-impact capabilities explicitly per task through reviewed, auditable allowlists."
+    },
     "context_contract" => %{
       "ownership" => "operator_visible_and_ck_controlled",
       "system_prompt_posture" => "minimal_and_stable",
@@ -101,6 +109,7 @@ defmodule ControlKeel.Intent.HarnessPolicy do
 
     %{
       "tool_execution" => tool_execution_policy(regulated?),
+      "capability_egress" => capability_egress_policy(regulated?),
       "context_contract" => context_contract_policy(),
       "memory" => memory_policy(regulated?),
       "compaction" => compaction_policy(regulated?),
@@ -126,6 +135,19 @@ defmodule ControlKeel.Intent.HarnessPolicy do
   end
 
   defp tool_execution_policy(false), do: @default_policy["tool_execution"]
+
+  defp capability_egress_policy(true) do
+    %{
+      "network_default" => "deny",
+      "grant_model" => "explicit_task_scoped_allowlist",
+      "approval_path" => "ck_review_or_trusted_human",
+      "audit_posture" => "approved_capabilities_are_traceable",
+      "rationale" =>
+        "High-risk sessions should require explicit, reviewed capability grants before network or other high-impact execution paths are opened."
+    }
+  end
+
+  defp capability_egress_policy(false), do: @default_policy["capability_egress"]
 
   defp context_contract_policy, do: @default_policy["context_contract"]
 

@@ -7,7 +7,7 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
   alias ControlKeel.ProviderBroker
 
   @approval_keywords ~w(approval approvals review reviewed reviewer human manual signoff)
-  @api_runtime_keywords ~w(api apis mcp tool tools integration integrations webhook webhooks oauth queue queues sync async cloudflare worker workers d1 r2 kv edge openapi graphql discovery schema typed typescript javascript executor)
+  @api_runtime_keywords ~w(api apis mcp tool tools integration integrations webhook webhooks oauth queue queues sync async cloudflare worker workers d1 r2 kv edge openapi graphql discovery schema typed typescript javascript executor code-mode codemode search execute single-shot orchestration)
   @virtual_workspace_keywords ~w(virtual workspace filesystem file tree repo search grep find cat bash shell read-only discovery sandbox)
 
   @undecided %{

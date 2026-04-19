@@ -196,6 +196,7 @@ That policy makes the control-plane assumptions explicit:
 - context compaction should run hierarchically, cheapest first
 - major error classes need named in-loop recovery paths
 - delegated mutation should prefer isolated worktrees or equivalent governed runtimes
+- network and other high-impact egress should default to deny and open only through explicit task-scoped reviewed allowlists
 
 This is important because “posture” and “policy” are different things.
 
