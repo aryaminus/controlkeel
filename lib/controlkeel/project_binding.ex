@@ -5,6 +5,7 @@ defmodule ControlKeel.ProjectBinding do
   alias ControlKeel.RuntimePaths
 
   @version 1
+  @compile_source_root Path.expand("../..", __DIR__)
 
   def read(project_root \\ File.cwd!()) do
     path = path(project_root)
@@ -280,6 +281,9 @@ defmodule ControlKeel.ProjectBinding do
     escaped_root = String.replace(project_root, "\"", "\\\"")
     escaped_default = String.replace(default_cli_command(), "\"", "\\\"")
 
+    source_launcher = source_repo_mcp_launcher_path() || ""
+    escaped_source_launcher = String.replace(source_launcher, "\"", "\\\"")
+
     case :os.type() do
       {:win32, _} ->
         """
@@ -297,7 +301,21 @@ defmodule ControlKeel.ProjectBinding do
         set -eu
 
         BINARY="${CONTROLKEEL_BIN:-#{escaped_default}}"
-        exec "$BINARY" mcp --project-root "#{escaped_root}" "$@"
+        SOURCE_LAUNCHER="#{escaped_source_launcher}"
+
+        if [ -n "$BINARY" ]; then
+          if [ -x "$BINARY" ] || command -v "$BINARY" >/dev/null 2>&1; then
+            exec "$BINARY" mcp --project-root "#{escaped_root}" "$@"
+          fi
+        fi
+
+        if [ -n "$SOURCE_LAUNCHER" ] && [ -x "$SOURCE_LAUNCHER" ]; then
+          export CK_PROJECT_ROOT="#{escaped_root}"
+          exec "$SOURCE_LAUNCHER" "$@"
+        fi
+
+        echo "controlkeel MCP wrapper could not find a runnable controlkeel binary. Install ControlKeel or set CONTROLKEEL_BIN to an absolute executable path." >&2
+        exit 1
         """
     end
   end
@@ -332,6 +350,23 @@ defmodule ControlKeel.ProjectBinding do
       end
 
     System.find_executable(candidate) || candidate
+  end
+
+  defp source_repo_mcp_launcher_path do
+    case :os.type() do
+      {:win32, _} ->
+        nil
+
+      _ ->
+        launcher = Path.join(@compile_source_root, "bin/controlkeel-mcp")
+        marker = Path.join(@compile_source_root, "lib/controlkeel/application.ex")
+
+        if File.exists?(launcher) and File.exists?(marker) do
+          launcher
+        else
+          nil
+        end
+    end
   end
 
   defp controlkeel_version do

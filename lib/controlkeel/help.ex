@@ -252,6 +252,43 @@ defmodule ControlKeel.Help do
       related: ["getting-started", "run", "codex"]
     },
     %{
+      id: "troubleshooting",
+      title: "MCP troubleshooting",
+      summary:
+        "Use this when CK tools return Not connected, a host says failed to connect, or attach looks successful but MCP calls fail.",
+      keywords: [
+        "troubleshoot",
+        "troubleshooting",
+        "not",
+        "connected",
+        "failed",
+        "connect",
+        "mcp",
+        "doctor",
+        "ck_context",
+        "ck_validate"
+      ],
+      phrases: [
+        "not connected",
+        "failed to connect",
+        "ck context not connected",
+        "ck validate not connected"
+      ],
+      commands: [
+        "controlkeel attach doctor",
+        "controlkeel status",
+        "controlkeel provider doctor",
+        "controlkeel attach claude-code"
+      ],
+      next_steps: [
+        "Run `controlkeel attach doctor` first to confirm attached and runnable host state.",
+        "For Claude, run `claude mcp get controlkeel` and re-attach if status is failed.",
+        "If a host cannot launch `controlkeel`, set `CONTROLKEEL_BIN` to an absolute binary path and attach again.",
+        "After startup, wait 2-5 seconds and retry once to avoid transient MCP backend boot races."
+      ],
+      related: ["attach", "mcp", "providers", "getting-started"]
+    },
+    %{
       id: "mcp",
       title: "MCP, hosted access, and remote clients",
       summary:
@@ -289,10 +326,11 @@ defmodule ControlKeel.Help do
 
     Guided help:
       controlkeel help                     Show the overview and common entry points
-      controlkeel help <topic>             Show guided help for a topic such as attach, codex, review, findings, run, skills, providers, or mcp
+      controlkeel help <topic>             Show guided help for a topic such as attach, codex, review, findings, run, skills, providers, troubleshooting, or mcp
       controlkeel help <question ...>      Route a free-form question such as:
                                           - controlkeel help how do i attach codex
                                           - controlkeel help why is my task blocked
+                                          - controlkeel help ck_context not connected
                                           - controlkeel help what can controlkeel do
 
     Commands:
@@ -497,6 +535,7 @@ defmodule ControlKeel.Help do
       - `controlkeel help why is my task blocked`
       - `controlkeel help run agents`
       - `controlkeel help providers`
+      - `controlkeel help troubleshooting`
 
     Common first commands:
       - `controlkeel init`
@@ -516,6 +555,7 @@ defmodule ControlKeel.Help do
       - run
       - skills
       - providers
+      - troubleshooting
       - mcp
     """
   end
@@ -543,6 +583,7 @@ defmodule ControlKeel.Help do
         Or ask in plain language, for example:
           - `controlkeel help how do i attach codex`
           - `controlkeel help why is my task blocked`
+          - `controlkeel help ck_validate not connected`
         """
 
       _ ->

@@ -203,6 +203,13 @@ ControlKeel now mirrors MCP config to both OpenCode config paths (`~/.config/ope
 
 If you still see transient `Not connected` messages immediately after OpenCode startup, wait 2-5 seconds and retry the tool call once. The local MCP server bootstraps Repo/services asynchronously and then stabilizes; a quick retry after startup usually resolves transient boot races.
 
+If `ck_context` or `ck_validate` still report `Not connected` after attach:
+
+```bash
+controlkeel attach doctor
+controlkeel provider doctor
+```
+
 If errors persist, check the OpenCode log at `~/.local/share/opencode/log/*.log` for `service=mcp key=controlkeel` lines and rerun:
 
 ```bash

@@ -82,6 +82,22 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert help_output =~ ".codex/config.toml"
   end
 
+  test "guided help routes not connected questions to troubleshooting topic" do
+    help_output =
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(%{
+                   command: :help,
+                   options: %{},
+                   args: ["ck_context", "not", "connected"]
+                 })
+      end)
+
+    assert help_output =~ "Matched topic: MCP troubleshooting"
+    assert help_output =~ "controlkeel attach doctor"
+    assert help_output =~ "controlkeel provider doctor"
+  end
+
   test "unknown commands return guided help suggestions" do
     assert {:error, message} = CLI.parse(["codx", "attach"])
     assert message =~ "Unknown command: controlkeel codx attach"

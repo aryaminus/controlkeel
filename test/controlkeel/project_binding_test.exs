@@ -66,6 +66,30 @@ defmodule ControlKeel.ProjectBindingTest do
     end
   end
 
+  test "ensure_mcp_wrapper launcher falls back to source launcher when binary missing", %{
+    tmp: tmp
+  } do
+    File.write!(Path.join(tmp, "README.md"), "not a controlkeel app")
+
+    assert :ok = ProjectBinding.ensure_mcp_wrapper(tmp)
+
+    body = File.read!(ProjectBinding.mcp_wrapper_path(tmp))
+
+    case :os.type() do
+      {:win32, _} ->
+        assert body =~ "CONTROLKEEL_BIN"
+        assert body =~ "mcp"
+
+      _ ->
+        compile_root = Path.expand("../..", __DIR__)
+        launcher_path = Path.join(compile_root, "bin/controlkeel-mcp")
+
+        assert body =~ "SOURCE_LAUNCHER"
+        assert body =~ launcher_path
+        assert body =~ "CK_PROJECT_ROOT"
+    end
+  end
+
   test "ensure_mcp_wrapper launcher uses resolved controlkeel path outside source tree", %{
     tmp: tmp
   } do
