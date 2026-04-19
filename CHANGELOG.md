@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.33 — 2026-04-19
+
+### What's changed
+
+- fix(mcp): harden launcher fallback and add troubleshooting guidance
+
 ## v0.2.32 — 2026-04-19
 
 ### What's changed
