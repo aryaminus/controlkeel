@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.32 — 2026-04-19
+
+### What's changed
+
+- feat(cli): add 'attach doctor' command for post-attach verification and health checks
+- feat(cli): add status option to watch command and improve error handling for connection failures
+- fix(docs): update target from 'codex' to 'opencode' in AGENTS.md and refine setup instructions in README.md
+- docs: add one-line setup instructions for ControlKeel in README
+
 ## v0.2.31 — 2026-04-18
 
 ### What's changed
