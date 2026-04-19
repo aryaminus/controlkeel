@@ -404,6 +404,49 @@ That is why validation is exposed consistently through:
 - A2A-adjacent interop
 - web surfaces
 
+## Intentional friction, not frictionless shipping
+
+One of CK's design assumptions is that **some friction is good**.
+
+This is not accidental product roughness. It is part of the control-plane model.
+
+CK is not trying to optimize every session toward “ship without friction.” It is trying to keep the places where human judgment matters from disappearing behind fast agent output.
+
+That shows up in the current implementation in a few concrete ways:
+
+- architecture and release-oriented work is explicitly decomposed into review-heavy or `human_gate` nodes instead of being treated like ordinary implementation slices
+- task plans carry rollback boundaries and validation gates, especially as risk rises
+- Mission Control surfaces human gate hints on findings instead of pretending every issue should be auto-fixed and silently resumed
+- `ck_validate` models trust boundary, intended use, and requested capabilities so risky actions can be treated differently from ordinary text or code review
+
+The practical point is simple:
+
+- speed is useful when the work is narrow and reversible
+- friction is useful when the work changes architecture, release posture, permissions, destructive authority, or rollback safety
+
+That is also why CK begins critical work with architecture and policy constraints before code generation, and why higher-risk paths keep review and proof pressure close to the loop.
+
+## Agent-legible repos
+
+CK also assumes that the repository itself becomes part of the agent execution surface.
+
+That does **not** mean CK currently enforces a single repo style. It means the product is built around the idea that agents do better when the repo stays reviewable, scoped, and legible.
+
+Current CK behavior already nudges in that direction:
+
+- intent and planning prefer small PR slices and rollback-safe delivery
+- task decomposition separates architecture, feature, and release tracks instead of flattening them into one giant execution stream
+- validation and findings preserve explicit boundary metadata rather than hiding risk inside natural-language prompts
+
+So for teams using CK seriously, “agent-legible” usually means:
+
+- keep work in narrow slices the human can still review
+- keep architecture and release boundaries explicit
+- preserve obvious rollback paths where mutation is involved
+- do not treat generated volume as proof that the underlying design is getting clearer
+
+CK's role here is not to magically remove entropy after the fact. It is to keep the operator boundary visible while the agent loop accelerates.
+
 ## Step 8: findings and review gates
 
 If validation or governance identifies a problem, CK turns it into a governed finding.
@@ -623,6 +666,58 @@ Hosted MCP exposes a governed subset of tools under scoped authorization.
 This gives agent-card discovery and narrow message dispatch for external agent systems.
 
 The important thing is that these transports all expose the **same governed model**, not entirely different products.
+
+## Enterprise gateway, catalog, and lineage
+
+If you look at CK from an enterprise rollout perspective, three existing behaviors matter a lot:
+
+1. one governed gateway layer for model and compatible API access
+2. one typed catalog/discovery layer for host and protocol surfaces
+3. one lineage model for governed work state
+
+### One governed gateway layer
+
+CK already centralizes several things that large organizations otherwise rebuild team by team:
+
+- provider resolution and fallback
+- governed OpenAI-compatible and Anthropic-compatible proxy access
+- explicit budget and spend tracking
+
+So the current CK story is already close to an enterprise AI gateway, but with a governance-first emphasis rather than only a traffic-routing emphasis.
+
+### One typed catalog/discovery layer
+
+CK also already has a catalog model for agent and runtime connectivity:
+
+- the typed integration catalog
+- `/skills` and `GET /api/v1/skills/targets`
+- hosted MCP discovery metadata
+- minimal A2A plus published agent card data
+- optional ACP registry enrichment
+
+This matters because CK does not force every team to describe agent connectivity from scratch. It keeps one typed, reviewable record of how a host or runtime uses CK, how CK can run it, what artifacts it installs, and what confidence/support level the surface really has.
+
+### One lineage model
+
+CK does not currently market a separate “use case registry” product surface by that exact name.
+
+What it does have today is a governed lineage model that already connects:
+
+- workspace
+- session
+- task
+- review
+- proof
+- task-run and audit-export metadata
+
+That gives CK a practical enterprise answer to questions like:
+
+- which governed workspace does this action belong to?
+- which task or review is affected?
+- what proof or audit evidence exists?
+- which service account is allowed to touch it?
+
+So the current product truth is not “CK ships every registry in the abstract.” The truthful claim is that CK already combines gateway control, typed discovery, and governed lineage into one control-plane model.
 
 ## Why CK is not “just an MCP server”
 

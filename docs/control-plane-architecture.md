@@ -48,6 +48,50 @@ CK now also derives a runtime recommendation from that posture:
 - the recommendation stays grounded in the typed integration catalog so CK suggests a real attach command or runtime export path instead of a generic “use a sandbox” note
 - when CK can see attached agents or already exported runtime bundles for the current workspace, it now biases the recommendation toward those live surfaces first
 
+## Enterprise control-plane posture
+
+Another useful way to read CK is as an **enterprise control plane for agent connectivity**, not just as a single-host helper.
+
+In current product terms, that breaks into three adjacent surfaces:
+
+- a central provider and proxy layer
+- a typed discovery/catalog layer
+- a governed lineage and evidence layer
+
+### 1. Central provider and proxy layer
+
+CK already centralizes model and compatible API access through:
+
+- provider brokerage and explicit fallback chains
+- governed OpenAI-style and Anthropic-style proxy endpoints
+- budget checks, spend alerts, and cost governance
+
+That means teams do not all need to reinvent their own raw model wiring, budget controls, or compatible upstream proxy handling to stay inside the same governed system.
+
+### 2. Typed discovery and catalog layer
+
+CK also already maintains a typed integration catalog and hosted protocol discovery surfaces:
+
+- the built-in integration catalog behind `/skills` and `GET /api/v1/skills/targets`
+- hosted MCP and minimal A2A discovery
+- agent-card publication for CK's hosted A2A surface
+- optional ACP registry enrichment layered on top of the built-in catalog
+
+That is not the same thing as claiming a separate enterprise “MCP registry product.” The important current truth is narrower: CK already gives organizations one typed place to describe what host/runtime surfaces exist, how they are installed, how they are reviewed, and which discovery metadata can be enriched from external registries.
+
+### 3. Governed lineage and evidence layer
+
+CK also ties execution back to governed state instead of leaving every agent or tool as an isolated island.
+
+Current lineage-bearing surfaces include:
+
+- workspace, session, task, review, and proof identifiers
+- task graph edges and task-run state
+- audit exports and proof bundles
+- service-account scoping across workspace/session/task/review access
+
+That is the part that makes enterprise governance practical. The point is not just “can we call a tool?” It is also “which governed workspace did this happen in, which task did it affect, what proof and review state exists, and who was allowed to see or operate it?”
+
 ## Harness principles
 
 ControlKeel already had most of these behaviors in practice, but they are now an explicit harness contract too:

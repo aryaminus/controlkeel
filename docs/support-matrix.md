@@ -49,6 +49,15 @@ Every shipped row also carries the stricter parity contract exposed in `/skills`
 
 Attachable and runtime integrations use the same governed MCP surface. Core routing/governance tools are always present, extended governance tools are currently enabled in protocol responses, and `ck_skill_list` / `ck_skill_load` are included when skills are available.
 
+The MCP surface is intentionally discovery-friendly rather than "dump everything into context" by default:
+
+- `tools/list` exposes the stable governed tool contract
+- hosted MCP can further narrow that list to the scoped hosted subset
+- skill catalogs and skill bodies are loaded separately through `ck_skill_list`, `ck_skill_load`, `resources/list`, `resources/read`, and `ck_load_resources`
+- tool results return `structuredContent`, so clients can compose over stable machine-readable payloads instead of reparsing long natural-language responses
+
+That design is important to the catalog itself. CK does not treat a large workspace skill inventory as a reason to bloat handshake-time context. It prefers progressive discovery and on-demand loading, especially in stdio MCP mode where slow registry walks can hurt connection reliability.
+
 The intent layer now consumes this same catalog for runtime recommendation. In practice:
 
 - approval-heavy or regulated briefs usually recommend an `attach_client` row with stronger review transport

@@ -54,6 +54,21 @@ These are **product expectations** for reviewers, not automatic enforcement rule
 
 Destructive or irreversible actions should stay behind explicit approval, proofs, and policy—regardless of severity.
 
+## Human wake-up surfaces
+
+CK is designed to preserve a few places where the human should wake back up instead of letting the agent loop stay frictionless.
+
+That expectation already shows up in the product through:
+
+- `human_gate` execution modes for review/release-oriented task nodes
+- architecture-first planning for higher-risk work
+- rollback boundaries on task plans
+- human gate hints attached to findings in Mission Control
+
+In practice, CK is telling the operator not to treat every generated diff the same. Narrow, reversible fixes can stay low-friction. Architecture decisions, release-boundary changes, destructive actions, and similarly high-consequence changes should pull the human back into the loop.
+
+CK does not claim to perfectly classify every risky change type today. The current product stance is narrower and more honest: keep the review boundary explicit, keep rollback and proof state visible, and increase human attention as impact and irreversibility go up.
+
 ## Relation to Mission Control
 
 Mission Control surfaces **human gate hints** next to each finding so operators see the same stance the docs describe. Approve, reject, and proof flows remain the source of truth for recorded decisions.

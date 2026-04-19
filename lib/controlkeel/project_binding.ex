@@ -289,6 +289,7 @@ defmodule ControlKeel.ProjectBinding do
         """
         @echo off
         setlocal
+        set "CK_PROJECT_ROOT=#{escaped_root}"
         if "%CONTROLKEEL_BIN%"=="" (
           set "CONTROLKEEL_BIN=#{escaped_default}"
         )
@@ -300,6 +301,7 @@ defmodule ControlKeel.ProjectBinding do
         #!/usr/bin/env sh
         set -eu
 
+        export CK_PROJECT_ROOT="#{escaped_root}"
         BINARY="${CONTROLKEEL_BIN:-#{escaped_default}}"
         SOURCE_LAUNCHER="#{escaped_source_launcher}"
 
@@ -310,7 +312,6 @@ defmodule ControlKeel.ProjectBinding do
         fi
 
         if [ -n "$SOURCE_LAUNCHER" ] && [ -x "$SOURCE_LAUNCHER" ]; then
-          export CK_PROJECT_ROOT="#{escaped_root}"
           exec "$SOURCE_LAUNCHER" "$@"
         fi
 

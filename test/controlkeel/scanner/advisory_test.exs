@@ -26,6 +26,7 @@ defmodule ControlKeel.Scanner.AdvisoryTest do
       "ANTHROPIC_API_KEY" => System.get_env("ANTHROPIC_API_KEY"),
       "OPENAI_API_KEY" => System.get_env("OPENAI_API_KEY"),
       "OPENROUTER_API_KEY" => System.get_env("OPENROUTER_API_KEY"),
+      "CK_PROJECT_ROOT" => System.get_env("CK_PROJECT_ROOT"),
       "CONTROLKEEL_OLLAMA_BASE_URL" => System.get_env("CONTROLKEEL_OLLAMA_BASE_URL"),
       "OLLAMA_HOST" => System.get_env("OLLAMA_HOST")
     }
@@ -79,6 +80,33 @@ defmodule ControlKeel.Scanner.AdvisoryTest do
 
     advisory =
       Advisory.advisory_status(%{"content" => String.duplicate("a", 40)}, [], project_root)
+
+    assert advisory.status == "skipped_no_provider"
+    assert advisory.detail =~ "No CK-owned LLM provider is configured"
+    assert advisory.detail =~ "codex-cli via codex_sdk"
+  end
+
+  test "uses CK_PROJECT_ROOT to resolve codex runtime hints without explicit project_root", %{
+    project_root: project_root
+  } do
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => 1,
+                 "session_id" => 1,
+                 "agent" => "codex-cli",
+                 "attached_agents" => %{
+                   "codex-cli" => %{
+                     "attached_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+                   }
+                 }
+               },
+               project_root
+             )
+
+    System.put_env("CK_PROJECT_ROOT", project_root)
+
+    advisory = Advisory.advisory_status(%{"content" => String.duplicate("a", 40)}, [])
 
     assert advisory.status == "skipped_no_provider"
     assert advisory.detail =~ "No CK-owned LLM provider is configured"

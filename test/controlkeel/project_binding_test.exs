@@ -101,11 +101,13 @@ defmodule ControlKeel.ProjectBindingTest do
 
     case :os.type() do
       {:win32, _} ->
+        assert body =~ "CK_PROJECT_ROOT"
         assert body =~ "CONTROLKEEL_BIN"
         assert body =~ "mcp"
 
       _ ->
         executable = System.find_executable("controlkeel") || "controlkeel"
+        assert body =~ "export CK_PROJECT_ROOT="
         assert body =~ executable
         assert body =~ "mcp --project-root"
     end

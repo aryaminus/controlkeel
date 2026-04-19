@@ -149,6 +149,31 @@ For skills, CK now supports both discovery patterns:
 
 In practice, `ck_context` is the main continuity surface across those transports. It returns current mission state plus a bounded workspace snapshot, a deterministic workspace cache key, recent CK-visible transcript events, transcript summaries, and resumable task context for the active session.
 
+### Progressive discovery and composition
+
+CK is intentionally designed so MCP clients do not have to front-load the entire governed surface into context at once.
+
+- `tools/list` stays lightweight and stable, even when the workspace has many skills or host-specific assets.
+- Hosted MCP narrows the visible tool set further through scoped filtering rather than exposing every local capability everywhere.
+- Skill discovery is meant to happen on demand through `ck_skill_list`, `resources/list`, `resources/read`, and `ck_load_resources`.
+
+That split is deliberate. In stdio mode, CK avoids walking the full skill registry during handshake-sensitive discovery paths, so clients can connect quickly and then load richer capability data only when they actually need it.
+
+CK also already supports a practical structured-composition pattern:
+
+- tool calls return `structuredContent` alongside text content
+- skill resources resolve to stable `skills://<name>` URIs
+- `ck_skill_list` returns compatibility and required-tool metadata before the client loads a skill body
+
+So the recommended client pattern is:
+
+1. use `ck_context` for continuity and current governed state
+2. discover only the next needed capability with `ck_skill_list` or resource listing
+3. load the specific skill or resource you need
+4. compose against the returned structured payloads instead of re-serializing long prose between steps
+
+This is the main way CK aligns with the broader MCP direction toward progressive discovery, typed semantics, and lower-latency composition without pretending every host supports the same UX surface.
+
 ACP registry support is supplemental only:
 
 - `controlkeel registry sync acp`

@@ -8,6 +8,9 @@ defmodule ControlKeel.Scanner.Advisory do
   """
 
   alias ControlKeel.ProviderBroker
+  alias ControlKeel.ProjectRoot
+  alias ControlKeel.Mission
+  alias ControlKeel.WorkspaceContext
   alias ControlKeel.Scanner.Finding
 
   @timeout_ms 8_000
@@ -21,7 +24,7 @@ defmodule ControlKeel.Scanner.Advisory do
   """
   def scan(input, existing_findings, opts \\ []) do
     content = input["content"] || ""
-    project_root = Keyword.get(opts, :project_root, File.cwd!())
+    project_root = resolve_project_root(input, Keyword.get(opts, :project_root))
 
     if enabled?() and String.length(content) > 30 do
       timeout = Keyword.get(opts, :timeout_ms, @timeout_ms)
@@ -45,10 +48,11 @@ defmodule ControlKeel.Scanner.Advisory do
 
   `layer3_findings` is the list returned by `scan/3` for this input.
   """
-  def advisory_status(input, layer3_findings, project_root \\ File.cwd!()) do
+  def advisory_status(input, layer3_findings, project_root \\ nil) do
     content = input["content"] || ""
     config = Application.get_env(:controlkeel, :advisory, [])
     explicit = Keyword.get(config, :enabled)
+    project_root = resolve_project_root(input, project_root)
     provider_status = ProviderBroker.status(project_root)
     runtime_hints = provider_status["runtime_hints"] || []
 
@@ -91,6 +95,47 @@ defmodule ControlKeel.Scanner.Advisory do
       detail: "No LLM provider configured; pattern scanners completed."
     }
   end
+
+  defp resolve_project_root(_input, explicit_root) when is_binary(explicit_root) do
+    ProjectRoot.resolve(explicit_root)
+  end
+
+  defp resolve_project_root(input, _explicit_root) when is_map(input) do
+    env_root = System.get_env("CK_PROJECT_ROOT")
+
+    cond do
+      is_binary(env_root) and env_root != "" ->
+        ProjectRoot.resolve(env_root)
+
+      session = advisory_session(input) ->
+        WorkspaceContext.resolve_project_root(session, File.cwd!()) ||
+          ProjectRoot.resolve(File.cwd!())
+
+      true ->
+        ProjectRoot.resolve(File.cwd!())
+    end
+  end
+
+  defp resolve_project_root(_input, _explicit_root), do: ProjectRoot.resolve(File.cwd!())
+
+  defp advisory_session(%{"session_id" => session_id}), do: fetch_session(session_id)
+  defp advisory_session(%{session_id: session_id}), do: fetch_session(session_id)
+  defp advisory_session(_input), do: nil
+
+  defp fetch_session(nil), do: nil
+
+  defp fetch_session(session_id) when is_integer(session_id) do
+    Mission.get_session_context(session_id)
+  end
+
+  defp fetch_session(session_id) when is_binary(session_id) do
+    case Integer.parse(session_id) do
+      {parsed, ""} -> Mission.get_session_context(parsed)
+      _ -> nil
+    end
+  end
+
+  defp fetch_session(_session_id), do: nil
 
   defp transport_suffix(nil), do: ""
   defp transport_suffix(""), do: ""
