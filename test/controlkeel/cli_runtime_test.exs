@@ -250,6 +250,34 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert parsed.options[:project_root] == tmp_dir
   end
 
+  test "attach rejects unsupported scope per host" do
+    assert {:error, message} = CLI.parse(["attach", "cursor", "--scope", "user"])
+    assert message =~ "Unsupported scope"
+    assert message =~ "Cursor"
+
+    assert {:ok, _parsed} = CLI.parse(["attach", "codex-cli", "--scope", "user"])
+  end
+
+  test "attach doctor parses and runs", %{tmp_dir: tmp_dir} do
+    assert {:ok, init} = CLI.parse(["init", "--no-attach"])
+
+    capture_io(fn ->
+      assert 0 == CLI.execute(init, project_root: tmp_dir)
+    end)
+
+    assert {:ok, parsed} = CLI.parse(["attach", "doctor", "--project-root", tmp_dir])
+    assert parsed.command == :attach_doctor
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(parsed, project_root: tmp_dir)
+      end)
+
+    assert output =~ "Attach health check"
+    assert output =~ "Verification commands:"
+    assert output =~ "controlkeel provider doctor"
+  end
+
   test "init and project-scoped codex attach accept --project-root explicitly", %{
     tmp_dir: tmp_dir
   } do
@@ -420,6 +448,7 @@ defmodule ControlKeel.CLIRuntimeTest do
       end)
 
     assert codex_output =~ "Companion target: codex."
+    assert codex_output =~ "Supported scope: user, project."
     assert codex_output =~ "@aryaminus/controlkeel"
     assert codex_output =~ "Installed Codex skills at "
     assert codex_output =~ ".codex/skills."

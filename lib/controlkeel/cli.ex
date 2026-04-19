@@ -280,6 +280,9 @@ defmodule ControlKeel.CLI do
       ["setup" | rest] ->
         parse_with_switches(:setup, rest, @setup_switches)
 
+      ["attach", "doctor" | rest] ->
+        parse_with_switches(:attach_doctor, rest, @agents_doctor_switches)
+
       ["attach", agent | rest] ->
         if agent in AgentIntegration.attachable_ids() do
           parse_attach(agent, rest)
@@ -725,6 +728,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :attach, args: ["claude-code"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => "claude-code"}),
+         {:ok, _scope} <- validate_attach_scope("claude-code", options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached_agent} <-
            ClaudeCLI.attach_local(
@@ -762,6 +766,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :attach, args: ["cursor"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => "cursor"}),
+         {:ok, _scope} <- validate_attach_scope("cursor", options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_cursor(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "cursor", attached),
@@ -789,6 +794,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :attach, args: ["windsurf"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => "windsurf"}),
+         {:ok, _scope} <- validate_attach_scope("windsurf", options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_windsurf(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "windsurf", attached),
@@ -815,10 +821,9 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["codex-cli"], options: options}, project_root) do
-    scope = attach_scope("codex-cli", options)
-
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => "codex-cli"}),
+         {:ok, scope} <- validate_attach_scope("codex-cli", options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          config_path <- CodexConfig.path_for_scope(project_root, scope),
          {:ok, _} <- CodexConfig.write(config_path, command_spec),
@@ -885,6 +890,7 @@ defmodule ControlKeel.CLI do
 
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => agent}),
+         {:ok, _scope} <- validate_attach_scope(agent, options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          config_path <- config_path_fn[agent].(),
          {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", command_spec, agent),
@@ -918,6 +924,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :attach, args: ["goose"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => "goose"}),
+         {:ok, _scope} <- validate_attach_scope("goose", options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_goose(command_spec, project_root),
          updated <- ProjectBinding.update_attached_agent(binding, "goose", attached),
@@ -946,6 +953,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :attach, args: ["continue"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => "continue"}),
+         {:ok, _scope} <- validate_attach_scope("continue", options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <-
            write_continue_mcp_config(continue_config_path(), "controlkeel", command_spec),
@@ -975,6 +983,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :attach, args: ["aider"], options: options}, project_root) do
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => "aider"}),
+         {:ok, _scope} <- validate_attach_scope("aider", options),
          command_spec <- ProjectBinding.mcp_command_spec(project_root),
          {:ok, attached} <- attach_to_aider(command_spec, project_root),
          updated <- ProjectBinding.update_attached_agent(binding, "aider", attached),
@@ -1012,10 +1021,9 @@ defmodule ControlKeel.CLI do
         "letta-code" => "letta-code-native"
       }[agent]
 
-    scope = attach_scope(agent, options)
-
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => agent}),
+         {:ok, scope} <- validate_attach_scope(agent, options),
          {:ok, result} <- attach_bundle_target(target, project_root, scope, options),
          attached_agent <- bundled_attached_agent(agent, target, scope, result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
@@ -1036,10 +1044,9 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
       when agent in ["vscode", "copilot"] do
-    scope = attach_scope(agent, options)
-
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(project_root, %{"agent" => agent}),
+         {:ok, scope} <- validate_attach_scope(agent, options),
          {:ok, install_result} <- Skills.install("github-repo", project_root, scope: scope),
          attached_agent <- github_repo_attached_agent(agent, scope, install_result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
@@ -1519,6 +1526,44 @@ defmodule ControlKeel.CLI do
        "Agents:"
        | agent_lines
      ]}
+  end
+
+  def run_command(%{command: :attach_doctor, options: options}, project_root) do
+    root = resolve_project_root(options, project_root)
+    doctor = AgentExecution.doctor(root)
+    snapshot = SetupAdvisor.snapshot(root)
+    provider_status = ProviderBroker.status(root)
+
+    attached = Enum.filter(doctor["agents"], & &1.attached)
+    runnable_attached = Enum.count(attached, & &1.runnable)
+
+    attached_lines =
+      if attached == [] do
+        ["Attached agents: none (run `controlkeel attach <agent>`)."]
+      else
+        [
+          "Attached agents: #{Enum.join(Enum.map(attached, & &1.id), ", ")}",
+          "Runnable attached agents: #{runnable_attached}/#{length(attached)}",
+          "Attached details:"
+        ] ++
+          Enum.map(attached, fn agent ->
+            "  #{agent.id}: runnable=#{if(agent.runnable, do: "yes", else: "no")} support=#{agent.execution_support}/#{agent.ck_runs_agent_via}"
+          end)
+      end
+
+    {:ok,
+     [
+       "Attach health check",
+       "Project root: #{doctor["project_root"]}",
+       SetupAdvisor.detected_hosts_line(snapshot),
+       "Provider source: #{provider_status["selected_source"]}",
+       "Provider: #{provider_status["selected_provider"]}",
+       "Core loop: #{SetupAdvisor.core_loop()}",
+       "Verification commands:",
+       "  - controlkeel status",
+       "  - controlkeel agents doctor",
+       "  - controlkeel provider doctor"
+     ] ++ attached_lines}
   end
 
   def run_command(%{command: :agents_list, options: options}, project_root) do
@@ -3941,7 +3986,13 @@ defmodule ControlKeel.CLI do
         {:error, usage_text()}
 
       true ->
-        {:ok, %{command: :attach, options: options, args: [agent]}}
+        case validate_attach_scope(agent, options) do
+          {:ok, _scope} ->
+            {:ok, %{command: :attach, options: options, args: [agent]}}
+
+          {:error, message} ->
+            {:error, message}
+        end
     end
   end
 
@@ -5329,11 +5380,31 @@ defmodule ControlKeel.CLI do
     end
   end
 
-  defp attach_scope("claude-code", options), do: options[:scope] || "user"
-  defp attach_scope("codex-cli", options), do: options[:scope] || "user"
-  defp attach_scope("hermes-agent", options), do: options[:scope] || "user"
-  defp attach_scope("forge", options), do: options[:scope] || "user"
-  defp attach_scope(_agent, options), do: options[:scope] || "project"
+  defp attach_scope(agent, options) do
+    options[:scope] ||
+      case AgentIntegration.get(agent) do
+        %AgentIntegration{default_scope: scope} when is_binary(scope) -> scope
+        _ -> "project"
+      end
+  end
+
+  defp validate_attach_scope(agent, options) do
+    scope = attach_scope(agent, options)
+
+    case AgentIntegration.get(agent) do
+      %AgentIntegration{supported_scopes: scopes, label: label}
+      when is_list(scopes) and scopes != [] ->
+        if scope in scopes do
+          {:ok, scope}
+        else
+          {:error,
+           "Unsupported scope `#{scope}` for #{label}. Supported scopes: #{Enum.join(scopes, ", ")}."}
+        end
+
+      _ ->
+        {:ok, scope}
+    end
+  end
 
   defp display_attach_agent(agent), do: AgentIntegration.label(agent)
 

@@ -159,6 +159,32 @@ Hosts without a documented published package flow remain attach-first in the doc
 
 For `skills.sh`, there is no separate marketplace submission step documented today. The official FAQ says leaderboard/listing visibility happens automatically from anonymous `npx skills add <owner/repo>` installs.
 
+## Post-attach verification and common MCP startup failures
+
+After any `controlkeel attach <host>`, run:
+
+```bash
+controlkeel attach doctor
+```
+
+Then follow host-specific checks:
+
+- Claude Code: `claude mcp get controlkeel`
+- OpenCode: `opencode mcp list`
+- Codex CLI: restart Codex and confirm the configured MCP server from `.codex/config.toml` is loaded
+- Cursor/Windsurf/Continue/Cline: restart the host and confirm the ControlKeel MCP entry is present in host settings/config
+
+Common failure causes and fixes:
+
+| Symptom | Likely cause | Fix |
+| --- | --- | --- |
+| MCP server is registered but shows failed/disconnected | Host cannot launch `controlkeel` from its PATH | Set `CONTROLKEEL_BIN` to an absolute `controlkeel` path and re-run `controlkeel attach <host>` |
+| MCP appears attached but tools fail immediately on first call | Host startup race after launch | Wait a few seconds, retry once, then run `controlkeel attach doctor` |
+| Attach succeeds but host ignores repo-level config | Host trust/workspace policy is blocking project config | Trust the repo/workspace and restart host |
+| Conflicting old and new host config files | Host reads a legacy config path | Re-run `controlkeel attach <host>` so CK rewrites canonical + compatibility config files |
+
+Security note: redact bearer tokens, proxy URLs with embedded credentials, and service-account secrets before sharing logs/transcripts.
+
 ## Update behavior after a new CK release
 
 ControlKeel does not silently rewrite repo files or host plugin directories when a new release ships.

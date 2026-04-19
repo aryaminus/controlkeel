@@ -234,6 +234,7 @@ defmodule ControlKeel.CLI.NewCommandsTest do
     assert {:ok, %{command: :version}} = CLI.parse(["--version"])
     assert {:ok, %{command: :version}} = CLI.parse(["-V"])
     assert {:ok, %{command: :version}} = CLI.parse(["-v"])
+    assert {:ok, %{command: :attach_doctor}} = CLI.parse(["attach", "doctor"])
   end
 
   describe "review plan commands" do

@@ -186,6 +186,7 @@ For OpenCode specifically:
 
 ```bash
 controlkeel attach opencode
+controlkeel attach doctor
 controlkeel status
 opencode mcp list
 ```
@@ -206,6 +207,7 @@ If errors persist, check the OpenCode log at `~/.local/share/opencode/log/*.log`
 
 ```bash
 controlkeel attach opencode
+controlkeel attach doctor
 ```
 
 OpenCode now has a native-first integration that writes `.opencode/skills`, `.opencode/plugins`, `.opencode/agents`, `.opencode/commands`, `.opencode/mcp.json`, and `.agents/skills` compatibility copies (using OpenCode's `mcp.controlkeel` local command-array shape). However, it does not currently expose a documented provider bridge the way Claude Code and Codex CLI do, so the usual next-best options for CK model work are:

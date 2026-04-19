@@ -87,12 +87,14 @@ defmodule ControlKeel.Help do
         "controlkeel attach codex-cli --scope project",
         "controlkeel attach claude-code",
         "controlkeel attach cursor",
+        "controlkeel attach doctor",
         "controlkeel help codex"
       ],
       next_steps: [
         "Use `--scope project` when you want repo-local host files.",
         "Use `--scope user` for hosts that support shared user config such as Codex or Claude.",
-        "Use `--mcp-only` when you only want MCP registration and not native companion files."
+        "Use `--mcp-only` when you only want MCP registration and not native companion files.",
+        "Run `controlkeel attach doctor` after attach to confirm host wiring and provider readiness."
       ],
       related: ["codex", "mcp", "skills"]
     },
@@ -304,6 +306,8 @@ defmodule ControlKeel.Help do
                                       Flags: --mcp-only, --no-native, --with-skills,
                                              --scope user|project
                                       Supported: #{supported_attach_agents_text()}
+      controlkeel attach doctor [--project-root /abs/path]
+                                      Run post-attach health checks and verification hints
       controlkeel review diff [options]
                                       Review a git diff between two refs before merge
       controlkeel review pr [options] Review a PR patch from --patch <file> or --stdin
@@ -497,6 +501,7 @@ defmodule ControlKeel.Help do
     Common first commands:
       - `controlkeel init`
       - `controlkeel attach codex-cli`
+      - `controlkeel attach doctor`
       - `controlkeel status`
       - `controlkeel findings`
       - `controlkeel agents doctor`
