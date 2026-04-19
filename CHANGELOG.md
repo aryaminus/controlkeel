@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.34 — 2026-04-19
+
+### What's changed
+
+- feat(governance): improve code-mode routing and plan-review fallback
+- feat(docs): enhance documentation on progressive discovery, human wake-up surfaces, and enterprise control-plane posture feat(core): improve project root resolution logic and enhance advisory status handling test: add tests for CK_PROJECT_ROOT usage in advisory status resolution
+
 ## v0.2.33 — 2026-04-19
 
 ### What's changed
