@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.37 — 2026-04-20
+
+### What's changed
+
+- fix: soften codex stop hook blocked-findings warning
+
 ## v0.2.36 — 2026-04-20
 
 ### What's changed
