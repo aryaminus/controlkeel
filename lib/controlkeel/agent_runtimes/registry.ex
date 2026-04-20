@@ -10,6 +10,7 @@ defmodule ControlKeel.AgentRuntimes.Registry do
     ControlKeel.AgentRuntimes.CodexCLI,
     ControlKeel.AgentRuntimes.Copilot,
     ControlKeel.AgentRuntimes.OpenCode,
+    ControlKeel.AgentRuntimes.T3Code,
     ControlKeel.AgentRuntimes.Pi,
     ControlKeel.AgentRuntimes.VSCode
   ]
@@ -32,7 +33,8 @@ defmodule ControlKeel.AgentRuntimes.Registry do
           | runtime_transport: runtime.runtime_transport(),
             runtime_auth_owner: runtime.runtime_auth_owner(),
             runtime_session_support: runtime.runtime_session_support(),
-            runtime_review_transport: runtime.runtime_review_transport()
+            runtime_review_transport: runtime.runtime_review_transport(),
+            runtime_capabilities: runtime.capabilities()
         }
     end
   end

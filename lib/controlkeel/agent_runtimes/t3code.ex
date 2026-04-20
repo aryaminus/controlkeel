@@ -1,13 +1,13 @@
-defmodule ControlKeel.AgentRuntimes.OpenCode do
+defmodule ControlKeel.AgentRuntimes.T3Code do
   @moduledoc false
 
   @behaviour ControlKeel.AgentRuntimes.Runtime
 
   @impl true
-  def id, do: "opencode"
+  def id, do: "t3code"
 
   @impl true
-  def runtime_transport, do: "opencode_sdk"
+  def runtime_transport, do: "t3code_provider_runtime"
 
   @impl true
   def runtime_auth_owner, do: "agent"
@@ -18,12 +18,12 @@ defmodule ControlKeel.AgentRuntimes.OpenCode do
   end
 
   @impl true
-  def runtime_review_transport, do: "plugin_session_tool"
+  def runtime_review_transport, do: "orchestration_domain_event"
 
   @impl true
   def runtime_provider_hint(_project_root, _opts) do
     %{
-      "provider" => "opencode_connected",
+      "provider" => "provider_neutral",
       "source" => "agent_runtime",
       "auth_mode" => "agent_runtime",
       "auth_owner" => "agent"
@@ -35,9 +35,9 @@ defmodule ControlKeel.AgentRuntimes.OpenCode do
     %{
       policy_gate: true,
       tool_approval: true,
-      user_input_pause_resume: false,
-      deterministic_event_ids: false,
-      replay_safe_delivery: false
+      user_input_pause_resume: true,
+      deterministic_event_ids: true,
+      replay_safe_delivery: true
     }
   end
 end

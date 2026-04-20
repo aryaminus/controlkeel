@@ -29,4 +29,15 @@ defmodule ControlKeel.AgentRuntimes.Copilot do
       "auth_owner" => "agent"
     }
   end
+
+  @impl true
+  def capabilities do
+    %{
+      policy_gate: true,
+      tool_approval: false,
+      user_input_pause_resume: false,
+      deterministic_event_ids: false,
+      replay_safe_delivery: false
+    }
+  end
 end

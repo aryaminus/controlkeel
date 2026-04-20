@@ -29,4 +29,15 @@ defmodule ControlKeel.AgentRuntimes.CodexAppServer do
       "auth_owner" => "agent"
     }
   end
+
+  @impl true
+  def capabilities do
+    %{
+      policy_gate: true,
+      tool_approval: true,
+      user_input_pause_resume: true,
+      deterministic_event_ids: true,
+      replay_safe_delivery: true
+    }
+  end
 end
