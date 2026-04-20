@@ -3,7 +3,7 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
 
   alias ControlKeel.AgentIntegration
   alias ControlKeel.AgentRuntimes.Registry, as: RuntimeRegistry
-  alias ControlKeel.Intent.{ExecutionBrief, ExecutionPosture}
+  alias ControlKeel.Intent.{ExecutionBrief, ExecutionPosture, RuntimePolicyProfile}
   alias ControlKeel.ProviderBroker
 
   @approval_keywords ~w(approval approvals review reviewed reviewer human manual signoff)
@@ -98,6 +98,8 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
       "runtime_auth_owner" => integration.runtime_auth_owner,
       "attach_command" => integration.attach_command,
       "runtime_export_command" => integration.runtime_export_command,
+      "runtime_capabilities" => integration.runtime_capabilities,
+      "runtime_policy_profile" => RuntimePolicyProfile.resolve(inference_mode(integration)),
       "availability" => availability_label(integration, availability)
     }
   end
@@ -253,6 +255,10 @@ defmodule ControlKeel.Intent.RuntimeRecommendation do
 
   defp api_runtime_candidate?(brief), do: mentions?(brief, @api_runtime_keywords)
   defp virtual_workspace_candidate?(brief), do: mentions?(brief, @virtual_workspace_keywords)
+
+  defp inference_mode(%{autonomy_mode: mode}) when is_binary(mode), do: mode
+  defp inference_mode(%{phase_model: "review_only"}), do: "approval_required"
+  defp inference_mode(_), do: "full_access"
 
   defp explicit_runtime_intent?(brief),
     do:
