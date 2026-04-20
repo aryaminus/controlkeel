@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.35 — 2026-04-20
+
+### What's changed
+
+- test: add comprehensive tests for t3code integration, governance, and runtime conformance
+- feat(governance): add canonical event bridge, turn lifecycle, thread state, and budget telemetry
+- feat(governance): add approval adapter, idempotency ledger, and remote session claims
+- feat(governance): add runtime policy profiles, orchestration event namespace, and wire into recommendations
+- feat(integration): promote t3code from alias to first-class attach client
+- feat(runtime): add capabilities callback to Runtime behaviour and implement across all runtimes
+- feat(docs): enhance documentation on agent integrations, control-plane architecture, and skill package distribution; clarify workflow phases and supply chain considerations
+
 ## v0.2.34 — 2026-04-19
 
 ### What's changed
