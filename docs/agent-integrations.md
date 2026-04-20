@@ -212,6 +212,14 @@ So the recommended client pattern is:
 
 This is the main way CK aligns with the broader MCP direction toward progressive discovery, typed semantics, and lower-latency composition without pretending every host supports the same UX surface.
 
+That same principle applies to repo-native host surfaces such as Codex and Claude-style skills and hooks:
+
+- keep `AGENTS.md`, host-local instructions, and always-loaded repo guidance focused on durable behavior and governance, not extra tone prose
+- prefer skill headers/metadata plus on-demand skill loading over stuffing every workflow into always-present context
+- keep hooks event-driven and specific to approvals, validation, or lifecycle checkpoints instead of using them as a second always-on prompt channel
+
+In other words, CK's design bias is "small stable contract first, richer capability on demand" rather than "inject every possible reminder on every turn."
+
 ### Skill trust and supply chain
 
 CK also treats skills as governed extensions, not as harmless prose blobs.

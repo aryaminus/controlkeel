@@ -93,7 +93,9 @@ defmodule ControlKeel.Governance.ApprovalAdapterTest do
           [
             %{"tool" => "file_read", "request_id" => "r1"},
             %{"tool" => "bash", "request_id" => "r2"}
-          ], policy_mode: "approval_required")
+          ],
+          policy_mode: "approval_required"
+        )
 
       assert length(results) == 2
 

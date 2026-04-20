@@ -104,6 +104,14 @@ Codex currently has three distinct CK stories, and mixing them together causes m
 3. Curated remote catalog visibility inside Codex product surfaces
    That is a separate distribution track controlled by OpenAI product surfaces, not something CK can force by writing local repo files.
 
+For day-to-day Codex use, there is one more practical guideline:
+
+- keep the repo-local `.codex/*` surface lean
+- use CK's native skills and hooks for governed checkpoints, not as a dumping ground for large always-on prose
+- prefer on-demand skill loading and focused lifecycle hooks over turning every session into a giant static harness preamble
+
+That keeps CK aligned with its own control-plane posture: minimal stable contracts first, richer capability only when the runtime actually needs it.
+
 Separately, CK now models `codex-app-server` as a real runtime surface for reporting and routing. It still reuses the same local `.codex/` assets, but it is no longer treated as a pure alias in CK's runtime metadata.
 
 Likewise, CK now models `t3code` as a first-class runtime surface (still bootstrapped via `controlkeel attach codex-cli`) so provider-neutral orchestration transport/review semantics are visible in routing and status outputs.

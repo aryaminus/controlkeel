@@ -127,6 +127,8 @@ ControlKeel already had most of these behaviors in practice, but they are now an
   CK treats the operator-visible brief, workspace snapshot, recent events, proof state, and typed memory as the real working context. It avoids treating silent host-side prompt edits or provider memory as the system of record.
 - **Minimal stable contracts**
   CK prefers a small stable control-plane contract: bounded context, typed tools, versioned schemas, and additive integration surfaces instead of constantly reshaping the basic loop underneath the agent.
+- **Lean harness over prompt bloat**
+  CK prefers progressive discovery, compact repo-local instructions, and event-driven hooks over stuffing every turn with large static system guidance, always-loaded skills, or repetitive tone/style reminders. The goal is to keep the harness useful without making the runtime fight unnecessary injected context.
 - **Observable compaction and recovery**
   Compaction, partial reads, findings, reviews, and delegated execution are meant to stay inspectable through runtime context integrity, recent events, resume packets, and proof bundles.
 - **Truthful extensibility**
