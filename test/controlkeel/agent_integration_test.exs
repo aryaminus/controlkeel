@@ -306,6 +306,7 @@ defmodule ControlKeel.AgentIntegrationTest do
            )
 
     codex_alias = AgentIntegration.get("codex")
+    t3code = AgentIntegration.get("t3code")
     gemini_alias = AgentIntegration.get("gemini")
     kiro_cli_alias = AgentIntegration.get("kiro-cli")
     roo_alias = AgentIntegration.get("roo")
@@ -314,6 +315,22 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert codex_alias.alias_of == "codex-cli"
     assert codex_alias.auth_mode == "agent_runtime"
     assert codex_alias.preferred_target == "codex"
+
+    assert t3code.support_class == "attach_client"
+    assert t3code.attach_command == "controlkeel attach codex-cli"
+    assert t3code.preferred_target == "codex"
+    assert t3code.auth_mode == "agent_runtime"
+    assert t3code.phase_model == "review_only"
+    assert t3code.submission_mode == "tool_call"
+    assert t3code.feedback_mode == "tool_call"
+    assert t3code.runtime_transport == "t3code_provider_runtime"
+    assert t3code.runtime_review_transport == "orchestration_domain_event"
+    assert t3code.runtime_session_support["fork"]
+    assert ".codex/skills" in t3code.artifact_surfaces
+    assert t3code.runtime_capabilities[:policy_gate] == true
+    assert t3code.runtime_capabilities[:tool_approval] == true
+    assert t3code.runtime_capabilities[:deterministic_event_ids] == true
+    assert t3code.runtime_capabilities[:replay_safe_delivery] == true
 
     assert gemini_alias.support_class == "alias"
     assert gemini_alias.alias_of == "gemini-cli"
@@ -389,6 +406,7 @@ defmodule ControlKeel.AgentIntegrationTest do
                is_nil(integration.runtime_review_transport)
 
       assert is_map(integration.runtime_session_support)
+      assert is_map(integration.runtime_capabilities)
       assert is_list(integration.plan_phase_support)
       assert is_list(integration.artifact_surfaces)
       assert is_list(integration.package_outputs)
@@ -398,6 +416,13 @@ defmodule ControlKeel.AgentIntegrationTest do
         assert integration.required_mcp_tools == []
       else
         assert integration.required_mcp_tools != []
+      end
+
+      if integration.runtime_capabilities != %{} do
+        assert Map.has_key?(integration.runtime_capabilities, :policy_gate)
+        assert Map.has_key?(integration.runtime_capabilities, :tool_approval)
+        assert Map.has_key?(integration.runtime_capabilities, :deterministic_event_ids)
+        assert Map.has_key?(integration.runtime_capabilities, :replay_safe_delivery)
       end
 
       if integration.support_class == "unverified" do
@@ -434,6 +459,15 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert codex_app.runtime_transport == "codex_app_server_json_rpc"
     assert codex_app.runtime_review_transport == "app_server_review"
     assert codex_app.runtime_session_support["fork"]
+
+    t3code = AgentIntegration.get("t3code")
+    assert t3code.support_class == "attach_client"
+    assert t3code.attach_command == "controlkeel attach codex-cli"
+    assert t3code.runtime_transport == "t3code_provider_runtime"
+    assert t3code.runtime_review_transport == "orchestration_domain_event"
+    assert t3code.runtime_session_support["fork"]
+    assert t3code.runtime_capabilities[:policy_gate] == true
+    assert t3code.runtime_capabilities[:tool_approval] == true
 
     assert vllm.support_class == "provider_only"
     assert vllm.preferred_target == "provider-profile"

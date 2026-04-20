@@ -196,6 +196,8 @@ defmodule ControlKeel.ProviderBrokerTest do
     assert attached["runtime_transport"] == "opencode_sdk"
     assert attached["runtime_auth_owner"] == "agent"
     assert attached["runtime_provider_hint"]["source"] == "agent_runtime"
+    assert is_map(attached["runtime_capabilities"])
+    assert attached["runtime_capabilities"][:policy_gate] == true
     assert hint["transport"] == "opencode_sdk"
     assert hint["hint"]["auth_owner"] == "agent"
   end
@@ -224,7 +226,41 @@ defmodule ControlKeel.ProviderBrokerTest do
     assert attached["runtime_transport"] == "codex_app_server_json_rpc"
     assert attached["runtime_review_transport"] == "app_server_review"
     assert attached["runtime_provider_hint"]["source"] == "agent_runtime"
+    assert is_map(attached["runtime_capabilities"])
     assert hint["transport"] == "codex_app_server_json_rpc"
+  end
+
+  test "t3code surfaces dedicated runtime transport and provider-neutral hints", %{
+    project_root: project_root
+  } do
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => 1,
+                 "session_id" => 1,
+                 "agent" => "t3code",
+                 "attached_agents" => %{
+                   "t3code" => %{
+                     "attached_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+                   }
+                 }
+               },
+               project_root
+             )
+
+    status = ProviderBroker.status(project_root)
+
+    attached = Enum.find(status["attached_agents"], &(&1["id"] == "t3code"))
+    hint = Enum.find(status["runtime_hints"], &(&1["agent_id"] == "t3code"))
+
+    assert attached["runtime_transport"] == "t3code_provider_runtime"
+    assert attached["runtime_review_transport"] == "orchestration_domain_event"
+    assert attached["runtime_provider_hint"]["source"] == "agent_runtime"
+    assert attached["runtime_provider_hint"]["provider"] == "provider_neutral"
+    assert attached["runtime_capabilities"][:policy_gate] == true
+    assert attached["runtime_capabilities"][:tool_approval] == true
+    assert attached["runtime_capabilities"][:deterministic_event_ids] == true
+    assert hint["transport"] == "t3code_provider_runtime"
   end
 
   defp restore_env(key, nil), do: System.delete_env(key)
