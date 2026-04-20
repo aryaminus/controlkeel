@@ -51,6 +51,7 @@ defmodule ControlKeel.AgentIntegration do
     package_outputs: [],
     direct_install_methods: [],
     runtime_session_support: %{},
+    runtime_capabilities: %{},
     supported_scopes: [],
     required_mcp_tools: [],
     install_channels: [],
@@ -1210,18 +1211,27 @@ defmodule ControlKeel.AgentIntegration do
         preferred_target: "roo-native",
         export_targets: ["roo-native", "instructions-only"]
       }),
-      alias_entry(%{
+      attach_client(%{
         id: "t3code",
-        label: "T3 Chat / T3 Code wrapper",
-        category: "alias",
+        label: "T3 Chat / T3 Code",
+        category: "native-first",
         description:
-          "Wrapper/alias path until a stable native integration surface exists. Prefer Codex CLI or Claude Code underneath.",
-        alias_of: "codex-cli",
-        auth_mode: "agent_runtime",
-        upstream_slug: "openai/codex",
-        upstream_docs_url: "https://github.com/openai/codex",
-        supported_scopes: ["user", "project"],
+          "Treats T3 Code as a first-class Codex app-server runtime surface while reusing the same governed local `.codex/*` install path as Codex CLI.",
+        attach_command: "controlkeel attach codex-cli",
+        config_location:
+          "T3 Code consumes the Codex local config surface (`~/.codex/config.toml` or `<project>/.codex/config.toml`).",
+        companion_delivery:
+          "Installs `.codex/skills`, `.agents/skills`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks`, `.codex/agents`, and `.codex/commands`; T3 Code uses that governed surface through its provider-neutral orchestration runtime.",
         preferred_target: "codex",
+        default_scope: "user",
+        router_agent_id: "t3code",
+        auth_mode: "agent_runtime",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "pingdotgg/t3code",
+        upstream_docs_url: "https://github.com/pingdotgg/t3code",
+        provider_bridge: %{supported: true, mode: "agent_runtime", owner: "agent"},
+        supported_scopes: ["user", "project"],
         export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       unverified_entry(%{
@@ -1868,6 +1878,8 @@ defmodule ControlKeel.AgentIntegration do
     "command"
   end
 
+  defp default_submission_mode(%{id: "t3code"}), do: "tool_call"
+
   defp default_submission_mode(%{support_class: "headless_runtime"}), do: "file_watch"
   defp default_submission_mode(_attrs), do: "manual"
 
@@ -1878,6 +1890,8 @@ defmodule ControlKeel.AgentIntegration do
        when id in ["claude-code", "codex-cli", "amp", "opencode"] do
     "tool_call"
   end
+
+  defp default_feedback_mode(%{id: "t3code"}), do: "tool_call"
 
   defp default_feedback_mode(%{id: id})
        when id in [
@@ -1920,6 +1934,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_phase_model(%{support_class: "framework_adapter"}), do: "review_only"
   defp default_phase_model(%{id: "pi"}), do: "file_plan_mode"
   defp default_phase_model(%{id: "codex-cli"}), do: "review_only"
+  defp default_phase_model(%{id: "t3code"}), do: "review_only"
   defp default_phase_model(%{id: "vscode"}), do: "review_only"
 
   defp default_phase_model(%{id: id}) when id in ["goose", "gemini-cli", "roo-code", "aider"],
@@ -1933,7 +1948,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_browser_embed(_attrs), do: "none"
 
   defp default_subagent_visibility(%{id: id})
-       when id in ["claude-code", "copilot", "opencode", "codex-cli", "pi"] do
+       when id in ["claude-code", "copilot", "opencode", "codex-cli", "t3code", "pi"] do
     "primary_only"
   end
 
@@ -1961,6 +1976,17 @@ defmodule ControlKeel.AgentIntegration do
       direct_install("brew_cli", "Codex via Homebrew", "brew install --cask codex"),
       direct_install("ck_attach", "CK attach", "controlkeel attach codex-cli"),
       direct_install("local_plugin", "Codex plugin", "controlkeel plugin install codex")
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "t3code"}) do
+    [
+      direct_install("ck_attach", "CK attach", "controlkeel attach codex-cli"),
+      direct_install(
+        "runtime_docs",
+        "T3 Code runtime docs",
+        "https://github.com/pingdotgg/t3code"
+      )
     ]
   end
 
@@ -2109,6 +2135,9 @@ defmodule ControlKeel.AgentIntegration do
     ]
 
   defp default_artifact_surfaces(%{id: "codex-app-server"}),
+    do: default_artifact_surfaces(%{id: "codex-cli"})
+
+  defp default_artifact_surfaces(%{id: "t3code"}),
     do: default_artifact_surfaces(%{id: "codex-cli"})
 
   defp default_artifact_surfaces(%{id: id}) when id in ["vscode", "copilot"] do

@@ -1442,6 +1442,7 @@ defmodule ControlKeelWeb.ApiController do
       runtime_auth_owner: integration.runtime_auth_owner,
       runtime_session_support: integration.runtime_session_support,
       runtime_review_transport: integration.runtime_review_transport,
+      runtime_capabilities: integration.runtime_capabilities,
       plan_phase_support: integration.plan_phase_support,
       artifact_surfaces: integration.artifact_surfaces,
       package_outputs: integration.package_outputs,

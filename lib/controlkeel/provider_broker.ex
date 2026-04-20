@@ -606,6 +606,7 @@ defmodule ControlKeel.ProviderBroker do
         "runtime_review_transport" => integration && integration.runtime_review_transport,
         "runtime_auth_owner" => integration && integration.runtime_auth_owner,
         "runtime_session_support" => integration && integration.runtime_session_support,
+        "runtime_capabilities" => integration && integration.runtime_capabilities,
         "runtime_provider_hint" => sanitize_runtime_hint(runtime_hint),
         "attached_at" => attrs["attached_at"] || attrs[:attached_at]
       }

@@ -200,7 +200,7 @@ Runtime transport truth for those first-class hosts:
 | `augment-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
 | `auggie-cli` | alias | use `augment` | same as `augment` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
 | `kimi-cli` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
-| `t3code` | alias | use `codex-cli` | same as `codex-cli` | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
+| `t3code` | attach client | `controlkeel attach codex-cli` | same `.codex/*` local surface as `codex-cli`, plus dedicated t3code provider-neutral runtime transport/review semantics | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
 | `rlm-agent` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `slate` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `retune` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |

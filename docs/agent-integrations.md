@@ -61,6 +61,8 @@ For Codex there are two supported CK delivery modes:
 
 CK also treats `codex-app-server` as a first-class runtime surface now rather than a pure alias. It still reuses the same `.codex/` local assets, but CK reports a dedicated app-server runtime transport and session/review capabilities for that host family.
 
+CK now treats `t3code` as a first-class runtime surface too (not just an alias row). It still bootstraps with `controlkeel attach codex-cli` and reuses `.codex/*`, but CK reports dedicated `t3code` runtime transport and orchestration-domain-event review semantics for that host family.
+
 In practical terms, that means:
 
 - `controlkeel attach codex-cli` is still the setup step for both Codex CLI and Codex app-server based clients

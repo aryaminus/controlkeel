@@ -106,6 +106,8 @@ Codex currently has three distinct CK stories, and mixing them together causes m
 
 Separately, CK now models `codex-app-server` as a real runtime surface for reporting and routing. It still reuses the same local `.codex/` assets, but it is no longer treated as a pure alias in CK's runtime metadata.
 
+Likewise, CK now models `t3code` as a first-class runtime surface (still bootstrapped via `controlkeel attach codex-cli`) so provider-neutral orchestration transport/review semantics are visible in routing and status outputs.
+
 The important practical consequence is that there is still no separate `controlkeel attach codex-app-server` command. If a team is building on top of Codex app-server, the correct CK setup is still `controlkeel attach codex-cli`, because that is what installs the governed `.codex/*` repo surface that app-server-powered clients consume.
 
 From there the layers split cleanly:

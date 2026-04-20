@@ -20,7 +20,7 @@ defmodule ControlKeel.AgentExecution do
     "claude-dispatch" => ["claude"],
     "codex-cli" => ["codex", "codex-cli"],
     "codex-app-server" => ["codex", "codex-cli"],
-    "t3code" => ["codex", "codex-cli"],
+    "t3code" => ["t3", "t3code", "codex", "codex-cli"],
     "copilot" => ["copilot"],
     "copilot-cli" => ["copilot"],
     "cline" => ["cline"],
