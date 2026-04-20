@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.36 — 2026-04-20
+
+### What's changed
+
+- docs: clarify lean harness guidance for host integrations
+
 ## v0.2.35 — 2026-04-20
 
 ### What's changed
