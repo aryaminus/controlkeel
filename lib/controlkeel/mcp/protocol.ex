@@ -266,7 +266,9 @@ defmodule ControlKeel.MCP.Protocol do
           "intended_use" => %{"type" => "string", "enum" => TrustBoundary.intended_uses()},
           "security_workflow_phase" => %{
             "type" => "string",
-            "enum" => SecurityWorkflow.phases()
+            "enum" => CkValidate.workflow_phase_values(),
+            "description" =>
+              "Canonical workflow phase. Compatibility aliases such as `preflight`, `analysis`, and `pre_edit` are accepted and normalized."
           },
           "artifact_type" => %{
             "type" => "string",

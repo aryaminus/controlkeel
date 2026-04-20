@@ -61,6 +61,27 @@ For Codex there are two supported CK delivery modes:
 
 CK also treats `codex-app-server` as a first-class runtime surface now rather than a pure alias. It still reuses the same `.codex/` local assets, but CK reports a dedicated app-server runtime transport and session/review capabilities for that host family.
 
+In practical terms, that means:
+
+- `controlkeel attach codex-cli` is still the setup step for both Codex CLI and Codex app-server based clients
+- the repo-local CK surface still lives in `.codex/config.toml`, `.codex/skills`, `.codex/hooks`, `.codex/agents`, and `.codex/commands`
+- the app-server side adds the richer Codex host runtime around that same surface: Codex-owned auth/account state, thread history, fork/resume/streaming session behavior, approvals, and app-server review transport
+
+So CK is not shipping a second parallel Codex install path here. It is reusing the same governed local Codex assets while recognizing that embedded Codex clients and app-server integrations expose a stronger host runtime than the plain terminal loop alone.
+
+The same practical rule applies to the newer Codex SDK paths:
+
+- the TypeScript SDK and the experimental Python SDK are both ways to drive the local Codex runtime programmatically
+- for CK users, that still lands in the same Codex runtime family as app-server-backed clients rather than creating a separate CK host target
+- if you want CK's governed MCP, skills, hooks, commands, and custom agents to be available to that SDK-driven Codex runtime, the setup step is still `controlkeel attach codex-cli`
+
+So the mental model is:
+
+- Codex CLI: interactive terminal surface
+- Codex app-server: embedded JSON-RPC runtime surface
+- Codex SDK: programmatic client surface over that same runtime family
+- CK: governed local `.codex/*` repo surface layered underneath all of them
+
 Two operational notes matter in practice:
 
 1. Codex only loads project-scoped `.codex/` config and hooks when the project is trusted.
@@ -77,6 +98,13 @@ When a user says "I don't see CK in the Codex plugins page," the most likely exp
 1. Verify the local plugin exists under `plugins/controlkeel` or `~/plugins/controlkeel`
 2. Verify the matching marketplace manifest exists at `.agents/plugins/marketplace.json` or `~/.agents/plugins/marketplace.json`
 3. If the goal is dependable local Codex behavior rather than plugin-catalog discovery, prefer `controlkeel attach codex-cli`
+
+For teams embedding Codex into another product, the practical guidance is:
+
+1. install the normal CK Codex local surface with `controlkeel attach codex-cli`
+2. run or connect your Codex client through app-server
+3. let Codex own app-server concerns such as auth, threads, approvals, and conversation history
+4. let CK own the governed repo-local MCP, skills, hooks, commands, and review/proof loop around that runtime
 
 For the exhaustive fields behind those rows, including phase model, runtime transport, package outputs, and execution support, use [support-matrix.md](support-matrix.md).
 
@@ -147,6 +175,14 @@ For skills, CK now supports both discovery patterns:
 - `ck_load_resources` is the tool fallback for clients that only support tool calls
 - `ck_skill_list` and `ck_skill_load` remain the explicit skill-catalog surfaces and are still useful when the client wants typed compatibility metadata before loading content
 
+That means CK's skill model is already closer to a progressive-disclosure package than to a flat prompt snippet:
+
+- the registry and compatibility metadata tell the client which skills exist and when they are relevant
+- `ck_skill_load` or `resources/read` loads the `SKILL.md` body only when the client actually needs that skill
+- bundled references, scripts, and other assets stay separate until the active host or agent needs them
+
+In practice, that gives CK the same core advantage that people want from modern skill systems: agents do not need to front-load every workflow into the initial context window just to keep the option available.
+
 In practice, `ck_context` is the main continuity surface across those transports. It returns current mission state plus a bounded workspace snapshot, a deterministic workspace cache key, recent CK-visible transcript events, transcript summaries, and resumable task context for the active session.
 
 ### Progressive discovery and composition
@@ -173,6 +209,20 @@ So the recommended client pattern is:
 4. compose against the returned structured payloads instead of re-serializing long prose between steps
 
 This is the main way CK aligns with the broader MCP direction toward progressive discovery, typed semantics, and lower-latency composition without pretending every host supports the same UX surface.
+
+### Skill trust and supply chain
+
+CK also treats skills as governed extensions, not as harmless prose blobs.
+
+That matters because a skill can change how an agent reasons, what tools it reaches for, and what steps it thinks are appropriate. In CK terms, imported skills are closer to a supply-chain input than to a casual prompt fragment.
+
+So the recommended model is:
+
+- first-party CK bundled skills are the trusted baseline
+- repo-local or team-maintained skills should be reviewed like other behavior-changing automation
+- third-party or community skills should not silently escalate into high-impact actions without normal CK review and trust-boundary checks
+
+This is also why CK has explicit trust-boundary findings around untrusted skill instruction and high-impact actions sourced from mixed or untrusted context. Skills remain useful, but they are still governed inputs.
 
 ACP registry support is supplemental only:
 

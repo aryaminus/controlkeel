@@ -26,6 +26,16 @@ ControlKeel's built-in skills are already installable through the public [skills
 
 This works today because the `skills` CLI already discovers the CK skill set in this repository. In a local validation run, it found 11 ControlKeel skills and offered installation into universal `.agents/skills` plus supported agent-specific skill directories.
 
+These installs are best understood as **skill-package distribution**, not as proof of a full native CK runtime contract for that host.
+
+Each CK skill bundle still centers on `SKILL.md`, with optional references, scripts, and assets layered around it. The host may discover only the skill metadata first, load the full skill body when relevant, and only then touch bundled helper files if the active workflow needs them. That is the practical progressive-disclosure model CK tries to preserve across native installs, AgentSkills-compatible directories, and MCP skill loading.
+
+Because of that, skill installs should also be treated with normal supply-chain caution:
+
+- CK bundled skills are the reviewed first-party baseline
+- team-authored skills should be versioned and reviewed like other automation
+- third-party/community skill packages should be inspected before they are allowed to steer high-impact work
+
 ## skills.sh agent-name coverage
 
 The [skills.sh](https://skills.sh/) agent list is broader than CK's native attach catalog. Treat those names in three buckets:
@@ -95,6 +105,15 @@ Codex currently has three distinct CK stories, and mixing them together causes m
    That is a separate distribution track controlled by OpenAI product surfaces, not something CK can force by writing local repo files.
 
 Separately, CK now models `codex-app-server` as a real runtime surface for reporting and routing. It still reuses the same local `.codex/` assets, but it is no longer treated as a pure alias in CK's runtime metadata.
+
+The important practical consequence is that there is still no separate `controlkeel attach codex-app-server` command. If a team is building on top of Codex app-server, the correct CK setup is still `controlkeel attach codex-cli`, because that is what installs the governed `.codex/*` repo surface that app-server-powered clients consume.
+
+From there the layers split cleanly:
+
+- Codex app-server owns thread lifecycle, approvals, conversation history, and host-side auth/account behavior
+- CK owns the governed local MCP, skills, hooks, commands, custom agents, and the review/proof loop attached to that Codex runtime
+
+The same guidance applies when a team is using the Codex SDK rather than talking to Codex only through the terminal UI. The SDK is a programmatic way to drive the local Codex runtime, not a separate CK attach family, so the correct CK setup still begins with `controlkeel attach codex-cli`.
 
 If a user does not see CK in a Codex plugins page, first verify the local install artifacts above before assuming the plugin install failed. Also verify that the repo is trusted, because Codex ignores project-scoped `.codex/` config and hooks for untrusted projects.
 

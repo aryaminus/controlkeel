@@ -1341,6 +1341,40 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(tmp_dir, ".agents/plugins/marketplace.json"))
   end
 
+  test "codex post-tool-use hook only warns on explicit failures", %{tmp_dir: tmp_dir} do
+    assert {:ok, _install} = Skills.install("codex", tmp_dir, scope: "project")
+
+    hook_path = Path.join(tmp_dir, ".codex/hooks/ck-post-tool-use.sh")
+
+    success_with_error_word =
+      Jason.encode!(%{
+        "tool_input" => %{"command" => "rg error lib"},
+        "tool_response" => "docs mention error handling",
+        "exit_code" => 0
+      })
+
+    {success_output, 0} =
+      System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
+        env: [{"CK_TEST_INPUT", success_with_error_word}, {"CK_HOOK_PATH", hook_path}]
+      )
+
+    assert success_output == ""
+
+    failing_test_command =
+      Jason.encode!(%{
+        "tool_input" => %{"command" => "mix test"},
+        "tool_response" => "1 failure",
+        "exit_code" => 2
+      })
+
+    {failure_output, 0} =
+      System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
+        env: [{"CK_TEST_INPUT", failing_test_command}, {"CK_HOOK_PATH", hook_path}]
+      )
+
+    assert failure_output =~ "test-oriented shell step"
+  end
+
   test "installer preserves existing AGENTS instructions and manages the CK block", %{
     tmp_dir: tmp_dir
   } do

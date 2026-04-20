@@ -244,5 +244,16 @@ defmodule ControlKeel.MCP.Tools.CkValidateTest do
              })
 
     assert result["allowed"] in [true, false]
+
+    assert {:ok, aliased_result} =
+             CkValidate.call(%{
+               "content" => "Check the repo first, then patch the affected files.",
+               "kind" => "bash",
+               "security_workflow_phase" => "pre_edit",
+               "artifact_type" => "text",
+               "target_scope" => "workspace"
+             })
+
+    assert aliased_result["allowed"] in [true, false]
   end
 end

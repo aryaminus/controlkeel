@@ -49,6 +49,32 @@ CK now also derives a runtime recommendation from that posture:
 - the recommendation stays grounded in the typed integration catalog so CK suggests a real attach command or runtime export path instead of a generic “use a sandbox” note
 - when CK can see attached agents or already exported runtime bundles for the current workspace, it now biases the recommendation toward those live surfaces first
 
+## Harness and sandbox
+
+CK is the harness and control plane, not the sandbox itself.
+
+That distinction matters because the two layers solve different problems:
+
+- the harness decides how work is understood, validated, resumed, reviewed, and evidenced
+- the sandbox or runtime provides the isolated execution environment where code, tools, or scripts actually run
+
+CK can attach to a host, export a headless runtime bundle, or route work toward a governed execution path without claiming that it owns every underlying sandbox substrate. The runtime can be swapped more easily than the control-plane record around it.
+
+In CK terms, the more durable system of record is the governed trajectory-adjacent state it already owns:
+
+- task, session, review, and proof state
+- recent transcript events and transcript summaries
+- resume packets and checkpoints
+- typed memory, outcomes, and workspace snapshots
+
+The sandbox filesystem still matters operationally. It may contain downloaded artifacts, generated analysis, or changed code that the next loop needs. But CK does not treat that local runtime state alone as the whole story, and it does not depend on opaque provider-managed memory as the source of truth either.
+
+That is why CK's runtime model is intentionally split:
+
+- the runtime or sandbox can fail, restart, or be replaced
+- the governed context, findings, review state, and proof trail remain portable across those restarts
+- runtime export and attach flows reuse the same task-run, validation, findings, and proof primitives instead of inventing a separate state model for each execution surface
+
 ## Enterprise control-plane posture
 
 Another useful way to read CK is as an **enterprise control plane for agent connectivity**, not just as a single-host helper.

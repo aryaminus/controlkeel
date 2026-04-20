@@ -185,6 +185,15 @@ This is a practical difference from many systems that only reason in the abstrac
 
 CK now also derives a harness policy layer alongside that recommendation.
 
+At this point it helps to make one distinction explicit:
+
+- CK is the harness and control plane
+- the sandbox or runtime is the execution environment
+
+Those are related, but they are not the same product surface.
+
+When CK recommends an attach-first host or a `headless_runtime` export, it is choosing an execution path. It is not claiming that CK itself is a microVM substrate or that every runtime is interchangeable at the filesystem level. The point is narrower: CK keeps the governed loop and its durable state outside any single runtime instance.
+
 That policy makes the control-plane assumptions explicit:
 
 - read-only discovery tools can be parallelized
@@ -508,6 +517,18 @@ CK stores:
 - memory records
 - outcomes
 - checkpoints
+
+That is the practical restartability story in CK.
+
+If a runtime dies, the important durable record is not just whatever happened to be left in that runtime's local filesystem. The recoverable control-plane record lives in:
+
+- task and session state
+- findings and review state
+- proof bundles
+- recent transcript events and transcript summaries
+- resume packets, checkpoints, and typed memory
+
+The local filesystem inside a sandbox or runtime can still be important, especially for generated files or repo mutations. But CK treats that as one execution surface among others, not as the only place the trajectory survives. This is also why CK avoids treating hidden provider memory as the durable source of truth.
 
 This lets the system remain useful after the original chat session is gone.
 

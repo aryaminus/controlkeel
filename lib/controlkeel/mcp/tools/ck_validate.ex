@@ -46,7 +46,16 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
     "shell" => "bash",
     "web" => "browser"
   }
-  @workflow_phase_aliases %{"preflight" => "discovery"}
+  @workflow_phase_aliases %{
+    "preflight" => "discovery",
+    "analysis" => "discovery",
+    "pre_edit" => "patch",
+    "pre edit" => "patch",
+    "preedit" => "patch",
+    "post_edit" => "validation",
+    "post edit" => "validation",
+    "postedit" => "validation"
+  }
   @target_scope_aliases %{
     "repo" => "owned_repo",
     "project" => "owned_repo",
@@ -170,6 +179,11 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
             "`domain_pack` must be one of #{Enum.join(Domains.supported_packs(), ", ")}"}}
         end
     end
+  end
+
+  def workflow_phase_values do
+    (SecurityWorkflow.phases() ++ Map.keys(@workflow_phase_aliases))
+    |> Enum.uniq()
   end
 
   defp maybe_persist(%{"session_id" => nil}, _findings), do: :ok

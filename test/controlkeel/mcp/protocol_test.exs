@@ -208,6 +208,20 @@ defmodule ControlKeel.MCP.ProtocolTest do
 
     assert capability_enum != nil
     assert "file_read" in capability_enum
+
+    assert "preflight" in get_in(tool, [
+             "inputSchema",
+             "properties",
+             "security_workflow_phase",
+             "enum"
+           ])
+
+    assert "pre_edit" in get_in(tool, [
+             "inputSchema",
+             "properties",
+             "security_workflow_phase",
+             "enum"
+           ])
   end
 
   test "tools/list exposes experience archive inputs" do

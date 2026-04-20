@@ -3937,22 +3937,109 @@ defmodule ControlKeel.Skills.Exporter do
 
     input=$(cat)
     command_text=""
-    tool_response=""
+    tool_failed="false"
 
     if command -v jq >/dev/null 2>&1; then
       command_text=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
-      tool_response=$(printf '%s' "$input" | jq -r '.tool_response // empty')
+      tool_failed=$(
+        printf '%s' "$input" | jq -r '
+          def nonzero_exit:
+            [
+              .exit_code?,
+              .exitCode?,
+              .tool_response.exit_code?,
+              .tool_response.exitCode?,
+              .tool_result.exit_code?,
+              .tool_result.exitCode?,
+              .tool_output.exit_code?,
+              .tool_output.exitCode?
+            ]
+            | map(select(type == "number" or type == "string"))
+            | map(try tonumber catch null)
+            | map(select(. != null))
+            | any(. != 0);
+          def failed_status:
+            [
+              .status?,
+              .result.status?,
+              .tool_response.status?,
+              .tool_result.status?,
+              .tool_output.status?
+            ]
+            | map(select(type == "string"))
+            | map(ascii_downcase)
+            | any(. == "failed" or . == "error");
+          if (nonzero_exit or failed_status) then "true" else "false" end
+        ' 2>/dev/null || printf 'false'
+      )
     elif command -v python3 >/dev/null 2>&1; then
       command_text=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input', {}).get('command', ''))" 2>/dev/null)
-      tool_response=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_response', ''))" 2>/dev/null)
+      tool_failed=$(
+        printf '%s' "$input" | python3 -c "import json,sys,textwrap; exec(textwrap.dedent('''\
+          try:
+              d = json.load(sys.stdin)
+          except Exception:
+              print(\"false\")
+              raise SystemExit(0)
+
+          def nested(obj, *path):
+              cur = obj
+              for key in path:
+                  if not isinstance(cur, dict):
+                      return None
+                  cur = cur.get(key)
+              return cur
+
+          exit_candidates = [
+              d.get(\"exit_code\"),
+              d.get(\"exitCode\"),
+              nested(d, \"tool_response\", \"exit_code\"),
+              nested(d, \"tool_response\", \"exitCode\"),
+              nested(d, \"tool_result\", \"exit_code\"),
+              nested(d, \"tool_result\", \"exitCode\"),
+              nested(d, \"tool_output\", \"exit_code\"),
+              nested(d, \"tool_output\", \"exitCode\"),
+          ]
+
+          status_candidates = [
+              d.get(\"status\"),
+              nested(d, \"result\", \"status\"),
+              nested(d, \"tool_response\", \"status\"),
+              nested(d, \"tool_result\", \"status\"),
+              nested(d, \"tool_output\", \"status\"),
+          ]
+
+          failed = False
+
+          for value in exit_candidates:
+              if value is None:
+                  continue
+              try:
+                  if int(value) != 0:
+                      failed = True
+                      break
+              except Exception:
+                  pass
+
+          if not failed:
+              for value in status_candidates:
+                  if isinstance(value, str) and value.lower() in (\"failed\", \"error\"):
+                      failed = True
+                      break
+
+          print(\"true\" if failed else \"false\")
+        '''))" 2>/dev/null || printf 'false'
+      )
     fi
 
     message=""
 
-    if printf '%s' "$tool_response" | grep -Eiq '(^|[^A-Za-z])(FAILED|FAILURES|ERROR|Traceback|Exception)([^A-Za-z]|$)'; then
-      message="ControlKeel noticed failing shell output. Re-check the command result before continuing and run ck_validate again if the next step changes code or config."
-    elif printf '%s' "$command_text" | grep -Eq '(^|[[:space:]])(mix[[:space:]]+test|mix[[:space:]]+precommit|npm[[:space:]]+test|pnpm[[:space:]]+test|yarn[[:space:]]+test|pytest)([[:space:]]|$)'; then
-      message="ControlKeel reviewed a test-oriented shell step. Summarize failures clearly before moving on, and do not treat the task as complete if the command failed."
+    if [ "$tool_failed" = "true" ]; then
+      if printf '%s' "$command_text" | grep -Eq '(^|[[:space:]])(mix[[:space:]]+test|mix[[:space:]]+precommit|npm[[:space:]]+test|pnpm[[:space:]]+test|yarn[[:space:]]+test|pytest)([[:space:]]|$)'; then
+        message="ControlKeel reviewed a test-oriented shell step. Summarize failures clearly before moving on, and do not treat the task as complete if the command failed."
+      else
+        message="ControlKeel noticed failing shell output. Re-check the command result before continuing and run ck_validate again if the next step changes code or config."
+      fi
     fi
 
     if [ -n "$message" ]; then

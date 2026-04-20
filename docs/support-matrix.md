@@ -191,7 +191,7 @@ Runtime transport truth for those first-class hosts:
 | `huggingface` | provider_only | provider template only | none | `none` | `inbound_only` | `ck_owned` / `none` | `provider-profile` |
 | `claude-dispatch` | alias | use `claude-code` | same as `claude-code` | `embedded` | `direct` | `env_bridge` / `native` | `claude-standalone` |
 | `cognition` | alias | use `devin` | same as `devin` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `devin-runtime` |
-| `codex-app-server` | attach client | `controlkeel attach codex-cli` | same `.codex/*` local surface as `codex-cli`, but tracked as a dedicated app-server runtime | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
+| `codex-app-server` | attach client | `controlkeel attach codex-cli` | same `.codex/*` local surface as `codex-cli`, but tracked as a dedicated app-server/runtime-SDK family with Codex-owned auth/thread/approval behavior on top | `embedded` | `direct` | `agent_runtime` / `native` | `codex` |
 | `cursor-agent` | alias | use `cursor` | same as `cursor` | `handoff` | `handoff` | `ck_owned` / `native` | `cursor-native` |
 | `copilot-cli` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
 | `copilot-web` | alias | use `copilot` | same as `copilot` | `embedded` | `direct` | `ck_owned` / `native` | `github-repo` |
