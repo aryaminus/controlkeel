@@ -1375,6 +1375,47 @@ defmodule ControlKeel.SkillsTest do
     assert failure_output =~ "test-oriented shell step"
   end
 
+  test "codex stop hook warns instead of blocking when blocked findings exist", %{
+    tmp_dir: tmp_dir
+  } do
+    assert {:ok, _install} = Skills.install("codex", tmp_dir, scope: "project")
+
+    hook_path = Path.join(tmp_dir, ".codex/hooks/ck-stop.sh")
+    bin_dir = Path.join(tmp_dir, "bin")
+    File.mkdir_p!(bin_dir)
+
+    controlkeel_stub = Path.join(bin_dir, "controlkeel")
+
+    File.write!(
+      controlkeel_stub,
+      """
+      #!/usr/bin/env sh
+      printf '%s' '{"active_findings":{"blocked":4}}'
+      """
+    )
+
+    File.chmod!(controlkeel_stub, 0o755)
+
+    payload =
+      Jason.encode!(%{
+        "session_id" => 1,
+        "stop_hook_active" => false
+      })
+
+    {output, 0} =
+      System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
+        env: [
+          {"CK_TEST_INPUT", payload},
+          {"CK_HOOK_PATH", hook_path},
+          {"PATH", "#{bin_dir}:#{System.get_env("PATH")}"}
+        ]
+      )
+
+    refute output =~ "\"decision\":\"block\""
+    assert output =~ "\"systemMessage\""
+    assert output =~ "blocked findings"
+  end
+
   test "installer preserves existing AGENTS instructions and manages the CK block", %{
     tmp_dir: tmp_dir
   } do

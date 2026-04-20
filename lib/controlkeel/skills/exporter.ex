@@ -3919,11 +3919,7 @@ defmodule ControlKeel.Skills.Exporter do
     fi
 
     if [ "${blocked_count:-0}" != "0" ]; then
-      if [ "${stop_hook_active:-false}" = "false" ]; then
-        printf '%s\n' '{"decision":"block","reason":"ControlKeel still has blocked findings in this session. Call ck_context, resolve the findings, and only then complete the turn."}'
-      else
-        printf '%s\n' '{"systemMessage":"ControlKeel still has blocked findings in this session. Call ck_context before treating the task as complete."}'
-      fi
+      printf '%s\n' '{"systemMessage":"ControlKeel still has blocked findings in this session. Call ck_context before treating the task as complete."}'
     fi
 
     exit 0
