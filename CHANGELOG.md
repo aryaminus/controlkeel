@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.41 — 2026-04-21
+
+### What's changed
+
+- feat: add diagnostics for daemon role fields in skill metadata and enhance parser validation
+- feat: add frontmatter hygiene diagnostics for third-party skills in parser
+
 ## v0.2.40 — 2026-04-21
 
 ### What's changed
