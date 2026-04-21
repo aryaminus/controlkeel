@@ -7,6 +7,28 @@ defmodule ControlKeel.Skills.Parser do
 
   @name_regex ~r/^[a-z0-9][a-z0-9-]{0,63}$/
   @resource_dirs ~w(scripts references assets agents)
+  @activation_text_limit 1536
+  @supported_frontmatter_fields ~w(
+    agent
+    allowed-tools
+    argument-hint
+    compatibility
+    context
+    dependencies
+    description
+    disable-model-invocation
+    effort
+    hooks
+    license
+    metadata
+    model
+    name
+    paths
+    shell
+    user-invocable
+    when_to_use
+  )
+  @legacy_frontmatter_fields ~w(triggers version dspy-compatibility dspy-version)
 
   def parse(skill_path, scope) do
     with {:ok, content} <- File.read(skill_path),
@@ -41,6 +63,7 @@ defmodule ControlKeel.Skills.Parser do
           |> Kernel.++(agent_diagnostics)
           |> Kernel.++(reference_diagnostics(body, skill_dir, skill_path, name))
           |> Kernel.++(compatibility_diagnostics(meta, openai_metadata, skill_path, name))
+          |> Kernel.++(frontmatter_hygiene_diagnostics(meta, skill_path, name))
           |> Kernel.++(quality_diagnostics(meta, body, skill_path, name))
 
         allowed_tools = normalize_list(Map.get(meta, "allowed-tools", []))
@@ -287,6 +310,74 @@ defmodule ControlKeel.Skills.Parser do
         skill_name: skill_name
       }
     end)
+  end
+
+  defp frontmatter_hygiene_diagnostics(meta, skill_path, skill_name) do
+    if classify_source(skill_path) == "builtin" do
+      []
+    else
+      unsupported =
+        meta
+        |> Map.keys()
+        |> Enum.map(&to_string/1)
+        |> Enum.reject(&(&1 in @supported_frontmatter_fields))
+
+      legacy = Enum.filter(unsupported, &(&1 in @legacy_frontmatter_fields))
+      unsupported = unsupported -- legacy
+
+      legacy_diagnostics =
+        Enum.map(legacy, fn field ->
+          %SkillDiagnostic{
+            level: "warn",
+            code: "legacy_frontmatter_field",
+            message:
+              "Frontmatter field #{field} is a legacy or ignored skill field. Move versioning to plugin metadata and describe activation with description/when_to_use.",
+            path: skill_path,
+            skill_name: skill_name
+          }
+        end)
+
+      unsupported_diagnostics =
+        Enum.map(unsupported, fn field ->
+          %SkillDiagnostic{
+            level: "warn",
+            code: "unsupported_frontmatter_field",
+            message:
+              "Frontmatter field #{field} is not part of the supported Agent Skills metadata surface and may be ignored by host agents.",
+            path: skill_path,
+            skill_name: skill_name
+          }
+        end)
+
+      activation_diagnostics =
+        case activation_text_length(meta) do
+          length when length > @activation_text_limit ->
+            [
+              %SkillDiagnostic{
+                level: "warn",
+                code: "activation_metadata_too_long",
+                message:
+                  "description + when_to_use is #{length} characters; keep activation metadata at or below #{@activation_text_limit} characters so hosts can load it cheaply.",
+                path: skill_path,
+                skill_name: skill_name
+              }
+            ]
+
+          _ ->
+            []
+        end
+
+      legacy_diagnostics ++ unsupported_diagnostics ++ activation_diagnostics
+    end
+  end
+
+  defp activation_text_length(meta) do
+    meta
+    |> Map.take(["description", "when_to_use"])
+    |> Map.values()
+    |> Enum.map(&to_string/1)
+    |> Enum.map(&String.length/1)
+    |> Enum.sum()
   end
 
   defp quality_diagnostics(meta, body, skill_path, skill_name) do

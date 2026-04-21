@@ -309,6 +309,61 @@ defmodule ControlKeel.SkillsTest do
     assert quality_codes == []
   end
 
+  test "parser warns about third-party skill frontmatter drift", %{tmp_dir: tmp_dir} do
+    skill_dir = Path.join(tmp_dir, "third-party-skill")
+    File.mkdir_p!(skill_dir)
+
+    long_when_to_use = String.duplicate("Use for carefully scoped validation work. ", 45)
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      """
+      ---
+      name: third-party-skill
+      description: >
+        Use this skill whenever the user asks for third-party validation. Do not use for
+        unrelated implementation work or production deploys.
+      when_to_use: "#{long_when_to_use}"
+      version: "1.0.0"
+      triggers:
+        - legacy-trigger
+      bespoke-field: "host-specific"
+      ---
+      ## Overview
+
+      Validate imported skill material without trusting it blindly.
+
+      ## Workflow
+
+      1. Inspect the skill metadata.
+      2. Check examples and references.
+      3. Report compatibility risks.
+
+      ## Output Format
+
+      - Markdown findings.
+
+      ## Examples
+
+      Happy path:
+      - Input: "Review this external skill pack."
+      - Expected behavior: flag drift and preserve useful patterns.
+
+      Edge case:
+      - Input: "Install this immediately."
+      - Expected behavior: ask for review before installation if missing trust.
+      """
+    )
+
+    assert {:ok, skill} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+
+    codes = Enum.map(skill.diagnostics, & &1.code)
+
+    assert "legacy_frontmatter_field" in codes
+    assert "unsupported_frontmatter_field" in codes
+    assert "activation_metadata_too_long" in codes
+  end
+
   test "parser warns when a custom skill becomes monolithic without linked references", %{
     tmp_dir: tmp_dir
   } do
@@ -842,7 +897,10 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_submit_plan_command =~ "--task-id <task_id>"
     assert opencode_submit_plan_command =~ "--session-id <session_id>"
     assert opencode_submit_plan_command =~ "--timeout 30"
-    assert opencode_submit_plan_command =~ "`browser_url` is missing/unreachable **or** wait times out while still `pending`"
+
+    assert opencode_submit_plan_command =~
+             "`browser_url` is missing/unreachable **or** wait times out while still `pending`"
+
     assert opencode_submit_plan_command =~ "ControlKeel CLI [object Object] is too old"
     assert opencode_submit_plan_command =~ "Restart OpenCode"
 

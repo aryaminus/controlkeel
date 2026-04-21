@@ -236,6 +236,19 @@ So the recommended model is:
 
 This is also why CK has explicit trust-boundary findings around untrusted skill instruction and high-impact actions sourced from mixed or untrusted context. Skills remain useful, but they are still governed inputs.
 
+### Third-party skill-pack evaluation
+
+The `intertwine/dspy-agent-skills` repository is a useful external pattern for evaluating skill packs without importing their domain-specific content into CK. The transferable lesson is packaging discipline:
+
+- keep startup metadata small and load deeper references only after activation
+- make activation text specific enough to trigger reliably, but short enough for hosts to load cheaply
+- put source-grounded procedural claims in `SKILL.md` or linked references, not vague marketing copy
+- ship offline or dry-run examples so the package can be smoke-tested without secrets or paid provider calls
+- add regression guards for known teaching-material mistakes, especially stale APIs and examples that would make an agent write broken code
+- keep versioning and marketplace metadata in plugin manifests rather than legacy skill-frontmatter fields
+
+For CK, third-party skill material should enter as evidence and patterns first. If the pack changes behavior, treat it like any other governed extension: run parser validation, inspect references/examples, record provenance, and require the normal review gate before it can influence high-impact actions.
+
 ACP registry support is supplemental only:
 
 - `controlkeel registry sync acp`
