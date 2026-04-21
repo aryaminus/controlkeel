@@ -28,6 +28,20 @@ Treat this as one external data point, not a universal performance claim. The tr
 - prefer diverse training coverage; tiny narrow sets can overfit and regress on unseen cases
 - promote only when held-out evidence improves without safety/regression backslide
 
+## External optimizer interoperability (hone-style pattern)
+
+The `twaldin/hone` project adds a useful interoperability pattern for CK benchmark operators: keep optimization outside the governed scorer, but preserve enough run context for reproducibility and promotion decisions.
+
+Recommended practice when importing external optimizer runs:
+
+- keep one stable scalar score channel (for ranking) and one structured trace channel (for diagnosis)
+- capture scorer contract details in metadata (for example: `score_source`, `trace_format`, `trace_count`)
+- record optimizer context in metadata (for example: `optimizer_framework`, `mutator`, `target_scope`, `scheduler_strategy`, `observer_mode`)
+- if observer/context-updating loops are used, require a rollback guard in promotion notes (for example, revert observer updates when rolling quality drops)
+- promote only when held-out evidence improves across multiple samples and safety/regression expectations still pass
+
+This is aligned with CK’s evidence-first posture: external optimizers can search freely, but CK remains the promotion gate and audit trail.
+
 ## Blessed external comparison
 
 The recommended first external comparison path is:
@@ -172,3 +186,4 @@ For GEPA-style text optimization specifically:
 - enforce zero overlap between optimization/training cases and held-out promotion cases
 - run multi-sample candidate evaluations (not single-run score snapshots) before promotion
 - use CK exports and run metadata as the audit trail for what changed and why it was promoted
+- include optimizer-run metadata (for example scheduler/observer/target-scope settings) so later comparisons stay apples-to-apples
