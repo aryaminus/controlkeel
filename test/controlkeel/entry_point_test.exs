@@ -17,6 +17,8 @@ defmodule ControlKeel.EntryPointTest do
     previous_application_start_fun =
       Application.get_env(:controlkeel, :entry_point_application_start_fun)
 
+    previous_endpoint_config = Application.get_env(:controlkeel, ControlKeelWeb.Endpoint)
+
     previous_logger_handler = :logger.get_handler_config(:default)
 
     on_exit(fn ->
@@ -56,6 +58,12 @@ defmodule ControlKeel.EntryPointTest do
         )
       else
         Application.delete_env(:controlkeel, :entry_point_application_start_fun)
+      end
+
+      if previous_endpoint_config do
+        Application.put_env(:controlkeel, ControlKeelWeb.Endpoint, previous_endpoint_config)
+      else
+        Application.delete_env(:controlkeel, ControlKeelWeb.Endpoint)
       end
 
       case previous_logger_handler do
@@ -123,6 +131,49 @@ defmodule ControlKeel.EntryPointTest do
       assert {:ok, _pid} = ControlKeel.EntryPoint.start(:normal, [])
     end)
 
+    assert_receive {:halted, 0}
+  end
+
+  test "non-server standalone commands disable endpoint watchers and reloader" do
+    parent = self()
+
+    System.put_env("__BURRITO", "1")
+
+    Application.put_env(:controlkeel, :cli_plain_arguments_provider, fn ->
+      [~c"attach", ~c"doctor", ~c"--project-root", ~c"/tmp"]
+    end)
+
+    Application.put_env(:controlkeel, ControlKeelWeb.Endpoint,
+      watchers: [tailwind: {Tailwind, :install_and_run, [:controlkeel, ~w(--watch)]}],
+      code_reloader: true,
+      live_reload: [web_console_logger: true, patterns: [~r"foo"]],
+      server: true
+    )
+
+    Application.put_env(:controlkeel, :entry_point_application_start_fun, fn ->
+      send(parent, {:endpoint_config, Application.get_env(:controlkeel, ControlKeelWeb.Endpoint)})
+      {:ok, self()}
+    end)
+
+    Application.put_env(:controlkeel, :entry_point_execute_fun, fn parsed ->
+      send(parent, {:executed, parsed})
+      0
+    end)
+
+    Application.put_env(:controlkeel, :entry_point_halt_fun, fn exit_code ->
+      send(parent, {:halted, exit_code})
+      :ok
+    end)
+
+    assert {:ok, _pid} = ControlKeel.EntryPoint.start(:normal, [])
+
+    assert_receive {:endpoint_config, endpoint_config}
+    assert endpoint_config[:watchers] == []
+    assert endpoint_config[:code_reloader] == false
+    assert endpoint_config[:server] == false
+    assert endpoint_config[:live_reload] == [web_console_logger: false, patterns: []]
+
+    assert_receive {:executed, %{command: :attach_doctor}}
     assert_receive {:halted, 0}
   end
 

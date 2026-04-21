@@ -16,6 +16,18 @@ That also makes it the right outer loop for GEPA-style optimization work:
 - bring the candidate back through CK benchmark and policy-training surfaces
 - promote only when the candidate improves held-out evidence, not just the visible optimization split
 
+## External signal: GEPA holdout transfer (single external study)
+
+An external write-up by Tim Waldin (Apr 2026) reported that GEPA-driven prompt evolution improved a Claude Haiku bug-fix benchmark from **0.6496 to 0.8462 on an unseen holdout** (**+0.1966**, 9 unseen bugs, 3 samples per prompt), with no train/holdout overlap in that setup. Source: Tim Waldin, "Using GEPA to hone Claude Haiku on GitHub bug fixes (+20% solve on untrained bugs)" (tim.waldin.net, 2026-04-19).
+
+Treat this as one external data point, not a universal performance claim. The transferable lesson for CK is benchmark hygiene and promotion discipline:
+
+- preserve strict optimization vs held-out split boundaries
+- require explicit overlap checks between training/optimization and holdout scenarios
+- use multi-sample evaluation before promotion (for example, multiple seeds/samples per candidate)
+- prefer diverse training coverage; tiny narrow sets can overfit and regress on unseen cases
+- promote only when held-out evidence improves without safety/regression backslide
+
 ## Blessed external comparison
 
 The recommended first external comparison path is:
@@ -157,4 +169,6 @@ For GEPA-style text optimization specifically:
 
 - treat prompts, system instructions, and lightweight text configs as candidate artifacts
 - keep the optimizer outside the governed scoring surface
+- enforce zero overlap between optimization/training cases and held-out promotion cases
+- run multi-sample candidate evaluations (not single-run score snapshots) before promotion
 - use CK exports and run metadata as the audit trail for what changed and why it was promoted

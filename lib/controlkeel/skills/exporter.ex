@@ -6267,6 +6267,11 @@ defmodule ControlKeel.Skills.Exporter do
                 status: "pending",
                 feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
                 timedOut: true,
+                waitSkipped: false,
+                manualApprovalRequired: true,
+                reason: "review_timeout",
+                guidance:
+                  "Plan review is still pending after timeout. Show the `browser_url` to the user if reachable. If browser review is unavailable or the user explicitly approves in chat, record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat after timeout/browser issue\" --json` (or `ck_review_feedback`) before proceeding.",
               }
             }
 
@@ -6421,7 +6426,7 @@ defmodule ControlKeel.Skills.Exporter do
     3. Run `controlkeel review plan submit --body-file .opencode/review-plan.md --submitted-by opencode --task-id <task_id> --json` (or use `--session-id <session_id>`)
     4. Read the returned `review.id` and `browser_url`
     5. If `browser_url` is available, wait with `controlkeel review plan wait --id <review_id> --timeout 30 --json`
-    6. If `browser_url` is missing/unreachable, do **not** loop on wait; ask for explicit user approval in chat and record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes "User approved in chat; browser unavailable" --json` (or `ck_review_feedback`)
+    6. If `browser_url` is missing/unreachable **or** wait times out while still `pending`, do **not** loop on wait; ask for explicit user approval in chat and record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes "User approved in chat; browser unavailable or timed out" --json` (or `ck_review_feedback`)
     7. Do not execute until the review is approved
 
     Fallback when the `submit_plan` tool is stale in a long-running OpenCode session:
@@ -6840,6 +6845,11 @@ defmodule ControlKeel.Skills.Exporter do
                 status: "pending",
                 feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
                 timedOut: true,
+                waitSkipped: false,
+                manualApprovalRequired: true,
+                reason: "review_timeout",
+                guidance:
+                  "Plan review is still pending after timeout. Show the `browser_url` to the user if reachable. If browser review is unavailable or the user explicitly approves in chat, record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat after timeout/browser issue\" --json` (or `ck_review_feedback`) before proceeding.",
               }
             }
 

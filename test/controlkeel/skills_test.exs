@@ -806,6 +806,8 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ "controlkeel review plan open"
     assert opencode_plugin =~ "waitSkipped: true"
     assert opencode_plugin =~ "manualApprovalRequired: true"
+    assert opencode_plugin =~ ~S|reason: "review_timeout"|
+    assert opencode_plugin =~ "User approved in chat after timeout/browser issue"
 
     assert opencode_plugin =~
              ~S|reason: !browserUrl ? "browser_url_unavailable" : "browser_unreachable"|
@@ -840,7 +842,7 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_submit_plan_command =~ "--task-id <task_id>"
     assert opencode_submit_plan_command =~ "--session-id <session_id>"
     assert opencode_submit_plan_command =~ "--timeout 30"
-    assert opencode_submit_plan_command =~ "`browser_url` is missing/unreachable"
+    assert opencode_submit_plan_command =~ "`browser_url` is missing/unreachable **or** wait times out while still `pending`"
     assert opencode_submit_plan_command =~ "ControlKeel CLI [object Object] is too old"
     assert opencode_submit_plan_command =~ "Restart OpenCode"
 

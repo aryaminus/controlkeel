@@ -25,6 +25,7 @@ defmodule ControlKeel.EntryPoint do
         ensure_standalone_logger_stderr()
         maybe_prepare_stdio_mcp!(parsed)
         maybe_prepare_machine_output!(parsed)
+        maybe_prepare_non_server_endpoint!(parsed)
 
         if CLI.app_required?(parsed) do
           maybe_enable_server(parsed)
@@ -92,6 +93,22 @@ defmodule ControlKeel.EntryPoint do
   defp maybe_prepare_machine_output!(parsed) do
     if System.get_env("LOGGER_LEVEL") in [nil, ""] and machine_output?(parsed) do
       Application.put_env(:logger, :level, :warning)
+    end
+  end
+
+  defp maybe_prepare_non_server_endpoint!(parsed) do
+    if CLI.app_required?(parsed) and not CLI.server_mode?(parsed) do
+      endpoint_config = Application.get_env(:controlkeel, ControlKeelWeb.Endpoint, [])
+
+      Application.put_env(
+        :controlkeel,
+        ControlKeelWeb.Endpoint,
+        endpoint_config
+        |> Keyword.put(:watchers, [])
+        |> Keyword.put(:code_reloader, false)
+        |> Keyword.put(:live_reload, web_console_logger: false, patterns: [])
+        |> Keyword.put(:server, false)
+      )
     end
   end
 
