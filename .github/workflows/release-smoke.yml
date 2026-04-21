@@ -20,7 +20,7 @@ env:
   CK_RELEASE_BURRITO: "1"
 
 jobs:
-  build-unix-and-windows:
+  build-linux:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
@@ -51,23 +51,66 @@ jobs:
       - run: mix assets.deploy
       - name: Build and smoke Linux
         run: |
+          mkdir -p release_stage/raw/linux release_stage/raw/linux-arm
           BURRITO_TARGET=linux mix release --overwrite
           chmod +x scripts/release_smoke.sh
           scripts/release_smoke.sh "burrito_out/controlkeel_linux"
-
-          mkdir -p release_stage/raw/linux release_stage/raw/linux-arm release_stage/raw/windows
           cp burrito_out/controlkeel_linux release_stage/raw/linux/controlkeel-linux-x86_64
 
           BURRITO_TARGET=linux_arm64 mix release --overwrite
           cp burrito_out/controlkeel_linux_arm64 release_stage/raw/linux-arm/controlkeel-linux-arm64
-      - name: Build Windows binary
-        run: |
-          BURRITO_TARGET=windows mix release --overwrite
-          cp burrito_out/controlkeel_windows.exe release_stage/raw/windows/controlkeel-windows-x86_64.exe
+
       - uses: actions/upload-artifact@v7
         with:
-          name: raw-linux-windows
-          path: release_stage/raw
+          name: raw-linux
+          path: release_stage/raw/linux
+          retention-days: 5
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: raw-linux-arm
+          path: release_stage/raw/linux-arm
+          retention-days: 5
+
+  build-windows:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1.23.0
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "27.3.4.3"
+      - name: Cache deps and build outputs
+        uses: actions/cache@v5
+        with:
+          path: |
+            deps
+            _build
+            ~/.hex
+            ~/.mix
+          key: ${{ runner.os }}-release-smoke-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-release-smoke-
+      - name: Install Zig 0.15.2
+        run: |
+          chmod +x scripts/install_zig.sh
+          scripts/install_zig.sh 0.15.2 >/dev/null
+          echo "/usr/local/zig" >> "$GITHUB_PATH"
+      - run: sudo apt-get update && sudo apt-get install -y xz-utils p7zip-full
+      - run: mix deps.get
+      - run: mix assets.deploy
+      - name: Build Windows binary
+        run: |
+          mkdir -p release_stage/raw/windows
+          BURRITO_TARGET=windows mix release --overwrite
+          cp burrito_out/controlkeel_windows.exe release_stage/raw/windows/controlkeel-windows-x86_64.exe
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: raw-windows
+          path: release_stage/raw/windows
           retention-days: 5
 
   build-macos:
@@ -124,13 +167,13 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
     runs-on: windows-latest
-    needs: build-unix-and-windows
+    needs: build-windows
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
-          name: raw-linux-windows
-          path: release_stage/raw
+          name: raw-windows
+          path: release_stage/raw/windows
       - name: Smoke test Windows binary
         timeout-minutes: 10
         shell: pwsh
@@ -141,7 +184,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
-    needs: [build-unix-and-windows, build-macos, windows-smoke]
+    needs: [build-linux, build-windows, build-macos, windows-smoke]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -162,8 +205,16 @@ jobs:
       - run: mix deps.get
       - uses: actions/download-artifact@v8
         with:
-          name: raw-linux-windows
-          path: release_stage/raw
+          name: raw-linux
+          path: release_stage/raw/linux
+      - uses: actions/download-artifact@v8
+        with:
+          name: raw-linux-arm
+          path: release_stage/raw/linux-arm
+      - uses: actions/download-artifact@v8
+        with:
+          name: raw-windows
+          path: release_stage/raw/windows
       - uses: actions/download-artifact@v8
         with:
           name: raw-macos
