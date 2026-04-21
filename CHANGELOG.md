@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.40 — 2026-04-21
+
+### What's changed
+
+- feat: add interoperability guidelines for external optimizers in benchmarks documentation
+- feat: enhance non-server endpoint configuration and update review timeout handling
+
 ## v0.2.39 — 2026-04-21
 
 ### What's changed
