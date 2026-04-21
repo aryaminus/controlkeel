@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.38 — 2026-04-21
+
+### What's changed
+
+- ci: parallelize release smoke linux and windows builds
+
 ## v0.2.37 — 2026-04-20
 
 ### What's changed
