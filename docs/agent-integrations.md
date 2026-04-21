@@ -249,6 +249,27 @@ The `intertwine/dspy-agent-skills` repository is a useful external pattern for e
 
 For CK, third-party skill material should enter as evidence and patterns first. If the pack changes behavior, treat it like any other governed extension: run parser validation, inspect references/examples, record provenance, and require the normal review gate before it can influence high-impact actions.
 
+### Persistent role files and daemon-style policy
+
+Charlie Labs' DAEMON.md docs are a useful external pattern for recurring operational roles without importing Charlie-specific runtime claims into CK. The transferable idea is the repo-owned role contract: a file such as `.agents/daemons/<daemon-id>/DAEMON.md` defines what wakes a role, what it may do, what it must not do, and what evidence it should leave behind.
+
+The important shape is:
+
+- keep the role narrow, explicit, concise, and predictable
+- require a clear identity and purpose, concrete routines, and at least one wake source such as `watch` or `schedule`
+- use hard `deny` boundaries for nearby risky shortcuts such as merging PRs, pushing to protected branches, deleting files, or publishing externally visible docs
+- put judgment-shaping guidance in the markdown body, especially Policy, Limits, Scope, Output Format, Verify, Report, Coordination, and Ignore patterns
+- treat repeated activation as a trust problem: bounded volume, resumable state, verification output, and focused approval questions matter more than broad prompt prose
+
+For CK, this maps to governed recurring work rather than to always-loaded agent context:
+
+- `AGENTS.md` remains durable repo policy
+- `SKILL.md` remains an explicitly invoked task workflow
+- hooks and automations should carry specific lifecycle triggers, approval checkpoints, and validation/reporting requirements
+- any daemon-style role policy should be reviewed like automation code before it can steer high-impact work
+
+Do not mix these surfaces casually. In particular, do not put daemon-only frontmatter such as `id`, `purpose`, `watch`, `routines`, `deny`, or `schedule` into Agent Skills metadata and assume hosts will honor it. CK parser diagnostics warn on that pattern so the role contract can stay in a daemon/automation surface while `SKILL.md` stays focused on explicit activation.
+
 ACP registry support is supplemental only:
 
 - `controlkeel registry sync acp`

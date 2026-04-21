@@ -29,6 +29,7 @@ defmodule ControlKeel.Skills.Parser do
     when_to_use
   )
   @legacy_frontmatter_fields ~w(triggers version dspy-compatibility dspy-version)
+  @daemon_frontmatter_fields ~w(id purpose watch routines deny schedule)
 
   def parse(skill_path, scope) do
     with {:ok, content} <- File.read(skill_path),
@@ -323,7 +324,12 @@ defmodule ControlKeel.Skills.Parser do
         |> Enum.reject(&(&1 in @supported_frontmatter_fields))
 
       legacy = Enum.filter(unsupported, &(&1 in @legacy_frontmatter_fields))
-      unsupported = unsupported -- legacy
+      daemon = Enum.filter(unsupported, &(&1 in @daemon_frontmatter_fields))
+
+      unsupported =
+        unsupported
+        |> Enum.reject(&(&1 in legacy))
+        |> Enum.reject(&(&1 in daemon))
 
       legacy_diagnostics =
         Enum.map(legacy, fn field ->
@@ -349,6 +355,18 @@ defmodule ControlKeel.Skills.Parser do
           }
         end)
 
+      daemon_diagnostics =
+        Enum.map(daemon, fn field ->
+          %SkillDiagnostic{
+            level: "warn",
+            code: "daemon_frontmatter_in_skill",
+            message:
+              "Frontmatter field #{field} is part of a persistent role/daemon contract, not Agent Skills metadata. Keep recurring role policy in a DAEMON.md-style surface and keep SKILL.md focused on explicit task activation.",
+            path: skill_path,
+            skill_name: skill_name
+          }
+        end)
+
       activation_diagnostics =
         case activation_text_length(meta) do
           length when length > @activation_text_limit ->
@@ -367,7 +385,8 @@ defmodule ControlKeel.Skills.Parser do
             []
         end
 
-      legacy_diagnostics ++ unsupported_diagnostics ++ activation_diagnostics
+      legacy_diagnostics ++
+        unsupported_diagnostics ++ daemon_diagnostics ++ activation_diagnostics
     end
   end
 

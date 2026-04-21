@@ -364,6 +364,56 @@ defmodule ControlKeel.SkillsTest do
     assert "activation_metadata_too_long" in codes
   end
 
+  test "parser warns when daemon role fields are used as skill metadata", %{tmp_dir: tmp_dir} do
+    skill_dir = Path.join(tmp_dir, "docs-librarian")
+    File.mkdir_p!(skill_dir)
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      """
+      ---
+      name: docs-librarian
+      description: Use this skill when asked to review documentation upkeep workflows. Do not use for direct production publishing.
+      id: docs-librarian
+      purpose: Keep docs aligned with shipped behavior.
+      watch:
+        - when a pull request is merged
+      routines:
+        - propose docs updates for changed behavior
+      deny:
+        - publish externally visible docs
+      schedule: "0 9 * * *"
+      ---
+      ## Workflow
+
+      1. Review the requested documentation workflow.
+      2. Identify missing verification or approval gates.
+      3. Return focused recommendations.
+
+      ## Output Format
+
+      - Findings
+      - Suggested edits
+
+      ## Examples
+
+      Good:
+      - Input: "Review this docs maintenance role."
+      - Expected behavior: warn if role fields are mixed into skill metadata.
+      """
+    )
+
+    assert {:ok, skill} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+
+    refute Enum.any?(skill.diagnostics, &(&1.code == "unsupported_frontmatter_field"))
+
+    assert skill.diagnostics
+           |> Enum.filter(&(&1.code == "daemon_frontmatter_in_skill"))
+           |> Enum.map(& &1.message)
+           |> tap(fn messages -> assert length(messages) == 6 end)
+           |> Enum.any?(&String.contains?(&1, "DAEMON.md-style surface"))
+  end
+
   test "parser warns when a custom skill becomes monolithic without linked references", %{
     tmp_dir: tmp_dir
   } do
@@ -505,6 +555,15 @@ defmodule ControlKeel.SkillsTest do
 
     assert Map.has_key?(codex_hooks["hooks"], "PostToolUse")
     assert Map.has_key?(codex_hooks["hooks"], "UserPromptSubmit")
+
+    codex_prompt_hook = Path.join(codex_plan.output_dir, ".codex/hooks/ck-user-prompt-submit.sh")
+
+    assert prompt_hook_output(codex_prompt_hook, "Use task-scoped review context") == ""
+
+    assert prompt_hook_output(
+             codex_prompt_hook,
+             "Use " <> ("sk-" <> String.duplicate("a", 24)) <> " for this request"
+           ) =~ "Potential secret material detected"
 
     assert {:ok, codex_plugin_plan} = Skills.export("codex-plugin", tmp_dir, scope: "export")
     assert File.exists?(Path.join(codex_plugin_plan.output_dir, ".codex-plugin/plugin.json"))
@@ -1548,5 +1607,17 @@ defmodule ControlKeel.SkillsTest do
              "${workspaceFolder}/bin/controlkeel-mcp"
 
     assert get_in(mcp, ["mcpServers", "controlkeel", "args"]) == []
+  end
+
+  defp prompt_hook_output(hook_path, prompt) do
+    input = Jason.encode!(%{"prompt" => prompt})
+
+    {output, 0} =
+      System.cmd("sh", ["-c", "printf '%s' \"$PROMPT_INPUT\" | sh \"$HOOK_PATH\""],
+        env: [{"PROMPT_INPUT", input}, {"HOOK_PATH", hook_path}],
+        stderr_to_stdout: true
+      )
+
+    output
   end
 end
