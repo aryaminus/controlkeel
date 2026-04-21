@@ -89,6 +89,8 @@ Two operational notes matter in practice:
 1. Codex only loads project-scoped `.codex/` config and hooks when the project is trusted.
 2. Restart Codex after `controlkeel attach codex-cli` or `controlkeel plugin install codex` so new hooks, custom agents, and marketplace state are reloaded.
 
+Those two checkpoints are intentionally human-visible. A setup agent can prepare the repo-local CK surface, but it should still stop and ask the user to trust the project or restart Codex instead of claiming the integration is fully live before Codex can load the changes.
+
 The generated Codex custom-agent set now includes:
 
 - `controlkeel-operator` for general governed execution

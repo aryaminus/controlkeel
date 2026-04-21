@@ -118,6 +118,8 @@ Likewise, CK now models `t3code` as a first-class runtime surface (still bootstr
 
 The important practical consequence is that there is still no separate `controlkeel attach codex-app-server` command. If a team is building on top of Codex app-server, the correct CK setup is still `controlkeel attach codex-cli`, because that is what installs the governed `.codex/*` repo surface that app-server-powered clients consume.
 
+If another agent is driving setup on the user's behalf, that agent should still pause for the same Codex checkpoints a human would need to handle: trust the repo if Codex is ignoring project-scoped `.codex/*`, restart Codex after attach or plugin changes, and ask for manual approval if a CK review gate cannot be cleared automatically.
+
 From there the layers split cleanly:
 
 - Codex app-server owns thread lifecycle, approvals, conversation history, and host-side auth/account behavior

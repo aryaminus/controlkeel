@@ -69,7 +69,7 @@ controlkeel setup
 
 That bootstraps the governed project binding, detects likely local hosts, shows provider state, and suggests the next attach or runtime-export commands.
 
-Then attach an agent. If you want the fastest first-run path today, OpenCode is now a blessed target:
+Then attach an agent. Start with the strongest active supported path for the current workspace rather than attaching every detected host up front. If you want the fastest first-run path today, OpenCode is now a blessed target:
 
 ```bash
 controlkeel attach opencode
@@ -104,6 +104,24 @@ Important setup rule:
 
 - agent install scope can be user/global for some clients
 - governed project binding stays project-local by design so each repo keeps its own proofs, policy context, and MCP wrapper
+
+User-intervention checkpoints:
+
+- if the host blocks repo-local config or MCP loading until the workspace is trusted, stop and ask the user to trust the repo/workspace first
+- if the host requires a restart after attach or plugin changes, stop and ask the user to restart it before continuing validation
+- if `controlkeel provider doctor` still resolves to heuristic mode and the workspace needs model-backed CK features, ask the user to confirm a provider bridge, CK-owned provider profile, or local Ollama path
+- if a plan review cannot auto-wait to `approved`, ask the user for explicit approval and record that instead of pretending the gate is cleared
+
+The smallest dependable verification loop after attach is:
+
+```bash
+controlkeel attach doctor
+controlkeel provider doctor
+controlkeel status
+controlkeel findings
+```
+
+Then run the host-specific MCP check, such as `opencode mcp list` for OpenCode or the relevant host-native MCP inspection command.
 
 ## 3. Configure provider access if needed
 
@@ -140,6 +158,8 @@ controlkeel provider default openai
 ```
 
 This is the path for vLLM, SGLang, LM Studio, Hugging Face Inference Providers, and Codestral-compatible endpoints. CK accepts base URLs with or without a trailing `/v1`.
+
+If `controlkeel provider doctor` still reports `heuristic`, CK governance and MCP flows still work, but advisory review and other model-backed CK features remain limited until you confirm one of the provider paths above.
 
 CK now treats routed and custom gateway paths as explicit trust boundaries rather than transparent drop-ins. `controlkeel provider show` and `controlkeel provider doctor` report:
 

@@ -452,7 +452,7 @@ And **never** do this:
 This project is governed by ControlKeel. Prefer the ControlKeel MCP server for validation, findings, budgets, proof context, workspace snapshots, transcript state, and routing.
 
 Project root: this repository (your IDE workspace / `CK_PROJECT_ROOT`)
-Target: `opencode`
+Target: `codex`
 Primary CK loop: `ck_context -> ck_validate -> ck_review_submit/ck_finding -> ck_budget/ck_route/ck_delegate`
 
 Required workflow:
