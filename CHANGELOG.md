@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.39 — 2026-04-21
+
+### What's changed
+
+- fix: update documentation for Codex integration and user checkpoints
+
 ## v0.2.38 — 2026-04-21
 
 ### What's changed
