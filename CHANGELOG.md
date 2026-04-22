@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.42 — 2026-04-22
+
+### What's changed
+
+- Enhance promotion integrity checks and decision prompts across modules
+
 ## v0.2.41 — 2026-04-21
 
 ### What's changed
