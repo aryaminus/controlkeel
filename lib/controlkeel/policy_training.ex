@@ -422,10 +422,7 @@ defmodule ControlKeel.PolicyTraining do
         "held-out average overhead is more than 10% worse than heuristic baseline"
       )
 
-    %{
-      "eligible" => reasons == [],
-      "reasons" => reasons
-    }
+    gates_with_integrity(reasons, evaluation)
   end
 
   defp promotion_gates("budget_hint", evaluation) do
@@ -444,9 +441,71 @@ defmodule ControlKeel.PolicyTraining do
         "held-out false-positive rate is above the configured ceiling"
       )
 
+    gates_with_integrity(reasons, evaluation)
+  end
+
+  def promotion_integrity(evaluation) when is_map(evaluation) do
+    training = metric_map(evaluation, :training_metrics, "training_metrics")
+    validation = metric_map(evaluation, :validation_metrics, "validation_metrics")
+    held_out = metric_map(evaluation, :held_out_metrics, "held_out_metrics")
+    baseline = metric_map(evaluation, :baseline_metrics, "baseline_metrics")
+
+    evidence_channels =
+      []
+      |> maybe_integrity_channel(map_size(training) > 0, "training")
+      |> maybe_integrity_channel(map_size(validation) > 0, "validation")
+      |> maybe_integrity_channel(map_size(held_out) > 0, "held_out")
+      |> maybe_integrity_channel(map_size(baseline) > 0, "baseline")
+      |> Enum.reverse()
+
+    warnings =
+      []
+      |> maybe_integrity_warning(map_size(held_out) > 0, "missing_holdout_evidence")
+      |> maybe_integrity_warning(map_size(validation) > 0, "missing_validation_evidence")
+      |> maybe_integrity_warning(map_size(baseline) > 0, "missing_baseline_evidence")
+      |> Enum.reverse()
+
     %{
-      "eligible" => reasons == [],
-      "reasons" => reasons
+      "status" => if(warnings == [], do: "ready", else: "warn"),
+      "evidence_channels" => evidence_channels,
+      "warnings" => warnings
+    }
+  end
+
+  def integrity_findings(integrity_or_evaluation, attrs \\ %{})
+      when is_map(integrity_or_evaluation) do
+    integrity =
+      if Map.has_key?(integrity_or_evaluation, "warnings") do
+        integrity_or_evaluation
+      else
+        promotion_integrity(integrity_or_evaluation)
+      end
+
+    Enum.map(integrity["warnings"] || [], fn warning ->
+      %{
+        "category" => "governance-product",
+        "severity" => "medium",
+        "rule_id" => "policy_training.#{warning}",
+        "title" => policy_integrity_title(warning),
+        "plain_message" => policy_integrity_message(warning),
+        "metadata" =>
+          Map.merge(attrs, %{
+            "diagnostic_source" => "policy_training_promotion_integrity",
+            "promotion_integrity" => integrity
+          })
+      }
+    end)
+  end
+
+  defp gates_with_integrity(reasons, evaluation) do
+    integrity = promotion_integrity(evaluation)
+    integrity_warnings = integrity["warnings"] || []
+
+    %{
+      "eligible" => reasons == [] and integrity_warnings == [],
+      "reasons" => reasons ++ integrity_warnings,
+      "integrity" => integrity,
+      "diagnostic_findings" => integrity_findings(integrity)
     }
   end
 
@@ -521,6 +580,36 @@ defmodule ControlKeel.PolicyTraining do
 
   defp maybe_gate_reason(reasons, true, _reason), do: reasons
   defp maybe_gate_reason(reasons, false, reason), do: [reason | reasons]
+
+  defp maybe_integrity_channel(channels, true, channel), do: [channel | channels]
+  defp maybe_integrity_channel(channels, false, _channel), do: channels
+
+  defp maybe_integrity_warning(warnings, true, _warning), do: warnings
+  defp maybe_integrity_warning(warnings, false, warning), do: [warning | warnings]
+
+  defp metric_map(evaluation, atom_key, string_key) do
+    value = Map.get(evaluation, atom_key) || Map.get(evaluation, string_key)
+    if is_map(value), do: value, else: %{}
+  end
+
+  defp policy_integrity_title("missing_holdout_evidence"), do: "Missing held-out evidence"
+  defp policy_integrity_title("missing_validation_evidence"), do: "Missing validation evidence"
+  defp policy_integrity_title("missing_baseline_evidence"), do: "Missing baseline evidence"
+  defp policy_integrity_title(warning), do: warning
+
+  defp policy_integrity_message("missing_holdout_evidence") do
+    "Policy promotion is missing held-out metrics, so the candidate may be overfit to visible training data."
+  end
+
+  defp policy_integrity_message("missing_validation_evidence") do
+    "Policy promotion is missing validation metrics, so the candidate lacks an intermediate regression check."
+  end
+
+  defp policy_integrity_message("missing_baseline_evidence") do
+    "Policy promotion is missing baseline comparison metrics, so improvement over current behavior is not established."
+  end
+
+  defp policy_integrity_message(warning), do: "Policy promotion integrity warning: #{warning}."
 
   defp env_float(name, default) do
     case System.get_env(name) do

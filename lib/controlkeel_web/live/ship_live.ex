@@ -275,6 +275,12 @@ defmodule ControlKeelWeb.ShipLive do
                 <:col :let={session} label="Outcome">
                   {session.goal_type}
                 </:col>
+                <:col :let={session} label="Constraint">
+                  <div>
+                    <span class="ck-note">{session.bottleneck_primary}</span>
+                    <p class="ck-note">ownership {session.ownership_risk}</p>
+                  </div>
+                </:col>
                 <:col :let={session} label="First finding">
                   {format_duration(session.time_to_first_finding_seconds)}
                 </:col>
@@ -340,10 +346,13 @@ defmodule ControlKeelWeb.ShipLive do
       row = Map.get(rows_by_session, session.id, %{})
       autonomy = AutonomyLoop.session_autonomy_profile(session)
       outcome = AutonomyLoop.session_outcome_profile(session)
+      improvement = AutonomyLoop.session_improvement_loop(session)
 
       Map.merge(row, %{
         autonomy_mode: autonomy["label"],
-        goal_type: outcome["label"]
+        goal_type: outcome["label"],
+        bottleneck_primary: get_in(improvement, ["bottleneck_summary", "primary"]) || "none",
+        ownership_risk: get_in(improvement, ["ownership_summary", "risk"]) || "clear"
       })
     end)
     |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})

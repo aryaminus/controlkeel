@@ -100,6 +100,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
 
     assert html =~ "Scenario matrix"
     assert html =~ "Catch rate"
+    assert html =~ "Promotion integrity"
     assert has_element?(view, "#benchmark-matrix")
     assert has_element?(view, "#scenario-hr_discriminatory_candidate_filter")
     assert has_element?(view, "a[href=\"/api/v1/benchmarks/runs/#{run.id}/export?format=csv\"]")

@@ -128,6 +128,7 @@ defmodule ControlKeel.WorkspaceContext do
         "signals" => [],
         "large_files" => [],
         "recent_hotspots" => [],
+        "complexity_budget" => complexity_budget([], [], []),
         "summary" => "Design drift unavailable."
       },
       "summary_text" => "Workspace context unavailable.",
@@ -219,14 +220,83 @@ defmodule ControlKeel.WorkspaceContext do
     large_files = large_file_signals(repo_root)
     hotspots = recent_hotspots(repo_root)
     signals = drift_signals(status_counts, large_files, hotspots)
+    complexity_budget = complexity_budget(signals, large_files, hotspots)
 
     %{
       "high_risk" => Enum.any?(signals, &(&1["severity"] == "high")),
       "signals" => signals,
       "large_files" => large_files,
       "recent_hotspots" => hotspots,
+      "complexity_budget" => complexity_budget,
+      "diagnostic_findings" =>
+        complexity_budget_findings(%{
+          "signals" => signals,
+          "large_files" => large_files,
+          "recent_hotspots" => hotspots,
+          "complexity_budget" => complexity_budget
+        }),
       "summary" => drift_summary(signals)
     }
+  end
+
+  def complexity_budget(signals, large_files, hotspots)
+      when is_list(signals) and is_list(large_files) and is_list(hotspots) do
+    score =
+      Enum.reduce(signals, 0, fn signal, acc ->
+        acc +
+          case signal["severity"] do
+            "high" -> 50
+            "medium" -> 25
+            "low" -> 10
+            _ -> 0
+          end
+      end)
+      |> Kernel.+(min(length(large_files), 5) * 5)
+      |> Kernel.+(min(length(hotspots), 5) * 5)
+      |> min(100)
+
+    level =
+      cond do
+        score >= 75 -> "high"
+        score >= 40 -> "medium"
+        score > 0 -> "low"
+        true -> "clear"
+      end
+
+    %{
+      "level" => level,
+      "score" => score,
+      "review_pressure" => review_pressure(level),
+      "recommended_action" => complexity_budget_action(level)
+    }
+  end
+
+  def complexity_budget_findings(design_drift, attrs \\ %{}) when is_map(design_drift) do
+    budget = design_drift["complexity_budget"] || complexity_budget([], [], [])
+
+    case budget["level"] do
+      level when level in ["high", "medium"] ->
+        [
+          %{
+            "category" => "design-drift",
+            "severity" => if(level == "high", do: "high", else: "medium"),
+            "rule_id" => "design.complexity_budget.#{level}",
+            "title" => "Workspace complexity budget is #{level}",
+            "plain_message" => budget["recommended_action"],
+            "metadata" =>
+              Map.merge(attrs, %{
+                "diagnostic_source" => "workspace_complexity_budget",
+                "complexity_budget" => budget,
+                "signals" => design_drift["signals"] || [],
+                "large_files" => design_drift["large_files"] || [],
+                "recent_hotspots" => design_drift["recent_hotspots"] || []
+              })
+          }
+        ]
+
+      _ ->
+        []
+    end
   end
 
   defp recent_commits(repo_root) do
@@ -421,6 +491,22 @@ defmodule ControlKeel.WorkspaceContext do
     |> Enum.map(& &1["summary"])
     |> Enum.join(" ")
   end
+
+  defp review_pressure("high"), do: "require_small_steps_and_stronger_tests"
+  defp review_pressure("medium"), do: "prefer_smaller_plan_or_refactor_note"
+  defp review_pressure("low"), do: "watch"
+  defp review_pressure(_level), do: "none"
+
+  defp complexity_budget_action("high") do
+    "Treat edits in drift-heavy modules as higher review pressure; ask for smaller steps, explicit tests, or a boundary-splitting note."
+  end
+
+  defp complexity_budget_action("medium") do
+    "Call out drift in review packets and prefer scoped changes with targeted validation."
+  end
+
+  defp complexity_budget_action("low"), do: "Keep drift visible while work continues."
+  defp complexity_budget_action(_level), do: "No complexity-budget action needed."
 
   defp tracked_source_files(repo_root) do
     case System.cmd("git", ["ls-files"], cd: repo_root, stderr_to_stdout: true) do

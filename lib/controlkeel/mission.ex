@@ -231,7 +231,8 @@ defmodule ControlKeel.Mission do
       "plan_quality_status" => gate["plan_quality_status"],
       "plan_quality_score" => gate["plan_quality_score"],
       "planning_depth" => gate["planning_depth"],
-      "grill_questions" => gate["grill_questions"] || []
+      "grill_questions" => gate["grill_questions"] || [],
+      "decision_prompts" => gate["decision_prompts"] || []
     }
   end
 
@@ -3855,6 +3856,7 @@ defmodule ControlKeel.Mission do
         |> Map.put(
           "quality",
           assess_plan_refinement(phase, scope_estimate, %{
+            "depth" => depth,
             "research_summary" => research_summary,
             "codebase_findings" => codebase_findings,
             "prior_art_summary" => prior_art_summary,
@@ -3983,6 +3985,7 @@ defmodule ControlKeel.Mission do
       "missing" => missing,
       "signals" => plan_quality_signals(phase, scope_high, missing),
       "grill_questions" => plan_grill_questions(phase, scope_high, missing),
+      "decision_prompts" => decision_hygiene_prompts(phase, scope_high, missing, fields),
       "next_phase" => next_plan_phase(phase)
     }
   end
@@ -4171,6 +4174,30 @@ defmodule ControlKeel.Mission do
 
   defp grill_question_for_missing(_missing, _phase), do: nil
 
+  defp decision_hygiene_prompts(phase, scope_high, missing, fields) do
+    []
+    |> maybe_add_signal(
+      scope_high,
+      "Inversion: what would make this large change fail in production, and what is the smallest reversible step?"
+    )
+    |> maybe_add_signal(
+      "validation_plan" in missing,
+      "Evidence check: what concrete signal would prove this is correct rather than merely plausible?"
+    )
+    |> maybe_add_signal(
+      (fields["depth"] || 1) >= 3,
+      "Sunk-cost check: what new evidence would justify stopping or choosing a smaller path?"
+    )
+    |> maybe_add_signal(
+      phase in ["narrowed_decision", "implementation_plan"] and
+        length(fields["rejected_options"] || []) == 0,
+      "Alternative check: what option are we rejecting, and why is that rejection evidence-backed?"
+    )
+    |> Enum.reverse()
+    |> Enum.uniq()
+    |> Enum.take(4)
+  end
+
   defp maybe_add_signal(signals, true, message), do: [message | signals]
   defp maybe_add_signal(signals, false, _message), do: signals
 
@@ -4270,6 +4297,7 @@ defmodule ControlKeel.Mission do
       "plan_quality_status" => plan_quality["status"],
       "plan_quality_score" => plan_quality["score"],
       "grill_questions" => plan_quality["grill_questions"] || [],
+      "decision_prompts" => plan_quality["decision_prompts"] || [],
       "planning_depth" => plan_refinement && plan_refinement["depth"],
       "updated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
     })

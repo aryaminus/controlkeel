@@ -114,6 +114,15 @@ defmodule ControlKeel.WorkspaceContextTest do
              get_in(context, ["design_drift", "signals"]),
              &(&1["code"] == "recent_edit_hotspot")
            )
+
+    assert get_in(context, ["design_drift", "complexity_budget", "level"]) == "high"
+
+    assert get_in(context, ["design_drift", "complexity_budget", "review_pressure"]) ==
+             "require_small_steps_and_stronger_tests"
+
+    [finding] = WorkspaceContext.complexity_budget_findings(context["design_drift"])
+    assert finding["rule_id"] == "design.complexity_budget.high"
+    assert finding["metadata"]["complexity_budget"]["level"] == "high"
   end
 
   test "build/1 returns unavailable for missing or non-git roots", %{tmp_dir: tmp_dir} do

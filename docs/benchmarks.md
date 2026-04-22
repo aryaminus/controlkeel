@@ -76,6 +76,8 @@ Each scenario also carries structured metadata that acts like behavior tags, inc
 
 ControlKeel now exposes split summaries and behavior-tag summaries in benchmark run metadata and exports so teams can see whether a result came from optimization-friendly coverage, held-out evidence, or both.
 
+Benchmark run exports also include a `promotion_integrity` profile and `diagnostic_findings` payloads. These are CK-style finding maps, but they are not auto-persisted by the benchmark runner. Operators or background jobs can choose to persist them when a promotion workflow wants durable findings for missing held-out evidence, low behavior diversity, or missing classification evidence.
+
 The intended operating model is:
 
 1. turn recurring production failures into trace packets and failure clusters
@@ -187,3 +189,5 @@ For GEPA-style text optimization specifically:
 - run multi-sample candidate evaluations (not single-run score snapshots) before promotion
 - use CK exports and run metadata as the audit trail for what changed and why it was promoted
 - include optimizer-run metadata (for example scheduler/observer/target-scope settings) so later comparisons stay apples-to-apples
+
+Policy-training promotion gates now carry the same integrity stance. A candidate policy artifact must have validation, held-out, and baseline evidence before promotion can succeed, and the gates include diagnostic finding payloads for review surfaces that want to persist the warning.

@@ -175,6 +175,25 @@ defmodule ControlKeelWeb.BenchmarksLive do
         </div>
 
         <div class="ck-card">
+          <p class="ck-mini-label">Promotion integrity</p>
+          <% integrity = get_in(Benchmark.run_eval_profile(@run), ["promotion_integrity"]) || %{} %>
+          <div class="ck-finding-head">
+            <h3>{integrity["status"] || "unknown"}</h3>
+            <span class="ck-pill ck-pill-neutral">
+              {Enum.join(integrity["evidence_channels"] || [], ", ")}
+            </span>
+          </div>
+          <p class="ck-note">
+            <%= case integrity["warnings"] || [] do %>
+              <% [] -> %>
+                Held-out, diversity, and classification evidence are present for this run.
+              <% warnings -> %>
+                Warnings: {Enum.join(warnings, ", ")}
+            <% end %>
+          </p>
+        </div>
+
+        <div class="ck-card">
           <p class="ck-mini-label">Scenario matrix</p>
           <div class="ck-table-wrap">
             <table class="min-w-full text-sm" id="benchmark-matrix">
@@ -473,6 +492,9 @@ defmodule ControlKeelWeb.BenchmarksLive do
                     No learned router artifact is active. Runtime routing is using heuristics.
                   <% end %>
                 </p>
+                <p :if={@active_router_artifact} class="ck-note">
+                  Integrity: {policy_integrity_label(@active_router_artifact)}
+                </p>
                 <%= if @active_router_artifact do %>
                   <.link
                     navigate={~p"/benchmarks/policies/#{@active_router_artifact.id}"}
@@ -505,6 +527,9 @@ defmodule ControlKeelWeb.BenchmarksLive do
                   <% else %>
                     No learned budget-hint artifact is active. Budget caps are still deterministic.
                   <% end %>
+                </p>
+                <p :if={@active_budget_artifact} class="ck-note">
+                  Integrity: {policy_integrity_label(@active_budget_artifact)}
                 </p>
                 <%= if @active_budget_artifact do %>
                   <.link
@@ -655,6 +680,18 @@ defmodule ControlKeelWeb.BenchmarksLive do
 
       true ->
         "n/a"
+    end
+  end
+
+  defp policy_integrity_label(nil), do: "not available"
+
+  defp policy_integrity_label(artifact) do
+    integrity = get_in(artifact.metrics || %{}, ["gates", "integrity"]) || %{}
+    warnings = integrity["warnings"] || []
+
+    case warnings do
+      [] -> integrity["status"] || "ready"
+      _ -> "#{integrity["status"] || "warn"} (#{Enum.join(warnings, ", ")})"
     end
   end
 

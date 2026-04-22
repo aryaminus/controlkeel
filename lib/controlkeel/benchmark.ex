@@ -331,16 +331,84 @@ defmodule ControlKeel.Benchmark do
       |> Enum.map(& &1.scenario)
       |> Enum.uniq_by(& &1.id)
 
-    %{
+    split_summary = count_by(scenarios, &scenario_split/1)
+
+    behavior_tag_summary =
+      scenarios
+      |> Enum.flat_map(&scenario_behavior_tags/1)
+      |> Enum.frequencies()
+
+    profile = %{
       "scenario_count" => length(scenarios),
-      "split_summary" => count_by(scenarios, &scenario_split/1),
+      "split_summary" => split_summary,
       "category_summary" => count_by(scenarios, & &1.category),
-      "behavior_tag_summary" =>
-        scenarios
-        |> Enum.flat_map(&scenario_behavior_tags/1)
-        |> Enum.frequencies(),
-      "holdout_present" => Enum.any?(scenarios, &(scenario_split(&1) == "held_out"))
+      "behavior_tag_summary" => behavior_tag_summary,
+      "holdout_present" => Enum.any?(scenarios, &(scenario_split(&1) == "held_out")),
+      "promotion_integrity" =>
+        promotion_integrity_profile(%{
+          "scenario_count" => length(scenarios),
+          "split_summary" => split_summary,
+          "behavior_tag_summary" => behavior_tag_summary,
+          "classification" => classification_metrics(run)
+        })
     }
+
+    Map.put(profile, "diagnostic_findings", integrity_findings(profile, %{"run_id" => run.id}))
+  end
+
+  def promotion_integrity_profile(profile) when is_map(profile) do
+    split_summary = Map.get(profile, "split_summary") || %{}
+    behavior_tag_summary = Map.get(profile, "behavior_tag_summary") || %{}
+    classification = Map.get(profile, "classification") || %{}
+    scenario_count = Map.get(profile, "scenario_count") || 0
+
+    evidence_channels =
+      []
+      |> maybe_channel(scenario_count > 0, "scenarios")
+      |> maybe_channel((split_summary["held_out"] || 0) > 0, "held_out")
+      |> maybe_channel(map_size(behavior_tag_summary) >= 2, "behavior_tags")
+      |> maybe_channel(not is_nil(classification["youdens_j"]), "classification")
+
+    warnings =
+      []
+      |> maybe_integrity_warning(
+        (split_summary["held_out"] || 0) > 0,
+        "missing_holdout_evidence"
+      )
+      |> maybe_integrity_warning(
+        map_size(behavior_tag_summary) >= 2,
+        "low_behavior_diversity"
+      )
+      |> maybe_integrity_warning(
+        not is_nil(classification["youdens_j"]),
+        "missing_classification_evidence"
+      )
+
+    %{
+      "status" => if(warnings == [], do: "ready", else: "warn"),
+      "evidence_channels" => Enum.reverse(evidence_channels),
+      "warnings" => Enum.reverse(warnings)
+    }
+  end
+
+  def integrity_findings(profile, attrs \\ %{}) when is_map(profile) do
+    integrity = Map.get(profile, "promotion_integrity") || promotion_integrity_profile(profile)
+    warnings = integrity["warnings"] || []
+
+    Enum.map(warnings, fn warning ->
+      %{
+        "category" => "governance-product",
+        "severity" => "medium",
+        "rule_id" => "benchmarks.#{warning}",
+        "title" => benchmark_integrity_title(warning),
+        "plain_message" => benchmark_integrity_message(warning),
+        "metadata" =>
+          Map.merge(attrs, %{
+            "diagnostic_source" => "benchmark_promotion_integrity",
+            "promotion_integrity" => integrity
+          })
+      }
+    end)
   end
 
   def scenario_behavior_tags(%Scenario{} = scenario) do
@@ -850,6 +918,35 @@ defmodule ControlKeel.Benchmark do
     |> Enum.reject(fn {key, _rows} -> is_nil(key) end)
     |> Enum.into(%{}, fn {key, rows} -> {key, length(rows)} end)
   end
+
+  defp maybe_channel(channels, true, channel), do: [channel | channels]
+  defp maybe_channel(channels, false, _channel), do: channels
+
+  defp maybe_integrity_warning(warnings, true, _warning), do: warnings
+  defp maybe_integrity_warning(warnings, false, warning), do: [warning | warnings]
+
+  defp benchmark_integrity_title("missing_holdout_evidence"), do: "Missing holdout evidence"
+  defp benchmark_integrity_title("low_behavior_diversity"), do: "Low benchmark behavior diversity"
+
+  defp benchmark_integrity_title("missing_classification_evidence"),
+    do: "Missing classification evidence"
+
+  defp benchmark_integrity_title(warning), do: warning
+
+  defp benchmark_integrity_message("missing_holdout_evidence") do
+    "Benchmark promotion evidence has no held-out split coverage; avoid treating public-suite score as sufficient."
+  end
+
+  defp benchmark_integrity_message("low_behavior_diversity") do
+    "Benchmark promotion evidence has too few behavior tags to protect against narrow metric gaming."
+  end
+
+  defp benchmark_integrity_message("missing_classification_evidence") do
+    "Benchmark promotion evidence is missing classification metrics such as TPR/FPR or Youden's J."
+  end
+
+  defp benchmark_integrity_message(warning),
+    do: "Benchmark promotion integrity warning: #{warning}."
 
   defp scenario_split(%Scenario{} = scenario), do: scenario.split || "public"
 

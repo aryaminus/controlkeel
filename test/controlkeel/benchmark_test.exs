@@ -263,6 +263,24 @@ defmodule ControlKeel.BenchmarkTest do
     assert Repo.aggregate(Suite, :count, :id) == initial_suite_count
   end
 
+  test "promotion integrity warns on single-score evidence without holdout coverage" do
+    integrity =
+      Benchmark.promotion_integrity_profile(%{
+        "scenario_count" => 3,
+        "split_summary" => %{"public" => 3},
+        "behavior_tag_summary" => %{"security" => 3},
+        "classification" => %{}
+      })
+
+    assert integrity["status"] == "warn"
+    assert "missing_holdout_evidence" in integrity["warnings"]
+    assert "low_behavior_diversity" in integrity["warnings"]
+    assert "missing_classification_evidence" in integrity["warnings"]
+
+    findings = Benchmark.integrity_findings(%{"promotion_integrity" => integrity})
+    assert Enum.any?(findings, &(&1["rule_id"] == "benchmarks.missing_holdout_evidence"))
+  end
+
   test "listing recent runs does not seed persisted suites" do
     initial_suite_count = Repo.aggregate(Suite, :count, :id)
     _runs = Benchmark.list_recent_runs()

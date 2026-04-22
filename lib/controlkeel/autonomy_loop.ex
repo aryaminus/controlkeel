@@ -60,6 +60,9 @@ defmodule ControlKeel.AutonomyLoop do
     eval_candidates = get_in(trace_packet || %{}, ["eval_candidates"]) || []
     trace_summary = get_in(trace_packet || %{}, ["trace_summary"]) || %{}
     cluster_count = get_in(failure_clusters || %{}, ["cluster_count"]) || 0
+    bottleneck = bottleneck_summary(session, current_task, latest_proof, trace_summary)
+    ownership = ownership_summary(session)
+    diagnostic_findings = bottleneck_findings(bottleneck) ++ ownership_findings(ownership)
 
     %{
       "loop" => @feedback_loop,
@@ -76,9 +79,140 @@ defmodule ControlKeel.AutonomyLoop do
       "benchmark_suite_count" => length(suites),
       "benchmark_suite_slugs" => Enum.map(suites, & &1.slug) |> Enum.take(3),
       "deploy_ready" => get_in(latest_proof || %{}, ["deploy_ready"]) == true,
+      "bottleneck_summary" => bottleneck,
+      "ownership_summary" => ownership,
+      "diagnostic_findings" => diagnostic_findings,
       "recommended_next_step" =>
-        recommended_next_step(current_task, trace_packet, cluster_count, latest_proof)
+        recommended_next_step(current_task, trace_packet, cluster_count, latest_proof, bottleneck)
     }
+  end
+
+  def bottleneck_summary(%Session{} = session, current_task, latest_proof, trace_summary \\ %{}) do
+    findings = assoc_list(session.findings)
+    active_findings = Enum.filter(findings, &(&1.status in ["open", "blocked", "escalated"]))
+    blocked_findings = Enum.count(active_findings, &(&1.status == "blocked"))
+    review_gate = if current_task, do: Mission.review_gate_status(current_task), else: %{}
+
+    budget_ratio =
+      case session.budget_cents do
+        budget when is_integer(budget) and budget > 0 ->
+          Float.round((session.spent_cents || 0) / budget, 3)
+
+        _ ->
+          0.0
+      end
+
+    candidates =
+      [
+        {"unresolved_findings",
+         blocked_findings * 30 + max(length(active_findings) - blocked_findings, 0) * 10},
+        {"review_wait", if(review_gate["execution_ready"] == false, do: 35, else: 0)},
+        {"missing_deploy_ready_proof",
+         if(get_in(latest_proof || %{}, ["deploy_ready"]) == true, do: 0, else: 20)},
+        {"budget_pressure", if(budget_ratio >= 0.8, do: 25, else: 0)},
+        {"trace_gap", if((trace_summary["invocations"] || 0) == 0, do: 10, else: 0)}
+      ]
+
+    {primary, score} =
+      candidates
+      |> Enum.max_by(fn {_name, score} -> score end, fn -> {"none", 0} end)
+
+    %{
+      "primary" => if(score > 0, do: primary, else: "none"),
+      "score" => min(score, 100),
+      "signals" => %{
+        "active_findings" => length(active_findings),
+        "blocked_findings" => blocked_findings,
+        "review_execution_ready" => review_gate["execution_ready"],
+        "deploy_ready" => get_in(latest_proof || %{}, ["deploy_ready"]) == true,
+        "budget_spend_ratio" => budget_ratio,
+        "trace_invocations" => trace_summary["invocations"] || 0
+      },
+      "recommendation" => bottleneck_recommendation(primary, score)
+    }
+  end
+
+  def ownership_summary(%Session{} = session) do
+    task_owners =
+      session.tasks
+      |> assoc_list()
+      |> Enum.map(&metadata_owner/1)
+      |> Enum.reject(&is_nil/1)
+
+    review_submitters =
+      session
+      |> Map.get(:reviews)
+      |> assoc_list()
+      |> Enum.map(& &1.submitted_by)
+      |> Enum.reject(&blank?/1)
+
+    finding_categories =
+      session.findings
+      |> assoc_list()
+      |> Enum.map(& &1.category)
+      |> Enum.reject(&blank?/1)
+
+    concentrations = %{
+      "task_owner" => concentration(task_owners),
+      "review_submitter" => concentration(review_submitters),
+      "finding_category" => concentration(finding_categories)
+    }
+
+    risks =
+      concentrations
+      |> Enum.filter(fn {_key, value} -> concentration_risky?(value) end)
+      |> Enum.map(fn {key, value} -> "#{key}:#{value["top"]}" end)
+
+    %{
+      "signals" => concentrations,
+      "risk" => if(risks == [], do: "clear", else: "concentrated"),
+      "risks" => risks,
+      "recommendation" => ownership_recommendation(risks)
+    }
+  end
+
+  def bottleneck_findings(summary, attrs \\ %{}) when is_map(summary) do
+    case summary["primary"] do
+      primary when primary in ["unresolved_findings", "review_wait", "budget_pressure"] ->
+        [
+          %{
+            "category" => "delivery-analytics",
+            "severity" => if(primary == "unresolved_findings", do: "high", else: "medium"),
+            "rule_id" => "delivery.serial_bottleneck.#{primary}",
+            "title" => "Delivery bottleneck: #{String.replace(primary, "_", " ")}",
+            "plain_message" => summary["recommendation"],
+            "metadata" =>
+              Map.merge(attrs, %{
+                "diagnostic_source" => "autonomy_loop_bottleneck",
+                "bottleneck_summary" => summary
+              })
+          }
+        ]
+
+      _ ->
+        []
+    end
+  end
+
+  def ownership_findings(summary, attrs \\ %{}) when is_map(summary) do
+    if summary["risk"] == "concentrated" do
+      [
+        %{
+          "category" => "delivery-analytics",
+          "severity" => "medium",
+          "rule_id" => "teams.ownership_concentration",
+          "title" => "Ownership concentration detected",
+          "plain_message" => summary["recommendation"],
+          "metadata" =>
+            Map.merge(attrs, %{
+              "diagnostic_source" => "autonomy_loop_ownership",
+              "ownership_summary" => summary
+            })
+        }
+      ]
+    else
+      []
+    end
   end
 
   def workspace_improvement_summary(sessions) when is_list(sessions) do
@@ -220,21 +354,92 @@ defmodule ControlKeel.AutonomyLoop do
     end
   end
 
-  defp recommended_next_step(nil, _trace_packet, _cluster_count, _latest_proof) do
+  defp recommended_next_step(nil, _trace_packet, _cluster_count, _latest_proof, _bottleneck) do
     "Define or queue the next task so the governed loop has an execution target."
   end
 
-  defp recommended_next_step(_task, _trace_packet, cluster_count, latest_proof)
+  defp recommended_next_step(_task, _trace_packet, _cluster_count, _latest_proof, %{
+         "primary" => "review_wait"
+       }) do
+    "Clear the pending review gate before adding more parallel work."
+  end
+
+  defp recommended_next_step(_task, _trace_packet, _cluster_count, _latest_proof, %{
+         "primary" => "unresolved_findings"
+       }) do
+    "Resolve or disposition unresolved findings before widening delegation."
+  end
+
+  defp recommended_next_step(_task, _trace_packet, cluster_count, latest_proof, _bottleneck)
        when cluster_count > 0 and not is_nil(latest_proof) do
     "Turn the recurring failure clusters into evals or skill updates before the next run."
   end
 
-  defp recommended_next_step(_task, trace_packet, _cluster_count, _latest_proof) do
+  defp recommended_next_step(_task, trace_packet, _cluster_count, _latest_proof, _bottleneck) do
     if is_map(trace_packet) and (get_in(trace_packet, ["eval_candidates"]) || []) != [] do
       "Promote the trace packet's eval candidates into a reusable benchmark or review check."
     else
       "Run the next governed cycle and capture a trace packet so CK has evidence to improve."
     end
+  end
+
+  defp bottleneck_recommendation(_primary, 0), do: "No serial bottleneck detected yet."
+
+  defp bottleneck_recommendation("unresolved_findings", _score) do
+    "Findings are the serial constraint; more agents will not help until blockers are resolved or accepted."
+  end
+
+  defp bottleneck_recommendation("review_wait", _score) do
+    "Review readiness is the serial constraint; get approval or refine the plan before parallelizing."
+  end
+
+  defp bottleneck_recommendation("missing_deploy_ready_proof", _score) do
+    "Proof readiness is the serial constraint; capture validation evidence before calling the loop done."
+  end
+
+  defp bottleneck_recommendation("budget_pressure", _score) do
+    "Budget pressure is the serial constraint; prefer cheaper validation or narrower execution."
+  end
+
+  defp bottleneck_recommendation("trace_gap", _score) do
+    "Trace coverage is thin; run one governed cycle and capture evidence before optimizing the loop."
+  end
+
+  defp bottleneck_recommendation(_primary, _score), do: "Keep the current governed loop moving."
+
+  defp metadata_owner(%{metadata: metadata}) when is_map(metadata) do
+    value =
+      metadata["owner"] || metadata["assignee"] || metadata["agent"] || metadata["submitted_by"]
+
+    if blank?(value), do: nil, else: to_string(value)
+  end
+
+  defp metadata_owner(_task), do: nil
+
+  defp concentration([]), do: %{"total" => 0, "top" => nil, "top_count" => 0, "top_share" => 0.0}
+
+  defp concentration(values) do
+    {top, count} =
+      values
+      |> Enum.frequencies()
+      |> Enum.max_by(fn {_value, count} -> count end)
+
+    %{
+      "total" => length(values),
+      "top" => top,
+      "top_count" => count,
+      "top_share" => Float.round(count / length(values), 3)
+    }
+  end
+
+  defp concentration_risky?(%{"total" => total, "top_share" => share}) do
+    total >= 3 and share >= 0.75
+  end
+
+  defp ownership_recommendation([]), do: "No ownership concentration risk detected."
+
+  defp ownership_recommendation(_risks) do
+    "Review ownership concentration before widening the work; add a second reviewer, proof author, or task owner where possible."
   end
 
   defp improvement_ready?(%Session{} = session) do
@@ -265,6 +470,10 @@ defmodule ControlKeel.AutonomyLoop do
   defp present?(value) when is_binary(value), do: String.trim(value) != ""
   defp present?(nil), do: false
   defp present?(value), do: value != nil
+
+  defp blank?(value) when is_binary(value), do: String.trim(value) == ""
+  defp blank?(nil), do: true
+  defp blank?(_value), do: false
 
   defp assoc_list(%Ecto.Association.NotLoaded{}), do: []
   defp assoc_list(nil), do: []

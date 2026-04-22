@@ -499,6 +499,14 @@ defmodule ControlKeelWeb.MissionControlLive do
                         {@active_findings} unresolved finding{if @active_findings != 1, do: "s"} — review before marking done
                       </p>
                     <% end %>
+                    <%= for prompt <- task_decision_prompts(task) do %>
+                      <p
+                        class="ck-note"
+                        style="color: var(--ck-color-muted); font-size: 0.75rem; margin-top: 0.15rem;"
+                      >
+                        {prompt}
+                      </p>
+                    <% end %>
                   </div>
                   <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
                     <span class={task_status_pill_class(task.status)}>{task_status_label(task)}</span>
@@ -894,6 +902,13 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   defp task_verification_label(task, _proof_summary),
     do: if(done_unverified?(task), do: "unverified", else: "verification pending")
+
+  defp task_decision_prompts(task) do
+    task
+    |> Mission.review_gate_status()
+    |> Map.get("decision_prompts", [])
+    |> Enum.take(2)
+  end
 
   defp format_currency(cents), do: cents |> Kernel./(100) |> Float.round(2)
   defp format_duration(nil), do: "Not recorded"

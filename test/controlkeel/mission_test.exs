@@ -410,7 +410,35 @@ defmodule ControlKeel.MissionTest do
     assert gate["latest_plan_phase"] == "research_packet"
     assert gate["planning_depth"] == 1
     assert is_list(gate["grill_questions"])
+    assert is_list(gate["decision_prompts"])
     assert Enum.any?(gate["grill_questions"], &String.contains?(&1, "files, modules, or flows"))
+  end
+
+  test "review gate includes decision hygiene prompts for large risky plans" do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "queued"})
+
+    assert {:ok, _review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "plan_phase" => "implementation_plan",
+               "submission_body" => "Large implementation plan",
+               "research_summary" => "Mapped the relevant modules.",
+               "options_considered" => ["Patch in place", "Extract helper"],
+               "selected_option" => "Patch in place",
+               "implementation_steps" => ["Patch", "Test"],
+               "scope_estimate" => %{
+                 "files_touched_estimate" => 7,
+                 "diff_size_estimate" => 400,
+                 "architectural_scope" => true
+               }
+             })
+
+    prompts = Mission.review_gate_status(Mission.get_task!(task.id))["decision_prompts"]
+
+    assert Enum.any?(prompts, &String.starts_with?(&1, "Inversion:"))
+    assert Enum.any?(prompts, &String.starts_with?(&1, "Evidence check:"))
   end
 
   test "session-scoped plan reviews without task_id key supersede previous pending review" do

@@ -106,6 +106,25 @@ defmodule ControlKeel.PolicyTrainingTest do
     assert Repo.get!(Run, candidate.training_run_id).status == "promotion_failed"
   end
 
+  test "promotion integrity requires held-out validation and baseline evidence" do
+    integrity =
+      PolicyTraining.promotion_integrity(%{
+        training_metrics: %{"reward" => 1.0},
+        validation_metrics: %{},
+        held_out_metrics: %{},
+        baseline_metrics: %{}
+      })
+
+    assert integrity["status"] == "warn"
+    assert integrity["evidence_channels"] == ["training"]
+    assert "missing_holdout_evidence" in integrity["warnings"]
+    assert "missing_validation_evidence" in integrity["warnings"]
+    assert "missing_baseline_evidence" in integrity["warnings"]
+
+    findings = PolicyTraining.integrity_findings(integrity)
+    assert Enum.any?(findings, &(&1["rule_id"] == "policy_training.missing_holdout_evidence"))
+  end
+
   test "invalid python path fails cleanly and marks the training run failed" do
     original = System.get_env("CONTROLKEEL_POLICY_TRAINING_PYTHON")
     System.put_env("CONTROLKEEL_POLICY_TRAINING_PYTHON", "/missing/python3")

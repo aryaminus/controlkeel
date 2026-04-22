@@ -49,6 +49,33 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "mission-task-checklist"
   end
 
+  test "mission control renders review decision prompts", %{conn: conn} do
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "queued", title: "Risky plan"})
+
+    assert {:ok, _review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "plan_phase" => "implementation_plan",
+               "submission_body" => "Large plan",
+               "research_summary" => "Mapped modules.",
+               "options_considered" => ["Patch", "Extract"],
+               "selected_option" => "Patch",
+               "implementation_steps" => ["Patch", "Test"],
+               "scope_estimate" => %{
+                 "files_touched_estimate" => 7,
+                 "diff_size_estimate" => 400,
+                 "architectural_scope" => true
+               }
+             })
+
+    {:ok, _view, html} = live(conn, ~p"/missions/#{session.id}")
+
+    assert html =~ "Inversion:"
+    assert html =~ "Evidence check:"
+  end
+
   test "mission control renders persisted runtime findings and proxy endpoints", %{conn: conn} do
     session = session_fixture()
     task_fixture(%{session: session})

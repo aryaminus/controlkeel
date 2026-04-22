@@ -3,6 +3,7 @@ defmodule ControlKeel.AutonomyLoopTest do
 
   import ControlKeel.MissionFixtures
 
+  alias ControlKeel.Mission
   alias ControlKeel.AutonomyLoop
 
   test "derives explicit KPI-oriented long-running autonomy profiles" do
@@ -61,5 +62,50 @@ defmodule ControlKeel.AutonomyLoopTest do
     assert summary["autonomy_mix"]["long_running_autonomy"] == 1
     assert summary["goal_type_mix"]["kpi"] == 1
     assert summary["explicit_outcome_sessions"] == 1
+  end
+
+  test "session improvement loop surfaces the serial bottleneck before more delegation" do
+    session = session_fixture(%{risk_tier: "critical"})
+    _task = task_fixture(%{session: session, status: "in_progress"})
+    _finding = finding_fixture(%{session: session, status: "blocked"})
+
+    loop =
+      session.id
+      |> Mission.get_session_with_details!()
+      |> AutonomyLoop.session_improvement_loop()
+
+    assert get_in(loop, ["bottleneck_summary", "primary"]) == "unresolved_findings"
+    assert get_in(loop, ["bottleneck_summary", "signals", "blocked_findings"]) == 1
+    assert loop["recommended_next_step"] =~ "Resolve or disposition unresolved findings"
+
+    findings = AutonomyLoop.bottleneck_findings(loop["bottleneck_summary"])
+
+    assert Enum.any?(
+             findings,
+             &(&1["rule_id"] == "delivery.serial_bottleneck.unresolved_findings")
+           )
+  end
+
+  test "session improvement loop surfaces ownership concentration" do
+    session = session_fixture()
+
+    Enum.each(1..3, fn index ->
+      task_fixture(%{
+        session: session,
+        position: index,
+        metadata: %{"owner" => "codex"}
+      })
+    end)
+
+    loop =
+      session.id
+      |> Mission.get_session_with_details!()
+      |> AutonomyLoop.session_improvement_loop()
+
+    assert get_in(loop, ["ownership_summary", "risk"]) == "concentrated"
+    assert get_in(loop, ["ownership_summary", "signals", "task_owner", "top"]) == "codex"
+
+    findings = AutonomyLoop.ownership_findings(loop["ownership_summary"])
+    assert [%{"rule_id" => "teams.ownership_concentration"}] = findings
   end
 end

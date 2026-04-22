@@ -8,7 +8,9 @@ defmodule ControlKeel.RuntimeConformanceTest do
 
   alias ControlKeel.AgentIntegration
   alias ControlKeel.Governance.ApprovalAdapter
+  alias ControlKeel.MCP.Protocol
   alias ControlKeel.OrchestrationEvents
+  alias ControlKeel.ProtocolInterop
 
   @attach_clients ["claude-code", "codex-cli", "codex-app-server", "opencode", "t3code"]
 
@@ -137,6 +139,42 @@ defmodule ControlKeel.RuntimeConformanceTest do
         integration = AgentIntegration.get(unquote(agent_id))
 
         assert integration.runtime_capabilities[:policy_gate] == true
+      end
+    end
+  end
+
+  describe "observable contract parity" do
+    test "hosted MCP scope map covers every hosted tool schema" do
+      hosted_names = ProtocolInterop.hosted_tool_names()
+      schema_names = Protocol.tool_schemas(tool_names: hosted_names) |> Enum.map(& &1["name"])
+
+      assert Enum.sort(schema_names) == Enum.sort(hosted_names)
+    end
+
+    test "hosted MCP tool schemas keep object inputs and descriptions" do
+      for schema <- Protocol.tool_schemas(tool_names: ProtocolInterop.hosted_tool_names()) do
+        assert is_binary(schema["description"])
+        assert get_in(schema, ["inputSchema", "type"]) == "object"
+        assert is_map(get_in(schema, ["inputSchema", "properties"]))
+      end
+    end
+
+    test "hosted MCP scopes are explicit for every exposed tool" do
+      hosted_scopes = ProtocolInterop.hosted_mcp_scopes()
+
+      assert "mcp:access" in hosted_scopes
+      assert "review:write" in hosted_scopes
+      assert "review:read" in hosted_scopes
+      assert "finding:write" in hosted_scopes
+      assert "validate:run" in hosted_scopes
+    end
+
+    test "core review and governance tools stay visible as one contract family" do
+      hosted_names = ProtocolInterop.hosted_tool_names()
+
+      for tool <-
+            ~w(ck_context ck_validate ck_finding ck_review_submit ck_review_status ck_review_feedback ck_budget ck_route ck_delegate) do
+        assert tool in hosted_names
       end
     end
   end

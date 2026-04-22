@@ -34,6 +34,13 @@ That profile is now surfaced in:
 
 So operators can tell whether a session is just trying to finish work, or whether it is meant to run as a longer-horizon control loop.
 
+The session improvement loop also exposes two software-law diagnostics:
+
+- `bottleneck_summary` identifies the likely serial constraint before CK recommends more parallel work. It distinguishes unresolved findings, pending review readiness, missing deploy-ready proof, budget pressure, and thin trace evidence.
+- `ownership_summary` reports concentration across available task owners, review submitters, and finding categories. It is intentionally evidence-backed and only warns when the current data shows enough concentration to be useful.
+
+Both diagnostics also provide CK-style `diagnostic_findings` payloads. CK does not auto-persist them by default, which avoids duplicate findings during normal dashboard refreshes; callers can persist them when they want a durable review item.
+
 ## Provider-backed vs heuristic mode
 
 - **LLM advisory** (extra pattern review on top of FastPath and Semgrep) runs only when a provider is configured. Validate and MCP `ck_validate` responses include an **`advisory`** object describing whether the advisory layer ran or was skipped (for example no API key).
@@ -68,6 +75,8 @@ That expectation already shows up in the product through:
 In practice, CK is telling the operator not to treat every generated diff the same. Narrow, reversible fixes can stay low-friction. Architecture decisions, release-boundary changes, destructive actions, and similarly high-consequence changes should pull the human back into the loop.
 
 CK does not claim to perfectly classify every risky change type today. The current product stance is narrower and more honest: keep the review boundary explicit, keep rollback and proof state visible, and increase human attention as impact and irreversibility go up.
+
+Plan reviews now also include decision hygiene prompts in review-gate metadata. These prompts are tied to concrete signals such as high scope, missing validation evidence, repeated plan depth, or missing rejected options. They are designed to trigger inversion, evidence, sunk-cost, and alternative checks without turning the UI into generic advice.
 
 ## Relation to Mission Control
 
