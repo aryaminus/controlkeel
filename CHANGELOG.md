@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.43 — 2026-04-24
+
+### What's changed
+
+- fix(benchmarks): track repo benchmark subjects for ci
+- feat(governance): expand diagnostic findings coverage
+- feat(benchmarks): add multi-host comparison workflow
+
 ## v0.2.42 — 2026-04-22
 
 ### What's changed
