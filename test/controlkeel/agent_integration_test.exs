@@ -19,6 +19,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert "augment" in ids
     assert "pi" in ids
     assert "devin" in ids
+    assert "dmux" in ids
     assert "virtual-bash" in ids
     assert "vllm" in ids
     assert "huggingface" in ids
@@ -50,6 +51,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     aider = AgentIntegration.get("aider")
     conductor = AgentIntegration.get("conductor")
     conductor_web = AgentIntegration.get("conductor-web")
+    dmux = AgentIntegration.get("dmux")
 
     assert claude.label == "Claude Code"
     assert claude.support_class == "attach_client"
@@ -293,6 +295,29 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert paperclip.ck_runs_agent_via == "none"
     assert paperclip.preferred_target == "framework-adapter"
     assert paperclip.provider_bridge == %{supported: false, mode: "none", owner: "none"}
+
+    assert dmux.support_class == "framework_adapter"
+    assert dmux.agent_uses_ck_via == ["local_mcp", "native_skills", "commands", "hooks"]
+    assert ".dmux-hooks/" in dmux.artifact_surfaces
+    assert ".dmux.defaults.json" in dmux.artifact_surfaces
+    assert ".dmux/worktrees/" in dmux.artifact_surfaces
+    assert dmux.mcp_mode == "native"
+    assert dmux.skills_mode == "native"
+    assert dmux.execution_support == "inbound_only"
+    assert dmux.ck_runs_agent_via == "none"
+    assert dmux.preferred_target == "framework-adapter"
+    assert dmux.provider_bridge == %{supported: false, mode: "none", owner: "none"}
+    assert dmux.phase_model == "host_plan_mode"
+    assert dmux.review_experience == "browser_review"
+    assert dmux.submission_mode == "command"
+    assert dmux.feedback_mode == "command_reply"
+
+    assert Enum.any?(dmux.direct_install_methods, &(&1["command"] == "npm -g i dmux"))
+
+    assert Enum.any?(
+             dmux.direct_install_methods,
+             &(&1["command"] == "controlkeel attach codex-cli")
+           )
 
     assert conductor_web.support_class == "alias"
     assert conductor_web.alias_of == "conductor"

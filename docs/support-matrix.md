@@ -182,6 +182,7 @@ Runtime transport truth for those first-class hosts:
 | `fastmcp` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
 | `conductor` | framework_adapter | use Claude Code repo-local surfaces inside Conductor | `local_mcp`, `native_skills`, `commands` | `none` | `inbound_only` | `heuristic` / `native` | `claude-standalone`, `claude-plugin`, `instructions-only` |
 | `paperclip` | framework_adapter | use CK-native attach surfaces inside Paperclip agent adapters | `local_mcp`, `native_skills`, `commands`, `plugin` | `none` | `inbound_only` | `config_reference` / `native` | `framework-adapter` |
+| `dmux` | framework_adapter | install `dmux`, then use CK-native attach surfaces inside dmux-managed worktrees and optional `.dmux-hooks/` lifecycle checks | `local_mcp`, `native_skills`, `commands`, `hooks` | `none` | `inbound_only` | `config_reference` / `native` | `framework-adapter` |
 | `augment-intent` | framework_adapter | adapter only | none | `none` | `inbound_only` | `none` / `none` | `framework-adapter` |
 | `codestral` | provider_only | provider template only | none | `none` | `inbound_only` | `ck_owned` / `none` | `provider-profile` |
 | `ollama-runtime` | provider_only | provider template only | none | `none` | `inbound_only` | `local` / `none` | `provider-profile` |

@@ -93,6 +93,26 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | OpenClaw | `controlkeel attach openclaw` |
 | Forge | `controlkeel attach forge` |
 
+## dmux compatibility
+
+`dmux` is supported as an orchestration adapter, not as a native CK attach target.
+
+Install dmux itself with:
+
+```bash
+npm -g i dmux
+```
+
+Then attach CK to the underlying agent runtime that dmux will launch inside its worktrees, for example:
+
+```bash
+controlkeel attach codex-cli
+controlkeel attach claude-code
+controlkeel attach opencode
+```
+
+dmux-managed worktrees under `.dmux/worktrees/` inherit those repo-local CK surfaces. If you want team-wide governed behavior inside dmux, add hooks such as `.dmux-hooks/worktree_created` and `.dmux-hooks/pre_merge` to run setup or validation before merge.
+
 ## Codex-specific note
 
 Codex currently has three distinct CK stories, and mixing them together causes most of the confusion:

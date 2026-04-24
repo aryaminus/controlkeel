@@ -139,6 +139,13 @@ Conductor sits between those buckets. Its official docs say it runs bundled Clau
 
 Paperclip is one layer higher again: an orchestration plane that schedules and supervises external agents through documented adapters such as Claude Local, Codex Local, Gemini Local, OpenClaw Gateway, Hermes Local, Pi Local, and Cursor Local, with instance config under `~/.paperclip/instances/default/config.json`. CK therefore models Paperclip as an orchestration adapter, not as a native attach target. The practical integration path is to attach CK to the underlying runtime each Paperclip agent uses.
 
+dmux fits the same orchestration-adapter bucket, but with a repo-local tmux/worktree focus. It launches Claude Code, Codex, OpenCode, Copilot, Gemini CLI, and other agents inside isolated git worktrees under `.dmux/worktrees/`, plus optional lifecycle automation through `.dmux-hooks/`. CK therefore does not pretend there is a `controlkeel attach dmux` command. The practical path is:
+
+1. install `dmux`
+2. attach CK to the actual agent runtime you plan to run inside dmux, such as `controlkeel attach codex-cli`, `controlkeel attach claude-code`, or `controlkeel attach opencode`
+3. let dmux create worktrees that inherit those repo-local CK surfaces
+4. optionally use `.dmux-hooks/worktree_created` and `.dmux-hooks/pre_merge` to run governed setup, checks, or `mix precommit` before merge
+
 ## Protocol interop
 
 ControlKeel exposes three protocol surfaces around the integration catalog:

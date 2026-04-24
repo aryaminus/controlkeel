@@ -854,6 +854,58 @@ defmodule ControlKeel.AgentIntegration do
         ck_runs_agent_via: "none"
       }),
       framework_adapter(%{
+        id: "dmux",
+        label: "dmux",
+        category: "framework-adapter",
+        description:
+          "Parallel-agent tmux/worktree orchestrator. CK support inside dmux-managed worktrees is real, but it comes from the underlying repo-local agent surfaces rather than a dedicated `controlkeel attach dmux` command.",
+        companion_delivery:
+          "Install dmux separately, then attach CK to the underlying agents you run inside dmux such as Codex, Claude Code, OpenCode, Copilot, or Gemini CLI. dmux worktrees inherit those repo-local CK surfaces, and `.dmux-hooks/` can enforce governed setup or pre-merge checks.",
+        preferred_target: "framework-adapter",
+        default_scope: "project",
+        auth_mode: "config_reference",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "standardagents/dmux",
+        upstream_docs_url: "https://github.com/standardagents/dmux",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["framework-adapter"],
+        agent_uses_ck_via: ["local_mcp", "native_skills", "commands", "hooks"],
+        artifact_surfaces: [
+          ".dmux.defaults.json",
+          ".dmux-hooks/",
+          ".dmux/worktrees/",
+          "underlying repo-local host config (.codex/, .claude/, .opencode/, .github/, .gemini/)",
+          "AGENTS.md"
+        ],
+        direct_install_methods: [
+          direct_install("npm_cli", "dmux via npm", "npm -g i dmux"),
+          direct_install(
+            "openrouter_env",
+            "OpenRouter key",
+            ~s|export OPENROUTER_API_KEY="sk-or-..."|
+          ),
+          direct_install("ck_attach_codex", "CK + Codex", "controlkeel attach codex-cli"),
+          direct_install(
+            "ck_attach_claude",
+            "CK + Claude Code",
+            "controlkeel attach claude-code"
+          ),
+          direct_install("ck_attach_opencode", "CK + OpenCode", "controlkeel attach opencode")
+        ],
+        install_experience: "guided",
+        confidence_level: "experimental",
+        review_experience: "browser_review",
+        submission_mode: "command",
+        feedback_mode: "command_reply",
+        phase_model: "host_plan_mode",
+        browser_embed: "external",
+        subagent_visibility: "all",
+        execution_support: "inbound_only",
+        ck_runs_agent_via: "none"
+      }),
+      framework_adapter(%{
         id: "augment-intent",
         label: "Intent by Augment",
         category: "framework-adapter",

@@ -171,6 +171,7 @@ defmodule ControlKeel.Mission.Planner do
     "n8n" => "n8n",
     "prefect" => "Prefect",
     "mastra" => "Mastra",
+    "dmux" => "dmux",
     # Cloud LLM providers (enterprise auth)
     "bedrock" => "AWS Bedrock",
     "vertex-ai" => "Google Vertex AI",

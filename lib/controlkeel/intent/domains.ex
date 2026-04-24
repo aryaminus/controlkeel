@@ -898,6 +898,7 @@ defmodule ControlKeel.Intent.Domains do
     {"n8n", "n8n"},
     {"prefect", "Prefect"},
     {"mastra", "Mastra"},
+    {"dmux", "dmux"},
     # Managed agent platforms
     {"bedrock-agents", "AWS Bedrock Agents"},
     {"azure-ai-agent", "Azure AI Agent Service"},
