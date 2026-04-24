@@ -1,0 +1,79 @@
+{
+  "subjects": [
+    {
+      "id": "opencode_manual",
+      "label": "OpenCode (Manual Import)",
+      "type": "manual_import"
+    },
+    {
+      "id": "opencode_shell",
+      "label": "OpenCode (Shell Wrapper)",
+      "type": "shell",
+      "command": "./scripts/benchmark-host.sh",
+      "args": ["opencode"],
+      "working_dir": ".",
+      "timeout_ms": 120000,
+      "output_mode": "stdout"
+    },
+    {
+      "id": "copilot_manual",
+      "label": "GitHub Copilot (Manual Import)",
+      "type": "manual_import"
+    },
+    {
+      "id": "copilot_shell",
+      "label": "GitHub Copilot (Shell Wrapper)",
+      "type": "shell",
+      "command": "./scripts/benchmark-host.sh",
+      "args": ["copilot"],
+      "working_dir": ".",
+      "timeout_ms": 120000,
+      "output_mode": "stdout"
+    },
+    {
+      "id": "gemini_manual",
+      "label": "Gemini CLI (Manual Import)",
+      "type": "manual_import"
+    },
+    {
+      "id": "gemini_shell",
+      "label": "Gemini CLI (Shell Wrapper)",
+      "type": "shell",
+      "command": "./scripts/benchmark-host.sh",
+      "args": ["gemini"],
+      "working_dir": ".",
+      "timeout_ms": 120000,
+      "output_mode": "stdout"
+    },
+    {
+      "id": "codex_manual",
+      "label": "Codex CLI (Manual Import)",
+      "type": "manual_import"
+    },
+    {
+      "id": "codex_shell",
+      "label": "Codex CLI (Shell Wrapper)",
+      "type": "shell",
+      "command": "./scripts/benchmark-host.sh",
+      "args": ["codex"],
+      "working_dir": ".",
+      "timeout_ms": 120000,
+      "output_mode": "stdout"
+    },
+    {
+      "id": "claude_manual",
+      "label": "Claude Code (Manual Import)",
+      "type": "manual_import"
+    },
+    {
+      "id": "claude_shell",
+      "label": "Claude Code (Shell Wrapper)",
+      "type": "shell",
+      "command": "./scripts/benchmark-host.sh",
+      "args": ["claude"],
+      "working_dir": ".",
+      "timeout_ms": 120000,
+      "output_mode": "stdout"
+    }
+  ]
+}
