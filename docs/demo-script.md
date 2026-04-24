@@ -69,6 +69,6 @@ To compare OpenCode against ControlKeel using the built-in benchmark engine:
 2. Run a benchmark with `controlkeel_validate,opencode_manual`.
 3. Let the `opencode_manual` result enter `awaiting_import` state.
 4. Capture the OpenCode-produced file or stdout for the same scenario.
-5. Import that output with `controlkeel benchmark import <run-id> opencode_manual --file <payload.json>`.
+5. Import that output with `controlkeel benchmark import <run-id> opencode_manual <payload.json>`.
 
 That gives you a reproducible `ControlKeel vs OpenCode` comparison without requiring a custom integration layer first.

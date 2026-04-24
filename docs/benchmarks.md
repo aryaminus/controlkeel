@@ -159,7 +159,7 @@ Capture the OpenCode-produced content for the target scenario and write a payloa
 Import it:
 
 ```bash
-controlkeel benchmark import <RUN_ID> opencode_manual --file payload.json
+controlkeel benchmark import <RUN_ID> opencode_manual payload.json
 ```
 
 ## Shell wrapper upgrade path

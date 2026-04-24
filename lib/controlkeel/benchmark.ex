@@ -333,6 +333,10 @@ defmodule ControlKeel.Benchmark do
 
     split_summary = count_by(scenarios, &scenario_split/1)
 
+    curation_mode =
+      get_in(run, [Access.key(:suite), Access.key(:metadata), "curation_mode"]) ||
+        "hand_curated_plus_trace_promoted"
+
     behavior_tag_summary =
       scenarios
       |> Enum.flat_map(&scenario_behavior_tags/1)
@@ -344,12 +348,14 @@ defmodule ControlKeel.Benchmark do
       "category_summary" => count_by(scenarios, & &1.category),
       "behavior_tag_summary" => behavior_tag_summary,
       "holdout_present" => Enum.any?(scenarios, &(scenario_split(&1) == "held_out")),
+      "curation_mode" => curation_mode,
       "promotion_integrity" =>
         promotion_integrity_profile(%{
           "scenario_count" => length(scenarios),
           "split_summary" => split_summary,
           "behavior_tag_summary" => behavior_tag_summary,
-          "classification" => classification_metrics(run)
+          "classification" => classification_metrics(run),
+          "curation_mode" => curation_mode
         })
     }
 
@@ -382,6 +388,14 @@ defmodule ControlKeel.Benchmark do
       |> maybe_integrity_warning(
         not is_nil(classification["youdens_j"]),
         "missing_classification_evidence"
+      )
+      |> maybe_integrity_warning(
+        length(evidence_channels) > 1,
+        "single_score_promotion"
+      )
+      |> maybe_integrity_warning(
+        has_trace_derived_scenarios?(profile),
+        "eval_staleness"
       )
 
     %{
@@ -931,6 +945,12 @@ defmodule ControlKeel.Benchmark do
   defp benchmark_integrity_title("missing_classification_evidence"),
     do: "Missing classification evidence"
 
+  defp benchmark_integrity_title("single_score_promotion"),
+    do: "Single-score promotion risk"
+
+  defp benchmark_integrity_title("eval_staleness"),
+    do: "Stale benchmark evaluation set"
+
   defp benchmark_integrity_title(warning), do: warning
 
   defp benchmark_integrity_message("missing_holdout_evidence") do
@@ -945,10 +965,23 @@ defmodule ControlKeel.Benchmark do
     "Benchmark promotion evidence is missing classification metrics such as TPR/FPR or Youden's J."
   end
 
+  defp benchmark_integrity_message("single_score_promotion") do
+    "Promotion evidence relies on a single channel; multi-channel corroboration is needed to resist metric gaming."
+  end
+
+  defp benchmark_integrity_message("eval_staleness") do
+    "The evaluation set has not been refreshed with trace-derived scenarios; repeated passes on the same set may mask regressions."
+  end
+
   defp benchmark_integrity_message(warning),
     do: "Benchmark promotion integrity warning: #{warning}."
 
   defp scenario_split(%Scenario{} = scenario), do: scenario.split || "public"
+
+  defp has_trace_derived_scenarios?(profile) do
+    curation_mode = Map.get(profile, "curation_mode") || "hand_curated_plus_trace_promoted"
+    String.contains?(curation_mode, "trace")
+  end
 
   defp average([]), do: nil
   defp average(values), do: Float.round(Enum.sum(values) / length(values), 1)

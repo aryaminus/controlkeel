@@ -5,7 +5,7 @@ defmodule ControlKeel.BenchmarkTest do
 
   alias ControlKeel.Analytics.Event
   alias ControlKeel.Benchmark
-  alias ControlKeel.Benchmark.{BuiltinSuites, Scenario, Suite}
+  alias ControlKeel.Benchmark.{BuiltinSuites, Result, Run, Scenario, Suite}
   alias ControlKeel.Mission.Session
   alias ControlKeel.Repo
 
@@ -281,6 +281,104 @@ defmodule ControlKeel.BenchmarkTest do
     assert Enum.any?(findings, &(&1["rule_id"] == "benchmarks.missing_holdout_evidence"))
   end
 
+  test "promotion integrity warns on single_score_promotion when only one evidence channel" do
+    integrity =
+      Benchmark.promotion_integrity_profile(%{
+        "scenario_count" => 3,
+        "split_summary" => %{"public" => 3},
+        "behavior_tag_summary" => %{"security" => 3},
+        "classification" => %{}
+      })
+
+    assert "single_score_promotion" in integrity["warnings"]
+
+    findings = Benchmark.integrity_findings(%{"promotion_integrity" => integrity})
+
+    assert Enum.any?(findings, &(&1["rule_id"] == "benchmarks.single_score_promotion"))
+    assert Enum.any?(findings, &String.contains?(&1["plain_message"], "single channel"))
+  end
+
+  test "promotion integrity warns on eval_staleness when no trace-derived scenarios" do
+    integrity =
+      Benchmark.promotion_integrity_profile(%{
+        "scenario_count" => 3,
+        "split_summary" => %{"public" => 3, "held_out" => 1},
+        "behavior_tag_summary" => %{"security" => 3, "governance" => 2},
+        "classification" => %{"youdens_j" => 0.75},
+        "curation_mode" => "hand_curated"
+      })
+
+    assert "eval_staleness" in integrity["warnings"]
+
+    findings = Benchmark.integrity_findings(%{"promotion_integrity" => integrity})
+
+    assert Enum.any?(findings, &(&1["rule_id"] == "benchmarks.eval_staleness"))
+    assert Enum.any?(findings, &String.contains?(&1["plain_message"], "trace-derived"))
+  end
+
+  test "promotion integrity does not warn on eval_staleness when trace-derived scenarios present" do
+    integrity =
+      Benchmark.promotion_integrity_profile(%{
+        "scenario_count" => 3,
+        "split_summary" => %{"public" => 3, "held_out" => 1},
+        "behavior_tag_summary" => %{"security" => 3, "governance" => 2},
+        "classification" => %{"youdens_j" => 0.75},
+        "curation_mode" => "hand_curated_plus_trace_promoted"
+      })
+
+    refute "eval_staleness" in integrity["warnings"]
+  end
+
+  test "run_eval_profile preserves suite curation_mode for eval_staleness diagnostics" do
+    scenario = %Scenario{
+      id: 123,
+      slug: "stale-suite-scenario",
+      name: "Stale suite scenario",
+      category: "security",
+      split: "public",
+      expected_decision: "block",
+      metadata: %{"domain_pack" => "software", "task_type" => "backend"}
+    }
+
+    run = %Run{
+      id: 456,
+      suite: %Suite{metadata: %{"curation_mode" => "hand_curated"}},
+      results: [
+        %Result{
+          scenario: scenario,
+          decision: "block",
+          findings_count: 1,
+          status: "completed",
+          payload: %{"findings" => [%{"rule_id" => "security.example"}]}
+        }
+      ]
+    }
+
+    profile = Benchmark.run_eval_profile(run)
+
+    assert profile["curation_mode"] == "hand_curated"
+    assert "eval_staleness" in profile["promotion_integrity"]["warnings"]
+
+    assert Enum.any?(
+             profile["diagnostic_findings"],
+             &(&1["rule_id"] == "benchmarks.eval_staleness")
+           )
+  end
+
+  test "promotion integrity passes with multi-channel evidence and trace curation" do
+    integrity =
+      Benchmark.promotion_integrity_profile(%{
+        "scenario_count" => 5,
+        "split_summary" => %{"public" => 3, "held_out" => 2},
+        "behavior_tag_summary" => %{"security" => 3, "governance" => 2},
+        "classification" => %{"youdens_j" => 0.8, "tpr" => 0.9, "fpr" => 0.1},
+        "curation_mode" => "hand_curated_plus_trace_promoted"
+      })
+
+    assert integrity["status"] == "ready"
+    assert integrity["warnings"] == []
+  end
+
   test "listing recent runs does not seed persisted suites" do
     initial_suite_count = Repo.aggregate(Suite, :count, :id)
     _runs = Benchmark.list_recent_runs()
@@ -454,6 +552,101 @@ defmodule ControlKeel.BenchmarkTest do
     assert get_in(decoded, ["run", "eval_profile", "behavior_tag_summary", "security"]) >= 1
     assert csv =~ "run_id,suite_slug,scenario_slug"
     assert csv =~ "hardcoded_api_key_python_webhook"
+  end
+
+  test "loads the host comparison suite for cross-host benchmarking" do
+    suite = benchmark_suite_fixture("host_comparison_v1")
+
+    assert suite.slug == "host_comparison_v1"
+    assert length(suite.scenarios) == 12
+
+    host_patterns =
+      suite.scenarios
+      |> Enum.map(&get_in(&1.metadata || %{}, ["host_pattern"]))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    assert host_patterns == ["both", "copilot", "opencode"]
+
+    assert Benchmark.suite_eval_profile(suite)["behavior_tag_summary"]["security"] >= 1
+
+    assert Enum.all?(suite.scenarios, fn scenario ->
+             scenario.expected_decision in ["block", "warn"]
+           end)
+  end
+
+  test "available subjects include copilot benchmark subjects", %{tmp_dir: tmp_dir} do
+    write_benchmark_subjects!(tmp_dir, [
+      %{
+        "id" => "opencode_manual",
+        "label" => "OpenCode (Manual Import)",
+        "type" => "manual_import"
+      },
+      %{
+        "id" => "copilot_manual",
+        "label" => "GitHub Copilot (Manual Import)",
+        "type" => "manual_import"
+      },
+      %{
+        "id" => "copilot_shell",
+        "label" => "GitHub Copilot (Shell Wrapper)",
+        "type" => "shell",
+        "command" => "./scripts/benchmark-host.sh",
+        "args" => ["copilot"],
+        "timeout_ms" => 120_000,
+        "output_mode" => "stdout"
+      }
+    ])
+
+    subject_ids =
+      Benchmark.available_subjects(tmp_dir)
+      |> Enum.map(& &1["id"])
+
+    assert "controlkeel_validate" in subject_ids
+    assert "copilot_manual" in subject_ids
+    assert "copilot_shell" in subject_ids
+  end
+
+  test "repo benchmark subjects include all supported host templates" do
+    subject_ids =
+      Benchmark.available_subjects()
+      |> Enum.map(& &1["id"])
+
+    assert "opencode_manual" in subject_ids
+    assert "copilot_manual" in subject_ids
+    assert "gemini_manual" in subject_ids
+    assert "codex_manual" in subject_ids
+    assert "claude_manual" in subject_ids
+  end
+
+  test "runs host comparison suite with copilot manual import subject", %{tmp_dir: tmp_dir} do
+    write_benchmark_subjects!(tmp_dir, [
+      %{
+        "id" => "copilot_manual",
+        "label" => "GitHub Copilot (Manual Import)",
+        "type" => "manual_import"
+      }
+    ])
+
+    {:ok, run} =
+      Benchmark.run_suite(
+        %{
+          "suite" => "host_comparison_v1",
+          "subjects" => "controlkeel_validate,copilot_manual",
+          "baseline_subject" => "controlkeel_validate",
+          "scenario_slugs" => "copilot_inline_stripe_key"
+        },
+        tmp_dir
+      )
+
+    assert run.total_scenarios == 1
+    assert length(run.results) == 2
+
+    ck_result = Enum.find(run.results, &(&1.subject == "controlkeel_validate"))
+    assert ck_result.status == "completed"
+
+    copilot_result = Enum.find(run.results, &(&1.subject == "copilot_manual"))
+    assert copilot_result.status == "awaiting_import"
   end
 
   defp elixir_bin! do

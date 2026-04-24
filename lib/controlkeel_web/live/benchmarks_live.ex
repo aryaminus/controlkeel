@@ -364,6 +364,24 @@ defmodule ControlKeelWeb.BenchmarksLive do
             >
               Validate + governed proxy
             </button>
+            <button
+              type="button"
+              class="ck-link"
+              id="benchmark-preset-copilot-vs-opencode"
+              phx-click="preset_benchmark"
+              phx-value-preset="copilot_vs_opencode"
+            >
+              Copilot vs OpenCode
+            </button>
+            <button
+              type="button"
+              class="ck-link"
+              id="benchmark-preset-full-compare"
+              phx-click="preset_benchmark"
+              phx-value-preset="full_compare"
+            >
+              Full host comparison
+            </button>
           </div>
           <.form for={@form} id="benchmark-runner" phx-submit="run">
             <div class="ck-filter-grid">
@@ -625,6 +643,17 @@ defmodule ControlKeelWeb.BenchmarksLive do
       },
       "ck_proxy" => %{
         "subjects" => "controlkeel_validate,controlkeel_proxy",
+        "baseline_subject" => "controlkeel_validate"
+      },
+      "copilot_vs_opencode" => %{
+        "suite" => "host_comparison_v1",
+        "subjects" => "controlkeel_validate,opencode_manual,copilot_manual",
+        "baseline_subject" => "controlkeel_validate"
+      },
+      "full_compare" => %{
+        "suite" => "host_comparison_v1",
+        "subjects" =>
+          "controlkeel_validate,opencode_manual,copilot_manual,gemini_manual,codex_manual,claude_manual",
         "baseline_subject" => "controlkeel_validate"
       }
     }

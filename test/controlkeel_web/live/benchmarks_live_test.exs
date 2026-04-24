@@ -105,4 +105,20 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     assert has_element?(view, "#scenario-hr_discriminatory_candidate_filter")
     assert has_element?(view, "a[href=\"/api/v1/benchmarks/runs/#{run.id}/export?format=csv\"]")
   end
+
+  test "index preset buttons fill multi-host subject fields", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+
+    view |> element("#benchmark-preset-copilot-vs-opencode") |> render_click()
+    html = render(view)
+    assert html =~ "host_comparison_v1"
+    assert html =~ "copilot_manual"
+
+    view |> element("#benchmark-preset-full-compare") |> render_click()
+    html = render(view)
+    assert html =~ "host_comparison_v1"
+    assert html =~ "gemini_manual"
+    assert html =~ "codex_manual"
+    assert html =~ "claude_manual"
+  end
 end
