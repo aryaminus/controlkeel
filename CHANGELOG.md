@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.44 — 2026-04-24
+
+### What's changed
+
+- feat(integrations): model dmux as a framework adapter
+
 ## v0.2.43 — 2026-04-24
 
 ### What's changed
