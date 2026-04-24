@@ -1050,4 +1050,189 @@ defmodule ControlKeel.MissionTest do
       assert {:error, :not_found} = Mission.audit_log(99_999_999)
     end
   end
+
+  describe "decision_hygiene_findings/2" do
+    test "produces sunk_cost_signal when plan refinement depth >= 3" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "queued"})
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Done",
+                 "codebase_findings" => ["Checked"],
+                 "options_considered" => ["A", "B"],
+                 "selected_option" => "A",
+                 "rejected_options" => ["B"],
+                 "implementation_steps" => ["Step 1", "Step 2"],
+                 "validation_plan" => ["mix test"],
+                 "scope_estimate" => %{"files_touched_estimate" => 2, "diff_size_estimate" => 100},
+                 "submission_body" => "Plan v1"
+               })
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Updated",
+                 "codebase_findings" => ["More"],
+                 "options_considered" => ["A", "C"],
+                 "selected_option" => "A",
+                 "rejected_options" => ["C"],
+                 "implementation_steps" => ["Step 1", "Step 2", "Step 3"],
+                 "validation_plan" => ["mix test"],
+                 "scope_estimate" => %{"files_touched_estimate" => 2, "diff_size_estimate" => 100},
+                 "submission_body" => "Plan v2"
+               })
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Final",
+                 "codebase_findings" => ["Done"],
+                 "options_considered" => ["A", "D"],
+                 "selected_option" => "A",
+                 "rejected_options" => ["D"],
+                 "implementation_steps" => ["Step 1", "Step 2"],
+                 "validation_plan" => ["mix test"],
+                 "scope_estimate" => %{"files_touched_estimate" => 2, "diff_size_estimate" => 100},
+                 "submission_body" => "Plan v3"
+               })
+
+      task = Mission.get_task!(task.id)
+      findings = Mission.decision_hygiene_findings(task)
+
+      assert Enum.any?(findings, &(&1["rule_id"] == "planning.sunk_cost_signal"))
+      assert Enum.any?(findings, &(&1["plain_message"] =~ "refined 3 times"))
+    end
+
+    test "produces scope_without_evidence for high-scope plans missing validation" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "queued"})
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Done",
+                 "options_considered" => ["A", "B"],
+                 "selected_option" => "A",
+                 "implementation_steps" => ["Step 1", "Step 2"],
+                 "scope_estimate" => %{
+                   "files_touched_estimate" => 8,
+                   "diff_size_estimate" => 500,
+                   "architectural_scope" => true
+                 },
+                 "submission_body" => "Big plan without validation"
+               })
+
+      task = Mission.get_task!(task.id)
+      findings = Mission.decision_hygiene_findings(task)
+
+      assert Enum.any?(findings, &(&1["rule_id"] == "planning.scope_without_evidence"))
+
+      scope_finding = Enum.find(findings, &(&1["rule_id"] == "planning.scope_without_evidence"))
+      assert scope_finding["severity"] == "high"
+      assert scope_finding["plain_message"] =~ "validation"
+    end
+
+    test "produces weak_verification_confidence for execution-ready plan without validation" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "queued"})
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Done",
+                 "options_considered" => ["A", "B"],
+                 "selected_option" => "A",
+                 "rejected_options" => ["B"],
+                 "implementation_steps" => ["Step 1", "Step 2"],
+                 "scope_estimate" => %{"files_touched_estimate" => 2, "diff_size_estimate" => 100},
+                 "submission_body" => "Plan v1"
+               })
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "code_backed_plan",
+                 "research_summary" => "Done",
+                 "options_considered" => ["A", "B"],
+                 "selected_option" => "A",
+                 "rejected_options" => ["B"],
+                 "implementation_steps" => ["Step 1", "Step 2"],
+                 "code_snippets" => ["def foo do\n  :ok\nend"],
+                 "scope_estimate" => %{"files_touched_estimate" => 2, "diff_size_estimate" => 100},
+                 "submission_body" => "Plan v2 still no validation"
+               })
+
+      task = Mission.get_task!(task.id)
+      findings = Mission.decision_hygiene_findings(task)
+
+      assert Enum.any?(findings, &(&1["rule_id"] == "review.weak_verification_confidence"))
+
+      weak_finding =
+        Enum.find(findings, &(&1["rule_id"] == "review.weak_verification_confidence"))
+
+      assert weak_finding["plain_message"] =~ "verification"
+    end
+
+    test "review_gate_status exposes decision hygiene diagnostic findings" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "queued"})
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "implementation_plan",
+                 "research_summary" => "Done",
+                 "options_considered" => ["A", "B"],
+                 "selected_option" => "A",
+                 "rejected_options" => ["B"],
+                 "implementation_steps" => ["Step 1", "Step 2"],
+                 "scope_estimate" => %{
+                   "files_touched_estimate" => 8,
+                   "diff_size_estimate" => 500,
+                   "architectural_scope" => true
+                 },
+                 "submission_body" => "Initial large plan without validation"
+               })
+
+      assert {:ok, _review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "plan_phase" => "code_backed_plan",
+                 "research_summary" => "Done",
+                 "options_considered" => ["A", "B"],
+                 "selected_option" => "A",
+                 "rejected_options" => ["B"],
+                 "implementation_steps" => ["Step 1", "Step 2"],
+                 "code_snippets" => ["def foo do\n  :ok\nend"],
+                 "scope_estimate" => %{
+                   "files_touched_estimate" => 8,
+                   "diff_size_estimate" => 500,
+                   "architectural_scope" => true
+                 },
+                 "submission_body" => "Large plan without validation"
+               })
+
+      task = Mission.get_task!(task.id)
+      gate = Mission.review_gate_status(task)
+      rule_ids = Enum.map(gate["diagnostic_findings"], & &1["rule_id"])
+
+      assert "planning.scope_without_evidence" in rule_ids
+      assert "review.weak_verification_confidence" in rule_ids
+    end
+  end
 end

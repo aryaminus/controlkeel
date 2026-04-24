@@ -232,8 +232,90 @@ defmodule ControlKeel.Mission do
       "plan_quality_score" => gate["plan_quality_score"],
       "planning_depth" => gate["planning_depth"],
       "grill_questions" => gate["grill_questions"] || [],
-      "decision_prompts" => gate["decision_prompts"] || []
+      "decision_prompts" => gate["decision_prompts"] || [],
+      "diagnostic_findings" => decision_hygiene_findings(task)
     }
+  end
+
+  def decision_hygiene_findings(%Task{} = task, attrs \\ %{}) do
+    gate = get_in(task.metadata || %{}, ["review_gate"]) || %{}
+    plan_quality = gate["plan_quality"] || %{}
+    plan_refinement = gate["plan_refinement"] || %{}
+
+    depth = plan_refinement["depth"] || gate["planning_depth"] || 1
+    scope_high = plan_quality["scope_high"]
+    missing = plan_quality["missing"] || []
+    validation_plan = plan_refinement["validation_plan"] || []
+
+    sunk_cost =
+      if depth >= 3 do
+        [
+          %{
+            "category" => "decision-hygiene",
+            "severity" => "medium",
+            "rule_id" => "planning.sunk_cost_signal",
+            "title" => "Sunk-cost risk: plan refinement depth is #{depth}",
+            "plain_message" =>
+              "This plan has been refined #{depth} times. Consider whether continued refinement is justified by new evidence, or whether the current plan should be approved, narrowed, or abandoned.",
+            "metadata" =>
+              Map.merge(attrs, %{
+                "diagnostic_source" => "mission_decision_hygiene",
+                "planning_depth" => depth,
+                "task_id" => task.id
+              })
+          }
+        ]
+      else
+        []
+      end
+
+    scope_without_evidence =
+      if scope_high == true and "validation_plan" in missing do
+        [
+          %{
+            "category" => "decision-hygiene",
+            "severity" => "high",
+            "rule_id" => "planning.scope_without_evidence",
+            "title" => "High-scope plan missing validation evidence",
+            "plain_message" =>
+              "The plan has high scope but no validation plan. Large changes without concrete verification steps are the strongest predictor of post-merge failures.",
+            "metadata" =>
+              Map.merge(attrs, %{
+                "diagnostic_source" => "mission_decision_hygiene",
+                "scope_high" => true,
+                "missing_fields" => missing,
+                "task_id" => task.id
+              })
+          }
+        ]
+      else
+        []
+      end
+
+    weak_verification =
+      if depth >= 2 and validation_plan == [] and plan_quality["execution_ready_phase"] == true do
+        [
+          %{
+            "category" => "decision-hygiene",
+            "severity" => "medium",
+            "rule_id" => "review.weak_verification_confidence",
+            "title" => "Execution-ready plan lacks verification steps",
+            "plain_message" =>
+              "The plan has reached execution-ready phase at depth #{depth} but still has no validation plan. Approval without verification evidence weakens the review gate.",
+            "metadata" =>
+              Map.merge(attrs, %{
+                "diagnostic_source" => "mission_decision_hygiene",
+                "planning_depth" => depth,
+                "execution_ready_phase" => true,
+                "task_id" => task.id
+              })
+          }
+        ]
+      else
+        []
+      end
+
+    sunk_cost ++ scope_without_evidence ++ weak_verification
   end
 
   def execution_ready?(%Task{} = task) do
@@ -4299,6 +4381,8 @@ defmodule ControlKeel.Mission do
       "grill_questions" => plan_quality["grill_questions"] || [],
       "decision_prompts" => plan_quality["decision_prompts"] || [],
       "planning_depth" => plan_refinement && plan_refinement["depth"],
+      "plan_quality" => plan_quality,
+      "plan_refinement" => plan_refinement,
       "updated_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
     })
   end

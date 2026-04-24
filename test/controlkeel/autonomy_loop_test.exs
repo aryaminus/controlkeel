@@ -106,6 +106,89 @@ defmodule ControlKeel.AutonomyLoopTest do
     assert get_in(loop, ["ownership_summary", "signals", "task_owner", "top"]) == "codex"
 
     findings = AutonomyLoop.ownership_findings(loop["ownership_summary"])
-    assert [%{"rule_id" => "teams.ownership_concentration"}] = findings
+    assert Enum.any?(findings, &(&1["rule_id"] == "teams.ownership_concentration"))
+    assert Enum.any?(findings, &(&1["rule_id"] == "teams.bus_factor.low"))
+  end
+
+  test "ownership findings include bus_factor.low for extreme concentration" do
+    session = session_fixture()
+
+    Enum.each(1..5, fn index ->
+      task_fixture(%{
+        session: session,
+        position: index,
+        metadata: %{"owner" => "codex"}
+      })
+    end)
+
+    loop =
+      session.id
+      |> Mission.get_session_with_details!()
+      |> AutonomyLoop.session_improvement_loop()
+
+    findings = AutonomyLoop.ownership_findings(loop["ownership_summary"])
+
+    assert Enum.any?(findings, &(&1["rule_id"] == "teams.ownership_concentration"))
+    assert Enum.any?(findings, &(&1["rule_id"] == "teams.bus_factor.low"))
+
+    bus_factor_finding = Enum.find(findings, &(&1["rule_id"] == "teams.bus_factor.low"))
+    assert bus_factor_finding["severity"] == "high"
+    assert bus_factor_finding["plain_message"] =~ "90%"
+  end
+
+  test "ownership findings include approval_concentration for review concentration" do
+    summary = %{
+      "risk" => "concentrated",
+      "risks" => ["review_submitter:same-reviewer"],
+      "recommendation" => "Diversify reviewers.",
+      "signals" => %{
+        "task_owner" => %{"total" => 4, "top" => "agent-a", "top_count" => 2, "top_share" => 0.5},
+        "review_submitter" => %{
+          "total" => 4,
+          "top" => "same-reviewer",
+          "top_count" => 4,
+          "top_share" => 1.0
+        },
+        "finding_category" => %{
+          "total" => 2,
+          "top" => "security",
+          "top_count" => 1,
+          "top_share" => 0.5
+        }
+      }
+    }
+
+    findings = AutonomyLoop.ownership_findings(summary)
+
+    assert Enum.any?(findings, &(&1["rule_id"] == "teams.ownership_concentration"))
+    assert Enum.any?(findings, &(&1["rule_id"] == "teams.approval_concentration"))
+
+    approval_finding = Enum.find(findings, &(&1["rule_id"] == "teams.approval_concentration"))
+    assert approval_finding["severity"] == "medium"
+    assert approval_finding["plain_message"] =~ "85%"
+  end
+
+  test "bottleneck findings include coordination_overhead when blocked findings accumulate" do
+    session = session_fixture(%{risk_tier: "critical"})
+
+    Enum.each(1..5, fn index ->
+      finding_fixture(%{
+        session: session,
+        status: if(index <= 2, do: "blocked", else: "open"),
+        rule_id: "test.finding.#{index}"
+      })
+    end)
+
+    loop =
+      session.id
+      |> Mission.get_session_with_details!()
+      |> AutonomyLoop.session_improvement_loop()
+
+    findings = AutonomyLoop.bottleneck_findings(loop["bottleneck_summary"])
+
+    assert Enum.any?(findings, &(&1["rule_id"] == "delegation.coordination_overhead"))
+
+    coord_finding = Enum.find(findings, &(&1["rule_id"] == "delegation.coordination_overhead"))
+    assert coord_finding["plain_message"] =~ "blocked findings"
   end
 end

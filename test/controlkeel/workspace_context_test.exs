@@ -120,9 +120,115 @@ defmodule ControlKeel.WorkspaceContextTest do
     assert get_in(context, ["design_drift", "complexity_budget", "review_pressure"]) ==
              "require_small_steps_and_stronger_tests"
 
-    [finding] = WorkspaceContext.complexity_budget_findings(context["design_drift"])
+    findings = WorkspaceContext.complexity_budget_findings(context["design_drift"])
+    finding = Enum.find(findings, &(&1["rule_id"] == "design.complexity_budget.high"))
     assert finding["rule_id"] == "design.complexity_budget.high"
     assert finding["metadata"]["complexity_budget"]["level"] == "high"
+  end
+
+  test "complexity_budget_findings produces granular findings for large files, hotspots, and second-system risk",
+       %{
+         tmp_dir: tmp_dir
+       } do
+    large_content = String.duplicate("# line of code\n", 850)
+
+    File.mkdir_p!(Path.join(tmp_dir, "lib"))
+    File.write!(Path.join(tmp_dir, "lib/big_file.ex"), large_content)
+
+    File.write!(Path.join(tmp_dir, "README.md"), "# Test\n")
+
+    assert {_, 0} = System.cmd("git", ["init"], cd: tmp_dir)
+    assert {"", 0} = System.cmd("git", ["config", "user.email", "test@example.com"], cd: tmp_dir)
+    assert {"", 0} = System.cmd("git", ["config", "user.name", "Test"], cd: tmp_dir)
+    assert {"", 0} = System.cmd("git", ["add", "."], cd: tmp_dir)
+    assert {_, 0} = System.cmd("git", ["commit", "-m", "initial"], cd: tmp_dir)
+
+    Enum.each(1..5, fn iteration ->
+      File.write!(
+        Path.join(tmp_dir, "lib/big_file.ex"),
+        large_content <> "# change #{iteration}\n"
+      )
+
+      assert {"", 0} = System.cmd("git", ["add", "lib/big_file.ex"], cd: tmp_dir)
+      assert {_, 0} = System.cmd("git", ["commit", "-m", "change #{iteration}"], cd: tmp_dir)
+    end)
+
+    context = WorkspaceContext.build(tmp_dir)
+    design_drift = context["design_drift"]
+
+    findings = WorkspaceContext.complexity_budget_findings(design_drift)
+
+    rule_ids = Enum.map(findings, & &1["rule_id"])
+
+    assert "design.complexity_budget.high" in rule_ids
+    assert "design.large_file_budget_exceeded" in rule_ids
+    assert "design.hotspot_churn" in rule_ids
+    assert "planning.second_system_risk" in rule_ids
+
+    large_file_finding =
+      Enum.find(findings, &(&1["rule_id"] == "design.large_file_budget_exceeded"))
+
+    assert large_file_finding["metadata"]["file_path"] == "lib/big_file.ex"
+
+    hotspot_finding = Enum.find(findings, &(&1["rule_id"] == "design.hotspot_churn"))
+    assert hotspot_finding["metadata"]["file_path"] == "lib/big_file.ex"
+
+    second_system = Enum.find(findings, &(&1["rule_id"] == "planning.second_system_risk"))
+    assert second_system["plain_message"] =~ "simplification"
+  end
+
+  test "complexity_budget_findings emits a finding for each large file and hotspot", %{
+    tmp_dir: tmp_dir
+  } do
+    large_content = String.duplicate("# line of code\n", 850)
+
+    File.mkdir_p!(Path.join(tmp_dir, "lib"))
+    File.write!(Path.join(tmp_dir, "lib/first_big.ex"), large_content)
+    File.write!(Path.join(tmp_dir, "lib/second_big.ex"), large_content)
+
+    assert {_, 0} = System.cmd("git", ["init"], cd: tmp_dir)
+    assert {"", 0} = System.cmd("git", ["config", "user.email", "test@example.com"], cd: tmp_dir)
+    assert {"", 0} = System.cmd("git", ["config", "user.name", "Test"], cd: tmp_dir)
+    assert {"", 0} = System.cmd("git", ["add", "."], cd: tmp_dir)
+    assert {_, 0} = System.cmd("git", ["commit", "-m", "initial"], cd: tmp_dir)
+
+    Enum.each(1..5, fn iteration ->
+      File.write!(
+        Path.join(tmp_dir, "lib/first_big.ex"),
+        large_content <> "# first #{iteration}\n"
+      )
+
+      File.write!(
+        Path.join(tmp_dir, "lib/second_big.ex"),
+        large_content <> "# second #{iteration}\n"
+      )
+
+      assert {"", 0} =
+               System.cmd("git", ["add", "lib/first_big.ex", "lib/second_big.ex"], cd: tmp_dir)
+
+      assert {_, 0} = System.cmd("git", ["commit", "-m", "change #{iteration}"], cd: tmp_dir)
+    end)
+
+    findings =
+      tmp_dir
+      |> WorkspaceContext.build()
+      |> Map.fetch!("design_drift")
+      |> WorkspaceContext.complexity_budget_findings()
+
+    large_file_paths =
+      findings
+      |> Enum.filter(&(&1["rule_id"] == "design.large_file_budget_exceeded"))
+      |> Enum.map(&get_in(&1, ["metadata", "file_path"]))
+      |> Enum.sort()
+
+    hotspot_paths =
+      findings
+      |> Enum.filter(&(&1["rule_id"] == "design.hotspot_churn"))
+      |> Enum.map(&get_in(&1, ["metadata", "file_path"]))
+      |> Enum.sort()
+
+    assert large_file_paths == ["lib/first_big.ex", "lib/second_big.ex"]
+    assert hotspot_paths == ["lib/first_big.ex", "lib/second_big.ex"]
   end
 
   test "build/1 returns unavailable for missing or non-git roots", %{tmp_dir: tmp_dir} do

@@ -172,15 +172,39 @@ defmodule ControlKeel.AutonomyLoop do
   end
 
   def bottleneck_findings(summary, attrs \\ %{}) when is_map(summary) do
-    case summary["primary"] do
-      primary when primary in ["unresolved_findings", "review_wait", "budget_pressure"] ->
+    base =
+      case summary["primary"] do
+        primary when primary in ["unresolved_findings", "review_wait", "budget_pressure"] ->
+          [
+            %{
+              "category" => "delivery-analytics",
+              "severity" => if(primary == "unresolved_findings", do: "high", else: "medium"),
+              "rule_id" => "delivery.serial_bottleneck.#{primary}",
+              "title" => "Delivery bottleneck: #{String.replace(primary, "_", " ")}",
+              "plain_message" => summary["recommendation"],
+              "metadata" =>
+                Map.merge(attrs, %{
+                  "diagnostic_source" => "autonomy_loop_bottleneck",
+                  "bottleneck_summary" => summary
+                })
+            }
+          ]
+
+        _ ->
+          []
+      end
+
+    coordination =
+      if get_in(summary, ["signals", "active_findings"]) >= 5 and
+           get_in(summary, ["signals", "blocked_findings"]) >= 2 do
         [
           %{
             "category" => "delivery-analytics",
-            "severity" => if(primary == "unresolved_findings", do: "high", else: "medium"),
-            "rule_id" => "delivery.serial_bottleneck.#{primary}",
-            "title" => "Delivery bottleneck: #{String.replace(primary, "_", " ")}",
-            "plain_message" => summary["recommendation"],
+            "severity" => "medium",
+            "rule_id" => "delegation.coordination_overhead",
+            "title" => "Coordination overhead from blocked findings",
+            "plain_message" =>
+              "The session has #{get_in(summary, ["signals", "blocked_findings"])} blocked findings among #{get_in(summary, ["signals", "active_findings"])} active. Widening delegation before resolving blockers will increase coordination cost without improving throughput.",
             "metadata" =>
               Map.merge(attrs, %{
                 "diagnostic_source" => "autonomy_loop_bottleneck",
@@ -188,31 +212,81 @@ defmodule ControlKeel.AutonomyLoop do
               })
           }
         ]
-
-      _ ->
+      else
         []
-    end
+      end
+
+    base ++ coordination
   end
 
   def ownership_findings(summary, attrs \\ %{}) when is_map(summary) do
-    if summary["risk"] == "concentrated" do
-      [
-        %{
-          "category" => "delivery-analytics",
-          "severity" => "medium",
-          "rule_id" => "teams.ownership_concentration",
-          "title" => "Ownership concentration detected",
-          "plain_message" => summary["recommendation"],
-          "metadata" =>
-            Map.merge(attrs, %{
-              "diagnostic_source" => "autonomy_loop_ownership",
-              "ownership_summary" => summary
-            })
-        }
-      ]
-    else
-      []
-    end
+    base =
+      if summary["risk"] == "concentrated" do
+        [
+          %{
+            "category" => "delivery-analytics",
+            "severity" => "medium",
+            "rule_id" => "teams.ownership_concentration",
+            "title" => "Ownership concentration detected",
+            "plain_message" => summary["recommendation"],
+            "metadata" =>
+              Map.merge(attrs, %{
+                "diagnostic_source" => "autonomy_loop_ownership",
+                "ownership_summary" => summary
+              })
+          }
+        ]
+      else
+        []
+      end
+
+    bus_factor =
+      case get_in(summary, ["signals", "task_owner"]) do
+        %{"total" => total, "top_share" => share} when total >= 3 and share >= 0.9 ->
+          [
+            %{
+              "category" => "delivery-analytics",
+              "severity" => "high",
+              "rule_id" => "teams.bus_factor.low",
+              "title" => "Bus factor is critically low",
+              "plain_message" =>
+                "A single owner holds >= 90% of task assignments (#{share |> Kernel.*(100) |> round()}% of #{total} tasks). If this agent or person becomes unavailable, delivery stalls.",
+              "metadata" =>
+                Map.merge(attrs, %{
+                  "diagnostic_source" => "autonomy_loop_ownership",
+                  "ownership_summary" => summary
+                })
+            }
+          ]
+
+        _ ->
+          []
+      end
+
+    approval_concentration =
+      case get_in(summary, ["signals", "review_submitter"]) do
+        %{"total" => total, "top_share" => share} when total >= 3 and share >= 0.85 ->
+          [
+            %{
+              "category" => "delivery-analytics",
+              "severity" => "medium",
+              "rule_id" => "teams.approval_concentration",
+              "title" => "Review approval is concentrated",
+              "plain_message" =>
+                "A single reviewer handles >= 85% of review submissions. Diversify reviewers to improve coverage and reduce single-point-of-failure risk.",
+              "metadata" =>
+                Map.merge(attrs, %{
+                  "diagnostic_source" => "autonomy_loop_ownership",
+                  "ownership_summary" => summary
+                })
+            }
+          ]
+
+        _ ->
+          []
+      end
+
+    base ++ bus_factor ++ approval_concentration
   end
 
   def workspace_improvement_summary(sessions) when is_list(sessions) do

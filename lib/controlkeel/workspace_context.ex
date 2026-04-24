@@ -273,30 +273,107 @@ defmodule ControlKeel.WorkspaceContext do
 
   def complexity_budget_findings(design_drift, attrs \\ %{}) when is_map(design_drift) do
     budget = design_drift["complexity_budget"] || complexity_budget([], [], [])
+    signals = design_drift["signals"] || []
+    large_files = design_drift["large_files"] || []
+    hotspots = design_drift["recent_hotspots"] || []
 
-    case budget["level"] do
-      level when level in ["high", "medium"] ->
+    base_finding =
+      case budget["level"] do
+        level when level in ["high", "medium"] ->
+          [
+            %{
+              "category" => "design-drift",
+              "severity" => if(level == "high", do: "high", else: "medium"),
+              "rule_id" => "design.complexity_budget.#{level}",
+              "title" => "Workspace complexity budget is #{level}",
+              "plain_message" => budget["recommended_action"],
+              "metadata" =>
+                Map.merge(attrs, %{
+                  "diagnostic_source" => "workspace_complexity_budget",
+                  "complexity_budget" => budget,
+                  "signals" => signals,
+                  "large_files" => large_files,
+                  "recent_hotspots" => hotspots
+                })
+            }
+          ]
+
+        _ ->
+          []
+      end
+
+    large_file_findings =
+      case budget["level"] do
+        level when level in ["high", "medium"] ->
+          Enum.map(large_files, fn file ->
+            %{
+              "category" => "design-drift",
+              "severity" => if(file["line_count"] >= 800, do: "high", else: "medium"),
+              "rule_id" => "design.large_file_budget_exceeded",
+              "title" => "Large file contributes to complexity budget",
+              "plain_message" =>
+                "#{file["path"]} is #{file["line_count"]} lines. Large files increase review difficulty and make agent edits harder to validate.",
+              "metadata" =>
+                Map.merge(attrs, %{
+                  "diagnostic_source" => "workspace_complexity_budget",
+                  "file_path" => file["path"],
+                  "line_count" => file["line_count"],
+                  "complexity_level" => level
+                })
+            }
+          end)
+
+        _ ->
+          []
+      end
+
+    hotspot_findings =
+      case budget["level"] do
+        level when level in ["high", "medium"] ->
+          Enum.map(hotspots, fn hotspot ->
+            %{
+              "category" => "design-drift",
+              "severity" => "medium",
+              "rule_id" => "design.hotspot_churn",
+              "title" => "Edit hotspot contributes to complexity budget",
+              "plain_message" =>
+                "#{hotspot["path"]} changed in #{hotspot["commit_count"]} of the last 20 commits. Repeated edits in a high-complexity workspace suggest unstable boundaries.",
+              "metadata" =>
+                Map.merge(attrs, %{
+                  "diagnostic_source" => "workspace_complexity_budget",
+                  "file_path" => hotspot["path"],
+                  "commit_count" => hotspot["commit_count"],
+                  "complexity_level" => level
+                })
+            }
+          end)
+
+        _ ->
+          []
+      end
+
+    second_system_findings =
+      if budget["level"] == "high" and budget["score"] >= 75 do
         [
           %{
             "category" => "design-drift",
-            "severity" => if(level == "high", do: "high", else: "medium"),
-            "rule_id" => "design.complexity_budget.#{level}",
-            "title" => "Workspace complexity budget is #{level}",
-            "plain_message" => budget["recommended_action"],
+            "severity" => "medium",
+            "rule_id" => "planning.second_system_risk",
+            "title" => "Second-system effect risk in high-complexity workspace",
+            "plain_message" =>
+              "Workspace complexity is very high (score #{budget["score"]}/100). Consider whether new features are genuinely needed or whether simplification and deletion would be more valuable.",
             "metadata" =>
               Map.merge(attrs, %{
                 "diagnostic_source" => "workspace_complexity_budget",
-                "complexity_budget" => budget,
-                "signals" => design_drift["signals"] || [],
-                "large_files" => design_drift["large_files"] || [],
-                "recent_hotspots" => design_drift["recent_hotspots"] || []
+                "complexity_budget" => budget
               })
           }
         ]
-
-      _ ->
+      else
         []
-    end
+      end
+
+    base_finding ++ large_file_findings ++ hotspot_findings ++ second_system_findings
   end
 
   defp recent_commits(repo_root) do

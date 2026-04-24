@@ -231,21 +231,25 @@ These principles already appear strongly in CK's shipped posture:
 
 ## Recommended Order
 
-1. Shipped: Goodhart guardrails in benchmark and policy promotion now expose integrity profiles, promotion-blocking policy gates, and diagnostic finding payloads.
-2. Shipped: Hyrum parity checks now cover hosted MCP tool/schema/scope parity in runtime conformance tests.
-3. Shipped: Design-drift signals now produce a workspace complexity budget and diagnostic finding payloads.
-4. Shipped: Bottleneck reporting now appears in session improvement loops and Ship Dashboard rows.
-5. Shipped: Ownership concentration now appears in session improvement loops and diagnostic finding payloads when existing data is strong enough.
-6. Shipped: Decision hygiene prompts now appear in plan review-gate metadata.
+1. **Shipped**: Goodhart guardrails — `Benchmark.promotion_integrity_profile/1` and `PolicyTraining.promotion_integrity/1` expose integrity profiles with evidence-channel counts, promotion-blocking policy gates, and diagnostic finding payloads including `benchmarks.single_score_promotion`, `benchmarks.eval_staleness`, `benchmarks.missing_holdout_evidence`, `benchmarks.low_behavior_diversity`, and `benchmarks.missing_classification_evidence`.
+2. **Shipped (partial)**: Hyrum parity checks — hosted MCP tool/schema/scope parity is covered in `runtime_conformance_test.exs`. Full cross-surface parity (CLI/REST/web payload parity) and rule IDs `contracts.surface_parity.*`, `contracts.schema_drift.*` remain planned.
+3. **Shipped**: Complexity and drift budgets — `WorkspaceContext.complexity_budget/3` produces a severity-scored budget. `WorkspaceContext.complexity_budget_findings/2` emits granular findings: `design.complexity_budget.high|medium`, `design.large_file_budget_exceeded`, `design.hotspot_churn`, and `planning.second_system_risk`.
+4. **Shipped**: Bottleneck reporting — `AutonomyLoop.bottleneck_summary/4` and `bottleneck_findings/2` appear in session improvement loops and Ship Dashboard rows with findings `delivery.serial_bottleneck.{unresolved_findings,review_wait,budget_pressure}` and `delegation.coordination_overhead`.
+5. **Shipped**: Ownership and bus-factor signals — `AutonomyLoop.ownership_summary/1` and `ownership_findings/2` emit `teams.ownership_concentration`, `teams.bus_factor.low`, and `teams.approval_concentration`.
+6. **Shipped**: Decision hygiene — `Mission.decision_hygiene_prompts/4` generates inversion, evidence, sunk-cost, and alternative prompts in review gates. `Mission.decision_hygiene_findings/2` emits structured finding payloads: `planning.sunk_cost_signal`, `planning.scope_without_evidence`, and `review.weak_verification_confidence`.
 
 ## Validation Notes
 
-This document is a roadmap/backlog artifact, not a product claim that the listed diagnostics are already implemented.
+Slices 1, 3, 4, 5, and 6 are fully implemented with dedicated test coverage in:
+- `test/controlkeel/benchmark_test.exs` — promotion integrity, single_score_promotion, eval_staleness
+- `test/controlkeel/policy_training_test.exs` — policy promotion integrity
+- `test/controlkeel/workspace_context_test.exs` — complexity budget, granular drift findings
+- `test/controlkeel/autonomy_loop_test.exs` — bottleneck, ownership, bus_factor, coordination
+- `test/controlkeel/mission_test.exs` — decision hygiene findings, review gate status
 
-Any implementation should:
+Slice 2 (Hyrum parity) has hosted MCP parity coverage. Cross-surface CLI/REST/web parity checks and the remaining rule IDs (`contracts.surface_parity.*`, `contracts.schema_drift.*`, `delegation.parallelism_limited`) are planned but not yet implemented.
 
+Any future implementation should:
 - add tests before exposing a diagnostic as shipped behavior
 - keep warnings evidence-backed and source-specific
 - avoid blocking work solely because a named law applies; current policy promotion gates block only when required evaluation evidence is missing
-- prefer plain-English findings over philosophical labels in operator-facing UI
-- keep diagnostic finding payloads opt-in for persistence unless a caller explicitly wants a durable finding, so dashboard refreshes do not create duplicate records
