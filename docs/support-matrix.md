@@ -339,6 +339,8 @@ CK now makes the execution posture explicit in the brief and context layer:
 - `shell_sandbox` remains the broad fallback path for repo mutation, package management, and test execution, with the strongest approval pressure
 - capability egress posture is default-deny; network/high-impact grants are expected to be explicit, task-scoped, and review-traceable
 
+Hosts may still expose their own file-backed memory surfaces, such as repo memory files or mounted working directories. CK treats those as companion execution surfaces, not as the governed system of record. Durable reviewable continuity still lives under `typed_storage`.
+
 ## MCP runtime tools
 
 Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/). The MCP server advertises the core and extended governance tools, and adds `ck_skill_list` and `ck_skill_load` when the runtime has a non-empty skill catalog (see `protocol.ex` `tool_schemas/0`).

@@ -142,6 +142,15 @@ For multi-agent memory experiments, use metadata to describe the strategy honest
 
 That lets CK compare governed runs across the same suite while keeping the benchmark evidence clear about what was actually used.
 
+When the run also depends on host-managed file memory, record that separately instead of smuggling it into a generic "memory" label. Useful values include:
+
+- `memory_surface: "typed_memory_only"` — CK memory/proofs/resume state only
+- `memory_surface: "filesystem_only"` — repo files, notes, or mounted directories only
+- `memory_surface: "hybrid_typed_plus_filesystem"` — CK typed memory plus host file memory
+- `memory_surface: "host_project_memory"` — host-native project memory files such as repo-scoped instruction/memory documents
+
+This makes it easier to compare "agent plus terminal" memory setups against governed typed-memory setups without pretending they are the same surface.
+
 ### Retrieval strategy metadata
 
 When benchmarking retrieval quality over CK memory, tag the retrieval backend:

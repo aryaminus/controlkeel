@@ -198,6 +198,8 @@ The same honesty applies to browser automation. CK can coexist with external bro
 
 In practice, `ck_context` is the main continuity surface across those transports. It returns current mission state plus a bounded workspace snapshot, a deterministic workspace cache key, recent CK-visible transcript events, transcript summaries, and resumable task context for the active session.
 
+When a host also offers file-backed memory, CK should coexist with it rather than pretending it does not exist. Project memory files, repo notes, or mounted memory directories can help the active agent work faster inside that host. CK still keeps the governed continuity layer in typed memory, proofs, traces, workspace snapshots, and resume packets so memory remains portable across hosts and auditable outside any one runtime.
+
 ### Progressive discovery and composition
 
 CK is intentionally designed so MCP clients do not have to front-load the entire governed surface into context at once.
