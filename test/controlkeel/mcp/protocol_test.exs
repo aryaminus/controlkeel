@@ -832,6 +832,9 @@ defmodule ControlKeel.MCP.ProtocolTest do
             "plan_phase" => "implementation_plan",
             "research_summary" => "Reviewed existing Mission review gates and proof bundles.",
             "codebase_findings" => ["Plan metadata can extend current review storage."],
+            "alignment_context" => [
+              "PM wants non-code alignment context to travel with the review packet."
+            ],
             "options_considered" => ["Extend review metadata", "Create planner subsystem"],
             "selected_option" => "Extend review metadata",
             "rejected_options" => ["Create planner subsystem"],
@@ -849,6 +852,15 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "implementation_plan"
 
     assert get_in(response, ["result", "structuredContent", "plan_quality", "ready"]) == true
+
+    assert get_in(response, [
+             "result",
+             "structuredContent",
+             "plan_refinement",
+             "alignment_context"
+           ]) !=
+             []
+
     assert is_list(get_in(response, ["result", "structuredContent", "grill_questions"]))
   end
 

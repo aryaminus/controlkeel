@@ -339,6 +339,9 @@ defmodule ControlKeel.MissionTest do
                "plan_phase" => "implementation_plan",
                "research_summary" => "Mapped the first implementation pass.",
                "codebase_findings" => ["Task execution already uses review_gate metadata."],
+               "alignment_context" => [
+                 "PM confirmed execution can stay within the existing review flow."
+               ],
                "options_considered" => ["Extend reviews", "Add planner service"],
                "selected_option" => "Extend reviews",
                "rejected_options" => ["Add planner service"],
@@ -357,6 +360,9 @@ defmodule ControlKeel.MissionTest do
                "plan_phase" => "implementation_plan",
                "research_summary" => "Refined the execution-ready plan after review.",
                "codebase_findings" => ["Proof bundle already loads plan reviews."],
+               "alignment_context" => [
+                 "PM confirmed execution can stay within the existing review flow."
+               ],
                "options_considered" => ["Extend reviews", "Add planner service"],
                "selected_option" => "Extend reviews",
                "rejected_options" => ["Add planner service"],
@@ -427,6 +433,8 @@ defmodule ControlKeel.MissionTest do
                "research_summary" => "Mapped the relevant modules.",
                "options_considered" => ["Patch in place", "Extract helper"],
                "selected_option" => "Patch in place",
+               "alignment_context" => [],
+               "consulted_roles" => [],
                "implementation_steps" => ["Patch", "Test"],
                "scope_estimate" => %{
                  "files_touched_estimate" => 7,
@@ -439,6 +447,7 @@ defmodule ControlKeel.MissionTest do
 
     assert Enum.any?(prompts, &String.starts_with?(&1, "Inversion:"))
     assert Enum.any?(prompts, &String.starts_with?(&1, "Evidence check:"))
+    assert Enum.any?(prompts, &String.starts_with?(&1, "Alignment check:"))
   end
 
   test "session-scoped plan reviews without task_id key supersede previous pending review" do
@@ -477,6 +486,10 @@ defmodule ControlKeel.MissionTest do
                "plan_phase" => "implementation_plan",
                "research_summary" => "Reviewed mission, MCP tools, and proof generation seams.",
                "codebase_findings" => ["Plan reviews already gate execution in Mission."],
+               "alignment_context" => [
+                 "PM wants this to remain inside the existing review flow rather than a new surface."
+               ],
+               "consulted_roles" => ["PM", "Security"],
                "options_considered" => [
                  "New planner subsystem",
                  "Extend existing review metadata"
@@ -925,6 +938,9 @@ defmodule ControlKeel.MissionTest do
                  "plan_phase" => "implementation_plan",
                  "research_summary" => "Reviewed the mission control and MCP review flow.",
                  "codebase_findings" => ["Mission already stores review metadata."],
+                 "alignment_context" => [
+                   "PM wants execution review to stay linked to an approved plan."
+                 ],
                  "options_considered" => ["Extend reviews", "Add new tables"],
                  "selected_option" => "Extend reviews",
                  "rejected_options" => ["Add new tables"],

@@ -8,6 +8,7 @@ defmodule ControlKeel.PolicyTraining do
   alias ControlKeel.Repo
 
   @artifact_types ~w(router budget_hint)
+  @busy_retry_backoff_ms [0, 250, 750, 1_500, 3_000, 5_000]
 
   def list_training_runs(limit \\ 10) do
     Run
@@ -126,7 +127,7 @@ defmodule ControlKeel.PolicyTraining do
         :training_run,
         Run.changeset(artifact.training_run, %{status: "promoted", finished_at: now()})
       )
-      |> Repo.transaction()
+      |> transaction_with_busy_retry()
       |> case do
         {:ok, %{activate_candidate: activated}} ->
           :ok = emit_artifact_promoted(activated)
@@ -153,7 +154,7 @@ defmodule ControlKeel.PolicyTraining do
       artifact ->
         artifact
         |> Artifact.changeset(%{status: "archived", archived_at: now()})
-        |> Repo.update()
+        |> update_with_busy_retry()
     end
   end
 
@@ -284,7 +285,7 @@ defmodule ControlKeel.PolicyTraining do
         "git_revision" => git_revision()
       }
     })
-    |> Repo.insert()
+    |> insert_with_busy_retry()
   end
 
   defp create_artifact(
@@ -325,7 +326,7 @@ defmodule ControlKeel.PolicyTraining do
         "subject_stats" => Map.get(bundle, :subject_stats, %{})
       }
     })
-    |> Repo.insert()
+    |> insert_with_busy_retry()
   end
 
   defp finalize_training_run(run, bundle, evaluation, artifact, status, failure_reason) do
@@ -344,7 +345,7 @@ defmodule ControlKeel.PolicyTraining do
         |> Map.put("artifact_id", artifact.id)
         |> Map.put("dataset_metadata", bundle.metadata)
     })
-    |> Repo.update()
+    |> update_with_busy_retry()
   end
 
   defp maybe_fail_latest_run(artifact_type, reason) do
@@ -359,7 +360,7 @@ defmodule ControlKeel.PolicyTraining do
           failure_reason: format_reason(reason),
           finished_at: now()
         })
-        |> Repo.update()
+        |> update_with_busy_retry()
 
         :telemetry.execute(
           [:controlkeel, :policy_training, :failed],
@@ -384,7 +385,7 @@ defmodule ControlKeel.PolicyTraining do
       %Artifact{training_run: %Run{} = run} ->
         run
         |> Run.changeset(%{status: "promotion_failed", finished_at: now()})
-        |> Repo.update()
+        |> update_with_busy_retry()
 
         :ok
 
@@ -470,6 +471,63 @@ defmodule ControlKeel.PolicyTraining do
       "evidence_channels" => evidence_channels,
       "warnings" => warnings
     }
+  end
+
+  defp transaction_with_busy_retry(operation, attempt \\ 0)
+
+  defp transaction_with_busy_retry(operation, attempt) do
+    case Repo.transaction(operation) do
+      {:error, _step, error, _changes} ->
+        if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+          Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+          transaction_with_busy_retry(operation, attempt + 1)
+        else
+          {:error, error}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp insert_with_busy_retry(changeset, attempt \\ 0)
+
+  defp insert_with_busy_retry(changeset, attempt) do
+    case Repo.insert(changeset) do
+      {:error, error} ->
+        if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+          Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+          insert_with_busy_retry(changeset, attempt + 1)
+        else
+          {:error, error}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp update_with_busy_retry(changeset, attempt \\ 0)
+
+  defp update_with_busy_retry(changeset, attempt) do
+    case Repo.update(changeset) do
+      {:error, error} ->
+        if busy_error?(error) and attempt < length(@busy_retry_backoff_ms) - 1 do
+          Process.sleep(Enum.at(@busy_retry_backoff_ms, attempt + 1))
+          update_with_busy_retry(changeset, attempt + 1)
+        else
+          {:error, error}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp busy_error?(error) do
+    error
+    |> Exception.message()
+    |> String.contains?("Database busy")
   end
 
   def integrity_findings(integrity_or_evaluation, attrs \\ %{})

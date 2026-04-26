@@ -21,6 +21,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
          "feedback_notes" => review.feedback_notes,
          "annotations" => review.annotations,
          "plan_phase" => plan_refinement["phase"],
+         "plan_refinement" => plan_refinement,
          "plan_quality" => plan_refinement["quality"],
          "grill_questions" => get_in(plan_refinement, ["quality", "grill_questions"]) || [],
          "agent_feedback" => review_agent_feedback(review),

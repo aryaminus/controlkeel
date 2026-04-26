@@ -478,6 +478,15 @@ Typical properties include:
 
 This lets CK treat review as part of the delivery system instead of as detached commentary.
 
+For plan reviews, CK can also carry alignment context that did not come from the codebase:
+
+- business or product constraints gathered from humans
+- design, support, security, or operations context
+- prior team decisions that should shape implementation
+- which roles were consulted before execution starts
+
+That matters because the best review packet is not only "here is the code or plan." It is also "here is the non-code context that should prevent the team from building the wrong thing quickly."
+
 Review state can then be:
 
 - opened

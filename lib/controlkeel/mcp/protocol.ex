@@ -593,6 +593,8 @@ defmodule ControlKeel.MCP.Protocol do
           "research_summary" => %{"type" => "string"},
           "codebase_findings" => %{"type" => "array", "items" => %{"type" => "string"}},
           "prior_art_summary" => %{"type" => "string"},
+          "alignment_context" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "consulted_roles" => %{"type" => "array", "items" => %{"type" => "string"}},
           "options_considered" => %{"type" => "array", "items" => %{"type" => "string"}},
           "selected_option" => %{"type" => "string"},
           "rejected_options" => %{"type" => "array", "items" => %{"type" => "string"}},

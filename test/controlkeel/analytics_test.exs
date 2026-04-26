@@ -193,6 +193,9 @@ defmodule ControlKeel.AnalyticsTest do
                "plan_phase" => "implementation_plan",
                "research_summary" => "Reviewed the analytics funnel and proof generation path.",
                "codebase_findings" => ["Deploy readiness is derived from proof bundles."],
+               "alignment_context" => [
+                 "PM wants deploy-ready analytics to reflect only reviewed execution-ready work."
+               ],
                "options_considered" => [
                  "Use proof bundle state",
                  "Track a separate analytics flag"

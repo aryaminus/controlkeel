@@ -3894,6 +3894,10 @@ defmodule ControlKeel.Mission do
              Map.get(raw_refinement, "prior_art_summary"),
              "prior_art_summary"
            ),
+         {:ok, alignment_context} <-
+           optional_string_list(Map.get(raw_refinement, "alignment_context"), "alignment_context"),
+         {:ok, consulted_roles} <-
+           optional_string_list(Map.get(raw_refinement, "consulted_roles"), "consulted_roles"),
          {:ok, options_considered} <-
            optional_string_list(
              Map.get(raw_refinement, "options_considered"),
@@ -3925,6 +3929,8 @@ defmodule ControlKeel.Mission do
           "research_summary" => research_summary,
           "codebase_findings" => codebase_findings,
           "prior_art_summary" => prior_art_summary,
+          "alignment_context" => alignment_context,
+          "consulted_roles" => consulted_roles,
           "options_considered" => options_considered,
           "selected_option" => selected_option,
           "rejected_options" => rejected_options,
@@ -3942,6 +3948,8 @@ defmodule ControlKeel.Mission do
             "research_summary" => research_summary,
             "codebase_findings" => codebase_findings,
             "prior_art_summary" => prior_art_summary,
+            "alignment_context" => alignment_context,
+            "consulted_roles" => consulted_roles,
             "options_considered" => options_considered,
             "selected_option" => selected_option,
             "rejected_options" => rejected_options,
@@ -3961,6 +3969,8 @@ defmodule ControlKeel.Mission do
     |> maybe_override_refinement("research_summary", Map.get(attrs, "research_summary"))
     |> maybe_override_refinement("codebase_findings", Map.get(attrs, "codebase_findings"))
     |> maybe_override_refinement("prior_art_summary", Map.get(attrs, "prior_art_summary"))
+    |> maybe_override_refinement("alignment_context", Map.get(attrs, "alignment_context"))
+    |> maybe_override_refinement("consulted_roles", Map.get(attrs, "consulted_roles"))
     |> maybe_override_refinement("options_considered", Map.get(attrs, "options_considered"))
     |> maybe_override_refinement("selected_option", Map.get(attrs, "selected_option"))
     |> maybe_override_refinement("rejected_options", Map.get(attrs, "rejected_options"))
@@ -4120,6 +4130,20 @@ defmodule ControlKeel.Mission do
       end
 
     missing =
+      if phase in @execution_ready_plan_phases and fields["alignment_context"] == [] do
+        ["alignment_context" | missing]
+      else
+        missing
+      end
+
+    missing =
+      if scope_high and phase in @execution_ready_plan_phases and fields["consulted_roles"] == [] do
+        ["consulted_roles" | missing]
+      else
+        missing
+      end
+
+    missing =
       if phase in ["implementation_plan", "code_backed_plan"] and
            length(fields["implementation_steps"]) < 2 do
         ["implementation_steps" | missing]
@@ -4211,6 +4235,7 @@ defmodule ControlKeel.Mission do
           [
             "What is the first vertical slice or tracer-bullet outcome that crosses storage, domain logic, and user-visible feedback?",
             "Which alternative interface designs did you consider, and why is the chosen boundary deep rather than shallow?",
+            "What non-code alignment context from product, design, support, security, or prior team decisions shaped this plan?",
             "Which project domain terms, CONTEXT notes, or ADRs constrain this plan?",
             "What automated reviewer and human QA checks will verify behavior-first issues before merge?",
             "What check would tell us early that the implementation is drifting from the plan?"
@@ -4240,6 +4265,14 @@ defmodule ControlKeel.Mission do
 
   defp grill_question_for_missing("options_considered", _phase) do
     "What are at least two viable approaches here, and what tradeoff separates them?"
+  end
+
+  defp grill_question_for_missing("alignment_context", _phase) do
+    "What non-code constraints or decisions from humans should the reviewer know before execution starts?"
+  end
+
+  defp grill_question_for_missing("consulted_roles", _phase) do
+    "Whose input is missing on this large plan, and which role should weigh in before execution?"
   end
 
   defp grill_question_for_missing("selected_option", _phase) do
@@ -4273,6 +4306,10 @@ defmodule ControlKeel.Mission do
     |> maybe_add_signal(
       "validation_plan" in missing,
       "Evidence check: what concrete signal would prove this is correct rather than merely plausible?"
+    )
+    |> maybe_add_signal(
+      "alignment_context" in missing,
+      "Alignment check: what business, product, design, support, or organizational context is still missing from this plan?"
     )
     |> maybe_add_signal(
       (fields["depth"] || 1) >= 3,

@@ -141,6 +141,8 @@ ControlKeel already had most of these behaviors in practice, but they are now an
 - **Bounded AFK, not unattended autonomy**
   CK models AFK execution as a night shift that catches up to day-shift planning. Humans still own requirements, PRD destination, QA, and merge decisions; planner agents should launch only unblocked sandboxed slices, and each implementation branch needs automated review plus human QA follow-up before it is trusted.
   CK is not claiming that teams should hand a vague spec to a swarm of agents and wake up to production-grade software for real users. The credible use case is narrower: bounded slices, existing repo context, cumulative project knowledge, and strong validation loops.
+- **Alignment context travels with the plan**
+  Review packets should carry more than codebase findings and validation steps. They should also capture the human context that shaped the decision: product constraints, design intent, support pain, operational limits, prior decisions, and which roles were consulted before execution. Otherwise teams still discover the most important feedback after implementation, when rework is most expensive.
 - **Closed loops first, explicit progress for open loops**
   CK should distinguish answerable delivery loops from exploratory optimization loops. Closed loops have a finish condition and should wake the operator with a completed, reviewable slice. Open loops are acceptable only when they declare the progress metric up front, such as search-space reduction, benchmark gain, or evidence gathered, so "overnight" does not become a vague token-burning promise.
 - **Relay handoffs over monolithic sessions**

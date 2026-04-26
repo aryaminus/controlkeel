@@ -114,6 +114,41 @@ defmodule ControlKeelWeb.ReviewLive do
                 <pre class="ck-code-block whitespace-pre-wrap">{@review.submission_body}</pre>
               </article>
 
+              <article
+                :if={
+                  present_plan_context?(@review, "alignment_context") or
+                    present_plan_context?(@review, "consulted_roles")
+                }
+                class="ck-card"
+                id="review-alignment-card"
+              >
+                <div class="ck-finding-head">
+                  <div>
+                    <p class="ck-mini-label">Alignment context</p>
+                    <h2>Human context gathered before execution</h2>
+                  </div>
+                </div>
+                <div class="mt-4 space-y-4">
+                  <div :if={present_plan_context?(@review, "alignment_context")}>
+                    <p class="ck-mini-label">Context that shaped the plan</p>
+                    <ul class="list-disc space-y-2 pl-5 text-sm text-slate-700">
+                      <li :for={entry <- plan_context(@review, "alignment_context")}>{entry}</li>
+                    </ul>
+                  </div>
+                  <div :if={present_plan_context?(@review, "consulted_roles")}>
+                    <p class="ck-mini-label">Roles consulted</p>
+                    <div class="flex flex-wrap gap-2">
+                      <span
+                        :for={role <- plan_context(@review, "consulted_roles")}
+                        class="ck-pill ck-pill-neutral"
+                      >
+                        {role}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
               <article :if={@review.previous_review} class="ck-card" id="review-diff-card">
                 <div class="ck-finding-head">
                   <div>
@@ -302,6 +337,14 @@ defmodule ControlKeelWeb.ReviewLive do
 
   defp present?(value) when is_binary(value), do: String.trim(value) != ""
   defp present?(_value), do: false
+
+  defp plan_context(review, key) do
+    get_in(review.metadata || %{}, ["plan_refinement", key]) || []
+  end
+
+  defp present_plan_context?(review, key) do
+    plan_context(review, key) != []
+  end
 
   defp parse_integer(value) when is_binary(value) do
     case Integer.parse(value) do

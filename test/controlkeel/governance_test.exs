@@ -103,6 +103,9 @@ defmodule ControlKeel.GovernanceTest do
                "plan_phase" => "implementation_plan",
                "research_summary" => "Reviewed the release-readiness and proof flow.",
                "codebase_findings" => ["Governance reads the latest proof bundle."],
+               "alignment_context" => [
+                 "Release managers require smoke evidence and provenance before calling work ready."
+               ],
                "options_considered" => ["Reuse proof bundles", "Add release-only state"],
                "selected_option" => "Reuse proof bundles",
                "rejected_options" => ["Add release-only state"],
