@@ -277,6 +277,7 @@ Hosted MCP tool authorization uses these protocol scopes:
 | ------ | ----------------- |
 | `ck_context` | `mcp:access`, `context:read` |
 | `ck_validate` | `mcp:access`, `validate:run` |
+| `ck_execute_code` | local/stdio MCP only; not exposed through hosted MCP or A2A until remote sandbox enforcement is available |
 | `ck_finding` | `mcp:access`, `finding:write` |
 | `ck_review_submit` | `mcp:access`, `review:write` |
 | `ck_review_status` | `mcp:access`, `review:read` |
@@ -292,7 +293,7 @@ Hosted MCP tool authorization uses these protocol scopes:
 | `ck_outcome_tracker` | `mcp:access`, `outcome:read`, `outcome:write` |
 | `ck_skill_list`, `ck_skill_load` | `mcp:access`, `skills:read` |
 
-`ck_deployment_advisor` is intentionally not exposed through hosted MCP yet because its current contract operates on an arbitrary `project_root` path rather than a session-bound workspace root.
+`ck_execute_code` and `ck_deployment_advisor` are intentionally not exposed through hosted MCP yet. `ck_execute_code` requires a local Docker sandbox boundary, and `ck_deployment_advisor` currently operates on an arbitrary `project_root` path rather than a session-bound workspace root.
 
 Service-account responses in the CLI and `/api/v1/workspaces/:id/service-accounts` include the derived `oauth_client_id` for this flow.
 
@@ -345,6 +346,7 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | Tool | Purpose |
 | ------ | --------- |
 | `ck_validate` | Run FastPath scan (patterns, destructive shell tripwires, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present plus recovery guidance for destructive shell findings. |
+| `ck_execute_code` | Validate and run generated JavaScript/Python only through CK's guarded Docker sandbox; supports `dry_run`; local host execution, network, filesystem, secrets, shell, and deploy are denied. Local/stdio MCP only for now. |
 | `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, reacquisition signals, design-drift summary, recent transcript events, transcript summary, resume packet, and provider status. Requires `session_id`; accepts optional `project_root`, but governed runtime context wins when CK already knows the workspace root. |
 | `ck_experience_index` | List recent prior sessions in the same workspace plus the read-only experience artifacts available for each run. |
 | `ck_experience_read` | Read one prior-run artifact such as a session summary, audit log, trace packet, or proof summary. |

@@ -13,6 +13,14 @@ defmodule ControlKeel.DistributionTest do
     assert "github-releases" in ids
   end
 
+  test "required MCP tools include guarded code execution" do
+    tools = Distribution.required_mcp_tools()
+
+    assert "ck_validate" in tools
+    assert "ck_execute_code" in tools
+    assert "ck_context" in tools
+  end
+
   test "maps raw binaries and archives by platform" do
     assert Distribution.raw_binary_asset_name("linux", "x86_64") == "controlkeel-linux-x86_64"
     assert Distribution.raw_binary_asset_name("macos", "arm64") == "controlkeel-macos-arm64"

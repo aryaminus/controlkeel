@@ -6395,6 +6395,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     - `ck_context` — Load mission, findings, budget, and proof context
     - `ck_validate` — Run full governance validation
+    - `ck_execute_code` — Run generated code only through CK's guarded Docker sandbox; use `dry_run` first and do not request network/secrets/shell/deploy
     - `ck_finding` — Record a governed finding when you detect a missed issue
     - `ck_review_submit` — Submit review material for human approval
     - `ck_review_status` — Check review status before execution

@@ -9,6 +9,7 @@ defmodule ControlKeel.Distribution do
   @core_mcp_tools ~w(
     ck_context
     ck_validate
+    ck_execute_code
     ck_finding
     ck_budget
     ck_route

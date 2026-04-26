@@ -952,6 +952,8 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_agent =~ "controlkeel update --json"
     assert opencode_agent =~ "`ck_context`"
     assert opencode_agent =~ "`ck_validate`"
+    assert opencode_agent =~ "`ck_execute_code`"
+    assert opencode_agent =~ "Docker sandbox"
     assert opencode_agent =~ "`ck_review_submit`"
     refute opencode_agent =~ "`ck_findings`"
     refute opencode_agent =~ "`ck_approve`"
