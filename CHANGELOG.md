@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.50 — 2026-04-26
+
+### What's changed
+
+- fix(install): write CLAUDE.md + hooks to project on init/attach
+
 ## v0.2.49 — 2026-04-26
 
 ### What's changed
