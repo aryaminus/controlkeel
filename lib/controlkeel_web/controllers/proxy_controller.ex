@@ -172,7 +172,8 @@ defmodule ControlKeelWeb.ProxyController do
               budget_estimate(preflight),
               response_payload.usage,
               model: extracted.model,
-              route: conn.request_path
+              route: conn.request_path,
+              rate_limit: rate_limit_metadata(response.headers)
             )
 
           if postflight.allowed do
@@ -192,7 +193,8 @@ defmodule ControlKeelWeb.ProxyController do
                 proxy_tool(provider, upstream_path),
                 budget_estimate(preflight),
                 nil,
-                route: conn.request_path
+                route: conn.request_path,
+                rate_limit: rate_limit_metadata(response.headers)
               )
 
             conn
@@ -241,7 +243,8 @@ defmodule ControlKeelWeb.ProxyController do
             model: extracted.model,
             parser: SSE.new(),
             usage: nil,
-            route: conn.request_path
+            route: conn.request_path,
+            rate_limit: rate_limit_metadata(response.headers)
           }
         )
 
@@ -276,7 +279,8 @@ defmodule ControlKeelWeb.ProxyController do
                 state.usage,
                 model: state.model,
                 route: state.route,
-                phase: "stream_error"
+                phase: "stream_error",
+                rate_limit: state.rate_limit
               )
 
             case chunk(conn, Errors.sse(state.provider, Exception.message(reason))) do
@@ -300,7 +304,8 @@ defmodule ControlKeelWeb.ProxyController do
             state.usage,
             model: state.model,
             route: state.route,
-            phase: "timeout"
+            phase: "timeout",
+            rate_limit: state.rate_limit
           )
 
         conn
@@ -336,7 +341,8 @@ defmodule ControlKeelWeb.ProxyController do
                 state.usage,
                 model: state.model,
                 route: state.route,
-                phase: "stream_complete"
+                phase: "stream_complete",
+                rate_limit: state.rate_limit
               )
 
             {:halt, {:stop, conn, state}}
@@ -351,7 +357,8 @@ defmodule ControlKeelWeb.ProxyController do
                 state.usage,
                 model: state.model,
                 route: state.route,
-                phase: "stream_blocked"
+                phase: "stream_blocked",
+                rate_limit: state.rate_limit
               )
 
             {:halt, {:stop, conn, state}}
@@ -398,7 +405,8 @@ defmodule ControlKeelWeb.ProxyController do
                 usage,
                 model: state.model,
                 route: state.route,
-                phase: "stream_blocked"
+                phase: "stream_blocked",
+                rate_limit: state.rate_limit
               )
 
             {:halt, {:halt, conn, %{state | usage: usage}}}
@@ -453,6 +461,38 @@ defmodule ControlKeelWeb.ProxyController do
       end)
     end)
   end
+
+  defp rate_limit_metadata(headers) do
+    headers
+    |> Enum.reduce(%{}, fn {key, value}, acc ->
+      normalized_key = String.downcase(to_string(key))
+
+      if rate_limit_header?(normalized_key) do
+        Map.put(acc, normalized_key, header_value(value))
+      else
+        acc
+      end
+    end)
+  end
+
+  defp rate_limit_header?("retry-after"), do: true
+
+  defp rate_limit_header?(key) do
+    String.starts_with?(key, "x-ratelimit-") or
+      String.starts_with?(key, "anthropic-ratelimit-")
+  end
+
+  defp header_value(value) when is_list(value) do
+    value
+    |> Enum.map(&to_string/1)
+    |> Enum.join(",")
+    |> truncate_header_value()
+  end
+
+  defp header_value(value), do: value |> to_string() |> truncate_header_value()
+
+  defp truncate_header_value(value) when byte_size(value) <= 256, do: value
+  defp truncate_header_value(value), do: binary_part(value, 0, 256)
 
   defp request_options(conn, method, url, raw_body, extra_opts \\ []) do
     opts =

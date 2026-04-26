@@ -12,6 +12,7 @@ defmodule ControlKeel.Budget.CostOptimizer do
       []
       |> add_model_alternatives(top_provider, top_model)
       |> add_caching_suggestions(spending)
+      |> add_session_hygiene_suggestion(spending)
       |> add_local_model_suggestion(spending)
       |> add_batching_suggestion(spending)
 
@@ -129,6 +130,33 @@ defmodule ControlKeel.Budget.CostOptimizer do
       else
         suggestions
       end
+    else
+      suggestions
+    end
+  end
+
+  defp add_session_hygiene_suggestion(suggestions, spending) do
+    total_calls = Enum.count(spending)
+
+    total_tokens =
+      Enum.reduce(spending, 0, fn s, acc ->
+        acc + Map.get(s, "input_tokens", 0) + Map.get(s, "output_tokens", 0) +
+          Map.get(s, "cached_input_tokens", 0)
+      end)
+
+    if total_calls >= 8 or total_tokens >= 100_000 do
+      [
+        %{
+          type: :session_hygiene,
+          priority: :medium,
+          title: "Keep agent sessions inside provider and subscription limits",
+          description:
+            "This workload has #{total_calls} recorded call(s) and ~#{total_tokens} token(s). Use compact/fresh sessions, cap max output tokens to the expected answer size, avoid unnecessary parallel agents, and prefer auto/cheaper models for routine work so rolling-window subscriptions and API TPM/RPM limits are not exhausted.",
+          call_count: total_calls,
+          token_count: total_tokens
+        }
+        | suggestions
+      ]
     else
       suggestions
     end

@@ -1472,6 +1472,7 @@ defmodule ControlKeelWeb.ApiController do
       ck_runs_agent_via: integration.ck_runs_agent_via,
       execution_support: integration.execution_support,
       autonomy_mode: integration.autonomy_mode,
+      experience_profile: integration.experience_profile || %{},
       upstream_slug: integration.upstream_slug,
       upstream_docs_url: integration.upstream_docs_url,
       registry_match: integration.registry_match || false,

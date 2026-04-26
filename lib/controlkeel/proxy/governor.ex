@@ -89,7 +89,7 @@ defmodule ControlKeel.Proxy.Governor do
             "output_tokens" => output_tokens,
             "source" => "proxy",
             "tool" => tool,
-            "metadata" => %{"route" => opts[:route], "phase" => opts[:phase] || "complete"}
+            "metadata" => proxy_metadata(opts)
           })
 
         _other ->
@@ -101,7 +101,7 @@ defmodule ControlKeel.Proxy.Governor do
               "estimated_cost_cents" => estimated_cost_cents,
               "source" => "proxy",
               "tool" => tool,
-              "metadata" => %{"route" => opts[:route], "phase" => opts[:phase] || "complete"}
+              "metadata" => proxy_metadata(opts)
             })
           end
       end
@@ -123,6 +123,20 @@ defmodule ControlKeel.Proxy.Governor do
 
     budget_result
   end
+
+  defp proxy_metadata(opts) do
+    %{"route" => opts[:route], "phase" => opts[:phase] || "complete"}
+    |> maybe_put_rate_limit(opts[:rate_limit])
+    |> Map.merge(opts[:metadata] || %{})
+  end
+
+  defp maybe_put_rate_limit(metadata, nil), do: metadata
+  defp maybe_put_rate_limit(metadata, rate_limit) when rate_limit == %{}, do: metadata
+
+  defp maybe_put_rate_limit(metadata, rate_limit) when is_map(rate_limit),
+    do: Map.put(metadata, "rate_limit", rate_limit)
+
+  defp maybe_put_rate_limit(metadata, _rate_limit), do: metadata
 
   defp scan_content(content, path, kind, opts) do
     normalized = %{

@@ -30,6 +30,8 @@ Only `attach_client` rows produce real `controlkeel attach <id>` commands. `head
 
 Every shipped row also carries the stricter parity contract exposed in `/skills` and `GET /api/v1/skills/targets`:
 
+The API also exposes a coarse `experience_profile` map for balancing host choice without pretending CK can know account-specific subscription state. The profile tracks `cost`, `performance`, `token_pressure`, `time`, and `ux` with stable labels such as `host_subscription_or_agent_metered`, `ck_budget_metered`, `interactive_direct`, `background_runtime`, `host_quota_sensitive`, `fast_feedback`, and `native_governed`. Use these labels as guidance alongside real budget/rate-limit telemetry, not as hard quota claims.
+
 - `install_experience`
 - `review_experience`
 - `submission_mode`
@@ -134,6 +136,16 @@ For hosts with a stronger native capability container, CK now prefers that too i
 - Augment ships a repo-native `.augment/` workspace bundle plus a local `.augment-plugin` hook bundle, so CK can be used by the agent through either workspace commands or hook-native interception.
 
 This keeps the product aligned with CK’s intent: agents should be able to invoke ControlKeel directly during autonomous work, rather than depending on the human operator to manually drive review state transitions.
+
+Experience profile examples for first-class hosts:
+
+| Host | Cost | Performance | Token pressure | Time | UX |
+| ---- | ---- | ----------- | -------------- | ---- | -- |
+| `claude-code` | host subscription / agent metered | interactive direct | host quota sensitive | fast feedback | native governed |
+| `opencode` | host subscription / agent metered | interactive direct | host quota sensitive | fast feedback | native governed |
+| `cursor` | CK-budget metered by default | human handoff | CK budget sensitive | checkpoint driven | native governed |
+| `vscode` | workspace subscription | human handoff | workspace quota sensitive | checkpoint driven | browser review |
+| `devin` | host subscription / agent metered | background runtime | host quota sensitive | long-running OK | runtime export |
 
 Runtime transport truth for those first-class hosts:
 

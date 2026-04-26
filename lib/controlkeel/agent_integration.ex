@@ -46,6 +46,7 @@ defmodule ControlKeel.AgentIntegration do
     :ck_runs_agent_via,
     :execution_support,
     :autonomy_mode,
+    :experience_profile,
     plan_phase_support: [],
     artifact_surfaces: [],
     package_outputs: [],
@@ -1726,6 +1727,7 @@ defmodule ControlKeel.AgentIntegration do
       ck_runs_agent_via: attrs[:ck_runs_agent_via] || default_ck_runs_agent_via(attrs),
       execution_support: attrs[:execution_support] || default_execution_support(attrs),
       autonomy_mode: attrs[:autonomy_mode] || "policy_gated",
+      experience_profile: attrs[:experience_profile] || default_experience_profile(attrs),
       plan_phase_support: attrs[:plan_phase_support] || default_plan_phase_support(attrs),
       artifact_surfaces: attrs[:artifact_surfaces] || default_artifact_surfaces(attrs),
       phase_model: attrs[:phase_model] || default_phase_model(attrs),
@@ -1745,6 +1747,103 @@ defmodule ControlKeel.AgentIntegration do
     }
     |> AdapterRegistry.enrich_integration()
     |> RuntimeRegistry.enrich_integration()
+  end
+
+  defp default_experience_profile(attrs) do
+    support_class = attrs[:support_class]
+    execution_support = default_execution_support(attrs)
+    auth_owner = auth_owner_for_attrs(attrs)
+
+    %{
+      cost: default_cost_profile(attrs, auth_owner),
+      performance: default_performance_profile(support_class, execution_support),
+      token_pressure: default_token_pressure_profile(attrs, auth_owner),
+      time: default_time_profile(support_class, execution_support),
+      ux: default_ux_profile(attrs, support_class)
+    }
+  end
+
+  defp default_cost_profile(%{id: id}, _auth_owner) when id in ["ollama-runtime"] do
+    "local_free"
+  end
+
+  defp default_cost_profile(%{support_class: "unverified"}, _auth_owner), do: "unknown"
+
+  defp default_cost_profile(%{support_class: "provider_only"}, _auth_owner),
+    do: "provider_metered"
+
+  defp default_cost_profile(_attrs, "agent"), do: "host_subscription_or_agent_metered"
+  defp default_cost_profile(_attrs, "controlkeel"), do: "ck_budget_metered"
+  defp default_cost_profile(_attrs, "workspace"), do: "workspace_subscription"
+  defp default_cost_profile(_attrs, _auth_owner), do: "unknown"
+
+  defp default_performance_profile("headless_runtime", _execution_support),
+    do: "background_runtime"
+
+  defp default_performance_profile("provider_only", _execution_support), do: "provider_backend"
+
+  defp default_performance_profile("framework_adapter", _execution_support),
+    do: "adapter_dependent"
+
+  defp default_performance_profile("unverified", _execution_support), do: "unknown"
+  defp default_performance_profile(_support_class, "direct"), do: "interactive_direct"
+  defp default_performance_profile(_support_class, "handoff"), do: "human_handoff"
+  defp default_performance_profile(_support_class, "runtime"), do: "background_runtime"
+  defp default_performance_profile(_support_class, _execution_support), do: "manual"
+
+  defp default_token_pressure_profile(attrs, auth_owner) do
+    cond do
+      attrs[:support_class] in ["unverified", "framework_adapter"] -> "unknown"
+      attrs[:support_class] == "provider_only" -> "provider_context_window"
+      auth_owner == "agent" -> "host_quota_sensitive"
+      auth_owner == "workspace" -> "workspace_quota_sensitive"
+      true -> "ck_budget_sensitive"
+    end
+  end
+
+  defp default_time_profile("headless_runtime", _execution_support), do: "long_running_ok"
+  defp default_time_profile("unverified", _execution_support), do: "manual_research"
+  defp default_time_profile(_support_class, "direct"), do: "fast_feedback"
+  defp default_time_profile(_support_class, "handoff"), do: "checkpoint_driven"
+  defp default_time_profile(_support_class, "runtime"), do: "long_running_ok"
+  defp default_time_profile(_support_class, _execution_support), do: "manual"
+
+  defp default_ux_profile(_attrs, "unverified"), do: "research_only"
+  defp default_ux_profile(_attrs, "provider_only"), do: "provider_configuration"
+  defp default_ux_profile(_attrs, "headless_runtime"), do: "runtime_export"
+
+  defp default_ux_profile(attrs, _support_class) do
+    case default_review_experience(attrs) do
+      "native_review" -> "native_governed"
+      "browser_review" -> "browser_review"
+      "feedback_only" -> "guided_feedback"
+      _ -> "manual"
+    end
+  end
+
+  defp auth_owner_for_attrs(attrs) do
+    case attrs[:auth_mode] do
+      "agent_runtime" ->
+        "agent"
+
+      "env_bridge" ->
+        "agent"
+
+      "ck_owned" ->
+        "controlkeel"
+
+      "local" ->
+        "controlkeel"
+
+      _ ->
+        attrs
+        |> Map.get(:provider_bridge, %{owner: nil})
+        |> case do
+          %{owner: owner} when is_binary(owner) -> owner
+          %{"owner" => owner} when is_binary(owner) -> owner
+          _ -> "unknown"
+        end
+    end
   end
 
   defp default_agent_uses_ck_via(attrs) do

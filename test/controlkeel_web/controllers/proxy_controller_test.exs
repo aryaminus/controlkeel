@@ -39,6 +39,9 @@ defmodule ControlKeelWeb.ProxyControllerTest do
 
       conn
       |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.put_resp_header("x-ratelimit-remaining-tokens", "149984")
+      |> Plug.Conn.put_resp_header("x-ratelimit-reset-tokens", "6m0s")
+      |> Plug.Conn.put_resp_header("retry-after", "2")
       |> Plug.Conn.resp(
         200,
         Jason.encode!(%{
@@ -59,6 +62,12 @@ defmodule ControlKeelWeb.ProxyControllerTest do
 
     assert json_response(conn, 200)["output_text"] == "all good"
     assert Repo.aggregate(Invocation, :count, :id) == 1
+
+    invocation = Repo.one!(Invocation)
+    assert invocation.metadata["rate_limit"]["x-ratelimit-remaining-tokens"] == "149984"
+    assert invocation.metadata["rate_limit"]["x-ratelimit-reset-tokens"] == "6m0s"
+    assert invocation.metadata["rate_limit"]["retry-after"] == "2"
+
     assert Mission.get_session!(session.id).spent_cents > 0
   end
 

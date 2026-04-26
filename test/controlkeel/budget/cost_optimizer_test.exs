@@ -45,6 +45,16 @@ defmodule ControlKeel.Budget.CostOptimizerTest do
     assert local_count >= 0
   end
 
+  test "suggest recommends session hygiene for high token workloads" do
+    spending =
+      for _ <- 1..8 do
+        %{"estimated_cost_cents" => 100, "input_tokens" => 12_000, "output_tokens" => 2_000}
+      end
+
+    assert {:ok, suggestions} = CostOptimizer.suggest("session_hygiene", spending: spending)
+    assert Enum.any?(suggestions, &(&1.type == :session_hygiene))
+  end
+
   test "compare_agents returns cost comparison" do
     assert {:ok, result} =
              CostOptimizer.compare_agents("Build a REST API", estimated_tokens: 50_000)

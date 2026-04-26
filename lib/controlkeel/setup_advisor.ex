@@ -95,6 +95,24 @@ defmodule ControlKeel.SetupAdvisor do
     end
   end
 
+  def experience_profile_lines(snapshot) do
+    snapshot["recommended_attach"]
+    |> case do
+      nil ->
+        []
+
+      [] ->
+        []
+
+      recommendations ->
+        Enum.map(recommendations, fn host ->
+          profile = Map.get(host, :experience_profile, %{})
+
+          "Host balance #{host.id}: cost=#{profile_value(profile, :cost)}, performance=#{profile_value(profile, :performance)}, tokens=#{profile_value(profile, :token_pressure)}, time=#{profile_value(profile, :time)}, ux=#{profile_value(profile, :ux)}"
+        end)
+    end
+  end
+
   def attached_agents_line(snapshot) do
     attached =
       snapshot["agents"]
@@ -105,6 +123,12 @@ defmodule ControlKeel.SetupAdvisor do
       do: "Attached agents: none.",
       else: "Attached agents: #{Enum.join(attached, ", ")}."
   end
+
+  defp profile_value(profile, key) when is_map(profile) do
+    Map.get(profile, key) || Map.get(profile, Atom.to_string(key)) || "unknown"
+  end
+
+  defp profile_value(_profile, _key), do: "unknown"
 
   defp recommended_attach(detected_hosts, agents) do
     attached_ids =
@@ -136,7 +160,8 @@ defmodule ControlKeel.SetupAdvisor do
             id: integration.id,
             label: integration.label,
             reason: presence.reason,
-            path: presence.path
+            path: presence.path,
+            experience_profile: integration.experience_profile || %{}
           }
           | acc
         ]

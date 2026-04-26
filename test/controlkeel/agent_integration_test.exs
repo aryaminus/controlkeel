@@ -436,6 +436,52 @@ defmodule ControlKeel.AgentIntegrationTest do
       assert is_list(integration.artifact_surfaces)
       assert is_list(integration.package_outputs)
       assert is_list(integration.direct_install_methods)
+      assert is_map(integration.experience_profile)
+
+      assert integration.experience_profile.cost in [
+               "local_free",
+               "host_subscription_or_agent_metered",
+               "ck_budget_metered",
+               "workspace_subscription",
+               "provider_metered",
+               "unknown"
+             ]
+
+      assert integration.experience_profile.performance in [
+               "interactive_direct",
+               "human_handoff",
+               "background_runtime",
+               "provider_backend",
+               "adapter_dependent",
+               "unknown",
+               "manual"
+             ]
+
+      assert integration.experience_profile.token_pressure in [
+               "host_quota_sensitive",
+               "workspace_quota_sensitive",
+               "ck_budget_sensitive",
+               "provider_context_window",
+               "unknown"
+             ]
+
+      assert integration.experience_profile.time in [
+               "fast_feedback",
+               "checkpoint_driven",
+               "long_running_ok",
+               "manual_research",
+               "manual"
+             ]
+
+      assert integration.experience_profile.ux in [
+               "native_governed",
+               "browser_review",
+               "guided_feedback",
+               "runtime_export",
+               "provider_configuration",
+               "research_only",
+               "manual"
+             ]
 
       if integration.support_class in ["framework_adapter", "provider_only", "unverified"] do
         assert integration.required_mcp_tools == []
@@ -505,6 +551,8 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert vscode.auth_mode == "ck_owned"
     assert opencode.auth_mode == "agent_runtime"
     assert opencode.runtime_transport == "opencode_sdk"
+    assert opencode.experience_profile.cost == "host_subscription_or_agent_metered"
+    assert opencode.experience_profile.token_pressure == "host_quota_sensitive"
     assert copilot.auth_mode == "agent_runtime"
     assert copilot.runtime_transport == "hook_session_parser"
   end

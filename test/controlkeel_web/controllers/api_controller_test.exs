@@ -666,6 +666,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert claude["runtime_auth_owner"] == "agent"
       assert claude["runtime_review_transport"] == "hook_sdk"
       assert claude["runtime_session_support"]["fork"] == true
+      assert claude["experience_profile"]["cost"] == "host_subscription_or_agent_metered"
+      assert claude["experience_profile"]["ux"] == "native_governed"
       assert "ck_validate" in claude["required_mcp_tools"]
       assert Enum.any?(claude["install_channels"], &(&1["id"] == "homebrew"))
 
@@ -721,6 +723,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert opencode["runtime_transport"] == "opencode_sdk"
       assert opencode["runtime_auth_owner"] == "agent"
       assert opencode["auth_mode"] == "agent_runtime"
+      assert opencode["experience_profile"]["token_pressure"] == "host_quota_sensitive"
 
       assert Enum.any?(
                opencode["direct_install_methods"],
