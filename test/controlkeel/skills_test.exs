@@ -916,15 +916,27 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ "waitPayload?.review?.status === \"pending\""
     assert opencode_plugin =~ "waitMessage.includes(\"timeout\")"
     assert opencode_plugin =~ "waitError.includes(\"timed out\")"
+    assert opencode_plugin =~ "const browserNotOpened = openPayload?.opened !== true"
     assert opencode_plugin =~ "timedOut: true"
     assert opencode_plugin =~ "controlkeel review plan open"
     assert opencode_plugin =~ "waitSkipped: true"
     assert opencode_plugin =~ "manualApprovalRequired: true"
+    assert opencode_plugin =~ ~S|? "browser_not_opened"|
     assert opencode_plugin =~ ~S|reason: "review_timeout"|
-    assert opencode_plugin =~ "User approved in chat after timeout/browser issue"
 
     assert opencode_plugin =~
-             ~S|reason: !browserUrl ? "browser_url_unavailable" : "browser_unreachable"|
+             "Browser review is unavailable from this environment or did not actually open."
+
+    assert opencode_plugin =~ "User approved in chat after timeout/browser issue"
+
+    assert opencode_plugin =~ ~S|"browser_url_unavailable"|
+    assert opencode_plugin =~ ~S|"browser_unreachable"|
+
+    assert opencode_plugin =~ "return JSON.stringify(result)"
+    refute opencode_plugin =~ "JSON.stringify(result, null, 2)"
+    refute opencode_plugin =~ "submitPayload,"
+    refute opencode_plugin =~ "openPayload,"
+    refute opencode_plugin =~ "waitPayload,"
 
     assert opencode_plugin =~
              "controlkeel review plan respond --id <review_id> --decision approved"
@@ -958,7 +970,7 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_submit_plan_command =~ "--timeout 30"
 
     assert opencode_submit_plan_command =~
-             "`browser_url` is missing/unreachable **or** wait times out while still `pending`"
+             "`browser_url` is missing/unreachable, the browser does not actually open, **or** wait times out while still `pending`"
 
     assert opencode_submit_plan_command =~ "ControlKeel CLI [object Object] is too old"
     assert opencode_submit_plan_command =~ "Restart OpenCode"

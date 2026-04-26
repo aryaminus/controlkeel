@@ -27,46 +27,128 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       recent_events = Mission.list_session_events(session.id)
       context_reacquisition = context_reacquisition(workspace_context)
 
-      {:ok,
-       %{
-         "session_id" => session.id,
-         "project_root" => project_root,
-         "session_title" => session.title,
-         "risk_tier" => session.risk_tier,
-         "compliance_profile" => session.workspace.compliance_profile,
-         "active_findings" => active_findings_summary(session.findings),
-         "security_case_summary" => Mission.security_case_summary(session.findings),
-         "autonomy_profile" => AutonomyLoop.session_autonomy_profile(session),
-         "outcome_profile" => AutonomyLoop.session_outcome_profile(session),
-         "improvement_loop" => AutonomyLoop.session_improvement_loop(session),
-         "budget_summary" => budget_summary(session),
-         "boundary_summary" =>
-           Intent.boundary_summary(session.execution_brief || %{}, project_root: project_root),
-         "current_task" => task_summary(task),
-         "past_patterns" => past_patterns(session),
-         "proof_summary" => Mission.proof_summary_for_task(task),
-         "planning_context" => planning_context(task),
-         "task_augmentation" => TaskAugmentation.build(session, task, workspace_context),
-         "memory_hits" => memory_hits(session, task),
-         "resume_packet" => resume_packet(task),
-         "workspace_context" => workspace_context,
-         "workspace_cache_key" => workspace_context["cache_key"],
-         "context_reacquisition" => context_reacquisition,
-         "instruction_hierarchy" => TrustBoundary.instruction_hierarchy(),
-         "recent_events" => recent_events,
-         "transcript_summary" => transcript_summary,
-         "provider_status" => %{
-           "source" => provider_status["selected_source"],
-           "provider" => provider_status["selected_provider"],
-           "model" => provider_status["selected_model"],
-           "fallback_chain" => provider_status["fallback_chain"]
-         },
-         "bootstrap_status" => provider_status["bootstrap"]
-       }}
+      context = %{
+        "session_id" => session.id,
+        "project_root" => project_root,
+        "session_title" => session.title,
+        "risk_tier" => session.risk_tier,
+        "compliance_profile" => session.workspace.compliance_profile,
+        "active_findings" => active_findings_summary(session.findings),
+        "security_case_summary" => Mission.security_case_summary(session.findings),
+        "autonomy_profile" => AutonomyLoop.session_autonomy_profile(session),
+        "outcome_profile" => AutonomyLoop.session_outcome_profile(session),
+        "improvement_loop" => AutonomyLoop.session_improvement_loop(session),
+        "budget_summary" => budget_summary(session),
+        "boundary_summary" =>
+          Intent.boundary_summary(session.execution_brief || %{}, project_root: project_root),
+        "current_task" => task_summary(task),
+        "past_patterns" => past_patterns(session),
+        "proof_summary" => Mission.proof_summary_for_task(task),
+        "planning_context" => planning_context(task),
+        "task_augmentation" => TaskAugmentation.build(session, task, workspace_context),
+        "memory_hits" => memory_hits(session, task),
+        "resume_packet" => resume_packet(task),
+        "workspace_context" => workspace_context,
+        "workspace_cache_key" => workspace_context["cache_key"],
+        "context_reacquisition" => context_reacquisition,
+        "instruction_hierarchy" => TrustBoundary.instruction_hierarchy(),
+        "recent_events" => recent_events,
+        "transcript_summary" => transcript_summary,
+        "provider_status" => %{
+          "source" => provider_status["selected_source"],
+          "provider" => provider_status["selected_provider"],
+          "model" => provider_status["selected_model"],
+          "fallback_chain" => provider_status["fallback_chain"]
+        },
+        "bootstrap_status" => provider_status["bootstrap"]
+      }
+
+      {:ok, apply_detail_level(context, arguments)}
     end
   end
 
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
+
+  defp apply_detail_level(context, arguments) do
+    case Map.get(arguments, "detail_level", "compact") do
+      value when value in ["full", :full] -> Map.put(context, "detail_level", "full")
+      _ -> compact_context(context)
+    end
+  end
+
+  defp compact_context(context) do
+    context
+    |> Map.put("detail_level", "compact")
+    |> Map.put(
+      "detail_hint",
+      "Pass detail_level: full to ck_context only when raw workspace, resume, or transcript payloads are required."
+    )
+    |> Map.update("workspace_context", %{}, &compact_workspace_context/1)
+    |> Map.update("resume_packet", nil, &compact_resume_packet/1)
+    |> Map.update("task_augmentation", %{}, &compact_task_augmentation/1)
+    |> Map.update("memory_hits", [], &compact_list(&1, 3))
+    |> Map.update("recent_events", [], &compact_list(&1, 10))
+  end
+
+  defp compact_workspace_context(workspace_context) when is_map(workspace_context) do
+    %{
+      "cache_key" => workspace_context["cache_key"],
+      "orientation" => %{
+        "recent_commits" =>
+          workspace_context
+          |> get_in(["orientation", "recent_commits"])
+          |> compact_list(5),
+        "active_assumptions" =>
+          workspace_context
+          |> get_in(["orientation", "active_assumptions"])
+          |> compact_list(5)
+      },
+      "design_drift" => %{
+        "summary" => get_in(workspace_context, ["design_drift", "summary"]),
+        "high_risk" => get_in(workspace_context, ["design_drift", "high_risk"])
+      }
+    }
+  end
+
+  defp compact_workspace_context(value), do: value
+
+  defp compact_resume_packet(nil), do: nil
+
+  defp compact_resume_packet(packet) when is_map(packet) do
+    packet
+    |> Map.take(["task_id", "generated_at", "summary", "status", "checkpoint_id"])
+    |> Map.put("memory_hits", packet |> Map.get("memory_hits", []) |> compact_list(3))
+    |> Map.put("recent_events", packet |> Map.get("recent_events", []) |> compact_list(5))
+    |> Map.put(
+      "workspace_context",
+      packet |> Map.get("workspace_context", %{}) |> compact_workspace_context()
+    )
+  end
+
+  defp compact_resume_packet(value), do: value
+
+  defp compact_task_augmentation(augmentation) when is_map(augmentation) do
+    augmentation
+    |> Map.take(["available", "search_terms", "risk_notes", "constraints", "recommended_checks"])
+    |> Map.update("search_terms", [], &compact_list(&1, 10))
+    |> maybe_put_truncated("augmented_brief", Map.get(augmentation, "augmented_brief"), 2_000)
+  end
+
+  defp compact_task_augmentation(value), do: value
+
+  defp compact_list(list, limit) when is_list(list), do: Enum.take(list, limit)
+  defp compact_list(_value, _limit), do: []
+
+  defp maybe_put_truncated(map, _key, value, _limit) when value in [nil, ""], do: map
+
+  defp maybe_put_truncated(map, key, value, limit) when is_binary(value) do
+    Map.put(map, key, truncate_binary(value, limit))
+  end
+
+  defp maybe_put_truncated(map, key, value, _limit), do: Map.put(map, key, value)
+
+  defp truncate_binary(value, limit) when byte_size(value) <= limit, do: value
+  defp truncate_binary(value, limit), do: binary_part(value, 0, limit) <> "…"
 
   defp fetch_session(session_id, arguments) do
     case Mission.get_session_context(session_id) do

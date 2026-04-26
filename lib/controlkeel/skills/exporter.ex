@@ -6214,29 +6214,42 @@ defmodule ControlKeel.Skills.Exporter do
             submitPayload?.review?.browser_url ??
             null
 
+          const buildPlanResult = (overrides = {}) => ({
+            reviewId,
+            browserUrl: overrides.browserUrl ?? browserUrl,
+            status: overrides.status ?? submitPayload?.review?.status ?? "pending",
+            feedbackNotes:
+              overrides.feedbackNotes ?? submitPayload?.review?.feedback_notes ?? null,
+            opened: overrides.opened ?? (openPayload?.opened === true),
+            timedOut: overrides.timedOut ?? false,
+            waitSkipped: overrides.waitSkipped ?? false,
+            manualApprovalRequired: overrides.manualApprovalRequired ?? false,
+            reason: overrides.reason ?? null,
+            guidance: overrides.guidance ?? null,
+          })
+
           const openError = typeof openPayload?.open_error === "string" ? openPayload.open_error.trim() : ""
           const openFailure = typeof openPayload?.error === "string" ? openPayload.error.trim() : ""
+          const browserNotOpened = openPayload?.opened !== true
 
           const remoteLocalhostMismatch =
             typeof browserUrl === "string" &&
             browserUrl.includes("localhost") &&
             openPayload?.remote === true
 
-          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch) {
-            return {
-              reviewId,
-              submitPayload,
-              openPayload,
-              browserUrl,
-              status: submitPayload?.review?.status ?? "pending",
-              feedbackNotes: submitPayload?.review?.feedback_notes ?? null,
-              timedOut: false,
+          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch || browserNotOpened) {
+            return buildPlanResult({
               waitSkipped: true,
               manualApprovalRequired: true,
-              reason: !browserUrl ? "browser_url_unavailable" : "browser_unreachable",
+              reason:
+                !browserUrl
+                  ? "browser_url_unavailable"
+                  : browserNotOpened
+                    ? "browser_not_opened"
+                    : "browser_unreachable",
               guidance:
-                "Browser review is unavailable from this environment. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
-            }
+                "Browser review is unavailable from this environment or did not actually open. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
+            })
           }
 
           const waitEnv = process.env.LOGGER_LEVEL
@@ -6259,10 +6272,7 @@ defmodule ControlKeel.Skills.Exporter do
 
           if (waitExit !== 0) {
             if (waitTimedOut && waitPending) {
-              return {
-                reviewId,
-                submitPayload,
-                waitPayload,
+              return buildPlanResult({
                 browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
                 status: "pending",
                 feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
@@ -6272,7 +6282,7 @@ defmodule ControlKeel.Skills.Exporter do
                 reason: "review_timeout",
                 guidance:
                   "Plan review is still pending after timeout. Show the `browser_url` to the user if reachable. If browser review is unavailable or the user explicitly approves in chat, record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat after timeout/browser issue\" --json` (or `ck_review_feedback`) before proceeding.",
-              }
+              })
             }
 
             throw new Error(
@@ -6280,17 +6290,13 @@ defmodule ControlKeel.Skills.Exporter do
             )
           }
 
-          return {
-            reviewId,
-            submitPayload,
-            openPayload,
-            waitPayload,
+          return buildPlanResult({
             browserUrl: waitPayload?.browser_url ?? browserUrl,
             status: waitPayload?.review?.status,
             feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
             waitSkipped: false,
             manualApprovalRequired: false,
-          }
+          })
         } finally {
           // Clean up temp file
           try { await Bun.file(tmpFile).unlink?.() ?? (await $`rm -f ${tmpFile}`.quiet()) } catch {}
@@ -6350,7 +6356,7 @@ defmodule ControlKeel.Skills.Exporter do
                 args.task_id,
                 args.session_id
               )
-              return JSON.stringify(result, null, 2)
+              return JSON.stringify(result)
             },
           }),
         },
@@ -6426,7 +6432,7 @@ defmodule ControlKeel.Skills.Exporter do
     3. Run `controlkeel review plan submit --body-file .opencode/review-plan.md --submitted-by opencode --task-id <task_id> --json` (or use `--session-id <session_id>`)
     4. Read the returned `review.id` and `browser_url`
     5. If `browser_url` is available, wait with `controlkeel review plan wait --id <review_id> --timeout 30 --json`
-    6. If `browser_url` is missing/unreachable **or** wait times out while still `pending`, do **not** loop on wait; ask for explicit user approval in chat and record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes "User approved in chat; browser unavailable or timed out" --json` (or `ck_review_feedback`)
+    6. If `browser_url` is missing/unreachable, the browser does not actually open, **or** wait times out while still `pending`, do **not** loop on wait; ask for explicit user approval in chat and record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes "User approved in chat; browser unavailable or timed out" --json` (or `ck_review_feedback`)
     7. Do not execute until the review is approved
 
     Fallback when the `submit_plan` tool is stale in a long-running OpenCode session:
@@ -6792,29 +6798,42 @@ defmodule ControlKeel.Skills.Exporter do
             submitPayload?.review?.browser_url ??
             null
 
+          const buildPlanResult = (overrides = {}) => ({
+            reviewId,
+            browserUrl: overrides.browserUrl ?? browserUrl,
+            status: overrides.status ?? submitPayload?.review?.status ?? "pending",
+            feedbackNotes:
+              overrides.feedbackNotes ?? submitPayload?.review?.feedback_notes ?? null,
+            opened: overrides.opened ?? (openPayload?.opened === true),
+            timedOut: overrides.timedOut ?? false,
+            waitSkipped: overrides.waitSkipped ?? false,
+            manualApprovalRequired: overrides.manualApprovalRequired ?? false,
+            reason: overrides.reason ?? null,
+            guidance: overrides.guidance ?? null,
+          })
+
           const openError = typeof openPayload?.open_error === "string" ? openPayload.open_error.trim() : ""
           const openFailure = typeof openPayload?.error === "string" ? openPayload.error.trim() : ""
+          const browserNotOpened = openPayload?.opened !== true
 
           const remoteLocalhostMismatch =
             typeof browserUrl === "string" &&
             browserUrl.includes("localhost") &&
             openPayload?.remote === true
 
-          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch) {
-            return {
-              reviewId,
-              submitPayload,
-              openPayload,
-              browserUrl,
-              status: submitPayload?.review?.status ?? "pending",
-              feedbackNotes: submitPayload?.review?.feedback_notes ?? null,
-              timedOut: false,
+          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch || browserNotOpened) {
+            return buildPlanResult({
               waitSkipped: true,
               manualApprovalRequired: true,
-              reason: !browserUrl ? "browser_url_unavailable" : "browser_unreachable",
+              reason:
+                !browserUrl
+                  ? "browser_url_unavailable"
+                  : browserNotOpened
+                    ? "browser_not_opened"
+                    : "browser_unreachable",
               guidance:
-                "Browser review is unavailable from this environment. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
-            }
+                "Browser review is unavailable from this environment or did not actually open. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
+            })
           }
 
           const waitEnv = process.env.LOGGER_LEVEL
@@ -6837,10 +6856,7 @@ defmodule ControlKeel.Skills.Exporter do
 
           if (waitExit !== 0) {
             if (waitTimedOut && waitPending) {
-              return {
-                reviewId,
-                submitPayload,
-                waitPayload,
+              return buildPlanResult({
                 browserUrl: waitPayload?.browser_url ?? submitPayload?.browser_url,
                 status: "pending",
                 feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
@@ -6850,7 +6866,7 @@ defmodule ControlKeel.Skills.Exporter do
                 reason: "review_timeout",
                 guidance:
                   "Plan review is still pending after timeout. Show the `browser_url` to the user if reachable. If browser review is unavailable or the user explicitly approves in chat, record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat after timeout/browser issue\" --json` (or `ck_review_feedback`) before proceeding.",
-              }
+              })
             }
 
             throw new Error(
@@ -6858,17 +6874,13 @@ defmodule ControlKeel.Skills.Exporter do
             )
           }
 
-          return {
-            reviewId,
-            submitPayload,
-            openPayload,
-            waitPayload,
+          return buildPlanResult({
             browserUrl: waitPayload?.browser_url ?? browserUrl,
             status: waitPayload?.review?.status,
             feedbackNotes: waitPayload?.review?.feedback_notes ?? null,
             waitSkipped: false,
             manualApprovalRequired: false,
-          }
+          })
         } finally {
           // Clean up temp file
           try { await Bun.file(tmpFile).unlink?.() ?? (await $`rm -f ${tmpFile}`.quiet()) } catch {}
@@ -6928,7 +6940,7 @@ defmodule ControlKeel.Skills.Exporter do
                 args.task_id,
                 args.session_id
               )
-              return JSON.stringify(result, null, 2)
+              return JSON.stringify(result)
             },
           }),
         },

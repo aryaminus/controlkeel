@@ -255,7 +255,7 @@ Plan-review tip for OpenCode:
 
 - when using the `submit_plan` tool directly, prefer `submit_plan({ plan: "...", wait_timeout_seconds: 30 })` for predictable wait behavior
 - the same timeout can be set globally with `CONTROLKEEL_REVIEW_WAIT_TIMEOUT`
-- if the returned payload indicates `waitSkipped: true` or `manualApprovalRequired: true` (for example browser URL missing/unreachable), ask the user for explicit chat approval and record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes "User approved in chat; browser unavailable" --json` (or `ck_review_feedback`) instead of repeatedly waiting
+- if the returned payload indicates `waitSkipped: true` or `manualApprovalRequired: true` (for example browser URL missing/unreachable or the browser did not actually open), ask the user for explicit chat approval and record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes "User approved in chat; browser unavailable" --json` (or `ck_review_feedback`) instead of repeatedly waiting
 
 ## 3b. Hosted MCP or A2A access for headless clients
 

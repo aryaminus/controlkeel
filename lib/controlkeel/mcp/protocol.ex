@@ -300,7 +300,13 @@ defmodule ControlKeel.MCP.Protocol do
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
           "task_id" => %{"type" => ["integer", "string"]},
-          "project_root" => %{"type" => "string"}
+          "project_root" => %{"type" => "string"},
+          "detail_level" => %{
+            "type" => "string",
+            "enum" => ["compact", "full"],
+            "description" =>
+              "Use compact by default to reduce token usage; request full only when raw workspace/resume/transcript payloads are needed."
+          }
         }
       }
     }

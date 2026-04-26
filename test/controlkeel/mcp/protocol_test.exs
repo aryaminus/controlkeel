@@ -708,6 +708,24 @@ defmodule ControlKeel.MCP.ProtocolTest do
              }
            } = response
 
+    payload = get_in(response, ["result", "structuredContent"])
+    assert payload["detail_level"] == "compact"
+    assert payload["detail_hint"] =~ "detail_level: full"
+
+    full_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 41,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_context",
+          "arguments" => %{"session_id" => session.id, "detail_level" => "full"}
+        }
+      })
+
+    assert get_in(full_response, ["result", "structuredContent", "detail_level"]) == "full"
+    refute Map.has_key?(get_in(full_response, ["result", "structuredContent"]), "detail_hint")
+
     assert is_list(memory_hits)
     assert is_binary(augmented_brief)
     assert is_list(search_terms)
