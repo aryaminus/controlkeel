@@ -200,6 +200,8 @@ In practice, `ck_context` is the main continuity surface across those transports
 
 When a host also offers file-backed memory, CK should coexist with it rather than pretending it does not exist. Project memory files, repo notes, or mounted memory directories can help the active agent work faster inside that host. CK still keeps the governed continuity layer in typed memory, proofs, traces, workspace snapshots, and resume packets so memory remains portable across hosts and auditable outside any one runtime.
 
+The same separation applies to protocol adapters that rewrite how a model expresses tool use. A repo or host may experiment with text-native tool formats, XML-style acts, or model-scoped prompt artifacts that sit between the model and an existing runtime. CK should describe those as harness-layer companion experiments unless CK itself owns that adapter contract.
+
 ### Progressive discovery and composition
 
 CK is intentionally designed so MCP clients do not have to front-load the entire governed surface into context at once.

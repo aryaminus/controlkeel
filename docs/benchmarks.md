@@ -174,6 +174,7 @@ Useful fields include:
 - `tool_call_surface: "terminal_native"` — terminal-style command blocks or delimiter formats that lean on pretraining-familiar syntax
 - `tool_call_surface: "mcp_native"` — direct MCP tool/resource surface
 - `tool_call_surface: "plain_text_delimited"` — ad hoc text protocol with stop tokens or sentinels
+- `tool_call_surface: "text_act_format"` — explicit text-native act protocol that an adapter lowers into normal tool events
 - `control_flow_surface: "single_pass"` — one forward reasoning pass with no recursive decomposition
 - `control_flow_surface: "search_loop"` — iterative planner/executor loop over a shared context
 - `control_flow_surface: "recursive_repl"` — recursive environment exploration or sub-call pattern
@@ -184,11 +185,17 @@ Useful fields include:
 - `progress_contract: "improve_metric"` — expected outcome is measurable benchmark or quality improvement
 - `handoff_contract: "relay_structured"` — baton passing via explicit plan, blockers, evidence, and next-step state
 - `validator_feedback: "per_iteration"` — validators or review checks fire between worker iterations
+- `protocol_adapter: "model_facing_adapter"` — a layer rewrites the model-facing protocol without replacing the underlying runtime loop
+- `parser_recovery_mode: "explicit_intent_only"` — malformed explicit tool attempts may be recovered, but missing intent is not guessed
+- `prompt_optimization_method: "gepa"` — adapter instructions tuned through GEPA or similar prompt optimization
+- `artifact_scope: "model_scoped"` — prompt/runtime artifacts are keyed to a specific model rather than treated as universal behavior
 
 These fields help distinguish "done by morning" runs from "better by morning" runs without pretending they should be judged the same way.
 - `control_flow_surface: "typed_runtime"` — recursion or decomposition handled by a constrained typed runtime rather than improvised free-form control flow
 
 This gives CK a way to compare experiments such as terminal-native tool syntax, recursive language-model loops, or typed functional runtimes without pretending those are all first-class shipped CK targets. The rule is simple: benchmark the concrete runtime contract that actually ran, record it honestly, and compare it on the same held-out suite.
+
+Protocol-adapter experiments are a good example of why this metadata matters. Sometimes the runtime loop is fine and the weak point is the model-facing interface: provider-native JSON tools are brittle, stop reasons are misleading, or smaller models fail to emit valid syntax. In those cases, the experiment is not "new runtime versus old runtime." It is "same runtime, different adapter contract." CK should record that distinction explicitly.
 
 ## Web UI quick presets
 

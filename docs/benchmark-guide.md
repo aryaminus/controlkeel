@@ -151,6 +151,27 @@ When importing or exporting those runs, use metadata that makes the loop shape e
 - `progress_contract: "finish_slice"`, `shrink_search_space`, or `improve_metric`
 - `handoff_contract: "relay_structured"` when the run uses baton-style planner/worker/validator handoffs
 
+### Record protocol-adapter experiments honestly
+
+If a run changes the model-facing protocol without replacing the runtime loop, record that as an adapter experiment rather than as a brand-new agent architecture.
+
+Examples:
+
+- replacing provider-native JSON tool calls with a text-native act format
+- parsing explicit malformed tool syntax back into valid tool calls
+- tuning model-specific adapter instructions with GEPA or similar optimizers
+- curating live bad traces into a feedback dataset for prompt-artifact improvement
+
+Useful metadata for those runs includes:
+
+- `tool_call_surface: "text_act_format"`
+- `protocol_adapter: "model_facing_adapter"`
+- `parser_recovery_mode: "explicit_intent_only"`
+- `prompt_optimization_method: "gepa"`
+- `artifact_scope: "model_scoped"`
+
+This lets CK compare "same runtime, different protocol layer" experiments fairly instead of mixing them together with loop, host, or execution-sandbox changes.
+
 ### Add pushback cases, not just exploit cases
 
 If you want benchmark results that feel closer to real expert use, do not limit suites to "does the model emit unsafe code." Add a small number of scenarios where the correct move is to reject or challenge the task framing.
