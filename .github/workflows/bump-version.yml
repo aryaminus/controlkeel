@@ -64,7 +64,7 @@ jobs:
         if: steps.release_gate.outputs.ready == 'true'
         run: |
           VERSION=$(cat /tmp/controlkeel-version.txt)
-          git add mix.exs CHANGELOG.md packages/npm/controlkeel/package.json
+          git add mix.exs CHANGELOG.md packages/npm/controlkeel/package.json packages/npm/controlkeel/server.json plugin.json .cursor-plugin/plugin.json
           git commit -m "chore(release): bump version to ${VERSION}"
           git tag -d "v${VERSION}" || true
           git tag "v${VERSION}"
