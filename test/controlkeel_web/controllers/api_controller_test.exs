@@ -330,6 +330,41 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert length(body["review"]["persisted_finding_ids"]) > 0
     end
 
+    test "reviews a PR directly from a GitHub pull request URL", %{conn: conn} do
+      previous = Application.get_env(:controlkeel, :governance_patch_fetcher)
+
+      Application.put_env(:controlkeel, :governance_patch_fetcher, fn url, _opts ->
+        assert url == "https://github.com/acme/demo/pull/456.patch"
+
+        {:ok,
+         """
+         diff --git a/lib/auth.ex b/lib/auth.ex
+         index 1111111..2222222 100644
+         --- a/lib/auth.ex
+         +++ b/lib/auth.ex
+         @@ -0,0 +1,1 @@
+         +api_key = "AKIAIOSFODNN7EXAMPLE"
+         """}
+      end)
+
+      on_exit(fn ->
+        if previous do
+          Application.put_env(:controlkeel, :governance_patch_fetcher, previous)
+        else
+          Application.delete_env(:controlkeel, :governance_patch_fetcher)
+        end
+      end)
+
+      conn =
+        post(conn, ~p"/api/v1/review/pr", %{
+          pr_url: "https://github.com/acme/demo/pull/456"
+        })
+
+      body = json_response(conn, 200)
+      assert body["review"]["decision"] == "block"
+      assert body["review"]["patch_url"] == "https://github.com/acme/demo/pull/456.patch"
+    end
+
     test "evaluates release readiness from proof and evidence state", %{conn: conn} do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "done"})

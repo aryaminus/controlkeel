@@ -1145,27 +1145,36 @@ defmodule ControlKeelWeb.ApiController do
     project_root = Map.get(params, "project_root", File.cwd!())
     session_id = normalize_integer_param(Map.get(params, "session_id"))
 
-    with {:ok, patch} <- require_param(params, "patch"),
-         :ok <- maybe_authorize_review(conn, session_id),
-         {:ok, review} <-
-           Governance.review_patch(patch,
-             session_id: session_id,
-             domain_pack: Map.get(params, "domain_pack"),
-             project_root: project_root,
-             dependency_review: Map.get(params, "dependency_review"),
-             github: Map.get(params, "github")
-           ) do
+    governance_opts = [
+      session_id: session_id,
+      domain_pack: Map.get(params, "domain_pack"),
+      project_root: project_root,
+      dependency_review: Map.get(params, "dependency_review"),
+      github: Map.get(params, "github")
+    ]
+
+    with :ok <- maybe_authorize_review(conn, session_id),
+         {:ok, review} <- review_pr_request(params, governance_opts) do
       json(conn, %{review: review})
     else
       {:error, :forbidden} ->
         conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
 
-      {:error, :missing_param, key} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: "`#{key}` is required"})
-
       {:error, message} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: message})
     end
+  end
+
+  defp review_pr_request(%{"pr_url" => pr_url}, opts) when is_binary(pr_url) and pr_url != "" do
+    Governance.review_pr_url(pr_url, opts)
+  end
+
+  defp review_pr_request(%{"patch" => patch}, opts) when is_binary(patch) and patch != "" do
+    Governance.review_patch(patch, opts)
+  end
+
+  defp review_pr_request(_params, _opts) do
+    {:error, "Provide `patch` or `pr_url`."}
   end
 
   def release_readiness(conn, params) do

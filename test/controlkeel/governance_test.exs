@@ -59,6 +59,39 @@ defmodule ControlKeel.GovernanceTest do
     assert review["chunks_reviewed"] == 1
   end
 
+  test "review_pr_url fetches a GitHub PR patch before review" do
+    patch = """
+    diff --git a/lib/auth.ex b/lib/auth.ex
+    index 1111111..2222222 100644
+    --- a/lib/auth.ex
+    +++ b/lib/auth.ex
+    @@ -0,0 +1,1 @@
+    +api_key = "AKIAIOSFODNN7EXAMPLE"
+    """
+
+    previous = Application.get_env(:controlkeel, :governance_patch_fetcher)
+
+    Application.put_env(:controlkeel, :governance_patch_fetcher, fn url, _opts ->
+      assert url == "https://github.com/acme/demo/pull/123.patch"
+      {:ok, patch}
+    end)
+
+    on_exit(fn ->
+      if previous do
+        Application.put_env(:controlkeel, :governance_patch_fetcher, previous)
+      else
+        Application.delete_env(:controlkeel, :governance_patch_fetcher)
+      end
+    end)
+
+    assert {:ok, review} =
+             Governance.review_pr_url("https://github.com/acme/demo/pull/123")
+
+    assert review["decision"] == "block"
+    assert review["pr_url"] == "https://github.com/acme/demo/pull/123"
+    assert review["patch_url"] == "https://github.com/acme/demo/pull/123.patch"
+  end
+
   test "release_readiness requires smoke and provenance even with a deploy-ready proof" do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "done"})

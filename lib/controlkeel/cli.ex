@@ -173,6 +173,7 @@ defmodule ControlKeel.CLI do
   ]
   @review_pr_switches [
     patch: :string,
+    url: :string,
     stdin: :boolean,
     session_id: :integer,
     domain_pack: :string,
@@ -1216,8 +1217,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: :review_pr, options: options}, project_root) do
     root = options[:project_root] || project_root
 
-    with {:ok, patch} <- patch_input(options),
-         {:ok, review} <- Governance.review_patch(patch, governance_opts(options, root)) do
+    with {:ok, review} <- review_pr_input(options, root) do
       {:ok, review_lines(review, "merge")}
     end
   end
@@ -4199,6 +4199,12 @@ defmodule ControlKeel.CLI do
 
   defp patch_input(options) do
     cond do
+      is_binary(options[:url]) and options[:url] != "" ->
+        Governance.review_pr_url(
+          options[:url],
+          governance_opts(options, options[:project_root] || File.cwd!())
+        )
+
       is_binary(options[:patch]) and options[:patch] != "" ->
         case File.read(options[:patch]) do
           {:ok, patch} -> {:ok, patch}
@@ -4209,7 +4215,22 @@ defmodule ControlKeel.CLI do
         {:ok, IO.read(:stdio, :eof)}
 
       true ->
-        {:error, "Provide --patch <file> or --stdin."}
+        {:error, "Provide --url <github-pr>, --patch <file>, or --stdin."}
+    end
+  end
+
+  defp review_pr_input(options, project_root) do
+    root = options[:project_root] || project_root
+
+    case patch_input(Keyword.put(options, :project_root, root)) do
+      {:ok, %{} = review} ->
+        {:ok, review}
+
+      {:ok, patch} when is_binary(patch) ->
+        Governance.review_patch(patch, governance_opts(options, root))
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

@@ -91,6 +91,21 @@ defmodule ControlKeel.Governance do
     end
   end
 
+  def review_pr_url(pr_url, opts \\ []) when is_binary(pr_url) do
+    with {:ok, patch_url} <- github_patch_url(pr_url),
+         {:ok, patch} <- patch_fetcher().(patch_url, opts),
+         {:ok, review} <-
+           review_patch(
+             patch,
+             opts
+             |> Keyword.put(:mode, "pr_url")
+             |> Keyword.put(:pr_url, pr_url)
+             |> Keyword.put(:patch_url, patch_url)
+           ) do
+      {:ok, Map.merge(review, %{"pr_url" => pr_url, "patch_url" => patch_url})}
+    end
+  end
+
   def release_readiness(opts \\ [])
 
   def release_readiness(opts) when is_list(opts) do
@@ -223,6 +238,85 @@ defmodule ControlKeel.Governance do
            "provenance" => release_evidence_summary(provenance, provenance_verified?),
            "telemetry" => telemetry
          }}
+    end
+  end
+
+  defp github_patch_url(pr_url) do
+    with %URI{scheme: scheme, host: host, path: path} = uri <- URI.parse(String.trim(pr_url)),
+         true <- scheme in ["http", "https"] || {:error, "PR URL must be an http(s) URL."},
+         true <-
+           host in ["github.com", "www.github.com"] ||
+             {:error, "Only GitHub PR URLs are supported."},
+         {:ok, patch_path} <- github_patch_path(path) do
+      {:ok,
+       URI.to_string(%{
+         uri
+         | scheme: "https",
+           host: "github.com",
+           query: nil,
+           fragment: nil,
+           path: patch_path
+       })}
+    else
+      {:error, reason} ->
+        {:error, reason}
+
+      _ ->
+        {:error,
+         "Unsupported PR URL format. Use a GitHub pull request URL such as https://github.com/org/repo/pull/123."}
+    end
+  end
+
+  defp github_patch_path(path) when is_binary(path) do
+    normalized =
+      path
+      |> String.trim()
+      |> String.trim_trailing("/")
+
+    cond do
+      Regex.match?(~r|^/[^/]+/[^/]+/pull/\d+\.patch$|, normalized) ->
+        {:ok, normalized}
+
+      Regex.match?(~r|^/[^/]+/[^/]+/pull/\d+$|, normalized) ->
+        {:ok, normalized <> ".patch"}
+
+      true ->
+        {:error,
+         "Unsupported PR URL format. Use a GitHub pull request URL such as https://github.com/org/repo/pull/123."}
+    end
+  end
+
+  defp patch_fetcher do
+    Application.get_env(:controlkeel, :governance_patch_fetcher, &default_patch_fetcher/2)
+  end
+
+  defp default_patch_fetcher(url, _opts) do
+    headers =
+      [{"accept", "text/plain"}, {"user-agent", "controlkeel-review"}]
+      |> maybe_put_github_auth()
+
+    req = Req.new(url: url, headers: headers, receive_timeout: 30_000)
+
+    case Req.request(req) do
+      {:ok, %Req.Response{status: status, body: body}}
+      when status in 200..299 and is_binary(body) ->
+        {:ok, body}
+
+      {:ok, %Req.Response{status: status}} ->
+        {:error, "Failed to fetch PR patch: HTTP #{status}"}
+
+      {:error, exception} ->
+        {:error, "Failed to fetch PR patch: #{Exception.message(exception)}"}
+    end
+  end
+
+  defp maybe_put_github_auth(headers) do
+    case System.get_env("GITHUB_TOKEN") || System.get_env("GH_TOKEN") do
+      token when is_binary(token) and token != "" ->
+        [{"authorization", "Bearer #{token}"} | headers]
+
+      _ ->
+        headers
     end
   end
 
