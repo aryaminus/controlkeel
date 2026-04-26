@@ -924,13 +924,17 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ ~S|? "browser_not_opened"|
     assert opencode_plugin =~ ~S|reason: "review_timeout"|
 
+    assert opencode_plugin =~ "serverUnavailable"
+    assert opencode_plugin =~ ~S|? "review_server_unavailable"|
+
     assert opencode_plugin =~
-             "Browser review is unavailable from this environment or did not actually open."
+             "Browser review is unavailable, the CK review server is not reachable"
 
     assert opencode_plugin =~ "User approved in chat after timeout/browser issue"
 
     assert opencode_plugin =~ ~S|"browser_url_unavailable"|
     assert opencode_plugin =~ ~S|"browser_unreachable"|
+    assert opencode_plugin =~ ~S|"review_server_unavailable"|
 
     assert opencode_plugin =~ "return JSON.stringify(result)"
     refute opencode_plugin =~ "JSON.stringify(result, null, 2)"

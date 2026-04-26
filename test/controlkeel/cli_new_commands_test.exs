@@ -6,6 +6,7 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
   alias ControlKeel.CLI
   alias ControlKeel.Mission
+  alias ControlKeel.ReviewBridge
   alias ControlKeel.ProjectBinding
   alias ControlKeel.Governance.CircuitBreaker
   alias ControlKeel.Governance.AgentMonitor
@@ -279,7 +280,13 @@ defmodule ControlKeel.CLI.NewCommandsTest do
                )
 
       assert Enum.any?(open_lines, &String.contains?(&1, "/reviews/#{review.id}"))
+      assert Enum.any?(open_lines, &String.contains?(&1, "Review server serving: false"))
       assert Enum.any?(open_lines, &String.contains?(&1, "Opened browser: false"))
+
+      assert Enum.any?(
+               open_lines,
+               &String.contains?(&1, "Manual approval fallback")
+             )
 
       assert {:ok, respond_lines} =
                CLI.run_command(
@@ -422,6 +429,8 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert open_payload["open_target"] == "manual"
       assert open_payload["opened"] == false
       assert open_payload["remote"] == true
+      assert open_payload["server_serving"] == false
+      assert is_binary(open_payload["server_error"])
 
       assert {:ok, _respond_lines} =
                CLI.run_command(
@@ -517,6 +526,31 @@ defmodule ControlKeel.CLI.NewCommandsTest do
       assert wait_payload["status"] == "pending"
       assert get_in(wait_payload, ["review", "status"]) == "pending"
       assert wait_payload["browser_url"] =~ "/reviews/#{review.id}"
+    end
+  end
+
+  describe "review bridge server checks" do
+    test "detects a serving review endpoint" do
+      bypass = Bypass.open()
+
+      Bypass.expect_once(bypass, "GET", "/reviews/123", fn conn ->
+        Plug.Conn.resp(conn, 200, "ok")
+      end)
+
+      status = ReviewBridge.review_server_status("http://127.0.0.1:#{bypass.port}/reviews/123")
+      assert status.serving == true
+      assert status.status == 200
+      assert status.error == nil
+    end
+
+    test "detects an unavailable review endpoint without hanging" do
+      status =
+        ReviewBridge.review_server_status("http://127.0.0.1:9/reviews/123",
+          server_check_timeout_ms: 50
+        )
+
+      assert status.serving == false
+      assert is_binary(status.error)
     end
   end
 

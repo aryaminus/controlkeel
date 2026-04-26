@@ -1282,7 +1282,10 @@ defmodule ControlKeel.CLI do
           "open_target" => review_open.open_target,
           "remote" => review_open.remote,
           "opened" => review_open.opened,
-          "open_error" => review_open.open_error
+          "open_error" => review_open.open_error,
+          "server_serving" => review_open.server_serving,
+          "server_status" => review_open.server_status,
+          "server_error" => review_open.server_error
         })
 
       if options[:json] do
@@ -1297,8 +1300,11 @@ defmodule ControlKeel.CLI do
            "Browser embed: #{review_open.browser_embed}"
          ] ++
            maybe_cli_line("Open target", review_open.open_target) ++
+           maybe_cli_line("Review server serving", to_string(review_open.server_serving)) ++
+           maybe_cli_line("Review server error", review_open.server_error) ++
            maybe_cli_line("Opened browser", to_string(review_open.opened)) ++
-           maybe_cli_line("Open error", review_open.open_error)}
+           maybe_cli_line("Open error", review_open.open_error) ++
+           manual_approval_lines(review, review_open)}
       end
     else
       {:error, :not_found} ->
@@ -4893,6 +4899,21 @@ defmodule ControlKeel.CLI do
   defp format_cli_error(reason), do: inspect(reason)
 
   defp review_url(review_id), do: Endpoint.url() <> "/reviews/#{review_id}"
+
+  defp manual_approval_lines(review, %{server_serving: false}) do
+    [
+      "Manual approval fallback: review server is not reachable from this CLI session.",
+      "Approve from CLI after explicit human approval: controlkeel review plan respond --id #{review.id} --decision approved --feedback-notes \"User approved in chat; review server unavailable\""
+    ]
+  end
+
+  defp manual_approval_lines(_review, %{opened: false}) do
+    [
+      "Manual approval fallback: browser did not open automatically; ask for explicit approval in chat or open the URL manually."
+    ]
+  end
+
+  defp manual_approval_lines(_review, _review_open), do: []
 
   defp review_feedback_lines(%{feedback_notes: notes}) when is_binary(notes) and notes != "",
     do: ["Feedback: #{notes}"]

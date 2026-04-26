@@ -6232,24 +6232,27 @@ defmodule ControlKeel.Skills.Exporter do
           const openError = typeof openPayload?.open_error === "string" ? openPayload.open_error.trim() : ""
           const openFailure = typeof openPayload?.error === "string" ? openPayload.error.trim() : ""
           const browserNotOpened = openPayload?.opened !== true
+          const serverUnavailable = openPayload?.server_serving === false
 
           const remoteLocalhostMismatch =
             typeof browserUrl === "string" &&
             browserUrl.includes("localhost") &&
             openPayload?.remote === true
 
-          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch || browserNotOpened) {
+          if (!browserUrl || serverUnavailable || openError || openFailure || remoteLocalhostMismatch || browserNotOpened) {
             return buildPlanResult({
               waitSkipped: true,
               manualApprovalRequired: true,
               reason:
                 !browserUrl
                   ? "browser_url_unavailable"
-                  : browserNotOpened
-                    ? "browser_not_opened"
-                    : "browser_unreachable",
+                  : serverUnavailable
+                    ? "review_server_unavailable"
+                    : browserNotOpened
+                      ? "browser_not_opened"
+                      : "browser_unreachable",
               guidance:
-                "Browser review is unavailable from this environment or did not actually open. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
+                "Browser review is unavailable, the CK review server is not reachable, or the browser did not actually open. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser/review server unavailable\" --json` or `ck_review_feedback`.",
             })
           }
 
@@ -6816,24 +6819,27 @@ defmodule ControlKeel.Skills.Exporter do
           const openError = typeof openPayload?.open_error === "string" ? openPayload.open_error.trim() : ""
           const openFailure = typeof openPayload?.error === "string" ? openPayload.error.trim() : ""
           const browserNotOpened = openPayload?.opened !== true
+          const serverUnavailable = openPayload?.server_serving === false
 
           const remoteLocalhostMismatch =
             typeof browserUrl === "string" &&
             browserUrl.includes("localhost") &&
             openPayload?.remote === true
 
-          if (!browserUrl || openError || openFailure || remoteLocalhostMismatch || browserNotOpened) {
+          if (!browserUrl || serverUnavailable || openError || openFailure || remoteLocalhostMismatch || browserNotOpened) {
             return buildPlanResult({
               waitSkipped: true,
               manualApprovalRequired: true,
               reason:
                 !browserUrl
                   ? "browser_url_unavailable"
-                  : browserNotOpened
-                    ? "browser_not_opened"
-                    : "browser_unreachable",
+                  : serverUnavailable
+                    ? "review_server_unavailable"
+                    : browserNotOpened
+                      ? "browser_not_opened"
+                      : "browser_unreachable",
               guidance:
-                "Browser review is unavailable from this environment or did not actually open. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser unavailable\" --json` or `ck_review_feedback`.",
+                "Browser review is unavailable, the CK review server is not reachable, or the browser did not actually open. Ask the user for explicit approval in chat, then record it with `controlkeel review plan respond --id <review_id> --decision approved --feedback-notes \"User approved in chat; browser/review server unavailable\" --json` or `ck_review_feedback`.",
             })
           }
 

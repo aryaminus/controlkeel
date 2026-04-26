@@ -15,22 +15,32 @@ defmodule ControlKeel.ReviewBridge do
       embed = Keyword.get(opts, :browser_embed, browser_embed())
       open_target = open_target(embed, remote_mode?())
 
+      url = browser_url(review)
+      serving = review_server_status(url, opts)
+
       open_result =
-        maybe_open_browser(
-          browser_url(review),
-          open_target,
-          Keyword.get(opts, :auto_open, auto_open_reviews?())
-        )
+        if serving.serving do
+          maybe_open_browser(
+            url,
+            open_target,
+            Keyword.get(opts, :auto_open, auto_open_reviews?())
+          )
+        else
+          %{opened: false, open_error: serving.error}
+        end
 
       {:ok,
        %{
          review: review,
-         url: browser_url(review),
+         url: url,
          browser_embed: embed,
          remote: remote_mode?(),
          open_target: open_target,
          opened: open_result.opened,
-         open_error: open_result.open_error
+         open_error: open_result.open_error,
+         server_serving: serving.serving,
+         server_status: serving.status,
+         server_error: serving.error
        }}
     end
   end
@@ -42,6 +52,32 @@ defmodule ControlKeel.ReviewBridge do
 
     do_wait(review_or_id, deadline, interval_ms)
   end
+
+  def review_server_status(url, opts \\ []) do
+    timeout = Keyword.get(opts, :server_check_timeout_ms, 750)
+
+    case Req.get(url,
+           receive_timeout: timeout,
+           connect_options: [timeout: timeout],
+           retry: false,
+           redirect: false
+         ) do
+      {:ok, %{status: status}} when status in 200..499 ->
+        %{serving: true, status: status, error: nil}
+
+      {:ok, %{status: status}} ->
+        %{serving: false, status: status, error: "review server returned HTTP #{status}"}
+
+      {:error, reason} ->
+        %{serving: false, status: nil, error: review_server_error(reason)}
+    end
+  rescue
+    error ->
+      %{serving: false, status: nil, error: Exception.message(error)}
+  end
+
+  defp review_server_error(%{reason: reason}), do: inspect(reason)
+  defp review_server_error(reason), do: inspect(reason)
 
   def browser_embed do
     System.get_env("CONTROLKEEL_REVIEW_EMBED") ||
