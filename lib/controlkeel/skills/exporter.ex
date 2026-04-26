@@ -5648,7 +5648,7 @@ defmodule ControlKeel.Skills.Exporter do
     3. Submit plans or approval packets with `ck_review_submit` and check `ck_review_status` before execution.
     4. Record any human-review issue with `ck_finding`.
     5. Check `ck_budget` before expensive model or multi-agent work, and keep `ck_context` compact unless full raw context is needed.
-    6. Before AFK or delegated implementation, split large work into human-approved vertical slices with explicit dependencies; planner agents should run only unblocked slices and every branch needs automated review plus human QA before merge.
+    6. Before AFK or delegated implementation, split large work into human-approved vertical slices with explicit dependencies; prefer durable behavior-first issues, stable deep-module interfaces, and branch-level automated review plus human QA before merge.
     7. Use `ck_route`, `ck_skill_list`, and `ck_skill_load` to delegate or activate specialized CK workflows.
 
     Install ControlKeel:
@@ -7691,7 +7691,7 @@ defmodule ControlKeel.Skills.Exporter do
     2. **Before mutations**: Call `ck_validate` before writing code, config, shell commands, or deploy artifacts.
     3. **Findings**: If you discover a problem, call `ck_finding` to persist it.
     4. **Budget**: Call `ck_budget` before expensive model calls or bulk operations; keep context compact until full raw context is necessary.
-    5. **Planning shape**: Prefer human-approved vertical slices/tracer bullets with explicit dependencies before AFK implementation; every generated branch needs automated review and human QA.
+    5. **Planning shape**: Prefer human-approved vertical slices/tracer bullets with explicit dependencies before AFK implementation; issues should be behavior-first and every generated branch needs automated review plus human QA.
     6. **Routing**: Call `ck_route` before delegating sub-work to another agent.
 
     ## Commands

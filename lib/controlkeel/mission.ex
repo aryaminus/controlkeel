@@ -4210,8 +4210,9 @@ defmodule ControlKeel.Mission do
         "implementation_plan" ->
           [
             "What is the first vertical slice or tracer-bullet outcome that crosses storage, domain logic, and user-visible feedback?",
-            "Which deep module interfaces should stay stable while implementation details can be delegated?",
-            "What automated reviewer and human QA checks will verify each branch before merge?",
+            "Which alternative interface designs did you consider, and why is the chosen boundary deep rather than shallow?",
+            "Which project domain terms, CONTEXT notes, or ADRs constrain this plan?",
+            "What automated reviewer and human QA checks will verify behavior-first issues before merge?",
             "What check would tell us early that the implementation is drifting from the plan?"
           ]
 
@@ -4254,7 +4255,7 @@ defmodule ControlKeel.Mission do
   end
 
   defp grill_question_for_missing("validation_plan", _phase) do
-    "What concrete checks, tests, or compiler signals will prove this change is correct?"
+    "What behavior-first checks, tests, or compiler signals will prove this change is correct without coupling to implementation details?"
   end
 
   defp grill_question_for_missing("code_snippets", _phase) do

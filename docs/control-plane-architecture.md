@@ -135,6 +135,12 @@ ControlKeel already had most of these behaviors in practice, but they are now an
   Plans should prefer tracer-bullet slices that cross storage, domain logic, and user-visible feedback so tests and review can exercise an integrated path early. Pure schema/API/UI phases are a warning sign unless they are explicitly justified.
 - **Bounded AFK, not unattended autonomy**
   CK models AFK execution as a night shift that catches up to day-shift planning. Humans still own requirements, PRD destination, QA, and merge decisions; planner agents should launch only unblocked sandboxed slices, and each implementation branch needs automated review plus human QA follow-up before it is trusted.
+- **Design interfaces before delegating internals**
+  For new or risky modules, CK should ask for at least two materially different interface shapes before implementation. The winning design should keep callers simple, hide complexity behind a deep module boundary, and make misuse hard.
+- **Domain language and durable issues**
+  Planning and QA artifacts should use project domain terms and documented decisions, not transient file paths or line numbers. Issues should describe behavior, expected outcomes, reproduction steps, blockers, and acceptance criteria so they survive refactors.
+- **Progressive skill disclosure**
+  Skills should keep descriptions precise and SKILL.md short. Detailed references and deterministic scripts belong in separate resources so agents pull them only when needed.
 - **Pull detailed standards, push review criteria**
   Keep always-on system guidance small. Let implementers pull detailed standards from skills or memory when needed, then push the relevant standards into fresh-context review so code style, security, and architecture constraints are checked deliberately.
 - **Observable compaction and recovery**
