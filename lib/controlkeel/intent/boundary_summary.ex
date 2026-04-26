@@ -8,20 +8,6 @@ defmodule ControlKeel.Intent.BoundarySummary do
     RuntimeRecommendation
   }
 
-  @empty_summary %{
-    "risk_tier" => nil,
-    "budget_note" => nil,
-    "data_summary" => nil,
-    "compliance" => [],
-    "constraints" => [],
-    "open_questions" => [],
-    "launch_window" => nil,
-    "next_step" => nil,
-    "execution_posture" => ExecutionPosture.build(nil),
-    "harness_policy" => HarnessPolicy.build(nil),
-    "runtime_recommendation" => RuntimeRecommendation.build(nil)
-  }
-
   def build(brief, opts \\ [])
 
   def build(%ExecutionBrief{} = brief, opts), do: build(ExecutionBrief.to_map(brief), opts)
@@ -47,7 +33,7 @@ defmodule ControlKeel.Intent.BoundarySummary do
     }
   end
 
-  def build(_brief, _opts), do: @empty_summary
+  def build(_brief, _opts), do: empty_summary()
 
   defp nested_map(map, key) do
     case fetch_key(map, key) do
@@ -105,4 +91,20 @@ defmodule ControlKeel.Intent.BoundarySummary do
   defp known_atom_key("interview_answers"), do: :interview_answers
   defp known_atom_key("constraints"), do: :constraints
   defp known_atom_key(_key), do: nil
+
+  defp empty_summary do
+    %{
+      "risk_tier" => nil,
+      "budget_note" => nil,
+      "data_summary" => nil,
+      "compliance" => [],
+      "constraints" => [],
+      "open_questions" => [],
+      "launch_window" => nil,
+      "next_step" => nil,
+      "execution_posture" => ExecutionPosture.build(nil),
+      "harness_policy" => HarnessPolicy.build(nil),
+      "runtime_recommendation" => RuntimeRecommendation.build(nil)
+    }
+  end
 end

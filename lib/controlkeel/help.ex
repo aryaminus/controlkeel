@@ -2,7 +2,6 @@ defmodule ControlKeel.Help do
   @moduledoc false
 
   alias ControlKeel.AgentIntegration
-  alias ControlKeel.ProtocolInterop
 
   @topics [
     %{
@@ -307,7 +306,7 @@ defmodule ControlKeel.Help do
       phrases: ["run mcp", "hosted mcp", "remote client"],
       commands: [
         "controlkeel mcp --project-root /abs/path",
-        "controlkeel service-account create --workspace-id 1 --name ci-mcp --scopes \"#{Enum.join(ProtocolInterop.hosted_mcp_scopes(), " ")}\"",
+        :hosted_service_account_command,
         "controlkeel registry status acp",
         "controlkeel help attach"
       ],
@@ -348,7 +347,7 @@ defmodule ControlKeel.Help do
                                       Run post-attach health checks and verification hints
       controlkeel review diff [options]
                                       Review a git diff between two refs before merge
-      controlkeel review pr [options] Review a PR patch from --patch <file> or --stdin
+      controlkeel review pr [options] Review a PR patch from --url <github-pr>, --patch <file>, or --stdin
       controlkeel review socket [options]
                   Review a Socket report from --report <file> or --stdin
       controlkeel review plan submit [options]
@@ -484,6 +483,14 @@ defmodule ControlKeel.Help do
       controlkeel update --sync-attached
                                       Refresh attached plugins, hooks, skills, agents, and commands
     """
+  end
+
+  defp hosted_service_account_command do
+    scopes =
+      ["a2a:access" | ControlKeel.ProtocolInterop.hosted_mcp_scopes()]
+      |> Enum.join(" ")
+
+    "controlkeel service-account create --workspace-id 1 --name ci-mcp --scopes \"#{scopes}\""
   end
 
   def render([]), do: general_help()
@@ -687,7 +694,7 @@ defmodule ControlKeel.Help do
   end
 
   defp matched_topics(query, tokens) do
-    @topics
+    topics()
     |> Enum.map(fn topic -> {topic, topic_score(topic, query, tokens)} end)
     |> Enum.filter(fn {_topic, score} -> score > 0 end)
     |> Enum.sort_by(fn {topic, score} -> {-score, topic.id} end)
@@ -739,4 +746,17 @@ defmodule ControlKeel.Help do
     |> Enum.map(& &1.id)
     |> Enum.join(", ")
   end
+
+  defp topics do
+    Enum.map(@topics, fn
+      %{commands: commands} = topic ->
+        %{topic | commands: Enum.map(commands, &resolve_command/1)}
+
+      topic ->
+        topic
+    end)
+  end
+
+  defp resolve_command(:hosted_service_account_command), do: hosted_service_account_command()
+  defp resolve_command(command), do: command
 end

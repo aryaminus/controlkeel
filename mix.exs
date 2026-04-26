@@ -71,7 +71,6 @@ defmodule ControlKeel.MixProject do
        app: false,
        compile: false,
        depth: 1},
-      {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
       {:chromic_pdf, "~> 1.17"},
       {:gnat, "~> 1.10"},

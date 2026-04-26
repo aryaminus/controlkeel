@@ -30,8 +30,6 @@ defmodule ControlKeel.AgentExecution do
     "gemini-cli" => ["gemini", "gemini-cli"]
   }
 
-  @hosted_scopes ["a2a:access" | ControlKeel.ProtocolInterop.hosted_mcp_scopes()]
-
   def list_agents(project_root \\ File.cwd!()) do
     project_root = ProjectRoot.resolve(project_root)
     attached = attached_agent_ids(project_root)
@@ -571,7 +569,7 @@ defmodule ControlKeel.AgentExecution do
     with {:ok, %{service_account: account, token: token}} <-
            Platform.create_service_account(session.workspace_id, %{
              "name" => "executor-#{mode}-session-#{session.id}",
-             "scopes" => Enum.join(@hosted_scopes, " "),
+             "scopes" => Enum.join(hosted_scopes(), " "),
              "metadata" => %{
                "cyber_access_mode" => SecurityWorkflow.session_cyber_access_mode(session)
              }
@@ -960,5 +958,9 @@ defmodule ControlKeel.AgentExecution do
 
   defp stringify_payload(map) when is_map(map) do
     Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
+  end
+
+  defp hosted_scopes do
+    ["a2a:access" | ControlKeel.ProtocolInterop.hosted_mcp_scopes()]
   end
 end
