@@ -101,6 +101,8 @@ You can say:
 
 > ControlKeel is the layer that sits between coding agents and production work. It does not replace Claude Code, Codex, OpenCode, or Copilot. It governs them. It gives agents bounded context, validates risky work, records findings, drives approvals, stores proof bundles, tracks budgets and providers, and keeps work reviewable across hosts. The point is not “more AI.” The point is making agent work safe enough, traceable enough, and structured enough to actually ship.
 
+That also means CK is intentionally skeptical of hype around unsupervised multi-agent product delivery. It is much better at making narrow, reviewable overnight slices credible than at pretending a pile of loosely directed agents can autonomously build robust user-facing software from scratch.
+
 CK also makes the operating model explicit: it tells you whether a session is effectively advise-only, supervised, guarded autonomy, or long-running outcome work, and whether the current goal is task delivery or a KPI.
 It also now derives a task augmentation brief so agents start from a scoped, reviewable problem frame instead of a vague ticket alone.
 

@@ -42,6 +42,8 @@ For overnight or AFK work, decide which loop you are actually running before lau
 
 If you cannot state the finish condition or acceptable progress condition clearly, the loop is probably too open to run unattended without waste.
 
+Also be honest about the task texture. Overnight work is much more credible when it builds on an existing codebase, existing tests, established architecture, and cumulative prior context. It is much less credible as a zero-to-one attempt to autonomously produce polished, user-facing product software from a vague prompt alone.
+
 ## Proxy observability
 
 When CK proxies provider traffic, it preserves allowlisted rate-limit metadata in invocation records:
