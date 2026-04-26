@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.48 — 2026-04-26
+
+### What's changed
+
+- docs(benchmarks): add protocol adapter experiment guidance
+- docs(afk): add overnight credibility guidance
+- docs(loops): clarify overnight execution posture
+- docs(memory): clarify host file memory posture
+- docs(integrations): align guarded code execution host surfaces
+
 ## v0.2.47 — 2026-04-26
 
 ### What's changed
