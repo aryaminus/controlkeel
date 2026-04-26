@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.45 — 2026-04-26
+
+### What's changed
+
+- docs(integrations): clarify benchmark and browser companion guidance
+- feat(governance): review GitHub PR URLs directly
+- chore(cleanup): remove dead mailer and unused assets
+
 ## v0.2.44 — 2026-04-24
 
 ### What's changed
