@@ -159,6 +159,12 @@ controlkeel provider default openai
 
 This is the path for vLLM, SGLang, LM Studio, Hugging Face Inference Providers, and Codestral-compatible endpoints. CK accepts base URLs with or without a trailing `/v1`.
 
+For local-model experimentation, treat the harness as part of the evaluation target, not as a transparent wrapper. A hosted coding harness, prompt format, or tool-call contract does not automatically transfer cleanly to a local backend just because the endpoint is OpenAI-compatible. The dependable path is:
+
+- start with a simple console-first loop
+- verify the actual request/response and tool behavior of the local runtime you are using
+- benchmark that concrete setup through CK before making product or quality claims
+
 If `controlkeel provider doctor` still reports `heuristic`, CK governance and MCP flows still work, but advisory review and other model-backed CK features remain limited until you confirm one of the provider paths above.
 
 CK now treats routed and custom gateway paths as explicit trust boundaries rather than transparent drop-ins. `controlkeel provider show` and `controlkeel provider doctor` report:

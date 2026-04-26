@@ -16,6 +16,16 @@ That also makes it the right outer loop for GEPA-style optimization work:
 - bring the candidate back through CK benchmark and policy-training surfaces
 - promote only when the candidate improves held-out evidence, not just the visible optimization split
 
+## Console-first evaluation posture
+
+For early agent and harness work, prefer a console-first loop before building product UI around it.
+
+- keep the benchmark, trace packet, and failure-cluster loop close to the real execution surface
+- make the harness behavior inspectable before investing in dashboards or orchestration chrome
+- treat reproducible benchmark exports, held-out transfer, and regression catches as the evidence, not the prettiness of the interface
+
+This is especially important when trying new prompting schemes, tool-call formats, recursive workflows, or optimizer loops. If the behavior is not legible in a small console-first path, UI polish will usually hide the problem rather than solve it.
+
 ## External signal: GEPA holdout transfer (single external study)
 
 An external write-up by Tim Waldin (Apr 2026) reported that GEPA-driven prompt evolution improved a Claude Haiku bug-fix benchmark from **0.6496 to 0.8462 on an unseen holdout** (**+0.1966**, 9 unseen bugs, 3 samples per prompt), with no train/holdout overlap in that setup. Source: Tim Waldin, "Using GEPA to hone Claude Haiku on GitHub bug fixes (+20% solve on untrained bugs)" (tim.waldin.net, 2026-04-19).
@@ -114,6 +124,23 @@ When benchmarking retrieval quality over CK memory, tag the retrieval backend:
 
 This vocabulary exists so future retrieval experiments can be compared fairly. See `docs/idea/2026-late-interaction-retrieval-research.md` for the research motivating multi-vector and late-interaction approaches.
 
+### Runtime experiment metadata
+
+When comparing experimental agent runtimes, keep the runtime shape explicit in metadata instead of hiding it behind a single score.
+
+Useful fields include:
+
+- `tool_call_surface: "json_schema"` — structured JSON or schema-bound tool calls
+- `tool_call_surface: "terminal_native"` — terminal-style command blocks or delimiter formats that lean on pretraining-familiar syntax
+- `tool_call_surface: "mcp_native"` — direct MCP tool/resource surface
+- `tool_call_surface: "plain_text_delimited"` — ad hoc text protocol with stop tokens or sentinels
+- `control_flow_surface: "single_pass"` — one forward reasoning pass with no recursive decomposition
+- `control_flow_surface: "search_loop"` — iterative planner/executor loop over a shared context
+- `control_flow_surface: "recursive_repl"` — recursive environment exploration or sub-call pattern
+- `control_flow_surface: "typed_runtime"` — recursion or decomposition handled by a constrained typed runtime rather than improvised free-form control flow
+
+This gives CK a way to compare experiments such as terminal-native tool syntax, recursive language-model loops, or typed functional runtimes without pretending those are all first-class shipped CK targets. The rule is simple: benchmark the concrete runtime contract that actually ran, record it honestly, and compare it on the same held-out suite.
+
 ## Web UI quick presets
 
 On `/benchmarks`, use **Quick presets** (OpenCode comparison, ControlKeel validate only, Validate + governed proxy) to fill the subject and baseline fields, then adjust if needed. The subjects field still accepts a comma-separated list and supports browser autocomplete from **Available subjects**.
@@ -189,5 +216,7 @@ For GEPA-style text optimization specifically:
 - run multi-sample candidate evaluations (not single-run score snapshots) before promotion
 - use CK exports and run metadata as the audit trail for what changed and why it was promoted
 - include optimizer-run metadata (for example scheduler/observer/target-scope settings) so later comparisons stay apples-to-apples
+
+For experimental recursive or typed-runtime systems, the same rule applies: benchmark the concrete runtime behavior that actually ran. Do not promote based on architectural taste alone. If the experiment matters, record it honestly in run metadata and compare it on the same held-out suite.
 
 Policy-training promotion gates now carry the same integrity stance. A candidate policy artifact must have validation, held-out, and baseline evidence before promotion can succeed, and the gates include diagnostic finding payloads for review surfaces that want to persist the warning.

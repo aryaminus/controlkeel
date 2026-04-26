@@ -264,3 +264,21 @@ CK also pulls a few practical host patterns from Plannotator for direct-install 
 - `CONTROLKEEL_BROWSER=/path/to/browser` or `BROWSER=...`: force a specific browser command for `controlkeel review plan open`.
 - `CONTROLKEEL_REVIEW_EMBED=vscode_webview`: prefer the VS Code companion embed path instead of an external browser.
 - `CONTROLKEEL_AUTO_OPEN_REVIEWS=0`: disable automatic browser launching entirely. Test runs already default to this behavior.
+
+## External browser companions
+
+ControlKeel does not currently ship its own browser engine. When a governed workflow needs lightweight headless browsing or scraping, the cleanest fit is usually an external MCP- or CDP-capable browser runtime alongside CK rather than pretending browser automation is a native CK attach family.
+
+One notable option is [Lightpanda](https://lightpanda.io/), a third-party headless browser built for automation and AI-agent workloads. Its open-source binary now exposes a native stdio MCP server (`lightpanda mcp`) and also supports CDP-compatible tooling, which makes it a practical companion when:
+
+- an agent needs fast, low-memory page navigation and extraction
+- Chrome or Chromium are too heavy for the target runtime
+- you want browser access through a dedicated MCP server instead of mixing that logic into CK itself
+
+Lightpanda is best treated as optional infrastructure next to ControlKeel, not as a ControlKeel-managed host target:
+
+- CK remains the governance, review, proof, and policy layer
+- Lightpanda can supply browser navigation and extraction through its own MCP server or CDP surface
+- the operator should still apply normal trust-boundary, robots.txt, and rate-limit discipline for any automated browsing or scraping workflow
+
+If you wire it into a repo-local MCP config, keep the support claim explicit: this is a third-party browser companion that CK can coexist with, not a native `controlkeel attach lightpanda` path.

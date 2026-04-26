@@ -194,6 +194,8 @@ That means CK's skill model is already closer to a progressive-disclosure packag
 
 In practice, that gives CK the same core advantage that people want from modern skill systems: agents do not need to front-load every workflow into the initial context window just to keep the option available.
 
+The same honesty applies to browser automation. CK can coexist with external browser runtimes and browser-specific MCP servers, but it should describe those as companions rather than native attach targets. For example, a third-party browser such as [Lightpanda](https://lightpanda.io/) can provide lightweight headless navigation through its own stdio MCP server or CDP-compatible surface, while CK continues to own the governance, findings, proof, and review loop around that work.
+
 In practice, `ck_context` is the main continuity surface across those transports. It returns current mission state plus a bounded workspace snapshot, a deterministic workspace cache key, recent CK-visible transcript events, transcript summaries, and resumable task context for the active session.
 
 ### Progressive discovery and composition
