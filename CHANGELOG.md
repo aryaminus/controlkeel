@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.46 — 2026-04-26
+
+### What's changed
+
+- fix(integrations): avoid stalled review waits and trim context payloads
+- chore(cleanup): remove leftover dev mailer config
+
 ## v0.2.45 — 2026-04-26
 
 ### What's changed
