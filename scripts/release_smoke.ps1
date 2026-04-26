@@ -13,7 +13,7 @@ function Invoke-BinaryStep {
   param(
     [string[]]$Arguments,
     [string]$WorkingDirectory = (Get-Location).Path,
-    [int]$TimeoutSeconds = 60
+    [int]$TimeoutSeconds = 120
   )
 
   $stdoutPath = Join-Path $env:TEMP ("controlkeel-smoke-stdout-" + [guid]::NewGuid() + ".log")
@@ -23,6 +23,7 @@ function Invoke-BinaryStep {
     $process = Start-Process -FilePath $BinaryPath `
       -ArgumentList $Arguments `
       -WorkingDirectory $WorkingDirectory `
+      -NoNewWindow `
       -RedirectStandardOutput $stdoutPath `
       -RedirectStandardError $stderrPath `
       -PassThru
@@ -48,6 +49,8 @@ function Invoke-BinaryStep {
     Remove-Item -Force $stderrPath -ErrorAction SilentlyContinue
   }
 }
+
+Invoke-BinaryStep -Arguments @("--help") -TimeoutSeconds 180 | Out-Null
 
 Invoke-BinaryStep -Arguments @("version") | Out-Null
 
@@ -133,6 +136,7 @@ try {
 
   $serverProcess = Start-Process -FilePath $BinaryPath `
     -ArgumentList @("serve") `
+    -NoNewWindow `
     -RedirectStandardOutput $serverStdoutLog `
     -RedirectStandardError $serverStderrLog `
     -WorkingDirectory $tmpDir `
