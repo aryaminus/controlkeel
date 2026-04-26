@@ -9,6 +9,7 @@ defmodule ControlKeel.MCP.Protocol do
   alias ControlKeel.MCP.Tools.{
     CkBudget,
     CkContext,
+    CkExecuteCode,
     CkDelegate,
     CkExperienceIndex,
     CkExperienceRead,
@@ -176,6 +177,7 @@ defmodule ControlKeel.MCP.Protocol do
   def tool_schemas(opts \\ []) do
     base = [
       ck_validate_tool(),
+      ck_execute_code_tool(),
       ck_context_tool(),
       ck_experience_index_tool(),
       ck_experience_read_tool(),
@@ -215,6 +217,7 @@ defmodule ControlKeel.MCP.Protocol do
   end
 
   def dispatch_tool("ck_validate", arguments), do: CkValidate.call(arguments)
+  def dispatch_tool("ck_execute_code", arguments), do: CkExecuteCode.call(arguments)
   def dispatch_tool("ck_context", arguments), do: CkContext.call(arguments)
   def dispatch_tool("ck_experience_index", arguments), do: CkExperienceIndex.call(arguments)
   def dispatch_tool("ck_experience_read", arguments), do: CkExperienceRead.call(arguments)
@@ -284,6 +287,63 @@ defmodule ControlKeel.MCP.Protocol do
             "type" => "array",
             "items" => %{"type" => "string", "enum" => TrustBoundary.capabilities()}
           }
+        }
+      }
+    }
+  end
+
+  def ck_execute_code_tool do
+    %{
+      "name" => "ck_execute_code",
+      "description" =>
+        "Execute generated code only inside a configured non-local sandbox. Defaults to Docker, denies network/filesystem/secrets/shell/deploy, validates source first, and supports dry_run for planning.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["code"],
+        "properties" => %{
+          "code" => %{
+            "type" => "string",
+            "description" => "Generated source code to validate and execute in the sandbox."
+          },
+          "language" => %{
+            "type" => "string",
+            "enum" => ["javascript", "python"],
+            "description" => "Runtime language. Defaults to javascript."
+          },
+          "sandbox" => %{
+            "type" => "string",
+            "enum" => ["docker"],
+            "description" =>
+              "Execution sandbox. Local host execution is intentionally unsupported."
+          },
+          "dry_run" => %{"type" => "boolean"},
+          "timeout_ms" => %{"type" => ["integer", "string"]},
+          "max_output_bytes" => %{"type" => ["integer", "string"]},
+          "risk_tier" => %{
+            "type" => "string",
+            "enum" => ["low", "medium", "moderate", "high", "critical"]
+          },
+          "requested_capabilities" => %{
+            "type" => "array",
+            "items" => %{
+              "type" => "string",
+              "enum" => [
+                "read_api",
+                "write_api",
+                "network",
+                "filesystem",
+                "secrets",
+                "shell",
+                "deploy"
+              ]
+            }
+          },
+          "network_allowlist" => %{
+            "type" => "array",
+            "items" => %{"type" => "string"}
+          },
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]}
         }
       }
     }

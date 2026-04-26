@@ -50,6 +50,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
 
     assert Enum.map(tools, & &1["name"]) == [
              "ck_validate",
+             "ck_execute_code",
              "ck_context",
              "ck_experience_index",
              "ck_experience_read",
@@ -78,6 +79,46 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_skill_list",
              "ck_skill_load"
            ]
+  end
+
+  test "tools/call ck_execute_code supports dry run" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 3001,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_execute_code",
+          "arguments" => %{
+            "code" => "console.log(42)",
+            "language" => "javascript",
+            "dry_run" => true
+          }
+        }
+      })
+
+    assert %{"result" => %{"structuredContent" => result}} = response
+    assert result["dry_run"] == true
+    assert result["policy"]["sandbox_required"] == true
+  end
+
+  test "tools/call ck_execute_code blocks local sandbox" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 3002,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_execute_code",
+          "arguments" => %{
+            "code" => "console.log(42)",
+            "sandbox" => "local"
+          }
+        }
+      })
+
+    assert %{"error" => %{"message" => message}} = response
+    assert message =~ "blocked"
   end
 
   test "resources/list exposes skills as MCP resources" do
