@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.47 — 2026-04-26
+
+### What's changed
+
+- docs: update ControlKeel workflow guidance
+- feat: add guarded code execution tool
+- feat: add code-mode governance policy
+- fix: avoid stalled plan review waits
+- feat: add experience profile support and session hygiene suggestions for cost management
+- docs(architecture): enhance planning guidance with interface design and behavior-first focus
+- docs(benchmarks): enhance benchmark guidance with premise-refusal and dissatisfaction evals docs(control-plane): clarify task sizing and execution boundaries in architecture fix(exporter): improve context management and planning guidance in exporter module
+
 ## v0.2.46 — 2026-04-26
 
 ### What's changed
