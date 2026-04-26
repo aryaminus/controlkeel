@@ -376,6 +376,9 @@ defmodule ControlKeelWeb.ApiControllerTest do
                  "plan_phase" => "implementation_plan",
                  "research_summary" => "Reviewed the release-readiness API flow.",
                  "codebase_findings" => ["API delegates release readiness to governance."],
+                 "alignment_context" => [
+                   "Release managers require smoke and provenance evidence before the API reports ready."
+                 ],
                  "options_considered" => ["Use proof bundles", "Add API-specific release state"],
                  "selected_option" => "Use proof bundles",
                  "rejected_options" => ["Add API-specific release state"],

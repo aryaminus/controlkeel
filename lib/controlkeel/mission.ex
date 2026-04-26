@@ -4130,7 +4130,8 @@ defmodule ControlKeel.Mission do
       end
 
     missing =
-      if phase in @execution_ready_plan_phases and fields["alignment_context"] == [] do
+      if scope_high and phase in @execution_ready_plan_phases and
+           fields["alignment_context"] == [] do
         ["alignment_context" | missing]
       else
         missing
