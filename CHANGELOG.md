@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.49 — 2026-04-26
+
+### What's changed
+
+- fix(release_smoke): increase timeout and improve process handling
+
 ## v0.2.48 — 2026-04-26
 
 ### What's changed
