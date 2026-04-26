@@ -39,6 +39,7 @@ The execution posture is the part of the brief that tells CK how to treat the ru
 - prefer typed or code-mode execution for large API and tool surfaces when available
 - keep shell as the broad fallback surface for repo mutation, test runs, and package commands
 - treat network/egress as default-deny and grant capability access through explicit task-scoped reviewed allowlists
+- attach a code-mode policy when generated scripts or programmatic tool-calling are a better fit than a large always-loaded tool set
 - escalate approval pressure as work moves from read-only exploration to high-impact execution
 
 CK now also derives a runtime recommendation from that posture:
@@ -48,6 +49,10 @@ CK now also derives a runtime recommendation from that posture:
 - repo-discovery briefs that want a just-bash-style loop can also bias toward a CK-owned virtual-workspace runtime, where discovery stays on the read-only virtual workspace and shell remains a governed fallback
 - the recommendation stays grounded in the typed integration catalog so CK suggests a real attach command or runtime export path instead of a generic “use a sandbox” note
 - when CK can see attached agents or already exported runtime bundles for the current workspace, it now biases the recommendation toward those live surfaces first
+
+## Code-mode policy
+
+For large API surfaces, CK now exposes `ControlKeel.Runtime.CodeModePolicy` as an advisory contract for generated scripts and programmatic tool calling. The policy keeps generated source as an artifact, requires an isolated runtime, denies filesystem/shell/secrets/deploy/network by default, and records the rate, egress, approval, and proof expectations a future sandbox must enforce. See [code-mode-governance.md](code-mode-governance.md).
 
 ## Harness and sandbox
 

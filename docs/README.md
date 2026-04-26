@@ -25,6 +25,7 @@ Use this page to decide where to read next.
 - [autonomy-and-findings.md](autonomy-and-findings.md): how findings, review state, and human approval interact
 - [benchmarks.md](benchmarks.md): benchmark and evaluation surfaces
 - [control-plane-architecture.md](control-plane-architecture.md): higher-level architecture map
+- [code-mode-governance.md](code-mode-governance.md): progressive discovery, generated scripts, and code-mode runtime guardrails
 - [cost-governance.md](cost-governance.md): token, rate-limit, subscription-window, and budget-control guidance
 - [explaining-controlkeel.md](explaining-controlkeel.md): includes the explicit harness principles around context ownership, observability, extensibility, and provider portability
 

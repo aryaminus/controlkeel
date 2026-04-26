@@ -2,6 +2,7 @@ defmodule ControlKeel.Intent.ExecutionPosture do
   @moduledoc false
 
   alias ControlKeel.Intent.ExecutionBrief
+  alias ControlKeel.Runtime.CodeModePolicy
 
   @default_clearance_focus ~w(file_write network deploy secrets)
   @regulated_risk_tiers ~w(high critical)
@@ -28,7 +29,7 @@ defmodule ControlKeel.Intent.ExecutionPosture do
         compliance != [] or
         external_or_sensitive_data?(brief)
 
-    %{
+    posture = %{
       "exploration_surface" => "virtual_workspace",
       "state_surface" => "typed_storage",
       "api_execution_surface" =>
@@ -38,9 +39,29 @@ defmodule ControlKeel.Intent.ExecutionPosture do
       "clearance_focus" => clearance_focus(risk_tier),
       "rationale" => rationale(regulated?, risk_tier, compliance)
     }
+
+    maybe_put_code_mode_policy(posture, brief, risk_tier)
   end
 
   def build(_brief), do: @default_posture
+
+  defp maybe_put_code_mode_policy(posture, brief, risk_tier) do
+    if CodeModePolicy.relevant_brief?(brief) do
+      requested_capabilities =
+        if external_or_sensitive_data?(brief), do: ["read_api", "network"], else: ["read_api"]
+
+      Map.put(
+        posture,
+        "code_mode_policy",
+        CodeModePolicy.build(
+          risk_tier: risk_tier || "medium",
+          requested_capabilities: requested_capabilities
+        )
+      )
+    else
+      posture
+    end
+  end
 
   defp clearance_focus("critical"), do: ["bash" | @default_clearance_focus]
   defp clearance_focus("high"), do: ["bash" | @default_clearance_focus]

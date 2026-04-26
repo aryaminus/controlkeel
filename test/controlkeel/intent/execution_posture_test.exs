@@ -41,6 +41,7 @@ defmodule ControlKeel.Intent.ExecutionPostureTest do
     assert posture["api_execution_surface"] == "typed_runtime_or_shell"
     assert posture["shell_role"] == "repo_local_fallback"
     assert posture["clearance_focus"] == ["file_write", "network", "deploy", "secrets"]
+    refute Map.has_key?(posture, "code_mode_policy")
   end
 
   test "recommends a headless typed runtime when API-heavy work is not approval-gated" do
@@ -114,6 +115,18 @@ defmodule ControlKeel.Intent.ExecutionPostureTest do
           }
         }
       )
+
+    posture = Intent.execution_posture(brief)
+
+    assert posture["code_mode_policy"]["sandbox_required"] == true
+
+    assert posture["code_mode_policy"]["default_denied_capabilities"] == [
+             "filesystem",
+             "network",
+             "secrets",
+             "shell",
+             "deploy"
+           ]
 
     recommendation = Intent.runtime_recommendation(brief)
 
