@@ -35,6 +35,13 @@ Before expensive or parallel work:
 7. Watch provider/host quota warnings; if a 429 occurs, respect `retry-after` instead of looping.
 8. Configure hard spend caps in provider dashboards for BYOK/API usage.
 
+For overnight or AFK work, decide which loop you are actually running before launch:
+
+- **Closed loop**: the answer is known enough that the agent should finish a bounded slice by morning.
+- **Open loop**: the answer is not known yet, so the agent should only optimize a named metric or shrink a search space by a bounded amount.
+
+If you cannot state the finish condition or acceptable progress condition clearly, the loop is probably too open to run unattended without waste.
+
 ## Proxy observability
 
 When CK proxies provider traffic, it preserves allowlisted rate-limit metadata in invocation records:

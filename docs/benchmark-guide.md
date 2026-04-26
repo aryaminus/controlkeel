@@ -136,6 +136,21 @@ The comparison naturally shows the improvement delta:
 - **CK catch rate** vs **unguarded host catch rate** (typically 0% since unguarded hosts have no governance)
 - The delta is the number of vulnerabilities CK caught that the host would have shipped
 
+### Separate closed-loop and open-loop runs
+
+If you benchmark overnight or AFK behavior, separate two different questions:
+
+- **Closed-loop**: did the governed run finish a bounded, reviewable slice?
+- **Open-loop**: did the governed run make acceptable progress on a named metric or search space?
+
+Do not score those the same way. Closed-loop runs care about completion, reviewability, and regression safety. Open-loop runs care about progress quality, not fake completion theater.
+
+When importing or exporting those runs, use metadata that makes the loop shape explicit:
+
+- `loop_shape: "closed"` or `loop_shape: "open"`
+- `progress_contract: "finish_slice"`, `shrink_search_space`, or `improve_metric`
+- `handoff_contract: "relay_structured"` when the run uses baton-style planner/worker/validator handoffs
+
 ### Add pushback cases, not just exploit cases
 
 If you want benchmark results that feel closer to real expert use, do not limit suites to "does the model emit unsafe code." Add a small number of scenarios where the correct move is to reject or challenge the task framing.

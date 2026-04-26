@@ -177,6 +177,15 @@ Useful fields include:
 - `control_flow_surface: "single_pass"` — one forward reasoning pass with no recursive decomposition
 - `control_flow_surface: "search_loop"` — iterative planner/executor loop over a shared context
 - `control_flow_surface: "recursive_repl"` — recursive environment exploration or sub-call pattern
+- `loop_shape: "closed"` — bounded delivery loop with an intended finish condition
+- `loop_shape: "open"` — exploratory or optimization loop with no guaranteed finish by the run boundary
+- `progress_contract: "finish_slice"` — expected outcome is a completed reviewable slice
+- `progress_contract: "shrink_search_space"` — expected outcome is narrower uncertainty or fewer remaining candidates
+- `progress_contract: "improve_metric"` — expected outcome is measurable benchmark or quality improvement
+- `handoff_contract: "relay_structured"` — baton passing via explicit plan, blockers, evidence, and next-step state
+- `validator_feedback: "per_iteration"` — validators or review checks fire between worker iterations
+
+These fields help distinguish "done by morning" runs from "better by morning" runs without pretending they should be judged the same way.
 - `control_flow_surface: "typed_runtime"` — recursion or decomposition handled by a constrained typed runtime rather than improvised free-form control flow
 
 This gives CK a way to compare experiments such as terminal-native tool syntax, recursive language-model loops, or typed functional runtimes without pretending those are all first-class shipped CK targets. The rule is simple: benchmark the concrete runtime contract that actually ran, record it honestly, and compare it on the same held-out suite.

@@ -140,6 +140,10 @@ ControlKeel already had most of these behaviors in practice, but they are now an
   Plans should prefer tracer-bullet slices that cross storage, domain logic, and user-visible feedback so tests and review can exercise an integrated path early. Pure schema/API/UI phases are a warning sign unless they are explicitly justified.
 - **Bounded AFK, not unattended autonomy**
   CK models AFK execution as a night shift that catches up to day-shift planning. Humans still own requirements, PRD destination, QA, and merge decisions; planner agents should launch only unblocked sandboxed slices, and each implementation branch needs automated review plus human QA follow-up before it is trusted.
+- **Closed loops first, explicit progress for open loops**
+  CK should distinguish answerable delivery loops from exploratory optimization loops. Closed loops have a finish condition and should wake the operator with a completed, reviewable slice. Open loops are acceptable only when they declare the progress metric up front, such as search-space reduction, benchmark gain, or evidence gathered, so "overnight" does not become a vague token-burning promise.
+- **Relay handoffs over monolithic sessions**
+  CK prefers relay-style execution where structured handoffs move between planner, worker, validator, and reviewer roles. The baton is not hidden chain-of-thought; it is explicit task state, blockers, evidence, and what remains. This keeps context bounded and reduces the chance that one long session drifts into repeated work or reward-hacking.
 - **Design interfaces before delegating internals**
   For new or risky modules, CK should ask for at least two materially different interface shapes before implementation. The winning design should keep callers simple, hide complexity behind a deep module boundary, and make misuse hard.
 - **Domain language and durable issues**
