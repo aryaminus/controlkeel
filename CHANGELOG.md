@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.1 — 2026-04-26
+
+### What's changed
+
+- feat(review): add alignment context and consulted roles to review packets
+- Add Apache-2.0 LICENSE and glama.json for Glama metadata
+- Refactor Policy Studio and Proof Browser Live Views to Use Layouts
+
 ## v0.2.50 — 2026-04-26
 
 ### What's changed
