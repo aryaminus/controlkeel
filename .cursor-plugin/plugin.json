@@ -4,7 +4,7 @@
     "name": "ControlKeel"
   },
   "commands": "./commands/",
-  "description": "ControlKeel governance for Cursor — validation, findings, budgets, proofs, memory, agent routing, and human review via MCP.",
+  "description": "ControlKeel governance for Cursor \u2014 validation, findings, budgets, proofs, memory, agent routing, and human review via MCP.",
   "homepage": "https://github.com/aryaminus/controlkeel",
   "hooks": "./hooks/hooks.json",
   "keywords": [
@@ -35,5 +35,5 @@
   "repository": "https://github.com/aryaminus/controlkeel.git",
   "rules": "./rules/",
   "skills": "./skills/",
-  "version": "0.2.33"
+  "version": "0.2.50"
 }

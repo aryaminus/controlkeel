@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 import subprocess
@@ -12,6 +13,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MIX_EXS = ROOT / "mix.exs"
 CHANGELOG = ROOT / "CHANGELOG.md"
 NPM_PACKAGE = ROOT / "packages" / "npm" / "controlkeel" / "package.json"
+NPM_SERVER = ROOT / "packages" / "npm" / "controlkeel" / "server.json"
+PLUGIN_MANIFESTS = [ROOT / "plugin.json", ROOT / ".cursor-plugin" / "plugin.json"]
 
 
 def read_version() -> tuple[str, str]:
@@ -46,6 +49,30 @@ def update_npm_package_version(version: str) -> None:
         count=1,
     )
     NPM_PACKAGE.write_text(updated)
+
+    update_npm_server_version(version)
+    update_plugin_manifest_versions(version)
+
+
+def update_npm_server_version(version: str) -> None:
+    if not NPM_SERVER.exists():
+        return
+
+    data = json.loads(NPM_SERVER.read_text())
+    data["version"] = version
+    for package in data.get("packages", []):
+        package["version"] = version
+    NPM_SERVER.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def update_plugin_manifest_versions(version: str) -> None:
+    for manifest in PLUGIN_MANIFESTS:
+        if not manifest.exists():
+            continue
+
+        data = json.loads(manifest.read_text())
+        data["version"] = version
+        manifest.write_text(json.dumps(data, indent=2) + "\n")
 
 
 def previous_tag() -> str | None:

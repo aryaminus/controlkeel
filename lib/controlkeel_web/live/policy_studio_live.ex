@@ -17,132 +17,133 @@ defmodule ControlKeelWeb.PolicyStudioLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.flash_group flash={@flash} />
-    <section class="ck-shell ck-shell-tight">
-      <div class="ck-section-header">
-        <div>
-          <p class="ck-kicker">Policy Studio</p>
-          <h1 class="ck-section-title">Active governance rules</h1>
-          <p class="ck-lead ck-lead-tight">
-            Every agent action passes through these policy packs before it executes. Rules that block are enforced automatically — no action required from you.
-          </p>
+    <Layouts.app flash={@flash}>
+      <section class="ck-shell ck-shell-tight">
+        <div class="ck-section-header">
+          <div>
+            <p class="ck-kicker">Policy Studio</p>
+            <h1 class="ck-section-title">Active governance rules</h1>
+            <p class="ck-lead ck-lead-tight">
+              Every agent action passes through these policy packs before it executes. Rules that block are enforced automatically — no action required from you.
+            </p>
+          </div>
+          <a href={~p"/"} class="ck-link">Back home</a>
         </div>
-        <a href={~p"/"} class="ck-link">Back home</a>
-      </div>
 
-      <div class="ck-stat-grid">
-        <div class="ck-card ck-stat-card">
-          <p class="ck-mini-label">Active packs</p>
-          <strong>{@pack_count}</strong>
-        </div>
-        <div class="ck-card ck-stat-card">
-          <p class="ck-mini-label">Total rules</p>
-          <strong>{@rule_count}</strong>
-        </div>
-        <div class="ck-card ck-stat-card">
-          <p class="ck-mini-label">Blocking rules</p>
-          <strong>{@block_count}</strong>
-        </div>
-        <div class="ck-card ck-stat-card">
-          <p class="ck-mini-label">Active sessions</p>
-          <strong>{length(@sessions)}</strong>
-        </div>
-      </div>
-
-      <div class="ck-grid ck-grid-dashboard">
-        <div>
-          <div class="ck-card">
-            <p class="ck-mini-label">Policy packs</p>
-            <div class="ck-finding-list">
-              <%= for {name, rules} <- @packs do %>
-                <article class="ck-finding-item">
-                  <div class="ck-finding-head">
-                    <h3>{pack_label(name)}</h3>
-                    <span class={"ck-pill #{pack_pill_class(name)}"}>{length(rules)} rules</span>
-                  </div>
-                  <p class="ck-note">{pack_description(name)}</p>
-                  <div class="ck-tag-list" style="margin-top: 0.5rem;">
-                    <%= for rule <- rules do %>
-                      <span class={"ck-tag ck-severity-#{rule.severity}"}>
-                        {rule.action}: {rule.category}
-                      </span>
-                    <% end %>
-                  </div>
-                </article>
-              <% end %>
-            </div>
+        <div class="ck-stat-grid">
+          <div class="ck-card ck-stat-card">
+            <p class="ck-mini-label">Active packs</p>
+            <strong>{@pack_count}</strong>
+          </div>
+          <div class="ck-card ck-stat-card">
+            <p class="ck-mini-label">Total rules</p>
+            <strong>{@rule_count}</strong>
+          </div>
+          <div class="ck-card ck-stat-card">
+            <p class="ck-mini-label">Blocking rules</p>
+            <strong>{@block_count}</strong>
+          </div>
+          <div class="ck-card ck-stat-card">
+            <p class="ck-mini-label">Active sessions</p>
+            <strong>{length(@sessions)}</strong>
           </div>
         </div>
 
-        <div>
-          <div class="ck-card" style="margin-bottom: 1rem;">
-            <p class="ck-mini-label">Session budgets</p>
-            <%= if @sessions == [] do %>
-              <p class="ck-note">
-                No active sessions. Start a mission at <a href={~p"/start"} class="ck-link">/start</a>.
-              </p>
-            <% else %>
+        <div class="ck-grid ck-grid-dashboard">
+          <div>
+            <div class="ck-card">
+              <p class="ck-mini-label">Policy packs</p>
               <div class="ck-finding-list">
-                <%= for session <- @sessions do %>
+                <%= for {name, rules} <- @packs do %>
                   <article class="ck-finding-item">
                     <div class="ck-finding-head">
-                      <h3>
-                        <.link navigate={~p"/missions/#{session.id}"} class="ck-link">
-                          {session.title}
-                        </.link>
-                      </h3>
-                      <span class={"ck-pill #{risk_pill_class(session.risk_tier)}"}>
-                        {session.risk_tier}
-                      </span>
+                      <h3>{pack_label(name)}</h3>
+                      <span class={"ck-pill #{pack_pill_class(name)}"}>{length(rules)} rules</span>
                     </div>
-                    <div class="ck-metric-row" style="margin-top: 0.5rem;">
-                      <span class="ck-note">
-                        Budget: {format_cents(session.budget_cents)}
-                      </span>
-                      <span class="ck-note">
-                        Spent: {format_cents(session.spent_cents)}
-                      </span>
-                      <span class="ck-note">
-                        Daily cap: {format_cents(session.daily_budget_cents)}
-                      </span>
+                    <p class="ck-note">{pack_description(name)}</p>
+                    <div class="ck-tag-list" style="margin-top: 0.5rem;">
+                      <%= for rule <- rules do %>
+                        <span class={"ck-tag ck-severity-#{rule.severity}"}>
+                          {rule.action}: {rule.category}
+                        </span>
+                      <% end %>
                     </div>
-                    <%= if (session.budget_cents || 0) > 0 do %>
-                      <% pct = budget_pct(session.spent_cents, session.budget_cents) %>
-                      <div class="ck-progress-bar">
-                        <div
-                          class={"ck-progress-fill #{budget_fill_class(pct)}"}
-                          style={"width: #{pct}%"}
-                        >
-                        </div>
-                      </div>
-                    <% end %>
                   </article>
                 <% end %>
               </div>
-            <% end %>
+            </div>
           </div>
 
-          <div class="ck-card">
-            <p class="ck-mini-label">What gets blocked automatically</p>
-            <ul class="ck-mini-list">
-              <li>Hardcoded API keys, passwords, tokens (baseline pack)</li>
-              <li>SQL injection patterns (baseline pack)</li>
-              <li>Open CORS wildcard headers (software pack)</li>
-              <li>Dynamic code execution — eval, exec (software pack)</li>
-              <li>Discriminatory candidate scoring or filtering (HR pack)</li>
-              <li>Privileged client communications written to logs (legal pack)</li>
-              <li>Tracking cookies or analytics without consent (marketing pack)</li>
-              <li>Deal value, quota, or revenue data written to logs (sales pack)</li>
-              <li>Fair Housing filtering by protected characteristics (real estate pack)</li>
-              <li>Agent runs that would exceed session budget (cost pack)</li>
-            </ul>
-            <p class="ck-note" style="margin-top: 1rem;">
-              Warnings let the agent continue but surface a finding for your review. Blocks stop execution and require a policy fix before proceeding.
-            </p>
+          <div>
+            <div class="ck-card" style="margin-bottom: 1rem;">
+              <p class="ck-mini-label">Session budgets</p>
+              <%= if @sessions == [] do %>
+                <p class="ck-note">
+                  No active sessions. Start a mission at <a href={~p"/start"} class="ck-link">/start</a>.
+                </p>
+              <% else %>
+                <div class="ck-finding-list">
+                  <%= for session <- @sessions do %>
+                    <article class="ck-finding-item">
+                      <div class="ck-finding-head">
+                        <h3>
+                          <.link navigate={~p"/missions/#{session.id}"} class="ck-link">
+                            {session.title}
+                          </.link>
+                        </h3>
+                        <span class={"ck-pill #{risk_pill_class(session.risk_tier)}"}>
+                          {session.risk_tier}
+                        </span>
+                      </div>
+                      <div class="ck-metric-row" style="margin-top: 0.5rem;">
+                        <span class="ck-note">
+                          Budget: {format_cents(session.budget_cents)}
+                        </span>
+                        <span class="ck-note">
+                          Spent: {format_cents(session.spent_cents)}
+                        </span>
+                        <span class="ck-note">
+                          Daily cap: {format_cents(session.daily_budget_cents)}
+                        </span>
+                      </div>
+                      <%= if (session.budget_cents || 0) > 0 do %>
+                        <% pct = budget_pct(session.spent_cents, session.budget_cents) %>
+                        <div class="ck-progress-bar">
+                          <div
+                            class={"ck-progress-fill #{budget_fill_class(pct)}"}
+                            style={"width: #{pct}%"}
+                          >
+                          </div>
+                        </div>
+                      <% end %>
+                    </article>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+
+            <div class="ck-card">
+              <p class="ck-mini-label">What gets blocked automatically</p>
+              <ul class="ck-mini-list">
+                <li>Hardcoded API keys, passwords, tokens (baseline pack)</li>
+                <li>SQL injection patterns (baseline pack)</li>
+                <li>Open CORS wildcard headers (software pack)</li>
+                <li>Dynamic code execution — eval, exec (software pack)</li>
+                <li>Discriminatory candidate scoring or filtering (HR pack)</li>
+                <li>Privileged client communications written to logs (legal pack)</li>
+                <li>Tracking cookies or analytics without consent (marketing pack)</li>
+                <li>Deal value, quota, or revenue data written to logs (sales pack)</li>
+                <li>Fair Housing filtering by protected characteristics (real estate pack)</li>
+                <li>Agent runs that would exceed session budget (cost pack)</li>
+              </ul>
+              <p class="ck-note" style="margin-top: 1rem;">
+                Warnings let the agent continue but surface a finding for your review. Blocks stop execution and require a policy fix before proceeding.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </Layouts.app>
     """
   end
 

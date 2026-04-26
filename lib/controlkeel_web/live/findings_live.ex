@@ -119,148 +119,149 @@ defmodule ControlKeelWeb.FindingsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.flash_group flash={@flash} />
-    <section class="ck-shell ck-shell-tight">
-      <div class="ck-section-header">
-        <div>
-          <p class="ck-kicker">Findings browser</p>
-          <h1 class="ck-section-title">Review findings across all missions</h1>
-          <p class="ck-lead ck-lead-tight">
-            Filter, approve, reject, and inspect guided fixes without leaving the governed ControlKeel workflow.
-          </p>
-        </div>
-        <a href={~p"/"} class="ck-link">Back home</a>
-      </div>
-
-      <div class="ck-card ck-browser-filters">
-        <.form for={@form} phx-change="filter">
-          <div class="ck-filter-grid">
-            <.input
-              field={@form[:q]}
-              type="text"
-              label="Search"
-              placeholder="Rule, title, session..."
-              phx-debounce="300"
-            />
-            <.input
-              field={@form[:severity]}
-              type="select"
-              label="Severity"
-              prompt="All severities"
-              options={Enum.map(@severities, &{String.capitalize(&1), &1})}
-            />
-            <.input
-              field={@form[:status]}
-              type="select"
-              label="Status"
-              prompt="All statuses"
-              options={Enum.map(@statuses, &{String.capitalize(&1), &1})}
-            />
-            <.input
-              field={@form[:category]}
-              type="select"
-              label="Category"
-              prompt="All categories"
-              options={Enum.map(@categories, &{String.capitalize(&1), &1})}
-            />
-            <.input
-              field={@form[:session_id]}
-              type="select"
-              label="Mission"
-              prompt="All missions"
-              options={session_filter_options(@session_options)}
-            />
+    <Layouts.app flash={@flash}>
+      <section class="ck-shell ck-shell-tight">
+        <div class="ck-section-header">
+          <div>
+            <p class="ck-kicker">Findings browser</p>
+            <h1 class="ck-section-title">Review findings across all missions</h1>
+            <p class="ck-lead ck-lead-tight">
+              Filter, approve, reject, and inspect guided fixes without leaving the governed ControlKeel workflow.
+            </p>
           </div>
-        </.form>
-
-        <div class="ck-metric-row">
-          <span>{@browser.total_count} total findings</span>
-          <span>Page {@browser.page} of {@browser.total_pages}</span>
-        </div>
-      </div>
-
-      <div class="ck-card">
-        <div class="ck-table-wrap">
-          <.table id="findings-browser" rows={@browser.entries}>
-            <:col :let={finding} label="Finding">
-              <div>
-                <strong>{finding.title}</strong>
-                <p class="ck-note">{finding.plain_message}</p>
-              </div>
-            </:col>
-            <:col :let={finding} label="Mission">
-              <div>
-                <.link navigate={~p"/missions/#{finding.session_id}"} class="ck-link">
-                  {finding.session.title}
-                </.link>
-                <p class="ck-note">{finding.session.workspace.name}</p>
-              </div>
-            </:col>
-            <:col :let={finding} label="Status">
-              <div class="ck-badge-stack">
-                <span class={["ck-pill", "ck-pill-#{finding.severity}"]}>{finding.severity}</span>
-                <span class="ck-pill ck-pill-neutral">{finding.status}</span>
-              </div>
-            </:col>
-            <:col :let={finding} label="Rule">
-              <div>
-                <strong>{finding.rule_id}</strong>
-                <p class="ck-note">{finding.category}</p>
-              </div>
-            </:col>
-            <:action :let={finding}>
-              <button type="button" class="ck-link" phx-click="approve" phx-value-id={finding.id}>
-                Approve
-              </button>
-            </:action>
-            <:action :let={finding}>
-              <button type="button" class="ck-link" phx-click="reject" phx-value-id={finding.id}>
-                Reject
-              </button>
-            </:action>
-            <:action :let={finding}>
-              <button type="button" class="ck-link" phx-click="view_fix" phx-value-id={finding.id}>
-                View fix
-              </button>
-            </:action>
-          </.table>
+          <a href={~p"/"} class="ck-link">Back home</a>
         </div>
 
-        <div class="ck-action-row" style="margin-top: 1rem;">
-          <.link
-            :if={@browser.page > 1}
-            patch={
-              findings_path(
-                Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page - 1})
-              )
-            }
-            class="ck-link"
-          >
-            Previous page
-          </.link>
-          <div />
-          <.link
-            :if={@browser.page < @browser.total_pages}
-            patch={
-              findings_path(
-                Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page + 1})
-              )
-            }
-            class="ck-link"
-          >
-            Next page
-          </.link>
-        </div>
-      </div>
+        <div class="ck-card ck-browser-filters">
+          <.form for={@form} phx-change="filter">
+            <div class="ck-filter-grid">
+              <.input
+                field={@form[:q]}
+                type="text"
+                label="Search"
+                placeholder="Rule, title, session..."
+                phx-debounce="300"
+              />
+              <.input
+                field={@form[:severity]}
+                type="select"
+                label="Severity"
+                prompt="All severities"
+                options={Enum.map(@severities, &{String.capitalize(&1), &1})}
+              />
+              <.input
+                field={@form[:status]}
+                type="select"
+                label="Status"
+                prompt="All statuses"
+                options={Enum.map(@statuses, &{String.capitalize(&1), &1})}
+              />
+              <.input
+                field={@form[:category]}
+                type="select"
+                label="Category"
+                prompt="All categories"
+                options={Enum.map(@categories, &{String.capitalize(&1), &1})}
+              />
+              <.input
+                field={@form[:session_id]}
+                type="select"
+                label="Mission"
+                prompt="All missions"
+                options={session_filter_options(@session_options)}
+              />
+            </div>
+          </.form>
 
-      <FindingComponents.autofix_panel
-        :if={@selected_finding && @selected_fix}
-        finding={@selected_finding}
-        fix={@selected_fix}
-        copy_event="copy_fix_prompt"
-        close_event="close_fix"
-      />
-    </section>
+          <div class="ck-metric-row">
+            <span>{@browser.total_count} total findings</span>
+            <span>Page {@browser.page} of {@browser.total_pages}</span>
+          </div>
+        </div>
+
+        <div class="ck-card">
+          <div class="ck-table-wrap">
+            <.table id="findings-browser" rows={@browser.entries}>
+              <:col :let={finding} label="Finding">
+                <div>
+                  <strong>{finding.title}</strong>
+                  <p class="ck-note">{finding.plain_message}</p>
+                </div>
+              </:col>
+              <:col :let={finding} label="Mission">
+                <div>
+                  <.link navigate={~p"/missions/#{finding.session_id}"} class="ck-link">
+                    {finding.session.title}
+                  </.link>
+                  <p class="ck-note">{finding.session.workspace.name}</p>
+                </div>
+              </:col>
+              <:col :let={finding} label="Status">
+                <div class="ck-badge-stack">
+                  <span class={["ck-pill", "ck-pill-#{finding.severity}"]}>{finding.severity}</span>
+                  <span class="ck-pill ck-pill-neutral">{finding.status}</span>
+                </div>
+              </:col>
+              <:col :let={finding} label="Rule">
+                <div>
+                  <strong>{finding.rule_id}</strong>
+                  <p class="ck-note">{finding.category}</p>
+                </div>
+              </:col>
+              <:action :let={finding}>
+                <button type="button" class="ck-link" phx-click="approve" phx-value-id={finding.id}>
+                  Approve
+                </button>
+              </:action>
+              <:action :let={finding}>
+                <button type="button" class="ck-link" phx-click="reject" phx-value-id={finding.id}>
+                  Reject
+                </button>
+              </:action>
+              <:action :let={finding}>
+                <button type="button" class="ck-link" phx-click="view_fix" phx-value-id={finding.id}>
+                  View fix
+                </button>
+              </:action>
+            </.table>
+          </div>
+
+          <div class="ck-action-row" style="margin-top: 1rem;">
+            <.link
+              :if={@browser.page > 1}
+              patch={
+                findings_path(
+                  Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page - 1})
+                )
+              }
+              class="ck-link"
+            >
+              Previous page
+            </.link>
+            <div />
+            <.link
+              :if={@browser.page < @browser.total_pages}
+              patch={
+                findings_path(
+                  Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page + 1})
+                )
+              }
+              class="ck-link"
+            >
+              Next page
+            </.link>
+          </div>
+        </div>
+
+        <FindingComponents.autofix_panel
+          :if={@selected_finding && @selected_fix}
+          finding={@selected_finding}
+          fix={@selected_fix}
+          copy_event="copy_fix_prompt"
+          close_event="close_fix"
+        />
+      </section>
+    </Layouts.app>
     """
   end
 

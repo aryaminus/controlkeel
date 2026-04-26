@@ -124,360 +124,363 @@ defmodule ControlKeelWeb.OnboardingLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.flash_group flash={@flash} />
-    <section class="ck-shell ck-shell-tight">
-      <div class="ck-section-header">
-        <div>
-          <p class="ck-kicker">Mission onboarding</p>
-          <h1 class="ck-section-title">Compile a governed execution brief</h1>
-          <p class="ck-lead ck-lead-tight">
-            ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. ControlKeel turns agent output into production engineering. This flow interviews the operator in plain language, compiles the brief on the server, and seeds a production-minded mission.
-          </p>
-          <p class="ck-note">
-            Agent output is cheap. Reviewability, security, release safety, and cost control are not. This flow exists to turn a rough idea into a governed execution brief, task plan, and proof trail.
-          </p>
-          <p class="ck-note">
-            If a generator leaves you with a brittle repo or unclear launch boundary, ControlKeel acts as the rescue control plane: it compiles the brief, makes the constraints visible, and keeps proof attached to the work.
-          </p>
+    <Layouts.app flash={@flash}>
+      <section class="ck-shell ck-shell-tight">
+        <div class="ck-section-header">
+          <div>
+            <p class="ck-kicker">Mission onboarding</p>
+            <h1 class="ck-section-title">Compile a governed execution brief</h1>
+            <p class="ck-lead ck-lead-tight">
+              ControlKeel is the control tower that turns agent-generated work into secure, scoped, validated, production-ready delivery. ControlKeel turns agent output into production engineering. This flow interviews the operator in plain language, compiles the brief on the server, and seeds a production-minded mission.
+            </p>
+            <p class="ck-note">
+              Agent output is cheap. Reviewability, security, release safety, and cost control are not. This flow exists to turn a rough idea into a governed execution brief, task plan, and proof trail.
+            </p>
+            <p class="ck-note">
+              If a generator leaves you with a brittle repo or unclear launch boundary, ControlKeel acts as the rescue control plane: it compiles the brief, makes the constraints visible, and keeps proof attached to the work.
+            </p>
+          </div>
+          <a href={~p"/"} class="ck-link">Back home</a>
         </div>
-        <a href={~p"/"} class="ck-link">Back home</a>
-      </div>
 
-      <div class="ck-metric-row">
-        <span>Step {@step} of 4</span>
-        <span>{@preflight.domain_pack_label} pack</span>
-        <span>{@preflight.preliminary_risk_tier} preliminary risk</span>
-      </div>
+        <div class="ck-metric-row">
+          <span>Step {@step} of 4</span>
+          <span>{@preflight.domain_pack_label} pack</span>
+          <span>{@preflight.preliminary_risk_tier} preliminary risk</span>
+        </div>
 
-      <div class="ck-grid ck-grid-dashboard">
-        <div class="ck-card">
-          <.form for={@form} phx-change="validate" phx-submit="next">
-            <%= case @step do %>
-              <% 1 -> %>
-                <div class="ck-form-panel">
-                  <p class="ck-mini-label">Step 1</p>
-                  <h2 class="ck-section-title">Choose the domain and primary agent</h2>
-                  <p class="ck-note">
-                    Start with what best describes the work. ControlKeel uses that choice to set the domain pack, interview language, and initial governance posture without forcing framework acronyms first.
-                  </p>
+        <div class="ck-grid ck-grid-dashboard">
+          <div class="ck-card">
+            <.form for={@form} phx-change="validate" phx-submit="next">
+              <%= case @step do %>
+                <% 1 -> %>
+                  <div class="ck-form-panel">
+                    <p class="ck-mini-label">Step 1</p>
+                    <h2 class="ck-section-title">Choose the domain and primary agent</h2>
+                    <p class="ck-note">
+                      Start with what best describes the work. ControlKeel uses that choice to set the domain pack, interview language, and initial governance posture without forcing framework acronyms first.
+                    </p>
 
-                  <div class="ck-session-grid">
-                    <%= for profile <- @occupation_profiles do %>
-                      <label class="ck-card ck-session-card">
-                        <input
-                          type="radio"
-                          name="launch[occupation]"
-                          value={profile.id}
-                          checked={@attrs["occupation"] == profile.id}
-                        />
-                        <div class="ck-session-head">
-                          <div>
-                            <p class="ck-mini-label">{Intent.pack_label(profile.domain_pack)}</p>
-                            <h3>{profile.label}</h3>
+                    <div class="ck-session-grid">
+                      <%= for profile <- @occupation_profiles do %>
+                        <label class="ck-card ck-session-card">
+                          <input
+                            type="radio"
+                            name="launch[occupation]"
+                            value={profile.id}
+                            checked={@attrs["occupation"] == profile.id}
+                          />
+                          <div class="ck-session-head">
+                            <div>
+                              <p class="ck-mini-label">{Intent.pack_label(profile.domain_pack)}</p>
+                              <h3>{profile.label}</h3>
+                            </div>
                           </div>
-                        </div>
-                        <p class="ck-note">{profile.description}</p>
-                      </label>
-                    <% end %>
-                  </div>
-                  <%= if error = field_error(@errors, "occupation") do %>
-                    <p class="ck-note">{error}</p>
-                  <% end %>
-
-                  <label>
-                    <span class="ck-label">Primary agent</span>
-                    <select name="launch[agent]">
-                      <%= for {id, label} <- @agent_options do %>
-                        <option value={id} selected={@attrs["agent"] == id}>{label}</option>
+                          <p class="ck-note">{profile.description}</p>
+                        </label>
                       <% end %>
-                    </select>
-                  </label>
-                  <%= if error = field_error(@errors, "agent") do %>
-                    <p class="ck-note">{error}</p>
-                  <% end %>
-
-                  <label>
-                    <span class="ck-label">Daily budget (USD)</span>
-                    <span class="ck-note">
-                      ControlKeel stops agents when this limit is reached. $10/day is roughly 3 full features.
-                    </span>
-                    <input
-                      type="number"
-                      name="launch[budget]"
-                      value={@attrs["budget"]}
-                      min="0"
-                      max="500"
-                      step="5"
-                      placeholder="30"
-                    />
-                  </label>
-                  <%= if error = field_error(@errors, "budget") do %>
-                    <p class="ck-note">{error}</p>
-                  <% end %>
-                </div>
-              <% 2 -> %>
-                <div class="ck-form-panel">
-                  <p class="ck-mini-label">Step 2</p>
-                  <h2 class="ck-section-title">Describe the product</h2>
-
-                  <label>
-                    <span class="ck-label">Project name</span>
-                    <input
-                      type="text"
-                      name="launch[project_name]"
-                      value={@attrs["project_name"]}
-                      placeholder="ControlKeel mission name"
-                    />
-                  </label>
-
-                  <label>
-                    <span class="ck-label">Core product prompt</span>
-                    <textarea
-                      name="launch[idea]"
-                      rows="8"
-                      placeholder="Describe what you want built in plain language."
-                    ><%= @attrs["idea"] %></textarea>
-                  </label>
-                  <%= if error = field_error(@errors, "idea") do %>
-                    <p class="ck-note">{error}</p>
-                  <% end %>
-                </div>
-              <% 3 -> %>
-                <div class="ck-form-panel">
-                  <p class="ck-mini-label">Step 3</p>
-                  <h2 class="ck-section-title">Answer the guided interview</h2>
-
-                  <%= for question <- @interview_questions do %>
-                    <label>
-                      <span class="ck-label">{question.label}</span>
-                      <span class="ck-note">{question.prompt}</span>
-                      <textarea
-                        name={"launch[interview_answers][#{question.id}]"}
-                        rows="4"
-                        placeholder={question.placeholder}
-                      ><%= Map.get(@attrs["interview_answers"], question.id, "") %></textarea>
-                    </label>
-                    <%= if error = field_error(@errors, "interview_answers.#{question.id}") do %>
+                    </div>
+                    <%= if error = field_error(@errors, "occupation") do %>
                       <p class="ck-note">{error}</p>
                     <% end %>
-                  <% end %>
-                  <%= if @compile_error do %>
-                    <p class="ck-note">{@compile_error}</p>
-                  <% end %>
-                </div>
-              <% 4 -> %>
-                <div class="ck-form-panel">
-                  <p class="ck-mini-label">Step 4</p>
-                  <h2 class="ck-section-title">Review the compiled brief</h2>
-                  <%= if @compiled_brief do %>
-                    <% brief = Intent.to_brief_map(@compiled_brief) %>
-                    <% compiler = brief["compiler"] || %{} %>
-                    <div class="ck-brief-grid">
-                      <div>
-                        <h3>Objective</h3>
-                        <p class="ck-note">{brief["objective"]}</p>
-                      </div>
-                      <div>
-                        <h3>Recommended stack</h3>
-                        <p class="ck-note">{brief["recommended_stack"]}</p>
-                      </div>
-                      <div>
-                        <h3>Next step</h3>
-                        <p class="ck-note">{brief["next_step"]}</p>
-                      </div>
-                      <div>
-                        <h3>Compiler</h3>
-                        <p class="ck-note">
-                          {compiler["provider"]} / {compiler["model"]}
-                        </p>
-                      </div>
-                      <div>
-                        <h3>Provider mode</h3>
-                        <p class="ck-note">{provider_mode_label(@provider_status)}</p>
-                      </div>
-                    </div>
 
-                    <div class="ck-grid ck-grid-dashboard">
-                      <div class="ck-card">
-                        <p class="ck-mini-label">Acceptance criteria</p>
-                        <ul class="ck-mini-list">
-                          <%= for item <- brief["acceptance_criteria"] || [] do %>
-                            <li>{item}</li>
-                          <% end %>
-                        </ul>
-                      </div>
-                      <div class="ck-card">
-                        <p class="ck-mini-label">Production boundary</p>
-                        <div class="ck-brief-grid">
-                          <div>
-                            <h3>Risk tier</h3>
-                            <p class="ck-note">
-                              {boundary_value(@compiled_boundary_summary, "risk_tier")}
-                            </p>
-                          </div>
-                          <div>
-                            <h3>Budget note</h3>
-                            <p class="ck-note">
-                              {boundary_value(@compiled_boundary_summary, "budget_note")}
-                            </p>
-                          </div>
-                          <div>
-                            <h3>Launch window</h3>
-                            <p class="ck-note">
-                              {boundary_value(@compiled_boundary_summary, "launch_window")}
-                            </p>
-                          </div>
-                          <div>
-                            <h3>Constraints</h3>
-                            <ul class="ck-mini-list">
-                              <%= for item <- boundary_list(@compiled_boundary_summary, "constraints") do %>
-                                <li>{item}</li>
-                              <% end %>
-                            </ul>
-                          </div>
+                    <label>
+                      <span class="ck-label">Primary agent</span>
+                      <select name="launch[agent]">
+                        <%= for {id, label} <- @agent_options do %>
+                          <option value={id} selected={@attrs["agent"] == id}>{label}</option>
+                        <% end %>
+                      </select>
+                    </label>
+                    <%= if error = field_error(@errors, "agent") do %>
+                      <p class="ck-note">{error}</p>
+                    <% end %>
+
+                    <label>
+                      <span class="ck-label">Daily budget (USD)</span>
+                      <span class="ck-note">
+                        ControlKeel stops agents when this limit is reached. $10/day is roughly 3 full features.
+                      </span>
+                      <input
+                        type="number"
+                        name="launch[budget]"
+                        value={@attrs["budget"]}
+                        min="0"
+                        max="500"
+                        step="5"
+                        placeholder="30"
+                      />
+                    </label>
+                    <%= if error = field_error(@errors, "budget") do %>
+                      <p class="ck-note">{error}</p>
+                    <% end %>
+                  </div>
+                <% 2 -> %>
+                  <div class="ck-form-panel">
+                    <p class="ck-mini-label">Step 2</p>
+                    <h2 class="ck-section-title">Describe the product</h2>
+
+                    <label>
+                      <span class="ck-label">Project name</span>
+                      <input
+                        type="text"
+                        name="launch[project_name]"
+                        value={@attrs["project_name"]}
+                        placeholder="ControlKeel mission name"
+                      />
+                    </label>
+
+                    <label>
+                      <span class="ck-label">Core product prompt</span>
+                      <textarea
+                        name="launch[idea]"
+                        rows="8"
+                        placeholder="Describe what you want built in plain language."
+                      ><%= @attrs["idea"] %></textarea>
+                    </label>
+                    <%= if error = field_error(@errors, "idea") do %>
+                      <p class="ck-note">{error}</p>
+                    <% end %>
+                  </div>
+                <% 3 -> %>
+                  <div class="ck-form-panel">
+                    <p class="ck-mini-label">Step 3</p>
+                    <h2 class="ck-section-title">Answer the guided interview</h2>
+
+                    <%= for question <- @interview_questions do %>
+                      <label>
+                        <span class="ck-label">{question.label}</span>
+                        <span class="ck-note">{question.prompt}</span>
+                        <textarea
+                          name={"launch[interview_answers][#{question.id}]"}
+                          rows="4"
+                          placeholder={question.placeholder}
+                        ><%= Map.get(@attrs["interview_answers"], question.id, "") %></textarea>
+                      </label>
+                      <%= if error = field_error(@errors, "interview_answers.#{question.id}") do %>
+                        <p class="ck-note">{error}</p>
+                      <% end %>
+                    <% end %>
+                    <%= if @compile_error do %>
+                      <p class="ck-note">{@compile_error}</p>
+                    <% end %>
+                  </div>
+                <% 4 -> %>
+                  <div class="ck-form-panel">
+                    <p class="ck-mini-label">Step 4</p>
+                    <h2 class="ck-section-title">Review the compiled brief</h2>
+                    <%= if @compiled_brief do %>
+                      <% brief = Intent.to_brief_map(@compiled_brief) %>
+                      <% compiler = brief["compiler"] || %{} %>
+                      <div class="ck-brief-grid">
+                        <div>
+                          <h3>Objective</h3>
+                          <p class="ck-note">{brief["objective"]}</p>
+                        </div>
+                        <div>
+                          <h3>Recommended stack</h3>
+                          <p class="ck-note">{brief["recommended_stack"]}</p>
+                        </div>
+                        <div>
+                          <h3>Next step</h3>
+                          <p class="ck-note">{brief["next_step"]}</p>
+                        </div>
+                        <div>
+                          <h3>Compiler</h3>
+                          <p class="ck-note">
+                            {compiler["provider"]} / {compiler["model"]}
+                          </p>
+                        </div>
+                        <div>
+                          <h3>Provider mode</h3>
+                          <p class="ck-note">{provider_mode_label(@provider_status)}</p>
                         </div>
                       </div>
-                      <div class="ck-card">
-                        <p class="ck-mini-label">Open questions</p>
-                        <ul class="ck-mini-list">
-                          <%= for item <- brief["open_questions"] || [] do %>
-                            <li>{item}</li>
-                          <% end %>
-                        </ul>
+
+                      <div class="ck-grid ck-grid-dashboard">
+                        <div class="ck-card">
+                          <p class="ck-mini-label">Acceptance criteria</p>
+                          <ul class="ck-mini-list">
+                            <%= for item <- brief["acceptance_criteria"] || [] do %>
+                              <li>{item}</li>
+                            <% end %>
+                          </ul>
+                        </div>
+                        <div class="ck-card">
+                          <p class="ck-mini-label">Production boundary</p>
+                          <div class="ck-brief-grid">
+                            <div>
+                              <h3>Risk tier</h3>
+                              <p class="ck-note">
+                                {boundary_value(@compiled_boundary_summary, "risk_tier")}
+                              </p>
+                            </div>
+                            <div>
+                              <h3>Budget note</h3>
+                              <p class="ck-note">
+                                {boundary_value(@compiled_boundary_summary, "budget_note")}
+                              </p>
+                            </div>
+                            <div>
+                              <h3>Launch window</h3>
+                              <p class="ck-note">
+                                {boundary_value(@compiled_boundary_summary, "launch_window")}
+                              </p>
+                            </div>
+                            <div>
+                              <h3>Constraints</h3>
+                              <ul class="ck-mini-list">
+                                <%= for item <- boundary_list(@compiled_boundary_summary, "constraints") do %>
+                                  <li>{item}</li>
+                                <% end %>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="ck-card">
+                          <p class="ck-mini-label">Open questions</p>
+                          <ul class="ck-mini-list">
+                            <%= for item <- brief["open_questions"] || [] do %>
+                              <li>{item}</li>
+                            <% end %>
+                          </ul>
+                        </div>
                       </div>
-                    </div>
-                  <% else %>
-                    <p class="ck-note">The brief is not available yet.</p>
+                    <% else %>
+                      <p class="ck-note">The brief is not available yet.</p>
+                    <% end %>
+                  </div>
+              <% end %>
+
+              <div class="ck-action-row">
+                <button
+                  :if={@step > 1}
+                  class="ck-link"
+                  type="button"
+                  phx-click="back"
+                >
+                  Back
+                </button>
+
+                <button :if={@step < 4} class="ck-button-primary" type="submit">
+                  {if @step == 3, do: "Compile brief", else: "Continue"}
+                </button>
+              </div>
+            </.form>
+
+            <div :if={@step == 4} class="ck-action-row">
+              <button class="ck-link" type="button" phx-click="back">Edit answers</button>
+              <button class="ck-link" type="button" phx-click="regenerate">Regenerate</button>
+              <button class="ck-button-primary" type="button" phx-click="accept">
+                Create mission
+              </button>
+            </div>
+          </div>
+
+          <div class="ck-card">
+            <p class="ck-mini-label">Domain pack preview</p>
+            <div class="ck-brief-grid">
+              <div>
+                <h3>Occupation</h3>
+                <p class="ck-note">{@preflight.occupation.label}</p>
+              </div>
+              <div>
+                <h3>Validation emphasis</h3>
+                <p class="ck-note">{@preflight.validation_language}</p>
+              </div>
+              <div>
+                <h3>Compliance</h3>
+                <ul class="ck-tag-list">
+                  <%= for item <- @preflight.compliance do %>
+                    <li><span class="ck-tag">{item}</span></li>
                   <% end %>
-                </div>
-            <% end %>
-
-            <div class="ck-action-row">
-              <button
-                :if={@step > 1}
-                class="ck-link"
-                type="button"
-                phx-click="back"
-              >
-                Back
-              </button>
-
-              <button :if={@step < 4} class="ck-button-primary" type="submit">
-                {if @step == 3, do: "Compile brief", else: "Continue"}
-              </button>
-            </div>
-          </.form>
-
-          <div :if={@step == 4} class="ck-action-row">
-            <button class="ck-link" type="button" phx-click="back">Edit answers</button>
-            <button class="ck-link" type="button" phx-click="regenerate">Regenerate</button>
-            <button class="ck-button-primary" type="button" phx-click="accept">Create mission</button>
-          </div>
-        </div>
-
-        <div class="ck-card">
-          <p class="ck-mini-label">Domain pack preview</p>
-          <div class="ck-brief-grid">
-            <div>
-              <h3>Occupation</h3>
-              <p class="ck-note">{@preflight.occupation.label}</p>
-            </div>
-            <div>
-              <h3>Validation emphasis</h3>
-              <p class="ck-note">{@preflight.validation_language}</p>
-            </div>
-            <div>
-              <h3>Compliance</h3>
-              <ul class="ck-tag-list">
-                <%= for item <- @preflight.compliance do %>
-                  <li><span class="ck-tag">{item}</span></li>
-                <% end %>
-              </ul>
-            </div>
-            <div>
-              <h3>Stack guidance</h3>
-              <p class="ck-note">{@preflight.stack_guidance}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="ck-card">
-          <p class="ck-mini-label">Provider and autonomy status</p>
-          <p class="ck-note">
-            Designed for serious solo builders and tiny teams first. ControlKeel is not another IDE, coding model, or post-hoc review layer; it is the governed control loop around those tools.
-          </p>
-          <p class="ck-note" style="margin-top: 0.75rem;">
-            Unsupported tool or rescue situation? Bootstrap the project, use `controlkeel watch`, findings, proofs, and `ck_validate`, then add governed proxy only when the tool can target compatible endpoints.
-          </p>
-          <div class="ck-brief-grid">
-            <div>
-              <h3>Current mode</h3>
-              <p class="ck-note">{provider_mode_label(@provider_status)}</p>
-            </div>
-            <div>
-              <h3>Current provider</h3>
-              <p class="ck-note">{provider_name(@provider_status)}</p>
-            </div>
-            <div>
-              <h3>Setup scope</h3>
-              <p class="ck-note">{setup_scope_copy(@provider_status)}</p>
-            </div>
-            <div>
-              <h3>Attached agents</h3>
-              <p class="ck-note">{attached_agents_copy(@provider_status)}</p>
+                </ul>
+              </div>
+              <div>
+                <h3>Stack guidance</h3>
+                <p class="ck-note">{@preflight.stack_guidance}</p>
+              </div>
             </div>
           </div>
 
-          <p class="ck-note" style="margin-top: 1rem;">
-            {provider_guidance(@provider_status)}
-          </p>
-
-          <p class="ck-note" style="margin-top: 0.75rem;">
-            Autonomy and findings: see
-            <code class="font-mono text-sm">docs/autonomy-and-findings.md</code>
-            in the repository for how severity maps to human review (LLM advisory requires a provider; validate responses include an advisory status).
-          </p>
-
-          <div class="ck-grid ck-grid-dashboard" style="margin-top: 1rem;">
-            <div class="ck-card">
-              <p class="ck-mini-label">Always available</p>
-              <ul class="ck-mini-list">
-                <%= for item <- always_available_capabilities() do %>
-                  <li>{item}</li>
-                <% end %>
-              </ul>
+          <div class="ck-card">
+            <p class="ck-mini-label">Provider and autonomy status</p>
+            <p class="ck-note">
+              Designed for serious solo builders and tiny teams first. ControlKeel is not another IDE, coding model, or post-hoc review layer; it is the governed control loop around those tools.
+            </p>
+            <p class="ck-note" style="margin-top: 0.75rem;">
+              Unsupported tool or rescue situation? Bootstrap the project, use `controlkeel watch`, findings, proofs, and `ck_validate`, then add governed proxy only when the tool can target compatible endpoints.
+            </p>
+            <div class="ck-brief-grid">
+              <div>
+                <h3>Current mode</h3>
+                <p class="ck-note">{provider_mode_label(@provider_status)}</p>
+              </div>
+              <div>
+                <h3>Current provider</h3>
+                <p class="ck-note">{provider_name(@provider_status)}</p>
+              </div>
+              <div>
+                <h3>Setup scope</h3>
+                <p class="ck-note">{setup_scope_copy(@provider_status)}</p>
+              </div>
+              <div>
+                <h3>Attached agents</h3>
+                <p class="ck-note">{attached_agents_copy(@provider_status)}</p>
+              </div>
             </div>
-            <div class="ck-card">
-              <p class="ck-mini-label">Model-backed features</p>
-              <ul class="ck-mini-list">
-                <%= for item <- model_backed_capabilities(@provider_status) do %>
-                  <li>{item}</li>
-                <% end %>
-              </ul>
-            </div>
-          </div>
 
-          <div class="ck-grid ck-grid-dashboard" style="margin-top: 1rem;">
-            <div class="ck-card">
-              <p class="ck-mini-label">Resolution order</p>
-              <ol class="ck-mini-list">
-                <%= for item <- provider_resolution_steps() do %>
-                  <li>{item}</li>
-                <% end %>
-              </ol>
+            <p class="ck-note" style="margin-top: 1rem;">
+              {provider_guidance(@provider_status)}
+            </p>
+
+            <p class="ck-note" style="margin-top: 0.75rem;">
+              Autonomy and findings: see
+              <code class="font-mono text-sm">docs/autonomy-and-findings.md</code>
+              in the repository for how severity maps to human review (LLM advisory requires a provider; validate responses include an advisory status).
+            </p>
+
+            <div class="ck-grid ck-grid-dashboard" style="margin-top: 1rem;">
+              <div class="ck-card">
+                <p class="ck-mini-label">Always available</p>
+                <ul class="ck-mini-list">
+                  <%= for item <- always_available_capabilities() do %>
+                    <li>{item}</li>
+                  <% end %>
+                </ul>
+              </div>
+              <div class="ck-card">
+                <p class="ck-mini-label">Model-backed features</p>
+                <ul class="ck-mini-list">
+                  <%= for item <- model_backed_capabilities(@provider_status) do %>
+                    <li>{item}</li>
+                  <% end %>
+                </ul>
+              </div>
             </div>
-            <div class="ck-card">
-              <p class="ck-mini-label">Autonomy defaults</p>
-              <ul class="ck-mini-list">
-                <%= for item <- autonomy_defaults() do %>
-                  <li>{item}</li>
-                <% end %>
-              </ul>
+
+            <div class="ck-grid ck-grid-dashboard" style="margin-top: 1rem;">
+              <div class="ck-card">
+                <p class="ck-mini-label">Resolution order</p>
+                <ol class="ck-mini-list">
+                  <%= for item <- provider_resolution_steps() do %>
+                    <li>{item}</li>
+                  <% end %>
+                </ol>
+              </div>
+              <div class="ck-card">
+                <p class="ck-mini-label">Autonomy defaults</p>
+                <ul class="ck-mini-list">
+                  <%= for item <- autonomy_defaults() do %>
+                    <li>{item}</li>
+                  <% end %>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </Layouts.app>
     """
   end
 

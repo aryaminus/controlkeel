@@ -1,7 +1,7 @@
 {
   "name": "controlkeel-companion",
   "description": "ControlKeel governance bundle for Copilot custom agents, skills, hooks, and MCP",
-  "version": "0.2.17",
+  "version": "0.2.50",
   "author": {
     "name": "ControlKeel"
   },

@@ -17,7 +17,8 @@
   "files": [
     "bin",
     "lib",
-    "README.md"
+    "README.md",
+    "server.json"
   ],
   "scripts": {
     "postinstall": "node lib/postinstall.js"

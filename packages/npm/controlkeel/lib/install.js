@@ -5,8 +5,10 @@ const os = require("node:os");
 const path = require("node:path");
 const https = require("node:https");
 
+const packageJson = require("../package.json");
+
 const REPOSITORY = process.env.CONTROLKEEL_GITHUB_REPO || "aryaminus/controlkeel";
-const VERSION = process.env.CONTROLKEEL_VERSION || "latest";
+const VERSION = process.env.CONTROLKEEL_VERSION || packageJson.version;
 
 function releaseBaseUrl() {
   if (VERSION === "latest") {

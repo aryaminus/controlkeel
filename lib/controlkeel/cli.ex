@@ -776,9 +776,7 @@ defmodule ControlKeel.CLI do
          {:ok, attached} <- attach_to_cursor(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "cursor", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        [
          "Attached ControlKeel to Cursor.",
@@ -806,9 +804,7 @@ defmodule ControlKeel.CLI do
          {:ok, attached} <- attach_to_windsurf(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "windsurf", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        [
          "Attached ControlKeel to Windsurf.",
@@ -855,9 +851,7 @@ defmodule ControlKeel.CLI do
            },
          updated <- ProjectBinding.update_attached_agent(binding, "codex-cli", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        [
          "Attached ControlKeel to Codex CLI.",
@@ -907,9 +901,7 @@ defmodule ControlKeel.CLI do
          {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", command_spec, agent),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        [
          "Attached ControlKeel to #{display_name[agent]}.",
@@ -942,9 +934,7 @@ defmodule ControlKeel.CLI do
          {:ok, attached} <- attach_to_goose(command_spec, root),
          updated <- ProjectBinding.update_attached_agent(binding, "goose", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        [
          "Attached ControlKeel to Goose.",
@@ -974,9 +964,7 @@ defmodule ControlKeel.CLI do
            write_continue_mcp_config(continue_config_path(), "controlkeel", command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "continue", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        [
          "Attached ControlKeel to Continue.",
@@ -1005,9 +993,7 @@ defmodule ControlKeel.CLI do
          {:ok, attached} <- attach_to_aider(command_spec, root),
          updated <- ProjectBinding.update_attached_agent(binding, "aider", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        [
          "Attached ControlKeel to Aider.",
@@ -1047,9 +1033,7 @@ defmodule ControlKeel.CLI do
          attached_agent <- bundled_attached_agent(agent, target, scope, result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
          {:ok, _binding} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       {:ok,
        bundle_attach_lines(agent, result) ++
          bootstrap_lines(root) ++
@@ -1072,9 +1056,7 @@ defmodule ControlKeel.CLI do
          attached_agent <- github_repo_attached_agent(agent, scope, install_result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
          {:ok, _binding} <-
-           ProjectBinding.write_effective(updated, root,
-             mode: binding_write_mode(binding)
-           ) do
+           ProjectBinding.write_effective(updated, root, mode: binding_write_mode(binding)) do
       lines =
         case install_result do
           %{destination: destination} ->

@@ -1,4 +1,4 @@
-defmodule ControlKeelWeb.ProxyWebsocketTest do
+defmodule ControlKeelWeb.ProxyWebSockTest do
   use ControlKeel.DataCase
 
   import ControlKeel.MissionFixtures
@@ -96,7 +96,7 @@ defmodule ControlKeelWeb.ProxyWebsocketTest do
     def call(%Plug.Conn{request_path: "/v1/realtime"} = conn, opts) do
       WebSockAdapter.upgrade(
         conn,
-        ControlKeelWeb.ProxyWebsocketTest.UpstreamSock,
+        ControlKeelWeb.ProxyWebSockTest.UpstreamSock,
         %{test_pid: opts[:test_pid]},
         timeout: 1_000
       )
