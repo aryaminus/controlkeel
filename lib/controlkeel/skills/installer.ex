@@ -166,12 +166,29 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("claude-standalone", project_root, scope: scope)
     copy_tree_contents(Path.join(plan.output_dir, ".claude/agents"), agent_root)
 
+    settings_path = Path.join(base, "settings.json")
+    merge_claude_settings(settings_path, Exporter.claude_manual_settings())
+
+    claude_md_dst = Path.join(project_root, "CLAUDE.md")
+
+    claude_md_written =
+      unless File.exists?(claude_md_dst) do
+        claude_md_src = Path.join(plan.output_dir, "CLAUDE.md")
+
+        if File.exists?(claude_md_src) do
+          File.copy!(claude_md_src, claude_md_dst)
+          claude_md_dst
+        end
+      end
+
     {:ok,
      %{
        target: "claude-standalone",
        scope: scope,
        destination: skill_root,
-       agent_destination: agent_root
+       agent_destination: agent_root,
+       settings_destination: settings_path,
+       instructions_destination: claude_md_written
      }}
   end
 
@@ -785,6 +802,25 @@ defmodule ControlKeel.Skills.Installer do
   defp normalize_scope(target, scope) do
     scope = to_string(scope || target.default_scope)
     if scope in target.supported_scopes, do: scope, else: target.default_scope
+  end
+
+  defp merge_claude_settings(path, new_settings) do
+    existing =
+      case File.read(path) do
+        {:ok, contents} -> Jason.decode!(contents)
+        {:error, _} -> %{}
+      end
+
+    merged =
+      Map.merge(existing, new_settings, fn
+        "hooks", old_hooks, new_hooks ->
+          Map.merge(old_hooks, new_hooks)
+
+        _key, _old, new_val ->
+          new_val
+      end)
+
+    File.write!(path, Jason.encode!(merged, pretty: true) <> "\n")
   end
 
   defp copy_skills(skills, destination_root) do

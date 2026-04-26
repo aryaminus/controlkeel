@@ -230,6 +230,9 @@ defmodule ControlKeel.Skills.Exporter do
     claude_md = Path.join(root, "CLAUDE.md")
     File.write!(claude_md, instructions_only_contents("claude", project_root, opts))
 
+    settings_path = Path.join(root, ".claude/settings.json")
+    File.write!(settings_path, Jason.encode!(claude_manual_settings(), pretty: true) <> "\n")
+
     with_common_assets(
       root,
       project_root,
@@ -238,10 +241,12 @@ defmodule ControlKeel.Skills.Exporter do
         %{"path" => skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => mcp_path, "kind" => "mcp"},
-        %{"path" => claude_md, "kind" => "instructions"}
+        %{"path" => claude_md, "kind" => "instructions"},
+        %{"path" => settings_path, "kind" => "hooks"}
       ],
       [
-        "Copy .claude/skills and .claude/agents into your project or home .claude directory.",
+        "Copy .claude/skills, .claude/agents into your project or home .claude directory.",
+        "Merge .claude/settings.json hooks into your existing settings.json (or copy if absent).",
         "Merge the generated .mcp.json into Claude's MCP configuration if needed.",
         "Use in Agent SDK: set `settingSources: [\"user\", \"project\"]` and `allowedTools: [\"Skill\", \"mcp__controlkeel__*\"]` so the SDK discovers CK skills, agents, and hooks from the filesystem.",
         "Caution: `settingSources: []` in multi-tenant SDK deployments bypasses CK governance entirely."
@@ -3348,7 +3353,7 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
-  defp claude_manual_settings do
+  def claude_manual_settings do
     %{
       "hooks" => %{
         "SessionStart" => [
@@ -3372,9 +3377,9 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" =>
-                  "cmd=$(cat | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"command\",\"\"))' 2>/dev/null || true); [ -z \"$cmd\" ] && exit 0; controlkeel validate --content \"$cmd\" --kind shell --json 2>/dev/null || true",
+                  "TOOL_INPUT=$(cat); if command -v jq >/dev/null 2>&1; then CMD=$(printf '%s' \"$TOOL_INPUT\" | jq -r '.command // empty' 2>/dev/null); else CMD=$(printf '%s' \"$TOOL_INPUT\"); fi; printf '%s' \"$CMD\" | grep -qiE '(deploy|fly |wrangler publish|mix release|docker push|heroku|git push origin)' && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"Deploy-like command detected. Confirm ck_validate and ck_review_submit were called this turn before proceeding.\"}}' || true",
                 "statusMessage" => "Checking Bash command with ControlKeel",
-                "timeout" => 15
+                "timeout" => 10
               }
             ]
           },

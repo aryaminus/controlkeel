@@ -727,13 +727,15 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["claude-code"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => "claude-code"}),
+           ensure_attach_project(root, %{"agent" => "claude-code"}),
          {:ok, _scope} <- validate_attach_scope("claude-code", options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
          {:ok, attached_agent} <-
            ClaudeCLI.attach_local(
-             project_root,
+             root,
              command_spec.command,
              command_spec.args
            ),
@@ -742,18 +744,18 @@ defmodule ControlKeel.CLI do
          {:ok, _binding} <-
            ProjectBinding.write_effective(
              updated_binding,
-             project_root,
+             root,
              mode: binding_write_mode(binding)
            ) do
-      emit_attach_succeeded(binding, project_root, attached_agent)
+      emit_attach_succeeded(binding, root, attached_agent)
 
       {:ok,
        [
          "Attached ControlKeel to Claude Code.",
          "Verified with `claude mcp get controlkeel`."
        ] ++
-         bootstrap_lines(project_root) ++
-         native_attach_lines("claude-code", project_root, options) ++
+         bootstrap_lines(root) ++
+         native_attach_lines("claude-code", root, options) ++
          attach_guidance_lines("claude-code")}
     else
       {:error, message} when is_binary(message) ->
@@ -765,14 +767,16 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["cursor"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => "cursor"}),
+           ensure_attach_project(root, %{"agent" => "cursor"}),
          {:ok, _scope} <- validate_attach_scope("cursor", options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
          {:ok, attached} <- attach_to_cursor(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "cursor", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
@@ -781,8 +785,8 @@ defmodule ControlKeel.CLI do
          "MCP server written to #{attached["config_path"]}.",
          "Restart Cursor to activate."
        ] ++
-         bootstrap_lines(project_root) ++
-         native_attach_lines("cursor", project_root, options) ++ attach_guidance_lines("cursor")}
+         bootstrap_lines(root) ++
+         native_attach_lines("cursor", root, options) ++ attach_guidance_lines("cursor")}
     else
       {:error, message} when is_binary(message) ->
         {:error, message}
@@ -793,14 +797,16 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["windsurf"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => "windsurf"}),
+           ensure_attach_project(root, %{"agent" => "windsurf"}),
          {:ok, _scope} <- validate_attach_scope("windsurf", options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
          {:ok, attached} <- attach_to_windsurf(command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "windsurf", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
@@ -809,8 +815,8 @@ defmodule ControlKeel.CLI do
          "MCP server written to #{attached["config_path"]}.",
          "Restart Windsurf to activate."
        ] ++
-         bootstrap_lines(project_root) ++
-         native_attach_lines("windsurf", project_root, options) ++
+         bootstrap_lines(root) ++
+         native_attach_lines("windsurf", root, options) ++
          attach_guidance_lines("windsurf")}
     else
       {:error, message} when is_binary(message) ->
@@ -822,13 +828,15 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["codex-cli"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => "codex-cli"}),
+           ensure_attach_project(root, %{"agent" => "codex-cli"}),
          {:ok, scope} <- validate_attach_scope("codex-cli", options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
-         config_path <- CodexConfig.path_for_scope(project_root, scope),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
+         config_path <- CodexConfig.path_for_scope(root, scope),
          {:ok, _} <- CodexConfig.write(config_path, command_spec),
-         {:ok, install_result} <- maybe_install_codex_native(project_root, scope, options),
+         {:ok, install_result} <- maybe_install_codex_native(root, scope, options),
          attached <-
            %{
              "server_name" => "controlkeel",
@@ -847,7 +855,7 @@ defmodule ControlKeel.CLI do
            },
          updated <- ProjectBinding.update_attached_agent(binding, "codex-cli", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
@@ -856,7 +864,7 @@ defmodule ControlKeel.CLI do
          "MCP server written to #{config_path}.",
          "Restart Codex CLI to activate."
        ] ++
-         bootstrap_lines(project_root) ++
+         bootstrap_lines(root) ++
          codex_attach_install_lines(install_result) ++ attach_guidance_lines("codex-cli")}
     else
       {:error, message} when is_binary(message) ->
@@ -889,15 +897,17 @@ defmodule ControlKeel.CLI do
       "cline" => "Cline"
     }
 
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => agent}),
+           ensure_attach_project(root, %{"agent" => agent}),
          {:ok, _scope} <- validate_attach_scope(agent, options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
          config_path <- config_path_fn[agent].(),
          {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", command_spec, agent),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
@@ -910,8 +920,8 @@ defmodule ControlKeel.CLI do
            else: "Restart #{display_name[agent]} to activate."
          )
        ] ++
-         bootstrap_lines(project_root) ++
-         native_attach_lines(agent, project_root, options) ++
+         bootstrap_lines(root) ++
+         native_attach_lines(agent, root, options) ++
          attach_guidance_lines(agent)}
     else
       {:error, message} when is_binary(message) ->
@@ -923,14 +933,16 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["goose"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => "goose"}),
+           ensure_attach_project(root, %{"agent" => "goose"}),
          {:ok, _scope} <- validate_attach_scope("goose", options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
-         {:ok, attached} <- attach_to_goose(command_spec, project_root),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
+         {:ok, attached} <- attach_to_goose(command_spec, root),
          updated <- ProjectBinding.update_attached_agent(binding, "goose", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
@@ -939,8 +951,8 @@ defmodule ControlKeel.CLI do
          "Goose extension written to #{attached["config_path"]}.",
          "Restart Goose to activate."
        ] ++
-         bootstrap_lines(project_root) ++
-         native_attach_lines("goose", project_root, options) ++
+         bootstrap_lines(root) ++
+         native_attach_lines("goose", root, options) ++
          attach_guidance_lines("goose")}
     else
       {:error, message} when is_binary(message) ->
@@ -952,15 +964,17 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["continue"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => "continue"}),
+           ensure_attach_project(root, %{"agent" => "continue"}),
          {:ok, _scope} <- validate_attach_scope("continue", options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
          {:ok, attached} <-
            write_continue_mcp_config(continue_config_path(), "controlkeel", command_spec),
          updated <- ProjectBinding.update_attached_agent(binding, "continue", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
@@ -969,8 +983,8 @@ defmodule ControlKeel.CLI do
          "MCP server written to #{attached["config_path"]}.",
          "Restart Continue to activate."
        ] ++
-         bootstrap_lines(project_root) ++
-         native_attach_lines("continue", project_root, options) ++
+         bootstrap_lines(root) ++
+         native_attach_lines("continue", root, options) ++
          attach_guidance_lines("continue")}
     else
       {:error, message} when is_binary(message) ->
@@ -982,14 +996,16 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: ["aider"], options: options}, project_root) do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => "aider"}),
+           ensure_attach_project(root, %{"agent" => "aider"}),
          {:ok, _scope} <- validate_attach_scope("aider", options),
-         command_spec <- ProjectBinding.mcp_command_spec(project_root),
-         {:ok, attached} <- attach_to_aider(command_spec, project_root),
+         command_spec <- ProjectBinding.mcp_command_spec(root),
+         {:ok, attached} <- attach_to_aider(command_spec, root),
          updated <- ProjectBinding.update_attached_agent(binding, "aider", attached),
          {:ok, _} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
@@ -997,8 +1013,8 @@ defmodule ControlKeel.CLI do
          "Attached ControlKeel to Aider.",
          "MCP config written to #{attached["config_path"]}."
        ] ++
-         bootstrap_lines(project_root) ++
-         native_attach_lines("aider", project_root, options) ++
+         bootstrap_lines(root) ++
+         native_attach_lines("aider", root, options) ++
          attach_guidance_lines("aider")}
     else
       {:error, message} when is_binary(message) ->
@@ -1011,6 +1027,8 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
       when agent in ["roo-code", "hermes-agent", "openclaw", "droid", "forge", "pi", "letta-code"] do
+    root = options[:project_root] || project_root
+
     target =
       %{
         "roo-code" => "roo-native",
@@ -1023,18 +1041,18 @@ defmodule ControlKeel.CLI do
       }[agent]
 
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => agent}),
+           ensure_attach_project(root, %{"agent" => agent}),
          {:ok, scope} <- validate_attach_scope(agent, options),
-         {:ok, result} <- attach_bundle_target(target, project_root, scope, options),
+         {:ok, result} <- attach_bundle_target(target, root, scope, options),
          attached_agent <- bundled_attached_agent(agent, target, scope, result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
          {:ok, _binding} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       {:ok,
        bundle_attach_lines(agent, result) ++
-         bootstrap_lines(project_root) ++
+         bootstrap_lines(root) ++
          attach_guidance_lines(agent)}
     else
       {:error, reason} ->
@@ -1045,14 +1063,16 @@ defmodule ControlKeel.CLI do
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
       when agent in ["vscode", "copilot"] do
+    root = options[:project_root] || project_root
+
     with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(project_root, %{"agent" => agent}),
+           ensure_attach_project(root, %{"agent" => agent}),
          {:ok, scope} <- validate_attach_scope(agent, options),
-         {:ok, install_result} <- Skills.install("github-repo", project_root, scope: scope),
+         {:ok, install_result} <- Skills.install("github-repo", root, scope: scope),
          attached_agent <- github_repo_attached_agent(agent, scope, install_result),
          updated <- ProjectBinding.update_attached_agent(binding, agent, attached_agent),
          {:ok, _binding} <-
-           ProjectBinding.write_effective(updated, project_root,
+           ProjectBinding.write_effective(updated, root,
              mode: binding_write_mode(binding)
            ) do
       lines =
@@ -1062,13 +1082,13 @@ defmodule ControlKeel.CLI do
               "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
               "Installed project bundle at #{destination}.",
               "Repository MCP config written under .github and .vscode."
-            ] ++ bootstrap_lines(project_root)
+            ] ++ bootstrap_lines(root)
 
           %ControlKeel.Skills.SkillExportPlan{} = plan ->
             [
               "Prepared ControlKeel companion files for #{display_attach_agent(agent)}.",
               "Output: #{plan.output_dir}"
-            ] ++ bootstrap_lines(project_root)
+            ] ++ bootstrap_lines(root)
         end
 
       {:ok, lines ++ attach_guidance_lines(agent)}
@@ -5272,11 +5292,24 @@ defmodule ControlKeel.CLI do
       case Skills.install("claude-standalone", project_root,
              scope: attach_scope("claude-code", options)
            ) do
-        {:ok, %{destination: destination, agent_destination: agent_destination}} ->
+        {:ok, %{destination: destination, agent_destination: agent_destination} = result} ->
+          settings_line =
+            case Map.get(result, :settings_destination) do
+              nil -> []
+              path -> ["Installed Claude hooks at #{path}."]
+            end
+
+          instructions_line =
+            case Map.get(result, :instructions_destination) do
+              nil -> []
+              false -> []
+              path -> ["Installed CLAUDE.md at #{path}."]
+            end
+
           [
             "Installed Claude native skills at #{destination}.",
             "Installed Claude companion agent at #{agent_destination}."
-          ]
+          ] ++ settings_line ++ instructions_line
 
         {:error, reason} ->
           ["Native Claude skills were not installed: #{inspect(reason)}"]
