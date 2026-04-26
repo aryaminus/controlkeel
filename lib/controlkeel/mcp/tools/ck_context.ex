@@ -81,7 +81,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     |> Map.put("detail_level", "compact")
     |> Map.put(
       "detail_hint",
-      "Pass detail_level: full to ck_context only when raw workspace, resume, or transcript payloads are required."
+      "Compact context keeps agents in the smart zone. Pass detail_level: full only when raw workspace, resume, or transcript payloads are required."
     )
     |> Map.update("workspace_context", %{}, &compact_workspace_context/1)
     |> Map.update("resume_packet", nil, &compact_resume_packet/1)

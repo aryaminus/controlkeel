@@ -97,6 +97,37 @@ The intended operating model is:
 
 This is the benchmark-side equivalent of treating evals like training data for harness engineering without letting the harness overfit the visible cases.
 
+## Premise-refusal and dissatisfaction evals
+
+Not every useful benchmark case is about producing the right positive answer. Some of the highest-signal CK scenarios should check whether the model refuses to over-solve a bad premise in the first place.
+
+Two especially useful patterns are:
+
+- **Premise-refusal or pushback cases**: prompts where the right behavior is to challenge the framing, reject the invalid premise, or ask for clarification instead of confidently producing a fake analysis.
+- **Dissatisfaction or both-bad cases**: expert prompts where two candidate outputs can both be unsatisfactory even if neither contains a classic policy violation.
+
+This matters because many benchmark curves overstate progress on narrow, well-specified tasks while missing failures such as:
+
+- confidently analyzing nonsense inputs
+- reasoning harder in the wrong direction instead of stopping
+- producing long plausible output that still fails expert taste or task reality
+
+For CK, the transferable lesson is not "use LLM-as-judge everywhere." It is to expand scenario design so benchmark suites include:
+
+- invalid-premise prompts where successful behavior is explicit pushback
+- expert-review prompts where "both bad" is a valid outcome class
+- harder real-work prompts whose quality depends on judgment, not just factual correctness
+
+When you need to represent those cases in run metadata, useful tags include:
+
+- `behavior_tags: ["premise_refusal"]`
+- `behavior_tags: ["clarification_required"]`
+- `behavior_tags: ["over_accommodation_risk"]`
+- `behavior_tags: ["expert_judgment"]`
+- `behavior_tags: ["both_bad_possible"]`
+
+If a run uses a softer scorer for these scenarios, keep that explicit in metadata and export notes rather than pretending it is as deterministic as CK's normal scanner-based path.
+
 For multi-agent memory experiments, use metadata to describe the strategy honestly rather than claiming native support CK does not implement itself. Examples:
 
 - `memory_sharing_strategy: "summary"`

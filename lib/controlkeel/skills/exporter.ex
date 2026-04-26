@@ -5647,8 +5647,9 @@ defmodule ControlKeel.Skills.Exporter do
     2. Call `ck_validate` before writing code, config, shell, or deploy content.
     3. Submit plans or approval packets with `ck_review_submit` and check `ck_review_status` before execution.
     4. Record any human-review issue with `ck_finding`.
-    5. Check `ck_budget` before expensive model or multi-agent work.
-    6. Use `ck_route`, `ck_skill_list`, and `ck_skill_load` to delegate or activate specialized CK workflows.
+    5. Check `ck_budget` before expensive model or multi-agent work, and keep `ck_context` compact unless full raw context is needed.
+    6. Before AFK or delegated implementation, split large work into human-approved vertical slices with explicit dependencies; planner agents should run only unblocked slices and every branch needs automated review plus human QA before merge.
+    7. Use `ck_route`, `ck_skill_list`, and `ck_skill_load` to delegate or activate specialized CK workflows.
 
     Install ControlKeel:
     #{Enum.map_join(Distribution.install_channels(), "\n", fn channel -> "- #{channel.label}: `#{channel.command}`" end)}
@@ -7689,8 +7690,9 @@ defmodule ControlKeel.Skills.Exporter do
     1. **Start**: Call `ck_context` with `session_id: 1` to load mission, risk, budget, proof, memory, and active findings.
     2. **Before mutations**: Call `ck_validate` before writing code, config, shell commands, or deploy artifacts.
     3. **Findings**: If you discover a problem, call `ck_finding` to persist it.
-    4. **Budget**: Call `ck_budget` before expensive model calls or bulk operations.
-    5. **Routing**: Call `ck_route` before delegating sub-work to another agent.
+    4. **Budget**: Call `ck_budget` before expensive model calls or bulk operations; keep context compact until full raw context is necessary.
+    5. **Planning shape**: Prefer human-approved vertical slices/tracer bullets with explicit dependencies before AFK implementation; every generated branch needs automated review and human QA.
+    6. **Routing**: Call `ck_route` before delegating sub-work to another agent.
 
     ## Commands
 

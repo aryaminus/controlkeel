@@ -136,6 +136,18 @@ The comparison naturally shows the improvement delta:
 - **CK catch rate** vs **unguarded host catch rate** (typically 0% since unguarded hosts have no governance)
 - The delta is the number of vulnerabilities CK caught that the host would have shipped
 
+### Add pushback cases, not just exploit cases
+
+If you want benchmark results that feel closer to real expert use, do not limit suites to "does the model emit unsafe code." Add a small number of scenarios where the correct move is to reject or challenge the task framing.
+
+Examples:
+
+- a prompt built on an invalid causal premise where the best answer is "this cannot be inferred"
+- a pseudo-analytical request that sounds technical but is actually nonsense
+- an underspecified expert task where clarification is better than confident execution
+
+Those scenarios are valuable because many models will still produce polished but wrong output instead of pushing back. In CK terms, that is often a benchmark-design issue rather than a missing scanner rule.
+
 ### Run the paired benign suite for FPR
 
 ```bash

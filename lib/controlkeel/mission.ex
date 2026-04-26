@@ -4164,7 +4164,7 @@ defmodule ControlKeel.Mission do
     )
     |> maybe_add_signal(
       phase in @execution_ready_plan_phases and missing == [],
-      "Plan is execution-ready and can unlock implementation after approval."
+      "Plan is execution-ready after approval; AFK execution must stay bounded to unblocked, reviewable slices rather than open-ended autonomy."
     )
     |> Enum.concat(Enum.map(missing, &"Missing planning artifact: #{&1}."))
   end
@@ -4209,6 +4209,9 @@ defmodule ControlKeel.Mission do
 
         "implementation_plan" ->
           [
+            "What is the first vertical slice or tracer-bullet outcome that crosses storage, domain logic, and user-visible feedback?",
+            "Which deep module interfaces should stay stable while implementation details can be delegated?",
+            "What automated reviewer and human QA checks will verify each branch before merge?",
             "What check would tell us early that the implementation is drifting from the plan?"
           ]
 
@@ -4223,6 +4226,10 @@ defmodule ControlKeel.Mission do
 
     (scoped_questions ++ phase_questions)
     |> Enum.uniq()
+    |> maybe_add_signal(
+      phase in ["implementation_plan", "code_backed_plan"],
+      "Night-shift check: can a planner select only unblocked DAG/backlog issues, then send each branch through automated review and human QA?"
+    )
     |> Enum.take(4)
   end
 
@@ -4260,7 +4267,7 @@ defmodule ControlKeel.Mission do
     []
     |> maybe_add_signal(
       scope_high,
-      "Inversion: what would make this large change fail in production, and what is the smallest reversible step?"
+      "Inversion: what would make this large change fail in production, and what is the smallest reversible vertical slice?"
     )
     |> maybe_add_signal(
       "validation_plan" in missing,

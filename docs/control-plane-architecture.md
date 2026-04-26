@@ -129,6 +129,14 @@ ControlKeel already had most of these behaviors in practice, but they are now an
   CK prefers a small stable control-plane contract: bounded context, typed tools, versioned schemas, and additive integration surfaces instead of constantly reshaping the basic loop underneath the agent.
 - **Lean harness over prompt bloat**
   CK prefers progressive discovery, compact repo-local instructions, and event-driven hooks over stuffing every turn with large static system guidance, always-loaded skills, or repetitive tone/style reminders. The goal is to keep the harness useful without making the runtime fight unnecessary injected context.
+- **Smart-zone task sizing**
+  CK treats context growth as a quality and budget risk. Human-in-loop planning should split large work into approved, dependency-aware backlog/DAG items before AFK agents execute them, rather than letting one session drift into a long, compacted “dumb zone.”
+- **Vertical slices over horizontal phases**
+  Plans should prefer tracer-bullet slices that cross storage, domain logic, and user-visible feedback so tests and review can exercise an integrated path early. Pure schema/API/UI phases are a warning sign unless they are explicitly justified.
+- **Bounded AFK, not unattended autonomy**
+  CK models AFK execution as a night shift that catches up to day-shift planning. Humans still own requirements, PRD destination, QA, and merge decisions; planner agents should launch only unblocked sandboxed slices, and each implementation branch needs automated review plus human QA follow-up before it is trusted.
+- **Pull detailed standards, push review criteria**
+  Keep always-on system guidance small. Let implementers pull detailed standards from skills or memory when needed, then push the relevant standards into fresh-context review so code style, security, and architecture constraints are checked deliberately.
 - **Observable compaction and recovery**
   Compaction, partial reads, findings, reviews, and delegated execution are meant to stay inspectable through runtime context integrity, recent events, resume packets, and proof bundles.
 - **Truthful extensibility**
