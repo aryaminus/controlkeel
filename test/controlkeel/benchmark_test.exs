@@ -419,6 +419,48 @@ defmodule ControlKeel.BenchmarkTest do
     assert get_in(result.payload, ["artifacts"]) != []
   end
 
+  test "shell subjects resolve relative commands from the project root", %{tmp_dir: tmp_dir} do
+    scripts_dir = Path.join(tmp_dir, "scripts")
+    File.mkdir_p!(scripts_dir)
+
+    script_path = Path.join(scripts_dir, "emit-secret.sh")
+
+    File.write!(
+      script_path,
+      "#!/usr/bin/env bash\nprintf 'OPENAI_KEY = \"AKIAIOSFODNN7EXAMPLE\"'"
+    )
+
+    File.chmod!(script_path, 0o755)
+
+    write_benchmark_subjects!(tmp_dir, [
+      %{
+        "id" => "relative_shell",
+        "label" => "Relative Shell",
+        "type" => "shell",
+        "command" => "./scripts/emit-secret.sh",
+        "working_dir" => ".",
+        "timeout_ms" => 5_000,
+        "output_mode" => "stdout"
+      }
+    ])
+
+    {:ok, run} =
+      Benchmark.run_suite(
+        %{
+          "suite" => "vibe_failures_v1",
+          "subjects" => "relative_shell",
+          "baseline_subject" => "relative_shell",
+          "scenario_slugs" => "hardcoded_api_key_python_webhook"
+        },
+        tmp_dir
+      )
+
+    [result] = run.results
+    assert result.status == "completed"
+    assert result.findings_count > 0
+    assert get_in(result.metadata, ["working_dir"]) == Path.expand(tmp_dir)
+  end
+
   test "shell subjects time out and unknown subjects are marked skipped", %{tmp_dir: tmp_dir} do
     write_benchmark_subjects!(tmp_dir, [
       %{

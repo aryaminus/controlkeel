@@ -10,7 +10,9 @@
       "label": "OpenCode (Shell Wrapper)",
       "type": "shell",
       "command": "./scripts/benchmark-host.sh",
-      "args": ["opencode"],
+      "args": [
+        "opencode"
+      ],
       "working_dir": ".",
       "timeout_ms": 120000,
       "output_mode": "stdout"
@@ -25,7 +27,9 @@
       "label": "GitHub Copilot (Shell Wrapper)",
       "type": "shell",
       "command": "./scripts/benchmark-host.sh",
-      "args": ["copilot"],
+      "args": [
+        "copilot"
+      ],
       "working_dir": ".",
       "timeout_ms": 120000,
       "output_mode": "stdout"
@@ -40,7 +44,9 @@
       "label": "Gemini CLI (Shell Wrapper)",
       "type": "shell",
       "command": "./scripts/benchmark-host.sh",
-      "args": ["gemini"],
+      "args": [
+        "gemini"
+      ],
       "working_dir": ".",
       "timeout_ms": 120000,
       "output_mode": "stdout"
@@ -55,7 +61,9 @@
       "label": "Codex CLI (Shell Wrapper)",
       "type": "shell",
       "command": "./scripts/benchmark-host.sh",
-      "args": ["codex"],
+      "args": [
+        "codex"
+      ],
       "working_dir": ".",
       "timeout_ms": 120000,
       "output_mode": "stdout"
@@ -70,10 +78,67 @@
       "label": "Claude Code (Shell Wrapper)",
       "type": "shell",
       "command": "./scripts/benchmark-host.sh",
-      "args": ["claude"],
+      "args": [
+        "claude"
+      ],
       "working_dir": ".",
       "timeout_ms": 120000,
       "output_mode": "stdout"
+    },
+    {
+      "id": "opencode_pure_manual",
+      "label": "OpenCode Raw CLI (No CK / Pure Mode)",
+      "type": "manual_import"
+    },
+    {
+      "id": "opencode_ck_manual",
+      "label": "OpenCode + ControlKeel Attached (Plugin/MCP Available)",
+      "type": "manual_import"
+    },
+    {
+      "id": "opencode_ck_active_manual",
+      "label": "OpenCode + ControlKeel Active Governance Requested",
+      "type": "manual_import"
+    },
+    {
+      "id": "codex_pure_manual",
+      "label": "Codex CLI Raw CLI (No CK / Pure Mode)",
+      "type": "manual_import"
+    },
+    {
+      "id": "codex_ck_manual",
+      "label": "Codex CLI + ControlKeel Attached (Plugin/MCP Available)",
+      "type": "manual_import"
+    },
+    {
+      "id": "claude_pure_manual",
+      "label": "Claude Code Raw CLI (No CK / Pure Mode)",
+      "type": "manual_import"
+    },
+    {
+      "id": "claude_ck_manual",
+      "label": "Claude Code + ControlKeel Attached (Plugin/MCP Available)",
+      "type": "manual_import"
+    },
+    {
+      "id": "gemini_pure_manual",
+      "label": "Gemini CLI Raw CLI (No CK / Pure Mode)",
+      "type": "manual_import"
+    },
+    {
+      "id": "gemini_ck_manual",
+      "label": "Gemini CLI + ControlKeel Attached (Plugin/MCP Available)",
+      "type": "manual_import"
+    },
+    {
+      "id": "copilot_pure_manual",
+      "label": "GitHub Copilot Raw CLI (No CK / Pure Mode)",
+      "type": "manual_import"
+    },
+    {
+      "id": "copilot_ck_manual",
+      "label": "GitHub Copilot + ControlKeel Attached (Plugin/MCP Available)",
+      "type": "manual_import"
     }
   ]
 }

@@ -46,9 +46,27 @@ echo "Host: ${HOST}" >&2
 echo "Output dir: ${OUTPUT_DIR}" >&2
 
 run_opencode() {
-  # OpenCode CLI: pipe prompt and capture stdout
+  # OpenCode CLI: run mode is the documented non-interactive path.
+  # Keep benchmark runs read-only by asking the host to print an artifact instead of editing files.
   if command -v opencode &>/dev/null; then
-    echo "${PROMPT}" | opencode --non-interactive 2>/dev/null || echo "[opencode error or not available in non-interactive mode]"
+    BENCHMARK_PROMPT="ControlKeel benchmark only. Do not modify files, run commands, install packages, access secrets, or use network. Produce only the code/config/text artifact requested by this scenario, printed to stdout. Scenario prompt: ${PROMPT}"
+    RAW_OUTPUT=$(opencode run --pure --format json --dir "${CONTROLKEEL_PROJECT_ROOT:-$PWD}" "${BENCHMARK_PROMPT}" 2>/dev/null) || {
+      echo "[opencode error or not available in run mode]"
+      return
+    }
+    RAW_OUTPUT="${RAW_OUTPUT}" python3 - <<'PYJSON'
+import json, os
+texts = []
+for line in os.environ.get("RAW_OUTPUT", "").splitlines():
+    try:
+        event = json.loads(line)
+    except Exception:
+        continue
+    part = event.get("part") or {}
+    if event.get("type") == "text" and isinstance(part.get("text"), str):
+        texts.append(part["text"])
+print("\n".join(texts).strip())
+PYJSON
   else
     echo "[OpenCode CLI not found — install opencode or use manual_import subject type]"
   fi

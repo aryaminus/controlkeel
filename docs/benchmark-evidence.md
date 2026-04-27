@@ -119,3 +119,49 @@ For external reporting, export:
 controlkeel benchmark export <HOST_RUN_ID> --format json > evidence-host-comparison.json
 controlkeel benchmark export <BENIGN_RUN_ID> --format json > evidence-benign-baseline.json
 ```
+
+
+## Current final evidence summaries
+
+Raw per-scenario benchmark captures are generated artifacts and are intentionally ignored by git. The durable evidence surface for the repository is this summary plus exported metrics copied into docs when they are ready to publish.
+
+| Evidence | Run | What it contains | Result summary |
+| --- | --- | --- | --- |
+| Deterministic positive baseline | `vibe_failures_v1` run `#20` | CK deterministic validator on 10 unsafe scenarios | 50% catch rate, 30% block rate |
+| Deterministic benign baseline | `benign_baseline_v1` run `#21` | CK deterministic validator on 10 benign scenarios | 30% false-positive/catch rate |
+| Deterministic host-pattern baseline | `host_comparison_v1` run `#22` | CK deterministic validator on 12 host-pattern fixtures | 16.7% catch/block rate |
+| OpenCode raw host-output slice | `host_comparison_v1` run `#24` | Actual OpenCode 1.14.26 outputs imported as `opencode_manual` | 1 low delivery warning, 0 blocks, 0 expected security-rule hits |
+| OpenCode pure vs CK-attached vs CK-active matrix | `host_comparison_v1` run `#26` | OpenCode 1.14.27 / GPT-5.5 outputs in raw, CK-attached, and active CK-use modes, plus CK deterministic fixture baseline | raw: 0/12 caught; CK-attached: 0/12 caught; CK-active: 1/12 caught, 0 blocked; CK fixture baseline: 2/12 caught and blocked |
+
+For OpenCode run `#24`, the single warning was `software.env_example_missing` on the JWT helper output. It was a low delivery warning, not an expected security-rule hit. This distinction matters: the benchmark shows both the host output and CK's governance response, but it does not imply every allowed artifact is production-ready.
+
+## Host runtime governance matrix evidence (OpenCode / GPT-5.5)
+
+Run `#26` is the current OpenCode matrix on `host_comparison_v1`:
+
+| Subject | Mode | Catch | Block | Expected-rule hits | Median latency | Total tokens | CK tool/MCP evidence |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `opencode_pure_manual` | `opencode run --pure` | 0/12 | 0/12 | 0/12 | 13,318 ms | 240,103 | unexpected CK/MCP events in 2/12 scenarios; no skill/plugin use |
+| `opencode_ck_manual` | CK-attached repo, no forced tool use | 0/12 | 0/12 | 0/12 | 10,217 ms | 242,205 | no CK tool calls; one event mentions MCP |
+| `opencode_ck_active_manual` | CK-attached repo, explicit CK-use request | 1/12 | 0/12 | 0/12 | 57,031 ms | 469,605 | CK/MCP/skill/plugin events in 12/12 scenarios; hook mentions in 11/12 |
+| `controlkeel_validate` | deterministic fixture baseline | 2/12 | 2/12 | 1/12 | n/a | n/a | direct CK scanner |
+
+Preflight proof for run `#26`:
+
+- OpenCode version: `1.14.27`
+- `opencode mcp list`: `controlkeel` MCP server connected
+- `controlkeel attach doctor`: core loop reported as `ck_context -> ck_validate -> ck_review_submit/ck_finding -> ck_budget/ck_route/ck_delegate`
+- `controlkeel skills list`: governance skills available, including `controlkeel-governance`, `benchmark-operator`, `security-review`, `proof-memory`, and `ship-readiness`
+- active surface probe invoked CK tools through OpenCode JSON events: `controlkeel_ck_context`, `controlkeel_ck_validate`, `controlkeel_ck_skill_list`, `controlkeel_ck_fs_ls`, and `controlkeel_ck_fs_find`
+
+Active-mode tool evidence from scenario event logs included: `controlkeel_ck_context`, `controlkeel_ck_validate`, `controlkeel_ck_budget`, `controlkeel_ck_review_submit`, `controlkeel_ck_review_status`, `controlkeel_ck_skill_list`, `controlkeel_ck_skill_load`, `controlkeel_ck_fs_find`, `controlkeel_ck_fs_read`, `controlkeel_ck_fs_grep`, and host `skill` calls.
+
+Interpretation:
+
+1. This run validates the harness can measure three separate things: raw host output, CK-surface availability, and explicit CK tool/skill invocation.
+2. Explicit CK-use mode did produce real CK/MCP/skill/plugin/hook event evidence, but it did **not** materially improve scanner catch/block outcomes on this public suite: 1/12 caught and 0/12 blocked for imported host output.
+3. CK deterministic scanning of fixture content still caught and blocked 2/12 scenarios. The difference means current host-generated artifacts often avoided the exact fixture patterns, not that all outputs are production-safe.
+4. `--pure` was not perfectly isolated in this governed repo: two raw-mode scenarios still emitted CK tool events. Treat `pure` as the requested OpenCode raw mode, not as cryptographic isolation from every host/runtime surface.
+5. Costs reported by OpenCode JSON events were `0` for this run; tokens and latency are still recorded.
+
+Use exported JSON/CSV metrics and this final-results summary for README claims, not screenshots or raw per-scenario payload directories.

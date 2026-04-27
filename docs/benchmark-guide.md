@@ -119,6 +119,55 @@ For automated replay, use the shell wrapper:
 
 The `scripts/benchmark-host.sh` harness includes template routing for `opencode`, `copilot`, `gemini`, `codex`, and `claude`. Verify each CLI's non-interactive invocation in your environment before treating shell-subject results as production evidence.
 
+
+## Host governance matrix (with and without CK surfaces)
+
+For a reproducible host-governance comparison, use the generic harness:
+
+```bash
+scripts/benchmark-host-governance.py --host opencode
+```
+
+The harness is host/mode based. The first concrete host is OpenCode, with three modes:
+
+- `pure` → `opencode_pure_manual` (`opencode run --pure --format json`)
+- `ck` → `opencode_ck_manual` (`opencode run --format json` in a CK-attached repo, no forced CK tool use)
+- `ck-active` → `opencode_ck_active_manual` (`opencode run --format json` with an explicit request to use CK MCP/tools/skills/hooks/plugins/extensions where available)
+
+All selected modes are imported into the same `host_comparison_v1` run alongside the `controlkeel_validate` deterministic fixture baseline. Future hosts should follow the same contract: define a host command, output extractor, version probe, and subject ids, then run the same suite/import/export path.
+
+Resume controls (useful for long scenarios/timeouts):
+
+```bash
+scripts/benchmark-host-governance.py --host opencode --run-id 26 --modes pure --scenario-timeout 360 --retry 1
+scripts/benchmark-host-governance.py --host opencode --run-id 26 --modes ck   --scenario-timeout 360 --retry 1
+scripts/benchmark-host-governance.py --host opencode --run-id 26 --modes ck-active --scenario-timeout 360 --retry 1
+```
+
+Raw per-scenario captures are generated output and should stay under `tmp/benchmark-evidence/` or another ignored path. Promote only final summaries, exported metrics, and interpretation into tracked docs.
+
+Important: CK surfaces can be available without being invoked by noninteractive host output. Treat "CK attached" and "CK actively called by host" as separate measurement dimensions. For valid claims, keep preflight surface proof (`opencode mcp list`, attach doctor, skills list) separate from per-scenario event evidence (`tool_use` events, CK tool names, skill/plugin/hook mentions).
+
+## Current OpenCode evidence workflow
+
+OpenCode supports non-interactive execution through `opencode run [message..]`. For benchmark capture, use JSON event mode so the text artifact can be extracted deterministically:
+
+```bash
+opencode run --pure --format json --dir /path/to/repo \
+  "Benchmark capture: print only the requested code/config/text artifact to stdout; do not edit files. <scenario prompt>"
+```
+
+The current final OpenCode matrix is run `#26`; the older raw OpenCode slice was captured this way and imported into `opencode_manual` for `host_comparison_v1` run `#24`:
+
+- OpenCode version: `1.14.26`
+- Suite: `host_comparison_v1`
+- Subject: `opencode_manual`
+- Result: 1 warning, 0 blocks, 12 total OpenCode artifacts
+- Expected security-rule hits on OpenCode output: 0
+- Evidence surface: final summaries in `docs/benchmark-evidence.md`; raw capture directories are generated output and ignored by git
+
+This is a real host-output run, but it is still a public-suite benchmark. Treat it as product evidence for the harness and current behavior, not as a universal claim about OpenCode safety.
+
 ## Interpreting results
 
 ### Classification metrics

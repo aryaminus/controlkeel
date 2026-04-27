@@ -38,6 +38,10 @@ npm-debug.log
 /assets/node_modules/
 /burrito_out/
 
+# Python cache artifacts
+__pycache__/
+*.py[cod]
+
 # Database files
 *.db
 *.db-*
@@ -47,6 +51,9 @@ npm-debug.log
 /controlkeel/bin/*
 !/controlkeel/bin/controlkeel-mcp
 !/controlkeel/benchmark_subjects.json
+
+# Generated benchmark evidence captures
+/docs/examples/benchmark-evidence/
 
 # Local Cursor / agent session exports (large; not part of the app)
 session-ses_*.md

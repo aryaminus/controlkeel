@@ -210,16 +210,23 @@ mkdir -p controlkeel
 cp docs/examples/opencode-benchmark-subjects.json controlkeel/benchmark_subjects.json
 ```
 
-Then run:
+Then run the host comparison suite with an import slot:
 
 ```bash
 controlkeel benchmark run \
-  --suite vibe_failures_v1 \
+  --suite host_comparison_v1 \
   --subjects controlkeel_validate,opencode_manual \
   --baseline-subject controlkeel_validate
 ```
 
-The `opencode_manual` result will enter `awaiting_import` state.
+The `opencode_manual` results enter `awaiting_import` state until you import captured OpenCode output. The current repository evidence used OpenCode's documented run mode:
+
+```bash
+opencode run --pure --format json --dir /path/to/repo \
+  "Benchmark capture: print only the requested code/config/text artifact to stdout; do not edit files. <scenario prompt>"
+```
+
+Current final evidence summaries are tracked in `docs/benchmark-evidence.md`. Raw per-scenario capture directories are generated output and should remain ignored.
 
 ## Import external output
 
@@ -247,7 +254,7 @@ controlkeel benchmark import <RUN_ID> opencode_manual payload.json
 
 ## Shell wrapper upgrade path
 
-When you already have a scripted OpenCode harness, replace `opencode_manual` with the `opencode_shell` subject from `docs/examples/opencode-benchmark-subjects.json` and point its `command` to your wrapper script.
+When you already have a scripted OpenCode harness, use `scripts/benchmark-host-governance.py` for host/mode captures or replace `opencode_manual` with the `opencode_shell` subject from `docs/examples/opencode-benchmark-subjects.json` and point its `command` to your wrapper script.
 
 ## Interpretation
 
@@ -276,3 +283,21 @@ For GEPA-style text optimization specifically:
 For experimental recursive or typed-runtime systems, the same rule applies: benchmark the concrete runtime behavior that actually ran. Do not promote based on architectural taste alone. If the experiment matters, record it honestly in run metadata and compare it on the same held-out suite.
 
 Policy-training promotion gates now carry the same integrity stance. A candidate policy artifact must have validation, held-out, and baseline evidence before promotion can succeed, and the gates include diagnostic finding payloads for review surfaces that want to persist the warning.
+
+
+## Host with-vs-without CK runtime matrix
+
+Use the generic host-governance harness for a research-grade matrix with tokens/cost/time when the host exposes them:
+
+```bash
+scripts/benchmark-host-governance.py --host opencode
+```
+
+For OpenCode today, it records three host-generation modes and one deterministic baseline in one run:
+
+- `opencode_pure_manual` (requested raw/`--pure` mode)
+- `opencode_ck_manual` (CK attached/MCP available, not forced)
+- `opencode_ck_active_manual` (explicitly asks the host to use CK MCP/tools/skills/hooks/plugins/extensions when available)
+- `controlkeel_validate` baseline
+
+Raw outputs are generated under ignored benchmark evidence directories (default: `tmp/benchmark-evidence/host-governance/<host>/`). Promote only final summaries and exported result interpretations into tracked docs such as `docs/benchmark-evidence.md`. A valid host-governance evaluation should include both surface preflight proof and per-scenario event evidence showing whether MCP/tools/skills/plugins/hooks were actually invoked.

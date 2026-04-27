@@ -5,13 +5,21 @@
 [![Latest Release](https://img.shields.io/github/v/release/aryaminus/controlkeel.svg)](https://github.com/aryaminus/controlkeel/releases/latest)
 [![npm bootstrap](https://img.shields.io/npm/v/%40aryaminus/controlkeel.svg)](https://www.npmjs.com/package/@aryaminus/controlkeel)
 
-> Agent output is cheap. Reviewability, security, release safety, and cost control are not.
+> Agent output is cheap. Governed delivery is not.
 
-**ControlKeel is the cerebellum for agent-generated software delivery.** ControlKeel sits between your coding agents and production, comparing *intended* delivery against *actual* delivery, catching governance drift before it ships and turning intent into governed tasks through validation and review gates.
+**ControlKeel is the control plane for agent-generated software delivery.** It sits between your coding agents and production: comparing *intended* delivery against *actual* delivery, catching governance drift before it ships and turning intent into governed tasks through findings and proofs, enforcing validation and review gates, and keeping work resumable across any host.
 
-It does not replace the coding model underneath. It governs the delivery layer around that model: routing, review, findings, proofs, policy, budgets, deployment readiness, and the governed context agents need to keep work grounded in the repo and session state.
+---
 
-CK also treats decomposition as a first-class governed surface. It does not just store tasks. It records how work is being split, where review gates sit, how context should be partitioned, and which parts of a session are effectively recursive, delegated, or release-gated.
+## Why this exists
+
+You already have an AI coding agent. Maybe you have a `CLAUDE.md` or a rules file telling it what not to do. So why would you need something else?
+
+Because a rules file is a promise made *to* the model. ControlKeel enforces the *output*. ControlKeel's deterministic scanner checks what the model *produced*, not just what it was *told*, and blocks or flags violations before they ship.
+
+Beyond the scanner, CK also provides what no single agent host gives you portably: task continuity and resume context, review gates and approval flows, proof bundles for audit, budget and cost control, and cross-host consistency — whether you are using Claude Code, Codex, OpenCode, Copilot, or anything else.
+
+---
 
 ## Quick start
 
@@ -20,7 +28,7 @@ CK also treats decomposition as a first-class governed surface. It does not just
 Copy/paste this into your agent (OpenCode, Claude, Codex, etc.):
 
 ```text
-Set up ControlKeel end-to-end for this repository with minimal user action: read and follow https://raw.githubusercontent.com/aryaminus/controlkeel/main/README.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/getting-started.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/direct-host-installs.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/support-matrix.md, and https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/agent-integrations.md; detect this host’s capabilities, install ControlKeel if missing, run controlkeel setup in the repo, then attach the strongest active supported host path first (attach additional configured hosts only when they add real value for this workspace) with plugin and MCP plus skills/hooks/agents as available; run controlkeel attach doctor, controlkeel provider doctor, controlkeel status, controlkeel findings, and the host-specific MCP check, and if a fix is safe and local apply it then re-verify; if the host requires a trusted project/workspace, restart after attach/plugin changes, needs manual provider configuration, or a plan review cannot auto-wait to approved, pause and ask the user to take that step before continuing; redact proxy tokens/secrets from any shared logs; for Codex ensure the project is trusted and restart Codex after attach/plugin changes.
+Set up ControlKeel end-to-end for this repository with minimal user action: read and follow https://raw.githubusercontent.com/aryaminus/controlkeel/main/README.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/getting-started.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/direct-host-installs.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/support-matrix.md, and https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/agent-integrations.md; detect this host's capabilities, install ControlKeel if missing, run controlkeel setup in the repo, then attach the strongest active supported host path first (attach additional configured hosts only when they add real value for this workspace) with plugin and MCP plus skills/hooks/agents as available; run controlkeel attach doctor, controlkeel provider doctor, controlkeel status, controlkeel findings, and the host-specific MCP check, and if a fix is safe and local apply it then re-verify; if the host requires a trusted project/workspace, restart after attach/plugin changes, needs manual provider configuration, or a plan review cannot auto-wait to approved, pause and ask the user to take that step before continuing; redact proxy tokens/secrets from any shared logs; for Codex ensure the project is trusted and restart Codex after attach/plugin changes.
 ```
 
 ### Install ControlKeel
@@ -55,7 +63,7 @@ controlkeel
 controlkeel setup
 
 # 3. Attach a supported host
-controlkeel attach opencode
+controlkeel attach claude-code   # or opencode, codex-cli, copilot, etc.
 
 # 4. Inspect governance state
 controlkeel status
@@ -68,6 +76,36 @@ controlkeel help "how do i attach opencode"
 ```
 
 For a full first-run walkthrough, see [docs/getting-started.md](docs/getting-started.md).
+
+---
+
+## Benchmark metrics: with and without ControlKeel
+
+### Current CK baseline
+
+| Suite | Configuration | Catch | Block | FPR | Youden's J |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `vibe_failures_v1` | CK deterministic validator | 50.0% | 30.0% | — | — |
+| `benign_baseline_v1` | CK deterministic validator | 30.0% | 0.0% | 30.0% | — |
+| `host_comparison_v1` | CK deterministic fixture baseline | 16.7% | 16.7% | — | — |
+| paired positive + benign | CK deterministic validator | 50.0% | 30.0% | 30.0% | 0.20 |
+
+### Host comparison numbers
+
+| Host | Mode | Suite / run | Catch | Block | Median latency | Tokens | Status |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| OpenCode | Raw / no CK (`--pure`) | `host_comparison_v1` / #25 | 0/12 | 0/12 | 23,776 ms | 304,598 | measured |
+| OpenCode | CK-attached repo | `host_comparison_v1` / #25 | 0/12 | 0/12 | 35,614 ms | 377,121 | measured |
+| Claude Code | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Claude Code | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Codex | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Codex | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Copilot | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Copilot | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Gemini | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Gemini | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+
+---
 
 ## Published surfaces
 
@@ -83,15 +121,50 @@ ControlKeel has one primary CLI and a smaller set of published companion package
 
 Release-only bundles currently cover the unpublished host artifacts such as Claude, Copilot, Codex, Augment, Gemini CLI, Amp, OpenClaw, and other exported native companions. Those surfaces follow the repository release version rather than separate package registries.
 
+---
+
+## How Claude Code is configured with ControlKeel
+
+Claude's governed path is:
+
+1. Claude calls `ck_context` → gets bounded session state instead of relying on raw chat history
+2. Claude calls `ck_validate` on proposed code or shell → CK's scanner checks output deterministically
+3. CK records findings → blocked patterns never reach the repo
+4. Proof bundles capture what happened → auditable, resumable, portable
+
+Without this loop, Claude is still writing code — but nothing is checking what it actually produced.
+
+---
+
+## What ControlKeel provides beyond validation
+
+Validation is the most visible part. CK also provides:
+
+**Governed context for agents (`ck_context`)** — bounded, session-aware, workspace-aware state: current task, proof summary, memory hits, resume packet, workspace snapshot, budget summary, recent transcript events. Agents start from grounded context instead of raw chat history or repeated shell exploration.
+
+**Task continuity and resume** — sessions, tasks, task graph, checkpoints, and resume packets. Work survives runtime restarts and host switches.
+
+**Findings and review gates** — every blocked or warned pattern becomes a governed finding with state (open, blocked, escalated, approved, denied), human gate hints, and Mission Control visibility. Review is part of the delivery system, not detached commentary.
+
+**Proof bundles** — immutable evidence of what happened, what was reviewed, what was validated, what findings existed. Hosts show chat history. CK stores proof bundles.
+
+**Budget and cost control** — session budgets, 24-hour rolling limits, proxy token estimates, circuit breakers on API-call rate, file-modification rate, and budget-burn rate. See [docs/cost-governance.md](docs/cost-governance.md).
+
+**Cross-host consistency** — the same governance loop works across Claude Code, Codex, OpenCode, Copilot, Cline, Windsurf, Continue, Goose, Roo Code, and others. See [docs/support-matrix.md](docs/support-matrix.md).
+
+**Ship readiness** — deploy-ready proof state, outcome metrics, and comparative benchmark evidence. The question is not just "did the agent finish?" but "is this ready to ship?"
+
+---
+
 ## Supported hosts
 
 ControlKeel supports hosts through a few real mechanisms:
 
-- Native attach: `controlkeel attach <host>` installs MCP config plus the strongest repo-native companion CK can truthfully ship.
-- Direct host install: some hosts also support a package, plugin, VSIX, or extension-link path.
-- Hosted protocol access: remote clients can use hosted MCP and minimal A2A.
-- Runtime export: headless systems such as Devin and Open SWE get runtime bundles instead of fake attach commands.
-- Provider-only and fallback governance: unsupported generators can still be governed through bootstrap, findings, proofs, and validation flows.
+- **Native attach**: `controlkeel attach <host>` installs MCP config plus the strongest repo-native companion CK can truthfully ship.
+- **Direct host install**: some hosts also support a package, plugin, VSIX, or extension-link path.
+- **Hosted protocol access**: remote clients can use hosted MCP and minimal A2A.
+- **Runtime export**: headless systems such as Devin and Open SWE get runtime bundles instead of fake attach commands.
+- **Provider-only and fallback governance**: unsupported generators can still be governed through bootstrap, findings, proofs, and validation flows.
 
 Common attach targets today:
 
@@ -109,6 +182,8 @@ Use the docs below for the precise truth per host:
 - [docs/support-matrix.md](docs/support-matrix.md)
 - [docs/agent-integrations.md](docs/agent-integrations.md)
 
+---
+
 ## What ControlKeel exposes
 
 Web app:
@@ -119,6 +194,7 @@ Web app:
 - `/proofs` for immutable proof bundles
 - `/skills` for install/export compatibility and bundle inventory
 - `/ship` for deploy readiness and session metrics
+- `/benchmarks` for benchmark runs and cross-agent comparison
 
 CLI:
 
@@ -131,6 +207,7 @@ controlkeel update
 controlkeel skills list
 controlkeel plugin install codex
 controlkeel run task <id>
+controlkeel benchmark run --suite vibe_failures_v1 --subjects controlkeel_validate
 controlkeel help
 ```
 
@@ -145,6 +222,8 @@ Full command coverage is available in the CLI itself through `controlkeel help`.
 
 For MCP tool details, hosted protocol access, and the exact `ck_context` contract, use [docs/agent-integrations.md](docs/agent-integrations.md) and [docs/support-matrix.md](docs/support-matrix.md).
 
+---
+
 ## Docs
 
 Start here:
@@ -152,6 +231,7 @@ Start here:
 - [docs/README.md](docs/README.md)
 - [docs/getting-started.md](docs/getting-started.md)
 - [docs/direct-host-installs.md](docs/direct-host-installs.md)
+- [docs/explaining-controlkeel.md](docs/explaining-controlkeel.md)
 
 Reference:
 
@@ -160,13 +240,19 @@ Reference:
 - [docs/agent-integrations.md](docs/agent-integrations.md)
 - [docs/autonomy-and-findings.md](docs/autonomy-and-findings.md)
 - [docs/benchmarks.md](docs/benchmarks.md)
+- [docs/benchmark-guide.md](docs/benchmark-guide.md)
+- [docs/benchmark-evidence.md](docs/benchmark-evidence.md)
+- [docs/cost-governance.md](docs/cost-governance.md)
 
 Architecture and release operations:
 
 - [docs/control-plane-architecture.md](docs/control-plane-architecture.md)
 - [docs/host-surface-parity.md](docs/host-surface-parity.md)
+- [docs/how-controlkeel-works.md](docs/how-controlkeel-works.md)
 - [docs/integration-validation-checklist.md](docs/integration-validation-checklist.md)
 - [docs/release-verification.md](docs/release-verification.md)
+
+---
 
 ## Development
 
@@ -178,3 +264,13 @@ mix precommit
 ```
 
 Phoenix + Ecto on SQLite. Uses `Req` for HTTP. Single-binary builds ship through Burrito and GitHub Releases.
+
+To run the benchmark suite locally:
+
+```bash
+controlkeel benchmark run --suite vibe_failures_v1 --subjects controlkeel_validate
+controlkeel benchmark run --suite benign_baseline_v1 --subjects controlkeel_validate
+controlkeel benchmark export <RUN_ID> --format json
+```
+
+See [docs/benchmark-guide.md](docs/benchmark-guide.md) for multi-host comparison setup and how to add Codex or OpenCode as subjects.

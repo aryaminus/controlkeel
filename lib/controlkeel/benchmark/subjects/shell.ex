@@ -25,7 +25,7 @@ defmodule ControlKeel.Benchmark.Subjects.Shell do
     prompt_file = Path.join(tmp_root, "prompt.txt")
     scenario_file = Path.join(tmp_root, "scenario.json")
     output_dir = Path.join(tmp_root, "output")
-    working_dir = Path.join(tmp_root, subject["working_dir"] || "workspace")
+    working_dir = resolve_working_dir(subject["working_dir"], tmp_root, project_root)
 
     File.mkdir_p!(output_dir)
     File.mkdir_p!(working_dir)
@@ -41,7 +41,7 @@ defmodule ControlKeel.Benchmark.Subjects.Shell do
 
     outcome =
       try do
-        case run_command(subject, working_dir, env) do
+        case run_command(subject, working_dir, env, project_root) do
           {:ok, output, exit_status} ->
             scan_payload =
               Runner.scan_generated_output(
@@ -106,12 +106,29 @@ defmodule ControlKeel.Benchmark.Subjects.Shell do
     path
   end
 
-  defp run_command(subject, working_dir, env) do
+  defp resolve_working_dir(nil, tmp_root, _project_root), do: Path.join(tmp_root, "workspace")
+  defp resolve_working_dir("", tmp_root, _project_root), do: Path.join(tmp_root, "workspace")
+  defp resolve_working_dir(".", _tmp_root, project_root), do: project_root
+
+  defp resolve_working_dir(path, _tmp_root, project_root) when is_binary(path) do
+    Path.expand(path, project_root)
+  end
+
+  defp resolve_command(command, project_root) when is_binary(command) do
+    cond do
+      Path.type(command) == :absolute -> command
+      String.contains?(command, "/") -> Path.expand(command, project_root)
+      true -> command
+    end
+  end
+
+  defp run_command(subject, working_dir, env, project_root) do
     timeout_ms = subject["timeout_ms"] || 30_000
+    command = resolve_command(subject["command"], project_root || File.cwd!())
 
     task =
       Task.async(fn ->
-        System.cmd(subject["command"], subject["args"] || [],
+        System.cmd(command, subject["args"] || [],
           cd: working_dir,
           env: env,
           stderr_to_stdout: true
