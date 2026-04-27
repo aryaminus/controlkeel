@@ -81,29 +81,41 @@ For a full first-run walkthrough, see [docs/getting-started.md](docs/getting-sta
 
 ## Benchmark metrics: with and without ControlKeel
 
-### Current CK baseline
+Numbers come from reproducible runs using CK's own benchmark engine. Full per-scenario breakdowns, host matrices, preflight proof, and methodology live in [docs/benchmark-evidence.md](docs/benchmark-evidence.md).
 
-| Suite | Configuration | Catch | Block | FPR | Youden's J |
-| --- | --- | ---: | ---: | ---: | ---: |
-| `vibe_failures_v1` | CK deterministic validator | 50.0% | 30.0% | — | — |
-| `benign_baseline_v1` | CK deterministic validator | 30.0% | 0.0% | 30.0% | — |
-| `host_comparison_v1` | CK deterministic fixture baseline | 16.7% | 16.7% | — | — |
-| paired positive + benign | CK deterministic validator | 50.0% | 30.0% | 30.0% | 0.20 |
+### CK deterministic validator (no API key required)
 
-### Host comparison numbers
+Uses the built-in `controlkeel_validate` subject — FastPath + Semgrep, deterministic, no provider keys needed.
 
-| Host | Mode | Suite / run | Catch | Block | Median latency | Tokens | Status |
-| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| OpenCode | Raw / no CK (`--pure`) | `host_comparison_v1` / #25 | 0/12 | 0/12 | 23,776 ms | 304,598 | measured |
-| OpenCode | CK-attached repo | `host_comparison_v1` / #25 | 0/12 | 0/12 | 35,614 ms | 377,121 | measured |
-| Claude Code | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
-| Claude Code | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
-| Codex | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
-| Codex | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
-| Copilot | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
-| Copilot | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
-| Gemini | Raw / no CK | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
-| Gemini | CK-attached | `host_comparison_v1` | TBD | TBD | TBD | TBD | pending run |
+| Suite | Scenarios | Catch rate | FPR | Youden's J |
+| --- | ---: | ---: | ---: | ---: |
+| `vibe_failures_v1` (unsafe patterns) | 10 | 50% | — | — |
+| `benign_baseline_v1` (safe counterparts) | 10 | — | 30% | — |
+| **Paired combined** | 20 | **50% TPR** | **30% FPR** | **0.20** |
+
+**Without ControlKeel:** 0% systematic catch rate. No enforcement layer means whatever the model produces ships.
+
+### OpenCode / GPT-5.5 — run #26 (`host_comparison_v1`, 12 scenarios)
+
+| Mode | Catch | Block |
+| --- | ---: | ---: |
+| Raw (`opencode run --pure`) | 0/12 | 0/12 |
+| CK-attached, not forced | 0/12 | 0/12 |
+| CK-active (explicit governance requested) | 1/12 | 0/12 |
+| **CK deterministic scanner (baseline)** | **2/12** | **2/12** |
+
+The scanner enforces outcomes deterministically at near-zero latency. The active governance loop adds context, review gates, proofs, and findings — all 11 CK tools were invoked in ck-active mode across 12/12 scenarios. Full matrix with latency, tokens, and CK surface evidence: [docs/benchmark-evidence.md](docs/benchmark-evidence.md).
+
+### Other agents (pending)
+
+| Host | Mode | Suite | Catch | Block |
+| --- | --- | --- | ---: | ---: |
+| Codex | Raw / no CK | `host_comparison_v1` | TBD | TBD |
+| Codex | CK-attached | `host_comparison_v1` | TBD | TBD |
+| Claude Code | Raw / no CK | `host_comparison_v1` | TBD | TBD |
+| Claude Code | CK-attached | `host_comparison_v1` | TBD | TBD |
+
+To run a host comparison: `controlkeel benchmark run --suite host_comparison_v1 --subjects controlkeel_validate,<host>_manual`. See [docs/benchmark-guide.md](docs/benchmark-guide.md).
 
 ---
 

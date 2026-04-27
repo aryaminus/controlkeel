@@ -80,7 +80,8 @@ defmodule ControlKeel.MissionTest do
       "logistics" => "Logistics / Supply Chain",
       "manufacturing" => "Manufacturing / Quality",
       "nonprofit" => "Nonprofit / Grants",
-      "security" => "Security / Defensive AppSec"
+      "security" => "Security / Defensive AppSec",
+      "gdpr" => "Privacy / Data Protection Officer"
     }
 
     Enum.each(ControlKeel.Intent.supported_packs(), fn pack ->

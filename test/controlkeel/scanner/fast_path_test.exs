@@ -106,4 +106,198 @@ defmodule ControlKeel.Scanner.FastPathTest do
 
     refute Enum.any?(result.findings, &String.starts_with?(&1.rule_id, "destructive.shell."))
   end
+
+  test "catches SECRET_KEY assignment pattern (debug_mode_production fix)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s(SECRET_KEY = "django-insecure-abc123xyz456"),
+        "path" => "config/settings.py",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "secret.hardcoded_credential"))
+    assert result.decision == "block"
+  end
+
+  test "catches Elixir module attribute hardcoded credential (hardcoded_admin_role fix)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s(@master_password "changeme123"),
+        "path" => "lib/admin/auth.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "secret.hardcoded_credential"))
+    assert result.decision == "block"
+  end
+
+  test "catches SQL built with Elixir <> string concatenation (supabase_storage_public_bucket fix)" do
+    result =
+      FastPath.scan(%{
+        "content" =>
+          ~s(query = "SELECT * FROM storage.objects WHERE bucket_id = '" <> bucket_id <> "'"),
+        "path" => "lib/storage/query.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.sql_injection"))
+    assert result.decision == "block"
+  end
+
+  test "catches SQL built with || concatenation (sql_injection extended)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s(query = "SELECT * FROM users WHERE id = " || user_id),
+        "path" => "lib/users/query.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.sql_injection"))
+    assert result.decision == "block"
+  end
+
+  test "catches user-controlled redirect (open_redirect)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s|redirect(conn, to: params["return_url"])|,
+        "path" => "lib/web/auth_controller.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.open_redirect"))
+    assert result.decision == "block"
+  end
+
+  test "catches pickle deserialization (pickle_deserialization_rce)" do
+    result =
+      FastPath.scan(%{
+        "content" => "data = pickle.loads(request.body)",
+        "path" => "app/handlers.py",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.unsafe_deserialization"))
+    assert result.decision == "block"
+  end
+
+  test "catches JWT none algorithm (jwt_none_algorithm)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s|token = JWT.decode(header, algorithm: "none")|,
+        "path" => "lib/auth/token.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.jwt_none_algorithm"))
+    assert result.decision == "block"
+  end
+
+  test "catches JWT alg:none in JSON header (jwt_none_algorithm json)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s(header = %{"alg" => "none", "typ" => "JWT"}),
+        "path" => "lib/auth/jwt.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.jwt_none_algorithm"))
+    assert result.decision == "block"
+  end
+
+  test "catches plaintext password field in Ecto schema (plaintext_password_storage)" do
+    result =
+      FastPath.scan(%{
+        "content" => "field :password, :string",
+        "path" => "lib/accounts/user.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.plaintext_password_storage"))
+    assert result.decision == "block"
+  end
+
+  test "catches Plug.Upload usage (file_upload_no_validation)" do
+    result =
+      FastPath.scan(%{
+        "content" => "%Plug.Upload{path: tmp_path, filename: filename} = upload",
+        "path" => "lib/web/upload_controller.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.file_upload_no_validation"))
+  end
+
+  test "catches all-env dump via System.get_env() (env_dump_leak)" do
+    result =
+      FastPath.scan(%{
+        "content" => "all_config = System.get_env()",
+        "path" => "lib/debug/env.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.env_dump_leak"))
+    assert result.decision == "block"
+  end
+
+  test "does not flag patient_data function parameter (healthcare phi_marker FP fix)" do
+    result =
+      FastPath.scan(%{
+        "content" => "def process(patient_data, patient_id), do: encrypt(patient_data)",
+        "path" => "lib/health/processor.ex",
+        "kind" => "code",
+        "domain_pack" => "healthcare"
+      })
+
+    refute Enum.any?(result.findings, &(&1.rule_id == "healthcare.phi_marker"))
+  end
+
+  test "does not flag console.log with user variable (console_log_sensitive FP fix)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s|console.log('Processing for user:', user.id)|,
+        "path" => "src/handlers.js",
+        "kind" => "code",
+        "domain_pack" => "software"
+      })
+
+    refute Enum.any?(result.findings, &(&1.rule_id == "software.console_log_sensitive"))
+  end
+
+  test "catches Elixir put_resp_header CORS wildcard (cors_wildcard fix)" do
+    result =
+      FastPath.scan(%{
+        "content" => ~s|put_resp_header(conn, "access-control-allow-origin", "*")|,
+        "path" => "lib/web/router.ex",
+        "kind" => "code",
+        "domain_pack" => "software"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "software.cors_wildcard"))
+    assert result.decision == "block"
+  end
+
+  test "catches Req.post with email (gdpr third_party_data_transfer)" do
+    result =
+      FastPath.scan(%{
+        "content" =>
+          ~s|Req.post("https://analytics.example.com/track", json: %{email: user.email})|,
+        "path" => "lib/analytics/tracker.ex",
+        "kind" => "code",
+        "domain_pack" => "gdpr"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "gdpr.third_party_data_transfer"))
+  end
+
+  test "catches remote_ip in logs (gdpr personal_data_logging)" do
+    result =
+      FastPath.scan(%{
+        "content" => "IO.puts conn.remote_ip",
+        "path" => "lib/web/plug.ex",
+        "kind" => "code",
+        "domain_pack" => "gdpr"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "gdpr.personal_data_logging"))
+  end
 end

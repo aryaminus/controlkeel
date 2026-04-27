@@ -8,7 +8,7 @@
     "matcher": {
       "type": "regex",
       "patterns": [
-        "(?i)patient|diagnosis|insurance|medical"
+        "(?i)\\bpatient\\b|\\bdiagnosis\\b|\\binsurance_id\\b|\\bmedical_record\\b|\\bhealth_record\\b|\\bPHI\\b|\\bHIPAA\\b|\\bePHI\\b"
       ]
     }
   }

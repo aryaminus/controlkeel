@@ -152,6 +152,14 @@ defmodule ControlKeel.Intent.Domains do
       industry: "security",
       description:
         "Detection engineering, telemetry workflows, endpoint validation, and incident-driven hardening"
+    },
+    %{
+      id: "privacy_officer",
+      label: "Privacy / Data Protection Officer",
+      domain_pack: "gdpr",
+      industry: "privacy",
+      description:
+        "GDPR compliance, data subject rights, third-party transfers, and retention policy"
     }
   ]
 
@@ -172,7 +180,8 @@ defmodule ControlKeel.Intent.Domains do
     "logistics" => "Logistics / Supply Chain",
     "manufacturing" => "Manufacturing / Quality",
     "nonprofit" => "Nonprofit / Grants",
-    "security" => "Security / Defensive AppSec"
+    "security" => "Security / Defensive AppSec",
+    "gdpr" => "Privacy / GDPR"
   }
 
   @packs %{
@@ -782,6 +791,42 @@ defmodule ControlKeel.Intent.Domains do
         }
       ]
     },
+    "gdpr" => %{
+      industry: "privacy",
+      compliance: ["GDPR", "CCPA", "ePrivacy Directive"],
+      stack_guidance:
+        "Require explicit consent records, minimize PII in logs, encrypt sensitive fields at rest, and document all third-party data transfers with a signed DPA.",
+      validation_language:
+        "Assume all user data is subject to GDPR. Require a documented legal basis for processing, consent timestamps, and implemented data subject rights before production use.",
+      questions: [
+        %{
+          id: "who_uses_it",
+          label: "Who accesses personal data?",
+          prompt: "Which staff, customers, or partners access personal data in this workflow?",
+          placeholder: "Internal ops, customers, marketing team, data processors..."
+        },
+        %{
+          id: "data_involved",
+          label: "What personal data is processed?",
+          prompt: "What categories of personal data are collected, stored, or transferred?",
+          placeholder: "Names, emails, IPs, location data, purchase history, health data..."
+        },
+        %{
+          id: "first_release",
+          label: "What must the first release do?",
+          prompt: "List the 3-5 privacy-related operations the first version must support.",
+          placeholder:
+            "Consent collection, data subject requests, retention policy, audit logging..."
+        },
+        %{
+          id: "constraints",
+          label: "What compliance limits apply?",
+          prompt: "What GDPR requirements or data transfer restrictions matter most?",
+          placeholder:
+            "EU data residency, consent before cookies, right-to-erasure, DPA with processors..."
+        }
+      ]
+    },
     "security" => %{
       industry: "security",
       compliance: [
@@ -1138,6 +1183,19 @@ defmodule ControlKeel.Intent.Domains do
         "critical"
 
       String.contains?(content, ["triage", "patch", "disclosure", "detection", "advisory"]) ->
+        "high"
+
+      true ->
+        "high"
+    end
+  end
+
+  def preliminary_risk_tier("gdpr", content) do
+    cond do
+      String.contains?(content, ["health", "medical", "biometric", "criminal record"]) ->
+        "critical"
+
+      String.contains?(content, ["email", "phone", "address", "ip address", "personal"]) ->
         "high"
 
       true ->

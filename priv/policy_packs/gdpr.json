@@ -8,7 +8,7 @@
     "matcher": {
       "type": "regex",
       "patterns": [
-        "(?i)(log|print|console\\.log|logger\\.|IO\\.puts|puts|echo).*\\b(email|full_name|phone_number|date_of_birth|home_address|ip_address|ssn|national_id)\\b"
+        "(?i)(log|print|console\\.log|logger\\.|IO\\.puts|puts|echo).*\\b(email|full_name|phone_number|date_of_birth|home_address|ip_address|remote_ip|ssn|national_id)\\b"
       ]
     }
   },
@@ -60,7 +60,7 @@
     "matcher": {
       "type": "regex",
       "patterns": [
-        "(?i)(Req\\.post|HTTPoison\\.post|requests\\.post|axios\\.post|fetch\\s*\\().*\\b(email|phone|full_name|user_id|customer_id)\\b"
+        "(?i)(?s)(Req\\.post|HTTPoison\\.post|requests\\.post|axios\\.post|fetch\\s*\\().*\\b(email|phone|full_name|user_id|customer_id)\\b"
       ]
     }
   },

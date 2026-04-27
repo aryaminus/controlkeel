@@ -21,7 +21,8 @@
     "matcher": {
       "type": "regex",
       "patterns": [
-        "(?i)(api[_-]?key|secret|token|password)\\s*[:=]\\s*[\"'][^\"'\\n]{6,}[\"']"
+        "(?i)(api[_-]?key|secret[_-]?key|secret|token|password|master[_-]?password|database[_-]?url)\\s*[:=]\\s*[\"'][^\"'\\n]{6,}[\"']",
+        "(?i)@(api_key|secret_key|master_password|admin_password|auth_token|access_token|private_key)\\s+[\"'][^\"'\\n]{6,}[\"']"
       ]
     }
   },
@@ -50,7 +51,7 @@
         "(?i)(['\"])\\s*or\\s*1=1",
         "(?i)union\\s+select",
         "(?i)drop\\s+table",
-        "(?i)select\\s+.+\\s+from\\s+.+(\\+|#\\{|\\$\\{)"
+        "(?i)select\\s+.+\\s+from\\s+.+(\\+|#\\{|\\$\\{|<>|\\|\\|)"
       ]
     }
   },
@@ -58,7 +59,7 @@
     "id": "security.xss_unsafe_html",
     "category": "security",
     "severity": "high",
-    "action": "warn",
+    "action": "block",
     "plain_message": "This content writes raw HTML into the page. Prefer safer rendering paths before shipping it.",
     "matcher": {
       "type": "regex",
@@ -66,6 +67,94 @@
         "(?i)<script\\b",
         "(?i)innerHTML\\s*=",
         "(?i)dangerouslySetInnerHTML"
+      ]
+    }
+  },
+  {
+    "id": "security.open_redirect",
+    "category": "security",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Redirect destination is controlled by user input. An attacker can redirect users to a malicious site. Validate the redirect target against an allowlist.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(redirect|location\\s*[=:]).{0,80}(params\\[|request\\.(args|form|query|body)|req\\.(query|body|params)|conn\\.params)",
+        "(?i)redirect\\(conn,\\s*(to:|external:)\\s*(params|conn\\.params)"
+      ]
+    }
+  },
+  {
+    "id": "security.unsafe_deserialization",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Deserializing untrusted data can lead to remote code execution. Use a safe format like JSON and never pass user-controlled input to pickle, Marshal, or unserialize.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)pickle\\.loads\\s*\\(",
+        "(?i)marshal\\.load\\s*\\(",
+        "(?i)yaml\\.load\\s*\\((?!.*Loader\\s*=\\s*yaml\\.SafeLoader)",
+        "(?i)\\bunserialize\\s*\\(",
+        "(?i)Marshal\\.load\\s*\\("
+      ]
+    }
+  },
+  {
+    "id": "security.jwt_none_algorithm",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "JWT 'none' algorithm disables signature verification and allows token forgery. Always enforce a specific signing algorithm and reject tokens that specify 'none'.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)[\"']alg[\"']\\s*(?:[:,]|=>)\\s*[\"']none[\"']",
+        "(?i)(algorithm|alg)\\s*(?:[=:]|=>)\\s*[\"']none[\"']",
+        "(?i)algorithms\\s*=\\s*\\[.*[\"']none[\"']"
+      ]
+    }
+  },
+  {
+    "id": "security.plaintext_password_storage",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Passwords must be hashed with a strong KDF (bcrypt, argon2, pbkdf2) before storage. Never store or persist plaintext passwords.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)field\\s*\\(?\\s*:(password|password_hash|passwd)\\s*,\\s*:string",
+        "(?i)(user\\.password|account\\.password)\\s*=\\s*(?!.*hash|.*bcrypt|.*argon|.*scrypt|.*pbkdf)"
+      ]
+    }
+  },
+  {
+    "id": "security.file_upload_no_validation",
+    "category": "security",
+    "severity": "high",
+    "action": "warn",
+    "plain_message": "File uploads must validate content type and file extension before writing to disk. Unrestricted uploads can lead to stored XSS or code execution.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?i)(File\\.cp!|File\\.write!|shutil\\.copy|move_uploaded_file).{0,100}(upload|tmp_path|filename)",
+        "(?i)\\bPlug\\.Upload\\b"
+      ]
+    }
+  },
+  {
+    "id": "security.env_dump_leak",
+    "category": "security",
+    "severity": "high",
+    "action": "block",
+    "plain_message": "Dumping all environment variables exposes every secret to logs or responses. Access only the specific variables your code needs.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "System\\.get_env\\(\\)",
+        "(?i)(os\\.environ\\.copy\\(\\)|os\\.environ\\.items\\(\\)|ENV\\.to_h\\b)"
       ]
     }
   }

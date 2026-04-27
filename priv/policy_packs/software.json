@@ -23,6 +23,7 @@
       "type": "regex",
       "patterns": [
         "(?i)access-control-allow-origin[\\s:\"']+\\*",
+        "(?i)put_resp_header.{0,60}[\"']access-control-allow-origin[\"'].{0,20}[\"']\\*[\"']",
         "(?i)allow_origin.*\\*",
         "(?i)cors.*origin.*\\*"
       ]
@@ -52,8 +53,7 @@
     "matcher": {
       "type": "regex",
       "patterns": [
-        "(?i)(console\\.log|IO\\.inspect|Logger\\.debug).{0,40}(password|token|secret|key|credential|ssn|email|phone)",
-        "(?i)(console\\.log|IO\\.inspect).{0,40}(user|session|auth)"
+        "(?i)(console\\.log|IO\\.inspect|Logger\\.debug).{0,40}(password|token|secret|key|credential|ssn|email|phone)"
       ]
     }
   },
