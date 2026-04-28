@@ -101,6 +101,11 @@
       "type": "manual_import"
     },
     {
+      "id": "opencode_ck_bounded_manual",
+      "label": "OpenCode + ControlKeel Bounded Active Governance",
+      "type": "manual_import"
+    },
+    {
       "id": "codex_pure_manual",
       "label": "Codex CLI Raw CLI (No CK / Pure Mode)",
       "type": "manual_import"

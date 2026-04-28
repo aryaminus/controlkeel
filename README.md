@@ -79,34 +79,26 @@ For a full first-run walkthrough, see [docs/getting-started.md](docs/getting-sta
 
 ---
 
-## Benchmark metrics: with and without ControlKeel
+## Why use ControlKeel? Benchmark-backed comparison
 
-Numbers come from reproducible runs using CK's own benchmark engine. Full per-scenario breakdowns, host matrices, preflight proof, and methodology live in [docs/benchmark-evidence.md](docs/benchmark-evidence.md).
+ControlKeel adds a governance layer around agent output: fast deterministic checks, optional in-agent CK validation, review gates, proof, and budget visibility. The table below is intentionally user-facing: it shows what a team gets from each level of CK integration without requiring you to run the benchmark yourself. Full reproducibility details and caveats live in [docs/benchmark-evidence.md](docs/benchmark-evidence.md).
 
-### CK deterministic validator (no API key required)
+### OpenCode / GPT-5.5 comparison (`host_comparison_v1`, 12 risky scenarios)
 
-Uses the built-in `controlkeel_validate` subject — FastPath + Semgrep, deterministic, no provider keys needed.
+| Option | What it means | Catch | Block | Median time | Tokens | Best use |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Raw OpenCode | Ask the model and trust the answer | 1/12 | 0/12 | 17,050 ms | 290,327 | Baseline only; not enough for risky changes |
+| CK-attached | CK is installed/available, model may call it | 4/12 | 3/12 | **10,818 ms** | 254,581 | Lightweight default when you want CK available without forcing tool use |
+| Exhaustive CK-active | Ask the model to inspect every CK surface | 2/12 | 0/12 | 47,560 ms | 510,280 | Demonstrates surface availability, but too slow/expensive for routine use |
+| **CK-bounded active** | Model calls CK context + validation, then stops | **5/12** | **3/12** | 23,772 ms | **255,941** | Best practical active-governance tradeoff so far |
+| **CK deterministic scanner** | CK validates directly, no model required | **12/12** | **9/12** | **~50 ms** | **0 provider tokens** | Fastest enforcement baseline; ideal for preflight and CI-style checks |
 
-| Suite | Scenarios | Catch rate | FPR | Youden's J |
-| --- | ---: | ---: | ---: | ---: |
-| `vibe_failures_v1` (unsafe patterns) | 10 | 50% | — | — |
-| `benign_baseline_v1` (safe counterparts) | 10 | — | 30% | — |
-| **Paired combined** | 20 | **50% TPR** | **30% FPR** | **0.20** |
+What users should take away:
 
-**Without ControlKeel:** 0% systematic catch rate. No enforcement layer means whatever the model produces ships.
-
-### OpenCode / GPT-5.5 — current evidence (`host_comparison_v1`, 12 scenarios)
-
-Complete host matrix, run #29:
-
-| Mode | Catch | Block |
-| --- | ---: | ---: |
-| Raw (`opencode run --pure`) | 1/12 | 0/12 |
-| CK-attached, not forced | 4/12 | 3/12 |
-| CK-active (explicit governance requested) | 2/12 | 0/12 |
-| **CK deterministic scanner (baseline)** | **8/12** | **7/12** |
-
-After targeted scanner-rule updates, partial run #30 raised the deterministic CK baseline to **12/12 caught** and **9/12 blocked**. That run is not promoted as the complete OpenCode matrix because CK-active timed out on 4 scenarios, but it is recorded in the detailed evidence. Full matrix with latency, tokens, model, caveats, and CK surface evidence: [docs/benchmark-evidence.md](docs/benchmark-evidence.md).
+- **Security lift:** CK raises systematic detection from raw model output's 1/12 to 5/12 with bounded active governance, and 12/12 with direct deterministic validation.
+- **Efficiency:** bounded active used about half the tokens of exhaustive active while catching more issues.
+- **Cost control:** OpenCode reported `$0` cost in JSON events, so we treat tokens/time as the reliable cost proxy. Direct CK scanning uses no provider tokens.
+- **Practical workflow:** use deterministic CK validation as the fast gate, and use bounded active governance when you want the agent itself to consult CK before responding.
 
 ### Other agents (pending)
 

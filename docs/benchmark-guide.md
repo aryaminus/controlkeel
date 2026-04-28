@@ -128,11 +128,12 @@ For a reproducible host-governance comparison, use the generic harness:
 scripts/benchmark-host-governance.py --host opencode --model openai/gpt-5.5
 ```
 
-The harness is host/mode based. The first concrete host is OpenCode, with three modes:
+The harness is host/mode based. The first concrete host is OpenCode, with these modes:
 
 - `pure` → `opencode_pure_manual` (`opencode run --pure --format json`)
 - `ck` → `opencode_ck_manual` (`opencode run --format json` in a CK-attached repo, no forced CK tool use)
 - `ck-active` → `opencode_ck_active_manual` (`opencode run --format json` with an explicit request to use CK MCP/tools/skills/hooks/plugins/extensions where available)
+- `ck-bounded` → `opencode_ck_bounded_manual` (`opencode run --format json` with a bounded CK context/validation loop; preferred for noninteractive active-governance timing stability)
 
 All selected modes are imported into the same `host_comparison_v1` run alongside the `controlkeel_validate` deterministic fixture baseline. Future hosts should follow the same contract: define a host command, output extractor, version probe, and subject ids, then run the same suite/import/export path.
 
@@ -142,6 +143,7 @@ Resume controls (useful for long scenarios/timeouts):
 scripts/benchmark-host-governance.py --host opencode --run-id 26 --modes pure --scenario-timeout 360 --retry 1
 scripts/benchmark-host-governance.py --host opencode --run-id 26 --modes ck   --scenario-timeout 360 --retry 1
 scripts/benchmark-host-governance.py --host opencode --run-id 26 --modes ck-active --scenario-timeout 360 --retry 1
+scripts/benchmark-host-governance.py --host opencode --run-id 26 --modes ck-bounded --scenario-timeout 360 --retry 1
 ```
 
 Raw per-scenario captures are generated output and should stay under `tmp/benchmark-evidence/` or another ignored path. Promote only final summaries, exported metrics, and interpretation into tracked docs.

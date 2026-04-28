@@ -293,11 +293,12 @@ Use the generic host-governance harness for a research-grade matrix with tokens/
 scripts/benchmark-host-governance.py --host opencode --model openai/gpt-5.5
 ```
 
-For OpenCode today, it records three host-generation modes and one deterministic baseline in one run:
+For OpenCode today, it can record four host-generation modes and one deterministic baseline in one run:
 
 - `opencode_pure_manual` (requested raw/`--pure` mode)
 - `opencode_ck_manual` (CK attached/MCP available, not forced)
 - `opencode_ck_active_manual` (explicitly asks the host to use CK MCP/tools/skills/hooks/plugins/extensions when available)
+- `opencode_ck_bounded_manual` (bounded CK context/validation loop for noninteractive timing stability)
 - `controlkeel_validate` baseline
 
 Raw outputs are generated under ignored benchmark evidence directories (default: `tmp/benchmark-evidence/host-governance/<host>/`). Promote only final summaries and exported result interpretations into tracked docs such as `docs/benchmark-evidence.md`. A valid host-governance evaluation should include both surface preflight proof and per-scenario event evidence showing whether MCP/tools/skills/plugins/hooks were actually invoked.

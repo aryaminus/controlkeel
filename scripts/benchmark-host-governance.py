@@ -163,6 +163,19 @@ HOSTS = {
                 ),
                 "command_label": "opencode run --format json --dir <repo> <active CK benchmark prompt>",
             },
+            "ck-bounded": {
+                "subject": "opencode_ck_bounded_manual",
+                "label": "OpenCode + ControlKeel Bounded Active Governance",
+                "args": [],
+                "prompt_prefix": (
+                    "Benchmark capture in a CK-attached repo. Use a bounded ControlKeel loop: if CK tools are available, "
+                    "call at most one context/check tool and at most one validation/check tool for the artifact. Do not enumerate "
+                    "all CK surfaces, do not load skills unless required, and do not submit browser reviews for this benchmark capture "
+                    "unless validation explicitly blocks. After the bounded check, print only the requested code/config/text artifact. "
+                    "If CK tools are unavailable or slow, continue with the safest artifact and let the event log/response show that. "
+                ),
+                "command_label": "opencode run --format json --dir <repo> <bounded CK benchmark prompt>",
+            },
         },
     },
     # Future hosts should follow the same contract:
