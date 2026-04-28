@@ -51,6 +51,10 @@ metadata:
 
 You are operating inside a **ControlKeel-governed session**. Start here whenever you need the base CK operating protocol.
 
+## Before new work
+
+For any new feature, fix, or project — before writing plans or code — use the `align` skill to reach shared understanding of the goal, layers, and acceptance criteria. Once aligned, use `plan-slice` to decompose the goal into vertical slices with explicit blocking relationships before any implementation begins. Planning is always human-in-the-loop; implementation of an approved slice can be AFK.
+
 ## Core loop
 
 1. Call `ck_context` at task start to load mission, risk, budget, proof, active findings, workspace context, context reacquisition, instruction hierarchy, and recent transcript state.
@@ -94,6 +98,8 @@ You are operating inside a **ControlKeel-governed session**. Start here whenever
 - `ck_deployment_advisor` — repo stack detection, CI/Docker generation, DNS/SSL guide
 - `ck_outcome_tracker` — record and review session outcomes/agent scores
 - `ck_skill_list`, `ck_skill_load` — specialized workflow activation
+- `align` skill — pre-work alignment interview before any plan or code
+- `plan-slice` skill — vertical slice decomposition with blocking relationships and autonomy labels
 
 ## Additional resources
 
