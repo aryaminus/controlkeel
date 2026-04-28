@@ -1288,6 +1288,39 @@ defmodule ControlKeel.AgentIntegration do
         export_targets: ["codex", "codex-plugin", "open-standard"]
       }),
       unverified_entry(%{
+        id: "jcode",
+        label: "jcode",
+        category: "research-compatible",
+        description:
+          "jcode is a distinct coding-agent harness with its own runtime and config model. CK can currently meet it through repo-local instructions and MCP wiring, but does not yet ship a native `attach jcode` installer/export path.",
+        auth_mode: "none",
+        upstream_slug: "1jehuang/jcode",
+        upstream_docs_url: "https://github.com/1jehuang/jcode",
+        provider_bridge: %{supported: false, mode: "none", owner: "none"},
+        mcp_mode: "native",
+        skills_mode: "instructions_only",
+        preferred_target: "instructions-only",
+        export_targets: ["instructions-only"],
+        agent_uses_ck_via: ["local_mcp"],
+        artifact_surfaces: ["AGENTS.md", ".jcode/mcp.json", ".jcode/prompt-overlay.md"],
+        direct_install_methods: [
+          %{
+            "kind" => "upstream_install",
+            "label" => "Install jcode upstream",
+            "command" =>
+              "curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh | bash",
+            "availability" => "research"
+          },
+          %{
+            "kind" => "local_mcp",
+            "label" => "Point jcode at local CK MCP",
+            "command" =>
+              ~s|Add {"servers":{"controlkeel":{"command":"controlkeel","args":["mcp","--project-root","/abs/path"]}}} to .jcode/mcp.json|,
+            "availability" => "research"
+          }
+        ]
+      }),
+      unverified_entry(%{
         id: "antigravity",
         label: "Antigravity",
         category: "skills-compatible",

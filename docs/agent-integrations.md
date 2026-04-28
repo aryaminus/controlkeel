@@ -21,6 +21,8 @@ ControlKeel supports agent ecosystems through a few distinct mechanisms:
 
 That mechanism split is intentionally simpler than the full catalog, but it should always match the canonical [support-matrix.md](support-matrix.md).
 
+One useful example is `jcode`: CK does not currently ship a native `controlkeel attach jcode` path, but jcode does load `AGENTS.md` and supports project-local `.jcode/mcp.json` plus optional `.jcode/prompt-overlay.md`. So CK treats jcode as a research/compatibility row rather than pretending it is already a first-class host adapter.
+
 ## Bidirectional execution model
 
 Each integration is modeled in both directions:

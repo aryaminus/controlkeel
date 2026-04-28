@@ -27,6 +27,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert "gemini" in ids
     assert "kiro-cli" in ids
     assert "roo" in ids
+    assert "jcode" in ids
     assert "antigravity" in ids
     assert "clawdbot" in ids
     assert "kilo" in ids
@@ -369,10 +370,28 @@ defmodule ControlKeel.AgentIntegrationTest do
   end
 
   test "skills-compatible agent names stay honest about support tier" do
+    jcode = AgentIntegration.get("jcode")
     antigravity = AgentIntegration.get("antigravity")
     clawdbot = AgentIntegration.get("clawdbot")
     nous = AgentIntegration.get("nous-research")
     trae = AgentIntegration.get("trae")
+
+    assert jcode.support_class == "unverified"
+    assert jcode.preferred_target == "instructions-only"
+    assert jcode.export_targets == ["instructions-only"]
+    assert jcode.agent_uses_ck_via == ["local_mcp"]
+    assert jcode.mcp_mode == "native"
+    assert jcode.skills_mode == "instructions_only"
+    assert "AGENTS.md" in jcode.artifact_surfaces
+    assert ".jcode/mcp.json" in jcode.artifact_surfaces
+    assert ".jcode/prompt-overlay.md" in jcode.artifact_surfaces
+    assert jcode.required_mcp_tools == []
+
+    assert Enum.any?(
+             jcode.direct_install_methods,
+             &(&1["command"] =~
+                 "raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh")
+           )
 
     for integration <- [antigravity, clawdbot, nous, trae] do
       assert integration.support_class == "unverified"

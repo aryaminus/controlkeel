@@ -219,6 +219,7 @@ Runtime transport truth for those first-class hosts:
 | `retune` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `claw-code` | unverified | research only (community leak-era port) | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `claude-code-source-mirror` | unverified | research only (leak-derived mirror) | none | `none` | `inbound_only` | `none` / `none` | n/a |
+| `jcode` | unverified | research compatibility only; use `AGENTS.md` plus `.jcode/mcp.json` and optional `.jcode/prompt-overlay.md` | `local_mcp` | `none` | `inbound_only` | `none` / `instructions_only` | `instructions-only` |
 | `z-ai-cli` | unverified | research only (evolving ecosystem) | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `capydotai` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
 | `neosigma` | unverified | research only | none | `none` | `inbound_only` | `none` / `none` | n/a |
