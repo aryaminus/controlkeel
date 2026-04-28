@@ -17,7 +17,7 @@ COPY config/runtime.exs config/
 RUN mix release
 
 # ---- Runtime Stage ----
-FROM alpine:3.20.1 AS app
+FROM alpine:3.23.4 AS app
 RUN apk add --no-cache libstdc++ openssl ncurses-libs
 WORKDIR /app
 RUN chown nobody /app
