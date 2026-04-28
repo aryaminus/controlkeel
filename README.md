@@ -7,7 +7,7 @@
 
 > Agent output is cheap. Governed delivery is not.
 
-**ControlKeel is the control plane for agent-generated software delivery.** It sits between your coding agents and production: comparing *intended* delivery against *actual* delivery, catching governance drift before it ships and turning intent into governed tasks through findings and proofs, enforcing validation and review gates, and keeping work resumable across any host.
+**ControlKeel is the control plane for agent-generated software delivery.** It sits between your coding agents and production as company brain: comparing *intended* delivery against *actual* delivery, catching governance drift before it ships and turning intent into governed tasks through findings and proofs, enforcing validation and review gates, and keeping work resumable across any host.
 
 ---
 
@@ -17,7 +17,7 @@ You already have an AI coding agent. Maybe you have a `CLAUDE.md` or a rules fil
 
 Because a rules file is a promise made *to* the model. ControlKeel enforces the *output*. ControlKeel's deterministic scanner checks what the model *produced*, not just what it was *told*, and blocks or flags violations before they ship.
 
-Beyond the scanner, CK also provides what no single agent host gives you portably: task continuity and resume context, review gates and approval flows, proof bundles for audit, budget and cost control, and cross-host consistency — whether you are using Claude Code, Codex, OpenCode, Copilot, or anything else.
+Beyond the scanner, CK also provides what no single agent host gives you portably: task continuity and resume context, review gates and approval flows, proof bundle states into typed memory, budget and cost control, reusable operational context, and cross-host consistency — whether you are using Claude Code, Codex, OpenCode, Copilot, or anything else.
 
 ---
 
@@ -95,16 +95,18 @@ Uses the built-in `controlkeel_validate` subject — FastPath + Semgrep, determi
 
 **Without ControlKeel:** 0% systematic catch rate. No enforcement layer means whatever the model produces ships.
 
-### OpenCode / GPT-5.5 — run #26 (`host_comparison_v1`, 12 scenarios)
+### OpenCode / GPT-5.5 — current evidence (`host_comparison_v1`, 12 scenarios)
+
+Complete host matrix, run #29:
 
 | Mode | Catch | Block |
 | --- | ---: | ---: |
-| Raw (`opencode run --pure`) | 0/12 | 0/12 |
-| CK-attached, not forced | 0/12 | 0/12 |
-| CK-active (explicit governance requested) | 1/12 | 0/12 |
-| **CK deterministic scanner (baseline)** | **2/12** | **2/12** |
+| Raw (`opencode run --pure`) | 1/12 | 0/12 |
+| CK-attached, not forced | 4/12 | 3/12 |
+| CK-active (explicit governance requested) | 2/12 | 0/12 |
+| **CK deterministic scanner (baseline)** | **8/12** | **7/12** |
 
-The scanner enforces outcomes deterministically at near-zero latency. The active governance loop adds context, review gates, proofs, and findings — all 11 CK tools were invoked in ck-active mode across 12/12 scenarios. Full matrix with latency, tokens, and CK surface evidence: [docs/benchmark-evidence.md](docs/benchmark-evidence.md).
+After targeted scanner-rule updates, partial run #30 raised the deterministic CK baseline to **12/12 caught** and **9/12 blocked**. That run is not promoted as the complete OpenCode matrix because CK-active timed out on 4 scenarios, but it is recorded in the detailed evidence. Full matrix with latency, tokens, model, caveats, and CK surface evidence: [docs/benchmark-evidence.md](docs/benchmark-evidence.md).
 
 ### Other agents (pending)
 

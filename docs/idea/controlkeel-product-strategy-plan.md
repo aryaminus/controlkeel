@@ -41,6 +41,17 @@ Its job is to provide the missing control layer around agent work:
 - preserve continuity across long-running work
 - attach immutable evidence to delivery decisions
 
+## RFS Alignment
+
+The strongest YC Summer 2026 Requests for Startups alignment is not "AI feature inside software." It is infrastructure for agent-native work.
+
+- **Software for Agents** is the clearest fit. ControlKeel already exposes agent-usable context, validation, routing, MCP surfaces, native skills, and host integration paths.
+- **Company Brain** is also a strong fit. Typed memory, resume packets, workspace context, findings, and proof bundles make operational knowledge legible and reusable across sessions and hosts.
+- **The AI Operating System for Companies** is directionally right if kept narrow. ControlKeel should be framed as the operating layer for governed agent delivery, not as a universal operating system for every internal company workflow.
+- **Startups That Want to Sell to Huge Companies** is a secondary go-to-market branch. Auditability, approvals, proofs, and reviewable delivery are exactly the kinds of controls larger organizations require, even though the current wedge remains smaller teams first.
+
+This framing is useful because it sharpens the story without changing the product. The honest claim is that ControlKeel makes agent work reviewable, resumable, and governable enough to ship.
+
 ## Default Customer and Wedge
 
 The default customer remains:
