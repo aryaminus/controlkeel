@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.4 — 2026-04-28
+
+### What's changed
+
+- feat: Add support for Multica native and cloud runtime targets in skill export
+
 ## v0.3.3 — 2026-04-28
 
 ### What's changed
