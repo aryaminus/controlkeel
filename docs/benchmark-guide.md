@@ -149,6 +149,12 @@ scripts/benchmark-host-governance.py --host opencode --run-id <RUN_ID> --modes c
 
 This guide is procedural. Current published results and interpretation live in [benchmark-evidence.md](benchmark-evidence.md). Keep generated per-scenario captures under an ignored evidence directory and promote only exported summaries, metrics, and interpretation into tracked docs. CK surfaces can be available without being invoked, so keep surface preflight proof separate from per-scenario event evidence.
 
+To inventory host-agent surfaces (CLI, MCP, skills, hooks/plugins/extensions, attach assets, and host event summaries), run:
+
+```bash
+scripts/evaluate-agent-surfaces.py --output-dir tmp/benchmark-evidence/full-suite/surfaces
+```
+
 ## Interpreting results
 
 ### Classification metrics

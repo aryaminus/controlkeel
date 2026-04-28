@@ -148,6 +148,40 @@ Cost note: OpenCode JSON events reported `cost: 0` for these captures, so the ev
 
 Run `#31` caught imported host output for `copilot_mass_assignment`, `copilot_file_upload_no_validation`, `opencode_plaintext_password_storage`, `copilot_hardcoded_admin_role`, and `opencode_log_sensitive_request_body`.
 
+## Full deterministic suite run (current pass)
+
+The latest full local deterministic pass ran every built-in public/utility suite with `controlkeel_validate` and exported JSON/CSV under ignored full-suite evidence. These runs are local and require no provider tokens.
+
+| Suite | Run | Scenarios | Catch | Block | Expected-rule hits | Median latency |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `vibe_failures_v1` | #32 | 10 | 80.0% | 80.0% | 70.0% | 56 ms |
+| `benign_baseline_v1` | #33 | 10 | 0.0% | 0.0% | 100.0% | 48 ms |
+| `domain_expansion_v1` | #34 | 5 | 100.0% | 100.0% | 100.0% | 48 ms |
+| `domain_expansion_v2` | #35 | 6 | 83.3% | 83.3% | 83.3% | 50 ms |
+| `detection_rule_gen_v1` | #36 | 2 | 50.0% | 50.0% | 100.0% | 70 ms |
+| `supply_chain_triage_v1` | #37 | 2 | 50.0% | 50.0% | 50.0% | 61 ms |
+| `vuln_patch_loop_v1` | #38 | 2 | 0.0% | 0.0% | 0.0% | 64 ms |
+| `host_comparison_v1` | #39 | 12 | 100.0% | 75.0% | 75.0% | 47 ms |
+
+`vuln_patch_loop_v1` is a patch-loop workflow suite rather than a simple dangerous-snippet detector; its 0% scanner catch rate should be interpreted as missing workflow validation coverage, not as a regression in direct security-pattern rules.
+
+## Host-agent surface evaluation
+
+The current surface evaluator (`scripts/evaluate-agent-surfaces.py`) checks what CK gives host agents to use and writes redacted JSON/Markdown evidence under ignored full-suite evidence. The latest pass completed these checks:
+
+| Surface area | Evidence | Result |
+| --- | --- | --- |
+| CK CLI | `controlkeel --version`, `help`, `status`, `findings` | all exited 0 |
+| Attach health | `controlkeel attach doctor` | exited 0 |
+| Skills | `controlkeel skills list` | exited 0, 80 output lines |
+| Host MCP visibility | `opencode mcp list` | exited 0, 7 output lines |
+| Host CLI | `opencode --version` | exited 0 |
+| MCP/protocol contract tests | `mix test test/controlkeel/mcp/protocol_test.exs` | 46 tests, 0 failures |
+
+Attach/generated asset inventory was present for `.opencode`, `.agents/skills`, `.agents`, `.claude`, `.codex`, `.github/agents`, `.github/skills`, `.github/commands`, `.github/mcp.json`, `.cursor-plugin`, `.vscode/mcp.json`, `.mcp.json`, `plugins`, `skills`, `copilot-instructions.md`, `CLAUDE.md`, `GEMINI.md`, and `AGENTS.md`. Hosted MCP config (`.mcp.hosted.json`) was not present in this workspace.
+
+The surface evaluator also summarizes benchmark event evidence for CK/MCP/skills/plugins/hooks. In the current evidence set, exhaustive active run #29 showed CK/MCP/skill/plugin/hook evidence in 12/12 scenarios, while bounded active run #31 showed CK/MCP evidence in 12/12 scenarios using `controlkeel_ck_context` and `controlkeel_ck_validate`.
+
 ## Caveats for claims
 
 1. Direct deterministic scanning is the strongest current enforcement path: 12/12 caught and 9/12 blocked in run #31.

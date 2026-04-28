@@ -203,7 +203,12 @@ On `/benchmarks`, use **Quick presets** (OpenCode comparison, ControlKeel valida
 
 ## OpenCode and host-governance procedures
 
-Procedural setup, import payload examples, and host-mode commands live in [benchmark-guide.md](benchmark-guide.md). Current published results and interpretation live in [benchmark-evidence.md](benchmark-evidence.md). Keep this document focused on benchmark concepts, metadata discipline, and operator guidance.
+Procedural setup, import payload examples, host-mode commands, and the surface evaluator live in [benchmark-guide.md](benchmark-guide.md). Current published results and interpretation live in [benchmark-evidence.md](benchmark-evidence.md). Keep this document focused on benchmark concepts, metadata discipline, and operator guidance.
+
+A full evaluation pass should include both layers:
+
+1. deterministic benchmark suites with `controlkeel_validate` for scanner/domain/security coverage;
+2. host-agent surface evaluation for CLI, MCP, skills, hooks/plugins/extensions, attach assets, and event evidence.
 
 ## Interpretation
 
