@@ -22,6 +22,7 @@ defmodule ControlKeel.Skills.SkillDefinition do
     :openai,
     :agent_metadata,
     :install_state,
-    :owner
+    :owner,
+    :content_hash
   ]
 end

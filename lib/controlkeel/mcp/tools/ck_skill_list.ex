@@ -37,6 +37,7 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
           "path" => s.path,
           "source" => s.source,
           "owner" => s.owner,
+          "content_hash" => s.content_hash,
           "install_state" => s.install_state,
           "diagnostics" => Enum.map(s.diagnostics, &diagnostic_summary/1)
         }

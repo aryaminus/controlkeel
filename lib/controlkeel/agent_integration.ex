@@ -748,6 +748,56 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["project", "export"],
         export_targets: ["open-swe-runtime"]
       }),
+      attach_client(%{
+        id: "multica",
+        label: "Multica",
+        category: "native-first",
+        description:
+          "Attaches ControlKeel to the Multica local daemon, which orchestrates Claude Code, Codex, OpenCode, Hermes, Kiro, and other coding agents as managed team members with issue-tracking, skills, and autopilots.",
+        attach_command: "controlkeel attach multica",
+        config_location:
+          "Multica daemon config at `~/.multica/` with per-profile directories at `~/.multica/profiles/<name>/`. MCP servers are configured per-agent via the Multica web UI or CLI (`multica agent list`).",
+        companion_delivery:
+          "Installs `.agents/skills`, repo `AGENTS.md`, and a `.multica/controlkeel-mcp.json` snippet for importing into the Multica agent MCP settings. Daemon must already be running (`multica daemon start`).",
+        preferred_target: "multica-native",
+        default_scope: "project",
+        router_agent_id: "multica",
+        auth_mode: "agent_runtime",
+        mcp_mode: "config_reference",
+        skills_mode: "native",
+        upstream_slug: "multica-ai/multica",
+        upstream_docs_url: "https://github.com/multica-ai/multica",
+        provider_bridge: %{
+          supported: true,
+          provider: "multica",
+          mode: "agent_runtime",
+          owner: "agent"
+        },
+        supported_scopes: ["user", "project"],
+        export_targets: ["multica-native"]
+      }),
+      headless_runtime(%{
+        id: "multica-cloud",
+        label: "Multica Cloud",
+        category: "headless-runtime",
+        description:
+          "Headless export for Multica Cloud-hosted agent workspaces, autopilots, and issue-triggered agent runs with repo `AGENTS.md` and MCP config guidance.",
+        runtime_export_command: "controlkeel runtime export multica-cloud",
+        config_location:
+          "Multica Cloud agents are managed via the Multica web app and CLI. Autopilots (cron-triggered agent tasks) and issue assignments are configured through the Multica workspace settings.",
+        companion_delivery:
+          "Emits repo `AGENTS.md`, a Multica cloud MCP config snippet, autopilot guidance, and skills delivery notes instead of a local attach target.",
+        preferred_target: "multica-cloud-runtime",
+        default_scope: "project",
+        auth_mode: "oauth_runtime",
+        mcp_mode: "export_only",
+        skills_mode: "instructions_only",
+        upstream_slug: "multica-ai/multica",
+        upstream_docs_url: "https://github.com/multica-ai/multica",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["multica-cloud-runtime"]
+      }),
       headless_runtime(%{
         id: "executor",
         label: "Executor",

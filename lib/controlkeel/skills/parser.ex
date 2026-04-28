@@ -81,6 +81,8 @@ defmodule ControlKeel.Skills.Parser do
           normalize_nil(Map.get(meta, "owner")) ||
             normalize_nil(Map.get(metadata_map, "owner"))
 
+        content_hash = compute_skill_hash(skill_dir, content)
+
         {:ok,
          %SkillDefinition{
            name: name,
@@ -105,7 +107,8 @@ defmodule ControlKeel.Skills.Parser do
            openai: openai_metadata,
            agent_metadata: agent_metadata,
            install_state: %{},
-           owner: owner
+           owner: owner,
+           content_hash: content_hash
          }}
       end
     end
@@ -665,6 +668,41 @@ defmodule ControlKeel.Skills.Parser do
       String.contains?(skill_path, "/.copilot/skills/") -> "copilot"
       true -> "agents"
     end
+  end
+
+  # Computes a SHA-256 content hash over SKILL.md and all resource files in the skill
+  # directory, sorted by relative path for determinism. This lets callers detect tampering
+  # or drift in third-party (e.g. GitHub-sourced) skills, matching the skills-lock pattern
+  # used by managed agent platforms (e.g. multica's skills-lock.json computedHash).
+  defp compute_skill_hash(skill_dir, skill_md_content) do
+    resource_contents =
+      @resource_dirs
+      |> Enum.flat_map(fn subdir ->
+        path = Path.join(skill_dir, subdir)
+
+        if File.dir?(path) do
+          path
+          |> Path.join("**/*")
+          |> Path.wildcard(match_dot: false)
+          |> Enum.filter(&File.regular?/1)
+          |> Enum.sort()
+          |> Enum.map(fn file ->
+            relative = Path.relative_to(file, skill_dir)
+            content = File.read!(file)
+            {relative, content}
+          end)
+        else
+          []
+        end
+      end)
+
+    all_content =
+      [{"SKILL.md", skill_md_content}]
+      |> Kernel.++(resource_contents)
+      |> Enum.sort_by(fn {path, _} -> path end)
+      |> Enum.map_join("", fn {path, content} -> path <> content end)
+
+    :crypto.hash(:sha256, all_content) |> Base.encode16(case: :lower)
   end
 
   defp normalize_nil(""), do: nil
