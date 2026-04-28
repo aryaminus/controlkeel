@@ -205,6 +205,24 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "multica-native",
+        "Multica native bundle",
+        "Multica daemon bundle with `.agents/skills`, repo `AGENTS.md`, and MCP companion config for Multica-orchestrated coding agents.",
+        true,
+        "project",
+        ["user", "project", "export"],
+        true
+      ),
+      target(
+        "multica-cloud-runtime",
+        "Multica Cloud runtime",
+        "Headless export for Multica Cloud-hosted agent workspaces, autopilots, and issue-triggered agent runs.",
+        true,
+        "export",
+        ["project", "export"],
+        true
+      ),
+      target(
         "openclaw-native",
         "OpenClaw native bundle",
         "Workspace or managed OpenClaw skills plus MCP companion config.",
