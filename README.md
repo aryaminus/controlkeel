@@ -13,11 +13,11 @@
 
 ## Why this exists
 
-You already have an AI coding agent. Maybe you have a `CLAUDE.md` or a rules file telling it what not to do. So why would you need something else?
+You already have an AI coding agent. Maybe you use OpenCode with an `opencode.json`, a repo `AGENTS.md`, or another host-specific rules file telling it what not to do. So why would you need something else?
 
 Because a rules file is a promise made *to* the model. ControlKeel enforces the *output*. ControlKeel's deterministic scanner checks what the model *produced*, not just what it was *told*, and blocks or flags violations before they ship.
 
-Beyond the scanner, CK also provides what no single agent host gives you portably: task continuity and resume context, review gates and approval flows, proof bundle states into typed memory, budget and cost control, reusable operational context, and cross-host consistency — whether you are using Claude Code, Codex, OpenCode, Copilot, or anything else.
+Beyond the scanner, CK also provides what no single agent host gives you portably: task continuity and resume context, review gates and approval flows, proof bundle state plus typed memory, budget and cost control, reusable operational context, and cross-host consistency — whether you are using OpenCode, move to Codex, switch to Claude Code, or use another supported host.
 
 ---
 
@@ -25,7 +25,7 @@ Beyond the scanner, CK also provides what no single agent host gives you portabl
 
 ### One-line setup via your agent
 
-Copy/paste this into your agent (OpenCode, Claude, Codex, etc.):
+Copy/paste this into your agent (OpenCode, Claude, Codex, or another supported host):
 
 ```text
 Set up ControlKeel end-to-end for this repository with minimal user action: read and follow https://raw.githubusercontent.com/aryaminus/controlkeel/main/README.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/getting-started.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/direct-host-installs.md, https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/support-matrix.md, and https://raw.githubusercontent.com/aryaminus/controlkeel/main/docs/agent-integrations.md; detect this host's capabilities, install ControlKeel if missing, run controlkeel setup in the repo, then attach the strongest active supported host path first (attach additional configured hosts only when they add real value for this workspace) with plugin and MCP plus skills/hooks/agents as available; run controlkeel attach doctor, controlkeel provider doctor, controlkeel status, controlkeel findings, and the host-specific MCP check, and if a fix is safe and local apply it then re-verify; if the host requires a trusted project/workspace, restart after attach/plugin changes, needs manual provider configuration, or a plan review cannot auto-wait to approved, pause and ask the user to take that step before continuing; redact proxy tokens/secrets from any shared logs; for Codex ensure the project is trusted and restart Codex after attach/plugin changes.
@@ -62,8 +62,8 @@ controlkeel
 # 2. In the target repo, bootstrap and inspect the environment
 controlkeel setup
 
-# 3. Attach a supported host
-controlkeel attach claude-code   # or opencode, codex-cli, copilot, etc.
+# 3. Attach a supported host. OpenCode is the recommended first path
+controlkeel attach opencode   # or codex-cli, claude-code, copilot, etc.
 
 # 4. Inspect governance state
 controlkeel status
@@ -71,8 +71,8 @@ controlkeel findings
 
 # 5. Use guided CLI help whenever you need it
 controlkeel help
-controlkeel help codex
-controlkeel help "how do i attach opencode"
+controlkeel help opencode
+controlkeel help "how do i attach codex"
 ```
 
 For a full first-run walkthrough, see [docs/getting-started.md](docs/getting-started.md).
@@ -129,16 +129,16 @@ Release-only bundles currently cover the unpublished host artifacts such as Clau
 
 ---
 
-## How Claude Code is configured with ControlKeel
+## How OpenCode is configured with ControlKeel
 
-Claude's governed path is:
+OpenCode is the primary host used in the benchmark evidence above, and CK supports it through two complementary paths:
 
-1. Claude calls `ck_context` → gets bounded session state instead of relying on raw chat history
-2. Claude calls `ck_validate` on proposed code or shell → CK's scanner checks output deterministically
-3. CK records findings → blocked patterns never reach the repo
-4. Proof bundles capture what happened → auditable, resumable, portable
+1. `controlkeel attach opencode` writes repo-local `.opencode/` assets, MCP configuration, commands, agents, skills, and `.agents/skills` compatibility copies.
+2. The published `@aryaminus/controlkeel-opencode` companion can be added to `opencode.json` for the direct plugin-package path.
+3. OpenCode can call `ck_context` / `ck_context_pack` to reacquire bounded session state, current task, proof summary, memory hits, resume packet, budget summary, review gate state, and workspace context without relying on chat history.
+4. OpenCode can call `ck_validate`, `ck_review_submit`, `ck_memory_record`, and `ck_budget` so validation, approvals, durable memory, and spend evidence stay in CK rather than in one host runtime.
 
-Without this loop, Claude is still writing code — but nothing is checking what it actually produced.
+The same governed loop is available to Codex, Claude Code, Copilot, and other supported hosts, but the README examples lead with OpenCode because that is the best current host-backed evidence path in this repository.
 
 ---
 
@@ -152,11 +152,11 @@ Validation is the most visible part. CK also provides:
 
 **Findings and review gates** — every blocked or warned pattern becomes a governed finding with state (open, blocked, escalated, approved, denied), human gate hints, and Mission Control visibility. Review is part of the delivery system, not detached commentary.
 
-**Proof bundles** — immutable evidence of what happened, what was reviewed, what was validated, what findings existed. Hosts show chat history. CK stores proof bundles.
+**Proof bundles and typed memory** — immutable proof bundles capture what happened, what was reviewed, what was validated, and what findings existed. CK also records important briefs, reviews, checkpoints, findings, proof events, and decisions as typed memory so agents can retrieve citable continuity later.
 
 **Budget and cost control** — session budgets, 24-hour rolling limits, proxy token estimates, circuit breakers on API-call rate, file-modification rate, and budget-burn rate. See [docs/cost-governance.md](docs/cost-governance.md).
 
-**Cross-host consistency** — the same governance loop works across Claude Code, Codex, OpenCode, Copilot, Cline, Windsurf, Continue, Goose, Roo Code, and others. See [docs/support-matrix.md](docs/support-matrix.md).
+**Cross-host consistency** — the same governance loop works across OpenCode, Codex, Claude Code, Copilot, Cline, Windsurf, Continue, Goose, Roo Code, and others. Project binding plus `ck_context`/typed memory/resume packets let a later host reacquire the same governed state. See [docs/support-matrix.md](docs/support-matrix.md).
 
 **Ship readiness** — deploy-ready proof state, outcome metrics, and comparative benchmark evidence. The question is not just "did the agent finish?" but "is this ready to ship?"
 
@@ -174,8 +174,9 @@ ControlKeel supports hosts through a few real mechanisms:
 
 Common attach targets today:
 
+- Plugin-native and benchmarked first path: `opencode`
 - Hook-native: `claude-code`, `copilot`, `windsurf`, `cline`, `kiro`, `augment`
-- Plugin-native: `opencode`, `amp`
+- Other plugin-native: `amp`
 - File-plan-mode: `pi`
 - Prompt or command-native: `continue`, `gemini-cli`, `goose`, `roo-code`
 - Hook, skill, and MCP-native with headless/remote support: `letta-code`
@@ -216,6 +217,8 @@ controlkeel run task <id>
 controlkeel benchmark run --suite vibe_failures_v1 --subjects controlkeel_validate
 controlkeel help
 ```
+
+For OpenCode, use `controlkeel attach opencode` for repo-local MCP/commands/skills/agents, and add the published `@aryaminus/controlkeel-opencode` package in `opencode.json` when you want the direct plugin package as well.
 
 For Codex there are two different CK install paths:
 

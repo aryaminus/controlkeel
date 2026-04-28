@@ -357,7 +357,7 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | ------ | --------- |
 | `ck_validate` | Run FastPath scan (patterns, destructive shell tripwires, Semgrep, optional LLM advisory); optional `session_id` / `task_id`; returns `advisory` metadata when present plus recovery guidance for destructive shell findings. |
 | `ck_execute_code` | Validate and run generated JavaScript/Python only through CK's guarded Docker sandbox; supports `dry_run`; local host execution, network, filesystem, secrets, shell, and deploy are denied. Local/stdio MCP only for now. |
-| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, reacquisition signals, design-drift summary, recent transcript events, transcript summary, resume packet, and provider status. Requires `session_id`; accepts optional `project_root`, but governed runtime context wins when CK already knows the workspace root. |
+| `ck_context` | Session/task context: findings summary, budget, production boundary summary, memory hits, proof summary, workspace snapshot, workspace cache key, reacquisition signals, design-drift summary, recent transcript events, transcript summary, resume packet, and provider status. Accepts `session_id`, `current`/`active`, or omitted session ID when `project_root` is bound; governed runtime context wins when CK already knows the workspace root. |
 | `ck_experience_index` | List recent prior sessions in the same workspace plus the read-only experience artifacts available for each run. |
 | `ck_experience_read` | Read one prior-run artifact such as a session summary, audit log, trace packet, or proof summary. |
 | `ck_trace_packet` | Export a structured session or task trace packet with failure patterns and eval candidates so teams can turn real runs into reusable improvement cases. |
@@ -373,9 +373,9 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | `ck_review_status` | Fetch latest review status, notes, and browser URL by `review_id` or `task_id`. |
 | `ck_review_feedback` | Approve or deny a submitted review and persist feedback notes or annotations. |
 | `ck_regression_result` | Record external regression-test evidence from systems like Bug0 or Passmark so proof bundles and release readiness can account for browser/UI failures. |
-| `ck_memory_search` | Search typed memory explicitly for prior decisions, findings, proofs, and checkpoints within the current session scope. |
-| `ck_memory_record` | Persist an explicit memory note or decision for later agent retrieval. |
-| `ck_memory_archive` | Archive a stale or superseded memory record so it stops surfacing in retrieval. |
+| `ck_memory_search` | Search typed memory explicitly for prior decisions, findings, proofs, and checkpoints within the current session scope. Accepts `session_id`, `current`/`active`, or a bound `project_root`. |
+| `ck_memory_record` | Persist an explicit memory note or decision for later agent retrieval. Accepts `session_id`, `current`/`active`, or a bound `project_root`, and validates task ownership before writing. |
+| `ck_memory_archive` | Archive a stale or superseded memory record so it stops surfacing in retrieval. Accepts `session_id`, `current`/`active`, or a bound `project_root`, and validates record ownership before archiving. |
 | `ck_budget` | Budget estimate or commit (`mode`: `estimate` \| `commit`). |
 | `ck_route` | Agent routing recommendation from `AgentRouter` (`task`, optional `risk_tier`, `budget_remaining_cents`, `allowed_agents`). |
 | `ck_delegate` | Ask ControlKeel to run or hand off another agent for a task or session under the current policy gates. |
