@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.2 — 2026-04-28
+
+### What's changed
+
+- feat: Add Warp and Warp Oz integrations
+- feat(agent): add support for Devin for Terminal integration with native configuration and hooks
+- feat(skill): add handoff skill for session state preservation and background execution
+- feat(skills): add align and plan-slice skills for improved project planning and execution
+- feat(docs): add details on Pi subagent extensions and their integration with ControlKeel
+- feat(tool): add ck_tool_health for governance coverage analysis and implement tests
+- feat(docs): enhance benchmark documentation with surface evaluation details and new evaluation script
+- feat(agent): add jcode integration with research compatibility and update tests
+- feat(docs): update benchmark documentation for clarity on evidence handling and OpenCode procedures
+- feat(benchmark): add ck-bounded mode for OpenCode governance and update documentation
+- feat(goals): add ck_goal tool for managing durable governed goals and ck_context_pack tool for creating context bundles
+- feat(docs): update README and product strategy to clarify ControlKeel's role as software for agents and a company brain for governed delivery
+- feat(security): add new rules for mass assignment, rate limiting, sensitive request logging, and IDOR protection
+- feat(gdpr): enhance GDPR compliance checks and add new privacy officer domain
+- Enhance benchmark subjects and governance harness
+
 ## v0.3.1 — 2026-04-26
 
 ### What's changed
