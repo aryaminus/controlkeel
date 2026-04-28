@@ -365,7 +365,7 @@ defmodule ControlKeel.MCP.Protocol do
         "Fetch current mission state, governed findings, budget, proof summary, planning context, workspace snapshot, reacquisition/drift signals, recent transcript events, resume context, and ControlKeel instruction hierarchy for a session.",
       "inputSchema" => %{
         "type" => "object",
-        "required" => ["session_id"],
+        "required" => [],
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
           "task_id" => %{"type" => ["integer", "string"]},
@@ -388,9 +388,10 @@ defmodule ControlKeel.MCP.Protocol do
         "Build a compact factual context bundle for the current session/task by combining task facts, proof state, resume highlights, memory excerpts, and citations into one agent-ready pack.",
       "inputSchema" => %{
         "type" => "object",
-        "required" => ["session_id"],
+        "required" => [],
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
+          "project_root" => %{"type" => "string"},
           "task_id" => %{"type" => ["integer", "string"]},
           "query" => %{
             "type" => "string",
@@ -733,9 +734,10 @@ defmodule ControlKeel.MCP.Protocol do
         "Search governed typed memory for the current session so agents can recover prior decisions, findings, and proof context explicitly.",
       "inputSchema" => %{
         "type" => "object",
-        "required" => ["session_id", "query"],
+        "required" => ["query"],
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
+          "project_root" => %{"type" => "string"},
           "task_id" => %{"type" => ["integer", "string"]},
           "query" => %{"type" => "string"},
           "record_type" => %{"type" => "string", "enum" => ControlKeel.Memory.record_types()},
@@ -752,9 +754,10 @@ defmodule ControlKeel.MCP.Protocol do
         "Record a governed memory note or decision for the current session so future agents can explicitly retrieve it.",
       "inputSchema" => %{
         "type" => "object",
-        "required" => ["session_id", "memory"],
+        "required" => ["memory"],
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
+          "project_root" => %{"type" => "string"},
           "task_id" => %{"type" => ["integer", "string"]},
           "memory" => %{"type" => "string"},
           "title" => %{"type" => "string"},
@@ -823,9 +826,10 @@ defmodule ControlKeel.MCP.Protocol do
         "Archive a memory record when it is stale, superseded, or no longer safe to surface to future agents.",
       "inputSchema" => %{
         "type" => "object",
-        "required" => ["session_id", "memory_id"],
+        "required" => ["memory_id"],
         "properties" => %{
           "session_id" => %{"type" => ["integer", "string"]},
+          "project_root" => %{"type" => "string"},
           "memory_id" => %{"type" => ["integer", "string"]}
         }
       }

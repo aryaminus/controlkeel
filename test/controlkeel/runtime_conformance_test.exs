@@ -94,6 +94,43 @@ defmodule ControlKeel.RuntimeConformanceTest do
         assert result.decision == :decline
       end
     end
+
+    test "interactive approval mode allows policy-gated medium tools without pestering" do
+      result =
+        ApprovalAdapter.evaluate(
+          "codex-cli",
+          %{"tool" => "file_write"},
+          policy_mode: "approval_required"
+        )
+
+      assert result.decision == :accept_for_session
+      assert result.requires_human_approval == false
+      assert "INTERACTIVE_GATE_MEDIUM_POLICY_ALLOW" in result.policy_rule_ids
+    end
+
+    test "interactive approval mode still gates high and critical tools" do
+      high =
+        ApprovalAdapter.evaluate(
+          "codex-cli",
+          %{"tool" => "bash"},
+          policy_mode: "approval_required"
+        )
+
+      assert high.decision == :decline
+      assert high.requires_human_approval == true
+      assert "INTERACTIVE_GATE_HIGH" in high.policy_rule_ids
+
+      critical =
+        ApprovalAdapter.evaluate(
+          "codex-cli",
+          %{"tool" => "secrets"},
+          policy_mode: "approval_required"
+        )
+
+      assert critical.decision == :decline
+      assert critical.requires_human_approval == true
+      assert Enum.any?(critical.policy_rule_ids, &String.starts_with?(&1, "CRITICAL_TOOL"))
+    end
   end
 
   describe "orchestration events produce valid payloads for all runtimes" do

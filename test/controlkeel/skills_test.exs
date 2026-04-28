@@ -942,6 +942,10 @@ defmodule ControlKeel.SkillsTest do
     assert opencode_plugin =~ "--project-root"
     assert opencode_plugin =~ "task_id: tool.schema.number().int().positive().optional()"
     assert opencode_plugin =~ "session_id: tool.schema.number().int().positive().optional()"
+    assert opencode_plugin =~ "const normalizeReviewId"
+    assert opencode_plugin =~ "Number.isFinite(value)"
+    assert opencode_plugin =~ "positive finite integer"
+    assert opencode_plugin =~ "Omit it to let ControlKeel infer scope from the bound project"
 
     assert opencode_plugin =~
              ~S|["controlkeel", "context", "--json", "--project-root", directory]|

@@ -2,16 +2,17 @@ defmodule ControlKeel.MCP.Tools.CkContextPack do
   @moduledoc false
 
   alias ControlKeel.Memory
+  alias ControlKeel.MCP.Arguments
   alias ControlKeel.Mission
 
   @default_top_k 5
   @max_top_k 10
 
   def call(arguments) when is_map(arguments) do
-    with {:ok, session_id} <- required_integer(arguments, "session_id"),
-         {:ok, task_id} <- optional_integer(arguments, "task_id"),
-         {:ok, top_k} <- optional_top_k(arguments),
-         {:ok, session} <- fetch_session(session_id),
+    with {:ok, task_id} <- Arguments.optional_integer(arguments, "task_id"),
+         {:ok, top_k} <-
+           Arguments.optional_top_k(arguments, default: @default_top_k, max: @max_top_k),
+         {:ok, session} <- Arguments.fetch_session(arguments, preload_context: true),
          {:ok, task} <- resolve_task(session, task_id),
          {:ok, pack} <- build_pack(arguments, session, task, top_k) do
       {:ok, pack}
@@ -56,13 +57,6 @@ defmodule ControlKeel.MCP.Tools.CkContextPack do
          "citations" => citations(task, proof_summary, resume_packet, search_result.entries)
        }
      }}
-  end
-
-  defp fetch_session(session_id) do
-    case Mission.get_session_context(session_id) do
-      nil -> {:error, {:invalid_arguments, "Session not found"}}
-      session -> {:ok, session}
-    end
   end
 
   defp resolve_task(session, nil) do
@@ -233,45 +227,4 @@ defmodule ControlKeel.MCP.Tools.CkContextPack do
   defp clip_text(nil, _limit), do: ""
   defp clip_text(text, limit) when byte_size(text) <= limit, do: text
   defp clip_text(text, limit), do: binary_part(text, 0, limit) <> "…"
-
-  defp required_integer(arguments, key) do
-    case Map.get(arguments, key) do
-      nil -> {:error, {:invalid_arguments, "`#{key}` is required"}}
-      value -> normalize_integer(value, key)
-    end
-  end
-
-  defp optional_integer(arguments, key) do
-    case Map.get(arguments, key) do
-      nil -> {:ok, nil}
-      value -> normalize_integer(value, key)
-    end
-  end
-
-  defp normalize_integer(value, _key) when is_integer(value), do: {:ok, value}
-
-  defp normalize_integer(value, key) when is_binary(value) do
-    case Integer.parse(value) do
-      {parsed, ""} -> {:ok, parsed}
-      _ -> {:error, {:invalid_arguments, "`#{key}` must be an integer if provided"}}
-    end
-  end
-
-  defp normalize_integer(_value, key),
-    do: {:error, {:invalid_arguments, "`#{key}` must be an integer if provided"}}
-
-  defp optional_top_k(arguments) do
-    case Map.get(arguments, "top_k", @default_top_k) do
-      value when is_integer(value) and value > 0 and value <= @max_top_k -> {:ok, value}
-      value when is_binary(value) -> parse_top_k(value)
-      _ -> {:error, {:invalid_arguments, "`top_k` must be between 1 and #{@max_top_k}"}}
-    end
-  end
-
-  defp parse_top_k(value) do
-    case Integer.parse(value) do
-      {parsed, ""} when parsed > 0 and parsed <= @max_top_k -> {:ok, parsed}
-      _ -> {:error, {:invalid_arguments, "`top_k` must be between 1 and #{@max_top_k}"}}
-    end
-  end
 end

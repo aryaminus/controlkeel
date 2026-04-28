@@ -85,6 +85,33 @@ defmodule ControlKeel.MCP.ProtocolTest do
            ]
   end
 
+  test "tools/list schemas allow bound-project continuation for context and memory tools" do
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2030,
+        "method" => "tools/list"
+      })
+
+    tools = get_in(response, ["result", "tools"])
+    by_name = Map.new(tools, &{&1["name"], &1})
+
+    assert get_in(by_name["ck_context_pack"], ["inputSchema", "required"]) == []
+    assert get_in(by_name["ck_memory_search"], ["inputSchema", "required"]) == ["query"]
+    assert get_in(by_name["ck_memory_record"], ["inputSchema", "required"]) == ["memory"]
+    assert get_in(by_name["ck_memory_archive"], ["inputSchema", "required"]) == ["memory_id"]
+
+    for tool_name <- [
+          "ck_context_pack",
+          "ck_memory_search",
+          "ck_memory_record",
+          "ck_memory_archive"
+        ] do
+      assert get_in(by_name[tool_name], ["inputSchema", "properties", "project_root", "type"]) ==
+               "string"
+    end
+  end
+
   test "tools/call ck_execute_code supports dry run" do
     response =
       Protocol.handle_request(%{
@@ -344,6 +371,13 @@ defmodule ControlKeel.MCP.ProtocolTest do
       |> Enum.find(&(&1["name"] == "ck_fs_grep"))
 
     assert get_in(tool, ["inputSchema", "required"]) == ["session_id", "query"]
+
+    find_tool =
+      response
+      |> get_in(["result", "tools"])
+      |> Enum.find(&(&1["name"] == "ck_fs_find"))
+
+    assert get_in(find_tool, ["inputSchema", "required"]) == ["session_id", "query"]
     assert get_in(tool, ["inputSchema", "properties", "fixed_strings", "type"]) == "boolean"
     assert get_in(tool, ["inputSchema", "properties", "ignore_case", "type"]) == "boolean"
   end
@@ -893,6 +927,152 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert Enum.any?(citations, &(&1["kind"] == "proof"))
     assert Enum.any?(citations, &(&1["kind"] == "resume_packet"))
     assert Enum.any?(citations, &(&1["kind"] == "memory" and &1["memory_id"] == memory_id))
+  end
+
+  test "tools/call carries continuity across simulated host binding changes" do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "ck-protocol-portability-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    session = session_fixture(%{budget_cents: 1_500, daily_budget_cents: 1_000, spent_cents: 100})
+    task = task_fixture(%{session: session, status: "in_progress", title: "Portable task"})
+
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => session.workspace_id,
+                 "session_id" => session.id,
+                 "agent" => "opencode",
+                 "attached_agents" => %{"opencode" => %{"scope" => "project"}}
+               },
+               tmp_dir
+             )
+
+    assert {:ok, _proof} = Mission.generate_proof_bundle(task.id)
+    assert {:ok, pause_result} = Mission.pause_task(task.id, "test-host-a")
+    assert pause_result.resume_packet["task_id"] == task.id
+    assert {:ok, resume_result} = Mission.resume_task(task.id, "test-host-b")
+    assert resume_result.resume_packet["session_id"] == session.id
+
+    review_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 903,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_review_submit",
+          "arguments" => %{
+            "session_id" => session.id,
+            "task_id" => task.id,
+            "review_type" => "plan",
+            "plan_phase" => "implementation_plan",
+            "submission_body" => "Validate portable continuation across host bindings.",
+            "submitted_by" => "test-host-a"
+          }
+        }
+      })
+
+    assert get_in(review_response, ["result", "structuredContent", "status"]) in [
+             "pending",
+             "approved"
+           ]
+
+    memory_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 904,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_memory_record",
+          "arguments" => %{
+            "project_root" => tmp_dir,
+            "task_id" => task.id,
+            "memory" => "Portable continuity checkpoint from host A.",
+            "record_type" => "checkpoint"
+          }
+        }
+      })
+
+    memory_id = get_in(memory_response, ["result", "structuredContent", "memory_id"])
+    assert is_integer(memory_id)
+
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => session.workspace_id,
+                 "session_id" => session.id,
+                 "agent" => "codex-cli",
+                 "attached_agents" => %{"codex-cli" => %{"scope" => "project"}}
+               },
+               tmp_dir
+             )
+
+    context_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 905,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_context",
+          "arguments" => %{"session_id" => "current", "project_root" => tmp_dir}
+        }
+      })
+
+    context = get_in(context_response, ["result", "structuredContent"])
+    assert context["session_id"] == session.id
+    assert context["current_task"]["id"] == task.id
+    assert context["proof_summary"]["task_id"] == task.id
+    assert context["resume_packet"]["task_id"] == task.id
+    assert context["budget_summary"]["session_budget_cents"] == 1_500
+    assert get_in(context, ["planning_context", "review_gate", "latest_review_id"])
+
+    pack_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 906,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_context_pack",
+          "arguments" => %{
+            "project_root" => tmp_dir,
+            "query" => "portable continuity checkpoint",
+            "top_k" => 5
+          }
+        }
+      })
+
+    pack = get_in(pack_response, ["result", "structuredContent", "context_pack"])
+    assert Enum.any?(pack["memory"], &(&1["id"] == memory_id))
+    assert Enum.any?(pack["citations"], &(&1["kind"] == "proof"))
+    assert Enum.any?(pack["citations"], &(&1["kind"] == "resume_packet"))
+
+    budget_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 907,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_budget",
+          "arguments" => %{
+            "session_id" => session.id,
+            "task_id" => task.id,
+            "mode" => "estimate",
+            "estimated_cost_cents" => 1,
+            "tool" => "portability-test"
+          }
+        }
+      })
+
+    assert get_in(budget_response, ["result", "structuredContent", "recorded"]) == false
+    assert get_in(budget_response, ["result", "structuredContent", "estimated_cost_cents"]) >= 0
   end
 
   test "tools/call ck_review_submit returns plan refinement quality" do

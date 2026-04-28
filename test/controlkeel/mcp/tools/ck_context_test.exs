@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
   use ControlKeel.DataCase
 
   alias ControlKeel.MCP.Tools.CkContext
+  alias ControlKeel.MCP.Tools.CkContextPack
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.ProjectBinding
@@ -179,5 +180,67 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
 
     assert message =~ "must be an integer"
     assert message =~ "bound project"
+  end
+
+  test "context pack accepts current and omitted session id from bound project" do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "ck-context-pack-current-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    session = session_fixture()
+    task = task_fixture(%{session: session, status: "in_progress"})
+
+    assert {:ok, _binding} =
+             ProjectBinding.write(
+               %{
+                 "workspace_id" => session.workspace_id,
+                 "session_id" => session.id,
+                 "agent" => "codex-cli",
+                 "attached_agents" => %{}
+               },
+               tmp_dir
+             )
+
+    assert {:ok, current_result} =
+             CkContextPack.call(%{
+               "session_id" => "current",
+               "project_root" => tmp_dir,
+               "query" => "continuation"
+             })
+
+    assert current_result["session_id"] == session.id
+    assert current_result["task_id"] == task.id
+
+    assert Enum.any?(
+             current_result["context_pack"]["citations"],
+             &(&1["kind"] == "resume_packet")
+           )
+
+    assert {:ok, omitted_result} =
+             CkContextPack.call(%{"project_root" => tmp_dir, "query" => "continuation"})
+
+    assert omitted_result["session_id"] == session.id
+  end
+
+  test "context pack rejects non-finite and non-integer ids clearly" do
+    assert {:error, {:invalid_arguments, message}} =
+             CkContextPack.call(%{"session_id" => :nan, "query" => "continuation"})
+
+    assert message =~ "session_id"
+    assert message =~ "integer"
+
+    assert {:error, {:invalid_arguments, message}} =
+             CkContextPack.call(%{"session_id" => "current", "task_id" => "not-a-number"})
+
+    assert message =~ "task_id"
+    assert message =~ "integer"
   end
 end

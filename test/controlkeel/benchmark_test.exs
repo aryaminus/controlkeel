@@ -134,7 +134,11 @@ defmodule ControlKeel.BenchmarkTest do
             "domain_pack" => "software",
             "task_type" => "analysis",
             "memory_sharing_strategy" => "latent_briefing",
-            "compaction_strategy" => "attention_guided_kv_compaction"
+            "memory_surface" => "typed_memory_only",
+            "retrieval_strategy" => "late_interaction_rerank",
+            "compaction_strategy" => "attention_guided_kv_compaction",
+            "handoff_contract" => "relay_structured",
+            "artifact_scope" => "model_scoped"
           }
         }
       ]
@@ -143,7 +147,11 @@ defmodule ControlKeel.BenchmarkTest do
     profile = Benchmark.suite_eval_profile(suite)
 
     assert profile["behavior_tag_summary"]["latent_briefing"] == 1
+    assert profile["behavior_tag_summary"]["typed_memory_only"] == 1
+    assert profile["behavior_tag_summary"]["late_interaction_rerank"] == 1
     assert profile["behavior_tag_summary"]["attention_guided_kv_compaction"] == 1
+    assert profile["behavior_tag_summary"]["relay_structured"] == 1
+    assert profile["behavior_tag_summary"]["model_scoped"] == 1
   end
 
   test "loads the defensive security benchmark suites" do

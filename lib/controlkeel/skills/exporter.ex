@@ -6501,25 +6501,45 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
+      const normalizeReviewId = (value: string | number | null | undefined, label: string) => {
+        if (value == null || value === "") return null
+
+        if (typeof value === "number") {
+          if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
+            throw new Error(`${label} must be a positive finite integer. Omit it to let ControlKeel infer scope from the bound project.`)
+          }
+
+          return String(value)
+        }
+
+        const trimmed = String(value).trim()
+        if (/^[1-9]\d*$/.test(trimmed)) return trimmed
+
+        throw new Error(`${label} must be a positive integer string. Omit it to let ControlKeel infer scope from the bound project.`)
+      }
+
       const resolveReviewScope = async (
         explicitTaskId?: string | number | null,
         explicitSessionId?: string | number | null
       ) => {
-        if (explicitTaskId || explicitSessionId) {
+        const normalizedExplicitTaskId = normalizeReviewId(explicitTaskId, "task_id")
+        const normalizedExplicitSessionId = normalizeReviewId(explicitSessionId, "session_id")
+
+        if (normalizedExplicitTaskId || normalizedExplicitSessionId) {
           return {
-            taskId: explicitTaskId != null ? String(explicitTaskId) : null,
-            sessionId: explicitSessionId != null ? String(explicitSessionId) : null,
+            taskId: normalizedExplicitTaskId,
+            sessionId: normalizedExplicitSessionId,
             source: "explicit",
           }
         }
 
-        const envTaskId = process.env.CONTROLKEEL_TASK_ID
-        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+        const envTaskId = normalizeReviewId(process.env.CONTROLKEEL_TASK_ID, "CONTROLKEEL_TASK_ID")
+        const envSessionId = normalizeReviewId(process.env.CONTROLKEEL_SESSION_ID, "CONTROLKEEL_SESSION_ID")
 
         if (envTaskId || envSessionId) {
           return {
-            taskId: envTaskId ?? null,
-            sessionId: envSessionId ?? null,
+            taskId: envTaskId,
+            sessionId: envSessionId,
             source: "env",
           }
         }
@@ -7099,22 +7119,42 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
 
+      const normalizeReviewId = (value, label) => {
+        if (value == null || value === "") return null
+
+        if (typeof value === "number") {
+          if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
+            throw new Error(`${label} must be a positive finite integer. Omit it to let ControlKeel infer scope from the bound project.`)
+          }
+
+          return String(value)
+        }
+
+        const trimmed = String(value).trim()
+        if (/^[1-9]\d*$/.test(trimmed)) return trimmed
+
+        throw new Error(`${label} must be a positive integer string. Omit it to let ControlKeel infer scope from the bound project.`)
+      }
+
       const resolveReviewScope = async (explicitTaskId, explicitSessionId) => {
-        if (explicitTaskId || explicitSessionId) {
+        const normalizedExplicitTaskId = normalizeReviewId(explicitTaskId, "task_id")
+        const normalizedExplicitSessionId = normalizeReviewId(explicitSessionId, "session_id")
+
+        if (normalizedExplicitTaskId || normalizedExplicitSessionId) {
           return {
-            taskId: explicitTaskId != null ? String(explicitTaskId) : null,
-            sessionId: explicitSessionId != null ? String(explicitSessionId) : null,
+            taskId: normalizedExplicitTaskId,
+            sessionId: normalizedExplicitSessionId,
             source: "explicit",
           }
         }
 
-        const envTaskId = process.env.CONTROLKEEL_TASK_ID
-        const envSessionId = process.env.CONTROLKEEL_SESSION_ID
+        const envTaskId = normalizeReviewId(process.env.CONTROLKEEL_TASK_ID, "CONTROLKEEL_TASK_ID")
+        const envSessionId = normalizeReviewId(process.env.CONTROLKEEL_SESSION_ID, "CONTROLKEEL_SESSION_ID")
 
         if (envTaskId || envSessionId) {
           return {
-            taskId: envTaskId ?? null,
-            sessionId: envSessionId ?? null,
+            taskId: envTaskId,
+            sessionId: envSessionId,
             source: "env",
           }
         }

@@ -36,13 +36,15 @@ defmodule ControlKeel.Governance.ApprovalAdapterTest do
       assert result.requires_human_approval
     end
 
-    test "blocks medium-tier tool under approval_required" do
+    test "allows policy-gated medium-tier tool under approval_required without pestering" do
       result =
         ApprovalAdapter.evaluate("t3code", %{"tool" => "file_edit"},
           policy_mode: "approval_required"
         )
 
-      assert result.decision == :decline
+      assert result.decision == :accept_for_session
+      refute result.requires_human_approval
+      assert "INTERACTIVE_GATE_MEDIUM_POLICY_ALLOW" in result.policy_rule_ids
     end
   end
 

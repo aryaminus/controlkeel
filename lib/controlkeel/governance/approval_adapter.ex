@@ -102,13 +102,42 @@ defmodule ControlKeel.Governance.ApprovalAdapter do
     end
   end
 
-  defp evaluate_decision(_capabilities, %{"interactive_gate" => true} = profile, tier, _request)
-       when tier in [:high, :medium] do
+  defp evaluate_decision(
+         %{policy_gate: true},
+         %{"interactive_gate" => true} = profile,
+         :medium,
+         _request
+       ) do
+    %{
+      decision: :accept_for_session,
+      reason:
+        "Interactive gate active (mode: #{profile["mode"]}) but medium-tier tool is covered by CK policy preflight and post-action validation.",
+      policy_rule_ids: ["INTERACTIVE_GATE_MEDIUM_POLICY_ALLOW"],
+      requires_human_approval: false
+    }
+  end
+
+  defp evaluate_decision(
+         _capabilities,
+         %{"interactive_gate" => true} = profile,
+         :medium,
+         _request
+       ) do
     %{
       decision: :decline,
       reason:
-        "Interactive gate active (mode: #{profile["mode"]}). #{tier}-tier tool requires human checkpoint.",
-      policy_rule_ids: ["INTERACTIVE_GATE_#{tier |> to_string() |> String.upcase()}"],
+        "Interactive gate active (mode: #{profile["mode"]}). Medium-tier tool requires human checkpoint because this runtime lacks CK policy-gate support.",
+      policy_rule_ids: ["INTERACTIVE_GATE_MEDIUM_NO_POLICY_GATE"],
+      requires_human_approval: true
+    }
+  end
+
+  defp evaluate_decision(_capabilities, %{"interactive_gate" => true} = profile, :high, _request) do
+    %{
+      decision: :decline,
+      reason:
+        "Interactive gate active (mode: #{profile["mode"]}). High-tier tool requires human checkpoint.",
+      policy_rule_ids: ["INTERACTIVE_GATE_HIGH"],
       requires_human_approval: true
     }
   end
