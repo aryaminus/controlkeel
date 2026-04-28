@@ -3445,6 +3445,32 @@ defmodule ControlKeel.Skills.Exporter do
             ]
           }
         ],
+        "PostToolUse" => [
+          %{
+            "matcher" => "Bash",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "TOOL_INPUT=$(cat); FAILED=$(printf '%s' \"$TOOL_INPUT\" | python3 -c 'import sys,json; d=json.load(sys.stdin); r=d.get(\"tool_response\",{}); ec=r.get(\"exitCode\",r.get(\"exit_code\",0)); st=str(r.get(\"status\",\"\")).lower(); print(\"true\" if (isinstance(ec,(int,float)) and int(ec)!=0) or st in (\"failed\",\"error\") else \"false\")' 2>/dev/null || echo \"false\"); [ \"$FAILED\" != \"true\" ] && exit 0; CMD=$(printf '%s' \"$TOOL_INPUT\" | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"command\",\"\"))' 2>/dev/null || echo \"\"); printf '%s' \"$CMD\" | grep -qiE '(mix[[:space:]]+test|npm[[:space:]]+test|pytest|pnpm[[:space:]]+test|yarn[[:space:]]+test)' && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Test run failed. Summarize failures clearly before moving on.\"}}' || printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Shell command failed. Re-check the result and run ck_validate again if the next step changes code or config.\"}}'; exit 0",
+                "statusMessage" => "Reviewing Bash output with ControlKeel",
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  "input=$(cat); prompt=$(printf '%s' \"$input\" | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"prompt\",\"\"))' 2>/dev/null || echo \"\"); [ -z \"$prompt\" ] && exit 0; printf '%s' \"$prompt\" | grep -qE '(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|BEGIN (RSA|OPENSSH|PGP) PRIVATE KEY)' && printf '{\"decision\":\"block\",\"reason\":\"Potential secret in prompt. Remove credentials before continuing.\"}' && exit 0; blocked=$(controlkeel context --json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get(\"active_findings\",{}).get(\"blocked\",0))' 2>/dev/null || echo 0); [ \"${blocked:-0}\" != \"0\" ] && [ \"${blocked:-0}\" != \"\" ] && printf '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"WARNING: %s blocked finding(s) active. Call ck_context and resolve them before proceeding.\"}}' \"$blocked\" || true",
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
         "PermissionRequest" => [
           %{
             "matcher" => "ExitPlanMode",
