@@ -58,6 +58,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_experience_read",
              "ck_trace_packet",
              "ck_failure_clusters",
+             "ck_tool_health",
              "ck_skill_evolution",
              "ck_fs_ls",
              "ck_fs_read",

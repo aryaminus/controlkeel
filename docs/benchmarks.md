@@ -236,4 +236,18 @@ For GEPA-style text optimization specifically:
 
 For experimental recursive or typed-runtime systems, the same rule applies: benchmark the concrete runtime behavior that actually ran. Do not promote based on architectural taste alone. If the experiment matters, record it honestly in run metadata and compare it on the same held-out suite.
 
+### Delegation and subagent surface checks
+
+When evaluating hosts or extensions that delegate to child agents, score the delegation surface explicitly instead of treating it as a generic model call. A useful benchmark or surface-evaluation packet should record:
+
+- **Depth and recursion guards**: maximum delegation depth, whether nested delegation is blocked or bounded, and what happens when the limit is reached.
+- **Isolation model**: fresh context, forked session, isolated worktree, or shared workspace; include whether parallel children can clobber each other.
+- **Tool/MCP/skill/extension allowlists**: which tools are inherited, overridden, or disabled for each child agent.
+- **Async/background observability**: status files, event logs, progress state, interrupt behavior, and completion receipts.
+- **Decision channels**: how a child asks for clarification or escalates a blocker instead of guessing.
+- **Handoff contracts**: what chain/parallel steps pass forward, how outputs are summarized, and whether artifacts such as context, plan, diff, or review files are durable.
+- **Budget and timeout controls**: per-child token/time limits, concurrency limits, fallback behavior, and failure reporting.
+
+For CK, these checks should be evidence fields in benchmark exports or surface-evaluation summaries. They should not be hidden inside a vague “multi-agent” label.
+
 Policy-training promotion gates now carry the same integrity stance. A candidate policy artifact must have validation, held-out, and baseline evidence before promotion can succeed, and the gates include diagnostic finding payloads for review surfaces that want to persist the warning.

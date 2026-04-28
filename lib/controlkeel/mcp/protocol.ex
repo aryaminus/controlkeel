@@ -37,7 +37,8 @@ defmodule ControlKeel.MCP.Protocol do
     CkValidate,
     CkCostOptimizer,
     CkDeploymentAdvisor,
-    CkOutcomeTracker
+    CkOutcomeTracker,
+    CkToolHealth
   }
 
   @server_info %{
@@ -186,6 +187,7 @@ defmodule ControlKeel.MCP.Protocol do
       ck_experience_read_tool(),
       ck_trace_packet_tool(),
       ck_failure_clusters_tool(),
+      ck_tool_health_tool(),
       ck_skill_evolution_tool(),
       ck_fs_ls_tool(),
       ck_fs_read_tool(),
@@ -228,6 +230,7 @@ defmodule ControlKeel.MCP.Protocol do
   def dispatch_tool("ck_experience_read", arguments), do: CkExperienceRead.call(arguments)
   def dispatch_tool("ck_trace_packet", arguments), do: CkTracePacket.call(arguments)
   def dispatch_tool("ck_failure_clusters", arguments), do: CkFailureClusters.call(arguments)
+  def dispatch_tool("ck_tool_health", arguments), do: CkToolHealth.call(arguments)
   def dispatch_tool("ck_skill_evolution", arguments), do: CkSkillEvolution.call(arguments)
   def dispatch_tool("ck_fs_ls", arguments), do: CkFsLs.call(arguments)
   def dispatch_tool("ck_fs_read", arguments), do: CkFsRead.call(arguments)
@@ -493,6 +496,25 @@ defmodule ControlKeel.MCP.Protocol do
           "session_id" => %{"type" => ["integer", "string"]},
           "session_limit" => %{"type" => ["integer", "string"]},
           "same_domain_only" => %{"type" => "boolean"}
+        }
+      }
+    }
+  end
+
+  def ck_tool_health_tool do
+    %{
+      "name" => "ck_tool_health",
+      "description" =>
+        "Analyze governance coverage across recent sessions in the workspace — which CK governance tools (ck_validate, ck_review_submit, ck_budget, ck_memory_record, ck_goal) are load-bearing, active, low-usage, or unused — and return actionable recommendations for gaps.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "session_limit" => %{
+            "type" => ["integer", "string"],
+            "description" => "Number of recent sessions to analyze. Defaults to 10."
+          }
         }
       }
     }

@@ -865,7 +865,7 @@ CK does not treat every session as the same kind of "agent run." It now derives 
 
 - **autonomy profile**: whether the session is effectively advise-only, supervised execute, guarded autonomy, or long-running autonomy
 - **outcome profile**: whether the work is aimed at task delivery or an explicit KPI / longer-horizon outcome
-- **improvement loop**: whether CK has enough evidence from traces, failure clusters, proofs, and benchmark coverage to recommend the next loop-closing move
+- **improvement loop**: whether CK has enough evidence from traces, failure clusters, governance coverage, proofs, and benchmark coverage to recommend the next loop-closing move
 
 Those views are derived, not magical. They come from:
 
@@ -874,6 +874,7 @@ Those views are derived, not magical. They come from:
 - cyber access mode for security work
 - current task / proof state
 - trace packet and failure-cluster availability
+- governance coverage signal (which governance tools are load-bearing vs unused across recent sessions)
 - benchmark suite availability for the current domain
 
 That means CK can say something operationally useful like:

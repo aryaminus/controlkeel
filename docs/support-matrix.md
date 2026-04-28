@@ -283,7 +283,7 @@ Hosted MCP tool authorization uses these protocol scopes:
 | `ck_review_submit` | `mcp:access`, `review:write` |
 | `ck_review_status` | `mcp:access`, `review:read` |
 | `ck_review_feedback` | `mcp:access`, `review:respond` |
-| `ck_context`, `ck_experience_index`, `ck_experience_read`, `ck_trace_packet`, `ck_failure_clusters`, `ck_skill_evolution`, `ck_fs_ls`, `ck_fs_read`, `ck_fs_find`, `ck_fs_grep` | `mcp:access`, `context:read` |
+| `ck_context`, `ck_experience_index`, `ck_experience_read`, `ck_trace_packet`, `ck_failure_clusters`, `ck_tool_health`, `ck_skill_evolution`, `ck_fs_ls`, `ck_fs_read`, `ck_fs_find`, `ck_fs_grep` | `mcp:access`, `context:read` |
 | `ck_regression_result` | `mcp:access`, `regression:write` |
 | `ck_memory_search` | `mcp:access`, `memory:read` |
 | `ck_memory_record`, `ck_memory_archive` | `mcp:access`, `memory:write` |
@@ -355,6 +355,7 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | `ck_experience_read` | Read one prior-run artifact such as a session summary, audit log, trace packet, or proof summary. |
 | `ck_trace_packet` | Export a structured session or task trace packet with failure patterns and eval candidates so teams can turn real runs into reusable improvement cases. |
 | `ck_failure_clusters` | Cluster recurring failure modes across recent workspace traces and return reusable eval candidates for the highest-frequency patterns. |
+| `ck_tool_health` | Analyze governance coverage across recent sessions — which CK governance tools (ck_validate, ck_review_submit, ck_budget, ck_memory_record, ck_goal) are load-bearing, active, low-usage, or unused — and return a coverage score and actionable recommendations for gaps. |
 | `ck_skill_evolution` | Synthesize one deduplicated skill-evolution packet from recent traces and failure clusters, including anti-patterns, reinforced practices, merged Do/Avoid/Verification guidance, and a ready-to-merge skill draft. |
 | `ck_fs_ls` | List files and directories inside the bound project root through a read-only virtual workspace surface. |
 | `ck_fs_read` | Read a text file from the bound project root without provisioning a sandbox. |

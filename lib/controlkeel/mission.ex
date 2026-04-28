@@ -1198,6 +1198,175 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  def governance_coverage(session_id, opts \\ []) when is_integer(session_id) do
+    with %Session{} = session <- get_session_with_workspace(session_id) do
+      session_limit = Keyword.get(opts, :session_limit, 10)
+
+      session_ids =
+        from(s in Session,
+          where: s.workspace_id == ^session.workspace_id,
+          order_by: [desc: s.inserted_at],
+          limit: ^max(session_limit, 1),
+          select: s.id
+        )
+        |> Repo.all()
+
+      finding_counts =
+        from(f in Finding,
+          where: f.session_id in ^session_ids,
+          group_by: f.status,
+          select: {f.status, count(f.id)}
+        )
+        |> Repo.all()
+        |> Map.new()
+
+      total_findings = finding_counts |> Map.values() |> Enum.sum()
+
+      review_counts =
+        from(r in Review,
+          where: r.session_id in ^session_ids,
+          group_by: r.status,
+          select: {r.status, count(r.id)}
+        )
+        |> Repo.all()
+        |> Map.new()
+
+      total_reviews = review_counts |> Map.values() |> Enum.sum()
+
+      total_budget_commits =
+        from(i in Invocation,
+          where: i.session_id in ^session_ids and i.tool == "ck_budget",
+          select: count(i.id)
+        )
+        |> Repo.one()
+        |> Kernel.||(0)
+
+      memory_type_counts =
+        from(mr in ControlKeel.Memory.Record,
+          where: mr.session_id in ^session_ids and is_nil(mr.archived_at),
+          group_by: mr.record_type,
+          select: {mr.record_type, count(mr.id)}
+        )
+        |> Repo.all()
+        |> Map.new()
+
+      total_memory =
+        ~w(decision brief checkpoint incident)
+        |> Enum.reduce(0, &(Map.get(memory_type_counts, &1, 0) + &2))
+
+      total_goals = Map.get(memory_type_counts, "goal", 0)
+
+      areas = [
+        %{
+          "tool" => "ck_validate / ck_finding",
+          "area" => "validation",
+          "signal" => "findings",
+          "count" => total_findings,
+          "detail" => %{
+            "blocked" => Map.get(finding_counts, "blocked", 0),
+            "open" => Map.get(finding_counts, "open", 0),
+            "approved" => Map.get(finding_counts, "approved", 0)
+          },
+          "health" => governance_health_signal(total_findings, 10, 3)
+        },
+        %{
+          "tool" => "ck_review_submit",
+          "area" => "review_gates",
+          "signal" => "reviews",
+          "count" => total_reviews,
+          "detail" => %{
+            "approved" => Map.get(review_counts, "approved", 0),
+            "pending" => Map.get(review_counts, "pending", 0),
+            "rejected" => Map.get(review_counts, "rejected", 0)
+          },
+          "health" => governance_health_signal(total_reviews, 5, 2)
+        },
+        %{
+          "tool" => "ck_budget",
+          "area" => "budget_tracking",
+          "signal" => "budget_invocations",
+          "count" => total_budget_commits,
+          "detail" => %{},
+          "health" => governance_health_signal(total_budget_commits, 5, 2)
+        },
+        %{
+          "tool" => "ck_memory_record",
+          "area" => "memory_retention",
+          "signal" => "memory_records",
+          "count" => total_memory,
+          "detail" => Map.take(memory_type_counts, ~w(decision brief checkpoint incident)),
+          "health" => governance_health_signal(total_memory, 5, 1)
+        },
+        %{
+          "tool" => "ck_goal",
+          "area" => "goal_tracking",
+          "signal" => "goal_records",
+          "count" => total_goals,
+          "detail" => %{},
+          "health" => governance_health_signal(total_goals, 3, 1)
+        }
+      ]
+
+      active_area_count = Enum.count(areas, &(&1["health"] != "unused"))
+
+      load_bearing =
+        areas |> Enum.filter(&(&1["health"] == "load_bearing")) |> Enum.map(& &1["area"])
+
+      unused = areas |> Enum.filter(&(&1["health"] == "unused")) |> Enum.map(& &1["area"])
+
+      {:ok,
+       %{
+         "workspace_id" => session.workspace_id,
+         "source_session_id" => session.id,
+         "sessions_analyzed" => length(session_ids),
+         "coverage_score" => Float.round(active_area_count / length(areas), 2),
+         "active_area_count" => active_area_count,
+         "total_area_count" => length(areas),
+         "load_bearing_areas" => load_bearing,
+         "unused_areas" => unused,
+         "areas" => areas,
+         "recommendations" => governance_coverage_recommendations(areas)
+       }}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp governance_health_signal(count, load_bearing_threshold, active_threshold) do
+    cond do
+      count == 0 -> "unused"
+      count < active_threshold -> "low_usage"
+      count < load_bearing_threshold -> "active"
+      true -> "load_bearing"
+    end
+  end
+
+  defp governance_coverage_recommendations(areas) do
+    areas
+    |> Enum.filter(&(&1["health"] in ["unused", "low_usage"]))
+    |> Enum.map(fn area ->
+      case area["area"] do
+        "validation" ->
+          "Call ck_validate before writing code or config; use ck_finding for issues not caught by the scanner."
+
+        "review_gates" ->
+          "Submit plans and completion packets with ck_review_submit before executing high-impact changes."
+
+        "budget_tracking" ->
+          "Commit spend with ck_budget before expensive model or multi-agent work to stay within session budget."
+
+        "memory_retention" ->
+          "Record decisions and checkpoints with ck_memory_record to preserve durable governance evidence."
+
+        "goal_tracking" ->
+          "Record session goals with ck_goal to keep delivery direction explicit and resumable."
+
+        _ ->
+          "Activate #{area["tool"]} to improve governance coverage."
+      end
+    end)
+  end
+
   def failure_mode_clusters(session_id, opts \\ []) when is_integer(session_id) do
     with %Session{} = session <- get_session_with_workspace(session_id) do
       session_limit = Keyword.get(opts, :session_limit, 5)
