@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.3 — 2026-04-28
+
+### What's changed
+
+- feat: Add Multica native and cloud runtime targets to skill catalog
+- feat: Enhance skill parsing with owner metadata and content hash computation
+- feat: Add Multica integration and content hash to skill definitions
+- feat: Add owner field to skill definitions and update related parsing logic
+- docs: Update README and support matrix for OpenCode integration details
+- Refactor MCP argument handling and tool schemas
+
 ## v0.3.2 — 2026-04-28
 
 ### What's changed
