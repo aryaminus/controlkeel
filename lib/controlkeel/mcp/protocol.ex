@@ -9,6 +9,7 @@ defmodule ControlKeel.MCP.Protocol do
   alias ControlKeel.MCP.Tools.{
     CkBudget,
     CkContext,
+    CkContextPack,
     CkExecuteCode,
     CkDelegate,
     CkExperienceIndex,
@@ -19,6 +20,7 @@ defmodule ControlKeel.MCP.Protocol do
     CkFsRead,
     CkFailureClusters,
     CkFinding,
+    CkGoal,
     CkLoadResources,
     CkMemoryArchive,
     CkMemoryRecord,
@@ -179,6 +181,7 @@ defmodule ControlKeel.MCP.Protocol do
       ck_validate_tool(),
       ck_execute_code_tool(),
       ck_context_tool(),
+      ck_context_pack_tool(),
       ck_experience_index_tool(),
       ck_experience_read_tool(),
       ck_trace_packet_tool(),
@@ -195,6 +198,7 @@ defmodule ControlKeel.MCP.Protocol do
       ck_regression_result_tool(),
       ck_memory_search_tool(),
       ck_memory_record_tool(),
+      ck_goal_tool(),
       ck_memory_archive_tool(),
       ck_budget_tool(),
       ck_route_tool(),
@@ -219,6 +223,7 @@ defmodule ControlKeel.MCP.Protocol do
   def dispatch_tool("ck_validate", arguments), do: CkValidate.call(arguments)
   def dispatch_tool("ck_execute_code", arguments), do: CkExecuteCode.call(arguments)
   def dispatch_tool("ck_context", arguments), do: CkContext.call(arguments)
+  def dispatch_tool("ck_context_pack", arguments), do: CkContextPack.call(arguments)
   def dispatch_tool("ck_experience_index", arguments), do: CkExperienceIndex.call(arguments)
   def dispatch_tool("ck_experience_read", arguments), do: CkExperienceRead.call(arguments)
   def dispatch_tool("ck_trace_packet", arguments), do: CkTracePacket.call(arguments)
@@ -235,6 +240,7 @@ defmodule ControlKeel.MCP.Protocol do
   def dispatch_tool("ck_regression_result", arguments), do: CkRegressionResult.call(arguments)
   def dispatch_tool("ck_memory_search", arguments), do: CkMemorySearch.call(arguments)
   def dispatch_tool("ck_memory_record", arguments), do: CkMemoryRecord.call(arguments)
+  def dispatch_tool("ck_goal", arguments), do: CkGoal.call(arguments)
   def dispatch_tool("ck_memory_archive", arguments), do: CkMemoryArchive.call(arguments)
   def dispatch_tool("ck_budget", arguments), do: CkBudget.call(arguments)
   def dispatch_tool("ck_route", arguments), do: CkRoute.call(arguments)
@@ -367,6 +373,29 @@ defmodule ControlKeel.MCP.Protocol do
             "description" =>
               "Use compact by default to reduce token usage; request full only when raw workspace/resume/transcript payloads are needed."
           }
+        }
+      }
+    }
+  end
+
+  def ck_context_pack_tool do
+    %{
+      "name" => "ck_context_pack",
+      "description" =>
+        "Build a compact factual context bundle for the current session/task by combining task facts, proof state, resume highlights, memory excerpts, and citations into one agent-ready pack.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "query" => %{
+            "type" => "string",
+            "description" =>
+              "Optional explicit retrieval query. When omitted, ControlKeel synthesizes one from the current task and session."
+          },
+          "top_k" => %{"type" => ["integer", "string"]},
+          "detail_level" => %{"type" => "string", "enum" => ["compact", "full"]}
         }
       }
     }
@@ -710,6 +739,47 @@ defmodule ControlKeel.MCP.Protocol do
           "summary" => %{"type" => "string"},
           "body" => %{"type" => "string"},
           "record_type" => %{"type" => "string", "enum" => ControlKeel.Memory.record_types()},
+          "tags" => %{
+            "oneOf" => [
+              %{"type" => "array", "items" => %{"type" => "string"}},
+              %{"type" => "string"}
+            ]
+          },
+          "source_type" => %{"type" => "string"},
+          "source_id" => %{"type" => "string"},
+          "metadata" => %{"type" => "object"}
+        }
+      }
+    }
+  end
+
+  def ck_goal_tool do
+    %{
+      "name" => "ck_goal",
+      "description" =>
+        "Record, list, and update durable governed goals so long-running intent stays explicit, citable, and reviewable across sessions.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "mode"],
+        "properties" => %{
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "mode" => %{"type" => "string", "enum" => ["record", "list", "update_status"]},
+          "goal" => %{"type" => "string"},
+          "goal_id" => %{"type" => ["integer", "string"]},
+          "title" => %{"type" => "string"},
+          "summary" => %{"type" => "string"},
+          "body" => %{"type" => "string"},
+          "status" => %{
+            "type" => "string",
+            "enum" => ControlKeel.MCP.Tools.CkGoal.statuses() ++ ["all"]
+          },
+          "horizon" => %{
+            "type" => "string",
+            "enum" => ControlKeel.MCP.Tools.CkGoal.horizons()
+          },
+          "progress_note" => %{"type" => "string"},
+          "limit" => %{"type" => ["integer", "string"]},
           "tags" => %{
             "oneOf" => [
               %{"type" => "array", "items" => %{"type" => "string"}},

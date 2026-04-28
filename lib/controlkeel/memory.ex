@@ -6,7 +6,7 @@ defmodule ControlKeel.Memory do
   alias ControlKeel.Memory.{Embeddings, Record, Store}
   alias ControlKeel.Repo
 
-  @record_types ~w(brief task finding proof checkpoint budget decision incident review)
+  @record_types ~w(brief task finding proof checkpoint budget decision incident review goal)
 
   def record_types, do: @record_types
 

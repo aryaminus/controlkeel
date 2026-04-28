@@ -149,6 +149,8 @@ For memory specifically, CK treats two different problems separately:
 
 That distinction matters because CK does not present memory as perfect recall. It can return ranked memory hits and portable typed state, but the active agent still has to reconcile those hits with the current task, recent transcript tail, and current validation state.
 
+When a team wants durable intent to persist beyond a single turn, CK prefers explicit goal records over hidden prompt mutation. Goals can live in governed typed memory as first-class records, which means the agent can list, cite, and update them later without pretending that the host has magical passive recall.
+
 CK also treats host-managed file memory as a companion surface rather than the governed source of truth. Repo-visible instruction files, sandbox-local notes, or mounted memory directories can still be useful for fast local recall inside a specific host. But CK keeps durable governed state in typed memory records, proofs, traces, workspace snapshots, and resume packets so continuity survives host switches and stays reviewable.
 
 This is one of CK’s biggest philosophical differences from many hosts:

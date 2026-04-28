@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
   use ControlKeel.DataCase
 
   alias ControlKeel.MCP.Protocol
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Invocation
   alias ControlKeel.ProjectBinding
@@ -52,6 +53,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_validate",
              "ck_execute_code",
              "ck_context",
+             "ck_context_pack",
              "ck_experience_index",
              "ck_experience_read",
              "ck_trace_packet",
@@ -68,6 +70,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_regression_result",
              "ck_memory_search",
              "ck_memory_record",
+             "ck_goal",
              "ck_memory_archive",
              "ck_budget",
              "ck_route",
@@ -815,6 +818,82 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert get_in(response, ["result", "structuredContent", "provider_status", "source"]) != nil
   end
 
+  test "tools/call ck_context_pack returns a factual context bundle with citations" do
+    session =
+      session_fixture(%{
+        budget_cents: 1_500,
+        daily_budget_cents: 500,
+        spent_cents: 250,
+        execution_brief:
+          execution_brief_fixture(
+            compiler: %{"interview_answers" => %{"constraints" => "Approval before deploy"}}
+          )
+          |> ControlKeel.Intent.to_brief_map()
+      })
+
+    task = task_fixture(%{session: session, status: "in_progress", title: "Implement router"})
+
+    assert {:ok, _proof} = Mission.generate_proof_bundle(task.id)
+
+    record_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 901,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_memory_record",
+          "arguments" => %{
+            "session_id" => session.id,
+            "task_id" => task.id,
+            "memory" => "Router rollout needs approval evidence and explicit route constraints.",
+            "record_type" => "decision",
+            "tags" => ["router", "approval"]
+          }
+        }
+      })
+
+    memory_id = get_in(record_response, ["result", "structuredContent", "memory_id"])
+    assert is_integer(memory_id)
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 902,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_context_pack",
+          "arguments" => %{"session_id" => session.id, "task_id" => task.id, "top_k" => 3}
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "session_id" => session_id,
+                 "task_id" => response_task_id,
+                 "query" => query,
+                 "factual_only" => true,
+                 "context_pack" => %{
+                   "task" => %{"title" => "Implement router"},
+                   "proof" => %{"proof_id" => proof_id},
+                   "resume" => %{"task_status" => "in_progress"},
+                   "memory" => memory_rows,
+                   "citations" => citations
+                 }
+               }
+             }
+           } = response
+
+    assert session_id == session.id
+    assert response_task_id == task.id
+    assert is_integer(proof_id)
+    assert is_binary(query)
+    assert Enum.any?(memory_rows, &(&1["id"] == memory_id))
+    assert Enum.any?(citations, &(&1["kind"] == "proof"))
+    assert Enum.any?(citations, &(&1["kind"] == "resume_packet"))
+    assert Enum.any?(citations, &(&1["kind"] == "memory" and &1["memory_id"] == memory_id))
+  end
+
   test "tools/call ck_review_submit returns plan refinement quality" do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "queued"})
@@ -1399,6 +1478,119 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert count >= 1
     assert semantic_available in [true, false]
     assert Enum.any?(records, &(&1["id"] == memory_id))
+  end
+
+  test "tools/call ck_goal records, lists, and updates persistent governed goals" do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    record_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2081,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_goal",
+          "arguments" => %{
+            "session_id" => session.id,
+            "task_id" => task.id,
+            "mode" => "record",
+            "goal" => "Keep governed MCP context explicit and citable.",
+            "horizon" => "task",
+            "tags" => ["context", "memory"]
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "recorded" => true,
+                 "goal_id" => goal_id,
+                 "status" => "active",
+                 "horizon" => "task"
+               }
+             }
+           } = record_response
+
+    list_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2082,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_goal",
+          "arguments" => %{
+            "session_id" => session.id,
+            "mode" => "list",
+            "status" => "active"
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "count" => active_count,
+                 "goals" => goals
+               }
+             }
+           } = list_response
+
+    assert active_count >= 1
+    assert Enum.any?(goals, &(&1["id"] == goal_id and &1["status"] == "active"))
+
+    update_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2083,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_goal",
+          "arguments" => %{
+            "session_id" => session.id,
+            "mode" => "update_status",
+            "goal_id" => goal_id,
+            "status" => "completed",
+            "progress_note" => "Added the explicit goal surface."
+          }
+        }
+      })
+
+    assert %{
+             "result" => %{
+               "structuredContent" => %{
+                 "updated" => true,
+                 "goal_id" => ^goal_id,
+                 "status" => "completed",
+                 "progress_note" => "Added the explicit goal surface."
+               }
+             }
+           } = update_response
+
+    record = Memory.get_record(goal_id)
+    assert record.record_type == "goal"
+    assert get_in(record.metadata, ["goal_status"]) == "completed"
+
+    completed_response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 2084,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_goal",
+          "arguments" => %{
+            "session_id" => session.id,
+            "mode" => "list",
+            "status" => "completed"
+          }
+        }
+      })
+
+    assert Enum.any?(
+             get_in(completed_response, ["result", "structuredContent", "goals"]),
+             &(&1["id"] == goal_id and &1["status"] == "completed")
+           )
   end
 
   test "tools/call ck_memory_archive archives an existing memory record" do
