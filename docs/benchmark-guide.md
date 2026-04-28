@@ -125,7 +125,7 @@ The `scripts/benchmark-host.sh` harness includes template routing for `opencode`
 For a reproducible host-governance comparison, use the generic harness:
 
 ```bash
-scripts/benchmark-host-governance.py --host opencode
+scripts/benchmark-host-governance.py --host opencode --model openai/gpt-5.5
 ```
 
 The harness is host/mode based. The first concrete host is OpenCode, with three modes:
@@ -275,3 +275,8 @@ controlkeel benchmark show <RUN_ID>
 controlkeel benchmark export <RUN_ID> --format csv
 controlkeel benchmark export <RUN_ID> --format json
 ```
+
+
+### Clean no-CK OpenCode baseline note
+
+OpenCode `--pure` disables external plugins, but local testing showed ControlKeel MCP/tool events can still appear from global OpenCode configuration even when `--dir` points at a generated isolated workdir. Treat `pure` rows as raw-prompt attempts, not a clean no-CK baseline, until the harness can run with provider authentication preserved and CK MCP/config fully excluded.

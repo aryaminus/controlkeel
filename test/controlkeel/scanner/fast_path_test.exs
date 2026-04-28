@@ -300,4 +300,86 @@ defmodule ControlKeel.Scanner.FastPathTest do
 
     assert Enum.any?(result.findings, &(&1.rule_id == "gdpr.personal_data_logging"))
   end
+
+  test "catches protected Ecto fields in mass assignment" do
+    result =
+      FastPath.scan(%{
+        "content" => """
+        def changeset(order, attrs) do
+          order
+          |> cast(attrs, [:total_cents, :status, :user_id, :discount_percent, :refunded_amount])
+          |> validate_required([:total_cents, :user_id])
+        end
+        """,
+        "path" => "lib/shop/order.ex",
+        "kind" => "code"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "security.mass_assignment"))
+    assert result.decision == "block"
+  end
+
+  test "warns on public registration without rate limiting" do
+    result =
+      FastPath.scan(%{
+        "content" => """
+        def register(conn, %{"email" => email, "password" => password}) do
+          %Accounts.User{}
+          |> Accounts.User.changeset(%{"email" => email, "password" => password})
+          |> Repo.insert!()
+
+          json(conn, %{message: "Account created successfully"})
+        end
+        """,
+        "path" => "lib/my_app_web/controllers/api_controller.ex",
+        "kind" => "code",
+        "domain_pack" => "software"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "software.missing_rate_limit"))
+    assert result.decision in ["warn", "block"]
+  end
+
+  test "warns on logging raw request body and headers" do
+    result =
+      FastPath.scan(%{
+        "content" => """
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        Logger.info("Request body: \#{body}")
+        Logger.info("Headers: \#{inspect(conn.req_headers)}")
+        Logger.info("Remote IP: \#{inspect(conn.remote_ip)}")
+        """,
+        "path" => "lib/my_app_web/plugs/request_logger.ex",
+        "kind" => "code",
+        "domain_pack" => "software"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "software.sensitive_request_logging"))
+    assert result.decision in ["warn", "block"]
+  end
+
+  test "blocks order lookup by URL id without ownership scope" do
+    result =
+      FastPath.scan(%{
+        "content" => """
+        def show(conn, %{"id" => id}) do
+          order = Repo.get!(Order, id)
+          json(conn, %{
+            order_id: order.id,
+            user_id: order.user_id,
+            total: order.total_cents,
+            items: order.items,
+            shipping_address: order.shipping_address,
+            payment_method: order.payment_last_four
+          })
+        end
+        """,
+        "path" => "lib/my_app_web/controllers/order_controller.ex",
+        "kind" => "code",
+        "domain_pack" => "ecommerce"
+      })
+
+    assert Enum.any?(result.findings, &(&1.rule_id == "ecommerce.idor_order_lookup"))
+    assert result.decision == "block"
+  end
 end

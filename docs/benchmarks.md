@@ -290,7 +290,7 @@ Policy-training promotion gates now carry the same integrity stance. A candidate
 Use the generic host-governance harness for a research-grade matrix with tokens/cost/time when the host exposes them:
 
 ```bash
-scripts/benchmark-host-governance.py --host opencode
+scripts/benchmark-host-governance.py --host opencode --model openai/gpt-5.5
 ```
 
 For OpenCode today, it records three host-generation modes and one deterministic baseline in one run:
@@ -301,3 +301,8 @@ For OpenCode today, it records three host-generation modes and one deterministic
 - `controlkeel_validate` baseline
 
 Raw outputs are generated under ignored benchmark evidence directories (default: `tmp/benchmark-evidence/host-governance/<host>/`). Promote only final summaries and exported result interpretations into tracked docs such as `docs/benchmark-evidence.md`. A valid host-governance evaluation should include both surface preflight proof and per-scenario event evidence showing whether MCP/tools/skills/plugins/hooks were actually invoked.
+
+
+### Clean no-CK OpenCode baseline note
+
+OpenCode `--pure` disables external plugins, but local testing showed ControlKeel MCP/tool events can still appear from global OpenCode configuration even when `--dir` points at a generated isolated workdir. Treat `pure` rows as raw-prompt attempts, not a clean no-CK baseline, until the harness can run with provider authentication preserved and CK MCP/config fully excluded.

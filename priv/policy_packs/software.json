@@ -113,5 +113,33 @@
         "(?i)/\\*\\s*(TODO|FIXME|HACK|XXX|BUG):?\\s"
       ]
     }
+  },
+  {
+    "id": "software.missing_rate_limit",
+    "category": "security",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Public account-creation endpoints should include rate limiting or throttling to reduce abuse and credential stuffing risk.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?is)def\\s+(?:register|signup|create_account)\\s*\\([^\\n]*password.*Repo\\.(?:insert!?|insert!)\\s*\\(",
+        "(?is)(?:/register|/signup|account created successfully).*Repo\\.(?:insert!?|insert!)"
+      ]
+    }
+  },
+  {
+    "id": "software.sensitive_request_logging",
+    "category": "security",
+    "severity": "medium",
+    "action": "warn",
+    "plain_message": "Logging raw request bodies, headers, or remote IPs can expose credentials and PII. Redact sensitive fields and log only the minimum metadata needed.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?is)read_body\\s*\\([^\\)]*conn[^\\)]*\\).*Logger\\.(?:info|debug|warn|error)\\s*\\([^\\n]*(?:body|req_headers|headers|remote_ip)",
+        "(?is)Logger\\.(?:info|debug|warn|error)\\s*\\([^\\n]*(?:Request body|Headers|req_headers|remote_ip)"
+      ]
+    }
   }
 ]

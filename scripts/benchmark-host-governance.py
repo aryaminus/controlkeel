@@ -106,18 +106,23 @@ def summarize_opencode_events(events):
     }
 
 
-def opencode_command(root, mode_config, benchmark_prompt):
+def opencode_command(root, mode_config, benchmark_prompt, model=None):
     execution_dir = mode_config.get("execution_dir") or root
-    return [
+    cmd = [
         "opencode",
         "run",
         *mode_config.get("args", []),
+    ]
+    if model:
+        cmd.extend(["--model", model])
+    cmd.extend([
         "--format",
         "json",
         "--dir",
         str(execution_dir),
         benchmark_prompt,
-    ]
+    ])
+    return cmd
 
 
 def opencode_version(root):
@@ -217,7 +222,7 @@ def export_run(root, run_id, output_dir):
         (output_dir / f"export.{fmt}").write_text(text[marker:] if marker >= 0 else text)
 
 
-def capture_subject(root, run_id, suite, host_name, host_config, mode_name, mode_config, output_dir, host_version, scenario_timeout=240, retries=1):
+def capture_subject(root, run_id, suite, host_name, host_config, mode_name, mode_config, output_dir, host_version, model=None, scenario_timeout=240, retries=1):
     subject = mode_config["subject"]
     subject_dir = output_dir / subject
     subject_dir.mkdir(parents=True, exist_ok=True)
@@ -239,7 +244,7 @@ def capture_subject(root, run_id, suite, host_name, host_config, mode_name, mode
             + "Scenario prompt: "
             + prompt
         )
-        cmd = host_config["command"](root, mode_config, benchmark_prompt)
+        cmd = host_config["command"](root, mode_config, benchmark_prompt, model=model)
 
         attempt = 0
         proc = None
@@ -284,6 +289,7 @@ def capture_subject(root, run_id, suite, host_name, host_config, mode_name, mode
                 "mode": mode_name,
                 "capture": f"{host_name}_governance_harness",
                 "host_version": host_version,
+                "model": model,
                 "command": mode_config.get("command_label"),
                 "execution_dir": str((mode_config.get("execution_dir") or root).relative_to(root) if str(mode_config.get("execution_dir") or root).startswith(str(root)) else mode_config.get("execution_dir") or root),
                 "isolation_policy": mode_config.get("isolation_policy", "repo root / CK-attached context"),
@@ -335,6 +341,7 @@ def main():
     parser.add_argument("--modes", default="all", help="comma-separated host modes or 'all' (for OpenCode: pure,ck,ck-active)")
     parser.add_argument("--scenario-timeout", type=int, default=240)
     parser.add_argument("--retry", type=int, default=2)
+    parser.add_argument("--model", default=None, help="OpenCode model id, e.g. openai/gpt-5.3-codex")
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -367,6 +374,7 @@ def main():
         "suite": args.suite,
         "host": args.host,
         "host_version": version,
+        "model": args.model,
         "subjects": {mode["subject"]: mode.get("label") for mode in mode_configs},
         "raw_capture_policy": "generated output; keep final summaries in docs, not committed payload directories",
     }
@@ -393,6 +401,7 @@ def main():
             out,
             version,
             scenario_timeout=args.scenario_timeout,
+            model=args.model,
             retries=args.retry,
         )
 

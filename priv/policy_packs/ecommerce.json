@@ -26,5 +26,19 @@
         "(?i)(disable|bypass).*(fraud|refund review|chargeback review)"
       ]
     }
+  },
+  {
+    "id": "ecommerce.idor_order_lookup",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Order lookups by URL id must be scoped to the authenticated user or authorization context before returning customer, shipping, or payment data.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?is)Repo\\.get!\\s*\\(\\s*(?:Order|__MODULE__)\\s*,\\s*id\\s*\\).*json\\s*\\([^\\)]*(?:shipping_address|payment_|user_id|items)",
+        "(?is)def\\s+show\\s*\\([^\\n]*%\\{[\\\"']id[\\\"']\\s*=>\\s*id\\}.*Repo\\.get!\\s*\\(\\s*Order\\s*,\\s*id\\s*\\)"
+      ]
+    }
   }
 ]

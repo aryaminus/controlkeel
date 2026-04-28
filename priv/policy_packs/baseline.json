@@ -157,5 +157,19 @@
         "(?i)(os\\.environ\\.copy\\(\\)|os\\.environ\\.items\\(\\)|ENV\\.to_h\\b)"
       ]
     }
+  },
+  {
+    "id": "security.mass_assignment",
+    "category": "security",
+    "severity": "critical",
+    "action": "block",
+    "plain_message": "Protected fields such as user_id, role, status, discounts, or refunds must not be mass-assigned from user params. Set them explicitly from trusted server context.",
+    "matcher": {
+      "type": "regex",
+      "patterns": [
+        "(?is)cast\\s*\\([^\\)]*,\\s*\\[[^\\]]*:(?:user_id|role|admin|is_admin|status|discount_percent|refunded_amount)[^\\]]*\\]",
+        "(?is)permit\\s*\\([^\\)]*(?:user_id|role|admin|is_admin|status|discount_percent|refunded_amount)"
+      ]
+    }
   }
 ]
