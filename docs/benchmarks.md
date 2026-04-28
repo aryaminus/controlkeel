@@ -198,6 +198,41 @@ This gives CK a way to compare experiments such as terminal-native tool syntax, 
 
 Protocol-adapter experiments are a good example of why this metadata matters. Sometimes the runtime loop is fine and the weak point is the model-facing interface: provider-native JSON tools are brittle, stop reasons are misleading, or smaller models fail to emit valid syntax. In those cases, the experiment is not "new runtime versus old runtime." It is "same runtime, different adapter contract." CK should record that distinction explicitly.
 
+### Skill activation and detection metadata
+
+When benchmarking skill routing, selection, and activation behavior, tag scenarios with the expected detection properties so results are comparable across runs and agent surfaces.
+
+**Detection confidence levels** (mirrors SkillGym's normalized session report model):
+
+- `skill_detection: "explicit"` — agent invoked the Skill tool directly by name; highest-confidence evidence
+- `skill_detection: "strong"` — agent read the skill's `SKILL.md` file as observed in file-read events
+- `skill_detection: "medium"` — indirect evidence such as a matching command or tool call consistent with the skill
+- `skill_detection: "weak"` — heuristic or inferred; pattern-matched from output text only
+
+**Skill read tracking:**
+
+- `observed_skill_reads: "required"` — scenario asserts that specific `SKILL.md` files were read, not just that the skill was invoked
+- `observed_skill_reads: "ordered"` — scenario requires skill files to be read in a specific sequence (e.g., routing skill before the target skill)
+- `observed_skill_reads: "exclusive"` — scenario asserts that no unexpected skills were activated (single-skill gate)
+
+**Token snapshot baseline:**
+
+- `token_snapshot: "enabled"` — this scenario has a captured token-usage baseline and should be flagged if usage regresses beyond the configured tolerance
+- `token_snapshot: "tolerance_10pct"` — allow up to 10% token growth before flagging as a regression
+- `token_snapshot: "tolerance_25pct"` — allow up to 25% token growth (useful for non-deterministic or multi-tool scenarios)
+
+Token snapshots catch context-bloat regressions: a skill that previously loaded in 400 tokens should not silently balloon to 4000 tokens after a body edit. Update snapshots explicitly (`--update-snapshots` equivalent in the benchmark runner) and treat unexplained growth as a finding, not a no-op.
+
+**Ordering and sequence assertions:**
+
+For scenarios where tool invocation order matters (e.g., `ck_validate` must precede `ck_review_submit`, or a routing skill must activate before the domain skill), record the expected sequence in metadata:
+
+- `tool_call_sequence: "required"` — scenario verifies that tool calls occurred in a specific order
+- `file_read_sequence: "required"` — scenario verifies that file reads occurred in a specific order
+- `skill_activation_sequence: "required"` — scenario verifies that skill A activated before skill B
+
+These tags make it clear in benchmark exports that a passing result depended on ordering, not just presence, so regressions that reorder but still complete are caught rather than silently passing.
+
 ## Rollout abort threshold
 
 When using benchmark scores as a release gate for agent harness changes (model swaps, system prompt rewrites, tool access changes), use these thresholds as the abort signal:

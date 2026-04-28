@@ -90,6 +90,98 @@ defmodule ControlKeel.SkillsTest do
     assert skill.user_invocable == true
   end
 
+  test "parser populates owner from top-level frontmatter and metadata.owner fallback", %{
+    tmp_dir: tmp_dir
+  } do
+    skill_dir_a = Path.join(tmp_dir, "owned-a")
+    File.mkdir_p!(skill_dir_a)
+
+    File.write!(Path.join(skill_dir_a, "SKILL.md"), """
+    ---
+    name: owned-a
+    description: Use this for data pipeline work. Do not use for UI tasks.
+    owner: data-team
+    ---
+    # Owned A
+    """)
+
+    assert {:ok, skill_a} = Parser.parse(Path.join(skill_dir_a, "SKILL.md"), "project")
+    assert skill_a.owner == "data-team"
+
+    skill_dir_b = Path.join(tmp_dir, "owned-b")
+    File.mkdir_p!(skill_dir_b)
+
+    File.write!(Path.join(skill_dir_b, "SKILL.md"), """
+    ---
+    name: owned-b
+    description: Use this for security audits. Do not use for general reviews.
+    metadata:
+      owner: security-team
+    ---
+    # Owned B
+    """)
+
+    assert {:ok, skill_b} = Parser.parse(Path.join(skill_dir_b, "SKILL.md"), "project")
+    assert skill_b.owner == "security-team"
+
+    skill_dir_c = Path.join(tmp_dir, "unowned")
+    File.mkdir_p!(skill_dir_c)
+
+    File.write!(Path.join(skill_dir_c, "SKILL.md"), """
+    ---
+    name: unowned
+    description: Use this for general tasks. Do not use for critical paths.
+    ---
+    # Unowned
+    """)
+
+    assert {:ok, skill_c} = Parser.parse(Path.join(skill_dir_c, "SKILL.md"), "project")
+    assert skill_c.owner == nil
+  end
+
+  test "parser computes a stable content_hash over SKILL.md and resource files", %{
+    tmp_dir: tmp_dir
+  } do
+    skill_dir = Path.join(tmp_dir, "hashable-skill")
+    File.mkdir_p!(Path.join(skill_dir, "references"))
+
+    skill_content = """
+    ---
+    name: hashable-skill
+    description: Use for hashing tests. Do not use in production.
+    ---
+    # Hashable Skill
+    """
+
+    ref_content = "# Reference\nSome reference content.\n"
+
+    File.write!(Path.join(skill_dir, "SKILL.md"), skill_content)
+    File.write!(Path.join(skill_dir, "references/guide.md"), ref_content)
+
+    assert {:ok, skill} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+    assert is_binary(skill.content_hash)
+    assert String.length(skill.content_hash) == 64
+    assert skill.content_hash =~ ~r/^[0-9a-f]+$/
+
+    # Same content produces same hash (deterministic)
+    assert {:ok, skill2} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+    assert skill.content_hash == skill2.content_hash
+
+    # Changing a resource changes the hash
+    File.write!(Path.join(skill_dir, "references/guide.md"), ref_content <> "\nExtra line.\n")
+    assert {:ok, skill3} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+    assert skill.content_hash != skill3.content_hash
+
+    # Changing SKILL.md itself changes the hash
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      String.replace(skill_content, "# Hashable Skill", "# Modified Skill")
+    )
+
+    assert {:ok, skill4} = Parser.parse(Path.join(skill_dir, "SKILL.md"), "project")
+    assert skill.content_hash != skill4.content_hash
+  end
+
   test "project-local skills are gated unless trusted", %{tmp_dir: tmp_dir} do
     project_root = Path.join(tmp_dir, "project")
     skill_dir = Path.join(project_root, ".agents/skills/project-only")

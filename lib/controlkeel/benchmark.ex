@@ -439,7 +439,10 @@ defmodule ControlKeel.Benchmark do
       metadata["retrieval_strategy"],
       metadata["compaction_strategy"],
       metadata["handoff_contract"],
-      metadata["artifact_scope"]
+      metadata["artifact_scope"],
+      metadata["skill_detection"],
+      metadata["token_snapshot"],
+      metadata["observed_skill_reads"]
       | List.wrap(metadata["behavior_tags"])
     ]
     |> Enum.reject(&is_nil/1)
