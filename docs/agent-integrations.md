@@ -148,6 +148,8 @@ dmux fits the same orchestration-adapter bucket, but with a repo-local tmux/work
 3. let dmux create worktrees that inherit those repo-local CK surfaces
 4. optionally use `.dmux-hooks/worktree_created` and `.dmux-hooks/pre_merge` to run governed setup, checks, or `mix precommit` before merge
 
+Pi subagent extensions such as `pi-subagents` fit a similar companion pattern inside the Pi host rather than a new CK dependency. The useful parts for CK are the delegation contracts they make visible: narrow child roles, chain or parallel runs, foreground/background status, recursion guards, fresh or forked context, clarification channels, and optional worktree isolation. Use `controlkeel attach pi` or the published `@aryaminus/controlkeel-pi-extension` so Pi parent and child sessions can reach the repo-local CK MCP, skills, and commands as appropriate; benchmark those runs with explicit delegation-surface evidence instead of a vague multi-agent label.
+
 ## Protocol interop
 
 ControlKeel exposes three protocol surfaces around the integration catalog:
