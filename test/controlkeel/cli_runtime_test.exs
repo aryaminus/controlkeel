@@ -514,6 +514,24 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert File.exists?(Path.join(tmp_dir, ".cursor/mcp.json"))
     assert File.exists?(cursor_config_path())
 
+    assert {:ok, devin_terminal_attach} = CLI.parse(["attach", "devin-terminal"])
+
+    devin_terminal_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(devin_terminal_attach, project_root: tmp_dir)
+      end)
+
+    assert devin_terminal_output =~ "Companion target: devin-terminal-native."
+    assert devin_terminal_output =~ "Support class: attach_client."
+    assert devin_terminal_output =~ "Auth mode: agent_runtime."
+    assert File.exists?(Path.join(tmp_dir, ".devin/config.json"))
+    assert File.exists?(Path.join(tmp_dir, ".devin/hooks.v1.json"))
+    assert File.exists?(Path.join(tmp_dir, ".devin/hooks/ck-session-start.sh"))
+    assert File.exists?(Path.join(tmp_dir, ".devin/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+
+    assert File.exists?(Path.join(tmp_dir, ".devin/agents/controlkeel-operator/AGENT.md"))
+
     assert {:ok, hermes_attach} = CLI.parse(["attach", "hermes-agent", "--scope", "project"])
 
     hermes_output =

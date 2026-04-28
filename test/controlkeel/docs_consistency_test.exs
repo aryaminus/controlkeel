@@ -47,6 +47,27 @@ defmodule ControlKeel.DocsConsistencyTest do
              "Restart Codex after `controlkeel attach codex-cli` or `controlkeel plugin install codex`"
   end
 
+  test "Devin local and hosted docs stay aligned with the typed integration catalog" do
+    direct_installs = read_doc!("docs/direct-host-installs.md")
+    integrations = read_doc!("docs/agent-integrations.md")
+    support_matrix = read_doc!("docs/support-matrix.md")
+
+    devin = AgentIntegration.get("devin")
+    devin_terminal = AgentIntegration.get("devin-terminal")
+
+    assert devin.runtime_export_command == "controlkeel runtime export devin"
+    assert devin_terminal.attach_command == "controlkeel attach devin-terminal"
+    assert devin_terminal.preferred_target == "devin-terminal-native"
+
+    assert direct_installs =~ "curl -fsSL https://cli.devin.ai/install.sh | bash"
+    assert direct_installs =~ "`controlkeel attach devin-terminal`"
+    assert integrations =~ "`controlkeel runtime export devin`"
+    assert integrations =~ "`controlkeel attach devin-terminal`"
+    assert integrations =~ ".devin/config.json"
+    assert support_matrix =~ "`devin-terminal`"
+    assert support_matrix =~ "`devin`"
+  end
+
   defp read_doc!(path) do
     @repo_root
     |> Path.join(path)

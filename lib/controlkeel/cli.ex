@@ -1012,7 +1012,16 @@ defmodule ControlKeel.CLI do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["roo-code", "hermes-agent", "openclaw", "droid", "forge", "pi", "letta-code"] do
+      when agent in [
+             "roo-code",
+             "hermes-agent",
+             "openclaw",
+             "droid",
+             "forge",
+             "pi",
+             "letta-code",
+             "devin-terminal"
+           ] do
     root = options[:project_root] || project_root
 
     target =
@@ -1023,7 +1032,8 @@ defmodule ControlKeel.CLI do
         "droid" => "droid-bundle",
         "forge" => "forge-acp",
         "pi" => "pi-native",
-        "letta-code" => "letta-code-native"
+        "letta-code" => "letta-code-native",
+        "devin-terminal" => "devin-terminal-native"
       }[agent]
 
     with {:ok, binding, _session, _mode} <-

@@ -2033,6 +2033,68 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "devin-terminal-native"}, root, project_root, skills, opts) do
+    compat_skill_root = Path.join(root, ".agents/skills")
+    native_skill_root = Path.join(root, ".devin/skills")
+    write_skill_tree(skills, compat_skill_root)
+    write_skill_tree(skills, native_skill_root)
+
+    agent_path = Path.join(root, ".devin/agents/controlkeel-operator/AGENT.md")
+    File.mkdir_p!(Path.dirname(agent_path))
+    File.write!(agent_path, devin_terminal_agent_contents())
+
+    hook_manifest_path = Path.join(root, ".devin/hooks.v1.json")
+    File.mkdir_p!(Path.dirname(hook_manifest_path))
+
+    File.write!(
+      hook_manifest_path,
+      Jason.encode!(devin_terminal_hooks_manifest(), pretty: true) <> "\n"
+    )
+
+    hook_dir = Path.join(root, ".devin/hooks")
+    File.mkdir_p!(hook_dir)
+
+    for {name, contents_fn} <- devin_terminal_hook_scripts() do
+      path = Path.join(hook_dir, name)
+      File.write!(path, contents_fn.())
+      File.chmod!(path, 0o755)
+    end
+
+    config_path = Path.join(root, ".devin/config.json")
+
+    File.write!(
+      config_path,
+      Jason.encode!(devin_terminal_config_payload(project_root, opts), pretty: true) <> "\n"
+    )
+
+    readme_path = Path.join(root, ".devin/README.md")
+    File.write!(readme_path, devin_terminal_readme_contents(project_root, opts))
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("devin-terminal", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => compat_skill_root, "kind" => "skills"},
+        %{"path" => native_skill_root, "kind" => "skills"},
+        %{"path" => agent_path, "kind" => "agent"},
+        %{"path" => hook_manifest_path, "kind" => "hooks"},
+        %{"path" => hook_dir, "kind" => "hooks"},
+        %{"path" => config_path, "kind" => "mcp"},
+        %{"path" => readme_path, "kind" => "runtime"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Keep `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks/`, `.devin/skills/`, and `.devin/agents/` in the repo so Devin for Terminal can load ControlKeel natively.",
+        "Keep `.agents/skills/` as the compatibility mirror because Devin also imports open-standard AgentSkills directories.",
+        "Use `devin mcp get controlkeel` or inspect `.devin/config.json` to confirm the local ControlKeel MCP registration."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "executor-runtime"}, root, project_root, _skills, opts) do
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, instructions_only_contents("executor", project_root, opts))
@@ -2435,6 +2497,10 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
+  defp devin_terminal_config_payload(project_root, opts) do
+    mcp_payload(project_root, opts)
+  end
+
   defp opencode_mcp_payload(project_root, opts) do
     %{
       "mcp" => %{
@@ -2444,6 +2510,116 @@ defmodule ControlKeel.Skills.Exporter do
         }
       }
     }
+  end
+
+  defp devin_terminal_agent_contents do
+    """
+    ---
+    name: controlkeel-operator
+    description: Govern Devin for Terminal work with ControlKeel validation, findings, reviews, and budget checks.
+    allowed-tools:
+      - read
+      - edit
+      - grep
+      - glob
+      - exec
+    ---
+
+    You are a ControlKeel-governed Devin subagent.
+
+    Always start by loading `ck_context`, then use `ck_validate` before risky code, config, or shell changes.
+    Use `ck_review_submit` before implementation plans or completion gates, `ck_finding` for issues you discover, and `ck_budget` before expensive multi-step work.
+    """
+  end
+
+  defp devin_terminal_hooks_manifest do
+    %{
+      "hooks" => %{
+        "SessionStart" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-session-start.sh"|,
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "PreToolUse" => [
+          %{
+            "matcher" => ".*",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-validate-shell.sh"|,
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "PostToolUse" => [
+          %{
+            "matcher" => ".*",
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-post-tool-use.sh"|,
+                "timeout" => 15
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" =>
+                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-user-prompt-submit.sh"|,
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "Stop" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-stop.sh"|,
+                "timeout" => 10
+              }
+            ]
+          }
+        ],
+        "SessionEnd" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-session-end.sh"|,
+                "timeout" => 10
+              }
+            ]
+          }
+        ]
+      }
+    }
+  end
+
+  defp devin_terminal_hook_scripts do
+    [
+      {"ck-session-start.sh", &codex_session_start_hook_contents/0},
+      {"ck-validate-shell.sh", &codex_validate_shell_hook_contents/0},
+      {"ck-post-tool-use.sh", &codex_post_tool_use_hook_contents/0},
+      {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
+      {"ck-stop.sh", &codex_stop_hook_contents/0},
+      {"ck-session-end.sh", &claude_plugin_session_end_hook_contents/0}
+    ]
   end
 
   defp hosted_mcp_payload(opts) do
@@ -2932,6 +3108,31 @@ defmodule ControlKeel.Skills.Exporter do
     - Use Devin's custom MCP flow and point it at the bundled `devin/controlkeel-mcp.json`
     - Prefer service accounts or shared runtime secrets for any OAuth-backed MCPs you add in Devin
     - Use webhook events such as `finding.created`, `task.completed`, `task.failed`, and `proof.generated` to sync governance state into CI or issue workflows
+    """
+  end
+
+  defp devin_terminal_readme_contents(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    """
+    # Devin for Terminal + ControlKeel
+
+    Use this native bundle when Devin runs locally in your shell and reads repo-local `.devin/` assets.
+
+    ## Repo context
+
+    - Repo root: `#{project_root}`
+    - Keep `AGENTS.md` at the repo root so Devin can ingest ControlKeel policy and workflow context.
+
+    ## Recommended Devin for Terminal setup
+
+    - Keep `.devin/config.json` checked in for project-scoped MCP and governance defaults.
+    - Keep `.devin/hooks.v1.json` and `.devin/hooks/` checked in so lifecycle guidance stays repo-visible.
+    - Keep `.devin/skills/` and `.devin/agents/` checked in so Devin can discover CK skills and governed subagents.
+    - Use `devin mcp get controlkeel` to inspect the ControlKeel MCP registration after attach.
     """
   end
 

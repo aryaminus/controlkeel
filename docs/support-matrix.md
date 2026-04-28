@@ -89,6 +89,7 @@ These are the first-class host adapters that currently implement the richer revi
 | `pi` | `controlkeel attach pi` | `file_plan_mode` | `browser_review` with persisted plan file state | `external` | `primary_only` | `controlkeel-pi-native.tar.gz`, `controlkeel-pi-native.tgz` |
 | `vscode` | `controlkeel attach vscode` | `review_only` | `browser_review` through companion extension | `vscode_webview` | `none` | `controlkeel-github-repo.tar.gz`, `controlkeel-vscode-companion.vsix` |
 | `codex-cli` | `controlkeel attach codex-cli` | `review_only` | `browser_review` through native commands | `none` | `primary_only` | `controlkeel-codex.tar.gz`, `controlkeel-codex-plugin.tar.gz` |
+| `devin-terminal` | `controlkeel attach devin-terminal` | `host_plan_mode` | `native_review` via Claude-compatible Devin hooks and MCP tool calls | `external` | `all` | `controlkeel-devin-terminal-native.tar.gz` |
 
 Everything else in the catalog remains supported according to its own typed row, but is not marketed as a first-class host adapter unless it has a real install surface plus a defined review path.
 
@@ -117,6 +118,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | `kilo` | Agent Skills, slash-command workflows, `.kilo/kilo.json`, and `AGENTS.md` |
 | `amp` | TypeScript plugin, native skill bundle, custom tool/command surface, and package scaffold |
 | `augment` | workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime metadata |
+| `devin-terminal` | `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks`, `.devin/skills`, `.devin/agents`, `.agents/skills`, and `AGENTS.md` |
 | `gemini-cli` | extension manifest, review/submit-plan commands, and skill bundle |
 | `cursor` | rules, Agent Skills (`.cursor/skills`), slash commands, governed agent prompts, background-agent guidance, repo `hooks.json` + hook scripts, MCP config, and `.cursor-plugin/` bundle |
 | `roo-code` | rules, commands, governed modes, and cloud-agent guidance |
@@ -185,6 +187,7 @@ Runtime transport truth for those first-class hosts:
 | `droid` | attach_client | `controlkeel attach droid` | `local_mcp`, `native_skills`, `commands`, `plugin` | `handoff` | `handoff` | `gateway_base_url` / `native` | `droid-bundle`, `droid-plugin` |
 | `forge` | attach_client | `controlkeel attach forge` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `acp_session` / `instructions_only` | `forge-acp` |
 | `devin` | headless_runtime | `controlkeel runtime export devin` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `devin-runtime` |
+| `devin-terminal` | attach_client | `controlkeel attach devin-terminal` | `local_mcp`, `native_skills`, `rules`, `hooks` | `embedded` | `direct` | `agent_runtime` / `native` | `devin-terminal-native` |
 | `open-swe` | headless_runtime | `controlkeel runtime export open-swe` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `ck_owned` / `instructions_only` | `open-swe-runtime` |
 | `executor` | headless_runtime | `controlkeel runtime export executor` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `executor-runtime` |
 | `virtual-bash` | headless_runtime | `controlkeel runtime export virtual-bash` | `hosted_mcp`, `commands` | `runtime` | `runtime` | `ck_owned` / `instructions_only` | `virtual-bash-runtime` |

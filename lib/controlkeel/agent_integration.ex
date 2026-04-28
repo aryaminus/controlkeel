@@ -648,6 +648,34 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["project", "export"],
         export_targets: ["devin-runtime"]
       }),
+      attach_client(%{
+        id: "devin-terminal",
+        label: "Devin for Terminal",
+        category: "native-first",
+        description:
+          "Attaches ControlKeel to Devin's local terminal agent by writing `.devin/` MCP, skills, hooks, and custom subagent files plus open-standard compatibility skills.",
+        attach_command: "controlkeel attach devin-terminal",
+        config_location:
+          "Devin for Terminal config in `<project>/.devin/config.json` or `~/.config/devin/config.json`.",
+        companion_delivery:
+          "Installs `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks`, `.devin/skills`, `.devin/agents`, `.agents/skills`, and repo `AGENTS.md`.",
+        preferred_target: "devin-terminal-native",
+        default_scope: "project",
+        router_agent_id: "devin-terminal",
+        auth_mode: "agent_runtime",
+        mcp_mode: "native",
+        skills_mode: "native",
+        upstream_slug: "cognition/devin",
+        upstream_docs_url: "https://cli.devin.ai/docs",
+        provider_bridge: %{
+          supported: true,
+          provider: "cognition",
+          mode: "agent_runtime",
+          owner: "agent"
+        },
+        supported_scopes: ["user", "project"],
+        export_targets: ["devin-terminal-native"]
+      }),
       headless_runtime(%{
         id: "open-swe",
         label: "Open SWE",
@@ -1920,6 +1948,9 @@ defmodule ControlKeel.AgentIntegration do
       "augment" ->
         ["local_mcp", "plugin", "native_skills", "rules", "commands", "hooks"]
 
+      "devin-terminal" ->
+        ["local_mcp", "native_skills", "rules", "hooks"]
+
       "aider" ->
         ["local_mcp", "commands"]
 
@@ -1960,6 +1991,7 @@ defmodule ControlKeel.AgentIntegration do
              "copilot-cli",
              "cline",
              "continue",
+             "devin-terminal",
              "letta-code",
              "aider",
              "augment",
@@ -2034,6 +2066,7 @@ defmodule ControlKeel.AgentIntegration do
               "kiro",
               "amp",
               "augment",
+              "devin-terminal",
               "letta-code"
             ] do
     "native_review"
@@ -2048,7 +2081,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_submission_mode(%{support_class: "framework_adapter"}), do: "manual"
 
   defp default_submission_mode(%{id: id})
-       when id in ["claude-code", "amp", "opencode"] do
+       when id in ["claude-code", "amp", "opencode", "devin-terminal"] do
     "tool_call"
   end
 
@@ -2071,7 +2104,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_feedback_mode(%{support_class: "provider_only"}), do: "manual"
 
   defp default_feedback_mode(%{id: id})
-       when id in ["claude-code", "codex-cli", "amp", "opencode"] do
+       when id in ["claude-code", "codex-cli", "amp", "opencode", "devin-terminal"] do
     "tool_call"
   end
 
@@ -2192,6 +2225,17 @@ defmodule ControlKeel.AgentIntegration do
     ]
   end
 
+  defp default_direct_install_methods(%{id: "devin-terminal"}) do
+    [
+      direct_install(
+        "host_cli",
+        "Install Devin for Terminal",
+        "curl -fsSL https://cli.devin.ai/install.sh | bash"
+      ),
+      direct_install("ck_attach", "CK attach", "controlkeel attach devin-terminal")
+    ]
+  end
+
   defp default_direct_install_methods(%{id: "pi"}) do
     [
       direct_install("ck_attach", "CK attach", "controlkeel attach pi"),
@@ -2284,7 +2328,8 @@ defmodule ControlKeel.AgentIntegration do
               "aider",
               "hermes-agent",
               "droid",
-              "forge"
+              "forge",
+              "devin-terminal"
             ] do
     [direct_install("ck_attach", "CK attach", "controlkeel attach #{id}")]
   end
@@ -2411,6 +2456,17 @@ defmodule ControlKeel.AgentIntegration do
 
   defp default_artifact_surfaces(%{id: "opencode"}),
     do: [".opencode/plugins", ".opencode/commands", ".opencode/mcp.json", "AGENTS.md"]
+
+  defp default_artifact_surfaces(%{id: "devin-terminal"}),
+    do: [
+      ".agents/skills",
+      ".devin/config.json",
+      ".devin/hooks.v1.json",
+      ".devin/hooks",
+      ".devin/skills",
+      ".devin/agents",
+      "AGENTS.md"
+    ]
 
   defp default_artifact_surfaces(%{id: "gemini-cli"}),
     do: [

@@ -58,6 +58,7 @@ The [skills.sh](https://skills.sh/) agent list is broader than CK's native attac
 | Gemini CLI | `gemini extensions link ./controlkeel/dist/gemini-cli-native` | Direct extension-link flow for the exported Gemini companion bundle. |
 | Augment / Auggie CLI | `npm install -g @augmentcode/auggie` | Installs the host CLI so CK’s Augment-native workspace bundle and plugin bundle can be used locally. |
 | Letta Code | `npm install -g @letta-ai/letta-code` | Installs the Letta CLI. Use `controlkeel attach letta-code` after that to add repo-local skills, hooks, and MCP registration helpers. |
+| Devin for Terminal | `curl -fsSL https://cli.devin.ai/install.sh | bash` | Installs the local Devin terminal client. Use `controlkeel attach devin-terminal` after that to add repo-local `.devin/` MCP, hooks, skills, agents, and `AGENTS.md`. |
 
 ## Direct local plugin or bundle installs
 
@@ -92,6 +93,7 @@ These hosts now ship richer hook, command, workflow, or config surfaces, but the
 | Hermes Agent | `controlkeel attach hermes-agent` |
 | OpenClaw | `controlkeel attach openclaw` |
 | Forge | `controlkeel attach forge` |
+| Devin for Terminal | `controlkeel attach devin-terminal` |
 
 ## dmux compatibility
 

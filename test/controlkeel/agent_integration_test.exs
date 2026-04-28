@@ -39,6 +39,7 @@ defmodule ControlKeel.AgentIntegrationTest do
     claude = AgentIntegration.get("claude-code")
     codex = AgentIntegration.get("codex-cli")
     cline = AgentIntegration.get("cline")
+    devin_terminal = AgentIntegration.get("devin-terminal")
     roo = AgentIntegration.get("roo-code")
     goose = AgentIntegration.get("goose")
     pi = AgentIntegration.get("pi")
@@ -113,6 +114,19 @@ defmodule ControlKeel.AgentIntegrationTest do
              mode: "agent_runtime",
              owner: "agent"
            }
+
+    assert devin_terminal.label == "Devin for Terminal"
+    assert devin_terminal.support_class == "attach_client"
+    assert devin_terminal.attach_command == "controlkeel attach devin-terminal"
+    assert devin_terminal.preferred_target == "devin-terminal-native"
+    assert "user" in devin_terminal.supported_scopes
+    assert "project" in devin_terminal.supported_scopes
+    assert devin_terminal.auth_mode == "agent_runtime"
+    assert devin_terminal.review_experience == "native_review"
+    assert ".devin/config.json" in devin_terminal.artifact_surfaces
+    assert ".devin/hooks.v1.json" in devin_terminal.artifact_surfaces
+    assert ".devin/skills" in devin_terminal.artifact_surfaces
+    assert ".devin/agents" in devin_terminal.artifact_surfaces
 
     assert cline.label == "Cline"
     assert cline.support_class == "attach_client"
@@ -525,6 +539,7 @@ defmodule ControlKeel.AgentIntegrationTest do
 
   test "typed runtime, provider, and alias rows stay truthful" do
     devin = AgentIntegration.get("devin")
+    devin_terminal = AgentIntegration.get("devin-terminal")
     executor = AgentIntegration.get("executor")
     virtual_bash = AgentIntegration.get("virtual-bash")
     codex_app = AgentIntegration.get("codex-app-server")
@@ -536,6 +551,9 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert devin.support_class == "headless_runtime"
     assert devin.runtime_export_command == "controlkeel runtime export devin"
     assert devin.preferred_target == "devin-runtime"
+    assert devin_terminal.support_class == "attach_client"
+    assert devin_terminal.attach_command == "controlkeel attach devin-terminal"
+    assert devin_terminal.preferred_target == "devin-terminal-native"
     assert executor.support_class == "headless_runtime"
     assert executor.runtime_export_command == "controlkeel runtime export executor"
     assert executor.preferred_target == "executor-runtime"

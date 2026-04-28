@@ -304,6 +304,15 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "devin-terminal-native",
+        "Devin for Terminal native bundle",
+        "Devin-native `.devin/` config, skills, subagents, hooks, and MCP companion files for local terminal use.",
+        true,
+        "project",
+        ["user", "project", "export"],
+        true
+      ),
+      target(
         "cloudflare-workers-runtime",
         "Cloudflare Workers runtime export",
         "Governed Cloudflare Workers AI agent with D1, KV, R2, and MCP governance integration.",

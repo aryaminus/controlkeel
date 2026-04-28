@@ -197,6 +197,61 @@ defmodule ControlKeel.Skills.Installer do
     install_plugin_bundle("claude-plugin", "claude", scope, project_root)
   end
 
+  defp do_install(%SkillTarget{id: "devin-terminal-native"}, scope, project_root, _skills, _opts)
+       when scope in ["user", "project"] do
+    {:ok, plan} = Exporter.export("devin-terminal-native", project_root, scope: scope)
+
+    {devin_root, compat_root} =
+      if scope == "user" do
+        {Path.join(user_home(), ".config/devin"), Path.join(user_home(), ".agents/skills")}
+      else
+        {Path.join(project_root, ".devin"), Path.join(project_root, ".agents/skills")}
+      end
+
+    native_skill_root = Path.join(devin_root, "skills")
+    agent_root = Path.join(devin_root, "agents")
+    hooks_root = Path.join(devin_root, "hooks")
+
+    File.mkdir_p!(devin_root)
+    File.mkdir_p!(native_skill_root)
+    File.mkdir_p!(agent_root)
+    File.mkdir_p!(hooks_root)
+    File.mkdir_p!(compat_root)
+
+    copy_tree_contents(Path.join(plan.output_dir, ".devin/skills"), native_skill_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".devin/agents"), agent_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".devin/hooks"), hooks_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), compat_root)
+
+    merge_json_file!(
+      Path.join(plan.output_dir, ".devin/config.json"),
+      Path.join(devin_root, "config.json")
+    )
+
+    merge_json_file!(
+      Path.join(plan.output_dir, ".devin/hooks.v1.json"),
+      Path.join(devin_root, "hooks.v1.json")
+    )
+
+    File.cp!(Path.join(plan.output_dir, ".devin/README.md"), Path.join(devin_root, "README.md"))
+
+    if scope == "project" do
+      install_project_agents_md!(plan.output_dir, project_root)
+    end
+
+    {:ok,
+     %{
+       target: "devin-terminal-native",
+       scope: scope,
+       destination: devin_root,
+       skills_destination: native_skill_root,
+       compat_skills_destination: compat_root,
+       agents_destination: agent_root,
+       hooks_destination: hooks_root,
+       config_destination: Path.join(devin_root, "config.json")
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "cline-native"}, scope, project_root, skills, _opts)
        when scope in ["user", "project"] do
     {:ok, plan} = Exporter.export("cline-native", project_root, scope: scope)

@@ -462,12 +462,15 @@ defmodule ControlKeel.SkillsTest do
 
     assert Enum.sort(names) == [
              "agent-integration",
+             "align",
              "benchmark-operator",
              "cloudflare-agent",
              "compliance-audit",
              "controlkeel-governance",
              "cost-optimization",
              "domain-audit",
+             "handoff",
+             "plan-slice",
              "policy-training",
              "proof-memory",
              "security-review",
@@ -775,6 +778,33 @@ defmodule ControlKeel.SkillsTest do
     assert {:ok, devin_plan} = Skills.export("devin-runtime", tmp_dir, scope: "export")
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/README.md"))
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/controlkeel-mcp.json"))
+
+    assert {:ok, devin_terminal_plan} =
+             Skills.export("devin-terminal-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(
+               devin_terminal_plan.output_dir,
+               ".devin/skills/controlkeel-governance/SKILL.md"
+             )
+           )
+
+    assert File.exists?(
+             Path.join(
+               devin_terminal_plan.output_dir,
+               ".agents/skills/controlkeel-governance/SKILL.md"
+             )
+           )
+
+    assert File.exists?(Path.join(devin_terminal_plan.output_dir, ".devin/config.json"))
+    assert File.exists?(Path.join(devin_terminal_plan.output_dir, ".devin/hooks.v1.json"))
+
+    assert File.exists?(
+             Path.join(
+               devin_terminal_plan.output_dir,
+               ".devin/agents/controlkeel-operator/AGENT.md"
+             )
+           )
 
     assert {:ok, executor_plan} = Skills.export("executor-runtime", tmp_dir, scope: "export")
     assert File.exists?(Path.join(executor_plan.output_dir, "executor/README.md"))

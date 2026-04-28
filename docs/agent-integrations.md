@@ -23,6 +23,13 @@ That mechanism split is intentionally simpler than the full catalog, but it shou
 
 One useful example is `jcode`: CK does not currently ship a native `controlkeel attach jcode` path, but jcode does load `AGENTS.md` and supports project-local `.jcode/mcp.json` plus optional `.jcode/prompt-overlay.md`. So CK treats jcode as a research/compatibility row rather than pretending it is already a first-class host adapter.
 
+Devin now splits into two truthful CK stories:
+
+- Hosted Devin stays a runtime export: `controlkeel runtime export devin`
+- Devin for Terminal is a local host attach surface: `controlkeel attach devin-terminal`
+
+That split matters because the hosted product uses cloud/runtime settings, while Devin for Terminal reads repo-local and user-local `.devin/` assets directly.
+
 ## Bidirectional execution model
 
 Each integration is modeled in both directions:
@@ -53,6 +60,7 @@ These are the current higher-confidence host adapters where the docs, release as
 | Pi | `controlkeel attach pi` | browser review with persisted plan state | file-plan bundle and published npm extension |
 | VS Code | `controlkeel attach vscode` | browser review through companion webview | companion `.vsix` plus repo-local MCP wiring |
 | Codex CLI | `controlkeel attach codex-cli` | browser review through native commands | `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks`, `.codex/agents`, `.codex/commands`, plus optional local plugin bundle via `controlkeel plugin install codex` |
+| Devin for Terminal | `controlkeel attach devin-terminal` | native hook review | `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks`, `.devin/skills`, `.devin/agents`, plus `.agents/skills` compatibility copies |
 
 For Codex there are two supported CK delivery modes:
 
@@ -129,6 +137,7 @@ Current examples:
 - Kilo Code: Agent Skills, slash-command workflows, MCP config, and `AGENTS.md`
 - Amp: TypeScript plugin scaffold, native skill bundle, commands, and MCP wiring
 - Gemini CLI: extension manifest, commands, skills, and `GEMINI.md`
+- Devin for Terminal: `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks/`, `.devin/skills/`, `.devin/agents/`, and repo `AGENTS.md`
 - Cursor: rules, Agent Skills (`.cursor/skills`), commands, governed agent prompts (`.cursor/agents`), background-agent guidance, repo hooks (`hooks.json` + scripts), MCP config, and `.cursor-plugin/` bundle
 - Roo Code: rules, commands, governed modes, and cloud-agent guidance
 - Aider: command-driven review snippets and `.aider.conf.yml`
@@ -140,6 +149,13 @@ The same distinction applies to the broader `skills.sh` ecosystem. Some names th
 Conductor sits between those buckets. Its official docs say it runs bundled Claude Code and Codex, uses Claude Code MCP config, maps project instructions to `CLAUDE.md`, and reads Claude slash commands from `.claude/commands`. In practice that means CK support inside Conductor is real, but it is inherited from the Claude Code repo-local surfaces rather than from a dedicated `controlkeel attach conductor` command.
 
 Paperclip is one layer higher again: an orchestration plane that schedules and supervises external agents through documented adapters such as Claude Local, Codex Local, Gemini Local, OpenClaw Gateway, Hermes Local, Pi Local, and Cursor Local, with instance config under `~/.paperclip/instances/default/config.json`. CK therefore models Paperclip as an orchestration adapter, not as a native attach target. The practical integration path is to attach CK to the underlying runtime each Paperclip agent uses.
+
+Devin for Terminal does not fit that orchestration-adapter bucket because it exposes direct local host surfaces. CK now uses those native surfaces directly:
+
+1. install Devin for Terminal itself
+2. run `controlkeel attach devin-terminal`
+3. let Devin load `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks/`, `.devin/skills/`, and `.devin/agents/`
+4. keep `.agents/skills/` in place as the open-standard compatibility mirror that Devin can also import
 
 dmux fits the same orchestration-adapter bucket, but with a repo-local tmux/worktree focus. It launches Claude Code, Codex, OpenCode, Copilot, Gemini CLI, and other agents inside isolated git worktrees under `.dmux/worktrees/`, plus optional lifecycle automation through `.dmux-hooks/`. CK therefore does not pretend there is a `controlkeel attach dmux` command. The practical path is:
 
