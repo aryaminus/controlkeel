@@ -23,6 +23,7 @@ defmodule ControlKeel.Skills.Parser do
     metadata
     model
     name
+    owner
     paths
     shell
     user-invocable
@@ -75,6 +76,11 @@ defmodule ControlKeel.Skills.Parser do
           |> compatibility_targets(openai_metadata)
           |> Enum.uniq()
 
+        metadata_map = Map.get(meta, "metadata", %{})
+        owner =
+          normalize_nil(Map.get(meta, "owner")) ||
+            normalize_nil(Map.get(metadata_map, "owner"))
+
         {:ok,
          %SkillDefinition{
            name: name,
@@ -82,7 +88,7 @@ defmodule ControlKeel.Skills.Parser do
            path: skill_path,
            skill_dir: skill_dir,
            body: String.trim(body),
-           metadata: Map.get(meta, "metadata", %{}),
+           metadata: metadata_map,
            scope: scope,
            source: classify_source(skill_path),
            license: normalize_nil(Map.get(meta, "license")),
@@ -98,7 +104,8 @@ defmodule ControlKeel.Skills.Parser do
            diagnostics: diagnostics,
            openai: openai_metadata,
            agent_metadata: agent_metadata,
-           install_state: %{}
+           install_state: %{},
+           owner: owner
          }}
       end
     end

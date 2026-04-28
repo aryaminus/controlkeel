@@ -36,6 +36,7 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
           "compatibility_targets" => s.compatibility_targets,
           "path" => s.path,
           "source" => s.source,
+          "owner" => s.owner,
           "install_state" => s.install_state,
           "diagnostics" => Enum.map(s.diagnostics, &diagnostic_summary/1)
         }

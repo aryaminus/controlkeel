@@ -191,11 +191,46 @@ Useful fields include:
 - `artifact_scope: "model_scoped"` — prompt/runtime artifacts are keyed to a specific model rather than treated as universal behavior
 
 These fields help distinguish "done by morning" runs from "better by morning" runs without pretending they should be judged the same way.
+
 - `control_flow_surface: "typed_runtime"` — recursion or decomposition handled by a constrained typed runtime rather than improvised free-form control flow
 
 This gives CK a way to compare experiments such as terminal-native tool syntax, recursive language-model loops, or typed functional runtimes without pretending those are all first-class shipped CK targets. The rule is simple: benchmark the concrete runtime contract that actually ran, record it honestly, and compare it on the same held-out suite.
 
 Protocol-adapter experiments are a good example of why this metadata matters. Sometimes the runtime loop is fine and the weak point is the model-facing interface: provider-native JSON tools are brittle, stop reasons are misleading, or smaller models fail to emit valid syntax. In those cases, the experiment is not "new runtime versus old runtime." It is "same runtime, different adapter contract." CK should record that distinction explicitly.
+
+## Rollout abort threshold
+
+When using benchmark scores as a release gate for agent harness changes (model swaps, system prompt rewrites, tool access changes), use these thresholds as the abort signal:
+
+- **Score drop**: abort rollout if the judge-averaged quality score drops **≥ 0.15** against the current production baseline
+- **Statistical window**: require a minimum of **200 interactions** before computing the gate decision
+- **Significance**: require **p < 0.05** on the quality delta before promoting or aborting
+- **Cohort ladder**: gate each promotion step (10% → 20% → 50% → 100%) against a fresh window, not the cumulative pool
+
+If the abort threshold triggers: flip traffic back to stable, open a finding with the regression cohort attached, and treat it as a new failure cluster entering the improvement loop. Do not re-promote until the root cause is identified and the held-out suite passes.
+
+For minority or experimental model integrations (non-dominant provider), sample at 100% rather than applying the standard traffic-proportional rate — minority models never reach statistical significance fast enough to gate a rollout decision at low sample rates.
+
+Record rollout gate decisions in benchmark run metadata using:
+
+- `rollout_gate: "score_drop_abort"` — rollout aborted by quality regression
+- `rollout_gate: "score_drop_threshold"` — threshold value used (e.g. 0.15)
+- `rollout_gate: "significance_window"` — interaction count at gate decision
+- `rollout_gate: "cohort_pct"` — traffic percentage at abort time
+
+## Pre-flight destructive capability checklist
+
+Before granting an agent production access or expanding its capability surface, answer these five questions. A single "yes without approval" is a blocker:
+
+1. **Can it delete data?** — write access to production databases, object storage, or durable state without a checkpoint or dry-run gate.
+2. **Can it touch backups?** — read or write access to backup targets, snapshot buckets, or recovery state.
+3. **Can it rotate secrets?** — ability to invalidate, regenerate, or reassign credentials, API keys, or IAM roles.
+4. **Can it change infrastructure?** — Terraform, CDK, cloud console, or equivalent that mutates running infrastructure.
+5. **Can it do any of the above without human approval?** — no review gate, no `ck_review_submit`, no `requires_human_review` finding raised.
+
+If the answer to question 5 is yes for any of 1–4, the task is a capability egress violation under CK policy (`network_default: deny`, `approval_path: ck_review_or_trusted_human`). Resolve with an explicit scoped allowlist and a `ck_review_submit` approval before granting access.
+
+CK's `fast_path` scanner catches the most common destructive shell patterns reactively (repo-wide `git checkout`, `git reset --hard`, broad `rm -rf`, etc.) — this checklist is the proactive gate that runs before those patterns can even reach execution.
 
 ## Web UI quick presets
 

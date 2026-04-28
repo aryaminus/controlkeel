@@ -21,6 +21,7 @@ defmodule ControlKeel.Skills.SkillDefinition do
     :diagnostics,
     :openai,
     :agent_metadata,
-    :install_state
+    :install_state,
+    :owner
   ]
 end
