@@ -500,6 +500,7 @@ controlkeel plugin export copilot
 controlkeel plugin export openclaw
 controlkeel plugin export augment
 controlkeel runtime export devin
+controlkeel runtime export warp-oz
 controlkeel runtime export open-swe
 controlkeel runtime export executor
 controlkeel runtime export virtual-bash
@@ -726,6 +727,7 @@ Validate:
 
 ```bash
 controlkeel runtime export devin
+controlkeel runtime export warp-oz
 controlkeel runtime export open-swe
 controlkeel runtime export cloudflare-workers
 controlkeel runtime export executor

@@ -313,6 +313,24 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
+        "warp-native",
+        "Warp native bundle",
+        "Warp-native `.warp/skills`, AgentSkills compatibility copies, AGENTS guidance, and copy-pasteable MCP companion files for local Oz agents.",
+        true,
+        "project",
+        ["user", "project", "export"],
+        true
+      ),
+      target(
+        "warp-oz-runtime",
+        "Warp Oz runtime export",
+        "Oz cloud-agent runtime export with AGENTS context, MCP config examples, schedule/integration guidance, and API request templates.",
+        false,
+        "export",
+        ["project", "export"],
+        true
+      ),
+      target(
         "cloudflare-workers-runtime",
         "Cloudflare Workers runtime export",
         "Governed Cloudflare Workers AI agent with D1, KV, R2, and MCP governance integration.",

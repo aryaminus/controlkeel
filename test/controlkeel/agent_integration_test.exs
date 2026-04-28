@@ -18,6 +18,8 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert "goose" in ids
     assert "augment" in ids
     assert "pi" in ids
+    assert "warp" in ids
+    assert "warp-oz" in ids
     assert "devin" in ids
     assert "dmux" in ids
     assert "virtual-bash" in ids
@@ -40,6 +42,8 @@ defmodule ControlKeel.AgentIntegrationTest do
     codex = AgentIntegration.get("codex-cli")
     cline = AgentIntegration.get("cline")
     devin_terminal = AgentIntegration.get("devin-terminal")
+    warp = AgentIntegration.get("warp")
+    warp_oz = AgentIntegration.get("warp-oz")
     roo = AgentIntegration.get("roo-code")
     goose = AgentIntegration.get("goose")
     pi = AgentIntegration.get("pi")
@@ -127,6 +131,27 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert ".devin/hooks.v1.json" in devin_terminal.artifact_surfaces
     assert ".devin/skills" in devin_terminal.artifact_surfaces
     assert ".devin/agents" in devin_terminal.artifact_surfaces
+
+    assert warp.label == "Warp"
+    assert warp.support_class == "attach_client"
+    assert warp.attach_command == "controlkeel attach warp"
+    assert warp.preferred_target == "warp-native"
+    assert warp.auth_mode == "agent_runtime"
+    assert warp.mcp_mode == "config_reference"
+    assert warp.review_experience == "native_review"
+    assert ".warp/skills" in warp.artifact_surfaces
+    assert ".warp/controlkeel-mcp.json" in warp.artifact_surfaces
+    assert ".warp/README.md" in warp.artifact_surfaces
+    assert ".agents/skills" in warp.artifact_surfaces
+
+    assert warp_oz.label == "Warp Oz Cloud Agents"
+    assert warp_oz.support_class == "headless_runtime"
+    assert warp_oz.runtime_export_command == "controlkeel runtime export warp-oz"
+    assert warp_oz.preferred_target == "warp-oz-runtime"
+    assert warp_oz.auth_mode == "oauth_runtime"
+    assert warp_oz.mcp_mode == "export_only"
+    assert "warp-oz/controlkeel-agent-config.json" in warp_oz.artifact_surfaces
+    assert "warp-oz/controlkeel-api-request.json" in warp_oz.artifact_surfaces
 
     assert cline.label == "Cline"
     assert cline.support_class == "attach_client"
@@ -540,6 +565,8 @@ defmodule ControlKeel.AgentIntegrationTest do
   test "typed runtime, provider, and alias rows stay truthful" do
     devin = AgentIntegration.get("devin")
     devin_terminal = AgentIntegration.get("devin-terminal")
+    warp = AgentIntegration.get("warp")
+    warp_oz = AgentIntegration.get("warp-oz")
     executor = AgentIntegration.get("executor")
     virtual_bash = AgentIntegration.get("virtual-bash")
     codex_app = AgentIntegration.get("codex-app-server")
@@ -554,6 +581,12 @@ defmodule ControlKeel.AgentIntegrationTest do
     assert devin_terminal.support_class == "attach_client"
     assert devin_terminal.attach_command == "controlkeel attach devin-terminal"
     assert devin_terminal.preferred_target == "devin-terminal-native"
+    assert warp.support_class == "attach_client"
+    assert warp.attach_command == "controlkeel attach warp"
+    assert warp.preferred_target == "warp-native"
+    assert warp_oz.support_class == "headless_runtime"
+    assert warp_oz.runtime_export_command == "controlkeel runtime export warp-oz"
+    assert warp_oz.preferred_target == "warp-oz-runtime"
     assert executor.support_class == "headless_runtime"
     assert executor.runtime_export_command == "controlkeel runtime export executor"
     assert executor.preferred_target == "executor-runtime"

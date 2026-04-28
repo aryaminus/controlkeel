@@ -463,6 +463,48 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
+  defp do_install(%SkillTarget{id: "warp-native"}, scope, project_root, _skills, _opts)
+       when scope in ["user", "project"] do
+    {:ok, plan} = Exporter.export("warp-native", project_root, scope: scope)
+
+    {warp_root, compat_root} =
+      if scope == "user" do
+        {Path.join(user_home(), ".warp"), Path.join(user_home(), ".agents/skills")}
+      else
+        {Path.join(project_root, ".warp"), Path.join(project_root, ".agents/skills")}
+      end
+
+    native_skill_root = Path.join(warp_root, "skills")
+
+    File.mkdir_p!(warp_root)
+    File.mkdir_p!(native_skill_root)
+    File.mkdir_p!(compat_root)
+
+    copy_tree_contents(Path.join(plan.output_dir, ".warp/skills"), native_skill_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), compat_root)
+
+    File.cp!(
+      Path.join(plan.output_dir, ".warp/controlkeel-mcp.json"),
+      Path.join(warp_root, "controlkeel-mcp.json")
+    )
+
+    File.cp!(Path.join(plan.output_dir, ".warp/README.md"), Path.join(warp_root, "README.md"))
+
+    if scope == "project" do
+      install_project_agents_md!(plan.output_dir, project_root)
+    end
+
+    {:ok,
+     %{
+       target: "warp-native",
+       scope: scope,
+       destination: warp_root,
+       skills_destination: native_skill_root,
+       compat_skills_destination: compat_root,
+       config_destination: Path.join(warp_root, "controlkeel-mcp.json")
+     }}
+  end
+
   defp do_install(%SkillTarget{id: "goose-native"}, "project", project_root, _skills, _opts) do
     {:ok, plan} = Exporter.export("goose-native", project_root, scope: "project")
 

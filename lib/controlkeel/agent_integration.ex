@@ -626,6 +626,56 @@ defmodule ControlKeel.AgentIntegration do
         supported_scopes: ["user", "project"],
         export_targets: ["forge-acp", "instructions-only"]
       }),
+      attach_client(%{
+        id: "warp",
+        label: "Warp",
+        category: "native-first",
+        description:
+          "Attaches ControlKeel to Warp's local Oz agents by writing `.warp/skills`, open-standard compatibility skills, repo `AGENTS.md`, and a copy-pasteable MCP snippet for the Warp desktop app.",
+        attach_command: "controlkeel attach warp",
+        config_location:
+          "Warp local MCP servers are configured in the desktop app or Warp Drive settings; project and user skills live in `.warp/skills` or `~/.warp/skills`.",
+        companion_delivery:
+          "Installs `.warp/skills`, `.agents/skills`, `.warp/controlkeel-mcp.json`, `.warp/README.md`, and repo `AGENTS.md` for project scope.",
+        preferred_target: "warp-native",
+        default_scope: "project",
+        router_agent_id: "warp",
+        auth_mode: "agent_runtime",
+        mcp_mode: "config_reference",
+        skills_mode: "native",
+        upstream_slug: "warpdotdev/Warp",
+        upstream_docs_url: "https://docs.warp.dev/agent-platform",
+        provider_bridge: %{
+          supported: true,
+          provider: "warp",
+          mode: "agent_runtime",
+          owner: "agent"
+        },
+        supported_scopes: ["user", "project"],
+        export_targets: ["warp-native"]
+      }),
+      headless_runtime(%{
+        id: "warp-oz",
+        label: "Warp Oz Cloud Agents",
+        category: "headless-runtime",
+        description:
+          "Headless export for Oz cloud agents with repo `AGENTS.md`, cloud MCP config examples, schedule/integration guidance, and API/SDK run templates.",
+        runtime_export_command: "controlkeel runtime export warp-oz",
+        config_location:
+          "Oz cloud agents run through the Oz CLI, Oz web app, schedules, integrations, or API/SDK with YAML/JSON agent config files and environment IDs.",
+        companion_delivery:
+          "Emits repo `AGENTS.md`, Oz runtime README, cloud agent config examples, and API request templates instead of a local attach target.",
+        preferred_target: "warp-oz-runtime",
+        default_scope: "project",
+        auth_mode: "oauth_runtime",
+        mcp_mode: "export_only",
+        skills_mode: "instructions_only",
+        upstream_slug: "warpdotdev/Warp",
+        upstream_docs_url: "https://docs.warp.dev/agent-platform/cloud-agents/platform",
+        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
+        supported_scopes: ["project", "export"],
+        export_targets: ["warp-oz-runtime"]
+      }),
       headless_runtime(%{
         id: "devin",
         label: "Devin (Cognition)",
@@ -1951,6 +2001,9 @@ defmodule ControlKeel.AgentIntegration do
       "devin-terminal" ->
         ["local_mcp", "native_skills", "rules", "hooks"]
 
+      "warp" ->
+        ["local_mcp", "native_skills", "rules"]
+
       "aider" ->
         ["local_mcp", "commands"]
 
@@ -1965,6 +2018,9 @@ defmodule ControlKeel.AgentIntegration do
 
       id when id in ["forge", "devin", "open-swe"] ->
         ["hosted_mcp", "a2a"]
+
+      "warp-oz" ->
+        ["hosted_mcp", "native_skills", "rules"]
 
       "open-agents" ->
         ["native_skills", "cli_bash"]
@@ -1992,6 +2048,7 @@ defmodule ControlKeel.AgentIntegration do
              "cline",
              "continue",
              "devin-terminal",
+             "warp",
              "letta-code",
              "aider",
              "augment",
@@ -2067,6 +2124,7 @@ defmodule ControlKeel.AgentIntegration do
               "amp",
               "augment",
               "devin-terminal",
+              "warp",
               "letta-code"
             ] do
     "native_review"
@@ -2081,7 +2139,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_submission_mode(%{support_class: "framework_adapter"}), do: "manual"
 
   defp default_submission_mode(%{id: id})
-       when id in ["claude-code", "amp", "opencode", "devin-terminal"] do
+       when id in ["claude-code", "amp", "opencode", "devin-terminal", "warp"] do
     "tool_call"
   end
 
@@ -2104,7 +2162,7 @@ defmodule ControlKeel.AgentIntegration do
   defp default_feedback_mode(%{support_class: "provider_only"}), do: "manual"
 
   defp default_feedback_mode(%{id: id})
-       when id in ["claude-code", "codex-cli", "amp", "opencode", "devin-terminal"] do
+       when id in ["claude-code", "codex-cli", "amp", "opencode", "devin-terminal", "warp"] do
     "tool_call"
   end
 
@@ -2233,6 +2291,24 @@ defmodule ControlKeel.AgentIntegration do
         "curl -fsSL https://cli.devin.ai/install.sh | bash"
       ),
       direct_install("ck_attach", "CK attach", "controlkeel attach devin-terminal")
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "warp"}) do
+    [
+      direct_install("host_app", "Install Warp", "brew install --cask warp"),
+      direct_install("ck_attach", "CK attach", "controlkeel attach warp")
+    ]
+  end
+
+  defp default_direct_install_methods(%{id: "warp-oz"}) do
+    [
+      direct_install(
+        "host_cli",
+        "Install Oz CLI",
+        "brew tap warpdotdev/warp && brew update && brew install --cask oz"
+      ),
+      direct_install("ck_export", "CK runtime export", "controlkeel runtime export warp-oz")
     ]
   end
 
@@ -2465,6 +2541,23 @@ defmodule ControlKeel.AgentIntegration do
       ".devin/hooks",
       ".devin/skills",
       ".devin/agents",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "warp"}),
+    do: [
+      ".warp/skills",
+      ".agents/skills",
+      ".warp/controlkeel-mcp.json",
+      ".warp/README.md",
+      "AGENTS.md"
+    ]
+
+  defp default_artifact_surfaces(%{id: "warp-oz"}),
+    do: [
+      "warp-oz/controlkeel-agent-config.json",
+      "warp-oz/controlkeel-api-request.json",
+      "warp-oz/README.md",
       "AGENTS.md"
     ]
 

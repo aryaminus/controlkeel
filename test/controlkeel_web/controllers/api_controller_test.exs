@@ -646,6 +646,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(agents, &(&1["id"] == "goose"))
       assert Enum.any?(agents, &(&1["id"] == "cursor"))
       assert Enum.any?(agents, &(&1["id"] == "open-swe"))
+      assert Enum.any?(agents, &(&1["id"] == "warp"))
+      assert Enum.any?(agents, &(&1["id"] == "warp-oz"))
       assert Enum.any?(agents, &(&1["id"] == "devin"))
       assert Enum.any?(agents, &(&1["id"] == "executor"))
       assert Enum.any?(agents, &(&1["id"] == "virtual-bash"))
@@ -702,6 +704,23 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert devin["support_class"] == "headless_runtime"
       assert devin["runtime_export_command"] == "controlkeel runtime export devin"
+
+      warp =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "warp"
+        end)
+
+      assert warp["support_class"] == "attach_client"
+      assert warp["attach_command"] == "controlkeel attach warp"
+      assert warp["preferred_target"] == "warp-native"
+
+      warp_oz =
+        Enum.find(agents, fn agent ->
+          agent["id"] == "warp-oz"
+        end)
+
+      assert warp_oz["support_class"] == "headless_runtime"
+      assert warp_oz["runtime_export_command"] == "controlkeel runtime export warp-oz"
 
       executor =
         Enum.find(agents, fn agent ->

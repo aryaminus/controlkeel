@@ -779,6 +779,30 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/README.md"))
     assert File.exists?(Path.join(devin_plan.output_dir, "devin/controlkeel-mcp.json"))
 
+    assert {:ok, warp_plan} = Skills.export("warp-native", tmp_dir, scope: "export")
+
+    assert File.exists?(
+             Path.join(warp_plan.output_dir, ".warp/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(
+             Path.join(warp_plan.output_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+           )
+
+    assert File.exists?(Path.join(warp_plan.output_dir, ".warp/controlkeel-mcp.json"))
+    assert File.exists?(Path.join(warp_plan.output_dir, ".warp/README.md"))
+
+    assert {:ok, warp_oz_plan} = Skills.export("warp-oz-runtime", tmp_dir, scope: "export")
+    assert File.exists?(Path.join(warp_oz_plan.output_dir, "warp-oz/README.md"))
+
+    assert File.exists?(
+             Path.join(warp_oz_plan.output_dir, "warp-oz/controlkeel-agent-config.json")
+           )
+
+    assert File.exists?(
+             Path.join(warp_oz_plan.output_dir, "warp-oz/controlkeel-api-request.json")
+           )
+
     assert {:ok, devin_terminal_plan} =
              Skills.export("devin-terminal-native", tmp_dir, scope: "export")
 
@@ -1346,6 +1370,21 @@ defmodule ControlKeel.SkillsTest do
       File.read!(Path.join(tmp_dir, ".opencode/agents/controlkeel-operator.md"))
 
     assert opencode_install_agent =~ "controlkeel update --json"
+
+    assert {:ok, warp_install} = Skills.install("warp-native", tmp_dir, scope: "project")
+    assert warp_install.destination == Path.join(tmp_dir, ".warp")
+    assert warp_install.skills_destination == Path.join(tmp_dir, ".warp/skills")
+    assert warp_install.compat_skills_destination == Path.join(tmp_dir, ".agents/skills")
+    assert File.exists?(Path.join(tmp_dir, ".warp/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".warp/controlkeel-mcp.json"))
+    assert File.exists?(Path.join(tmp_dir, ".warp/README.md"))
+    assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+
+    warp_mcp = Jason.decode!(File.read!(Path.join(tmp_dir, ".warp/controlkeel-mcp.json")))
+
+    assert get_in(warp_mcp, ["mcpServers", "controlkeel", "working_directory"]) ==
+             Path.expand(tmp_dir)
 
     assert {:ok, gemini_install} =
              Skills.install("gemini-cli-native", tmp_dir, scope: "project")

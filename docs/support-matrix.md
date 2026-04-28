@@ -89,6 +89,7 @@ These are the first-class host adapters that currently implement the richer revi
 | `pi` | `controlkeel attach pi` | `file_plan_mode` | `browser_review` with persisted plan file state | `external` | `primary_only` | `controlkeel-pi-native.tar.gz`, `controlkeel-pi-native.tgz` |
 | `vscode` | `controlkeel attach vscode` | `review_only` | `browser_review` through companion extension | `vscode_webview` | `none` | `controlkeel-github-repo.tar.gz`, `controlkeel-vscode-companion.vsix` |
 | `codex-cli` | `controlkeel attach codex-cli` | `review_only` | `browser_review` through native commands | `none` | `primary_only` | `controlkeel-codex.tar.gz`, `controlkeel-codex-plugin.tar.gz` |
+| `warp` | `controlkeel attach warp` | `host_plan_mode` | `native_review` through Warp local agent review and MCP tool calls | `external` | `all` | `controlkeel-warp-native.tar.gz` |
 | `devin-terminal` | `controlkeel attach devin-terminal` | `host_plan_mode` | `native_review` via Claude-compatible Devin hooks and MCP tool calls | `external` | `all` | `controlkeel-devin-terminal-native.tar.gz` |
 
 Everything else in the catalog remains supported according to its own typed row, but is not marketed as a first-class host adapter unless it has a real install surface plus a defined review path.
@@ -118,6 +119,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | `kilo` | Agent Skills, slash-command workflows, `.kilo/kilo.json`, and `AGENTS.md` |
 | `amp` | TypeScript plugin, native skill bundle, custom tool/command surface, and package scaffold |
 | `augment` | workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime metadata |
+| `warp` | `.warp/skills`, `.agents/skills`, `.warp/controlkeel-mcp.json`, `.warp/README.md`, and `AGENTS.md` |
 | `devin-terminal` | `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks`, `.devin/skills`, `.devin/agents`, `.agents/skills`, and `AGENTS.md` |
 | `gemini-cli` | extension manifest, review/submit-plan commands, and skill bundle |
 | `cursor` | rules, Agent Skills (`.cursor/skills`), slash commands, governed agent prompts, background-agent guidance, repo `hooks.json` + hook scripts, MCP config, and `.cursor-plugin/` bundle |
@@ -186,6 +188,8 @@ Runtime transport truth for those first-class hosts:
 | `openclaw` | attach_client | `controlkeel attach openclaw` | `local_mcp`, `plugin`, `native_skills` | `handoff` | `handoff` | `config_reference` / `plugin_bundle` | `openclaw-native` |
 | `droid` | attach_client | `controlkeel attach droid` | `local_mcp`, `native_skills`, `commands`, `plugin` | `handoff` | `handoff` | `gateway_base_url` / `native` | `droid-bundle`, `droid-plugin` |
 | `forge` | attach_client | `controlkeel attach forge` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `acp_session` / `instructions_only` | `forge-acp` |
+| `warp` | attach_client | `controlkeel attach warp` | `local_mcp`, `native_skills`, `rules` | `embedded` | `direct` | `agent_runtime` / `native` | `warp-native` |
+| `warp-oz` | headless_runtime | `controlkeel runtime export warp-oz` | `hosted_mcp`, `native_skills`, `rules` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `warp-oz-runtime` |
 | `devin` | headless_runtime | `controlkeel runtime export devin` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `oauth_runtime` / `instructions_only` | `devin-runtime` |
 | `devin-terminal` | attach_client | `controlkeel attach devin-terminal` | `local_mcp`, `native_skills`, `rules`, `hooks` | `embedded` | `direct` | `agent_runtime` / `native` | `devin-terminal-native` |
 | `open-swe` | headless_runtime | `controlkeel runtime export open-swe` | `hosted_mcp`, `a2a` | `runtime` | `runtime` | `ck_owned` / `instructions_only` | `open-swe-runtime` |

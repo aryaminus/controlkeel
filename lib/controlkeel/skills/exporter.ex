@@ -2033,6 +2033,46 @@ defmodule ControlKeel.Skills.Exporter do
     )
   end
 
+  defp write_target(%SkillTarget{id: "warp-native"}, root, project_root, skills, opts) do
+    compat_skill_root = Path.join(root, ".agents/skills")
+    native_skill_root = Path.join(root, ".warp/skills")
+    write_skill_tree(skills, compat_skill_root)
+    write_skill_tree(skills, native_skill_root)
+
+    config_path = Path.join(root, ".warp/controlkeel-mcp.json")
+    File.mkdir_p!(Path.dirname(config_path))
+
+    File.write!(
+      config_path,
+      Jason.encode!(warp_native_mcp_payload(project_root, opts), pretty: true) <> "\n"
+    )
+
+    readme_path = Path.join(root, ".warp/README.md")
+    File.write!(readme_path, warp_native_readme_contents(project_root, opts))
+
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("warp", project_root, opts))
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => compat_skill_root, "kind" => "skills"},
+        %{"path" => native_skill_root, "kind" => "skills"},
+        %{"path" => config_path, "kind" => "mcp"},
+        %{"path" => readme_path, "kind" => "runtime"},
+        %{"path" => agents_path, "kind" => "instructions"}
+      ],
+      [
+        "Keep `.warp/skills/` checked in so Warp local agents can discover governed skills natively.",
+        "Keep `.agents/skills/` checked in as the compatibility mirror because Warp also scans open-standard AgentSkills directories.",
+        "Import or copy `.warp/controlkeel-mcp.json` into Warp Settings > MCP Servers or Warp Drive > MCP Servers; Warp local MCP is app-managed, not repo-auto-loaded.",
+        "Keep `AGENTS.md` at the repo root so Warp project rules apply automatically."
+      ]
+    )
+  end
+
   defp write_target(%SkillTarget{id: "devin-terminal-native"}, root, project_root, skills, opts) do
     compat_skill_root = Path.join(root, ".agents/skills")
     native_skill_root = Path.join(root, ".devin/skills")
@@ -2091,6 +2131,47 @@ defmodule ControlKeel.Skills.Exporter do
         "Keep `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks/`, `.devin/skills/`, and `.devin/agents/` in the repo so Devin for Terminal can load ControlKeel natively.",
         "Keep `.agents/skills/` as the compatibility mirror because Devin also imports open-standard AgentSkills directories.",
         "Use `devin mcp get controlkeel` or inspect `.devin/config.json` to confirm the local ControlKeel MCP registration."
+      ]
+    )
+  end
+
+  defp write_target(%SkillTarget{id: "warp-oz-runtime"}, root, project_root, _skills, opts) do
+    agents_path = Path.join(root, "AGENTS.md")
+    File.write!(agents_path, instructions_only_contents("warp-oz", project_root, opts))
+
+    readme_path = Path.join(root, "warp-oz/README.md")
+    File.mkdir_p!(Path.dirname(readme_path))
+    File.write!(readme_path, warp_oz_runtime_contents(project_root, opts))
+
+    config_path = Path.join(root, "warp-oz/controlkeel-agent-config.json")
+
+    File.write!(
+      config_path,
+      Jason.encode!(warp_oz_agent_config_payload(), pretty: true) <> "\n"
+    )
+
+    api_request_path = Path.join(root, "warp-oz/controlkeel-api-request.json")
+
+    File.write!(
+      api_request_path,
+      Jason.encode!(warp_oz_api_request_payload(), pretty: true) <> "\n"
+    )
+
+    with_common_assets(
+      root,
+      project_root,
+      opts,
+      [
+        %{"path" => agents_path, "kind" => "instructions"},
+        %{"path" => readme_path, "kind" => "runtime"},
+        %{"path" => config_path, "kind" => "settings"},
+        %{"path" => api_request_path, "kind" => "runtime"}
+      ],
+      [
+        "Place `AGENTS.md` at the repo root so Warp/Oz runs inherit ControlKeel workflow guidance.",
+        "Add this repository to an Oz environment so `.warp/skills/` and `.agents/skills/` become available to cloud agents.",
+        "Use `warp-oz/controlkeel-agent-config.json` with `oz agent run-cloud -f ...` for repeatable MCP-enabled runs.",
+        "Use `warp-oz/controlkeel-api-request.json` as the starting point for REST/API runs authenticated with `WARP_API_KEY`."
       ]
     )
   end
@@ -2622,6 +2703,73 @@ defmodule ControlKeel.Skills.Exporter do
     ]
   end
 
+  defp warp_native_mcp_payload(project_root, opts) do
+    root =
+      if portable_project_root?(opts) do
+        Distribution.portable_project_root()
+      else
+        Path.expand(project_root)
+      end
+
+    project_root_arg =
+      case opts[:scope] do
+        "user" -> "<PROJECT_ROOT>"
+        _ -> root
+      end
+
+    working_directory =
+      case opts[:scope] do
+        "user" -> "<PROJECT_ROOT>"
+        _ -> root
+      end
+
+    %{
+      "mcpServers" => %{
+        "controlkeel" => %{
+          "command" => mcp_command(project_root, opts),
+          "args" => ["mcp", "--project-root", project_root_arg],
+          "env" => %{},
+          "working_directory" => working_directory
+        }
+      }
+    }
+  end
+
+  defp warp_oz_agent_config_payload do
+    %{
+      "name" => "controlkeel-governed-run",
+      "model_id" => "claude-sonnet-4",
+      "system_prompt" =>
+        "Use repository AGENTS.md guidance and call the ControlKeel MCP server before high-impact changes.",
+      "environment_id" => "<ENV_ID>",
+      "mcp_servers" => %{
+        "controlkeel" => %{
+          "command" => "controlkeel",
+          "args" => ["mcp", "--project-root", "<PROJECT_ROOT>"],
+          "env" => %{}
+        }
+      }
+    }
+  end
+
+  defp warp_oz_api_request_payload do
+    %{
+      "prompt" =>
+        "Review the repository, follow AGENTS.md, and summarize proposed changes before editing.",
+      "config" => %{
+        "environment_id" => "<ENV_ID>",
+        "skill_spec" => "owner/repo:controlkeel-governance",
+        "mcp_servers" => %{
+          "controlkeel" => %{
+            "command" => "controlkeel",
+            "args" => ["mcp", "--project-root", "<PROJECT_ROOT>"],
+            "env" => %{}
+          }
+        }
+      }
+    }
+  end
+
   defp hosted_mcp_payload(opts) do
     base_url = Keyword.get(opts, :hosted_base_url, "https://your-controlkeel.example")
     client_id = Keyword.get(opts, :oauth_client_id, "ck-sa-<service-account-id>")
@@ -3133,6 +3281,75 @@ defmodule ControlKeel.Skills.Exporter do
     - Keep `.devin/hooks.v1.json` and `.devin/hooks/` checked in so lifecycle guidance stays repo-visible.
     - Keep `.devin/skills/` and `.devin/agents/` checked in so Devin can discover CK skills and governed subagents.
     - Use `devin mcp get controlkeel` to inspect the ControlKeel MCP registration after attach.
+    """
+  end
+
+  defp warp_native_readme_contents(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    project_root_note =
+      case opts[:scope] do
+        "user" ->
+          "Replace `<PROJECT_ROOT>` in `.warp/controlkeel-mcp.json` with the repo path you want Warp to govern before importing it."
+
+        _ ->
+          "The generated `.warp/controlkeel-mcp.json` already points at this repo and sets `working_directory` explicitly, matching Warp's local MCP guidance."
+      end
+
+    """
+    # Warp + ControlKeel
+
+    Use this native bundle when you want Warp's local Oz agents to discover ControlKeel skills and repo rules directly from the repository.
+
+    ## Repo context
+
+    - Repo root: `#{project_root}`
+    - Keep `AGENTS.md` at the repo root so Warp project rules apply automatically.
+
+    ## Recommended Warp setup
+
+    - Keep `.warp/skills/` checked in so Warp local agents can discover governed skills natively.
+    - Keep `.agents/skills/` checked in because Warp also scans open-standard AgentSkills directories.
+    - Import or copy `.warp/controlkeel-mcp.json` into Warp Settings > MCP Servers or Warp Drive > MCP Servers.
+    - #{project_root_note}
+    - If you already use Claude Code, Codex CLI, Gemini CLI, or OpenCode inside Warp's third-party utility bar, keep using the existing CK attach flow for those hosts separately. This bundle is for Warp's own local Oz agents.
+    """
+  end
+
+  defp warp_oz_runtime_contents(project_root, opts) do
+    project_root =
+      if portable_project_root?(opts),
+        do: Distribution.portable_project_root(),
+        else: Path.expand(project_root)
+
+    """
+    # Warp Oz Cloud Agents + ControlKeel
+
+    Use this runtime export when you want Oz cloud agents, schedules, integrations, or API-driven runs to inherit ControlKeel governance.
+
+    ## Repo context
+
+    - Repo root: `#{project_root}`
+    - Keep `AGENTS.md` at the repo root so cloud runs inherit ControlKeel workflow guidance.
+    - Add this repository to an Oz environment so `.warp/skills/` and `.agents/skills/` become available to cloud agents.
+
+    ## Recommended Oz setup
+
+    - Install the Oz CLI with `brew tap warpdotdev/warp && brew update && brew install --cask oz`, or use the copy bundled with the Warp desktop app.
+    - Use `oz login` for interactive machines, or set `WARP_API_KEY` for CI, remote runners, or other headless environments.
+    - Start repeatable MCP-enabled runs with `oz agent run-cloud --environment <ENV_ID> -f warp-oz/controlkeel-agent-config.json --prompt "..."`.
+    - Create recurring jobs with `oz schedule create --name "CK review" --cron "0 10 * * 1" --environment <ENV_ID> --prompt "..."`.
+    - Connect Slack or Linear trigger surfaces with `oz integration create slack --environment <ENV_ID>` or the Oz web app at `oz.warp.dev`.
+    - Use `warp-oz/controlkeel-api-request.json` with `curl -X POST https://app.warp.dev/api/v1/agent/run -H "Authorization: Bearer $WARP_API_KEY" -H "Content-Type: application/json" -d @warp-oz/controlkeel-api-request.json`.
+
+    ## Important notes
+
+    - Replace `<ENV_ID>` with your Oz environment id.
+    - Replace `<PROJECT_ROOT>` with the repository path inside the cloud environment before using the stdio MCP example.
+    - Warp's cloud MCP config supports `command`, `args`, `env`, `url`, `headers`, and `warp_id`, but not the desktop-only `working_directory` field.
     """
   end
 

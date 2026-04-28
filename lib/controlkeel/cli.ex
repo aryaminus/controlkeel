@@ -1020,7 +1020,8 @@ defmodule ControlKeel.CLI do
              "forge",
              "pi",
              "letta-code",
-             "devin-terminal"
+             "devin-terminal",
+             "warp"
            ] do
     root = options[:project_root] || project_root
 
@@ -1033,7 +1034,8 @@ defmodule ControlKeel.CLI do
         "forge" => "forge-acp",
         "pi" => "pi-native",
         "letta-code" => "letta-code-native",
-        "devin-terminal" => "devin-terminal-native"
+        "devin-terminal" => "devin-terminal-native",
+        "warp" => "warp-native"
       }[agent]
 
     with {:ok, binding, _session, _mode} <-
@@ -1154,6 +1156,28 @@ defmodule ControlKeel.CLI do
 
       {:error, reason} ->
         {:error, "Failed to export Executor runtime bundle: #{inspect(reason)}"}
+    end
+  end
+
+  def run_command(%{command: :runtime_export, args: ["warp-oz"], options: options}, project_root) do
+    root = resolve_project_root(options, project_root)
+    snapshot = SetupAdvisor.snapshot(root)
+
+    case Skills.export("warp-oz-runtime", root, scope: "export") do
+      {:ok, plan} ->
+        {:ok,
+         [
+           "Prepared Warp Oz runtime export.",
+           "Project root: #{snapshot["project_root"]}",
+           SetupAdvisor.detected_hosts_line(snapshot),
+           "Output: #{plan.output_dir}",
+           "Core loop: #{SetupAdvisor.core_loop()}"
+         ] ++
+           Enum.map(plan.instructions, &"  #{&1}") ++
+           maybe_line(SetupAdvisor.service_account_hint(snapshot), "  ")}
+
+      {:error, reason} ->
+        {:error, "Failed to export Warp Oz runtime bundle: #{inspect(reason)}"}
     end
   end
 

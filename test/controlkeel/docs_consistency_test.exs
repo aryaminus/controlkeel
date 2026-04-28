@@ -68,6 +68,29 @@ defmodule ControlKeel.DocsConsistencyTest do
     assert support_matrix =~ "`devin`"
   end
 
+  test "Warp local and Oz cloud docs stay aligned with the typed integration catalog" do
+    direct_installs = read_doc!("docs/direct-host-installs.md")
+    integrations = read_doc!("docs/agent-integrations.md")
+    support_matrix = read_doc!("docs/support-matrix.md")
+
+    warp = AgentIntegration.get("warp")
+    warp_oz = AgentIntegration.get("warp-oz")
+
+    assert warp.attach_command == "controlkeel attach warp"
+    assert warp.preferred_target == "warp-native"
+    assert warp_oz.runtime_export_command == "controlkeel runtime export warp-oz"
+    assert warp_oz.preferred_target == "warp-oz-runtime"
+
+    assert direct_installs =~ "brew install --cask warp"
+    assert direct_installs =~ "brew tap warpdotdev/warp && brew update && brew install --cask oz"
+    assert direct_installs =~ "`controlkeel attach warp`"
+    assert integrations =~ "`controlkeel attach warp`"
+    assert integrations =~ "`controlkeel runtime export warp-oz`"
+    assert integrations =~ ".warp/skills"
+    assert support_matrix =~ "`warp`"
+    assert support_matrix =~ "`warp-oz`"
+  end
+
   defp read_doc!(path) do
     @repo_root
     |> Path.join(path)

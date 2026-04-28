@@ -30,6 +30,13 @@ Devin now splits into two truthful CK stories:
 
 That split matters because the hosted product uses cloud/runtime settings, while Devin for Terminal reads repo-local and user-local `.devin/` assets directly.
 
+Warp also splits into two truthful CK stories:
+
+- Local Warp agents use `controlkeel attach warp`
+- Oz cloud agents use `controlkeel runtime export warp-oz`
+
+That split matters because Warp's local agent surface reads repo and home skills plus `AGENTS.md`, while local MCP stays app-managed in Warp settings. Oz cloud agents, schedules, integrations, and API/SDK runs are a separate runtime surface with YAML/JSON config files, environment ids, and cloud-run orchestration.
+
 ## Bidirectional execution model
 
 Each integration is modeled in both directions:
@@ -60,6 +67,7 @@ These are the current higher-confidence host adapters where the docs, release as
 | Pi | `controlkeel attach pi` | browser review with persisted plan state | file-plan bundle and published npm extension |
 | VS Code | `controlkeel attach vscode` | browser review through companion webview | companion `.vsix` plus repo-local MCP wiring |
 | Codex CLI | `controlkeel attach codex-cli` | browser review through native commands | `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks`, `.codex/agents`, `.codex/commands`, plus optional local plugin bundle via `controlkeel plugin install codex` |
+| Warp | `controlkeel attach warp` | native review through Warp local agent + MCP/tool loop | `.warp/skills`, `.agents/skills`, `.warp/controlkeel-mcp.json`, `.warp/README.md`, and repo `AGENTS.md` |
 | Devin for Terminal | `controlkeel attach devin-terminal` | native hook review | `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks`, `.devin/skills`, `.devin/agents`, plus `.agents/skills` compatibility copies |
 
 For Codex there are two supported CK delivery modes:

@@ -532,6 +532,20 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert File.exists?(Path.join(tmp_dir, ".devin/agents/controlkeel-operator/AGENT.md"))
 
+    assert {:ok, warp_attach} = CLI.parse(["attach", "warp"])
+
+    warp_output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(warp_attach, project_root: tmp_dir)
+      end)
+
+    assert warp_output =~ "Companion target: warp-native."
+    assert warp_output =~ "MCP mode: config_reference."
+    assert File.exists?(Path.join(tmp_dir, ".warp/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".warp/controlkeel-mcp.json"))
+    assert File.exists?(Path.join(tmp_dir, ".warp/README.md"))
+
     assert {:ok, hermes_attach} = CLI.parse(["attach", "hermes-agent", "--scope", "project"])
 
     hermes_output =
@@ -892,6 +906,29 @@ defmodule ControlKeel.CLIRuntimeTest do
              Path.join(
                tmp_dir,
                "controlkeel/dist/executor-runtime/executor/controlkeel-sources.example.ts"
+             )
+           )
+  end
+
+  test "runtime export emits the Warp Oz headless bundle", %{tmp_dir: tmp_dir} do
+    assert {:ok, export} = CLI.parse(["runtime", "export", "warp-oz", "--project-root", tmp_dir])
+
+    output =
+      capture_io(fn ->
+        assert 0 == CLI.execute(export, project_root: tmp_dir)
+      end)
+
+    resolved_root = ProjectRoot.resolve(tmp_dir)
+
+    assert output =~ "Prepared Warp Oz runtime export."
+    assert output =~ "Project root: #{resolved_root}"
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/warp-oz-runtime/AGENTS.md"))
+    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/warp-oz-runtime/warp-oz/README.md"))
+
+    assert File.exists?(
+             Path.join(
+               tmp_dir,
+               "controlkeel/dist/warp-oz-runtime/warp-oz/controlkeel-agent-config.json"
              )
            )
   end
