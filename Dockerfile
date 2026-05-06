@@ -8,7 +8,7 @@
 # (release-smoke.yml uses erlef/setup-beam with otp-version: "27.3.4.3"
 # and elixir-version: "1.19.5").  hexpm images no longer carry OTP 27 stable.
 #
-FROM debian:bookworm-slim AS build
+FROM debian:13.4-slim AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -62,7 +62,7 @@ COPY config/runtime.exs config/
 RUN mix release
 
 # ---- Runtime Stage ----
-FROM debian:bookworm-slim AS app
+FROM debian:13.4-slim AS app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libstdc++ openssl ca-certificates \
