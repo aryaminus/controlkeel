@@ -2,6 +2,16 @@
 
 ControlKeel's observability loop turns governed evidence into reviewed regression protection. It is local-first and human-gated: it can propose evals, benchmark drafts, and promotion candidates, but it does not automatically rewrite policy, router, prompt, skill, or autofix artifacts.
 
+## How the loop closes
+
+The observability loop is a closed feedback loop, not a logbook:
+
+1. **Outcome auto-emission** — deploy readiness, security scan, regression, and prompt-approval outcomes auto-emit to `OutcomeTracker` with metadata linking back to the shipping decision. No manual call required.
+2. **Eval candidate generation** — recurring failure patterns cluster into eval candidates from real trace packets, not paraphrases.
+3. **Benchmark drafts** — eval candidates generate benchmark drafts with bounded real trace evidence from `trace_improvement_packet`.
+4. **Lifecycle closure** — benchmark run results automatically archive the originating eval candidate when all results matched expected, or reopen it when any result missed. This means the eval backlog self-maintains: passed candidates close, failed candidates stay open for investigation.
+5. **Skill evolution** — `ck_skill_evolution` synthesizes from traces and failure clusters. Install mode materializes generated drafts into `.agents/skills/` under the project root, so evolved skills re-enter the catalog without manual copy-paste.
+
 ## Workflow
 
 ```bash

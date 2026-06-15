@@ -10,6 +10,27 @@ When an agent attempts an action that violates a rule, exceeds budget, or fails 
 
 Findings are recorded automatically on lifecycle events (session, task, review, proof, budget, regression) and can be created explicitly through `ck_finding`. Each finding writes a typed memory record so future agents recover the context without re-deriving it.
 
+### Decision-time snapshots
+When a finding or review is created, ControlKeel stamps decision-time metadata that survives later state changes:
+- **Policy snapshot** — domain pack, policy packs, and a packs hash identifying the exact ruleset that governed the decision.
+- **Artifact snapshot** — content SHA256, byte count, path, and kind of the reviewed artifact.
+- **Model provenance** — provider, model, agent ID, and invocation reference, sourced from explicit metadata or the latest invocation.
+
+These snapshots mean a historical decision can be replayed against the ruleset and content that governed it at decision time, not current mutable state.
+
+### Finding disposition audit events
+Every finding disposition (resolve, dismiss, escalate) writes an append-only `FindingAuditEvent` row recording:
+- event type (approved, rejected, escalated)
+- previous status and new status
+- reason (for dismissals)
+- actor source and actor identifier
+- timestamp
+
+These are immutable audit rows, separate from the mutable finding record, so disposition history cannot be retroactively rewritten.
+
+### Precedent at decision time
+When `ck_validate` or `ck_finding` handles a rule, ControlKeel surfaces cross-session prior resolutions for the same rule from other sessions in the same workspace. This means the agent sees how that rule was resolved before, by whom, and under what rationale — without a manual memory query. `ck_context` exposes a separate workspace-wide precedent channel distinct from session-scoped memory hits.
+
 ## Review Gates
 Agent plans (`ck_review_submit`) require human approval (`ck_review_feedback`) before large-scale execution. The agent polls `ck_review_status` rather than blindly proceeding. Review tools expose `browser_url`, `review_url`, `approval_instructions` (with CLI fallback commands), and `review_roles` so humans always know where and how to act.
 
@@ -41,15 +62,19 @@ Memory records are written automatically on every significant lifecycle event an
 ### Write triggers (automatic)
 - Session created → brief memory
 - Task created/updated/completed/paused/resumed → task memory + checkpoint
-- Finding created/approved/rejected/escalated → finding memory + platform event
-- Review submitted/approved/denied → review memory + prompt outcome tracking
-- Proof bundle generated → proof memory
+- Finding created/approved/rejected/escalated → finding memory + platform event + FindingAuditEvent
+- Review submitted/approved/denied → review memory + ReviewAuditEvent + prompt outcome tracking
+- Proof bundle generated → proof memory + deploy readiness outcome (deploy_success/deploy_failure)
 - Budget warn/block → budget memory
-- Regression result → invocation (for proof scoring) + regression memory (for retrieval)
+- Regression result → invocation (for proof scoring) + regression memory + test_pass/test_fail outcome
+- Security scan (ck_validate) → security_scan_clean/security_scan_found outcome
+- All outcomes link back to proof, review, and commit SHA where available
 
 ### Retrieval triggers (automatic)
-- `ck_context` → `Memory.retrieve_for_task` → ranked memory hits
+- `ck_context` → `Memory.retrieve_for_task` → ranked memory hits + workspace-wide precedent channel
 - `ck_context_pack` → task-fact-driven memory hits
+- `ck_validate` → same-rule precedent from prior dispositions across the workspace
+- `ck_finding` → same-rule precedent from prior dispositions across the workspace
 - Resume packet → memory hits + recent events
 - `ck_memory_search` → explicit ranked search
 
