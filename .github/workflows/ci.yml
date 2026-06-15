@@ -154,16 +154,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build agent-runner image
         run: docker build -f Dockerfile.agent-runner -t controlkeel-agent-runner:ci .
-      - name: Verify main Dockerfile apt package sets resolve on its base image
+      - name: Verify main Dockerfile apt package sets resolve on their base images
         run: |
           set -euo pipefail
-          base="$(grep -m1 -oE '^FROM [^ ]+' Dockerfile | awk '{print $2}')"
-          echo "Base image: $base"
-          docker run --rm "$base" bash -c '
+          build_base="$(awk '/^FROM/{print $2; exit}' Dockerfile)"
+          runtime_base="$(awk '/^FROM/ && seen++ {print $2; exit}' Dockerfile)"
+          echo "Build base: $build_base"
+          echo "Runtime base: $runtime_base"
+          docker run --rm "$build_base" bash -c '
             set -eux
             apt-get update
             apt-get install -y --no-install-recommends \
               build-essential ca-certificates curl git wget unzip libssl-dev libncurses-dev
+          '
+          docker run --rm "$runtime_base" bash -c '
+            set -eux
+            apt-get update
             apt-get install -y --no-install-recommends \
               libstdc++6 libssl3t64 ca-certificates libncurses6 git
           '
