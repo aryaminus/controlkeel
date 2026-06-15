@@ -12,19 +12,19 @@ const packageJson = require("../package.json");
 const REPOSITORY = "aryaminus/controlkeel";
 const VERSION = packageJson.version;
 
-// Base64 encoded URL parts to avoid supply chain scanners detecting URL strings
-const GITHUB_BASE = Buffer.from("aHR0cHM6Ly9naXRodWIuY29t", "base64").toString("utf8");
-const RELEASES_PATH = Buffer.from("L3JlbGVhc2VzLw==", "base64").toString("utf8");
-const LATEST_PART = Buffer.from("bGF0ZXN0L2Rvd25sb2Fk", "base64").toString("utf8");
-const DOWNLOAD_PART = Buffer.from("ZG93bmxvYWQv", "base64").toString("utf8");
-const VERSION_PREFIX = Buffer.from("dg==", "base64").toString("utf8");
+// Binary releases are downloaded from the project's public GitHub Releases and
+// their signatures verified with cosign (see verifyCosignSignature). These URLs
+// are intentional and the only network egress this installer performs. They are
+// kept as plain, auditable strings: obfuscating them (e.g. base64 at runtime)
+// is a pattern supply-chain scanners treat as MORE suspicious, not less.
+const RELEASES_URL = `https://github.com/${REPOSITORY}/releases`;
 
 function releaseBaseUrl() {
   if (VERSION === "latest") {
-    return GITHUB_BASE + `/${REPOSITORY}` + RELEASES_PATH + LATEST_PART;
+    return `${RELEASES_URL}/latest/download`;
   }
 
-  return GITHUB_BASE + `/${REPOSITORY}` + RELEASES_PATH + DOWNLOAD_PART + VERSION_PREFIX + VERSION;
+  return `${RELEASES_URL}/download/v${VERSION}`;
 }
 
 function assetName(platform = process.platform, arch = process.arch) {
@@ -184,7 +184,7 @@ async function verifySignature(filePath, asset, baseUrl) {
 
   if (!cosignPath) return;
 
-  const repo = `${Buffer.from("YXJ5YW1pbnVzL2NvbnRyb2xrZWVs", "base64")}`;
+  const repo = REPOSITORY;
   const sigUrl = `${baseUrl}/${asset}.sig`;
   const certUrl = `${baseUrl}/${asset}.pem`;
   const sigFile = path.join(os.tmpdir(), `${asset}.sig`);

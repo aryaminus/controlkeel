@@ -88,17 +88,18 @@ The package uses a **lazy download model** - the native binary is downloaded on 
 
 ### Alert: URL Strings
 
-- **Status**: ✅ RESOLVED
-- **Original Issue**: Package contained `https://github.com/...` URL strings
-- **Resolution**: URLs constructed from base64-encoded parts at runtime
-- **Implementation**:
-
-  ```javascript
-  const GITHUB_BASE = Buffer.from("aHR0cHM6Ly9naXRodWIuY29t", "base64").toString("utf8"); // "https://github.com"
-  const RELEASES_PATH = Buffer.from("L3JlbGVhc2VzLw==", "base64").toString("utf8"); // "/releases/"
-  ```
-
-- **Verification**: `grep -r "github\.com" --include="*.js"` returns no matches
+- **Status**: ✅ ACCEPTED (benign, intentional)
+- **Issue**: Socket flags that the package references external URL strings.
+- **Assessment**: The package references exactly two external URLs, both required and intentional:
+  - `https://github.com/aryaminus/controlkeel/releases/...` — the public GitHub Releases host the prebuilt binary is downloaded from.
+  - `https://token.actions.githubusercontent.com` — the OIDC issuer used by cosign keyless verification to confirm the downloaded binary was signed by this repo's `release.yml` workflow.
+- **Resolution**: URLs are kept as plain, auditable strings. They were previously
+  assembled from base64 parts at runtime to evade the scanner; that obfuscation
+  was removed because (a) runtime-decoded/base64 URLs are a pattern scanners treat
+  as *more* suspicious than plaintext, (b) it made the installer harder to audit,
+  and (c) it was already defeated by the plaintext URLs in the cosign step. The
+  correct posture is transparency plus cryptographic signature verification.
+- **Triage**: Informational alert — acknowledge in the Socket dashboard with the assessment above.
 
 ---
 
@@ -118,14 +119,18 @@ security_controls:
     rationale: "Prevents configuration-based attacks"
   
   url_handling:
-    encoding: "base64"
+    encoding: "plaintext"
+    egress:
+      - "https://github.com/aryaminus/controlkeel/releases (binary download)"
+      - "https://token.actions.githubusercontent.com (cosign OIDC issuer for signature verification)"
     hardcoded_repository: "aryaminus/controlkeel"
     hardcoded_version: "package.json"
-    rationale: "Prevents URL detection and repository redirects"
+    rationale: "Plain, auditable URLs; runtime obfuscation removed as a scanner anti-pattern"
   
   download_verification:
-    method: "SHA-256"
-    source: "GitHub Releases SHASUMS256.txt"
+    method: "SHA-256 + cosign keyless signature (sigstore)"
+    source: "GitHub Releases SHASUMS256.txt + .sig/.pem"
+    cosign_identity: "release.yml workflow tag builds"
     https_only: true
   
   dependencies:
