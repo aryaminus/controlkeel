@@ -179,6 +179,8 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
 
     case Benchmark.run_suite(attrs, project_root) do
       {:ok, run} ->
+        ControlKeel.Observability.close_eval_candidate_lifecycle_from_run!(run)
+
         detail = Benchmark.run_detail_metrics(run)
 
         {:ok,

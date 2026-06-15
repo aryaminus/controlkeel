@@ -938,7 +938,11 @@ defmodule ControlKeel.ObservabilityTest do
     assert drafts.by_status == %{"draft" => 1}
     assert [%{status: "draft", human_gate_required: true} = draft] = drafts.drafts
     assert draft.title =~ "security.benchmark_draft"
-    assert draft.scenario_prompt =~ "summary-only evidence"
+    refute draft.scenario_prompt =~ "summary-only evidence"
+    assert draft.scenario_prompt =~ "bounded real trace evidence"
+    assert draft.metadata["trace_evidence"]["available"] == true
+    assert draft.metadata["trace_evidence"]["session_id"] == session.id
+    assert is_list(draft.metadata["trace_evidence"]["findings"])
     assert Enum.any?(drafts.recommendations, &String.contains?(&1, "human gate"))
   end
 
@@ -1378,5 +1382,215 @@ defmodule ControlKeel.ObservabilityTest do
       )
 
     assert result.task_id == task.id
+  end
+
+  describe "close_eval_candidate_lifecycle_from_run!/1" do
+    setup do
+      session = session_fixture()
+
+      {:ok, candidate} =
+        %EvalCandidate{}
+        |> EvalCandidate.changeset(%{
+          title: "Lifecycle test candidate",
+          rule_id: "security.lifecycle_test",
+          category: "security",
+          severity: "high",
+          priority: "high",
+          evidence_kind: "trace",
+          evidence_summary: "Recurring pattern",
+          suggested_action: "Add regression test",
+          benchmark_hint: "detection_rule_gen_v1",
+          source_problem_key: "lifecycle-test-#{System.unique_integer([:positive])}",
+          status: "open",
+          human_gate_required: true,
+          metadata: %{},
+          workspace_id: session.workspace_id,
+          session_id: session.id
+        })
+        |> Repo.insert()
+
+      suite = benchmark_suite_fixture()
+
+      {:ok, scenario} =
+        %Scenario{}
+        |> Scenario.changeset(%{
+          suite_id: suite.id,
+          slug: "lifecycle-test-#{candidate.id}",
+          name: "Lifecycle test scenario",
+          category: "detection_rule_gen_v1",
+          kind: "text",
+          content: "test content",
+          expected_rules: [],
+          expected_decision: "warn",
+          position: 0,
+          split: "local",
+          metadata: %{
+            "source" => "observability_benchmark_draft",
+            "eval_candidate_id" => candidate.id
+          }
+        })
+        |> Repo.insert()
+
+      {:ok, run} =
+        %Run{}
+        |> Run.changeset(%{
+          suite_id: suite.id,
+          status: "completed",
+          baseline_subject: "controlkeel_validate",
+          subjects: ["controlkeel_validate"],
+          started_at: DateTime.utc_now(),
+          total_scenarios: 1,
+          caught_count: 1,
+          blocked_count: 1,
+          catch_rate: 100.0,
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      %{candidate: candidate, scenario: scenario, run: run, session: session}
+    end
+
+    test "archives the EvalCandidate when all results matched_expected", %{
+      candidate: _candidate,
+      scenario: scenario,
+      run: run
+    } do
+      {:ok, _result} =
+        %ControlKeel.Benchmark.Result{}
+        |> ControlKeel.Benchmark.Result.changeset(%{
+          run_id: run.id,
+          scenario_id: scenario.id,
+          subject: "controlkeel_validate",
+          subject_type: "controlkeel",
+          status: "completed",
+          decision: "block",
+          findings_count: 1,
+          matched_expected: true,
+          payload: %{},
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      [updated] = Observability.close_eval_candidate_lifecycle_from_run!(run)
+
+      assert updated.status == "archived"
+      assert updated.metadata["lifecycle_closed_by_run"]["run_id"] == run.id
+      assert updated.metadata["lifecycle_closed_by_run"]["all_matched"] == true
+    end
+
+    test "reopens the EvalCandidate when any result did not match", %{
+      candidate: _candidate,
+      scenario: scenario,
+      run: run
+    } do
+      {:ok, _result} =
+        %ControlKeel.Benchmark.Result{}
+        |> ControlKeel.Benchmark.Result.changeset(%{
+          run_id: run.id,
+          scenario_id: scenario.id,
+          subject: "controlkeel_validate",
+          subject_type: "controlkeel",
+          status: "completed",
+          decision: "allow",
+          findings_count: 0,
+          matched_expected: false,
+          payload: %{},
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      [updated] = Observability.close_eval_candidate_lifecycle_from_run!(run)
+
+      assert updated.status == "open"
+      assert updated.metadata["lifecycle_reopened_by_run"]["run_id"] == run.id
+      assert updated.metadata["lifecycle_reopened_by_run"]["all_matched"] == false
+    end
+
+    test "reopens a previously archived candidate on new failure evidence", %{
+      candidate: candidate,
+      scenario: scenario,
+      run: run
+    } do
+      candidate
+      |> EvalCandidate.changeset(%{status: "archived"})
+      |> Repo.update!()
+
+      {:ok, _result} =
+        %ControlKeel.Benchmark.Result{}
+        |> ControlKeel.Benchmark.Result.changeset(%{
+          run_id: run.id,
+          scenario_id: scenario.id,
+          subject: "controlkeel_validate",
+          subject_type: "controlkeel",
+          status: "completed",
+          decision: "allow",
+          findings_count: 0,
+          matched_expected: false,
+          payload: %{},
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      [updated] = Observability.close_eval_candidate_lifecycle_from_run!(run)
+
+      assert updated.status == "open"
+      assert updated.metadata["lifecycle_reopened_by_run"]
+    end
+
+    test "ignores runs with no eval-candidate-linked scenarios" do
+      _session = session_fixture()
+      suite = benchmark_suite_fixture()
+
+      {:ok, plain_scenario} =
+        %Scenario{}
+        |> Scenario.changeset(%{
+          suite_id: suite.id,
+          slug: "plain-no-candidate",
+          name: "Plain scenario",
+          category: "vibe_failures_v1",
+          kind: "code",
+          content: "x = 1",
+          expected_rules: [],
+          expected_decision: "warn",
+          position: 0,
+          split: "public",
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      {:ok, run} =
+        %Run{}
+        |> Run.changeset(%{
+          suite_id: suite.id,
+          status: "completed",
+          baseline_subject: "controlkeel_validate",
+          subjects: ["controlkeel_validate"],
+          started_at: DateTime.utc_now(),
+          total_scenarios: 1,
+          caught_count: 1,
+          blocked_count: 1,
+          catch_rate: 100.0,
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      {:ok, _result} =
+        %ControlKeel.Benchmark.Result{}
+        |> ControlKeel.Benchmark.Result.changeset(%{
+          run_id: run.id,
+          scenario_id: plain_scenario.id,
+          subject: "controlkeel_validate",
+          subject_type: "controlkeel",
+          status: "completed",
+          decision: "block",
+          findings_count: 1,
+          matched_expected: true,
+          payload: %{},
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      assert [] == Observability.close_eval_candidate_lifecycle_from_run!(run)
+    end
   end
 end

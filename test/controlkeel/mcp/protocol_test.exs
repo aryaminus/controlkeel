@@ -1,6 +1,7 @@
 defmodule ControlKeel.MCP.ProtocolTest do
   use ControlKeel.DataCase
 
+  alias ControlKeel.Accounts
   alias ControlKeel.MCP.Protocol
   alias ControlKeel.Memory
   alias ControlKeel.Mission
@@ -2056,6 +2057,47 @@ defmodule ControlKeel.MCP.ProtocolTest do
     assert get_in(response, ["result", "structuredContent", "source_session_id"]) == session.id
   end
 
+  test "tools/call ck_skill_evolution can install generated skill into project registry" do
+    workspace = workspace_fixture()
+
+    session =
+      session_fixture(%{
+        workspace: workspace,
+        execution_brief: %{"domain_pack" => "software"}
+      })
+
+    _task = task_fixture(%{session: session, status: "done"})
+
+    tmp_dir =
+      Path.join(System.tmp_dir!(), "ck-skill-install-#{System.unique_integer([:positive])}")
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(tmp_dir)
+    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+    response =
+      Protocol.handle_request(%{
+        "jsonrpc" => "2.0",
+        "id" => 202_611,
+        "method" => "tools/call",
+        "params" => %{
+          "name" => "ck_skill_evolution",
+          "arguments" => %{
+            "session_id" => session.id,
+            "project_root" => tmp_dir,
+            "session_limit" => 1,
+            "current_skill_name" => "Evolved Review Skill",
+            "mode" => "install"
+          }
+        }
+      })
+
+    install = get_in(response, ["result", "structuredContent", "install"])
+    assert install["installed"] == true
+    assert install["skill_name"] == "evolved-review-skill"
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/evolved-review-skill/SKILL.md"))
+  end
+
   test "tools/call ck_review_submit returns grill questions for weak planning packets" do
     session = session_fixture()
     task = task_fixture(%{session: session, status: "queued"})
@@ -2916,6 +2958,12 @@ defmodule ControlKeel.MCP.ProtocolTest do
       })
 
     assert get_in(feedback_response, ["result", "structuredContent", "status"]) == "approved"
+
+    [event] = Accounts.review_audit_events(review_id)
+    assert event.event_type == "approved"
+    assert event.actor_source == "mcp"
+    assert event.actor_identifier == "mcp"
+    assert event.note == "Proceed"
 
     denied_response =
       Protocol.handle_request(%{
