@@ -7,7 +7,7 @@
 [![Socket Badge](https://badge.socket.dev/npm/package/@aryaminus/controlkeel)](https://socket.dev/npm/package/@aryaminus/controlkeel/overview)
 [![controlkeel MCP server](https://glama.ai/mcp/servers/aryaminus/controlkeel/badges/score.svg)](https://glama.ai/mcp/servers/aryaminus/controlkeel)
 
-> Turn the way your team works into enforceable memory for AI agents.
+> Turn the way your team works into enforceable memory for AI agents. - [@arya_minus](https://x.com/arya_minus/status/2066580759209816418)
 
 **ControlKeel is an agent control plane for day-to-day governed engineering.** Through observation, findings and evaluation, it learns your intent rules, review taste and delivery habits, turning them into typed memory, policy checks and proof bundles. CK sits between your coding agents and production as a portable "company brain": comparing *intended* delivery against *actual* delivery and turning raw agent intent into policy-validated tasks.
 
