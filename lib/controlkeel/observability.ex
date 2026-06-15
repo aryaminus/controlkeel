@@ -281,22 +281,26 @@ defmodule ControlKeel.Observability do
   reopens it, keeping the loop honest.
   """
   def close_eval_candidate_lifecycle_from_run!(run_or_id) do
-    run = normalize_benchmark_run(run_or_id)
+    case normalize_benchmark_run(run_or_id) do
+      nil ->
+        []
 
-    run.results
-    |> Enum.reject(&is_nil(&1.scenario))
-    |> Enum.group_by(fn result -> result.scenario end)
-    |> Enum.reduce([], fn {scenario, results}, acc ->
-      case scenario.metadata do
-        %{"eval_candidate_id" => candidate_id} when is_integer(candidate_id) ->
-          updated = update_eval_candidate_from_results(candidate_id, scenario, results, run)
+      run ->
+        run.results
+        |> Enum.reject(&is_nil(&1.scenario))
+        |> Enum.group_by(fn result -> result.scenario end)
+        |> Enum.reduce([], fn {scenario, results}, acc ->
+          case scenario.metadata do
+            %{"eval_candidate_id" => candidate_id} when is_integer(candidate_id) ->
+              updated = update_eval_candidate_from_results(candidate_id, scenario, results, run)
 
-          if updated, do: [updated | acc], else: acc
+              if updated, do: [updated | acc], else: acc
 
-        _other ->
-          acc
-      end
-    end)
+            _other ->
+              acc
+          end
+        end)
+    end
   end
 
   defp normalize_benchmark_run(%BenchmarkRun{} = run), do: Repo.preload(run, results: :scenario)

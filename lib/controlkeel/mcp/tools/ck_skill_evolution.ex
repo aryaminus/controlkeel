@@ -64,6 +64,12 @@ defmodule ControlKeel.MCP.Tools.CkSkillEvolution do
          "path" => target_path,
          "registry_hint" => "Project skills registry discovers .agents/skills/<name>/SKILL.md"
        })}
+    else
+      {:error, reason} when is_atom(reason) ->
+        {:error, {:invalid_arguments, "Skill install filesystem error: #{reason}"}}
+
+      {:error, _} = error ->
+        error
     end
   end
 

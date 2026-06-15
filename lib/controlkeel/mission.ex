@@ -1152,9 +1152,8 @@ defmodule ControlKeel.Mission do
         "approved_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
       })
 
-    case update_finding(finding, %{status: "approved", metadata: metadata}) do
+    case update_finding_with_audit(finding, %{status: "approved", metadata: metadata}, :approved, opts) do
       {:ok, updated} ->
-        record_finding_audit_event(:approved, finding, updated, opts)
         emit_finding_event(:approved, updated)
         record_finding_memory(:approved, updated)
         emit_platform_finding_event("finding.approved", updated)
@@ -1183,15 +1182,13 @@ defmodule ControlKeel.Mission do
       })
       |> maybe_put_metadata("rejection_reason", reason)
 
-    case update_finding(finding, %{status: "rejected", metadata: metadata}) do
+    case update_finding_with_audit(
+           finding,
+           %{status: "rejected", metadata: metadata},
+           :rejected,
+           Keyword.put(opts, :reason, reason)
+         ) do
       {:ok, updated} ->
-        record_finding_audit_event(
-          :rejected,
-          finding,
-          updated,
-          Keyword.put(opts, :reason, reason)
-        )
-
         emit_finding_event(:rejected, updated)
         record_finding_memory(:rejected, updated)
         emit_platform_finding_event("finding.rejected", updated)
@@ -1218,9 +1215,8 @@ defmodule ControlKeel.Mission do
           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
       })
 
-    case update_finding(finding, %{status: "escalated", metadata: metadata}) do
+    case update_finding_with_audit(finding, %{status: "escalated", metadata: metadata}, :escalated, opts) do
       {:ok, updated} ->
-        record_finding_audit_event(:escalated, finding, updated, opts)
         emit_finding_event(:escalated, updated)
         record_finding_memory(:escalated, updated)
         {:ok, updated}
@@ -1319,10 +1315,30 @@ defmodule ControlKeel.Mission do
     |> Repo.all()
   end
 
-  defp record_finding_audit_event(event_type, previous, updated, opts) do
+  # Atomically persist a finding status change and its append-only audit event.
+  # Mirrors the review-decision Multi in respond_review so the lineage guarantee
+  # holds even under a failed audit insert: the status update and the audit row
+  # commit together or roll back together (no status change without a trail).
+  defp update_finding_with_audit(finding, attrs, event_type, opts) do
+    Multi.new()
+    |> Multi.update(:finding, Finding.changeset(finding, attrs))
+    |> Multi.insert(:finding_audit_event, fn %{finding: updated} ->
+      FindingAuditEvent.changeset(
+        %FindingAuditEvent{},
+        finding_audit_attrs(event_type, finding, updated, opts)
+      )
+    end)
+    |> transaction_with_busy_retry()
+    |> case do
+      {:ok, %{finding: updated}} -> {:ok, updated}
+      {:error, _step, reason, _changes} -> {:error, reason}
+    end
+  end
+
+  defp finding_audit_attrs(event_type, previous, updated, opts) do
     actor_source = Keyword.get(opts, :actor_source) || "unknown"
 
-    attrs = %{
+    %{
       finding_id: updated.id,
       event_type: Atom.to_string(event_type),
       previous_status: previous.status,
@@ -1333,10 +1349,6 @@ defmodule ControlKeel.Mission do
       actor_identifier: Keyword.get(opts, :actor_identifier) || actor_source,
       recorded_at: DateTime.utc_now() |> DateTime.truncate(:second)
     }
-
-    %FindingAuditEvent{}
-    |> FindingAuditEvent.changeset(attrs)
-    |> Repo.insert()
   end
 
   @doc """
@@ -4147,7 +4159,6 @@ defmodule ControlKeel.Mission do
   end
 
   defp maybe_put_shipping(map, _key, nil), do: map
-  defp maybe_put_shipping(map, _key, false), do: Map.put(map, "commit_sha_matched", false)
   defp maybe_put_shipping(map, key, value), do: Map.put(map, key, value)
 
   defp regression_invocation?(invocation) do

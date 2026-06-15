@@ -1141,6 +1141,46 @@ defmodule ControlKeel.MissionTest do
       assert is_integer(meta["proof_id"])
     end
 
+    test "record_regression_result stores a false proof_deploy_ready under its own key" do
+      # Regression for maybe_put_shipping/3: a `false` value must be stored under
+      # its own key, not collapsed into "commit_sha_matched".
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      proof = proof_bundle_fixture(%{task: task})
+      {:ok, _} = proof |> Ecto.Changeset.change(deploy_ready: false) |> Repo.update()
+
+      Mission.record_regression_result(%{
+        "session_id" => session.id,
+        "task_id" => task.id,
+        "engine" => "bug0",
+        "flow_name" => "auth flow",
+        "outcome" => "failed",
+        "commit_sha" => "abc1234",
+        "summary" => "Login button unresponsive"
+      })
+
+      search =
+        Memory.search("outcome test_fail",
+          workspace_id: session.workspace_id,
+          session_id: session.id,
+          top_k: 50,
+          include_metadata: true
+        )
+
+      outcome_entry =
+        Enum.find(search.entries, fn e ->
+          meta = Map.get(e, :metadata) || %{}
+          meta["outcome"] == "test_fail" and meta["task_id"] == task.id
+        end)
+
+      assert outcome_entry
+      meta = outcome_entry.metadata
+      assert Map.has_key?(meta, "proof_deploy_ready")
+      assert meta["proof_deploy_ready"] == false
+      assert is_integer(meta["proof_id"])
+    end
+
     test "record_regression_result auto-emits test_pass for passing outcome" do
       session = session_fixture()
       task = task_fixture(%{session: session, status: "done"})
