@@ -44,7 +44,7 @@ The package uses a **lazy download model** - the native binary is downloaded on 
 |---------|---------------|------------------|
 | No Install Scripts | Removed all `postinstall` and lifecycle scripts | Code execution during install |
 | No Environment Variables | Removed all `process.env` usage; hardcoded configuration | Configuration-based attacks |
-| URL Encoding | Base64-encoded URL parts constructed at runtime | URL string detection by scanners |
+| Plain URLs | Plaintext, auditable URL strings (base64 removed) | Auditability; no hidden network destinations |
 | Hardcoded Repository | Fixed to `aryaminus/controlkeel` | Repository redirect attacks |
 | HTTPS Only | All downloads use HTTPS | Man-in-the-middle attacks |
 | SHA-256 Verification | Checksum verification against official releases | Tampered binary downloads |
@@ -120,17 +120,18 @@ security_controls:
   
   url_handling:
     encoding: "plaintext"
-    egress:
-      - "https://github.com/aryaminus/controlkeel/releases (binary download)"
-      - "https://token.actions.githubusercontent.com (cosign OIDC issuer for signature verification)"
+    url_strings_referenced:
+      - "https://github.com/aryaminus/controlkeel/releases — installer downloads binary, checksum, and optional cosign sig/cert from this base"
+      - "https://token.actions.githubusercontent.com — OIDC issuer string passed to cosign --certificate-oidc-issuer (not a direct HTTP endpoint; cosign contacts it)"
     hardcoded_repository: "aryaminus/controlkeel"
     hardcoded_version: "package.json"
     rationale: "Plain, auditable URLs; runtime obfuscation removed as a scanner anti-pattern"
   
   download_verification:
-    method: "SHA-256 + cosign keyless signature (sigstore)"
+    method: "SHA-256 (always); cosign keyless signature (when cosign is on PATH)"
     source: "GitHub Releases SHASUMS256.txt + .sig/.pem"
     cosign_identity: "release.yml workflow tag builds"
+    cosign_required: false
     https_only: true
   
   dependencies:

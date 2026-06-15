@@ -13,10 +13,11 @@ const REPOSITORY = "aryaminus/controlkeel";
 const VERSION = packageJson.version;
 
 // Binary releases are downloaded from the project's public GitHub Releases and
-// their signatures verified with cosign (see verifyCosignSignature). These URLs
-// are intentional and the only network egress this installer performs. They are
-// kept as plain, auditable strings: obfuscating them (e.g. base64 at runtime)
-// is a pattern supply-chain scanners treat as MORE suspicious, not less.
+// their signatures verified with cosign (see verifySignature). This is the base
+// URL for all network egress this installer performs — binary, checksum file,
+// and optional cosign sig/cert artifacts all resolve from here. Kept as plain,
+// auditable strings: obfuscating them (e.g. base64 at runtime) is a pattern
+// supply-chain scanners treat as MORE suspicious, not less.
 const RELEASES_URL = `https://github.com/${REPOSITORY}/releases`;
 
 function releaseBaseUrl() {
