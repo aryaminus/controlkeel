@@ -139,3 +139,31 @@ jobs:
       - run: chmod +x scripts/self_host_smoke.sh
       - name: Run self-host smoke
         run: scripts/self_host_smoke.sh
+
+  docker-base:
+    # Validates the Dockerfile base images without the expensive from-source OTP
+    # build: fully builds the agent-runner image and verifies the main
+    # Dockerfile's apt package sets resolve on its base image. Catches base-image
+    # bumps (e.g. bookworm -> trixie) that rename/drop packages.
+    if: >-
+      github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build agent-runner image
+        run: docker build -f Dockerfile.agent-runner -t controlkeel-agent-runner:ci .
+      - name: Verify main Dockerfile apt package sets resolve on its base image
+        run: |
+          set -euo pipefail
+          base="$(grep -m1 -oE '^FROM [^ ]+' Dockerfile | awk '{print $2}')"
+          echo "Base image: $base"
+          docker run --rm "$base" bash -c '
+            set -eux
+            apt-get update
+            apt-get install -y --no-install-recommends \
+              build-essential ca-certificates curl git wget unzip libssl-dev libncurses-dev
+            apt-get install -y --no-install-recommends \
+              libstdc++6 libssl3t64 ca-certificates libncurses6 git
+          '

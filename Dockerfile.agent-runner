@@ -9,7 +9,7 @@
 # Published by .github/workflows/agent-runner-image.yml to
 # ghcr.io/aryaminus/controlkeel-agent-runner:latest using the built-in
 # GITHUB_TOKEN (no external registry credentials required).
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
