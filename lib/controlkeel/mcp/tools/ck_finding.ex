@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
   @moduledoc false
 
   alias ControlKeel.Mission
+  alias ControlKeel.Precedent
 
   @allowed_decisions ~w(allow warn block escalate_to_human)
   @disposition_modes ~w(resolve dismiss escalate)
@@ -47,6 +48,7 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
          "finding_id" => finding.id,
          "status" => finding.status,
          "requires_human" => finding.status in ["blocked", "escalated"],
+         "precedent" => finding_precedent(session_id, finding.rule_id),
          "resolved_finding_ids" => resolved_ids,
          "resolved_findings_count" => length(resolved_ids),
          "extends_finding_id" => finding.extends_finding_id,
@@ -55,6 +57,16 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
            "Recorded #{finding.severity} #{finding.category} finding for #{finding.title}."
        }}
     end
+  end
+
+  defp finding_precedent(session_id, rule_id) do
+    with %{workspace_id: workspace_id} <- Mission.get_session(session_id) do
+      Precedent.for_rule_id(rule_id, workspace_id: workspace_id, exclude_session_id: session_id)
+    else
+      _ -> []
+    end
+  rescue
+    _ -> []
   end
 
   # ---- disposition modes (resolve | dismiss | escalate) ----
@@ -75,7 +87,7 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
         {:error, {:invalid_arguments, "`finding_id` #{finding_id} was not found"}}
 
       %{session_id: ^session_id} = finding ->
-        case Mission.dispose_finding(mode, finding, reason: reason) do
+        case Mission.dispose_finding(mode, finding, disposition_opts(reason)) do
           {:ok, updated} ->
             {:ok,
              %{
@@ -107,7 +119,11 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
 
     if filter_present?(filter) do
       {:ok, %{count: count, ids: ids}} =
-        Mission.dispose_session_findings(session_id, filter, mode)
+        Mission.dispose_session_findings(
+          session_id,
+          Map.put(filter, :disposition_opts, disposition_opts(reason)),
+          mode
+        )
 
       {:ok,
        %{
@@ -140,6 +156,10 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
   defp disposition_verb("resolve"), do: "Resolved"
   defp disposition_verb("dismiss"), do: "Dismissed"
   defp disposition_verb("escalate"), do: "Escalated"
+
+  defp disposition_opts(reason) do
+    [reason: reason, actor_source: "mcp", actor_identifier: "ck_finding"]
+  end
 
   # ---- create-path helpers ----
 
@@ -195,7 +215,10 @@ defmodule ControlKeel.MCP.Tools.CkFinding do
 
     resolved_ids =
       Enum.reduce(query, [], fn finding, acc ->
-        case Mission.approve_finding(finding) do
+        case Mission.approve_finding(finding,
+               actor_source: "mcp",
+               actor_identifier: "ck_finding:auto_resolve"
+             ) do
           {:ok, updated} -> [updated.id | acc]
           _ -> acc
         end

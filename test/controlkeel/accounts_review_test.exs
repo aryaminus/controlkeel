@@ -2,6 +2,7 @@ defmodule ControlKeel.AccountsReviewTest do
   use ControlKeel.DataCase, async: false
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Mission
   alias ControlKeel.MissionFixtures
 
   setup do
@@ -113,6 +114,13 @@ defmodule ControlKeel.AccountsReviewTest do
       assert decided.decided_by_user_id == bob.id
       assert decided.feedback_notes == "lgtm"
       assert decided.reviewed_by == "user:#{bob.id}"
+
+      approval =
+        Accounts.review_audit_events(review.id)
+        |> Enum.find(&(&1.event_type == "approved"))
+
+      assert approval.actor_source == "user"
+      assert approval.actor_identifier == Integer.to_string(bob.id)
     end
 
     test "assignee can deny", %{review: review, bob: bob} do
@@ -185,6 +193,129 @@ defmodule ControlKeel.AccountsReviewTest do
 
       assert approval != nil
       assert approval.actor_role == "admin"
+    end
+  end
+
+  describe "Mission.respond_review/2 audit integration" do
+    test "live review response records an immutable decision audit event", %{review: review} do
+      assert {:ok, updated} =
+               Mission.respond_review(review, %{
+                 "decision" => "approved",
+                 "feedback_notes" => "ship it",
+                 "reviewed_by" => "mcp"
+               })
+
+      assert updated.status == "approved"
+
+      [event] = Accounts.review_audit_events(review.id)
+      assert event.event_type == "approved"
+      assert event.actor_source == "mcp"
+      assert event.actor_identifier == "mcp"
+      assert event.note == "ship it"
+      assert event.recorded_at == updated.responded_at
+
+      [session_event | _] = Mission.list_session_events(review.session_id)
+      assert session_event["event_type"] == "review.approved"
+      assert session_event["review_id"] == review.id
+      assert session_event["payload"]["review_id"] == review.id
+    end
+  end
+
+  describe "review decision-time metadata" do
+    test "review submission stores policy and artifact snapshots", %{session: session} do
+      body = "Implementation plan with invariant boundaries"
+
+      {:ok, invocation} =
+        Mission.create_invocation(%{
+          source: "agent",
+          tool: "ck_review_submit",
+          provider: "openai",
+          model: "gpt-5.5",
+          estimated_cost_cents: 1,
+          decision: "allow",
+          metadata: %{},
+          session_id: session.id
+        })
+
+      assert {:ok, review} =
+               Mission.submit_review(%{
+                 "session_id" => session.id,
+                 "submission_body" => body,
+                 "review_type" => "plan"
+               })
+
+      assert review.metadata["policy_snapshot"]["version"] == 1
+      assert is_binary(review.metadata["policy_snapshot"]["packs_hash"])
+
+      assert review.metadata["artifact_snapshot"]["content_sha256"] ==
+               ControlKeel.Policy.Snapshot.hash(body)
+
+      assert review.metadata["artifact_snapshot"]["kind"] == "plan"
+      assert review.metadata["model_provenance"]["source"] == "latest_invocation"
+      assert review.metadata["model_provenance"]["invocation_id"] == invocation.id
+      assert review.metadata["model_provenance"]["provider"] == "openai"
+      assert review.metadata["model_provenance"]["model"] == "gpt-5.5"
+    end
+
+    test "finding creation stores explicit model provenance", %{session: session} do
+      assert {:ok, finding} =
+               Mission.create_finding(%{
+                 session_id: session.id,
+                 title: "Model-linked finding",
+                 severity: "high",
+                 category: "governance",
+                 rule_id: "governance.model_provenance.fixture",
+                 plain_message: "Decision should carry model provenance.",
+                 metadata: %{"provider" => "anthropic", "model" => "claude-sonnet-4.6"}
+               })
+
+      assert finding.metadata["model_provenance"]["provider"] == "anthropic"
+      assert finding.metadata["model_provenance"]["model"] == "claude-sonnet-4.6"
+    end
+
+    test "trace packet preserves decision-time metadata after mutable state changes", %{
+      session: session
+    } do
+      body = "Original plan body with invariant boundaries"
+
+      assert {:ok, review} =
+               Mission.submit_review(%{
+                 "session_id" => session.id,
+                 "submission_body" => body,
+                 "review_type" => "plan"
+               })
+
+      original_policy_hash = review.metadata["policy_snapshot"]["packs_hash"]
+      original_artifact_hash = review.metadata["artifact_snapshot"]["content_sha256"]
+
+      assert {:ok, _updated} =
+               Mission.respond_review(review, %{
+                 "decision" => "approved",
+                 "feedback_notes" => "ship it",
+                 "reviewed_by" => "test"
+               })
+
+      {:ok, packet} = Mission.trace_improvement_packet(session.id)
+
+      trace_review =
+        Enum.find(get_in(packet, ["trace", "reviews"]) || [], &(&1["id"] == review.id))
+
+      assert trace_review["policy_snapshot"]["packs_hash"] == original_policy_hash
+      assert trace_review["artifact_snapshot"]["content_sha256"] == original_artifact_hash
+      assert trace_review["status"] == "approved"
+
+      # Mutate current mutable state — simulate a later change by
+      # clearing the policy pack cache. The stored snapshot must survive.
+      ControlKeel.Policy.PackLoader.clear_cache()
+
+      # Re-read the trace packet — stored decision metadata must be stable.
+      {:ok, packet2} = Mission.trace_improvement_packet(session.id)
+
+      trace_review2 =
+        Enum.find(get_in(packet2, ["trace", "reviews"]) || [], &(&1["id"] == review.id))
+
+      assert trace_review2["policy_snapshot"]["packs_hash"] == original_policy_hash
+      assert trace_review2["artifact_snapshot"]["content_sha256"] == original_artifact_hash
     end
   end
 

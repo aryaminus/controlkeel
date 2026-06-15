@@ -6,7 +6,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
   import ControlKeel.MissionFixtures
   import ControlKeel.PlatformFixtures
 
-  alias ControlKeel.Mission
+  alias ControlKeel.{Accounts, Mission}
 
   defp aws_key_fixture do
     ["AKIA", "IOSF", "ODNN", "7EXA", "MPLE"] |> Enum.join()
@@ -264,6 +264,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert %{"review" => updated} = json_response(conn, 200)
       assert updated["status"] == "approved"
+
+      [event] = Accounts.review_audit_events(review["id"])
+      assert event.event_type == "approved"
+      assert event.actor_source == "human"
+      assert event.actor_identifier == "human"
+      assert event.note == "Proceed"
     end
   end
 

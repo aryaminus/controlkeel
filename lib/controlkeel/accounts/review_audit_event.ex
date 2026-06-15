@@ -20,6 +20,8 @@ defmodule ControlKeel.Accounts.ReviewAuditEvent do
     field :event_type, :string
     field :required_role, :string
     field :actor_role, :string
+    field :actor_source, :string
+    field :actor_identifier, :string
     field :note, :string
     field :recorded_at, :utc_datetime
 
@@ -37,6 +39,8 @@ defmodule ControlKeel.Accounts.ReviewAuditEvent do
       :target_user_id,
       :required_role,
       :actor_role,
+      :actor_source,
+      :actor_identifier,
       :note,
       :recorded_at
     ])

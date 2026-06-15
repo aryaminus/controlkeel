@@ -875,6 +875,8 @@ defmodule ControlKeel.Accounts do
             target_user_id: review.assigned_user_id,
             required_role: review.required_role,
             actor_role: role,
+            actor_source: "user",
+            actor_identifier: Integer.to_string(decider_user_id),
             note: note,
             recorded_at: now
           })
@@ -889,6 +891,8 @@ defmodule ControlKeel.Accounts do
             actor_user_id: decider_user_id,
             required_role: nil,
             actor_role: nil,
+            actor_source: "user",
+            actor_identifier: Integer.to_string(decider_user_id),
             note: "rejected by policy: #{reason}",
             recorded_at: now
           })
@@ -907,6 +911,31 @@ defmodule ControlKeel.Accounts do
     |> where([e], e.review_id == ^review_id)
     |> order_by([e], asc: e.recorded_at, asc: e.id)
     |> Repo.all()
+  end
+
+  @doc "Record an immutable audit event for a live review decision path."
+  @spec record_review_decision_event(Review.t(), map()) ::
+          {:ok, ReviewAuditEvent.t()} | {:error, Ecto.Changeset.t()}
+  def record_review_decision_event(%Review{} = review, attrs) when is_map(attrs) do
+    now = Map.get(attrs, :recorded_at) || DateTime.utc_now() |> DateTime.truncate(:second)
+    event_type = Map.fetch!(attrs, :event_type)
+    actor_user_id = Map.get(attrs, :actor_user_id)
+
+    actor_source =
+      Map.get(attrs, :actor_source) || actor_source(actor_user_id, review.reviewed_by)
+
+    record_review_event(review.id, %{
+      event_type: event_type,
+      actor_user_id: actor_user_id,
+      target_user_id: review.assigned_user_id,
+      required_role: review.required_role,
+      actor_role: Map.get(attrs, :actor_role),
+      actor_source: actor_source,
+      actor_identifier:
+        Map.get(attrs, :actor_identifier) || actor_identifier(actor_user_id, actor_source),
+      note: Map.get(attrs, :note),
+      recorded_at: now
+    })
   end
 
   defp fetch_review(id) do
@@ -967,6 +996,20 @@ defmodule ControlKeel.Accounts do
     |> ReviewAuditEvent.changeset(Map.put(attrs, :review_id, review_id))
     |> Repo.insert()
   end
+
+  defp actor_source(_actor_user_id, reviewed_by)
+       when is_binary(reviewed_by) and reviewed_by != "" do
+    reviewed_by
+  end
+
+  defp actor_source(actor_user_id, _reviewed_by) when is_integer(actor_user_id), do: "user"
+  defp actor_source(_actor_user_id, _reviewed_by), do: "unknown"
+
+  defp actor_identifier(actor_user_id, _actor_source) when is_integer(actor_user_id) do
+    Integer.to_string(actor_user_id)
+  end
+
+  defp actor_identifier(_actor_user_id, actor_source), do: actor_source
 
   # ──────────────── Helpers ────────────────
 

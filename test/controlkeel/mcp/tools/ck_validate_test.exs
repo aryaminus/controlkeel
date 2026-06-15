@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkValidateTest do
   use ControlKeel.DataCase
 
   alias ControlKeel.MCP.Tools.CkValidate
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Finding
 
@@ -38,6 +39,108 @@ defmodule ControlKeel.MCP.Tools.CkValidateTest do
     assert finding.metadata["task_id"] == task.id
     assert finding.metadata["scanner"] == "fast_path"
     assert finding.metadata["matched_text_redacted"] == "[redacted]"
+    assert finding.metadata["policy_snapshot"]["version"] == 1
+    assert is_binary(finding.metadata["policy_snapshot"]["packs_hash"])
+    assert finding.metadata["artifact_snapshot"]["path"] == "lib/query_builder.js"
+    assert finding.metadata["artifact_snapshot"]["kind"] == "code"
+
+    assert finding.metadata["artifact_snapshot"]["content_sha256"] ==
+             ControlKeel.Policy.Snapshot.hash(
+               ~s(query = "SELECT * FROM users WHERE email = '" <> params["email"] <> "' OR 1=1 --")
+             )
+
+    event =
+      session.id
+      |> Mission.list_session_events()
+      |> Enum.find(&(&1["event_type"] == "finding.created" and &1["finding_id"] == finding.id))
+
+    assert event
+    assert event["payload"]["finding_id"] == finding.id
+
+    outcome_entry =
+      Memory.search("outcome security_scan_found",
+        workspace_id: session.workspace_id,
+        session_id: session.id,
+        top_k: 20,
+        include_metadata: true
+      ).entries
+      |> Enum.find(fn entry ->
+        meta = entry.metadata || %{}
+        meta["outcome"] == "security_scan_found" and meta["path"] == "lib/query_builder.js"
+      end)
+
+    assert outcome_entry
+    assert outcome_entry.metadata["finding_count"] > 0
+    assert "security.sql_injection" in outcome_entry.metadata["rule_ids"]
+  end
+
+  test "records security_scan_clean outcome for clean session scans" do
+    session = session_fixture()
+    task = task_fixture(%{session: session})
+
+    assert {:ok, result} =
+             CkValidate.call(%{
+               "content" => "const ready = true;",
+               "path" => "assets/app.js",
+               "kind" => "code",
+               "session_id" => session.id,
+               "task_id" => task.id
+             })
+
+    assert result["allowed"] == true
+
+    outcome_entry =
+      Memory.search("outcome security_scan_clean",
+        workspace_id: session.workspace_id,
+        session_id: session.id,
+        top_k: 20,
+        include_metadata: true
+      ).entries
+      |> Enum.find(fn entry ->
+        meta = entry.metadata || %{}
+        meta["outcome"] == "security_scan_clean" and meta["path"] == "assets/app.js"
+      end)
+
+    assert outcome_entry
+    assert outcome_entry.metadata["finding_count"] == 0
+    assert outcome_entry.metadata["task_id"] == task.id
+  end
+
+  test "surfaces prior same-rule precedent during validation" do
+    prior_session = session_fixture()
+    workspace = Mission.get_session_with_workspace(prior_session.id).workspace
+    session = session_fixture(%{workspace: workspace})
+
+    {:ok, _memory} =
+      Memory.record(%{
+        workspace_id: session.workspace_id,
+        session_id: prior_session.id,
+        record_type: "finding",
+        title: "Finding approved: SQL fixture exception",
+        summary: "Prior reviewer approved the scanner fixture as non-production test data.",
+        body: "security.sql_injection (critical/approved)",
+        tags: ["security.sql_injection", "approved", "finding"],
+        source_type: "finding",
+        source_id: "precedent-fixture",
+        metadata: %{
+          "rule_id" => "security.sql_injection",
+          "status" => "approved",
+          "recorded_at" => "2026-01-01T00:00:00Z"
+        }
+      })
+
+    assert {:ok, result} =
+             CkValidate.call(%{
+               "content" =>
+                 ~s(query = "SELECT * FROM users WHERE email = '" <> params["email"] <> "' OR 1=1 --"),
+               "path" => "lib/query_builder.js",
+               "kind" => "code",
+               "session_id" => session.id
+             })
+
+    precedent = result["precedent"]
+    assert is_list(precedent)
+    assert Enum.any?(precedent, &(&1["rule_id"] == "security.sql_injection"))
   end
 
   test "returns findings without persistence when session_id is absent" do

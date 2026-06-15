@@ -4,13 +4,16 @@ defmodule ControlKeel.Mission do
   import Ecto.Query, warn: false
 
   alias Ecto.Multi
+  alias ControlKeel.Accounts
   alias ControlKeel.AutoFix
   alias ControlKeel.Intent.ExecutionBrief
+  alias ControlKeel.Learning.OutcomeTracker
   alias ControlKeel.Memory
   alias ControlKeel.Mission.Decomposition
   alias ControlKeel.Notifications.Webhook
   alias ControlKeel.Platform
   alias ControlKeel.SessionTranscript
+  alias ControlKeel.Policy.Snapshot
   alias ControlKeel.SecurityWorkflow
   alias ControlKeel.Repo
   alias ControlKeel.WorkspaceContext
@@ -18,6 +21,7 @@ defmodule ControlKeel.Mission do
 
   alias ControlKeel.Mission.{
     Finding,
+    FindingAuditEvent,
     Invocation,
     Planner,
     ProofBundle,
@@ -456,6 +460,15 @@ defmodule ControlKeel.Mission do
 
       Multi.new()
       |> Multi.update(:review, Review.changeset(review, review_attrs))
+      |> Multi.run(:review_audit_event, fn _repo, %{review: updated} ->
+        Accounts.record_review_decision_event(updated, %{
+          event_type: normalized.decision,
+          actor_source: Map.get(review_attrs, "reviewed_by"),
+          actor_identifier: Map.get(review_attrs, "reviewed_by"),
+          note: Map.get(review_attrs, "feedback_notes"),
+          recorded_at: Map.get(review_attrs, "responded_at")
+        })
+      end)
       |> maybe_apply_review_response_gate(review, normalized)
       |> transaction_with_busy_retry()
       |> case do
@@ -495,6 +508,8 @@ defmodule ControlKeel.Mission do
   end
 
   def create_finding(attrs) do
+    attrs = stamp_finding_decision_metadata(attrs)
+
     %Finding{}
     |> Finding.changeset(attrs)
     |> Repo.insert()
@@ -547,7 +562,8 @@ defmodule ControlKeel.Mission do
              session_id: normalized["session_id"],
              task_id: normalized["task_id"]
            }),
-         {:ok, memory} <- record_regression_memory(session, normalized, invocation) do
+         {:ok, memory} <- record_regression_memory(session, normalized, invocation),
+         {:ok, _outcome} <- maybe_record_regression_outcome(session, normalized, invocation) do
       {:ok,
        %{
          "recorded" => true,
@@ -1128,7 +1144,9 @@ defmodule ControlKeel.Mission do
 
   def auto_fix_for_finding(%Finding{} = finding), do: AutoFix.generate(finding)
 
-  def approve_finding(%Finding{} = finding) do
+  def approve_finding(finding_or_id, opts \\ [])
+
+  def approve_finding(%Finding{} = finding, opts) when is_list(opts) do
     metadata =
       Map.merge(finding.metadata || %{}, %{
         "approved_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
@@ -1136,6 +1154,7 @@ defmodule ControlKeel.Mission do
 
     case update_finding(finding, %{status: "approved", metadata: metadata}) do
       {:ok, updated} ->
+        record_finding_audit_event(:approved, finding, updated, opts)
         emit_finding_event(:approved, updated)
         record_finding_memory(:approved, updated)
         emit_platform_finding_event("finding.approved", updated)
@@ -1146,16 +1165,16 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  def approve_finding(id) when is_integer(id) do
+  def approve_finding(id, opts) when is_integer(id) and is_list(opts) do
     case get_finding(id) do
       nil -> {:error, :not_found}
-      finding -> approve_finding(finding)
+      finding -> approve_finding(finding, opts)
     end
   end
 
-  def reject_finding(finding_or_id, reason \\ nil)
+  def reject_finding(finding_or_id, reason \\ nil, opts \\ [])
 
-  def reject_finding(%Finding{} = finding, reason) do
+  def reject_finding(%Finding{} = finding, reason, opts) when is_list(opts) do
     metadata =
       finding.metadata
       |> Kernel.||(%{})
@@ -1166,6 +1185,13 @@ defmodule ControlKeel.Mission do
 
     case update_finding(finding, %{status: "rejected", metadata: metadata}) do
       {:ok, updated} ->
+        record_finding_audit_event(
+          :rejected,
+          finding,
+          updated,
+          Keyword.put(opts, :reason, reason)
+        )
+
         emit_finding_event(:rejected, updated)
         record_finding_memory(:rejected, updated)
         emit_platform_finding_event("finding.rejected", updated)
@@ -1176,14 +1202,16 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  def reject_finding(id, reason) when is_integer(id) do
+  def reject_finding(id, reason, opts) when is_integer(id) and is_list(opts) do
     case get_finding(id) do
       nil -> {:error, :not_found}
-      finding -> reject_finding(finding, reason)
+      finding -> reject_finding(finding, reason, opts)
     end
   end
 
-  def escalate_finding(%Finding{} = finding) do
+  def escalate_finding(finding_or_id, opts \\ [])
+
+  def escalate_finding(%Finding{} = finding, opts) when is_list(opts) do
     metadata =
       Map.merge(finding.metadata || %{}, %{
         "escalated_at" =>
@@ -1192,12 +1220,20 @@ defmodule ControlKeel.Mission do
 
     case update_finding(finding, %{status: "escalated", metadata: metadata}) do
       {:ok, updated} ->
+        record_finding_audit_event(:escalated, finding, updated, opts)
         emit_finding_event(:escalated, updated)
         record_finding_memory(:escalated, updated)
         {:ok, updated}
 
       other ->
         other
+    end
+  end
+
+  def escalate_finding(id, opts) when is_integer(id) and is_list(opts) do
+    case get_finding(id) do
+      nil -> {:error, :not_found}
+      finding -> escalate_finding(finding, opts)
     end
   end
 
@@ -1225,12 +1261,12 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  defp do_dispose_finding("resolve", finding, _opts), do: approve_finding(finding)
+  defp do_dispose_finding("resolve", finding, opts), do: approve_finding(finding, opts)
 
   defp do_dispose_finding("dismiss", finding, opts),
-    do: reject_finding(finding, Keyword.get(opts, :reason))
+    do: reject_finding(finding, Keyword.get(opts, :reason), opts)
 
-  defp do_dispose_finding("escalate", finding, _opts), do: escalate_finding(finding)
+  defp do_dispose_finding("escalate", finding, opts), do: escalate_finding(finding, opts)
   defp do_dispose_finding(_action, _finding, _opts), do: {:error, :invalid_action}
 
   @doc """
@@ -1244,13 +1280,14 @@ defmodule ControlKeel.Mission do
   def dispose_session_findings(session_id, filter, action)
       when is_integer(session_id) and action in @disposition_actions do
     reason = Map.get(filter, :reason)
+    disposition_opts = Map.get(filter, :disposition_opts, [])
 
     ids =
       session_id
       |> list_findings_for_session()
       |> Enum.filter(&matches_disposition_filter?(&1, filter))
       |> Enum.reduce([], fn finding, acc ->
-        case do_dispose_finding(action, finding, reason: reason) do
+        case do_dispose_finding(action, finding, Keyword.put(disposition_opts, :reason, reason)) do
           {:ok, updated} -> [updated.id | acc]
           _ -> acc
         end
@@ -1272,6 +1309,35 @@ defmodule ControlKeel.Mission do
 
   defp disposition_filter_match?(_value, nil), do: true
   defp disposition_filter_match?(value, expected), do: value == expected
+
+  @doc "List append-only audit events for a finding, oldest first."
+  @spec finding_audit_events(integer()) :: [FindingAuditEvent.t()]
+  def finding_audit_events(finding_id) when is_integer(finding_id) do
+    FindingAuditEvent
+    |> where([event], event.finding_id == ^finding_id)
+    |> order_by([event], asc: event.recorded_at, asc: event.id)
+    |> Repo.all()
+  end
+
+  defp record_finding_audit_event(event_type, previous, updated, opts) do
+    actor_source = Keyword.get(opts, :actor_source) || "unknown"
+
+    attrs = %{
+      finding_id: updated.id,
+      event_type: Atom.to_string(event_type),
+      previous_status: previous.status,
+      new_status: updated.status,
+      reason: Keyword.get(opts, :reason),
+      actor_user_id: Keyword.get(opts, :actor_user_id),
+      actor_source: actor_source,
+      actor_identifier: Keyword.get(opts, :actor_identifier) || actor_source,
+      recorded_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    }
+
+    %FindingAuditEvent{}
+    |> FindingAuditEvent.changeset(attrs)
+    |> Repo.insert()
+  end
 
   @doc """
   Complete a task, gating on open/blocked findings.
@@ -1318,6 +1384,7 @@ defmodule ControlKeel.Mission do
           )
 
           record_proof_memory(proof)
+          record_deploy_outcome(proof)
           Platform.persist_proof_generated(proof)
           {:ok, updated_task}
 
@@ -1389,6 +1456,7 @@ defmodule ControlKeel.Mission do
     |> case do
       {:ok, proof} ->
         record_proof_memory(proof)
+        record_deploy_outcome(proof)
         Platform.persist_proof_generated(proof)
         {:ok, proof}
 
@@ -2192,6 +2260,8 @@ defmodule ControlKeel.Mission do
   end
 
   defp trace_review_entry(review) do
+    metadata = review.metadata || %{}
+
     %{
       "id" => review.id,
       "review_type" => review.review_type,
@@ -2199,12 +2269,17 @@ defmodule ControlKeel.Mission do
       "task_id" => review.task_id,
       "feedback_notes" => review.feedback_notes,
       "annotations" => review.annotations || %{},
-      "plan_refinement" => get_in(review.metadata || %{}, ["plan_refinement"]) || %{},
+      "plan_refinement" => get_in(metadata, ["plan_refinement"]) || %{},
+      "policy_snapshot" => get_in(metadata, ["policy_snapshot"]),
+      "artifact_snapshot" => get_in(metadata, ["artifact_snapshot"]),
+      "model_provenance" => get_in(metadata, ["model_provenance"]),
       "inserted_at" => review.inserted_at
     }
   end
 
   defp trace_finding_entry(finding) do
+    metadata = finding.metadata || %{}
+
     %{
       "id" => finding.id,
       "rule_id" => finding.rule_id,
@@ -2213,7 +2288,10 @@ defmodule ControlKeel.Mission do
       "severity" => finding.severity,
       "status" => finding.status,
       "plain_message" => finding.plain_message,
-      "task_id" => get_in(finding.metadata || %{}, ["task_id"]),
+      "task_id" => get_in(metadata, ["task_id"]),
+      "policy_snapshot" => get_in(metadata, ["policy_snapshot"]),
+      "artifact_snapshot" => get_in(metadata, ["artifact_snapshot"]),
+      "model_provenance" => get_in(metadata, ["model_provenance"]),
       "inserted_at" => finding.inserted_at
     }
   end
@@ -3980,6 +4058,98 @@ defmodule ControlKeel.Mission do
   defp regression_decision("flaky"), do: "warn"
   defp regression_decision("failed"), do: "warn"
 
+  defp maybe_record_regression_outcome(session, normalized, invocation) do
+    outcome_atom = regression_outcome_atom(normalized["outcome"])
+    task_id = normalized["task_id"]
+
+    shipping_context =
+      resolve_shipping_decision(session.id, task_id, normalized["commit_sha"])
+
+    metadata =
+      %{
+        "engine" => normalized["engine"],
+        "flow_name" => normalized["flow_name"],
+        "regression_outcome" => normalized["outcome"],
+        "commit_sha" => normalized["commit_sha"],
+        "invocation_id" => invocation.id,
+        "task_id" => task_id
+      }
+      |> Map.merge(shipping_context)
+
+    try do
+      case ControlKeel.Learning.OutcomeTracker.record(
+             session.id,
+             outcome_atom,
+             agent_id: "regression:#{normalized["engine"]}",
+             task_type: "regression_test",
+             workspace_id: session.workspace_id,
+             metadata: metadata
+           ) do
+        {:ok, result} ->
+          {:ok, result}
+
+        {:error, reason} ->
+          require Logger
+          Logger.debug("regression outcome emission returned error: #{inspect(reason)}")
+          {:ok, :skipped}
+      end
+    rescue
+      err ->
+        require Logger
+        Logger.debug("regression outcome emission skipped: #{inspect(err)}")
+        {:ok, :skipped}
+    end
+  end
+
+  defp regression_outcome_atom(outcome) when outcome in ["passed", "skipped"], do: :test_pass
+  defp regression_outcome_atom(_outcome), do: :test_fail
+
+  defp resolve_shipping_decision(session_id, task_id, commit_sha) do
+    proof = maybe_latest_proof_for_shipping(task_id, session_id)
+    review = maybe_latest_approved_review(task_id, session_id)
+
+    %{}
+    |> maybe_put_shipping("proof_id", proof && proof.id)
+    |> maybe_put_shipping("proof_deploy_ready", proof && proof.deploy_ready)
+    |> maybe_put_shipping("review_id", review && review.id)
+    |> maybe_put_shipping("review_status", review && review.status)
+    |> maybe_put_shipping("commit_sha_matched", commit_sha_matched?(commit_sha, proof))
+  end
+
+  defp maybe_latest_proof_for_shipping(nil, session_id) do
+    latest_proof_bundles_for_session(session_id)
+    |> Map.values()
+    |> Enum.max_by(& &1.inserted_at, DateTime, fn -> nil end)
+  end
+
+  defp maybe_latest_proof_for_shipping(task_id, _session_id) when is_integer(task_id) do
+    latest_proof_bundle_for_task(task_id)
+  end
+
+  defp maybe_latest_approved_review(nil, _session_id), do: nil
+
+  defp maybe_latest_approved_review(task_id, session_id) when is_integer(task_id) do
+    Review
+    |> where([r], r.session_id == ^session_id and r.task_id == ^task_id)
+    |> where([r], r.status == "approved")
+    |> order_by([r], desc: r.responded_at, desc: r.id)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  defp commit_sha_matched?(nil, _proof), do: nil
+  defp commit_sha_matched?("", _proof), do: nil
+  defp commit_sha_matched?(_sha, nil), do: false
+
+  defp commit_sha_matched?(sha, proof) do
+    proof_sha = get_in(proof.bundle || %{}, ["git", "head_sha"])
+    proof_sha != nil and String.starts_with?(to_string(proof_sha), String.slice(sha, 0, 7))
+  end
+
+  defp maybe_put_shipping(map, _key, nil), do: map
+  defp maybe_put_shipping(map, _key, false), do: Map.put(map, "commit_sha_matched", false)
+  defp maybe_put_shipping(map, key, value), do: Map.put(map, key, value)
+
   defp regression_invocation?(invocation) do
     invocation.source == "external_qa" and invocation.tool == "regression_test"
   end
@@ -4237,11 +4407,13 @@ defmodule ControlKeel.Mission do
           summary: "Finding #{to_string(action)}: #{finding.title}",
           body: finding.plain_message,
           payload: %{
+            "finding_id" => finding.id,
             "rule_id" => finding.rule_id,
             "severity" => finding.severity,
             "status" => finding.status,
             "category" => finding.category
           },
+          finding_id: finding.id,
           metadata: %{
             "domain_pack" => get_in(session.execution_brief || %{}, ["domain_pack"])
           }
@@ -4270,6 +4442,32 @@ defmodule ControlKeel.Mission do
         "deploy_ready" => proof.deploy_ready
       }
     })
+  end
+
+  defp record_deploy_outcome(%ProofBundle{} = proof) do
+    proof = Repo.preload(proof, task: [], session: :workspace)
+    outcome = if proof.deploy_ready, do: :deploy_success, else: :deploy_failure
+
+    metadata = %{
+      "proof_id" => proof.id,
+      "task_id" => proof.task_id,
+      "proof_version" => proof.version,
+      "deploy_ready" => proof.deploy_ready,
+      "risk_score" => proof.risk_score,
+      "open_findings_count" => proof.open_findings_count,
+      "blocked_findings_count" => proof.blocked_findings_count,
+      "source" => "proof_bundle"
+    }
+
+    case OutcomeTracker.record(proof.session_id, outcome,
+           agent_id: get_in(proof.session.execution_brief || %{}, ["agent"]) || "proof_bundle",
+           task_type: "deploy_readiness",
+           workspace_id: proof.session.workspace_id,
+           metadata: metadata
+         ) do
+      {:ok, _record} -> :ok
+      {:error, _reason} -> :ok
+    end
   end
 
   defp record_review_memory(action, %Review{} = review) do
@@ -4302,10 +4500,12 @@ defmodule ControlKeel.Mission do
       summary: review_memory_title(action, review),
       body: review_memory_body(review),
       payload: %{
+        "review_id" => review.id,
         "review_type" => review.review_type,
         "status" => review.status,
         "previous_review_id" => review.previous_review_id
-      }
+      },
+      review_id: review.id
     })
   end
 
@@ -4454,6 +4654,7 @@ defmodule ControlKeel.Mission do
         |> maybe_put_value("task_id", task && task.id)
         |> maybe_put_value("previous_review_id", previous_review && previous_review.id)
         |> Map.put("status", "pending")
+        |> stamp_review_decision_metadata()
 
       {:ok,
        %{
@@ -5736,7 +5937,9 @@ defmodule ControlKeel.Mission do
         "phase" => opts[:phase],
         "security_workflow_phase" => opts[:security_workflow_phase],
         "artifact_type" => opts[:artifact_type],
-        "target_scope" => opts[:target_scope]
+        "target_scope" => opts[:target_scope],
+        "content_sha256" => opts[:content_sha256],
+        "content_bytes" => opts[:content_bytes]
       })
       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
       |> Map.new()
@@ -5753,6 +5956,136 @@ defmodule ControlKeel.Mission do
       metadata: metadata,
       session_id: opts[:session_id]
     }
+  end
+
+  defp stamp_review_decision_metadata(attrs) do
+    metadata = Map.get(attrs, "metadata") || %{}
+    submission_body = Map.get(attrs, "submission_body")
+
+    metadata =
+      metadata
+      |> put_new_metadata("policy_snapshot", Snapshot.identity(policy_snapshot_opts(metadata)))
+      |> put_new_metadata(
+        "artifact_snapshot",
+        Snapshot.artifact(submission_body,
+          path: Map.get(metadata, "path"),
+          kind: Map.get(attrs, "review_type")
+        )
+      )
+      |> put_new_metadata(
+        "model_provenance",
+        model_provenance_for_decision(
+          Map.get(attrs, "session_id"),
+          Map.get(attrs, "task_id"),
+          metadata
+        )
+      )
+
+    Map.put(attrs, "metadata", metadata)
+  end
+
+  defp stamp_finding_decision_metadata(attrs) do
+    attrs = Enum.into(attrs, %{}, fn {key, value} -> {to_string(key), value} end)
+    metadata = Map.get(attrs, "metadata") || %{}
+
+    metadata =
+      metadata
+      |> put_new_metadata("policy_snapshot", Snapshot.identity(policy_snapshot_opts(metadata)))
+      |> put_new_metadata("artifact_snapshot", artifact_snapshot_from_metadata(metadata))
+      |> put_new_metadata(
+        "model_provenance",
+        model_provenance_for_decision(
+          Map.get(attrs, "session_id"),
+          Map.get(metadata, "task_id"),
+          metadata
+        )
+      )
+
+    Map.put(attrs, "metadata", metadata)
+  end
+
+  defp model_provenance_for_decision(session_id, task_id, metadata) do
+    explicit = explicit_model_provenance(metadata)
+
+    cond do
+      map_size(explicit) > 0 -> explicit
+      is_integer(session_id) -> latest_invocation_model_provenance(session_id, task_id)
+      true -> %{"source" => "unknown"}
+    end
+  end
+
+  defp explicit_model_provenance(%{"model_provenance" => value}) when is_map(value), do: value
+
+  defp explicit_model_provenance(metadata) do
+    %{}
+    |> maybe_put_model_value("provider", Map.get(metadata, "provider"))
+    |> maybe_put_model_value("model", Map.get(metadata, "model"))
+    |> maybe_put_model_value("agent_id", Map.get(metadata, "agent_id"))
+    |> maybe_put_model_value("source", Map.get(metadata, "source"))
+  end
+
+  defp latest_invocation_model_provenance(session_id, task_id) do
+    query =
+      Invocation
+      |> where([i], i.session_id == ^session_id)
+      |> where([i], not is_nil(i.provider) or not is_nil(i.model))
+
+    query =
+      if is_integer(task_id) do
+        where(query, [i], i.task_id == ^task_id)
+      else
+        query
+      end
+
+    case query |> order_by([i], desc: i.inserted_at, desc: i.id) |> limit(1) |> Repo.one() do
+      %Invocation{} = invocation ->
+        %{
+          "source" => "latest_invocation",
+          "invocation_id" => invocation.id,
+          "provider" => invocation.provider,
+          "model" => invocation.model,
+          "tool" => invocation.tool,
+          "invocation_source" => invocation.source
+        }
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+
+      nil ->
+        %{"source" => "unknown"}
+    end
+  end
+
+  defp maybe_put_model_value(map, _key, nil), do: map
+  defp maybe_put_model_value(map, _key, ""), do: map
+  defp maybe_put_model_value(map, key, value), do: Map.put(map, key, value)
+
+  defp policy_snapshot_opts(metadata) do
+    [
+      domain_pack: Map.get(metadata, "domain_pack"),
+      policy_packs: Map.get(metadata, "policy_packs", [])
+    ]
+  end
+
+  defp artifact_snapshot_from_metadata(metadata) do
+    case Map.get(metadata, "content_sha256") do
+      hash when is_binary(hash) and hash != "" ->
+        %{
+          "content_sha256" => hash,
+          "content_bytes" => Map.get(metadata, "content_bytes")
+        }
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+        |> Map.merge(
+          Snapshot.artifact(nil, path: Map.get(metadata, "path"), kind: Map.get(metadata, "kind"))
+        )
+
+      _other ->
+        Snapshot.artifact(nil, path: Map.get(metadata, "path"), kind: Map.get(metadata, "kind"))
+    end
+  end
+
+  defp put_new_metadata(metadata, key, value) do
+    if Map.has_key?(metadata, key), do: metadata, else: Map.put(metadata, key, value)
   end
 
   defp maybe_add_vulnerability_metadata(metadata, finding, opts) do

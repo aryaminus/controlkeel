@@ -239,10 +239,39 @@ defmodule ControlKeel.MissionTest do
     assert approved.status == "approved"
     assert approved.metadata["approved_at"]
 
+    assert [approved_event] = Mission.finding_audit_events(finding.id)
+    assert approved_event.event_type == "approved"
+    assert approved_event.previous_status == finding.status
+    assert approved_event.new_status == "approved"
+
     assert {:ok, rejected} = Mission.reject_finding(approved, "False positive")
     assert rejected.status == "rejected"
     assert rejected.metadata["rejected_at"]
     assert rejected.metadata["rejection_reason"] == "False positive"
+
+    assert [_approved_event, rejected_event] = Mission.finding_audit_events(finding.id)
+    assert rejected_event.event_type == "rejected"
+    assert rejected_event.previous_status == "approved"
+    assert rejected_event.new_status == "rejected"
+    assert rejected_event.reason == "False positive"
+  end
+
+  test "dispose_finding/3 records actor metadata for finding audit events" do
+    finding = finding_fixture(%{status: "blocked"})
+
+    assert {:ok, escalated} =
+             Mission.dispose_finding("escalate", finding,
+               actor_source: "mcp",
+               actor_identifier: "ck_finding"
+             )
+
+    assert escalated.status == "escalated"
+    assert [event] = Mission.finding_audit_events(finding.id)
+    assert event.event_type == "escalated"
+    assert event.previous_status == "blocked"
+    assert event.new_status == "escalated"
+    assert event.actor_source == "mcp"
+    assert event.actor_identifier == "ck_finding"
   end
 
   test "browse_findings/1 applies filters and paginates deterministically" do
@@ -835,6 +864,22 @@ defmodule ControlKeel.MissionTest do
       assert is_binary(bundle["generated_at"])
       assert is_binary(bundle["rollback_instructions"])
       assert Repo.aggregate(ProofBundle, :count, :id) == 1
+
+      outcome_entry =
+        Memory.search("outcome deploy",
+          workspace_id: session.workspace_id,
+          session_id: session.id,
+          top_k: 20,
+          include_metadata: true
+        ).entries
+        |> Enum.find(fn entry ->
+          meta = entry.metadata || %{}
+          meta["task_id"] == task.id and meta["task_type"] == "deploy_readiness"
+        end)
+
+      assert outcome_entry
+      assert outcome_entry.metadata["deploy_ready"] == bundle["deploy_ready"]
+      assert outcome_entry.metadata["outcome"] in ["deploy_success", "deploy_failure"]
     end
 
     test "deploy_ready is false when open findings exist" do
@@ -1044,6 +1089,88 @@ defmodule ControlKeel.MissionTest do
                }
                | _
              ] = bundle["test_outcomes"]["latest_failures"]
+    end
+
+    test "record_regression_result auto-emits test_fail outcome and links shipping decision" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      _proof = proof_bundle_fixture(%{task: task})
+
+      {:ok, review} =
+        Mission.submit_review(%{
+          "task_id" => task.id,
+          "review_type" => "diff",
+          "submission_body" => "diff plan",
+          "plan_phase" => "implementation_plan"
+        })
+
+      {:ok, _approved} = Mission.respond_review(review, %{"decision" => "approved"})
+
+      Mission.record_regression_result(%{
+        "session_id" => session.id,
+        "task_id" => task.id,
+        "engine" => "bug0",
+        "flow_name" => "auth flow",
+        "outcome" => "failed",
+        "commit_sha" => "abc1234",
+        "summary" => "Login button unresponsive"
+      })
+
+      search =
+        Memory.search("outcome test_fail",
+          workspace_id: session.workspace_id,
+          session_id: session.id,
+          top_k: 50,
+          include_metadata: true
+        )
+
+      outcome_entry =
+        Enum.find(search.entries, fn e ->
+          meta = Map.get(e, :metadata, %{})
+          meta["outcome"] == "test_fail" and meta["task_id"] == task.id
+        end)
+
+      assert outcome_entry
+      meta = outcome_entry.metadata
+      assert meta["agent_id"] == "regression:bug0"
+      assert meta["task_type"] == "regression_test"
+      assert meta["regression_outcome"] == "failed"
+      assert is_integer(meta["review_id"])
+      assert meta["review_status"] == "approved"
+      assert is_integer(meta["proof_id"])
+    end
+
+    test "record_regression_result auto-emits test_pass for passing outcome" do
+      session = session_fixture()
+      task = task_fixture(%{session: session, status: "done"})
+
+      Mission.record_regression_result(%{
+        "session_id" => session.id,
+        "task_id" => task.id,
+        "engine" => "bug0",
+        "flow_name" => "smoke suite",
+        "outcome" => "passed",
+        "summary" => "All smoke tests passed"
+      })
+
+      search =
+        Memory.search("outcome test_pass",
+          workspace_id: session.workspace_id,
+          session_id: session.id,
+          top_k: 50,
+          include_metadata: true
+        )
+
+      outcome_entry =
+        Enum.find(search.entries, fn e ->
+          meta = Map.get(e, :metadata, %{})
+          meta["outcome"] == "test_pass"
+        end)
+
+      assert outcome_entry
+      assert outcome_entry.metadata["regression_outcome"] == "passed"
+      assert outcome_entry.metadata["reward"] > 0
     end
 
     test "verification assessment becomes strong with mixed evidence" do

@@ -11,6 +11,8 @@ defmodule ControlKeel.Mission.SessionEvent do
     field :body, :string, default: ""
     field :payload, :map, default: %{}
     field :metadata, :map, default: %{}
+    field :review_id, :integer
+    field :finding_id, :integer
 
     belongs_to :session, Session
     belongs_to :task, Task
@@ -27,6 +29,8 @@ defmodule ControlKeel.Mission.SessionEvent do
       :body,
       :payload,
       :metadata,
+      :review_id,
+      :finding_id,
       :session_id,
       :task_id
     ])

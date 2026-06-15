@@ -3,7 +3,9 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
 
   alias ControlKeel.AutoFix
   alias ControlKeel.Intent.Domains
+  alias ControlKeel.Learning.OutcomeTracker
   alias ControlKeel.Mission
+  alias ControlKeel.Precedent
   alias ControlKeel.Scanner
   alias ControlKeel.Scanner.FastPath
   alias ControlKeel.SecurityWorkflow
@@ -69,8 +71,10 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
     with {:ok, normalized} <- normalize(arguments) do
       result = FastPath.scan(normalized)
       maybe_persist(normalized, result.findings)
+      maybe_record_security_scan_outcome(normalized, result)
       trust_advisory = trust_policy_advisory(normalized["task_id"])
-      {:ok, public_result(result, trust_advisory)}
+      precedent = lookup_precedent(normalized, result.findings)
+      {:ok, public_result(result, trust_advisory, precedent)}
     end
   end
 
@@ -211,6 +215,7 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
 
   defp maybe_persist(
          %{
+           "content" => content,
            "session_id" => session_id,
            "path" => path,
            "kind" => kind,
@@ -228,6 +233,8 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
         task_id: task_id,
         path: path,
         kind: kind,
+        content_sha256: ControlKeel.Policy.Snapshot.hash(content),
+        content_bytes: byte_size(content),
         domain_pack: domain_pack,
         security_workflow_phase: security_workflow_phase,
         artifact_type: artifact_type,
@@ -237,7 +244,38 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
     :ok
   end
 
-  defp public_result(%Scanner.Result{} = result, trust_advisory) do
+  defp maybe_record_security_scan_outcome(%{"session_id" => nil}, _result), do: :ok
+
+  defp maybe_record_security_scan_outcome(%{"session_id" => session_id} = normalized, result) do
+    outcome = if result.findings == [], do: :security_scan_clean, else: :security_scan_found
+
+    metadata = %{
+      "task_id" => normalized["task_id"],
+      "path" => normalized["path"],
+      "kind" => normalized["kind"],
+      "domain_pack" => normalized["domain_pack"],
+      "security_workflow_phase" => normalized["security_workflow_phase"],
+      "artifact_type" => normalized["artifact_type"],
+      "target_scope" => normalized["target_scope"],
+      "decision" => result.decision,
+      "allowed" => result.allowed,
+      "finding_count" => length(result.findings),
+      "blocked_count" => Enum.count(result.findings, &(&1.decision == "block")),
+      "rule_ids" => Enum.map(result.findings, & &1.rule_id),
+      "source" => "ck_validate"
+    }
+
+    case OutcomeTracker.record(session_id, outcome,
+           agent_id: "security_scan:ck_validate",
+           task_type: normalized["kind"] || "unknown",
+           metadata: metadata
+         ) do
+      {:ok, _record} -> :ok
+      {:error, _reason} -> :ok
+    end
+  end
+
+  defp public_result(%Scanner.Result{} = result, trust_advisory, precedent) do
     fix_prompts =
       result.findings
       |> Enum.filter(&(&1.decision == "block"))
@@ -267,9 +305,26 @@ defmodule ControlKeel.MCP.Tools.CkValidate do
       "findings" => Enum.map(result.findings, &finding_to_map/1),
       "fix_prompts" => fix_prompts,
       "scanned_at" => result.scanned_at,
+      "precedent" => precedent,
       "advisory" => advisory,
       "trust_policy_advisory" => trust_advisory
     }
+  end
+
+  defp lookup_precedent(%{"session_id" => nil}, _findings), do: []
+  defp lookup_precedent(_normalized, []), do: []
+
+  defp lookup_precedent(%{"session_id" => session_id}, findings) do
+    with %{workspace_id: workspace_id} <- Mission.get_session(session_id) do
+      findings
+      |> Enum.map(& &1.rule_id)
+      |> Enum.uniq()
+      |> Precedent.for_rule_ids(workspace_id: workspace_id, exclude_session_id: session_id)
+    else
+      _ -> []
+    end
+  rescue
+    _ -> []
   end
 
   defp normalize_advisory(nil), do: nil

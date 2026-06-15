@@ -8,6 +8,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   alias ControlKeel.Mission
   alias ControlKeel.Mission.{Finding, Session}
   alias ControlKeel.ProviderBroker
+  alias ControlKeel.Precedent
   alias ControlKeel.LocalProject
   alias ControlKeel.Repo
   alias ControlKeel.TaskAugmentation
@@ -47,6 +48,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
         "planning_context" => planning_context(task),
         "task_augmentation" => TaskAugmentation.build(session, task, workspace_context),
         "memory_hits" => memory_hits(session, task),
+        "precedent" => precedent_hits(session),
         "resume_packet" => resume_packet(task),
         "workspace_context" => workspace_context,
         "workspace_cache_key" => workspace_context["cache_key"],
@@ -88,6 +90,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     |> Map.update("resume_packet", nil, &compact_resume_packet/1)
     |> Map.update("task_augmentation", %{}, &compact_task_augmentation/1)
     |> Map.update("memory_hits", [], &compact_list(&1, 3))
+    |> Map.update("precedent", [], &compact_list(&1, 5))
     |> Map.update("recent_events", [], &compact_list(&1, 10))
   end
 
@@ -241,6 +244,12 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     session
     |> Memory.retrieve_for_task(task, findings: session.findings, top_k: 5)
     |> Map.get(:entries, [])
+  end
+
+  defp precedent_hits(session) do
+    Precedent.workspace_precedent(session, limit: 5)
+  rescue
+    _ -> []
   end
 
   defp resume_packet(nil), do: nil

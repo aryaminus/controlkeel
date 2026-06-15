@@ -3,6 +3,7 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
 
   alias ControlKeel.MCP.Tools.CkContext
   alias ControlKeel.MCP.Tools.CkContextPack
+  alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.ProjectBinding
@@ -10,6 +11,41 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
 
   import ControlKeel.IntentFixtures
   import ControlKeel.MissionFixtures
+
+  test "returns workspace-wide precedent separate from session-scoped memory hits" do
+    prior_session = session_fixture()
+    workspace = Mission.get_session_with_workspace(prior_session.id).workspace
+    session = session_fixture(%{workspace: workspace})
+
+    {:ok, _finding} =
+      Mission.create_finding(%{
+        session_id: session.id,
+        title: "SQL injection",
+        severity: "critical",
+        category: "security",
+        rule_id: "security.sql_injection",
+        plain_message: "Current active issue",
+        status: "blocked",
+        metadata: %{}
+      })
+
+    {:ok, _memory} =
+      Memory.record(%{
+        workspace_id: workspace.id,
+        session_id: prior_session.id,
+        record_type: "finding",
+        title: "Finding approved: prior SQL exception",
+        summary: "Prior same-rule exception was approved for generated test data.",
+        body: "security.sql_injection (critical/approved)",
+        tags: ["security.sql_injection", "approved", "finding"],
+        source_type: "finding",
+        source_id: "context-precedent-fixture",
+        metadata: %{"rule_id" => "security.sql_injection", "status" => "approved"}
+      })
+
+    assert {:ok, result} = CkContext.call(%{"session_id" => session.id})
+    assert Enum.any?(result["precedent"], &(&1["rule_id"] == "security.sql_injection"))
+  end
 
   test "returns task assurance with verification and context integrity" do
     session = session_fixture()

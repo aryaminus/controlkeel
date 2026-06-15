@@ -155,6 +155,9 @@ defmodule ControlKeel.Cloud.AuditExport do
         "title" => f.title,
         "plain_message" => f.plain_message,
         "status" => f.status,
+        "policy_snapshot" => get_in(f.metadata || %{}, ["policy_snapshot"]),
+        "artifact_snapshot" => get_in(f.metadata || %{}, ["artifact_snapshot"]),
+        "model_provenance" => get_in(f.metadata || %{}, ["model_provenance"]),
         "inserted_at" => iso(f.inserted_at)
       }
     end)
@@ -187,6 +190,9 @@ defmodule ControlKeel.Cloud.AuditExport do
         "required_role" => r.required_role,
         "session_id" => r.session_id,
         "task_id" => r.task_id,
+        "policy_snapshot" => get_in(r.metadata || %{}, ["policy_snapshot"]),
+        "artifact_snapshot" => get_in(r.metadata || %{}, ["artifact_snapshot"]),
+        "model_provenance" => get_in(r.metadata || %{}, ["model_provenance"]),
         "responded_at" => iso(r.responded_at),
         "inserted_at" => iso(r.inserted_at)
       }
@@ -218,6 +224,8 @@ defmodule ControlKeel.Cloud.AuditExport do
         "target_user_id" => e.target_user_id,
         "required_role" => e.required_role,
         "actor_role" => e.actor_role,
+        "actor_source" => e.actor_source,
+        "actor_identifier" => e.actor_identifier,
         "note" => e.note,
         "recorded_at" => iso(e.recorded_at)
       }

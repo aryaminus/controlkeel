@@ -43,6 +43,7 @@ defmodule ControlKeel.MCP.OutputSchemas do
           }
         },
         "scanned_at" => %{"type" => "string"},
+        "precedent" => %{"type" => "array", "items" => %{"type" => "object"}},
         "advisory" => @nullable_object,
         "trust_policy_advisory" => @nullable_string
       }
@@ -84,6 +85,7 @@ defmodule ControlKeel.MCP.OutputSchemas do
         "planning_context" => %{"type" => "object"},
         "task_augmentation" => %{"type" => "object"},
         "memory_hits" => %{"type" => "array", "items" => %{"type" => "object"}},
+        "precedent" => %{"type" => "array", "items" => %{"type" => "object"}},
         "resume_packet" => %{"type" => "object"},
         "workspace_context" => %{"type" => "object"},
         "workspace_cache_key" => @nullable_string,
@@ -160,6 +162,7 @@ defmodule ControlKeel.MCP.OutputSchemas do
         "finding_id" => %{"type" => "integer"},
         "status" => %{"type" => "string"},
         "requires_human" => %{"type" => "boolean"},
+        "precedent" => %{"type" => "array", "items" => %{"type" => "object"}},
         "resolved_finding_ids" => %{"type" => "array", "items" => %{"type" => "integer"}},
         "resolved_findings_count" => %{"type" => "integer"},
         "disposed_finding_ids" => %{"type" => "array", "items" => %{"type" => "integer"}},
@@ -198,7 +201,8 @@ defmodule ControlKeel.MCP.OutputSchemas do
       "properties" => %{
         "anti_patterns" => %{"type" => "array", "items" => %{"type" => "object"}},
         "reinforced_practices" => %{"type" => "array", "items" => %{"type" => "object"}},
-        "skill_draft" => %{"type" => "object"}
+        "skill_draft" => %{"type" => "object"},
+        "install" => %{"type" => "object"}
       }
     },
     "ck_fs_ls" => %{

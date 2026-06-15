@@ -68,6 +68,8 @@ defmodule ControlKeel.SessionTranscript do
       "body" => event.body,
       "payload" => event.payload || %{},
       "metadata" => event.metadata || %{},
+      "review_id" => event.review_id,
+      "finding_id" => event.finding_id,
       "task_id" => event.task_id,
       "inserted_at" => event.inserted_at
     }
@@ -83,6 +85,8 @@ defmodule ControlKeel.SessionTranscript do
       body: clip_text(attrs["body"] || "", @body_max),
       payload: clip_payload(attrs["payload"] || %{}),
       metadata: clip_payload(attrs["metadata"] || %{}),
+      review_id: attrs["review_id"],
+      finding_id: attrs["finding_id"],
       session_id: attrs["session_id"],
       task_id: attrs["task_id"]
     }
