@@ -1152,7 +1152,12 @@ defmodule ControlKeel.Mission do
         "approved_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
       })
 
-    case update_finding_with_audit(finding, %{status: "approved", metadata: metadata}, :approved, opts) do
+    case update_finding_with_audit(
+           finding,
+           %{status: "approved", metadata: metadata},
+           :approved,
+           opts
+         ) do
       {:ok, updated} ->
         emit_finding_event(:approved, updated)
         record_finding_memory(:approved, updated)
@@ -1215,7 +1220,12 @@ defmodule ControlKeel.Mission do
           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
       })
 
-    case update_finding_with_audit(finding, %{status: "escalated", metadata: metadata}, :escalated, opts) do
+    case update_finding_with_audit(
+           finding,
+           %{status: "escalated", metadata: metadata},
+           :escalated,
+           opts
+         ) do
       {:ok, updated} ->
         emit_finding_event(:escalated, updated)
         record_finding_memory(:escalated, updated)

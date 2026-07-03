@@ -517,7 +517,7 @@ defmodule ControlKeel.MCP.OutputSchemas do
       "properties" => %{
         "name" => %{"type" => "string"},
         "content" => %{"type" => "string"},
-        "resources" => %{"type" => "array", "items" => %{"type" => "object"}}
+        "resources" => %{"type" => "array", "items" => %{"type" => "string"}}
       }
     },
     "ck_skill_validate" => %{
