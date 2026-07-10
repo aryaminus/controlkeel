@@ -172,32 +172,21 @@ defmodule ControlKeel.CLI.Updater do
         }
 
       true ->
-        downloader = Keyword.get(opts, :download_binary, &download_release_binary/2)
         latest_version = get_in(report, ["latest_release", "version"])
 
-        case downloader.(latest_version, opts) do
-          {:ok, downloaded_path} ->
-            with :ok <- File.cp(downloaded_path, path),
-                 :ok <- File.chmod(path, 0o755) do
-              %{
-                "status" => "applied",
-                "channel" => "github_release_binary",
-                "message" => "Replaced #{path} with ControlKeel #{latest_version}."
-              }
-            else
-              {:error, reason} ->
-                %{
-                  "status" => "error",
-                  "channel" => "github_release_binary",
-                  "message" => "Failed to replace #{path}: #{inspect(reason)}"
-                }
-            end
+        case install_direct_binary(path, latest_version, opts) do
+          :ok ->
+            %{
+              "status" => "applied",
+              "channel" => "github_release_binary",
+              "message" => "Replaced #{path} with ControlKeel #{latest_version}."
+            }
 
           {:error, reason} ->
             %{
               "status" => "error",
               "channel" => "github_release_binary",
-              "message" => "Failed to download the latest binary: #{format_reason(reason)}"
+              "message" => "Failed to replace #{path}: #{format_reason(reason)}"
             }
         end
     end
@@ -396,14 +385,79 @@ defmodule ControlKeel.CLI.Updater do
 
   defp update_available?(_, _), do: false
 
-  defp download_release_binary(version, opts) do
+  @doc false
+  def install_direct_binary(path, version, opts \\ []) do
+    temp_path =
+      Path.join(
+        Path.dirname(path),
+        ".controlkeel-update-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    downloader = Keyword.get(opts, :download_binary, &download_release_binary/3)
+    chmod = Keyword.get(opts, :chmod, &File.chmod/2)
+    rename = Keyword.get(opts, :rename, &File.rename/2)
+
+    try do
+      with :ok <- downloader.(version, temp_path, opts),
+           :ok <- chmod.(temp_path, 0o755),
+           :ok <- rename.(temp_path, path) do
+        :ok
+      end
+    after
+      File.rm(temp_path)
+    end
+  end
+
+  defp download_release_binary(version, destination, opts) do
     asset = asset_name()
+    base_url = official_release_base_url(version)
+    download = Keyword.get(opts, :download_file, &download_file/2)
 
-    url =
-      "https://github.com/#{Keyword.get(opts, :repository, repository())}/releases/download/v#{version}/#{asset}"
+    with :ok <- download.("#{base_url}/#{asset}", destination),
+         checksum_path = "#{destination}.checksums",
+         :ok <- download.("#{base_url}/controlkeel-checksums.txt", checksum_path),
+         {:ok, checksums} <- File.read(checksum_path),
+         :ok <- verify_download_checksum(destination, asset, checksums) do
+      File.rm(checksum_path)
+      :ok
+    else
+      {:error, reason} ->
+        File.rm(destination)
+        File.rm("#{destination}.checksums")
+        {:error, reason}
+    end
+  end
 
-    destination = Path.join(System.tmp_dir!(), "#{asset}-#{System.unique_integer([:positive])}")
+  @doc false
+  def official_release_base_url(version) do
+    "https://github.com/#{@repository}/releases/download/v#{version}"
+  end
 
+  @doc false
+  def verify_download_checksum(path, asset, checksums) do
+    expected =
+      checksums
+      |> String.split("\n")
+      |> Enum.find_value(fn line ->
+        case String.split(String.trim(line), ~r/\s+/, parts: 2) do
+          [hash, name] -> if Path.basename(name) == asset, do: String.downcase(hash)
+          _ -> nil
+        end
+      end)
+
+    with hash when is_binary(hash) <- expected,
+         {:ok, contents} <- File.read(path),
+         actual = :crypto.hash(:sha256, contents) |> Base.encode16(case: :lower),
+         true <- Plug.Crypto.secure_compare(actual, hash) do
+      :ok
+    else
+      nil -> {:error, "no checksum entry for #{asset}"}
+      false -> {:error, "checksum mismatch for #{asset}"}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp download_file(url, destination) do
     req =
       Req.new(
         url: url,
@@ -413,14 +467,9 @@ defmodule ControlKeel.CLI.Updater do
       )
 
     case Req.request(req) do
-      {:ok, %Req.Response{status: status}} when status in 200..299 ->
-        {:ok, destination}
-
-      {:ok, %Req.Response{status: status}} ->
-        {:error, "download failed with HTTP #{status}"}
-
-      {:error, exception} ->
-        {:error, Exception.message(exception)}
+      {:ok, %Req.Response{status: status}} when status in 200..299 -> :ok
+      {:ok, %Req.Response{status: status}} -> {:error, "download failed with HTTP #{status}"}
+      {:error, exception} -> {:error, Exception.message(exception)}
     end
   end
 
@@ -479,7 +528,7 @@ defmodule ControlKeel.CLI.Updater do
   end
 
   defp repository do
-    System.get_env("CONTROLKEEL_GITHUB_REPO") || @repository
+    @repository
   end
 
   defp normalize_version("v" <> rest), do: rest

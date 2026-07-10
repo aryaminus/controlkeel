@@ -25,8 +25,9 @@ The package uses a **lazy download model** - the native binary is downloaded on 
 1. User runs `controlkeel` or imports the package programmatically
 2. Installer detects platform (OS and architecture) using Node.js built-ins
 3. Downloads appropriate binary from official GitHub Releases
-4. Verifies SHA-256 checksum against release's `SHASUMS256.txt`
-5. Caches binary locally for subsequent uses
+4. Verifies SHA-256 checksum against the release's `controlkeel-checksums.txt`
+5. Verifies the keyless cosign signature when cosign is available; set `CONTROLKEEL_REQUIRE_SIGNATURE=1` to fail closed when signature material is unavailable
+6. Caches binary locally for subsequent uses
 
 **Supported Platforms**
 
@@ -43,7 +44,7 @@ The package uses a **lazy download model** - the native binary is downloaded on 
 | Measure | Implementation | Threat Mitigated |
 |---------|---------------|------------------|
 | No Install Scripts | Removed all `postinstall` and lifecycle scripts | Code execution during install |
-| No Environment Variables | Removed all `process.env` usage; hardcoded configuration | Configuration-based attacks |
+| Fixed Download Source | Repository and package version cannot be overridden | Configuration-based redirect attacks |
 | Plain URLs | Plaintext, auditable URL strings (base64 removed) | Auditability; no hidden network destinations |
 | Hardcoded Repository | Fixed to `aryaminus/controlkeel` | Repository redirect attacks |
 | HTTPS Only | All downloads use HTTPS | Man-in-the-middle attacks |
@@ -53,7 +54,7 @@ The package uses a **lazy download model** - the native binary is downloaded on 
 
 ### Configuration
 
-**Hardcoded Values** (cannot be overridden):
+**Hardcoded download values** (cannot be overridden):
 
 - Repository: `aryaminus/controlkeel`
 - Version: Matched to package.json version
@@ -65,6 +66,8 @@ The package uses a **lazy download model** - the native binary is downloaded on 
 - `CONTROLKEEL_VERSION` - Version pinning
 - `CONTROLKEEL_SKIP_DOWNLOAD` - Skip auto-download
 - `CONTROLKEEL_ALLOW_CUSTOM_SOURCE` - Custom source guard
+
+`CONTROLKEEL_SKIP_SIGNATURE` and `CONTROLKEEL_REQUIRE_SIGNATURE` only control optional cosign verification. SHA-256 verification is mandatory in the npm bootstrap and cannot be disabled.
 
 **Rationale**: Hardcoding eliminates attack vectors from environment variable manipulation or configuration redirection.
 
@@ -83,8 +86,8 @@ The package uses a **lazy download model** - the native binary is downloaded on 
 
 - **Status**: ✅ RESOLVED
 - **Original Issue**: Package accessed `process.env.CONTROLKEEL_*` variables
-- **Resolution**: Removed all `process.env` usage; configuration hardcoded
-- **Verification**: `grep -r "process\.env" --include="*.js"` returns no matches
+- **Resolution**: Removed environment overrides for the repository, version, and download source; those values are hardcoded
+- **Verification**: Download URL construction does not read environment variables
 
 ### Alert: URL Strings
 

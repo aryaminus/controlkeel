@@ -544,6 +544,15 @@ defmodule ControlKeel.Agent.IntegrationTest do
     end)
   end
 
+  test "integration scopes are supported by their preferred install target" do
+    for integration <- Integration.catalog(), integration.preferred_target do
+      target = SkillTarget.get(integration.preferred_target)
+
+      assert integration.supported_scopes -- target.supported_scopes == [],
+             "#{integration.id} advertises scopes unsupported by #{target.id}"
+    end
+  end
+
   test "typed runtime and alias rows stay truthful" do
     devin = Integration.get("devin")
     devin_terminal = Integration.get("devin-terminal")

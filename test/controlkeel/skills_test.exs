@@ -16,13 +16,21 @@ defmodule ControlKeel.SkillsTest do
     File.mkdir_p!(tmp_dir)
 
     original_home = System.get_env("HOME")
+    original_controlkeel_home = System.get_env("CONTROLKEEL_HOME")
     System.put_env("HOME", tmp_dir)
+    System.put_env("CONTROLKEEL_HOME", tmp_dir)
 
     on_exit(fn ->
       if original_home do
         System.put_env("HOME", original_home)
       else
         System.delete_env("HOME")
+      end
+
+      if original_controlkeel_home do
+        System.put_env("CONTROLKEEL_HOME", original_controlkeel_home)
+      else
+        System.delete_env("CONTROLKEEL_HOME")
       end
 
       Activation.reset()
@@ -1268,6 +1276,69 @@ defmodule ControlKeel.SkillsTest do
     # Guards against the decomposition silently dropping a host (handlers were
     # lost-and-restored twice during the exporter/CLI refactors).
     assert length(ids) >= 40
+  end
+
+  test "invalid install scopes return an error instead of falling back", %{tmp_dir: tmp_dir} do
+    assert {:error, {:unsupported_scope, "cursor-native", "user", ["project", "export"]}} =
+             Skills.install("cursor-native", tmp_dir, scope: "user")
+
+    refute File.exists?(Path.join(tmp_dir, ".cursor"))
+  end
+
+  test "multica installs concrete native artifacts for project and user scopes", %{
+    tmp_dir: tmp_dir
+  } do
+    project = Path.join(tmp_dir, "project")
+    File.mkdir_p!(project)
+
+    assert {:ok, project_install} = Skills.install("multica-native", project, scope: "project")
+    assert project_install.destination == Path.join(project, ".multica")
+    assert project_install.skills_destination == Path.join(project, ".agents/skills")
+    assert File.exists?(Path.join(project, ".multica/controlkeel-mcp.json"))
+    assert File.exists?(Path.join(project, ".multica/commands/controlkeel-review.md"))
+    assert File.exists?(Path.join(project, ".agents/skills/controlkeel-governance/SKILL.md"))
+
+    assert {:ok, user_install} = Skills.install("multica-native", project, scope: "user")
+    assert user_install.destination == Path.join(tmp_dir, ".multica")
+    assert user_install.skills_destination == Path.join(tmp_dir, ".agents/skills")
+    assert File.exists?(Path.join(tmp_dir, ".multica/controlkeel-mcp.json"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+  end
+
+  test "antigravity installs its workspace-native bundle", %{tmp_dir: tmp_dir} do
+    assert {:ok, install} =
+             Skills.install("antigravity-cli-native", tmp_dir, scope: "project")
+
+    assert install.destination == Path.join(tmp_dir, ".agents")
+    assert install.plugins_destination == Path.join(tmp_dir, ".agents/plugins/controlkeel")
+    assert File.exists?(Path.join(tmp_dir, ".agents/plugins/controlkeel/plugin.json"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/hooks.json"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/mcp_config.json"))
+    assert File.exists?(Path.join(tmp_dir, "GEMINI.md"))
+    assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+  end
+
+  test "runtime targets with project scope return unsupported_install instead of crashing", %{
+    tmp_dir: tmp_dir
+  } do
+    for target <- ~w(open-swe-runtime devin-runtime warp-oz-runtime executor-runtime
+                     cloudflare-workers-runtime virtual-bash-runtime multica-cloud-runtime) do
+      assert {:error, {:unsupported_install, ^target, "project"}} =
+               Skills.install(target, tmp_dir, scope: "project"),
+             "expected #{target} to return unsupported_install for project scope"
+    end
+  end
+
+  test "export-only plugin targets reject project install scope", %{tmp_dir: tmp_dir} do
+    for plugin <-
+          ~w(claude-plugin augment-plugin openclaw-plugin droid-plugin antigravity-cli-plugin) do
+      result = Skills.install(plugin, tmp_dir, scope: "project")
+
+      assert match?({:error, {:unsupported_scope, ^plugin, "project", _}}, result) ||
+               match?({:error, {:unsupported_install, ^plugin, "project"}}, result),
+             "expected #{plugin} to reject project scope, got: #{inspect(result)}"
+    end
   end
 
   describe "repo_hook_command/1 scope resolution" do

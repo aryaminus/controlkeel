@@ -98,8 +98,8 @@ defmodule ControlKeel.MCP.Server do
     {:noreply, %{state | read_task: nil}}
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{read_task: {pid, ref}} = state) do
-    {:noreply, %{state | read_task: {pid, ref}}}
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{read_task: {_, ref}} = state) do
+    {:noreply, %{state | read_task: nil}}
   end
 
   defp maybe_write_frame(:no_response, _output), do: :ok

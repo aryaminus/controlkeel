@@ -45,7 +45,8 @@ defmodule ControlKeel.Ops.Distribution do
       command:
         "curl -fsSL https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.sh | sh",
       platforms: ["macos", "linux"],
-      description: "Stable bootstrap script from the repository that installs the latest release."
+      description:
+        "Mutable bootstrap script from the current default branch that installs the latest release."
     },
     %{
       id: "powershell-installer",
@@ -61,7 +62,8 @@ defmodule ControlKeel.Ops.Distribution do
       command:
         "irm https://raw.githubusercontent.com/aryaminus/controlkeel/main/scripts/install.ps1 | iex",
       platforms: ["windows"],
-      description: "Stable bootstrap script from the repository that installs the latest release."
+      description:
+        "Mutable bootstrap script from the current default branch that installs the latest release."
     },
     %{
       id: "github-releases",

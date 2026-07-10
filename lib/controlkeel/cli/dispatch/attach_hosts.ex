@@ -182,11 +182,11 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
 
     with {:ok, binding, _session, _mode} <-
            ensure_attach_project(root, %{"agent" => agent}),
-         {:ok, _scope} <- validate_attach_scope(agent, options),
+         {:ok, scope} <- validate_attach_scope(agent, options),
          command_spec <- Binding.mcp_command_spec(root, portable: true),
          config_path <- config_path_fn[agent].(),
          {:ok, attached} <- write_ide_mcp_config(config_path, "controlkeel", command_spec, agent),
-         {:ok, native_attrs, native_lines} <- install_native_attach(agent, root, options),
+         {:ok, native_attrs, native_lines} <- install_native_attach(agent, root, scope, options),
          attached <- Map.merge(attached, native_attrs),
          updated <- Binding.update_attached_agent(binding, agent, attached),
          {:ok, _} <-
@@ -600,19 +600,19 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
     end
   end
 
-  defp install_native_attach(agent, project_root, options) do
+  defp install_native_attach(agent, project_root, scope, options) do
     if native_attach_skipped?(options) do
       {:ok, %{}, []}
     else
       target = native_attach_target(agent)
 
-      case Skills.install(target, project_root, scope: "project") do
+      case Skills.install(target, project_root, scope: scope) do
         {:ok, %{destination: destination} = result} ->
           attrs =
             result
             |> Enum.into(%{}, fn {key, value} -> {to_string(key), value} end)
             |> Map.put("target", target)
-            |> Map.put("scope", "project")
+            |> Map.put("scope", scope)
 
           {:ok, attrs,
            [
@@ -621,15 +621,18 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
            ]}
 
         {:ok, plan} ->
-          {:ok, %{"target" => target, "scope" => "project"},
-           [
-             "Prepared native instruction snippets for #{display_attach_agent(agent)}.",
-             "Instructions bundle: #{plan.output_dir}"
-           ]}
+          if target == "instructions-only" do
+            {:ok, %{"target" => target, "scope" => scope},
+             [
+               "Prepared native instruction snippets for #{display_attach_agent(agent)}.",
+               "Instructions bundle: #{plan.output_dir}"
+             ]}
+          else
+            {:error, {:unexpected_export_plan, target, plan.output_dir}}
+          end
 
         {:error, reason} ->
-          {:ok, %{"target" => target, "scope" => "project"},
-           ["Instruction bundle was not prepared: #{inspect(reason)}"]}
+          {:error, reason}
       end
     end
   end

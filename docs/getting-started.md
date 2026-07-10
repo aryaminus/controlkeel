@@ -41,6 +41,10 @@ controlkeel findings
 
 If the host requires workspace trust or a restart after attach, do that before validating MCP/tool availability. Project binding stays repo-local so each repo keeps its own proofs, policy context, and MCP wrapper.
 
+Attach uses project scope by default and mutates only the governed repository. Use `--scope user` only when the selected host advertises user scope; that installs host-level files under your user configuration, while project binding, policy context, and evidence remain project-specific.
+
+Local stdio MCP exposes the complete local tool catalog for that project. Hosted MCP is a separate service-account OAuth path with a deliberately narrower, scope-authorized tool set; local-only filesystem or sandbox capabilities must not be inferred from hosted access. See [support-matrix.md](support-matrix.md#local-stdio-mcp) for the exact sets.
+
 ## 3. Provider access, only if needed
 
 CK governance, findings, proof bundles, skills, and deterministic validation work without a model key. Model-backed advisory review and intent compilation need one of:

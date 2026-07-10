@@ -81,6 +81,15 @@ defmodule ControlKeel.MCP.OutputSchemasTest do
       assert props["contradicts_finding_id"]["type"] == ["integer", "null"]
     end
 
+    test "ck_review_submit and ck_review_status schemas allow nullable review_url" do
+      for tool <- ~w(ck_review_submit ck_review_status) do
+        props = OutputSchemas.schema_for(tool)["properties"]
+
+        assert props["review_url"]["type"] == ["string", "null"],
+               "#{tool} review_url should accept nil for stdio MCP mode"
+      end
+    end
+
     test "ck_finding schema has specific properties" do
       schema = OutputSchemas.schema_for("ck_finding")
       props = schema["properties"]
@@ -149,16 +158,10 @@ defmodule ControlKeel.MCP.OutputSchemasTest do
     end
 
     test "all tools have output schema definitions" do
-      all_tools = ToolGroups.all_tools()
-      schema_tools = OutputSchemas.tool_names()
+      exposed_tools = Protocol.tool_schemas(tool_groups: :all) |> Enum.map(& &1["name"])
 
-      for tool_name <- all_tools do
-        assert tool_name in schema_tools,
-               "Tool #{tool_name} missing from OutputSchemas"
-      end
-
-      assert length(all_tools) == 54
-      assert length(schema_tools) >= 54
+      assert MapSet.new(OutputSchemas.tool_names()) == MapSet.new(exposed_tools)
+      assert MapSet.new(ToolGroups.all_tools()) == MapSet.new(exposed_tools)
     end
   end
 

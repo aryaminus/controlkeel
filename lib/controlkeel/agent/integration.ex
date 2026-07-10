@@ -1374,7 +1374,7 @@ defmodule ControlKeel.Agent.Integration do
           mode: "agent_runtime",
           owner: "agent"
         },
-        supported_scopes: ["user", "project"],
+        supported_scopes: ["project"],
         export_targets: ["antigravity-cli-native", "antigravity-cli-plugin"],
         review_experience: "native_review",
         submission_mode: "tool_call",

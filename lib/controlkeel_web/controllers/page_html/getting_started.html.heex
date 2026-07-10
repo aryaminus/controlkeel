@@ -53,7 +53,7 @@
             to boot the local web app.
           </li>
           <li class="text-sm text-zinc-400">
-            2. In your project, run <code class="rounded bg-white/10 px-1.5 py-0.5 text-zinc-200">controlkeel attach opencode</code>.
+            2. In your project, run <code class="rounded bg-white/10 px-1.5 py-0.5 text-zinc-200">controlkeel setup</code>, then <code class="rounded bg-white/10 px-1.5 py-0.5 text-zinc-200">controlkeel attach opencode</code>.
           </li>
           <li class="text-sm text-zinc-400">
             3. Binding auto-bootstraps on first use; use
@@ -65,10 +65,10 @@
             to do it explicitly.
           </li>
           <li class="text-sm text-zinc-400">
-            4. Ask OpenCode to add a hardcoded secret or unsafe SQL query.
+            4. Run <code class="rounded bg-white/10 px-1.5 py-0.5 text-zinc-200">controlkeel attach doctor</code>, <code class="rounded bg-white/10 px-1.5 py-0.5 text-zinc-200">controlkeel provider doctor</code>, and <code class="rounded bg-white/10 px-1.5 py-0.5 text-zinc-200">controlkeel status</code>.
           </li>
           <li class="text-sm text-zinc-400">
-            5. Open Mission Control or run
+            5. Trigger a controlled validation, then open Mission Control or run
             <code class="rounded bg-white/10 px-1.5 py-0.5 text-zinc-200">
               controlkeel findings
             </code>
@@ -106,6 +106,9 @@
         </ol>
       </div>
     </div>
+    <p class="ck-note mt-4 text-sm">
+      Attach defaults to project scope and writes inside the governed repository. User scope is available only for hosts that advertise it. Local stdio MCP exposes the full local tool set; hosted MCP is a separate, narrower OAuth-scoped surface.
+    </p>
   </section>
 
   <section class="ck-shell ck-shell-tight" style="padding-top:0">

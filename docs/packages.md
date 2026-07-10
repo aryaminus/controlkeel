@@ -28,6 +28,8 @@ Release artifacts and `controlkeel runtime export <target>` generate bundles for
 - framework adapters and instructions-only bundles
 - VS Code companion extension and release tarballs
 
+A release bundle may contain a plugin or marketplace manifest so a host can install it locally. That does not mean the bundle has been published to, reviewed by, or listed in that host's public marketplace. Treat marketplace publication as a separate channel and verify the listing in the marketplace itself.
+
 ### Skills registry
 
 ControlKeel skills can also be installed through skills.sh:
@@ -45,7 +47,13 @@ Standard setup:
 npm i -g @aryaminus/controlkeel
 controlkeel setup
 controlkeel attach <host>
+controlkeel attach doctor
+controlkeel provider doctor
+controlkeel status
+controlkeel findings
 ```
+
+Run this sequence in the repository being governed. Attach defaults to project scope. `--scope user` is accepted only by targets that advertise it and mutates user-level host configuration, not project binding or project evidence.
 
 Companion package path:
 
@@ -66,6 +74,10 @@ controlkeel runtime export <runtime>
 
 - Keep bootstrap, companion packages, and generated bundles on the same ControlKeel version.
 - GitHub Releases are the canonical source for binaries, checksums, plugin tarballs, exported native bundles, and the VS Code companion `.vsix`.
+- Direct CLI updates pin downloads to `aryaminus/controlkeel` and require the release checksum before atomic replacement. The checksum detects corruption or mismatch within a release; it is not independent proof against a compromised release origin. Shell, PowerShell, and npm installers can additionally verify keyless cosign provenance when cosign is available.
+- A successful CI run only authorizes a version bump while its exact commit remains current `main`. Native release-smoke evidence is created later by the commit-bound release-candidate workflow and is required by the tag release workflow before publication.
+- The `releases/latest/download/...` installers are versioned release assets selected by GitHub's latest-release redirect. The `raw.githubusercontent.com/.../main/...` installers are mutable snapshots of the current default branch and can change before the next release.
+- Release artifacts and marketplace publication are independent; an exported marketplace-ready bundle is not evidence of a public marketplace listing.
 - Run `controlkeel update`, then rerun `controlkeel attach <host>` when repo-local artifacts need syncing.
 
 ## Troubleshooting

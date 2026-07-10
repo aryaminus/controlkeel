@@ -42,8 +42,10 @@ defmodule ControlKeel.MCP.ToolGroupsTest do
 
   describe "tool_to_group_map/0" do
     test "every tool has exactly one group" do
+      frequencies = ToolGroups.all_tools() |> Enum.frequencies()
       map = ToolGroups.tool_to_group_map()
 
+      assert Enum.all?(frequencies, fn {_tool, count} -> count == 1 end)
       assert map_size(map) == 54
 
       all_tools = ToolGroups.all_tools()
@@ -83,7 +85,7 @@ defmodule ControlKeel.MCP.ToolGroupsTest do
 
       all_from_groups = ToolGroups.all_tools() |> MapSet.new()
 
-      assert MapSet.subset?(all_from_groups, all_from_protocol)
+      assert all_from_groups == all_from_protocol
     end
   end
 end

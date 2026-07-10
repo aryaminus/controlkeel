@@ -326,7 +326,7 @@ defmodule ControlKeel.MCP.OutputSchemas do
       "properties" => %{
         "review_id" => %{"type" => "integer"},
         "status" => %{"type" => "string"},
-        "review_url" => %{"type" => "string"},
+        "review_url" => @nullable_string,
         "title" => %{"type" => "string"}
       }
     },
@@ -337,7 +337,7 @@ defmodule ControlKeel.MCP.OutputSchemas do
         "status" => %{"type" => "string"},
         "decision" => %{"type" => "string"},
         "reviewer_notes" => %{"type" => "string"},
-        "review_url" => %{"type" => "string"}
+        "review_url" => @nullable_string
       }
     },
     "ck_review_feedback" => %{

@@ -20,6 +20,12 @@ defmodule ControlKeelWeb.PageControllerTest do
 
     assert body =~ "Install to first finding in five minutes"
     assert body =~ "controlkeel attach opencode"
+    assert body =~ "controlkeel setup"
+    assert body =~ "controlkeel attach doctor"
+    assert body =~ "controlkeel provider doctor"
+    assert body =~ "controlkeel status"
+    assert body =~ "controlkeel findings"
+    assert body =~ "Local stdio MCP exposes the full local tool set"
     assert body =~ "Quick start"
     assert body =~ "Available where"
     assert body =~ "How it governs"

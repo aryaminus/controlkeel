@@ -169,7 +169,7 @@ defmodule ControlKeel.CLI do
   def run_command(%{command: command} = parsed, project_root) do
     case ControlKeel.CLI.Catalog.for_command(command) do
       %{family: family} ->
-        module = dispatch_module(family)
+        module = Map.fetch!(dispatch_modules(), family)
         module.run_command(parsed, project_root)
 
       nil ->
@@ -181,27 +181,25 @@ defmodule ControlKeel.CLI do
     {:error, "Invalid command payload"}
   end
 
-  defp dispatch_module(:core), do: ControlKeel.CLI.Dispatch.Core
-  defp dispatch_module(:attach_hosts), do: ControlKeel.CLI.Dispatch.AttachHosts
-  defp dispatch_module(:governance), do: ControlKeel.CLI.Dispatch.Governance
-  defp dispatch_module(:review), do: ControlKeel.CLI.Dispatch.Review
-  defp dispatch_module(:execution), do: ControlKeel.CLI.Dispatch.Execution
-  defp dispatch_module(:observability), do: ControlKeel.CLI.Dispatch.Observability
-  defp dispatch_module(:memory_continuity), do: ControlKeel.CLI.Dispatch.MemoryContinuity
-  defp dispatch_module(:mcp_tools), do: ControlKeel.CLI.Dispatch.McpTools
-  defp dispatch_module(:skills_plugins_hooks), do: ControlKeel.CLI.Dispatch.SkillsPluginsHooks
-  defp dispatch_module(:cloud_selfhost), do: ControlKeel.CLI.Dispatch.CloudSelfhost
-  defp dispatch_module(:providers_budget), do: ControlKeel.CLI.Dispatch.ProvidersBudget
-
-  defp dispatch_module(:sandbox_security_code_mode),
-    do: ControlKeel.CLI.Dispatch.SandboxSecurityCodeMode
-
-  defp dispatch_module(:benchmarks_harness), do: ControlKeel.CLI.Dispatch.BenchmarksHarness
-
-  defp dispatch_module(:deployment_portability),
-    do: ControlKeel.CLI.Dispatch.DeploymentPortability
-
-  defp dispatch_module(:learning_loop), do: ControlKeel.CLI.Dispatch.LearningLoop
+  def dispatch_modules do
+    %{
+      core: ControlKeel.CLI.Dispatch.Core,
+      attach_hosts: ControlKeel.CLI.Dispatch.AttachHosts,
+      governance: ControlKeel.CLI.Dispatch.Governance,
+      review: ControlKeel.CLI.Dispatch.Review,
+      execution: ControlKeel.CLI.Dispatch.Execution,
+      observability: ControlKeel.CLI.Dispatch.Observability,
+      memory_continuity: ControlKeel.CLI.Dispatch.MemoryContinuity,
+      mcp_tools: ControlKeel.CLI.Dispatch.McpTools,
+      skills_plugins_hooks: ControlKeel.CLI.Dispatch.SkillsPluginsHooks,
+      cloud_selfhost: ControlKeel.CLI.Dispatch.CloudSelfhost,
+      providers_budget: ControlKeel.CLI.Dispatch.ProvidersBudget,
+      sandbox_security_code_mode: ControlKeel.CLI.Dispatch.SandboxSecurityCodeMode,
+      benchmarks_harness: ControlKeel.CLI.Dispatch.BenchmarksHarness,
+      deployment_portability: ControlKeel.CLI.Dispatch.DeploymentPortability,
+      learning_loop: ControlKeel.CLI.Dispatch.LearningLoop
+    }
+  end
 
   def format_default_branch(nil), do: ""
   def format_default_branch(""), do: ""

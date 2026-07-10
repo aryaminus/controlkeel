@@ -170,7 +170,9 @@ defmodule ControlKeel.MCP.Discovery do
   end
 
   defp discover_stdio(_server_path, _timeout) do
-    {:error, {:unsupported_transport, :stdio}}
+    {:error,
+     {:stdio_discovery_unsupported,
+      "Stdio MCP discovery is not supported. Use configured MCP clients (e.g. controlkeel attach <host>) for stdio servers."}}
   end
 
   defp parse_tools_response(%{"result" => %{"tools" => tools}}, server_url, transport)

@@ -1,5 +1,5 @@
 defmodule ControlKeel.CLI.CatalogTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias ControlKeel.Agent.Integration
   alias ControlKeel.CLI
@@ -66,7 +66,8 @@ defmodule ControlKeel.CLI.CatalogTest do
 
   test "supported attach hosts share the attach catalog entry" do
     for agent <- Integration.attachable_ids() do
-      assert {:ok, %{command: :attach}} = CLI.parse(["attach", agent])
+      scope = Integration.get(agent).supported_scopes |> List.first()
+      assert {:ok, %{command: :attach}} = CLI.parse(["attach", agent, "--scope", scope])
     end
 
     entry = Catalog.for_command(:attach)
@@ -101,6 +102,21 @@ defmodule ControlKeel.CLI.CatalogTest do
         assert is_boolean(entry.safety[key]),
                "#{inspect(entry.command)} safety #{key} must be boolean"
       end
+    end
+  end
+
+  test "each command has exactly one catalog and dispatch owner" do
+    entries = Catalog.all()
+    command_counts = Enum.frequencies_by(entries, & &1.command)
+
+    assert Enum.all?(command_counts, fn {_command, count} -> count == 1 end)
+
+    assert MapSet.new(Map.keys(CLI.dispatch_modules())) ==
+             MapSet.new(Catalog.families() |> Map.keys())
+
+    for module <- Map.values(CLI.dispatch_modules()) do
+      assert Code.ensure_loaded?(module)
+      assert function_exported?(module, :run_command, 2)
     end
   end
 

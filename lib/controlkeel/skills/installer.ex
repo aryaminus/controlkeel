@@ -15,7 +15,7 @@ defmodule ControlKeel.Skills.Installer do
 
   def install(target_id, project_root, opts \\ []) do
     with %SkillTarget{} = target <- SkillTarget.get(target_id),
-         scope <- normalize_scope(target, Keyword.get(opts, :scope, target.default_scope)),
+         {:ok, scope} <- normalize_scope(target, Keyword.get(opts, :scope, target.default_scope)),
          analysis <- Registry.analyze(project_root, trust_project_skills: true),
          {:ok, result} <- do_install(target, scope, project_root, analysis.skills, opts) do
       :telemetry.execute(
@@ -1060,14 +1060,82 @@ defmodule ControlKeel.Skills.Installer do
     install_plugin_bundle("copilot-plugin", "copilot", scope, project_root)
   end
 
+  defp do_install(%SkillTarget{id: "multica-native"}, scope, project_root, _skills, opts)
+       when scope in ["user", "project"] do
+    {:ok, plan} = Exporter.export("multica-native", project_root, scope: scope)
+
+    {skills_root, multica_root} =
+      if scope == "user" do
+        {Path.join(user_home(), ".agents/skills"), Path.join(user_home(), ".multica")}
+      else
+        {Path.join(project_root, ".agents/skills"), Path.join(project_root, ".multica")}
+      end
+
+    copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), skills_root)
+    copy_tree_contents(Path.join(plan.output_dir, ".multica"), multica_root)
+
+    if scope == "project" do
+      maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
+    end
+
+    {:ok,
+     %{
+       target: "multica-native",
+       scope: scope,
+       destination: multica_root,
+       skills_destination: skills_root,
+       commands_destination: Path.join(multica_root, "commands"),
+       config_destination: Path.join(multica_root, "controlkeel-mcp.json")
+     }}
+  end
+
+  defp do_install(
+         %SkillTarget{id: "antigravity-cli-native"},
+         "project",
+         project_root,
+         _skills,
+         opts
+       ) do
+    {:ok, plan} = Exporter.export("antigravity-cli-native", project_root, scope: "project")
+    agents_root = Path.join(project_root, ".agents")
+
+    copy_tree_contents(Path.join(plan.output_dir, ".agents"), agents_root)
+    File.cp!(Path.join(plan.output_dir, "GEMINI.md"), Path.join(project_root, "GEMINI.md"))
+    maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
+
+    {:ok,
+     %{
+       target: "antigravity-cli-native",
+       scope: "project",
+       destination: agents_root,
+       skills_destination: Path.join(agents_root, "skills"),
+       plugins_destination: Path.join(agents_root, "plugins/controlkeel"),
+       rules_destination: Path.join(agents_root, "rules"),
+       hooks_destination: Path.join(agents_root, "hooks.json"),
+       config_destination: Path.join(agents_root, "mcp_config.json")
+     }}
+  end
+
   defp do_install(%SkillTarget{id: target}, "export", project_root, _skills, _opts)
        when is_binary(target) do
     Exporter.export(target, project_root, scope: "export")
   end
 
+  # Catch-all: any target/scope combination without an explicit installer returns
+  # an explicit error instead of crashing with FunctionClauseError. This covers
+  # runtime targets that declare project scope but are only installable via export.
+  defp do_install(%SkillTarget{id: target}, scope, _project_root, _skills, _opts) do
+    {:error, {:unsupported_install, target, scope}}
+  end
+
   defp normalize_scope(target, scope) do
     scope = to_string(scope || target.default_scope)
-    if scope in target.supported_scopes, do: scope, else: target.default_scope
+
+    if scope in target.supported_scopes do
+      {:ok, scope}
+    else
+      {:error, {:unsupported_scope, target.id, scope, target.supported_scopes}}
+    end
   end
 
   defp merge_claude_settings(path, new_settings) do

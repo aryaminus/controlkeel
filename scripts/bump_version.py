@@ -13,6 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MIX_EXS = ROOT / "mix.exs"
 CHANGELOG = ROOT / "CHANGELOG.md"
 NPM_PACKAGE = ROOT / "packages" / "npm" / "controlkeel" / "package.json"
+NPM_PACKAGE_LOCK = ROOT / "packages" / "npm" / "controlkeel" / "package-lock.json"
 NPM_SERVER = ROOT / "packages" / "npm" / "controlkeel" / "server.json"
 PLUGIN_MANIFESTS = [
     ROOT / "plugin.json",
@@ -59,6 +60,12 @@ def update_npm_package_version(version: str) -> None:
         count=1,
     )
     NPM_PACKAGE.write_text(updated)
+
+    if NPM_PACKAGE_LOCK.exists():
+        lock = json.loads(NPM_PACKAGE_LOCK.read_text())
+        lock["version"] = version
+        lock["packages"][""]["version"] = version
+        NPM_PACKAGE_LOCK.write_text(json.dumps(lock, indent=2) + "\n")
 
     update_npm_server_version(version)
     update_plugin_manifest_versions(version)

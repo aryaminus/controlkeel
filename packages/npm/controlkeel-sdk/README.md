@@ -2,6 +2,8 @@
 
 TypeScript SDK for the [ControlKeel](https://github.com/aryaminus/controlkeel) cloud governance API.
 
+This package is a hosted API client, not the local CLI or local stdio MCP server. Hosted MCP uses service-account OAuth and exposes a narrower scope-authorized tool set than local stdio MCP.
+
 ## Install
 
 ```bash

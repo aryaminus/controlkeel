@@ -42,7 +42,7 @@ defmodule ControlKeel.MCP.IntegrationTest do
     result = resp["result"]
     assert is_binary(result["protocolVersion"])
     assert result["serverInfo"]["name"] == "controlkeel"
-    assert get_in(result, ["capabilities", "tools"]) != nil
+    assert result["capabilities"]["tools"] == %{"listChanged" => false}
   end
 
   test "initialize echoes back jsonrpc and id", %{server: pid} do
@@ -88,9 +88,13 @@ defmodule ControlKeel.MCP.IntegrationTest do
         "arguments" => %{"content" => "SELECT * FROM users", "kind" => "code"}
       })
 
-    # Should return a result (pass or fail), not a -32601 method-not-found error
-    assert resp["result"] != nil or resp["error"] != nil
-    refute get_in(resp, ["error", "code"]) == -32601, "unexpected method not found"
+    assert %{
+             "jsonrpc" => "2.0",
+             "id" => 1,
+             "result" => %{"structuredContent" => structured_content}
+           } = resp
+
+    assert structured_content["decision"] in ["allow", "warn", "block", "escalate_to_human"]
   end
 
   test "tools/call with unknown tool name returns an error response (not a crash)", %{server: pid} do
@@ -100,8 +104,13 @@ defmodule ControlKeel.MCP.IntegrationTest do
         "arguments" => %{}
       })
 
-    # Unknown tool returns an error map, not an exception
-    assert is_map(resp)
+    assert %{
+             "jsonrpc" => "2.0",
+             "id" => 1,
+             "error" => %{"code" => -32602, "message" => message}
+           } = resp
+
+    assert message =~ "Unknown tool"
     assert Process.alive?(pid), "Server must stay alive after unknown tool call"
   end
 
@@ -116,10 +125,12 @@ defmodule ControlKeel.MCP.IntegrationTest do
   # ── Malformed requests ──────────────────────────────────────────────────
 
   test "non-map request returns an error map without crashing the server", %{server: pid} do
-    # Protocol.handle_request/2 catch-all returns an error_response map for non-maps.
-    # GenServer.call returns it directly (or {:error, ...} on a rescue/catch in handle_call).
-    result = Server.dispatch_request(pid, "not a map")
-    assert is_map(result) or match?({:error, _}, result)
+    assert %{
+             "jsonrpc" => "2.0",
+             "id" => nil,
+             "error" => %{"code" => -32600, "message" => "Invalid Request"}
+           } = Server.dispatch_request(pid, "not a map")
+
     assert Process.alive?(pid), "Server must survive a malformed request"
   end
 end

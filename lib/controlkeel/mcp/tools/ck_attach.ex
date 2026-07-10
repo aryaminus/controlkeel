@@ -23,14 +23,16 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
       `ck_attach` error output to see the supported host IDs.
     - `project_root` (optional): absolute path to the project. Defaults to
       `CK_PROJECT_ROOT` or the MCP server's working directory.
-    - `scope` (optional): `"project"` (default) or `"user"`. Forwarded to
-      the host's attach command where applicable.
+    - `scope` (optional): `"project"` (default) or `"user"`. Scope selects
+      host artifact destinations; it never widens project authorization.
 
   ## Trust boundary
 
-  This tool writes files within `project_root` (hooks, skills, MCP config,
-  AGENTS.md). It does not run network egress and does not touch state
-  outside the project root. Same trust class as any MCP write tool.
+  The requested project must exist and remain within the canonical
+  `CK_PROJECT_ROOT` for every scope. Project artifacts stay within that root.
+  Hosts whose MCP registration is user-managed may also update their documented
+  host config path; user scope may additionally install native host artifacts.
+  This tool does not run network egress.
   """
 
   alias ControlKeel.Agent.Integration
@@ -38,11 +40,13 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
 
   def call(arguments) when is_map(arguments) do
     with {:ok, host} <- require_host(arguments),
-         {:ok, _integration} <- validate_host(host) do
+         {:ok, _integration} <- validate_host(host),
+         {:ok, scope} <- validate_scope(arguments),
+         {:ok, project_root} <- resolve_project_root(arguments) do
       options =
         []
-        |> maybe_put(:project_root, Map.get(arguments, "project_root"))
-        |> Keyword.put(:scope, Map.get(arguments, "scope", "project"))
+        |> Keyword.put(:project_root, project_root)
+        |> Keyword.put(:scope, scope)
 
       command = %{
         command: :attach,
@@ -50,7 +54,7 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
         options: Enum.into(options, %{})
       }
 
-      case CLI.run_command(command, Map.get(arguments, "project_root")) do
+      case CLI.run_command(command, project_root) do
         {:ok, lines} ->
           {:ok,
            %{
@@ -90,9 +94,47 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
     end
   end
 
-  defp maybe_put(opts, _key, nil), do: opts
-  defp maybe_put(opts, _key, ""), do: opts
-  defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+  defp validate_scope(arguments) do
+    case Map.get(arguments, "scope", "project") do
+      scope when scope in ["project", "user"] -> {:ok, scope}
+      scope -> {:error, {:invalid_arguments, "invalid scope: #{inspect(scope)}"}}
+    end
+  end
+
+  defp resolve_project_root(arguments) do
+    boundary = System.get_env("CK_PROJECT_ROOT") || File.cwd!()
+    requested = Map.get(arguments, "project_root") || boundary
+
+    cond do
+      not is_binary(requested) or requested == "" ->
+        {:error, {:invalid_arguments, "project_root must be a non-empty absolute path"}}
+
+      Path.type(requested) != :absolute ->
+        {:error, {:invalid_arguments, "project_root must be an absolute path"}}
+
+      not File.dir?(boundary) ->
+        {:error, {:invalid_arguments, "CK_PROJECT_ROOT must be an existing directory"}}
+
+      not File.dir?(requested) ->
+        {:error, {:invalid_arguments, "project_root must be an existing directory"}}
+
+      not within_root?(canonical_path(boundary), canonical_path(requested)) ->
+        {:error,
+         {:invalid_arguments, "project_root must stay within #{canonical_path(boundary)}"}}
+
+      true ->
+        {:ok, canonical_path(requested)}
+    end
+  end
+
+  defp within_root?(root, path), do: path == root or String.starts_with?(path, root <> "/")
+
+  defp canonical_path(path) do
+    case :file.read_link_all(String.to_charlist(Path.expand(path))) do
+      {:ok, resolved} -> List.to_string(resolved)
+      {:error, _reason} -> Path.expand(path)
+    end
+  end
 
   defp next_steps do
     [

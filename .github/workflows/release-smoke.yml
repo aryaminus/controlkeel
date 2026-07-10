@@ -66,6 +66,9 @@ jobs:
           BURRITO_TARGET=linux_arm64 mix release --overwrite
           cp burrito_out/controlkeel_linux_arm64 release_stage/raw/linux-arm/controlkeel-linux-arm64
 
+          sudo apt-get install -y qemu-user-static
+          qemu-aarch64-static burrito_out/controlkeel_linux_arm64 version | grep -q "ControlKeel"
+
       - uses: actions/upload-artifact@v4
         with:
           name: raw-linux
@@ -302,6 +305,9 @@ jobs:
       - name: Generate checksums
         run: |
           find dist -maxdepth 1 -type f ! -name 'controlkeel-checksums.txt' -print0 | sort -z | xargs -0 sha256sum > dist/controlkeel-checksums.txt
+      - name: Verify checksums
+        run: |
+          cd dist && sha256sum -c controlkeel-checksums.txt
       - uses: actions/upload-artifact@v4
         with:
           name: release-candidate-dist-${{ github.sha }}

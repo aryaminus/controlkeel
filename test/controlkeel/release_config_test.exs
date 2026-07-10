@@ -76,6 +76,17 @@ defmodule ControlKeel.ReleaseConfigTest do
              get_in(generated, ["mcpServers", "controlkeel", "args"])
   end
 
+  test "gemini extension manifest uses independent versioning from the app" do
+    # The Gemini extension manifest points to the ControlKeel binary but versions
+    # independently (1.0.x) because it is an extension-format declaration, not a
+    # release artifact. This test documents that intention explicitly so it does
+    # not get accidentally "fixed" by aligning it to the app version.
+    gemini = read_json("gemini-extension.json")
+
+    assert gemini["version"] =~ ~r/^1\./,
+           "gemini-extension.json should use independent 1.x versioning, got: #{gemini["version"]}"
+  end
+
   defp read_json(relative_path) do
     @root
     |> Path.join(relative_path)

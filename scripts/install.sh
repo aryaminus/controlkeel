@@ -188,25 +188,42 @@ case ":$PATH:" in
   *)
     echo "Add ${DEST_DIR} to your PATH first:" >&2
     echo "  export PATH=\"${DEST_DIR}:\$PATH\"" >&2
+    rc_file=""
+    case "${SHELL:-}" in
+      */zsh) rc_file="${HOME}/.zshrc" ;;
+      */bash) rc_file="${HOME}/.bashrc" ;;
+    esac
+    if [ -n "$rc_file" ]; then
+      echo "  Tip: add this to ${rc_file} to persist across shells." >&2
+    else
+      echo "  Tip: add this to ~/.zshrc or ~/.bashrc to persist across shells." >&2
+    fi
     echo "" >&2
     ;;
 esac
 
 cat <<'EOF'
-Next steps — wire ControlKeel into your agent host:
+Next steps — set up this project and wire ControlKeel into your agent host:
 
-  1. Attach to the agent you use (one or more):
+  1. From the repository you want to govern:
+       controlkeel setup
+
+  2. Attach to the agent you use (project scope is the default):
        controlkeel attach claude-code
        controlkeel attach cursor
        controlkeel attach codex-cli
        controlkeel attach opencode
        controlkeel attach copilot
 
-  2. Optional — sync governance evidence to a control plane:
+  3. Verify the local governance path:
+       controlkeel attach doctor
+       controlkeel provider doctor
+       controlkeel status
+       controlkeel findings
+
+  4. Optional — sync governance evidence to a control plane:
        controlkeel cloud connect --enroll https://controlkeel.com
      (or your self-host URL, e.g. https://govern.acme.com)
-
-  3. Verify everything is healthy:
        controlkeel cloud doctor
 
 Run `controlkeel --help` for the full surface. See docs/self-hosting.md

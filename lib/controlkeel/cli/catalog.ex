@@ -26,7 +26,6 @@ defmodule ControlKeel.CLI.Catalog do
   def all do
     family_specs()
     |> Enum.flat_map(&expand_family/1)
-    |> Enum.uniq_by(& &1.command)
     |> Enum.sort_by(&{to_string(&1.family), &1.path})
   end
 
@@ -617,8 +616,6 @@ defmodule ControlKeel.CLI.Catalog do
           :provider_set_fallback_chain,
           :cost_optimize,
           :cost_compare,
-          :org_budget_set,
-          :org_budget_show,
           :workspace_tool_policy_get,
           :workspace_tool_policy_set
         ],
