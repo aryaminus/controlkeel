@@ -412,19 +412,21 @@ defmodule ControlKeel.CLI.Updater do
     asset = asset_name()
     base_url = official_release_base_url(version)
     download = Keyword.get(opts, :download_file, &download_file/2)
+    checksum_path = "#{destination}.checksums"
 
-    with :ok <- download.("#{base_url}/#{asset}", destination),
-         checksum_path = "#{destination}.checksums",
-         :ok <- download.("#{base_url}/controlkeel-checksums.txt", checksum_path),
-         {:ok, checksums} <- File.read(checksum_path),
-         :ok <- verify_download_checksum(destination, asset, checksums) do
+    try do
+      with :ok <- download.("#{base_url}/#{asset}", destination),
+           :ok <- download.("#{base_url}/controlkeel-checksums.txt", checksum_path),
+           {:ok, checksums} <- File.read(checksum_path),
+           :ok <- verify_download_checksum(destination, asset, checksums) do
+        :ok
+      else
+        {:error, reason} ->
+          File.rm(destination)
+          {:error, reason}
+      end
+    after
       File.rm(checksum_path)
-      :ok
-    else
-      {:error, reason} ->
-        File.rm(destination)
-        File.rm("#{destination}.checksums")
-        {:error, reason}
     end
   end
 

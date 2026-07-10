@@ -82,6 +82,40 @@ defmodule ControlKeel.MCP.Tools.CkAttachTest do
       assert message =~ "must stay within"
     end
 
+    test "rejects an intermediate symlink that escapes the boundary" do
+      boundary =
+        Path.join(System.tmp_dir!(), "ck-attach-boundary-#{System.unique_integer([:positive])}")
+
+      outside =
+        Path.join(System.tmp_dir!(), "ck-attach-outside-#{System.unique_integer([:positive])}")
+
+      File.mkdir_p!(boundary)
+      File.mkdir_p!(outside)
+
+      # Create an intermediate symlink: boundary/linkdir -> outside
+      # Then request boundary/linkdir/sub, which resolves to outside/sub
+      File.ln_s!(outside, Path.join(boundary, "linkdir"))
+      target = Path.join([boundary, "linkdir", "sub"])
+      File.mkdir_p!(target)
+
+      previous = System.get_env("CK_PROJECT_ROOT")
+      System.put_env("CK_PROJECT_ROOT", boundary)
+
+      on_exit(fn ->
+        if previous,
+          do: System.put_env("CK_PROJECT_ROOT", previous),
+          else: System.delete_env("CK_PROJECT_ROOT")
+
+        File.rm_rf!(boundary)
+        File.rm_rf!(outside)
+      end)
+
+      assert {:error, {:invalid_arguments, message}} =
+               CkAttach.call(%{"host" => "opencode", "project_root" => target})
+
+      assert message =~ "must stay within"
+    end
+
     test "rejects relative project roots" do
       assert {:error, {:invalid_arguments, message}} =
                CkAttach.call(%{"host" => "opencode", "project_root" => "../escape"})

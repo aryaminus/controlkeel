@@ -127,12 +127,45 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
     end
   end
 
-  defp within_root?(root, path), do: path == root or String.starts_with?(path, root <> "/")
+  defp within_root?(root, path) do
+    # Use Path.relative_to/2 for cross-platform separator handling.
+    # Returns the path unchanged when not inside root, so equality means "outside".
+    Path.relative_to(path, root) != path
+  end
 
   defp canonical_path(path) do
-    case :file.read_link_all(String.to_charlist(Path.expand(path))) do
-      {:ok, resolved} -> List.to_string(resolved)
-      {:error, _reason} -> Path.expand(path)
+    # Walk each path component and resolve symlinks at every level.
+    # :file.read_link_all/1 only resolves when the *leaf* is a symlink;
+    # intermediate symlinks return :einval, which would leave the path
+    # unresolved and defeat the boundary check.
+    path
+    |> Path.expand()
+    |> Path.split()
+    |> Enum.reduce("/", fn component, acc ->
+      candidate = Path.join(acc, component)
+      resolve_component(candidate, MapSet.new())
+    end)
+  end
+
+  defp resolve_component(candidate, seen) do
+    cond do
+      MapSet.member?(seen, candidate) ->
+        # Symlink loop — return as-is; caller's File.dir?/1 check will reject.
+        candidate
+
+      true ->
+        case :file.read_link(String.to_charlist(candidate)) do
+          {:ok, target} ->
+            absolute =
+              if Path.type(target) == :absolute,
+                do: target,
+                else: Path.join(Path.dirname(candidate), target)
+
+            resolve_component(Path.expand(absolute), MapSet.put(seen, candidate))
+
+          {:error, _} ->
+            candidate
+        end
     end
   end
 
