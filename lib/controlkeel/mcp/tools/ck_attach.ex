@@ -138,10 +138,16 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
     # :file.read_link_all/1 only resolves when the *leaf* is a symlink;
     # intermediate symlinks return :einval, which would leave the path
     # unresolved and defeat the boundary check.
-    path
-    |> Path.expand()
-    |> Path.split()
-    |> Enum.reduce("/", fn component, acc ->
+    #
+    # Path.split/1 returns the root/drive as the first element (e.g. ["C:/" | rest]
+    # on Windows, ["/" | rest] on Unix). Use it as the initial accumulator instead
+    # of hardcoding "/" so drive letters are preserved on Windows.
+    [root | components] =
+      path
+      |> Path.expand()
+      |> Path.split()
+
+    Enum.reduce(components, root, fn component, acc ->
       candidate = Path.join(acc, component)
       resolve_component(candidate, MapSet.new())
     end)
@@ -155,7 +161,10 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
 
       true ->
         case :file.read_link(String.to_charlist(candidate)) do
-          {:ok, target} ->
+          {:ok, target_charlist} ->
+            # :file.read_link/1 returns a charlist; convert to binary for Path functions.
+            target = List.to_string(target_charlist)
+
             absolute =
               if Path.type(target) == :absolute,
                 do: target,

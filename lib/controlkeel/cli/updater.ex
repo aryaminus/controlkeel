@@ -448,8 +448,8 @@ defmodule ControlKeel.CLI.Updater do
       end)
 
     with hash when is_binary(hash) <- expected,
-         {:ok, contents} <- File.read(path),
-         actual = :crypto.hash(:sha256, contents) |> Base.encode16(case: :lower),
+         true <- File.exists?(path) || {:error, :enoent},
+         actual = stream_sha256(path),
          true <- Plug.Crypto.secure_compare(actual, hash) do
       :ok
     else
@@ -457,6 +457,16 @@ defmodule ControlKeel.CLI.Updater do
       false -> {:error, "checksum mismatch for #{asset}"}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp stream_sha256(path) do
+    path
+    |> File.stream!([:binary, :read], 2048)
+    |> Enum.reduce(:crypto.hash_init(:sha256), fn chunk, acc ->
+      :crypto.hash_update(acc, chunk)
+    end)
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
   end
 
   defp download_file(url, destination) do

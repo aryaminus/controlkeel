@@ -81,10 +81,13 @@ defmodule ControlKeel.ReleaseConfigTest do
     # independently (1.0.x) because it is an extension-format declaration, not a
     # release artifact. This test documents that intention explicitly so it does
     # not get accidentally "fixed" by aligning it to the app version.
-    gemini = read_json("gemini-extension.json")
+    #
+    # gemini-extension.json is a generated, gitignored artifact — generate it
+    # from the exporter instead of reading from disk so the test is hermetic.
+    manifest = ControlKeel.Skills.Exporter.gemini_extension_manifest(@root, [])
 
-    assert gemini["version"] =~ ~r/^1\./,
-           "gemini-extension.json should use independent 1.x versioning, got: #{gemini["version"]}"
+    assert manifest["version"] =~ ~r/^1\./,
+           "gemini extension manifest should use independent 1.x versioning, got: #{manifest["version"]}"
   end
 
   defp read_json(relative_path) do
