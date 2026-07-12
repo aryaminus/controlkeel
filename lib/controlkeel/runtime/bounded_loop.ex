@@ -161,19 +161,19 @@ defmodule ControlKeel.Runtime.BoundedLoop do
         longevity_decision
 
       total_cost > contract["max_cost_cents"] ->
-        decision("stopped", "cost_limit", improved)
+        decision("stopped", "cost_limit", improved, not improved)
 
       elapsed > contract["max_duration_seconds"] ->
-        decision("stopped", "deadline", improved)
+        decision("stopped", "deadline", improved, not improved)
 
       target_met?(value, contract) ->
         decision("awaiting_review", "target_met", improved)
 
       index >= contract["max_iterations"] ->
-        decision("stopped", "iteration_limit", improved)
+        decision("stopped", "iteration_limit", improved, not improved)
 
       no_progress >= contract["no_progress_limit"] ->
-        decision("stopped", "no_progress_limit", improved)
+        decision("stopped", "no_progress_limit", improved, not improved)
 
       improved ->
         decision("accept", "metric_improved", true)
@@ -186,16 +186,16 @@ defmodule ControlKeel.Runtime.BoundedLoop do
   defp terminal_or_reject(contract, index, cost, elapsed, no_progress, improved, reason) do
     cond do
       cost > contract["max_cost_cents"] ->
-        decision("stopped", "cost_limit", improved)
+        decision("stopped", "cost_limit", improved, not improved)
 
       elapsed > contract["max_duration_seconds"] ->
-        decision("stopped", "deadline", improved)
+        decision("stopped", "deadline", improved, not improved)
 
       index >= contract["max_iterations"] ->
-        decision("stopped", "iteration_limit", improved)
+        decision("stopped", "iteration_limit", improved, not improved)
 
       no_progress >= contract["no_progress_limit"] ->
-        decision("stopped", "no_progress_limit", improved)
+        decision("stopped", "no_progress_limit", improved, not improved)
 
       true ->
         decision("reject", reason, improved, true)
@@ -737,7 +737,7 @@ defmodule ControlKeel.Runtime.BoundedLoop do
   defp promotion_packet(arguments, %{"artifact_class" => "lasting_code"} = contract, value) do
     if target_met?(value, contract) do
       with {:ok, packet} <- required_map(arguments, "promotion_packet"),
-           {:ok, worker_identity} <- identity(packet, "worker_identity"),
+           {:ok, worker_identity} <- BoundedLoopReviewPolicy.worker_identity(packet),
            {:ok, changed_behavior} <- required_string(packet, "changed_behavior"),
            {:ok, owning_invariant} <- required_string(packet, "owning_invariant"),
            :ok <- declared_invariant(owning_invariant, contract),
@@ -927,15 +927,6 @@ defmodule ControlKeel.Runtime.BoundedLoop do
   defp awaiting_review(_),
     do: {:error, {:invalid_arguments, "Bounded loop is not awaiting promotion review"}}
 
-  defp identity(arguments, key) do
-    with {:ok, value} <- required_map(arguments, key),
-         {:ok, agent_id} <- required_string(value, "agent_id"),
-         {:ok, provider} <- required_string(value, "provider"),
-         {:ok, model} <- required_string(value, "model") do
-      {:ok, %{"agent_id" => agent_id, "provider" => provider, "model" => model}}
-    end
-  end
-
   defp blocked_findings?(_contract, arguments) do
     session_id = Map.get(arguments, "session_id")
     Mission.list_findings_for_session(session_id) |> Enum.any?(&(&1.status == "blocked"))
@@ -983,8 +974,18 @@ defmodule ControlKeel.Runtime.BoundedLoop do
     end
   end
 
-  defp positive_integer(arguments, key),
-    do: bounded_integer(arguments, key, nil, 1, 2_147_483_647)
+  defp positive_integer(arguments, key) do
+    value = Map.get(arguments, key)
+    parsed = if is_binary(value), do: Integer.parse(value), else: {value, ""}
+
+    case parsed do
+      {integer, ""} when is_integer(integer) ->
+        bounded_integer(Map.put(arguments, key, integer), key, nil, 1, 2_147_483_647)
+
+      _ ->
+        bounded_integer(arguments, key, nil, 1, 2_147_483_647)
+    end
+  end
 
   defp non_negative_integer(arguments, key, default),
     do: bounded_integer(arguments, key, default, 0, 1_000_000)

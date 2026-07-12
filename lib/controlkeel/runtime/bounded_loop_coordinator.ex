@@ -18,15 +18,8 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinator do
          :ok <- active_loop(loop),
          :ok <- heartbeat(task_id, loop["iteration_count"], "preparing iteration"),
          context <- context(session_id, task_id, loop, opts),
-         {:ok, checkpoint} <- adapters.rollback.prepare(context),
-         :ok <- not_cancelled(opts),
-         {:ok, worker_result} <- adapters.worker.run(context),
-         :ok <- heartbeat(task_id, loop["iteration_count"], "verifying iteration"),
-         {:ok, verifier_result} <- adapters.verifier.verify(context, worker_result),
-         {:ok, result} <-
-           BoundedLoop.record(record_arguments(context, worker_result, verifier_result)),
-         :ok <- maybe_rollback(result, context, checkpoint, adapters.rollback) do
-      {:ok, result}
+         {:ok, checkpoint} <- adapters.rollback.prepare(context) do
+      run_prepared(context, checkpoint, adapters, opts)
     else
       {:error, reason} -> {:error, reason}
     end
@@ -34,6 +27,44 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinator do
 
   def run_once(_session_id, _task_id, _opts),
     do: {:error, {:invalid_arguments, "session_id and task_id must be integers"}}
+
+  defp run_prepared(context, checkpoint, adapters, opts) do
+    case execute_iteration(context, adapters, opts) do
+      {:ok, result} ->
+        with :ok <- maybe_rollback(result, context, checkpoint, adapters.rollback),
+             do: {:ok, result}
+
+      {:error, reason} ->
+        rollback_after_error(context, checkpoint, adapters.rollback, reason)
+    end
+  end
+
+  defp execute_iteration(context, adapters, opts) do
+    try do
+      with :ok <- not_cancelled(opts),
+           {:ok, worker_result} <- adapters.worker.run(context),
+           :ok <- heartbeat(context.task_id, context.iteration - 1, "verifying iteration"),
+           {:ok, verifier_result} <- adapters.verifier.verify(context, worker_result),
+           {:ok, result} <-
+             BoundedLoop.record(record_arguments(context, worker_result, verifier_result)) do
+        {:ok, result}
+      end
+    rescue
+      error -> {:error, {:adapter_exception, Exception.message(error)}}
+    catch
+      kind, reason -> {:error, {:adapter_throw, kind, reason}}
+    end
+  end
+
+  defp rollback_after_error(context, checkpoint, rollback, reason) do
+    case rollback.rollback(context, checkpoint, "iteration_failed") do
+      :ok ->
+        {:error, reason}
+
+      {:error, rollback_reason} ->
+        handle_rollback({:error, rollback_reason}, context, "iteration_failed")
+    end
+  end
 
   def run_until_stop(session_id, task_id, opts) do
     with {:ok, loop} <- BoundedLoop.status(base_args(session_id, task_id)) do

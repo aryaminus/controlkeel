@@ -24,7 +24,7 @@ def main():
     checked = 0
     for path in sorted(evidence_dir.rglob("*.json")):
         try:
-            artifact = json.loads(path.read_text())
+            artifact = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             issues.append(f"invalid JSON {path}: {error}")
             continue

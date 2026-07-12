@@ -31,15 +31,21 @@ defmodule ControlKeel.BoundedLoopTestAdapter do
 
   @impl true
   def verify(_context, worker_result) do
-    metric = worker_result["observed_metric"]
+    case Process.get(:bounded_loop_verifier_error) do
+      nil ->
+        metric = worker_result["observed_metric"]
 
-    {:ok,
-     %{
-       "metric_value" => metric,
-       "verifier_passed" => true,
-       "observed_effect" => "Metric was #{metric}"
-     }
-     |> Map.merge(verifier_longevity_evidence(worker_result, metric))}
+        {:ok,
+         %{
+           "metric_value" => metric,
+           "verifier_passed" => true,
+           "observed_effect" => "Metric was #{metric}"
+         }
+         |> Map.merge(verifier_longevity_evidence(worker_result, metric))}
+
+      reason ->
+        {:error, reason}
+    end
   end
 
   @impl true
@@ -97,7 +103,8 @@ defmodule ControlKeel.BoundedLoopTestAdapter do
       "worker_identity" => %{
         "agent_id" => "worker-agent",
         "provider" => "openai",
-        "model" => "gpt-5.6-sol"
+        "model" => "gpt-5.6-sol",
+        "canonical_model_id" => "openai/gpt-5.6-sol"
       },
       "changed_behavior" => "Invalid state is rejected before persistence",
       "owning_invariant" => "Only validated state reaches storage",

@@ -9,7 +9,7 @@ cd "$ROOT_DIR"
 _has_json_flag() {
   for arg in "$@"; do
     case "$arg" in
-      --json|--format)
+      --json)
         return 0
         ;;
       *)

@@ -24,6 +24,7 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
     Process.delete(:bounded_loop_worker_error)
     Process.delete(:bounded_loop_rollback_error)
     Process.delete(:bounded_loop_invariant_effect)
+    Process.delete(:bounded_loop_verifier_error)
     Process.put(:bounded_loop_metrics, [0.5])
 
     {:ok, session: session, task: task, root: root}
@@ -62,6 +63,13 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
     Process.put(:bounded_loop_worker_error, :provider_failed)
     assert {:error, :provider_failed} = run_once(context)
     assert_received {:prepared, 1}
+    assert_received {:rolled_back, 1, {:checkpoint, 1}, "iteration_failed"}
+  end
+
+  test "rolls back when verifier adapter fails", context do
+    Process.put(:bounded_loop_verifier_error, :verifier_failed)
+    assert {:error, :verifier_failed} = run_once(context)
+    assert_received {:rolled_back, 1, {:checkpoint, 1}, "iteration_failed"}
   end
 
   test "honors cancellation before preparing an iteration", context do
@@ -71,6 +79,24 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
              BoundedLoopCoordinator.run_once(context.session.id, context.task.id, opts)
 
     refute_received {:prepared, _}
+  end
+
+  test "rolls back cancellation after preparing an iteration", context do
+    Process.put(:cancellation_checks, 0)
+
+    cancelled? = fn ->
+      checks = Process.get(:cancellation_checks, 0)
+      Process.put(:cancellation_checks, checks + 1)
+      checks > 0
+    end
+
+    opts = Keyword.put(coordinator_opts(context), :cancelled?, cancelled?)
+
+    assert {:error, :cancelled} =
+             BoundedLoopCoordinator.run_once(context.session.id, context.task.id, opts)
+
+    assert_received {:prepared, 1}
+    assert_received {:rolled_back, 1, {:checkpoint, 1}, "iteration_failed"}
   end
 
   test "stops the loop when a rejected iteration cannot be rolled back", context do

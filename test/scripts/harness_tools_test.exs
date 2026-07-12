@@ -2,6 +2,7 @@ defmodule ControlKeel.HarnessToolsTest do
   use ExUnit.Case, async: false
 
   @root Path.expand("../..", __DIR__)
+  @python System.find_executable("python3")
 
   test "performance comparator enforces review for regressions" do
     tmp = temp_dir("performance")
@@ -98,6 +99,18 @@ defmodule ControlKeel.HarnessToolsTest do
     assert plan["timeout_seconds"] == 30
   end
 
+  test "profiling adapter reports subprocess errors without a traceback" do
+    {output, 1} =
+      python(
+        "profile_beam.py",
+        ["--profiler", "cprof", "--expression", "Enum.sum(1..10)", "--execute"],
+        [{"PATH", ""}]
+      )
+
+    refute output =~ "Traceback"
+    assert output =~ "mix"
+  end
+
   test "evidence audit rejects stale generated artifacts" do
     tmp = git_repo("evidence-audit")
     File.write!(Path.join(tmp, "README.md"), "fixture\n")
@@ -131,7 +144,7 @@ defmodule ControlKeel.HarnessToolsTest do
   end
 
   defp python(script, args, env \\ []) do
-    System.cmd("python3", [Path.join(@root, "scripts/#{script}") | args],
+    System.cmd(@python, [Path.join(@root, "scripts/#{script}") | args],
       env: env,
       stderr_to_stdout: true
     )

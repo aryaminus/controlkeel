@@ -40,11 +40,11 @@ def metadata(content):
 
 def generate(args):
     repo = Path(args.repo).resolve()
-    results = json.loads(Path(args.results).read_text()) if args.results else {}
+    results = json.loads(Path(args.results).read_text(encoding="utf-8")) if args.results else {}
     entries = []
     for path in sorted(repo.glob("test/**/*_test.exs")):
         relative = path.relative_to(repo).as_posix()
-        content = path.read_text(errors="replace")
+        content = path.read_text(encoding="utf-8", errors="replace")
         meta = metadata(content)
         entries.append({
             "file": relative,
@@ -55,13 +55,15 @@ def generate(args):
             "execution": results.get(relative, {"status": "unexecuted", "runtime_ms": None}),
         })
     output = {"schema_version": 1, "evidence_kind": "test_inventory", "commit_sha": head(repo), "generated_at": generated_at(), "tests": entries}
-    Path(args.output).write_text(json.dumps(output, indent=2, sort_keys=True) + "\n")
+    Path(args.output).write_text(
+        json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return 0
 
 
 def audit(args):
     repo = Path(args.repo).resolve()
-    inventory = json.loads(Path(args.inventory).read_text())
+    inventory = json.loads(Path(args.inventory).read_text(encoding="utf-8"))
     issues = []
     if inventory.get("schema_version") != 1 or inventory.get("evidence_kind") != "test_inventory":
         issues.append("inventory schema is invalid")

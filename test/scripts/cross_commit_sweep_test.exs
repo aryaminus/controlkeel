@@ -57,6 +57,26 @@ defmodule ControlKeel.CrossCommitSweepTest do
     assert String.trim(git_status(tmp)) == "?? report.md"
   end
 
+  test "script reports git failures without a traceback" do
+    {output, 1} =
+      System.cmd(
+        "python3",
+        [
+          Path.join(@root, "scripts/cross_commit_sweep.py"),
+          "--repo",
+          @root,
+          "--base",
+          "not-a-ref",
+          "--output",
+          Path.join(System.tmp_dir!(), "unused-sweep.md")
+        ],
+        stderr_to_stdout: true
+      )
+
+    refute output =~ "Traceback"
+    assert output != ""
+  end
+
   defp git_status(repo) do
     {status, 0} = System.cmd("git", ["-C", repo, "status", "--short"])
     status

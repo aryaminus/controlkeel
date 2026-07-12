@@ -3,6 +3,23 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
 
   alias ControlKeel.Mission
 
+  def worker_identity(arguments) do
+    with {:ok, value} <- required_map(arguments, "worker_identity"),
+         {:ok, agent_id} <- required_string(value, "agent_id"),
+         {:ok, provider} <- required_string(value, "provider"),
+         {:ok, model} <- required_string(value, "model"),
+         {:ok, canonical_model_id} <- required_string(value, "canonical_model_id"),
+         :ok <- canonical_model_id(provider, canonical_model_id) do
+      {:ok,
+       %{
+         "agent_id" => agent_id,
+         "provider" => provider,
+         "model" => model,
+         "canonical_model_id" => canonical_model_id
+       }}
+    end
+  end
+
   def approved_review(ids, review_id, stop, contract) do
     case Mission.get_review(review_id) do
       %{
@@ -98,11 +115,14 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
            {:ok, agent_id} <- required_string(reviewer, "agent_id"),
            {:ok, provider} <- required_string(reviewer, "provider"),
            {:ok, model} <- required_string(reviewer, "model"),
+           {:ok, canonical_model_id} <- required_string(reviewer, "canonical_model_id"),
+           :ok <- canonical_model_id(provider, canonical_model_id),
            {:ok, personas} <- string_list(reviewer, "personas") do
         identity = %{
           "agent_id" => agent_id,
           "provider" => provider,
           "model" => model,
+          "canonical_model_id" => canonical_model_id,
           "personas" => personas
         }
 
@@ -148,15 +168,37 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
     do: {:error, {:invalid_arguments, "Promotion packet has no review policy"}}
 
   defp same_model?(reviewer, worker) do
-    normalize_model(reviewer["model"]) == normalize_model(worker["model"])
+    normalize_model(reviewer["canonical_model_id"]) ==
+      normalize_model(worker["canonical_model_id"])
   end
 
   defp normalize_model(model), do: model |> String.trim() |> String.downcase()
+
+  defp canonical_model_id(provider, model_id) do
+    normalized_provider = provider |> String.trim() |> String.downcase()
+
+    if model_id == String.downcase(String.trim(model_id)) and
+         String.starts_with?(model_id, normalized_provider <> "/") and
+         model_id != normalized_provider <> "/" do
+      :ok
+    else
+      {:error,
+       {:invalid_arguments,
+        "canonical_model_id must be a lowercase provider/model identifier matching provider"}}
+    end
+  end
 
   defp required_string(arguments, key) do
     case Map.get(arguments, key) do
       value when is_binary(value) and value != "" -> {:ok, value}
       _ -> {:error, {:invalid_arguments, "#{key} is required"}}
+    end
+  end
+
+  defp required_map(arguments, key) do
+    case Map.get(arguments, key) do
+      value when is_map(value) -> {:ok, value}
+      _ -> {:error, {:invalid_arguments, "#{key} must be an object"}}
     end
   end
 

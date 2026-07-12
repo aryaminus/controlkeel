@@ -30,6 +30,25 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
     assert status["contract_id"] == result["contract_id"]
   end
 
+  test "accepts numeric string identifiers advertised by the MCP schema", context do
+    args =
+      create_args(context)
+      |> Map.put("session_id", Integer.to_string(context.session.id))
+      |> Map.put("task_id", Integer.to_string(context.task.id))
+
+    assert {:ok, result} = CkLoop.call(args)
+    assert result["session_id"] == context.session.id
+
+    assert {:ok, status} =
+             CkLoop.call(%{
+               "mode" => "status",
+               "session_id" => Integer.to_string(context.session.id),
+               "task_id" => Integer.to_string(context.task.id)
+             })
+
+    assert status["contract_id"] == result["contract_id"]
+  end
+
   test "rejects overlapping worker and verifier paths", context do
     args = create_args(context) |> Map.put("mutable_paths", ["test"])
     assert {:error, {:invalid_arguments, message}} = CkLoop.call(args)
@@ -66,6 +85,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
     assert {:ok, third} = CkLoop.call(record_args(context, 3, 0.3))
     assert third["decision"]["status"] == "stopped"
     assert third["decision"]["reason"] == "no_progress_limit"
+    assert third["decision"]["rollback_required"]
   end
 
   test "blocked session findings stop progression", context do
@@ -81,6 +101,15 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
     assert {:ok, result} = CkLoop.call(record_args(context, 1, 0.9))
     assert result["decision"]["status"] == "stopped"
     assert result["decision"]["reason"] == "cost_limit"
+  end
+
+  test "non-improving limit stops require rollback", context do
+    assert {:ok, _} = CkLoop.call(create_args(context) |> Map.put("max_cost_cents", 6))
+    assert {:ok, _} = CkLoop.call(record_args(context, 1, 0.5))
+    assert {:ok, result} = CkLoop.call(record_args(context, 2, 0.4))
+    assert result["decision"]["status"] == "stopped"
+    assert result["decision"]["reason"] == "cost_limit"
+    assert result["decision"]["rollback_required"]
   end
 
   test "supports minimization objectives", context do
@@ -214,6 +243,20 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
     assert message =~ "path:line"
   end
 
+  test "promotion packet rejects non-canonical worker model identity", context do
+    assert {:ok, _} = CkLoop.call(lasting_create_args(context))
+
+    args =
+      lasting_record_args(context, 1, 0.9)
+      |> put_in(
+        ["promotion_packet", "worker_identity", "canonical_model_id"],
+        "anthropic/gpt-5.6-sol"
+      )
+
+    assert {:error, {:invalid_arguments, message}} = CkLoop.call(args)
+    assert message =~ "matching provider"
+  end
+
   test "promotion packet rejects citations beyond the current file", context do
     assert {:ok, _} = CkLoop.call(lasting_create_args(context))
 
@@ -320,7 +363,8 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
       %{
         "agent_id" => "independent-reviewer",
         "provider" => "openai",
-        "model" => "gpt-5.6-sol",
+        "model" => "deployment-alias",
+        "canonical_model_id" => "openai/gpt-5.6-sol",
         "personas" => ["maintainability", "security"]
       }
     ]
@@ -337,6 +381,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         "agent_id" => "independent-reviewer",
         "provider" => "anthropic",
         "model" => "claude-sonnet-4.6",
+        "canonical_model_id" => "anthropic/claude-sonnet-4.6",
         "personas" => ["maintainability"]
       }
     ]
@@ -359,7 +404,8 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
       %{
         "agent_id" => "independent-reviewer",
         "provider" => "openai",
-        "model" => "gpt-5.6-sol",
+        "model" => "critical-review-alias",
+        "canonical_model_id" => "openai/gpt-5.6-sol",
         "personas" => ["maintainability", "security"]
       }
     ]
@@ -382,6 +428,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         "agent_id" => "worker-agent",
         "provider" => "anthropic",
         "model" => "claude-sonnet-4.6",
+        "canonical_model_id" => "anthropic/claude-sonnet-4.6",
         "personas" => ["maintainability", "security"]
       }
     ]
@@ -411,7 +458,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
                "mode" => "promote",
                "session_id" => context.session.id,
                "task_id" => context.task.id,
-               "review_id" => review.id
+               "review_id" => Integer.to_string(review.id)
              })
 
     assert message =~ "approved independent"
@@ -513,7 +560,8 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
       "worker_identity" => %{
         "agent_id" => "worker-agent",
         "provider" => "openai",
-        "model" => "gpt-5.6-sol"
+        "model" => "gpt-5.6-sol",
+        "canonical_model_id" => "openai/gpt-5.6-sol"
       },
       "changed_behavior" => "Invalid state is rejected before persistence",
       "owning_invariant" => "Only validated state reaches storage",
@@ -580,6 +628,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         "agent_id" => "independent-reviewer",
         "provider" => "anthropic",
         "model" => "claude-sonnet-4.6",
+        "canonical_model_id" => "anthropic/claude-sonnet-4.6",
         "personas" => ["maintainability", "security"]
       }
     ]
