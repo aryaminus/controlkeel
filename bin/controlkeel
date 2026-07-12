@@ -37,6 +37,9 @@ if _has_json_flag "$@"; then
   # emitted by mix ck.context / ck.validate (used by Cursor hooks).
   export CK_CLI_MODE=1
   export LOGGER_LEVEL=error
+  # Mix may recompile when CK_CLI_MODE changes compile-time configuration. Keep
+  # that progress off stdout so machine consumers receive exactly one JSON value.
+  mix compile >/dev/null
 fi
 
 CMD="$1"
