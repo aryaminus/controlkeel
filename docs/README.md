@@ -21,6 +21,8 @@ ControlKeel is the control plane for AI-agent work: policy gates, findings, proo
 - [agent-specs.md](agent-specs.md): reusable agent/task behavior contracts for specs, reviews, and benchmarks
 - [observability-feedback-loop.md](observability-feedback-loop.md): local eval-to-draft-to-benchmark-to-promotion-advisory workflow with regression evidence
 - [control-plane-claim-matrix.md](control-plane-claim-matrix.md): README claim-to-test matrix for governance, memory, cloud sync, and human gates
+- [testing/evidence.md](testing/evidence.md): application performance baselines, profiling evidence, and the reviewed boundary for future browser/visual tests
+- [testing/harness-tools.md](testing/harness-tools.md): commit-linked performance comparison, generated test inventory audits, and bounded BEAM profiling plans
 
 ## Operate teams, projects, and cloud deployments
 
