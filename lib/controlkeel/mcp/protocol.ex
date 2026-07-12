@@ -28,6 +28,7 @@ defmodule ControlKeel.MCP.Protocol do
     CkFinding,
     CkGoal,
     CkLoadResources,
+    CkLoop,
     CkMemoryArchive,
     CkMemoryRecord,
     CkMemorySearch,
@@ -342,6 +343,7 @@ defmodule ControlKeel.MCP.Protocol do
         ck_token_audit_tool(),
         ck_attach_tool(),
         ck_session_digest_tool(),
+        ck_loop_tool(),
         ck_rollback_tool(),
         ck_workspace_agent_tool(),
         ck_copilot_tool(),
@@ -527,6 +529,7 @@ defmodule ControlKeel.MCP.Protocol do
     do: ControlKeel.MCP.Tools.CkAttach.call(arguments)
 
   defp do_dispatch_tool("ck_session_digest", arguments), do: CkSessionDigest.call(arguments)
+  defp do_dispatch_tool("ck_loop", arguments), do: CkLoop.call(arguments)
   defp do_dispatch_tool("ck_rollback", arguments), do: CkRollback.call(arguments)
   defp do_dispatch_tool("ck_workspace_agent", arguments), do: CkWorkspaceAgent.call(arguments)
   defp do_dispatch_tool("ck_copilot", arguments), do: CkCopilot.call(arguments)
@@ -3050,6 +3053,105 @@ defmodule ControlKeel.MCP.Protocol do
             "type" => "string",
             "description" => "Absolute path to the project root."
           }
+        }
+      }
+    }
+  end
+
+  def ck_loop_tool do
+    %{
+      "name" => "ck_loop",
+      "description" =>
+        "Create and govern a bounded iterative loop without executing worker code. The contract freezes verifier paths and hashes, separates mutable paths, classifies artifact longevity, and enforces metric, iteration, cost, duration, no-progress, blocked-finding, and lasting-code architecture stop conditions. Modes: create, record, status, stop, promote. Rejected iterations require an explicit audited rollback.",
+      "inputSchema" => %{
+        "type" => "object",
+        "required" => ["session_id", "task_id"],
+        "properties" => %{
+          "mode" => %{
+            "type" => "string",
+            "enum" => ["create", "record", "status", "stop", "promote"]
+          },
+          "session_id" => %{"type" => ["integer", "string"]},
+          "task_id" => %{"type" => ["integer", "string"]},
+          "project_root" => %{"type" => "string"},
+          "artifact_class" => %{
+            "type" => "string",
+            "enum" => [
+              "ephemeral_experiment",
+              "mechanical_transformation",
+              "research",
+              "security_triage",
+              "lasting_code"
+            ]
+          },
+          "mutable_paths" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "verifier_paths" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "verifier_command" => %{"type" => "string"},
+          "metric_name" => %{"type" => "string"},
+          "direction" => %{"type" => "string", "enum" => ["maximize", "minimize"]},
+          "target" => %{"type" => "number"},
+          "max_iterations" => %{"type" => "integer", "minimum" => 1, "maximum" => 100},
+          "max_cost_cents" => %{"type" => "integer", "minimum" => 1},
+          "max_duration_seconds" => %{"type" => "integer", "minimum" => 1, "maximum" => 86400},
+          "no_progress_limit" => %{"type" => "integer", "minimum" => 1, "maximum" => 20},
+          "allowed_sandbox_adapters" => %{
+            "type" => "array",
+            "items" => %{"type" => "string", "enum" => ["docker", "e2b", "nono"]}
+          },
+          "require_ephemeral_environment" => %{"type" => "boolean"},
+          "invariant_boundaries" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "allowed_semantic_changes" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "forbidden_semantic_changes" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "machine_independence_requirements" => %{
+            "type" => "array",
+            "items" => %{"type" => "string"}
+          },
+          "review_risk" => %{
+            "type" => "string",
+            "enum" => ["standard", "high", "critical"]
+          },
+          "required_review_personas" => %{
+            "type" => "array",
+            "items" => %{"type" => "string"}
+          },
+          "complexity_budget" => %{"type" => "object"},
+          "local_defense_limit" => %{"type" => "integer", "minimum" => 1, "maximum" => 20},
+          "human_promotion_required" => %{"type" => "boolean"},
+          "iteration" => %{"type" => "integer", "minimum" => 1},
+          "metric_value" => %{"type" => "number"},
+          "cost_cents" => %{"type" => "integer", "minimum" => 0},
+          "verifier_passed" => %{"type" => "boolean"},
+          "summary" => %{"type" => "string"},
+          "changed_paths" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "sandbox_adapter" => %{
+            "type" => "string",
+            "enum" => ["docker", "e2b", "nono"]
+          },
+          "environment_id" => %{"type" => "string"},
+          "hypothesis" => %{"type" => "string"},
+          "mechanism" => %{"type" => "string"},
+          "observed_effect" => %{"type" => "string"},
+          "documentation_impact" => %{"type" => "string"},
+          "invariant_effect" => %{
+            "type" => "string",
+            "enum" => ["strengthened", "preserved", "local_defense_added", "unknown"]
+          },
+          "invariant_evidence" => %{"type" => "string"},
+          "semantic_changes" => %{"type" => "array", "items" => %{"type" => "string"}},
+          "complexity_delta" => %{"type" => "object"},
+          "machine_independence_verified" => %{"type" => "boolean"},
+          "machine_independence_evidence" => %{"type" => "string"},
+          "call_graph" => %{"type" => "string"},
+          "diagnosis_path" => %{"type" => "string"},
+          "rollback_path" => %{"type" => "string"},
+          "maintenance_without_model" => %{"type" => "string"},
+          "promotion_packet" => %{
+            "type" => "object",
+            "description" =>
+              "Required when a lasting_code iteration reaches its target. Contains citable behavior, invariant, interface, deterministic command, rollback, and documentation evidence."
+          },
+          "review_id" => %{"type" => ["integer", "string"]},
+          "reason" => %{"type" => "string"}
         }
       }
     }

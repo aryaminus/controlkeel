@@ -390,6 +390,7 @@ Implemented under [`lib/controlkeel/mcp/tools/`](../lib/controlkeel/mcp/tools/).
 | `ck_review_status` | Fetch the latest decision status (pending/approved/denied), reviewer notes, and browser review URL for a previously submitted review. Read-only. Provide review_id (returned by ck_review_submit) for a specific review, or task_id to get the latest review for that task. review_type (plan/diff/completion) filters when task_id is used without review_id. Poll this after ck_review_submit to check whether a human has approved or denied the submission before proceeding with execution. |
 | `ck_review_submit` | Submit a governed plan, diff, or completion packet for human review and execution gating. Write operation — creates a review record and returns a review_id and browser URL. review_type controls what is being submitted: plan (before implementation), diff (before merging), or completion (task done). submission_body is the full content: plan text, diff, or completion description. For iterative plan refinement, pass previous_review_id and plan_phase (ticket → research_packet → design_options → narrowed_decision → implementation_plan → code_backed_plan). The plan-quality scorer evaluates structured fields, not just submission_body — populate research_summary, options_considered, selected_option, rejected_options, implementation_steps, validation_plan, code_snippets, alignment_context, consulted_roles, codebase_findings, prior_art_summary, and scope_estimate for a strong score. Returns review_id, status (pending), and a URL where the human reviewer can approve or deny. After submission, poll ck_review_status until the decision is approved or denied before proceeding. Use ck_review_feedback (human-facing) to record a decision on an existing review. |
 | `ck_rollback` | Execute a governed rollback of an agent's work. Records a git checkpoint before each task and provides a single action to revert. Safety-checked: refuses if downstream tasks depend on the changes. Creates an audit finding on every rollback. Modes: checkpoint (capture git HEAD before task), execute (revert agent's changes), status (check snapshot state), list (all snapshots for session). |
+| `ck_loop` | Govern an objective bounded loop with immutable verifier hashes, fresh sandbox evidence, hard limits, and independent promotion review; worker execution remains separate. |
 | `ck_route` | Recommend the best available AI agent for a given task based on security tier, remaining budget, task type, and past performance data. Read-only — no session state is changed. task is a plain-language description of what needs to be done. risk_tier (low/medium/high/critical) filters out agents that are not cleared for the security level; defaults to medium. allowed_agents restricts routing to a specific subset of agent IDs; omit to allow all. Returns a ranked list of agent recommendations with rationale. Use ck_route to pick an agent, then ck_delegate to transfer the task. Use ck_cost_optimizer for a price-focused comparison without routing. |
 | `ck_session_digest` | Generate a condensed, human-scannable digest of what happened in a session — tasks completed, findings raised, budget spent, reviews pending, and notable highlights. Three modes: generate (create a new digest), latest (return the most recent), list (paginated history). Designed for the forward-deployed engineer who needs an 'inbox that summarizes what happened' without reading raw event streams. |
 | `ck_skill_evolution` | Synthesize a deduplicated skill-evolution packet from recent traces and recurring failure clusters, including anti-patterns, reinforced practices, and a ready-to-merge skill draft. |
@@ -417,9 +418,11 @@ These directories ship with the repo and are discovered by [`ControlKeel.Skills.
 | `align` | Pre-work alignment interview. |
 | `architect-first` | Architect-first module design. |
 | `benchmark-operator` | Benchmark operator playbooks. |
+| `bounded-loop` | Verifier-isolated, budgeted iterative improvement workflow. |
 | `challenge` | Adversarial plan challenge. |
 | `cli-for-agents` | CLI design for agent-friendliness. |
 | `cloudflare-agent` | Cloudflare agent governance. |
+| `communication-style` | Concise, evidence-preserving technical communication. |
 | `compliance-audit` | Compliance / control matrix audits. |
 | `continual-learning` | Session learning and memory. |
 | `continuity` | Codebase pattern continuity. |
@@ -428,6 +431,8 @@ These directories ship with the repo and are discovered by [`ControlKeel.Skills.
 | `deep-code-quality-review` | Deep maintainability review. |
 | `deslop` | AI slop cleanup. |
 | `domain-audit` | Domain-specific review matrices. |
+| `end-of-shift` | Governed validation, proof, digest, and handoff closure. |
+| `false-confidence-test-audit` | Evidence-based audit of tests that may pass without proving behavior. |
 | `handoff` | Session state handoff. |
 | `investigate` | Read-only codebase Q&A. |
 | `orchestrate-tasks` | Parallel task orchestration. |

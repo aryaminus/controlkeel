@@ -585,6 +585,23 @@ defmodule ControlKeel.MCP.OutputSchemas do
         "snapshots" => %{"type" => "array", "items" => %{"type" => "object"}}
       }
     },
+    "ck_loop" => %{
+      "type" => "object",
+      "required" => ["session_id", "task_id", "status", "contract", "iterations"],
+      "properties" => %{
+        "session_id" => %{"type" => "integer"},
+        "task_id" => %{"type" => "integer"},
+        "contract_id" => %{"type" => "integer"},
+        "status" => %{"type" => "string"},
+        "stop_reason" => %{"type" => ["string", "null"]},
+        "contract" => %{"type" => "object"},
+        "iteration_count" => %{"type" => "integer"},
+        "cost_cents" => %{"type" => "integer"},
+        "best_metric" => %{"type" => ["number", "null"]},
+        "iterations" => %{"type" => "array", "items" => %{"type" => "object"}},
+        "decision" => %{"type" => "object"}
+      }
+    },
     "ck_workspace_agent" => %{
       "type" => "object",
       "properties" => %{

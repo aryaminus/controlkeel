@@ -22,7 +22,7 @@ defmodule ControlKeel.MCP.ToolGroupsTest do
   describe "all_tools/0" do
     test "returns all tools" do
       tools = ToolGroups.all_tools()
-      assert length(tools) == 54
+      assert length(tools) == 55
     end
 
     test "includes the 7 previously missing tools" do
@@ -46,7 +46,7 @@ defmodule ControlKeel.MCP.ToolGroupsTest do
       map = ToolGroups.tool_to_group_map()
 
       assert Enum.all?(frequencies, fn {_tool, count} -> count == 1 end)
-      assert map_size(map) == 54
+      assert map_size(map) == 55
 
       all_tools = ToolGroups.all_tools()
       assert MapSet.new(Map.keys(map)) == MapSet.new(all_tools)
@@ -56,7 +56,7 @@ defmodule ControlKeel.MCP.ToolGroupsTest do
   describe "tools_for_group/1" do
     test "returns tools for known groups" do
       assert length(ToolGroups.tools_for_group("core")) == 9
-      assert length(ToolGroups.tools_for_group("governance")) == 21
+      assert length(ToolGroups.tools_for_group("governance")) == 22
       assert length(ToolGroups.tools_for_group("observability")) == 8
       assert length(ToolGroups.tools_for_group("skills")) == 4
       assert length(ToolGroups.tools_for_group("filesystem")) == 4

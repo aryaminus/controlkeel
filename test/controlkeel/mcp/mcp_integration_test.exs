@@ -26,7 +26,7 @@ defmodule ControlKeel.MCP.IntegrationTest do
   # dispatch_request/2 is a GenServer.call that returns the JSON-RPC response map
   # directly (not {:ok, map}) — the {:reply, map, state} tuple is unwrapped by OTP.
   # Use a generous timeout: on CI with Postgres the boot gate (2 s) + tool schema
-  # generation for 54 tools can exceed the default 5 s GenServer.call timeout.
+  # generation for 55 tools can exceed the default 5 s GenServer.call timeout.
   defp request(pid, method, params \\ %{}, id \\ 1) do
     req = %{"jsonrpc" => "2.0", "id" => id, "method" => method, "params" => params}
     GenServer.call(pid, {:dispatch, req}, 30_000)

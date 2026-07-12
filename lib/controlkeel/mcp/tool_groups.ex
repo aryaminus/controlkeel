@@ -34,6 +34,7 @@ defmodule ControlKeel.MCP.ToolGroups do
       "ck_deployment_advisor",
       "ck_outcome_tracker",
       "ck_session_digest",
+      "ck_loop",
       "ck_rollback",
       "ck_workspace_agent",
       "ck_copilot",

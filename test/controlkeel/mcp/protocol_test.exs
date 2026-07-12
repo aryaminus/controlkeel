@@ -99,6 +99,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
              "ck_token_audit",
              "ck_attach",
              "ck_session_digest",
+             "ck_loop",
              "ck_rollback",
              "ck_workspace_agent",
              "ck_copilot",
