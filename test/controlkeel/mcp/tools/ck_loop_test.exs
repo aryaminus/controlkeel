@@ -16,7 +16,21 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
     File.write!(Path.join(root, "test/verifier.exs"), "assert true\n")
     File.write!(Path.join(root, "docs/evidence.md"), "# Evidence\n")
     on_exit(fn -> File.rm_rf(root) end)
-    {:ok, session: session, task: task, root: root}
+
+    {:ok, worker_invocation} =
+      Mission.create_invocation(%{
+        source: "worker-agent",
+        tool: "bounded_loop_worker",
+        provider: "openai",
+        model: "gpt-5.6-sol",
+        estimated_cost_cents: 0,
+        decision: "allow",
+        metadata: %{"canonical_model_id" => "openai/gpt-5.6-sol"},
+        session_id: session.id,
+        task_id: task.id
+      })
+
+    {:ok, session: session, task: task, root: root, worker_invocation: worker_invocation}
   end
 
   test "creates an immutable bounded contract and reports status", context do
@@ -246,12 +260,22 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
   test "promotion packet rejects non-canonical worker model identity", context do
     assert {:ok, _} = CkLoop.call(lasting_create_args(context))
 
+    {:ok, invocation} =
+      Mission.create_invocation(%{
+        source: "worker-agent",
+        tool: "bounded_loop_worker",
+        provider: "openai",
+        model: "gpt-5.6-sol",
+        estimated_cost_cents: 0,
+        decision: "allow",
+        metadata: %{"canonical_model_id" => "anthropic/gpt-5.6-sol"},
+        session_id: context.session.id,
+        task_id: context.task.id
+      })
+
     args =
       lasting_record_args(context, 1, 0.9)
-      |> put_in(
-        ["promotion_packet", "worker_identity", "canonical_model_id"],
-        "anthropic/gpt-5.6-sol"
-      )
+      |> put_in(["promotion_packet", "worker_identity", "invocation_id"], invocation.id)
 
     assert {:error, {:invalid_arguments, message}} = CkLoop.call(args)
     assert message =~ "matching provider"
@@ -315,6 +339,8 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         submitted_by: "worker"
       })
 
+    reviewer_identities = trusted_reviewers(context, diversified_reviewers())
+
     assert {:ok, _} =
              CkReviewFeedback.call(%{
                "review_id" => attested_review.id,
@@ -329,7 +355,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
                    "ownership_accepted" => true,
                    "longevity_justified" => true
                  },
-                 "reviewer_identities" => diversified_reviewers()
+                 "reviewer_identities" => reviewer_identities
                }
              })
 
@@ -552,16 +578,16 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         "maintenance_without_model" => "Tests and module contracts document the behavior"
       })
 
-    if metric >= 0.9, do: Map.put(args, "promotion_packet", promotion_packet()), else: args
+    if metric >= 0.9,
+      do: Map.put(args, "promotion_packet", promotion_packet(context)),
+      else: args
   end
 
-  defp promotion_packet do
+  defp promotion_packet(context) do
     %{
       "worker_identity" => %{
         "agent_id" => "worker-agent",
-        "provider" => "openai",
-        "model" => "gpt-5.6-sol",
-        "canonical_model_id" => "openai/gpt-5.6-sol"
+        "invocation_id" => context.worker_invocation.id
       },
       "changed_behavior" => "Invalid state is rejected before persistence",
       "owning_invariant" => "Only validated state reaches storage",
@@ -593,6 +619,8 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
          reviewers \\ nil,
          reviewed_by \\ "independent-reviewer"
        ) do
+    reviewer_identities = trusted_reviewers(context, reviewers || diversified_reviewers())
+
     review =
       review_fixture(%{
         session: context.session,
@@ -615,11 +643,34 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
                    "ownership_accepted" => true,
                    "longevity_justified" => true
                  },
-                 "reviewer_identities" => reviewers || diversified_reviewers()
+                 "reviewer_identities" => reviewer_identities
                }
              })
 
     review
+  end
+
+  defp trusted_reviewers(context, reviewers) do
+    Enum.map(reviewers, fn reviewer ->
+      {:ok, invocation} =
+        Mission.create_invocation(%{
+          source: reviewer["agent_id"],
+          tool: "bounded_loop_review",
+          provider: reviewer["provider"],
+          model: reviewer["model"],
+          estimated_cost_cents: 0,
+          decision: "allow",
+          metadata: %{"canonical_model_id" => reviewer["canonical_model_id"]},
+          session_id: context.session.id,
+          task_id: context.task.id
+        })
+
+      %{
+        "agent_id" => reviewer["agent_id"],
+        "invocation_id" => invocation.id,
+        "personas" => reviewer["personas"]
+      }
+    end)
   end
 
   defp diversified_reviewers do

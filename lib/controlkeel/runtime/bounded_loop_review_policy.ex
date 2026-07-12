@@ -3,20 +3,12 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
 
   alias ControlKeel.Mission
 
-  def worker_identity(arguments) do
+  def worker_identity(arguments, ids) do
     with {:ok, value} <- required_map(arguments, "worker_identity"),
          {:ok, agent_id} <- required_string(value, "agent_id"),
-         {:ok, provider} <- required_string(value, "provider"),
-         {:ok, model} <- required_string(value, "model"),
-         {:ok, canonical_model_id} <- required_string(value, "canonical_model_id"),
-         :ok <- canonical_model_id(provider, canonical_model_id) do
-      {:ok,
-       %{
-         "agent_id" => agent_id,
-         "provider" => provider,
-         "model" => model,
-         "canonical_model_id" => canonical_model_id
-       }}
+         {:ok, invocation_id} <- positive_integer(value, "invocation_id"),
+         {:ok, identity} <- trusted_identity(ids, invocation_id, agent_id) do
+      {:ok, identity}
     end
   end
 
@@ -38,7 +30,7 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
         with true <-
                DateTime.compare(responded_at, stop.inserted_at) in [:eq, :gt] ||
                  {:error, {:invalid_arguments, "Review predates the target iteration"}},
-             :ok <- ownership_attestations(contract.payload, stop, annotations, reviewed_by) do
+             :ok <- ownership_attestations(contract.payload, stop, annotations, reviewed_by, ids) do
           :ok
         end
 
@@ -56,7 +48,8 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
          %{"artifact_class" => "lasting_code"},
          stop,
          annotations,
-         reviewed_by
+         reviewed_by,
+         ids
        ) do
     required =
       ~w(architecture_understandable complexity_proportional invariants_mechanical ownership_accepted longevity_justified)
@@ -75,13 +68,13 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
         {:error, {:invalid_arguments, "All lasting-code ownership attestations must be true"}}
 
       true ->
-        validate(stop, annotations, reviewed_by)
+        validate(stop, annotations, reviewed_by, ids)
     end
   end
 
-  defp ownership_attestations(_contract, _stop, _annotations, _reviewed_by), do: :ok
+  defp ownership_attestations(_contract, _stop, _annotations, _reviewed_by, _ids), do: :ok
 
-  def validate(stop, annotations, reviewed_by) do
+  def validate(stop, annotations, reviewed_by, ids) do
     packet = stop.payload["promotion_packet"] || %{}
     worker = packet["worker_identity"] || %{}
     reviewers = annotations["reviewer_identities"]
@@ -92,7 +85,7 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
              {:error,
               {:invalid_arguments,
                "Lasting-code review requires exactly one attributable reviewer identity"}},
-         {:ok, reviewers} <- reviewer_identities(reviewers),
+         {:ok, reviewers} <- reviewer_identities(reviewers, ids),
          :ok <- attributable_reviewer(reviewers, reviewed_by),
          :ok <- distinct_reviewer_agents(worker, reviewers),
          :ok <- required_personas(policy, reviewers),
@@ -107,24 +100,16 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
       else: {:error, {:invalid_arguments, "Reviewer identity must match reviewed_by"}}
   end
 
-  defp reviewer_identities(reviewers) do
+  defp reviewer_identities(reviewers, ids) do
     Enum.reduce_while(reviewers, {:ok, []}, fn reviewer, {:ok, acc} ->
       with true <-
              is_map(reviewer) ||
                {:error, {:invalid_arguments, "reviewer identities must be objects"}},
            {:ok, agent_id} <- required_string(reviewer, "agent_id"),
-           {:ok, provider} <- required_string(reviewer, "provider"),
-           {:ok, model} <- required_string(reviewer, "model"),
-           {:ok, canonical_model_id} <- required_string(reviewer, "canonical_model_id"),
-           :ok <- canonical_model_id(provider, canonical_model_id),
+           {:ok, invocation_id} <- positive_integer(reviewer, "invocation_id"),
+           {:ok, trusted} <- trusted_identity(ids, invocation_id, agent_id),
            {:ok, personas} <- string_list(reviewer, "personas") do
-        identity = %{
-          "agent_id" => agent_id,
-          "provider" => provider,
-          "model" => model,
-          "canonical_model_id" => canonical_model_id,
-          "personas" => personas
-        }
+        identity = Map.put(trusted, "personas", personas)
 
         {:cont, {:ok, [identity | acc]}}
       else
@@ -174,6 +159,43 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
 
   defp normalize_model(model), do: model |> String.trim() |> String.downcase()
 
+  defp trusted_identity(ids, invocation_id, agent_id) do
+    case Mission.get_invocation(invocation_id) do
+      %{
+        session_id: session_id,
+        task_id: task_id,
+        source: ^agent_id,
+        provider: provider,
+        model: model,
+        metadata: metadata
+      }
+      when session_id == ids.session_id and task_id == ids.task_id and is_binary(provider) and
+             is_binary(model) ->
+        canonical_model_id = (metadata || %{})["canonical_model_id"]
+
+        with true <-
+               is_binary(canonical_model_id) ||
+                 {:error,
+                  {:invalid_arguments,
+                   "Invocation must contain trusted canonical_model_id metadata"}},
+             :ok <- canonical_model_id(provider, canonical_model_id) do
+          {:ok,
+           %{
+             "agent_id" => agent_id,
+             "invocation_id" => invocation_id,
+             "provider" => provider,
+             "model" => model,
+             "canonical_model_id" => canonical_model_id
+           }}
+        end
+
+      _ ->
+        {:error,
+         {:invalid_arguments,
+          "Model identity must reference an attributable invocation for this session and task"}}
+    end
+  end
+
   defp canonical_model_id(provider, model_id) do
     normalized_provider = provider |> String.trim() |> String.downcase()
 
@@ -185,6 +207,21 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
       {:error,
        {:invalid_arguments,
         "canonical_model_id must be a lowercase provider/model identifier matching provider"}}
+    end
+  end
+
+  defp positive_integer(arguments, key) do
+    case Map.get(arguments, key) do
+      value when is_integer(value) and value > 0 -> {:ok, value}
+      value when is_binary(value) -> parse_positive_integer(value, key)
+      _ -> {:error, {:invalid_arguments, "#{key} must be a positive integer"}}
+    end
+  end
+
+  defp parse_positive_integer(value, key) do
+    case Integer.parse(value) do
+      {integer, ""} when integer > 0 -> {:ok, integer}
+      _ -> {:error, {:invalid_arguments, "#{key} must be a positive integer"}}
     end
   end
 

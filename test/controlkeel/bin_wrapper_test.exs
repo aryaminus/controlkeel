@@ -71,7 +71,7 @@ defmodule ControlKeel.BinWrapperTest do
   test "--format only enables JSON mode for a json value" do
     wrapper = File.read!(@wrapper)
 
-    assert wrapper =~ "--json)"
+    assert wrapper =~ "--json|--format=json|--format=JSON)"
     assert wrapper =~ ~s(if [ "$arg" = "--format" ])
     assert wrapper =~ "json|JSON) return 0"
     refute wrapper =~ "--json|--format)"

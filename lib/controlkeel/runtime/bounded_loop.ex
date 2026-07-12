@@ -55,7 +55,7 @@ defmodule ControlKeel.Runtime.BoundedLoop do
          {:ok, index} <- positive_integer(arguments, "iteration"),
          :ok <- next_iteration(index, iterations),
          {:ok, value} <- number(arguments, "metric_value"),
-         {:ok, promotion_packet} <- promotion_packet(arguments, contract.payload, value),
+         {:ok, promotion_packet} <- promotion_packet(arguments, ids, contract.payload, value),
          {:ok, cost} <- non_negative_integer(arguments, "cost_cents", 0),
          {:ok, changed_paths} <- changed_paths(arguments, contract.payload),
          {:ok, sandbox} <- sandbox_evidence(arguments, contract.payload, iterations),
@@ -734,10 +734,10 @@ defmodule ControlKeel.Runtime.BoundedLoop do
     end
   end
 
-  defp promotion_packet(arguments, %{"artifact_class" => "lasting_code"} = contract, value) do
+  defp promotion_packet(arguments, ids, %{"artifact_class" => "lasting_code"} = contract, value) do
     if target_met?(value, contract) do
       with {:ok, packet} <- required_map(arguments, "promotion_packet"),
-           {:ok, worker_identity} <- BoundedLoopReviewPolicy.worker_identity(packet),
+           {:ok, worker_identity} <- BoundedLoopReviewPolicy.worker_identity(packet, ids),
            {:ok, changed_behavior} <- required_string(packet, "changed_behavior"),
            {:ok, owning_invariant} <- required_string(packet, "owning_invariant"),
            :ok <- declared_invariant(owning_invariant, contract),
@@ -787,7 +787,7 @@ defmodule ControlKeel.Runtime.BoundedLoop do
     end
   end
 
-  defp promotion_packet(_arguments, _contract, _value), do: {:ok, %{}}
+  defp promotion_packet(_arguments, _ids, _contract, _value), do: {:ok, %{}}
 
   defp required_map(arguments, key) do
     case Map.get(arguments, key) do

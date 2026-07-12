@@ -552,6 +552,11 @@ defmodule ControlKeel.Mission do
     |> Repo.insert()
   end
 
+  def get_invocation(invocation_id) when is_integer(invocation_id),
+    do: Repo.get(Invocation, invocation_id)
+
+  def get_invocation(_invocation_id), do: nil
+
   def record_regression_result(attrs) when is_map(attrs) do
     with {:ok, normalized} <- normalize_regression_result(attrs),
          %Session{} = session <- get_session(normalized["session_id"]) || {:error, :not_found},

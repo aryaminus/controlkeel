@@ -1,7 +1,7 @@
 defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
   use ControlKeel.DataCase
 
-  alias ControlKeel.Platform
+  alias ControlKeel.{Mission, Platform}
   alias ControlKeel.Runtime.{BoundedLoop, BoundedLoopCoordinator}
 
   import ControlKeel.MissionFixtures
@@ -25,6 +25,7 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
     Process.delete(:bounded_loop_rollback_error)
     Process.delete(:bounded_loop_invariant_effect)
     Process.delete(:bounded_loop_verifier_error)
+    Process.delete(:bounded_loop_worker_invocation_id)
     Process.put(:bounded_loop_metrics, [0.5])
 
     {:ok, session: session, task: task, root: root}
@@ -128,6 +129,7 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
   test "forwards strict lasting-code evidence from explicit adapters", context do
     task = task_fixture(%{session: context.session, status: "ready"})
     {:ok, _run} = Platform.claim_task(task.id, nil, %{"execution_mode" => "local"})
+    put_worker_invocation(context.session, task)
 
     assert {:ok, _} =
              BoundedLoop.create(lasting_contract_args(context.session, task, context.root))
@@ -149,6 +151,7 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
   test "rolls back the candidate when a lasting-code safety stop fires", context do
     task = task_fixture(%{session: context.session, status: "ready"})
     {:ok, _run} = Platform.claim_task(task.id, nil, %{"execution_mode" => "local"})
+    put_worker_invocation(context.session, task)
 
     assert {:ok, _} =
              BoundedLoop.create(lasting_contract_args(context.session, task, context.root))
@@ -225,5 +228,22 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
       "local_defense_limit" => 1,
       "human_promotion_required" => true
     })
+  end
+
+  defp put_worker_invocation(session, task) do
+    {:ok, invocation} =
+      Mission.create_invocation(%{
+        source: "worker-agent",
+        tool: "bounded_loop_worker",
+        provider: "openai",
+        model: "gpt-5.6-sol",
+        estimated_cost_cents: 0,
+        decision: "allow",
+        metadata: %{"canonical_model_id" => "openai/gpt-5.6-sol"},
+        session_id: session.id,
+        task_id: task.id
+      })
+
+    Process.put(:bounded_loop_worker_invocation_id, invocation.id)
   end
 end

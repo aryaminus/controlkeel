@@ -102,9 +102,7 @@ defmodule ControlKeel.BoundedLoopTestAdapter do
     %{
       "worker_identity" => %{
         "agent_id" => "worker-agent",
-        "provider" => "openai",
-        "model" => "gpt-5.6-sol",
-        "canonical_model_id" => "openai/gpt-5.6-sol"
+        "invocation_id" => Process.get(:bounded_loop_worker_invocation_id)
       },
       "changed_behavior" => "Invalid state is rejected before persistence",
       "owning_invariant" => "Only validated state reaches storage",
