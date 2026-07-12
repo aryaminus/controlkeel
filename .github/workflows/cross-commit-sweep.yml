@@ -1,0 +1,54 @@
+name: Cross-commit sweep
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback:
+        description: "Number of first-parent commits to inspect"
+        required: false
+        default: "25"
+  schedule:
+    - cron: "17 9 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "27.3.4.3"
+      - name: Resolve bounded range
+        id: range
+        env:
+          REQUESTED_LOOKBACK: ${{ inputs.lookback || '25' }}
+        run: |
+          case "$REQUESTED_LOOKBACK" in
+            ''|*[!0-9]*) echo "lookback must be numeric" >&2; exit 1 ;;
+          esac
+          if [ "$REQUESTED_LOOKBACK" -lt 1 ] || [ "$REQUESTED_LOOKBACK" -gt 75 ]; then
+            echo "lookback must be between 1 and 75" >&2
+            exit 1
+          fi
+          base="$(git rev-parse "HEAD~${REQUESTED_LOOKBACK}" 2>/dev/null || git rev-list --max-parents=0 HEAD)"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+      - name: Generate read-only sweep report
+        run: python3 scripts/cross_commit_sweep.py --base "${{ steps.range.outputs.base }}" --head HEAD --output artifacts/cross-commit-sweep.md
+      - name: Install dependencies
+        run: mix deps.get
+      - name: Run harness integrity checks
+        run: mix test test/controlkeel/skills_test.exs test/scripts/cross_commit_sweep_test.exs
+      - name: Run opt-in performance baseline
+        run: mix test --only performance test/performance
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cross-commit-sweep-${{ github.run_id }}
+          path: artifacts/cross-commit-sweep.md
+          retention-days: 30
