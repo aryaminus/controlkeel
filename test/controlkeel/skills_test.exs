@@ -622,9 +622,11 @@ defmodule ControlKeel.SkillsTest do
              "align",
              "architect-first",
              "benchmark-operator",
+             "bounded-loop",
              "challenge",
              "cli-for-agents",
              "cloudflare-agent",
+             "communication-style",
              "compliance-audit",
              "continual-learning",
              "continuity",
@@ -633,6 +635,8 @@ defmodule ControlKeel.SkillsTest do
              "deep-code-quality-review",
              "deslop",
              "domain-audit",
+             "end-of-shift",
+             "false-confidence-test-audit",
              "handoff",
              "investigate",
              "orchestrate-tasks",
@@ -650,6 +654,34 @@ defmodule ControlKeel.SkillsTest do
     assert "codex" in governance.compatibility_targets
     assert "claude-plugin" in governance.compatibility_targets
     assert governance.required_mcp_tools != []
+  end
+
+  test "consequential built-in skills require explicit model invocation" do
+    result = Skills.validate(nil)
+
+    for name <- [
+          "cost-optimization",
+          "end-of-shift",
+          "false-confidence-test-audit",
+          "handoff",
+          "orchestrate-tasks",
+          "parallel-review",
+          "ship-readiness"
+        ] do
+      skill = Enum.find(result.skills, &(&1.name == name))
+      assert skill, "missing built-in skill #{name}"
+      assert skill.disable_model_invocation, "#{name} must require explicit invocation"
+    end
+  end
+
+  test "closure and test audit skills expose typed result schemas" do
+    result = Skills.validate(nil)
+
+    for name <- ["end-of-shift", "false-confidence-test-audit"] do
+      skill = Enum.find(result.skills, &(&1.name == name))
+      assert skill.result_schema["type"] == "object"
+      assert is_list(skill.result_schema["required"])
+    end
   end
 
   test "built-in skills include observability loop guidance" do
@@ -673,6 +705,14 @@ defmodule ControlKeel.SkillsTest do
         assert File.read!(path) =~ "ck_observability"
       end
     end
+  end
+
+  test "governance requires explicit or plan-approved delegation" do
+    contents =
+      File.read!(Path.join([@root, "priv/skills/controlkeel-governance/SKILL.md"]))
+
+    assert contents =~ "Delegate only when the user explicitly requests it"
+    assert contents =~ "Tool availability alone is not a reason to delegate"
   end
 
   test "export writes codex and claude plugin bundles", %{tmp_dir: tmp_dir} do

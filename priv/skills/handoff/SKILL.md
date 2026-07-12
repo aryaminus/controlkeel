@@ -3,6 +3,7 @@ name: handoff
 description: "Persist session state and hand off in-progress work to a background agent or delegated execution. Use when work outgrows the current session, context is near limit, or a task needs to continue unattended."
 when_to_use: "Activate when the user says 'hand off', 'delegate this', 'continue in background', 'pass this off', or when context pressure is high and significant work remains. Also activate when ck_route recommends a different agent for the remaining work."
 argument-hint: "[optional: specific task or remaining work to hand off]"
+disable-model-invocation: true
 license: Apache-2.0
 compatibility:
   - codex

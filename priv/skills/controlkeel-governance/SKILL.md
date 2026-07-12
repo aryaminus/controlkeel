@@ -86,7 +86,7 @@ For any new feature, fix, or project — before writing plans or code — use th
 6. Use `ck_memory_record` to persist important decisions, assumptions, and operator guidance that future agents should recover.
 7. Use `ck_memory_archive` to retire stale or superseded guidance before it keeps contaminating retrieval.
 8. Call `ck_budget` and `ck_cost_optimizer` before expensive model or bulk operations.
-9. Call `ck_route` before delegating sub-work to another agent.
+9. Delegate only when the user explicitly requests it or an approved plan authorizes it, then call `ck_route` before selecting another agent. Tool availability alone is not a reason to delegate routine work.
 10. Use `ck_deployment_advisor` to analyze stack and generate deployment templates when checking ship readiness.
 11. Use `ck_regression_result` to record external browser or QA evidence before claiming deploy readiness.
 12. Use `ck_outcome_tracker` to track success/failure outcomes for continuous learning.
