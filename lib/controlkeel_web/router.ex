@@ -72,6 +72,8 @@ defmodule ControlKeelWeb.Router do
     get "/auth/saml/start", SamlController, :start
     get "/auth/logout", AuthController, :logout
     get "/auth/complete/:token", AuthController, :complete
+    get "/auth/:provider/request", OAuthLoginController, :request
+    get "/auth/:provider/callback", OAuthLoginController, :callback
 
     # Public invitation-acceptance page. Uses the :dashboard framework layout
     # for chrome but is NOT auth-gated (it handles its own session and works
