@@ -159,6 +159,51 @@ config :controlkeel, ControlKeel.Intent,
     }
   }
 
+# ──────────────── OAuth providers ──────────────────
+#
+# Providers activate only when both client_id and client_secret are set, so
+# self-hosted and cloud deployments can configure providers independently
+# without the app failing when one is missing. Runs in all envs; the guard
+# ensures dev.exs placeholder providers are NOT overridden when these env vars
+# are absent here.
+oauth_google_id = System.get_env("GOOGLE_OAUTH_CLIENT_ID")
+oauth_google_secret = System.get_env("GOOGLE_OAUTH_CLIENT_SECRET")
+oauth_github_id = System.get_env("GITHUB_OAUTH_CLIENT_ID")
+oauth_github_secret = System.get_env("GITHUB_OAUTH_CLIENT_SECRET")
+
+oauth_base_url =
+  System.get_env("CONTROLKEEL_OAUTH_BASE_URL") ||
+    "http://localhost:4000"
+
+oauth_providers =
+  [
+    if(oauth_google_id && oauth_google_secret,
+      do:
+        {:google,
+         [
+           strategy: Assent.Strategy.Google,
+           client_id: oauth_google_id,
+           client_secret: oauth_google_secret,
+           redirect_uri: "#{oauth_base_url}/auth/google/callback"
+         ]}
+    ),
+    if(oauth_github_id && oauth_github_secret,
+      do:
+        {:github,
+         [
+           strategy: Assent.Strategy.Github,
+           client_id: oauth_github_id,
+           client_secret: oauth_github_secret,
+           redirect_uri: "#{oauth_base_url}/auth/github/callback"
+         ]}
+    )
+  ]
+  |> Enum.reject(&is_nil/1)
+
+if oauth_providers != [] do
+  config :controlkeel, :oauth_providers, oauth_providers
+end
+
 if config_env() == :prod do
   database_path = ControlKeel.Runtime.Defaults.database_path()
 

@@ -93,3 +93,20 @@ config :phoenix_live_view,
   debug_attributes: true,
   # Enable helpful, but potentially expensive runtime checks
   enable_expensive_runtime_checks: true
+
+# OAuth providers — read from env, fall back to placeholders so the login
+# buttons render in dev without real secrets. Set real credentials in .env or
+# the shell to exercise the full OAuth round-trip.
+config :controlkeel, :oauth_providers,
+  google: [
+    strategy: Assent.Strategy.Google,
+    client_id: System.get_env("GOOGLE_OAUTH_CLIENT_ID", "dev-placeholder"),
+    client_secret: System.get_env("GOOGLE_OAUTH_CLIENT_SECRET", "dev-placeholder"),
+    redirect_uri: "http://localhost:4000/auth/google/callback"
+  ],
+  github: [
+    strategy: Assent.Strategy.Github,
+    client_id: System.get_env("GITHUB_OAUTH_CLIENT_ID", "dev-placeholder"),
+    client_secret: System.get_env("GITHUB_OAUTH_CLIENT_SECRET", "dev-placeholder"),
+    redirect_uri: "http://localhost:4000/auth/github/callback"
+  ]

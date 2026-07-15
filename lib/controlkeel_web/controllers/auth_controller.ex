@@ -5,18 +5,18 @@ defmodule ControlKeelWeb.AuthController do
   ## Signed completion tokens
 
   LiveViews cannot call `put_session/3` directly because the session lives
-  on the parent HTTP conn, not the live socket. Two flows need to establish
-  a session after a LiveView completes:
-
-    * **Signup completion** — `/signup` LiveView creates Org/User/Membership,
-      then redirects to `/auth/complete/:token` with a signed Phoenix.Token
-      carrying `%{user_id, org_id}`. This controller verifies the token
-      and sets the session keys.
+  on the parent HTTP conn, not the live socket. The invitation flow
+  establishes a session after a LiveView completes:
 
     * **Invitation auto-login** — `InvitationLive` accepts the invite, then
-      redirects to the same completion endpoint with a signed token. The
-      invite token itself is single-use and already consumed by accept;
-      the completion token is a separate short-lived signed payload.
+      redirects to `/auth/complete/:token` with a signed Phoenix.Token
+      carrying `%{user_id, org_id}`. This controller verifies the token
+      and sets the session keys. The invite token itself is single-use and
+      already consumed by accept; the completion token is a separate
+      short-lived signed payload.
+
+  OAuth sign-in (`OAuthLoginController`) sets the session directly via
+  `put_session/3` on the controller conn and does not use this endpoint.
 
   The signed token has a 60-second max-age so a stale completion link
   cannot be replayed.
