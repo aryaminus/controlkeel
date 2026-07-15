@@ -84,6 +84,7 @@ defmodule ControlKeel.MixProject do
       {:bandit, "~> 1.5"},
       {:websockex, "~> 0.4.3"},
       {:bypass, "~> 2.1", only: :test},
+      {:assent, "~> 0.3.1"},
       {:burrito, "~> 1.5.0", runtime: false}
     ]
   end

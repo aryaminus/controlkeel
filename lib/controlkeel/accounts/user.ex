@@ -25,6 +25,7 @@ defmodule ControlKeel.Accounts.User do
     field :created_by_user_id, :integer
 
     has_many :memberships, Membership
+    has_many :oauth_identities, ControlKeel.Accounts.OAuthIdentity
     timestamps(type: :utc_datetime)
   end
 

@@ -13,6 +13,7 @@ defmodule ControlKeel.Accounts do
   import Ecto.Query, warn: false
 
   alias ControlKeel.Accounts.Membership
+  alias ControlKeel.Accounts.OAuthIdentity
   alias ControlKeel.Accounts.Org
   alias ControlKeel.Accounts.ReviewAuditEvent
   alias ControlKeel.Accounts.User
@@ -1141,4 +1142,178 @@ defmodule ControlKeel.Accounts do
         end
     end
   end
+
+  # ──────────────── OAuth identities ──────────────────
+
+  @doc """
+  Returns whether a given OAuth provider is configured.
+  """
+  @spec oauth_provider_configured?(atom()) :: boolean()
+  def oauth_provider_configured?(provider) when is_atom(provider) do
+    :controlkeel
+    |> Application.get_env(:oauth_providers, [])
+    |> Keyword.has_key?(provider)
+  end
+
+  @doc """
+  Returns the list of configured OAuth provider atoms (e.g. `[:google, :github]`).
+  """
+  @spec oauth_configured_providers() :: [atom()]
+  def oauth_configured_providers do
+    :controlkeel
+    |> Application.get_env(:oauth_providers, [])
+    |> Keyword.keys()
+  end
+
+  @doc """
+  Returns the keyword-list config for a provider, or `nil` if unconfigured.
+  """
+  @spec oauth_provider_config(atom()) :: keyword() | nil
+  def oauth_provider_config(provider) when is_atom(provider) do
+    :controlkeel
+    |> Application.get_env(:oauth_providers, [])
+    |> Keyword.get(provider)
+  end
+
+  @doc """
+  Finds or creates a user from OAuth provider data.
+
+  Resolution order (inside a transaction):
+  1. Identity exists for `provider` + `provider_uid` → return the linked user.
+  2. Email matches an existing user **and** `user_info["email_verified"]` is
+     `true` → link a new identity to that user. Email-based linking is gated on
+     a verified email to prevent account takeover via an unverified provider.
+  3. Otherwise → create a new user and identity atomically.
+
+  `user_info` is the normalized claims map returned by Assent (string keys,
+  OIDC claims: `sub`, `name`, `email`, `email_verified`, `picture`).
+  """
+  @spec find_or_create_oauth_user(String.t() | atom(), String.t(), map()) ::
+          {:ok, User.t()} | {:error, term()}
+  def find_or_create_oauth_user(provider, provider_uid, user_info) do
+    provider_str = to_string(provider)
+    uid_str = to_string(provider_uid)
+    email = oauth_email(user_info)
+    name = oauth_string(user_info, "name")
+    avatar = oauth_string(user_info, "picture")
+
+    with {:ok, email} <- validate_oauth_email(email) do
+      Repo.transact(fn ->
+        case get_oauth_identity(provider_str, uid_str) do
+          %OAuthIdentity{user: user} ->
+            update_oauth_identity_metadata(provider_str, uid_str, user_info)
+            {:ok, user}
+
+          nil ->
+            matched_user =
+              if user_info["email_verified"] == true,
+                do: get_user_by_email(email),
+                else: nil
+
+            case matched_user do
+              %User{} = user ->
+                link_oauth_identity(user, provider_str, uid_str, email, name, avatar, user_info)
+
+              nil ->
+                create_user_with_oauth_identity(
+                  provider_str,
+                  uid_str,
+                  email,
+                  name,
+                  avatar,
+                  user_info
+                )
+            end
+        end
+      end)
+    end
+  end
+
+  @doc """
+  Lists all OAuth identities linked to a user, ordered by provider name.
+  """
+  @spec list_oauth_identities(User.t()) :: [OAuthIdentity.t()]
+  def list_oauth_identities(%User{id: user_id}) do
+    OAuthIdentity
+    |> where([i], i.user_id == ^user_id)
+    |> order_by([i], asc: i.provider)
+    |> Repo.all()
+  end
+
+  @doc """
+  Unlinks (deletes) an OAuth identity from a user by provider name.
+
+  Returns `{:ok, identity}` on success or `{:error, :not_found}` if the user
+  has no identity for the given provider.
+  """
+  @spec unlink_oauth_identity(User.t(), String.t()) ::
+          {:ok, OAuthIdentity.t()} | {:error, :not_found}
+  def unlink_oauth_identity(%User{} = user, provider) when is_binary(provider) do
+    OAuthIdentity
+    |> where([i], i.user_id == ^user.id and i.provider == ^provider)
+    |> Repo.one()
+    |> case do
+      nil -> {:error, :not_found}
+      identity -> Repo.delete(identity)
+    end
+  end
+
+  defp get_oauth_identity(provider, provider_uid) do
+    OAuthIdentity
+    |> where([i], i.provider == ^provider and i.provider_uid == ^provider_uid)
+    |> preload(:user)
+    |> Repo.one()
+  end
+
+  defp link_oauth_identity(user, provider, provider_uid, email, name, avatar, user_info) do
+    %OAuthIdentity{}
+    |> OAuthIdentity.changeset(%{
+      provider: provider,
+      provider_uid: provider_uid,
+      provider_email: email,
+      provider_name: name,
+      provider_avatar_url: avatar,
+      provider_data: user_info,
+      user_id: user.id
+    })
+    |> Repo.insert()
+    |> case do
+      {:ok, _identity} -> {:ok, user}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp create_user_with_oauth_identity(provider, provider_uid, email, name, avatar, user_info) do
+    with {:ok, user} <- create_user(%{email: email, name: name}) do
+      link_oauth_identity(user, provider, provider_uid, email, name, avatar, user_info)
+    end
+  end
+
+  defp update_oauth_identity_metadata(provider, provider_uid, user_info) do
+    OAuthIdentity
+    |> where([i], i.provider == ^provider and i.provider_uid == ^provider_uid)
+    |> Repo.one()
+    |> case do
+      nil ->
+        :ok
+
+      identity ->
+        identity
+        |> OAuthIdentity.changeset(%{provider_data: user_info})
+        |> Repo.update()
+    end
+  end
+
+  defp oauth_email(user_info) do
+    case user_info["email"] do
+      nil -> nil
+      raw -> raw |> to_string() |> String.downcase() |> String.trim()
+    end
+  end
+
+  defp oauth_string(user_info, key) when is_binary(key), do: user_info[key]
+
+  defp validate_oauth_email(nil), do: {:error, :missing_email}
+  defp validate_oauth_email(""), do: {:error, :missing_email}
+  defp validate_oauth_email(email), do: {:ok, email}
 end
