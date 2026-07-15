@@ -11,6 +11,13 @@ defmodule ControlKeelWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  # Membership gate for controller routes — the LiveAuth equivalent for
+  # LiveViews. Use via `pipe_through [:browser, :require_cloud_auth]` so
+  # LoadCurrentUser populates `current_membership` before the gate runs.
+  pipeline :require_cloud_auth do
+    plug ControlKeelWeb.Plugs.RequireCloudAuth
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
     plug ControlKeelWeb.Plugs.ApiAuth
@@ -80,6 +87,15 @@ defmodule ControlKeelWeb.Router do
     live_session :invitations,
       layout: {ControlKeelWeb.Layouts, :dashboard} do
       live "/cloud/invitations/:token", InvitationLive, :show
+    end
+
+    # First-run onboarding for OAuth users without an org/membership. Uses
+    # :load_if_available (not :require_cloud_auth) so a signed-in user with no
+    # membership can reach it without bouncing to /auth/login (Gap 2.1).
+    live_session :cloud_onboarding,
+      layout: {ControlKeelWeb.Layouts, :dashboard},
+      on_mount: [{ControlKeelWeb.LiveAuth, :load_if_available}] do
+      live "/cloud/onboarding", CloudOnboardingLive, :new
     end
 
     # Cloud-auth gated: in cloud/self_hosted mode requires active membership.
@@ -152,10 +168,13 @@ defmodule ControlKeelWeb.Router do
       live "/observability/sessions/:id/timeline", ObservabilityTimelineLive, :show
       live "/observability/sessions/:id", ObservabilityLive, :show
     end
+  end
 
-    # TODO: Auth-gate this route when OAuth/session auth is implemented (refactor/web-auth).
-    # Currently unprotected — the LiveView equivalents are gated via LiveAuth.require_cloud_auth
-    # but this controller GET has no equivalent plug. See Copilot review 2026-07-13.
+  # JSON export is gated by RequireCloudAuth (the controller equivalent of
+  # LiveAuth.require_cloud_auth). Closes Gap 2.5 — previously unprotected.
+  scope "/", ControlKeelWeb do
+    pipe_through [:browser, :require_cloud_auth]
+
     get "/observability/sessions/:id/export.json", ObservabilityController, :export_session
   end
 

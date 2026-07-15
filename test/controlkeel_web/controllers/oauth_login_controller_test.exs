@@ -1,6 +1,8 @@
 defmodule ControlKeelWeb.OAuthLoginControllerTest do
   use ControlKeelWeb.ConnCase, async: false
 
+  alias ControlKeel.Accounts
+
   defmodule FakeStrategy do
     @moduledoc false
     def authorize_url(_config) do
@@ -63,7 +65,7 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
   end
 
   describe "callback/2" do
-    test "establishes the session and redirects on success", %{conn: conn} do
+    test "establishes the user session and sends a brand-new user to onboarding", %{conn: conn} do
       put_oauth_env(google: [strategy: FakeStrategy, client_id: "id", client_secret: "secret"])
 
       conn =
@@ -75,11 +77,34 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
         |> get(~p"/auth/google/callback?code=abc&state=test-state")
 
       assert conn.status == 302
-      assert redirected_to(conn) == ~p"/cloud/projects"
+      assert redirected_to(conn) == ~p"/cloud/onboarding"
       assert get_session(conn, :current_user_id) != nil
       assert get_session(conn, :session_last_active) != nil
+      assert get_session(conn, :current_org_id) == nil
       assert get_session(conn, :oauth_session_params) == nil
       assert get_session(conn, :oauth_provider) == nil
+    end
+
+    test "sets org context and lands on projects for a returning user with a membership", %{
+      conn: conn
+    } do
+      put_oauth_env(google: [strategy: FakeStrategy, client_id: "id", client_secret: "secret"])
+
+      {:ok, user} = Accounts.create_user(%{email: "oauth-user@example.com", name: "Existing"})
+
+      {:ok, {org, _}} =
+        Accounts.create_org_with_owner(user, %{name: "Existing Org", slug: "existing-org"})
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{
+          oauth_provider: "google",
+          oauth_session_params: %{state: "test-state"}
+        })
+        |> get(~p"/auth/google/callback?code=abc&state=test-state")
+
+      assert redirected_to(conn) == ~p"/cloud/projects"
+      assert get_session(conn, :current_org_id) == org.id
     end
 
     test "clears oauth session and redirects to login on provider error", %{conn: conn} do

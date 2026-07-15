@@ -104,4 +104,30 @@ defmodule ControlKeel.Accounts.OAuthTest do
       assert {:error, :not_found} = Accounts.unlink_oauth_identity(user, "google")
     end
   end
+
+  describe "create_org_with_owner/2" do
+    test "creates an org with an active owner membership for the user" do
+      {:ok, user} = Accounts.create_user(%{email: "owner@example.com"})
+
+      assert {:ok, {org, membership}} =
+               Accounts.create_org_with_owner(user, %{name: "Acme", slug: "acme"})
+
+      assert org.name == "Acme"
+      assert org.slug == "acme"
+      assert membership.user_id == user.id
+      assert membership.org_id == org.id
+      assert membership.role == "owner"
+      assert membership.status == "active"
+      assert membership.accepted_at
+    end
+
+    test "rolls back when the org attrs are invalid" do
+      {:ok, user} = Accounts.create_user(%{email: "owner2@example.com"})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Accounts.create_org_with_owner(user, %{name: "No Slug"})
+
+      assert Accounts.list_memberships_for_user(user.id) == []
+    end
+  end
 end

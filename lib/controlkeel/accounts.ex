@@ -77,6 +77,36 @@ defmodule ControlKeel.Accounts do
     |> Repo.insert()
   end
 
+  @doc """
+  Creates an org and an active owner membership for the given user in one
+  transaction. Used by first-run onboarding so a brand-new OAuth user can
+  establish their personal org immediately.
+  """
+  @spec create_org_with_owner(User.t(), map()) ::
+          {:ok, {Org.t(), Membership.t()}} | {:error, term()}
+  def create_org_with_owner(%User{id: user_id}, attrs) do
+    Repo.transact(fn ->
+      with {:ok, org} <- create_org(attrs),
+           {:ok, membership} <- create_owner_membership(user_id, org.id) do
+        {:ok, {org, membership}}
+      end
+    end)
+  end
+
+  defp create_owner_membership(user_id, org_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    %Membership{}
+    |> Membership.changeset(%{
+      user_id: user_id,
+      org_id: org_id,
+      role: "owner",
+      status: "active",
+      accepted_at: now
+    })
+    |> Repo.insert()
+  end
+
   @spec get_org(integer()) :: Org.t() | nil
   def get_org(id), do: Repo.get(Org, id)
 

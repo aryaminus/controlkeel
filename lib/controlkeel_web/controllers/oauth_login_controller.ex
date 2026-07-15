@@ -8,9 +8,21 @@ defmodule ControlKeelWeb.OAuthLoginController do
        authorization code is exchanged, userinfo is fetched, the user is found
        or created, and the session is established.
 
-  Rate-limiting of the request endpoint should be handled at the reverse-proxy
-  layer (e.g. Cloudflare / nginx). No `current_org_id` is set during login —
-  org selection happens post-login.
+  ## Security
+
+    * **CSRF / state** — Assent generates a random opaque `state` value (and a
+      PKCE code verifier) per request, returned in `session_params`. We persist
+      it in `:oauth_session_params` inside the signed cookie session and pass it
+      back on callback; Assent verifies the state matches before accepting the
+      response, binding the callback to the originating request.
+
+    * **Rate-limiting** — the `/auth/:provider/request` endpoint should be
+      rate-limited at the reverse-proxy layer (e.g. Cloudflare / nginx) to
+      mitigate OAuth abuse and provider-driven redirect loops.
+
+  No `current_org_id` is set during login. Returning users get their org context
+  set and land on `/cloud/projects`; brand-new users redirect to
+  `/cloud/onboarding`.
   """
 
   use ControlKeelWeb, :controller
@@ -78,13 +90,30 @@ defmodule ControlKeelWeb.OAuthLoginController do
         |> clear_oauth_session()
         |> put_session(:current_user_id, user.id)
         |> put_session(:session_last_active, DateTime.utc_now() |> DateTime.to_iso8601())
-        |> put_flash(:info, "Signed in with #{String.capitalize(provider_name)}")
-        |> redirect(to: ~p"/cloud/projects")
+        |> redirect_after_login(user, provider_name)
 
       {:error, _reason} ->
         conn
         |> put_flash(:error, "Could not complete sign-in. Please contact support.")
         |> redirect(to: ~p"/auth/login")
+    end
+  end
+
+  # Returning user with an active membership → set org context and land on
+  # projects. Brand-new user with no membership → onboarding (avoids the
+  # /cloud/projects → /auth/login redirect loop, Gap 2.1).
+  defp redirect_after_login(conn, user, provider_name) do
+    case Accounts.list_memberships_for_user(user.id, status: "active") do
+      [%Accounts.Membership{org_id: org_id} | _] ->
+        conn
+        |> put_session(:current_org_id, org_id)
+        |> put_flash(:info, "Signed in with #{String.capitalize(provider_name)}")
+        |> redirect(to: ~p"/cloud/projects")
+
+      [] ->
+        conn
+        |> put_flash(:info, "Welcome! Let's set up your workspace.")
+        |> redirect(to: ~p"/cloud/onboarding")
     end
   end
 
