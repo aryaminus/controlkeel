@@ -37,6 +37,19 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
   conflict resolution, matching the existing ``findings``, ``reviews``,
   ``session_digests`` and ``memory_records`` schemas.
 
+  ## Backfill
+
+  Existing rows in the five new syncable tables get an ``external_id`` of
+  the form ``<prefix>legacy_<id>`` (e.g. ``inv_legacy_42``) so they remain
+  addressable by the sync engine.  Without this backfill, rows that existed
+  before the migration would be collected by ``collect_unsynced/2`` (which
+  filters on ``synced_at IS NULL``) but skipped on the cloud side
+  (``external_id`` is nil → ``missing_external_id``), then marked synced by
+  ``mark_synced/1`` — permanently losing them from cloud sync.  The
+  ``<prefix>legacy_`` form mirrors the ``ses_legacy_<id>`` backfill used
+  for ``sessions`` in migration ``20260528270000`` and avoids colliding
+  with newly-issued ULIDs (which use ``<prefix>`` + ULID).
+
   ## Unused tables
 
   ``policy_training_runs`` and ``policy_artifacts`` were created by an earlier
@@ -50,6 +63,8 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
     cleanup_orphaned_references()
     add_foreign_key_constraints()
     add_cloud_sync_columns()
+    backfill_external_ids()
+    create_cloud_sync_indexes()
     drop_unused_tables()
   end
 
@@ -58,6 +73,7 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
     # policy-training pipeline was never implemented and re-creating empty
     # tables adds no value.  Cloud-sync columns and FK constraints are
     # reversible.
+    drop_cloud_sync_indexes()
     remove_cloud_sync_columns()
     remove_foreign_key_constraints()
   end
@@ -442,7 +458,46 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
       add :external_id, :string
       add :synced_at, :utc_datetime
     end
+  end
 
+  defp backfill_external_ids do
+    # Existing rows predate the external_id column.  Stamp them with a
+    # legacy-prefixed id derived from the primary key so they are addressable
+    # by the sync engine.  Runs before the unique index is created so every
+    # row gets a value.  The ``<prefix>legacy_`` form cannot collide with
+    # newly-issued ``<prefix>`` + ULID ids.
+    execute("""
+    UPDATE invocations
+       SET external_id = 'inv_legacy_' || id
+     WHERE external_id IS NULL
+    """)
+
+    execute("""
+    UPDATE proof_bundles
+       SET external_id = 'pb_legacy_' || id
+     WHERE external_id IS NULL
+    """)
+
+    execute("""
+    UPDATE session_events
+       SET external_id = 'se_legacy_' || id
+     WHERE external_id IS NULL
+    """)
+
+    execute("""
+    UPDATE task_checkpoints
+       SET external_id = 'tc_legacy_' || id
+     WHERE external_id IS NULL
+    """)
+
+    execute("""
+    UPDATE rollback_snapshots
+       SET external_id = 'rs_legacy_' || id
+     WHERE external_id IS NULL
+    """)
+  end
+
+  defp create_cloud_sync_indexes do
     create unique_index(:invocations, [:external_id], where: "external_id IS NOT NULL")
     create unique_index(:proof_bundles, [:external_id], where: "external_id IS NOT NULL")
     create unique_index(:session_events, [:external_id], where: "external_id IS NOT NULL")
@@ -456,7 +511,7 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
     create index(:rollback_snapshots, [:synced_at])
   end
 
-  defp remove_cloud_sync_columns do
+  defp drop_cloud_sync_indexes do
     drop index(:rollback_snapshots, [:synced_at])
     drop index(:task_checkpoints, [:synced_at])
     drop index(:session_events, [:synced_at])
@@ -468,7 +523,9 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
     drop unique_index(:session_events, [:external_id])
     drop unique_index(:proof_bundles, [:external_id])
     drop unique_index(:invocations, [:external_id])
+  end
 
+  defp remove_cloud_sync_columns do
     alter table(:rollback_snapshots) do
       remove :synced_at
       remove :external_id

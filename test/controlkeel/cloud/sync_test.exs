@@ -656,4 +656,104 @@ defmodule ControlKeel.Cloud.SyncTest do
       assert Repo.get!(SessionEvent, ev.id).synced_at != nil
     end
   end
+
+  # ── Legacy backfill compatibility ────────────────────────────────────
+  #
+  # Simulates an upgrade from an older schema version: rows exist in the
+  # five new syncable tables with external_id stamped by the migration's
+  # backfill (``<prefix>legacy_<id>``) rather than by the changeset's
+  # maybe_generate_external_id.  These rows must still be collectable and
+  # serializable so historical data is not lost when an existing user
+  # upgrades and runs their first cloud sync.
+
+  describe "legacy backfill rows (pre-upgrade compatibility)" do
+    test "rows with legacy-prefixed external_id are collected and serialized" do
+      ws = workspace!("legacy")
+      s = session!(ws, "S1")
+      t = task!(s)
+
+      # Insert rows directly, bypassing the changeset's external_id
+      # generation, then stamp a legacy external_id the way the migration
+      # backfill does.  synced_at stays nil so collect_unsynced picks them up.
+      {:ok, inv} =
+        %Invocation{}
+        |> Invocation.changeset(%{
+          source: "legacy",
+          tool: "ck_route",
+          provider: "anthropic",
+          model: "claude-sonnet",
+          estimated_cost_cents: 10,
+          decision: "allow",
+          metadata: %{},
+          session_id: s.id,
+          task_id: t.id
+        })
+        |> Repo.insert()
+
+      inv = Repo.update!(Ecto.Changeset.change(inv, external_id: "inv_legacy_#{inv.id}"))
+
+      {:ok, ev} =
+        %SessionEvent{}
+        |> SessionEvent.changeset(%{
+          event_type: "tool_call",
+          actor: "agent",
+          summary: "legacy event",
+          body: "",
+          payload: %{},
+          metadata: %{},
+          session_id: s.id,
+          task_id: t.id
+        })
+        |> Repo.insert()
+
+      ev = Repo.update!(Ecto.Changeset.change(ev, external_id: "se_legacy_#{ev.id}"))
+
+      {:ok, cp} =
+        %TaskCheckpoint{}
+        |> TaskCheckpoint.changeset(%{
+          session_id: s.id,
+          task_id: t.id,
+          checkpoint_type: "resume",
+          summary: "legacy checkpoint",
+          payload: %{},
+          created_by: "system"
+        })
+        |> Repo.insert()
+
+      cp = Repo.update!(Ecto.Changeset.change(cp, external_id: "tc_legacy_#{cp.id}"))
+
+      {:ok, snap} =
+        %RollbackSnapshot{}
+        |> RollbackSnapshot.changeset(%{
+          session_id: s.id,
+          task_id: t.id,
+          commit_sha_before: "aaa",
+          commit_sha_after: "bbb",
+          status: "available",
+          rollback_method: "git_revert",
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      snap = Repo.update!(Ecto.Changeset.change(snap, external_id: "rs_legacy_#{snap.id}"))
+
+      result = Sync.collect_unsynced(ws.id)
+
+      # All four legacy rows are collected.
+      collected_ids = Enum.map(result.records, fn {_, r} -> r.id end)
+      assert inv.id in collected_ids
+      assert ev.id in collected_ids
+      assert cp.id in collected_ids
+      assert snap.id in collected_ids
+
+      # Each serializes to an envelope with a non-nil external_id — the
+      # cloud-side upsert would otherwise skip them (missing_external_id).
+      for {kind, record} <- result.records,
+          kind in ["invocation", "session_event", "task_checkpoint", "rollback_snapshot"] do
+        envelope = Sync.serialize_record({kind, record})
+        assert envelope["external_id"] != nil, "#{kind} external_id must not be nil"
+        assert String.starts_with?(envelope["external_id"], String.at(kind, 0))
+      end
+    end
+  end
 end
