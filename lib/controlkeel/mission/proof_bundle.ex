@@ -14,6 +14,9 @@ defmodule ControlKeel.Mission.ProofBundle do
     field :approved_findings_count, :integer, default: 0
     field :bundle, :map, default: %{}
     field :generated_at, :utc_datetime
+    field :external_id, :string
+    field :synced_at, :utc_datetime
+    field :lock_version, :integer, default: 1
 
     belongs_to :session, Session
     belongs_to :task, Task
@@ -34,7 +37,9 @@ defmodule ControlKeel.Mission.ProofBundle do
       :blocked_findings_count,
       :approved_findings_count,
       :bundle,
-      :generated_at
+      :generated_at,
+      :external_id,
+      :synced_at
     ])
     |> validate_required([
       :session_id,
@@ -56,5 +61,6 @@ defmodule ControlKeel.Mission.ProofBundle do
     |> unique_constraint([:task_id, :version])
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
+    |> unique_constraint(:external_id)
   end
 end

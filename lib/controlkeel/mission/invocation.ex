@@ -15,6 +15,9 @@ defmodule ControlKeel.Mission.Invocation do
     field :estimated_cost_cents, :integer, default: 0
     field :decision, :string
     field :metadata, :map, default: %{}
+    field :external_id, :string
+    field :synced_at, :utc_datetime
+    field :lock_version, :integer, default: 1
 
     belongs_to :session, Session
     belongs_to :task, Task
@@ -35,6 +38,8 @@ defmodule ControlKeel.Mission.Invocation do
       :estimated_cost_cents,
       :decision,
       :metadata,
+      :external_id,
+      :synced_at,
       :session_id,
       :task_id
     ])
@@ -52,5 +57,6 @@ defmodule ControlKeel.Mission.Invocation do
     |> validate_number(:estimated_cost_cents, greater_than_or_equal_to: 0)
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
+    |> unique_constraint(:external_id)
   end
 end

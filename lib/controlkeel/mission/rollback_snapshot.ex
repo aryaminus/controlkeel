@@ -16,6 +16,8 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
     field :rolled_back_at, :utc_datetime
     field :rolled_back_by, :string
     field :metadata, :map, default: %{}
+    field :external_id, :string
+    field :synced_at, :utc_datetime
 
     belongs_to :session, Session
     belongs_to :task, Task
@@ -37,12 +39,15 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
       :rolled_back_at,
       :rolled_back_by,
       :finding_id,
-      :metadata
+      :metadata,
+      :external_id,
+      :synced_at
     ])
     |> validate_required([:session_id, :task_id, :commit_sha_before, :status])
     |> validate_inclusion(:status, @valid_statuses)
     |> validate_inclusion(:rollback_method, @valid_methods)
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
+    |> unique_constraint(:external_id)
   end
 end

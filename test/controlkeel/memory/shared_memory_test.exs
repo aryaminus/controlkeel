@@ -5,12 +5,14 @@ defmodule ControlKeel.Memory.SharedMemoryTest do
   alias ControlKeel.Memory.Store.Sqlite
   alias ControlKeel.Repo
 
+  import ControlKeel.AccountsFixtures
   import ControlKeel.MissionFixtures
 
   setup do
-    ws1 = workspace_fixture()
-    ws2 = workspace_fixture()
-    {:ok, ws1: ws1, ws2: ws2}
+    org = org_fixture()
+    ws1 = workspace_fixture(%{org_id: org.id})
+    ws2 = workspace_fixture(%{org_id: org.id})
+    {:ok, ws1: ws1, ws2: ws2, org: org}
   end
 
   defp insert_record(attrs) do
@@ -43,32 +45,36 @@ defmodule ControlKeel.Memory.SharedMemoryTest do
   end
 
   describe "visibility: org" do
-    test "org-scoped search returns own workspace + org-shared records", %{ws1: ws1, ws2: ws2} do
-      org_id = ws1.org_id || 1
-
+    test "org-scoped search returns own workspace + org-shared records", %{
+      ws1: ws1,
+      ws2: ws2,
+      org: org
+    } do
       insert_record(%{workspace_id: ws1.id, title: "ws1 private", visibility: "workspace"})
 
       insert_record(%{
         workspace_id: ws2.id,
         title: "org shared note",
         visibility: "org",
-        shared_org_id: org_id
+        shared_org_id: org.id
       })
 
-      result = Sqlite.search("note", workspace_id: ws1.id, org_id: org_id, visibility: :org)
+      result = Sqlite.search("note", workspace_id: ws1.id, org_id: org.id, visibility: :org)
       titles = Enum.map(result.entries, & &1.title)
       assert "org shared note" in titles
     end
 
-    test "org record from different org is not returned", %{ws1: ws1, ws2: ws2} do
+    test "org record from different org is not returned", %{ws1: ws1, ws2: ws2, org: org} do
+      other_org = org_fixture()
+
       insert_record(%{
         workspace_id: ws2.id,
         title: "other org note",
         visibility: "org",
-        shared_org_id: 9999
+        shared_org_id: other_org.id
       })
 
-      result = Sqlite.search("note", workspace_id: ws1.id, org_id: 1, visibility: :org)
+      result = Sqlite.search("note", workspace_id: ws1.id, org_id: org.id, visibility: :org)
       titles = Enum.map(result.entries, & &1.title)
       refute "other org note" in titles
     end
@@ -98,11 +104,11 @@ defmodule ControlKeel.Memory.SharedMemoryTest do
       assert record.shared_org_id == nil
     end
 
-    test "persists org visibility and shared_org_id", %{ws1: ws1} do
-      record = insert_record(%{workspace_id: ws1.id, visibility: "org", shared_org_id: 42})
+    test "persists org visibility and shared_org_id", %{ws1: ws1, org: org} do
+      record = insert_record(%{workspace_id: ws1.id, visibility: "org", shared_org_id: org.id})
       reloaded = Repo.get!(Record, record.id)
       assert reloaded.visibility == "org"
-      assert reloaded.shared_org_id == 42
+      assert reloaded.shared_org_id == org.id
     end
   end
 end

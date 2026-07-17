@@ -2,6 +2,7 @@ defmodule ControlKeel.Memory.Record do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Cloud.Telemetry.Envelope
   alias ControlKeel.Memory.Embedding
   alias ControlKeel.Mission.{Session, Task, Workspace}
@@ -19,12 +20,12 @@ defmodule ControlKeel.Memory.Record do
     field :metadata, :map, default: %{}
     field :archived_at, :utc_datetime
     field :visibility, :string, default: "workspace"
-    field :shared_org_id, :integer
     field :synced_at, :utc_datetime
 
     belongs_to :workspace, Workspace
     belongs_to :session, Session
     belongs_to :task, Task
+    belongs_to :shared_org, Org, foreign_key: :shared_org_id
     has_many :embeddings, Embedding, foreign_key: :memory_record_id
 
     timestamps(type: :utc_datetime)
@@ -71,6 +72,7 @@ defmodule ControlKeel.Memory.Record do
     |> assoc_constraint(:workspace)
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
+    |> assoc_constraint(:shared_org)
   end
 
   defp validate_org_visibility_scope(changeset) do

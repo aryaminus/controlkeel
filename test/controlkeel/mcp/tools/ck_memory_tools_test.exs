@@ -4,6 +4,7 @@ defmodule ControlKeel.MCP.Tools.CkMemoryToolsTest do
   alias ControlKeel.MCP.Tools.{CkMemoryArchive, CkMemoryRecord, CkMemorySearch}
   alias ControlKeel.Project.Binding
 
+  import ControlKeel.AccountsFixtures
   import ControlKeel.MissionFixtures
 
   test "memory tools accept current session from bound project and enforce task ownership" do
@@ -137,6 +138,7 @@ defmodule ControlKeel.MCP.Tools.CkMemoryToolsTest do
   end
 
   test "ck_memory_record is source-id idempotent and accepts visibility controls" do
+    org = org_fixture()
     session = session_fixture()
 
     assert {:ok, first} =
@@ -148,7 +150,7 @@ defmodule ControlKeel.MCP.Tools.CkMemoryToolsTest do
                "source_type" => "human_review",
                "source_id" => "guidance-1",
                "visibility" => "org",
-               "shared_org_id" => 123
+               "shared_org_id" => org.id
              })
 
     assert {:ok, second} =
@@ -160,7 +162,7 @@ defmodule ControlKeel.MCP.Tools.CkMemoryToolsTest do
                "source_type" => "human_review",
                "source_id" => "guidance-1",
                "visibility" => "org",
-               "shared_org_id" => 123
+               "shared_org_id" => org.id
              })
 
     assert second["memory_id"] == first["memory_id"]
@@ -168,6 +170,6 @@ defmodule ControlKeel.MCP.Tools.CkMemoryToolsTest do
     record = ControlKeel.Memory.get_record!(first["memory_id"])
     assert record.title == "Updated org guidance"
     assert record.visibility == "org"
-    assert record.shared_org_id == 123
+    assert record.shared_org_id == org.id
   end
 end

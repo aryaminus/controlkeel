@@ -11,10 +11,11 @@ defmodule ControlKeel.Cloud.Mcp.ToolCall do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Mission.Workspace
+  alias ControlKeel.Platform.ServiceAccount
+
   @primary_key {:id, :id, autogenerate: true}
   schema "cloud_mcp_tool_calls" do
-    field :workspace_id, :integer
-    field :service_account_id, :integer
     field :resource, :string
     field :tool_name, :string
     field :outcome, :string
@@ -22,6 +23,9 @@ defmodule ControlKeel.Cloud.Mcp.ToolCall do
     field :scopes_granted, :string
     field :argument_keys, :string
     field :requested_at, :utc_datetime
+
+    belongs_to :workspace, Workspace
+    belongs_to :service_account, ServiceAccount
   end
 
   @required ~w(resource tool_name outcome requested_at)a
@@ -35,5 +39,7 @@ defmodule ControlKeel.Cloud.Mcp.ToolCall do
     )
     |> validate_required(@required)
     |> validate_inclusion(:outcome, @valid_outcomes)
+    |> assoc_constraint(:workspace)
+    |> assoc_constraint(:service_account)
   end
 end

@@ -9,6 +9,8 @@ defmodule ControlKeel.Mission.TaskCheckpoint do
     field :summary, :string
     field :payload, :map, default: %{}
     field :created_by, :string, default: "system"
+    field :external_id, :string
+    field :synced_at, :utc_datetime
 
     belongs_to :session, Session
     belongs_to :task, Task
@@ -18,7 +20,16 @@ defmodule ControlKeel.Mission.TaskCheckpoint do
 
   def changeset(task_checkpoint, attrs) do
     task_checkpoint
-    |> cast(attrs, [:session_id, :task_id, :checkpoint_type, :summary, :payload, :created_by])
+    |> cast(attrs, [
+      :session_id,
+      :task_id,
+      :checkpoint_type,
+      :summary,
+      :payload,
+      :created_by,
+      :external_id,
+      :synced_at
+    ])
     |> validate_required([
       :session_id,
       :task_id,
@@ -29,5 +40,6 @@ defmodule ControlKeel.Mission.TaskCheckpoint do
     ])
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
+    |> unique_constraint(:external_id)
   end
 end

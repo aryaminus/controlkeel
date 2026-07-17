@@ -11,6 +11,9 @@ defmodule ControlKeel.Mission.SessionEvent do
     field :body, :string, default: ""
     field :payload, :map, default: %{}
     field :metadata, :map, default: %{}
+    field :external_id, :string
+    field :synced_at, :utc_datetime
+    field :lock_version, :integer, default: 1
     field :review_id, :integer
     field :finding_id, :integer
 
@@ -29,6 +32,8 @@ defmodule ControlKeel.Mission.SessionEvent do
       :body,
       :payload,
       :metadata,
+      :external_id,
+      :synced_at,
       :review_id,
       :finding_id,
       :session_id,
@@ -44,5 +49,6 @@ defmodule ControlKeel.Mission.SessionEvent do
     ])
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
+    |> unique_constraint(:external_id)
   end
 end

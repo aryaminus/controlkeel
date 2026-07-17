@@ -1,6 +1,7 @@
 defmodule ControlKeel.MemoryTest do
   use ControlKeel.DataCase
 
+  import ControlKeel.AccountsFixtures
   import ControlKeel.MissionFixtures
 
   alias ControlKeel.Memory
@@ -96,6 +97,7 @@ defmodule ControlKeel.MemoryTest do
   end
 
   test "record/1 validates visibility and org sharing scope" do
+    org = org_fixture()
     session = session_fixture()
 
     base = %{
@@ -115,10 +117,10 @@ defmodule ControlKeel.MemoryTest do
     assert %{shared_org_id: ["can't be blank"]} = errors_on(changeset)
 
     assert {:ok, record} =
-             Memory.record(Map.merge(base, %{visibility: "org", shared_org_id: 42}))
+             Memory.record(Map.merge(base, %{visibility: "org", shared_org_id: org.id}))
 
     assert record.visibility == "org"
-    assert record.shared_org_id == 42
+    assert record.shared_org_id == org.id
   end
 
   test "archive_record/1 removes a memory hit from retrieval" do
