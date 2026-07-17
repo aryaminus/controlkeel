@@ -239,7 +239,6 @@ defmodule ControlKeel.Runtime.BoundedLoopCoordinatorTest do
         model: "gpt-5.6-sol",
         estimated_cost_cents: 0,
         decision: "allow",
-        metadata: %{"canonical_model_id" => "openai/gpt-5.6-sol"},
         session_id: session.id,
         task_id: task.id
       })

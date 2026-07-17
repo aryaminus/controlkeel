@@ -25,7 +25,6 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         model: "gpt-5.6-sol",
         estimated_cost_cents: 0,
         decision: "allow",
-        metadata: %{"canonical_model_id" => "openai/gpt-5.6-sol"},
         session_id: session.id,
         task_id: task.id
       })
@@ -257,28 +256,18 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
     assert message =~ "path:line"
   end
 
-  test "promotion packet rejects non-canonical worker model identity", context do
+  test "canonical model identity is derived from invocation schema fields", context do
     assert {:ok, _} = CkLoop.call(lasting_create_args(context))
 
-    {:ok, invocation} =
-      Mission.create_invocation(%{
-        source: "worker-agent",
-        tool: "bounded_loop_worker",
-        provider: "openai",
-        model: "gpt-5.6-sol",
-        estimated_cost_cents: 0,
-        decision: "allow",
-        metadata: %{"canonical_model_id" => "anthropic/gpt-5.6-sol"},
-        session_id: context.session.id,
-        task_id: context.task.id
-      })
+    args = lasting_record_args(context, 1, 0.9)
 
-    args =
-      lasting_record_args(context, 1, 0.9)
-      |> put_in(["promotion_packet", "worker_identity", "invocation_id"], invocation.id)
+    {:ok, _result} = CkLoop.call(args)
+    stop = stop_checkpoint(context)
+    packet = stop.payload["promotion_packet"]
 
-    assert {:error, {:invalid_arguments, message}} = CkLoop.call(args)
-    assert message =~ "matching provider"
+    assert packet["worker_identity"]["canonical_model_id"] == "openai/gpt-5.6-sol"
+    assert packet["worker_identity"]["provider"] == "openai"
+    assert packet["worker_identity"]["model"] == "gpt-5.6-sol"
   end
 
   test "promotion packet rejects citations beyond the current file", context do
@@ -389,8 +378,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
       %{
         "agent_id" => "independent-reviewer",
         "provider" => "openai",
-        "model" => "deployment-alias",
-        "canonical_model_id" => "openai/gpt-5.6-sol",
+        "model" => "gpt-5.6-sol",
         "personas" => ["maintainability", "security"]
       }
     ]
@@ -407,7 +395,6 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         "agent_id" => "independent-reviewer",
         "provider" => "anthropic",
         "model" => "claude-sonnet-4.6",
-        "canonical_model_id" => "anthropic/claude-sonnet-4.6",
         "personas" => ["maintainability"]
       }
     ]
@@ -430,8 +417,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
       %{
         "agent_id" => "independent-reviewer",
         "provider" => "openai",
-        "model" => "critical-review-alias",
-        "canonical_model_id" => "openai/gpt-5.6-sol",
+        "model" => "gpt-5.6-sol",
         "personas" => ["maintainability", "security"]
       }
     ]
@@ -454,7 +440,6 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         "agent_id" => "worker-agent",
         "provider" => "anthropic",
         "model" => "claude-sonnet-4.6",
-        "canonical_model_id" => "anthropic/claude-sonnet-4.6",
         "personas" => ["maintainability", "security"]
       }
     ]
@@ -660,7 +645,7 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
           model: reviewer["model"],
           estimated_cost_cents: 0,
           decision: "allow",
-          metadata: %{"canonical_model_id" => reviewer["canonical_model_id"]},
+          metadata: %{},
           session_id: context.session.id,
           task_id: context.task.id
         })
@@ -679,7 +664,6 @@ defmodule ControlKeel.MCP.Tools.CkLoopTest do
         "agent_id" => "independent-reviewer",
         "provider" => "anthropic",
         "model" => "claude-sonnet-4.6",
-        "canonical_model_id" => "anthropic/claude-sonnet-4.6",
         "personas" => ["maintainability", "security"]
       }
     ]

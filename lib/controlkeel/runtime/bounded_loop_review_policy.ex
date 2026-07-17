@@ -166,28 +166,20 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
         task_id: task_id,
         source: ^agent_id,
         provider: provider,
-        model: model,
-        metadata: metadata
+        model: model
       }
       when session_id == ids.session_id and task_id == ids.task_id and is_binary(provider) and
-             is_binary(model) ->
-        canonical_model_id = (metadata || %{})["canonical_model_id"]
+             provider != "" and is_binary(model) and model != "" ->
+        canonical_model_id = derive_canonical_model_id(provider, model)
 
-        with true <-
-               is_binary(canonical_model_id) ||
-                 {:error,
-                  {:invalid_arguments,
-                   "Invocation must contain trusted canonical_model_id metadata"}},
-             :ok <- canonical_model_id(provider, canonical_model_id) do
-          {:ok,
-           %{
-             "agent_id" => agent_id,
-             "invocation_id" => invocation_id,
-             "provider" => provider,
-             "model" => model,
-             "canonical_model_id" => canonical_model_id
-           }}
-        end
+        {:ok,
+         %{
+           "agent_id" => agent_id,
+           "invocation_id" => invocation_id,
+           "provider" => provider,
+           "model" => model,
+           "canonical_model_id" => canonical_model_id
+         }}
 
       _ ->
         {:error,
@@ -196,18 +188,13 @@ defmodule ControlKeel.Runtime.BoundedLoopReviewPolicy do
     end
   end
 
-  defp canonical_model_id(provider, model_id) do
-    normalized_provider = provider |> String.trim() |> String.downcase()
-
-    if model_id == String.downcase(String.trim(model_id)) and
-         String.starts_with?(model_id, normalized_provider <> "/") and
-         model_id != normalized_provider <> "/" do
-      :ok
-    else
-      {:error,
-       {:invalid_arguments,
-        "canonical_model_id must be a lowercase provider/model identifier matching provider"}}
-    end
+  # Derives the canonical model identity from the invocation's first-class
+  # schema fields (provider + model), never from free-form metadata. These
+  # fields are set by the CK runtime when recording invocations, not by the
+  # caller.
+  defp derive_canonical_model_id(provider, model) do
+    (normalize_model(provider) <> "/" <> normalize_model(model))
+    |> String.replace(~r/[^a-z0-9._\/-]/, "")
   end
 
   defp positive_integer(arguments, key) do
