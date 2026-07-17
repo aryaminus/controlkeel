@@ -3,7 +3,7 @@ defmodule ControlKeel.Mission.SessionEvent do
   import Ecto.Changeset
 
   alias ControlKeel.Cloud.Telemetry.Envelope
-  alias ControlKeel.Mission.{Session, Task}
+  alias ControlKeel.Mission.{Finding, Review, Session, Task}
 
   schema "session_events" do
     field :event_type, :string
@@ -14,11 +14,11 @@ defmodule ControlKeel.Mission.SessionEvent do
     field :metadata, :map, default: %{}
     field :external_id, :string
     field :synced_at, :utc_datetime
-    field :review_id, :integer
-    field :finding_id, :integer
 
     belongs_to :session, Session
     belongs_to :task, Task
+    belongs_to :review, Review
+    belongs_to :finding, Finding
 
     timestamps(type: :utc_datetime)
   end
@@ -52,6 +52,8 @@ defmodule ControlKeel.Mission.SessionEvent do
     |> maybe_generate_external_id()
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
+    |> assoc_constraint(:review)
+    |> assoc_constraint(:finding)
     |> unique_constraint(:external_id)
   end
 

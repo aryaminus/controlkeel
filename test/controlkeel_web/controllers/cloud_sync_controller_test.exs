@@ -185,5 +185,98 @@ defmodule ControlKeelWeb.CloudSyncControllerTest do
       refute encoded =~ "secret-token"
       refute encoded =~ "Bearer secret"
     end
+
+    test "returns all 9 append-only kinds including invocations, proof_bundles, session_events, task_checkpoints, and rollback_snapshots",
+         %{
+           conn: conn
+         } do
+      workspace = workspace_fixture()
+      session = session_fixture(%{workspace: workspace})
+      task = task_fixture(%{session: session})
+      enrollment = enroll_workspace!(workspace)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, invocation} =
+        Mission.create_invocation(%{
+          source: "test",
+          tool: "ck_route",
+          provider: "anthropic",
+          model: "claude-sonnet",
+          estimated_cost_cents: 50,
+          decision: "allow",
+          metadata: %{},
+          session_id: session.id,
+          task_id: task.id
+        })
+
+      {:ok, proof} = Mission.generate_proof_bundle(task.id)
+
+      {:ok, event} =
+        %ControlKeel.Mission.SessionEvent{}
+        |> ControlKeel.Mission.SessionEvent.changeset(%{
+          event_type: "tool_call",
+          actor: "agent",
+          summary: "called ck_route",
+          body: "",
+          payload: %{},
+          metadata: %{},
+          session_id: session.id,
+          task_id: task.id
+        })
+        |> Repo.insert()
+
+      {:ok, checkpoint} =
+        Mission.create_task_checkpoint(%{
+          session_id: session.id,
+          task_id: task.id,
+          checkpoint_type: "resume",
+          summary: "checkpoint",
+          payload: %{},
+          created_by: "test"
+        })
+
+      {:ok, snapshot} =
+        %ControlKeel.Mission.RollbackSnapshot{}
+        |> ControlKeel.Mission.RollbackSnapshot.changeset(%{
+          session_id: session.id,
+          task_id: task.id,
+          commit_sha_before: "abc123",
+          commit_sha_after: "def456",
+          status: "available",
+          rollback_method: "git_revert",
+          metadata: %{}
+        })
+        |> Repo.insert()
+
+      # Stamp synced_at so the pull query (synced_at > since) returns them.
+      Enum.each([invocation, proof, event, checkpoint, snapshot], fn record ->
+        record
+        |> Ecto.Changeset.change(%{synced_at: now})
+        |> Repo.update!()
+      end)
+
+      resp =
+        conn
+        |> authed(enrollment.token)
+        |> post("/cloud/v1/sync/pull", %{
+          "workspace_id" => enrollment.workspace_id,
+          "since" => DateTime.add(now, -60, :second) |> DateTime.to_iso8601()
+        })
+        |> json_response(200)
+
+      kinds = Enum.map(resp["records"], & &1["kind"])
+
+      for kind <-
+            ~w(invocation proof_bundle session_event task_checkpoint rollback_snapshot) do
+        assert kind in kinds, "expected #{kind} in pull response kinds: #{inspect(kinds)}"
+      end
+
+      external_ids = Enum.map(resp["records"], & &1["external_id"])
+      assert invocation.external_id in external_ids
+      assert proof.external_id in external_ids
+      assert event.external_id in external_ids
+      assert checkpoint.external_id in external_ids
+      assert snapshot.external_id in external_ids
+    end
   end
 end

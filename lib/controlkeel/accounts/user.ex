@@ -15,15 +15,15 @@ defmodule ControlKeel.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
 
-  alias ControlKeel.Accounts.Membership
+  alias ControlKeel.Accounts.{Membership, User}
 
   @primary_key {:id, :id, autogenerate: true}
   schema "users" do
     field :email, :string
     field :name, :string
     field :status, :string, default: "active"
-    field :created_by_user_id, :integer
 
+    belongs_to :created_by_user, User, foreign_key: :created_by_user_id
     has_many :memberships, Membership
     timestamps(type: :utc_datetime)
   end

@@ -10,7 +10,9 @@ defmodule ControlKeelWeb.CloudSyncController do
 
     * `POST /cloud/v1/sync/pull` — returns records for a workspace whose
       `synced_at` is newer than the requester's `since` timestamp. Covers all
-      four append-only kinds (finding, review, session_digest, memory_record).
+      append-only kinds listed in `Cloud.Sync.append_only_schemas/0`
+      (finding, review, session_digest, memory_record, invocation,
+      proof_bundle, session_event, task_checkpoint, rollback_snapshot).
 
   Auth is bearer-token, verified by `Cloud.AuthToken.verify/1`. The token's
   `workspace_id` (cloud string UUID) is resolved to a local
@@ -23,8 +25,6 @@ defmodule ControlKeelWeb.CloudSyncController do
   require Logger
 
   alias ControlKeel.Cloud.{AuthToken, Sync, Workspace.KeyRegistry}
-  alias ControlKeel.Mission.{Finding, Review, SessionDigest}
-  alias ControlKeel.Memory.Record, as: MemoryRecord
   alias ControlKeel.Repo
 
   plug :verify_sync_token when action in [:push, :pull]
@@ -151,23 +151,15 @@ defmodule ControlKeelWeb.CloudSyncController do
     if session_ids == [] do
       []
     else
-      Enum.flat_map(
-        [
-          {"finding", Finding},
-          {"review", Review},
-          {"session_digest", SessionDigest},
-          {"memory_record", MemoryRecord}
-        ],
-        fn {kind, schema} ->
-          schema
-          |> where([r], r.session_id in ^session_ids)
-          |> where([r], r.synced_at > ^since)
-          |> where([r], not is_nil(r.external_id))
-          |> limit(500)
-          |> Repo.all()
-          |> Enum.map(&Sync.serialize_record({kind, &1}))
-        end
-      )
+      Enum.flat_map(Sync.append_only_schemas(), fn {kind, schema} ->
+        schema
+        |> where([r], r.session_id in ^session_ids)
+        |> where([r], r.synced_at > ^since)
+        |> where([r], not is_nil(r.external_id))
+        |> limit(500)
+        |> Repo.all()
+        |> Enum.map(&Sync.serialize_record({kind, &1}))
+      end)
     end
   end
 

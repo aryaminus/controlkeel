@@ -36,10 +36,10 @@ defmodule ControlKeel.Accounts.Membership do
     field :invitation_token_hash, :string
     field :invited_at, :utc_datetime
     field :accepted_at, :utc_datetime
-    field :invited_by_user_id, :integer
 
     belongs_to :user, User
     belongs_to :org, Org
+    belongs_to :invited_by_user, User, foreign_key: :invited_by_user_id
     belongs_to :mission_workspace, ControlKeel.Mission.Workspace
     timestamps(type: :utc_datetime)
   end
@@ -65,6 +65,7 @@ defmodule ControlKeel.Accounts.Membership do
     |> validate_inclusion(:status, @valid_statuses)
     |> assoc_constraint(:user)
     |> assoc_constraint(:org)
+    |> assoc_constraint(:invited_by_user)
     |> unique_constraint([:user_id, :org_id], name: :memberships_user_id_org_id_index)
     |> unique_constraint(:invitation_token_hash)
   end

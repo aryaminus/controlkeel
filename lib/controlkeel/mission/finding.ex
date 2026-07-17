@@ -3,7 +3,7 @@ defmodule ControlKeel.Mission.Finding do
   import Ecto.Changeset
 
   alias ControlKeel.Cloud.Telemetry.Envelope
-  alias ControlKeel.Mission.Session
+  alias ControlKeel.Mission.{Finding, Session}
 
   schema "findings" do
     field :external_id, :string
@@ -16,10 +16,10 @@ defmodule ControlKeel.Mission.Finding do
     field :auto_resolved, :boolean, default: false
     field :metadata, :map, default: %{}
     field :synced_at, :utc_datetime
-    field :extends_finding_id, :integer
-    field :contradicts_finding_id, :integer
 
     belongs_to :session, Session
+    belongs_to :extends_finding, Finding
+    belongs_to :contradicts_finding, Finding
 
     timestamps(type: :utc_datetime)
   end
@@ -57,6 +57,8 @@ defmodule ControlKeel.Mission.Finding do
     |> maybe_generate_external_id()
     |> unique_constraint(:external_id)
     |> assoc_constraint(:session)
+    |> assoc_constraint(:extends_finding)
+    |> assoc_constraint(:contradicts_finding)
   end
 
   @doc """

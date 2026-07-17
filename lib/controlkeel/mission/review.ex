@@ -2,6 +2,7 @@ defmodule ControlKeel.Mission.Review do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Accounts.User
   alias ControlKeel.Cloud.Telemetry.Envelope
   alias ControlKeel.Mission.{Review, Session, Task}
 
@@ -22,15 +23,15 @@ defmodule ControlKeel.Mission.Review do
     field :responded_at, :utc_datetime
     field :synced_at, :utc_datetime
 
-    field :assigned_user_id, :integer
-    field :assigned_by_user_id, :integer
     field :assigned_at, :utc_datetime
-    field :decided_by_user_id, :integer
     field :required_role, :string
 
     belongs_to :session, Session
     belongs_to :task, Task
     belongs_to :previous_review, Review
+    belongs_to :assigned_user, User, foreign_key: :assigned_user_id
+    belongs_to :assigned_by_user, User, foreign_key: :assigned_by_user_id
+    belongs_to :decided_by_user, User, foreign_key: :decided_by_user_id
     has_many :revisions, Review, foreign_key: :previous_review_id
 
     timestamps(type: :utc_datetime)
@@ -70,6 +71,9 @@ defmodule ControlKeel.Mission.Review do
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
     |> assoc_constraint(:previous_review)
+    |> assoc_constraint(:assigned_user)
+    |> assoc_constraint(:assigned_by_user)
+    |> assoc_constraint(:decided_by_user)
   end
 
   @doc """

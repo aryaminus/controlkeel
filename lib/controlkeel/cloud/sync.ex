@@ -410,7 +410,14 @@ defmodule ControlKeel.Cloud.Sync do
 
   # ── Schema registry ────────────────────────────────────────────────
 
-  defp append_only_schemas do
+  @doc """
+  Append-only syncable schemas (immutable historical records).
+
+  Public so the cloud-side pull endpoint (`CloudSyncController.collect_since/2`)
+  and `collect_unsynced/2` share a single source of truth — adding a new
+  append-only kind here automatically wires both push and pull.
+  """
+  def append_only_schemas do
     [
       {"finding", ControlKeel.Mission.Finding},
       {"review", ControlKeel.Mission.Review},
