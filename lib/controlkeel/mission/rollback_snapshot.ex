@@ -13,7 +13,6 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
     field :commit_sha_after, :string
     field :status, :string, default: "available"
     field :rollback_method, :string, default: "git_revert"
-    field :safety_check, :map, default: %{}
     field :rolled_back_at, :utc_datetime
     field :rolled_back_by, :string
     field :metadata, :map, default: %{}
@@ -38,7 +37,6 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
       :commit_sha_after,
       :status,
       :rollback_method,
-      :safety_check,
       :rolled_back_at,
       :rolled_back_by,
       :finding_id,
@@ -56,9 +54,9 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
   end
 
   @doc """
-  Allowlist of fields safe to ship via cloud sync. `safety_check` and
-  `metadata` pass through the redactor because they can contain diff content
-  or commit messages with embedded tokens.
+  Allowlist of fields safe to ship via cloud sync. `metadata` passes through
+  the redactor because it can contain diff content or commit messages with
+  embedded tokens.
   """
   def sync_fields do
     {:include,
@@ -72,7 +70,6 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
        :commit_sha_after,
        :status,
        :rollback_method,
-       {:redact, :safety_check},
        :rolled_back_at,
        :rolled_back_by,
        {:redact, :metadata},
