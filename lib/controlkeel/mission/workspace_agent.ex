@@ -2,6 +2,7 @@ defmodule ControlKeel.Mission.WorkspaceAgent do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Accounts.User
   alias ControlKeel.Mission.Workspace
 
   @valid_roles ~w(primary specialized ephemeral)
@@ -21,13 +22,13 @@ defmodule ControlKeel.Mission.WorkspaceAgent do
     field :budget_cents, :integer, default: 0
     field :spent_cents, :integer, default: 0
     field :policy_overrides, :map, default: %{}
-    field :maintainer_id, :integer
     field :sessions_count, :integer, default: 0
     field :last_active_at, :utc_datetime
     field :metadata, :map, default: %{}
     field :lock_version, :integer, default: 1
 
     belongs_to :workspace, Workspace
+    belongs_to :maintainer, User, foreign_key: :maintainer_id
 
     timestamps(type: :utc_datetime)
   end
@@ -58,6 +59,7 @@ defmodule ControlKeel.Mission.WorkspaceAgent do
     |> unique_constraint(:external_id)
     |> unique_constraint(:workspace_id, name: :workspace_agents_primary_unique)
     |> assoc_constraint(:workspace)
+    |> assoc_constraint(:maintainer)
     |> maybe_generate_external_id()
   end
 

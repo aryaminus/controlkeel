@@ -8,21 +8,34 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
   Several columns were created as plain integers (or had ``belongs_to``
   associations in their Ecto schemas) without a database-level FK constraint:
 
-    * ``workspace_keys.org_id``               → ``orgs.id``
-    * ``memory_records.shared_org_id``         → ``orgs.id``
-    * ``cloud_mcp_tool_calls.workspace_id``    → ``workspaces.id``
+    * ``workspace_keys.org_id``                  → ``orgs.id``
+    * ``memory_records.shared_org_id``            → ``orgs.id``
+    * ``cloud_mcp_tool_calls.workspace_id``       → ``workspaces.id``
     * ``cloud_mcp_tool_calls.service_account_id`` → ``service_accounts.id``
+    * ``workspace_agents.maintainer_id``          → ``users.id``
 
   On Postgres we add the constraints with ``ALTER TABLE … ADD CONSTRAINT``.
   On SQLite we recreate the tables (SQLite cannot add FKs to existing tables)
   following the same recreation pattern used by earlier migrations.
 
+  ## Orphan cleanup
+
+  Older database versions may contain rows whose ``*_id`` columns reference
+  non-existent parent rows (the FK was not enforced when the row was
+  written).  Before adding the FK constraints we NULL out every orphaned
+  reference so the constraint addition succeeds on both adapters and the
+  migration is safe for local-to-cloud upgrades from older schema versions.
+
   ## Cloud sync columns
 
-  ``external_id``, ``synced_at`` and (where applicable) ``lock_version`` are
-  added to ``invocations``, ``proof_bundles``, ``session_events``,
-  ``task_checkpoints`` and ``rollback_snapshots`` so that local-to-cloud
-  migration works for older, current and new database versions.
+  ``external_id`` and ``synced_at`` are added to ``invocations``,
+  ``proof_bundles``, ``session_events``, ``task_checkpoints`` and
+  ``rollback_snapshots`` so that local-to-cloud migration works for older,
+  current and new database versions.  All five are append-only event records
+  (immutable historical logs), so they do not need ``lock_version`` — the
+  sync engine's append-only path uses ``updated_at`` comparison for
+  conflict resolution, matching the existing ``findings``, ``reviews``,
+  ``session_digests`` and ``memory_records`` schemas.
 
   ## Unused tables
 
@@ -34,6 +47,7 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
   use Ecto.Migration
 
   def up do
+    cleanup_orphaned_references()
     add_foreign_key_constraints()
     add_cloud_sync_columns()
     drop_unused_tables()
@@ -48,6 +62,49 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
     remove_foreign_key_constraints()
   end
 
+  # ---------------------------------------------------- Orphan cleanup
+
+  defp cleanup_orphaned_references do
+    # Older databases were written before FK enforcement existed for these
+    # columns, so they may contain references to deleted parent rows.  NULL
+    # them out before adding the constraints so the migration never fails on
+    # dirty data from an older schema version.
+    execute("""
+    UPDATE memory_records
+    SET shared_org_id = NULL
+    WHERE shared_org_id IS NOT NULL
+      AND shared_org_id NOT IN (SELECT id FROM orgs)
+    """)
+
+    execute("""
+    UPDATE workspace_keys
+    SET org_id = NULL
+    WHERE org_id IS NOT NULL
+      AND org_id NOT IN (SELECT id FROM orgs)
+    """)
+
+    execute("""
+    UPDATE cloud_mcp_tool_calls
+    SET workspace_id = NULL
+    WHERE workspace_id IS NOT NULL
+      AND workspace_id NOT IN (SELECT id FROM workspaces)
+    """)
+
+    execute("""
+    UPDATE cloud_mcp_tool_calls
+    SET service_account_id = NULL
+    WHERE service_account_id IS NOT NULL
+      AND service_account_id NOT IN (SELECT id FROM service_accounts)
+    """)
+
+    execute("""
+    UPDATE workspace_agents
+    SET maintainer_id = NULL
+    WHERE maintainer_id IS NOT NULL
+      AND maintainer_id NOT IN (SELECT id FROM users)
+    """)
+  end
+
   # ------------------------------------------------------------------ FKs
 
   defp add_foreign_key_constraints do
@@ -55,6 +112,7 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
       recreate_workspace_keys_with_fks()
       recreate_memory_records_with_fks()
       recreate_cloud_mcp_tool_calls_with_fks()
+      recreate_workspace_agents_with_fks()
     else
       execute(
         "ALTER TABLE workspace_keys " <>
@@ -79,6 +137,12 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
           "ADD CONSTRAINT cloud_mcp_tool_calls_service_account_id_fkey " <>
           "FOREIGN KEY (service_account_id) REFERENCES service_accounts(id) ON DELETE SET NULL"
       )
+
+      execute(
+        "ALTER TABLE workspace_agents " <>
+          "ADD CONSTRAINT workspace_agents_maintainer_id_fkey " <>
+          "FOREIGN KEY (maintainer_id) REFERENCES users(id) ON DELETE SET NULL"
+      )
     end
   end
 
@@ -89,6 +153,10 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
       # table recreation on rollback — the constraints are harmless to keep.
       :ok
     else
+      execute(
+        "ALTER TABLE workspace_agents DROP CONSTRAINT IF EXISTS workspace_agents_maintainer_id_fkey"
+      )
+
       execute(
         "ALTER TABLE cloud_mcp_tool_calls DROP CONSTRAINT IF EXISTS cloud_mcp_tool_calls_service_account_id_fkey"
       )
@@ -294,25 +362,75 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
     create index(:cloud_mcp_tool_calls, [:outcome, :requested_at])
   end
 
+  defp recreate_workspace_agents_with_fks do
+    # Column order matches the live table after all prior ALTER ADD COLUMN
+    # migrations (external_id, lock_version) have run.
+    execute("""
+    CREATE TABLE workspace_agents_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      external_id TEXT,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'specialized',
+      agent_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      scope TEXT NOT NULL DEFAULT '{}',
+      budget_cents INTEGER DEFAULT 0,
+      spent_cents INTEGER DEFAULT 0,
+      policy_overrides TEXT NOT NULL DEFAULT '{}',
+      maintainer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      sessions_count INTEGER DEFAULT 0,
+      last_active_at DATETIME,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      lock_version INTEGER NOT NULL DEFAULT 1,
+      inserted_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL
+    )
+    """)
+
+    execute("""
+    INSERT INTO workspace_agents_new (
+      id, workspace_id, external_id, name, role, agent_type, status, scope,
+      budget_cents, spent_cents, policy_overrides, maintainer_id,
+      sessions_count, last_active_at, metadata, lock_version,
+      inserted_at, updated_at
+    )
+    SELECT
+      id, workspace_id, external_id, name, role, agent_type, status, scope,
+      budget_cents, spent_cents, policy_overrides, maintainer_id,
+      sessions_count, last_active_at, metadata, lock_version,
+      inserted_at, updated_at
+    FROM workspace_agents
+    """)
+
+    execute("DROP TABLE workspace_agents")
+    execute("ALTER TABLE workspace_agents_new RENAME TO workspace_agents")
+
+    create index(:workspace_agents, [:workspace_id])
+    create unique_index(:workspace_agents, [:external_id])
+
+    create unique_index(:workspace_agents, [:workspace_id],
+             where: "role = 'primary' AND status != 'retired'",
+             name: :workspace_agents_primary_unique
+           )
+  end
+
   # ------------------------------------------------------- Cloud sync cols
 
   defp add_cloud_sync_columns do
     alter table(:invocations) do
       add :external_id, :string
       add :synced_at, :utc_datetime
-      add :lock_version, :integer, default: 1, null: false
     end
 
     alter table(:proof_bundles) do
       add :external_id, :string
       add :synced_at, :utc_datetime
-      add :lock_version, :integer, default: 1, null: false
     end
 
     alter table(:session_events) do
       add :external_id, :string
       add :synced_at, :utc_datetime
-      add :lock_version, :integer, default: 1, null: false
     end
 
     alter table(:task_checkpoints) do
@@ -362,19 +480,16 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
     end
 
     alter table(:session_events) do
-      remove :lock_version
       remove :synced_at
       remove :external_id
     end
 
     alter table(:proof_bundles) do
-      remove :lock_version
       remove :synced_at
       remove :external_id
     end
 
     alter table(:invocations) do
-      remove :lock_version
       remove :synced_at
       remove :external_id
     end

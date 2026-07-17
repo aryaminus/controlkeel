@@ -415,7 +415,12 @@ defmodule ControlKeel.Cloud.Sync do
       {"finding", ControlKeel.Mission.Finding},
       {"review", ControlKeel.Mission.Review},
       {"session_digest", ControlKeel.Mission.SessionDigest},
-      {"memory_record", ControlKeel.Memory.Record}
+      {"memory_record", ControlKeel.Memory.Record},
+      {"invocation", ControlKeel.Mission.Invocation},
+      {"proof_bundle", ControlKeel.Mission.ProofBundle},
+      {"session_event", ControlKeel.Mission.SessionEvent},
+      {"task_checkpoint", ControlKeel.Mission.TaskCheckpoint},
+      {"rollback_snapshot", ControlKeel.Mission.RollbackSnapshot}
     ]
   end
 

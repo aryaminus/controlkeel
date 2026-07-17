@@ -8,7 +8,7 @@ defmodule ControlKeel.AccountsFixtures do
       attrs
       |> Enum.into(%{
         name: "Test Org",
-        slug: "test-org-#{:rand.uniform(1_000_000)}",
+        slug: "test-org-#{System.unique_integer([:positive])}",
         status: "active"
       })
       |> Accounts.create_org()
@@ -20,7 +20,7 @@ defmodule ControlKeel.AccountsFixtures do
     {:ok, user} =
       attrs
       |> Enum.into(%{
-        email: "user-#{:rand.uniform(1_000_000)}@example.com",
+        email: "user-#{System.unique_integer([:positive])}@example.com",
         name: "Test User",
         status: "active"
       })

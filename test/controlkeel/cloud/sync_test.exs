@@ -3,12 +3,13 @@ defmodule ControlKeel.Cloud.SyncTest do
 
   alias ControlKeel.Cloud.Sync
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.{Invocation, RollbackSnapshot, SessionEvent, TaskCheckpoint}
 
   defp workspace!(seed) do
     {:ok, ws} =
       Mission.create_workspace(%{
         name: "Sync-#{seed}",
-        slug: "sync-#{seed}-#{:rand.uniform(99_999)}",
+        slug: "sync-#{seed}-#{System.unique_integer([:positive])}",
         industry: "software",
         agent: "claude-code",
         budget_cents: 10_000,
@@ -47,6 +48,87 @@ defmodule ControlKeel.Cloud.SyncTest do
       })
 
     f
+  end
+
+  defp task!(session, title \\ "sync task") do
+    {:ok, t} =
+      Mission.create_task(%{
+        session_id: session.id,
+        title: title,
+        status: "queued",
+        position: 1,
+        estimated_cost_cents: 10,
+        metadata: %{},
+        validation_gate: "approved"
+      })
+
+    t
+  end
+
+  defp invocation!(session, task) do
+    {:ok, inv} =
+      Mission.create_invocation(%{
+        source: "test",
+        tool: "ck_route",
+        provider: "anthropic",
+        model: "claude-sonnet",
+        estimated_cost_cents: 50,
+        decision: "allow",
+        metadata: %{"trace" => "x"},
+        session_id: session.id,
+        task_id: task.id
+      })
+
+    inv
+  end
+
+  defp session_event!(session, task) do
+    {:ok, ev} =
+      %SessionEvent{}
+      |> SessionEvent.changeset(%{
+        event_type: "tool_call",
+        actor: "agent",
+        summary: "called ck_route",
+        body: "tool output",
+        payload: %{"tool" => "ck_route"},
+        metadata: %{},
+        session_id: session.id,
+        task_id: task.id
+      })
+      |> Repo.insert()
+
+    ev
+  end
+
+  defp task_checkpoint!(session, task) do
+    {:ok, cp} =
+      Mission.create_task_checkpoint(%{
+        session_id: session.id,
+        task_id: task.id,
+        checkpoint_type: "resume",
+        summary: "checkpoint",
+        payload: %{"step" => 1},
+        created_by: "test"
+      })
+
+    cp
+  end
+
+  defp rollback_snapshot!(session, task) do
+    {:ok, snap} =
+      %RollbackSnapshot{}
+      |> RollbackSnapshot.changeset(%{
+        session_id: session.id,
+        task_id: task.id,
+        commit_sha_before: "abc123",
+        commit_sha_after: "def456",
+        status: "available",
+        rollback_method: "git_revert",
+        metadata: %{}
+      })
+      |> Repo.insert()
+
+    snap
   end
 
   describe "collect_unsynced/2" do
@@ -270,6 +352,308 @@ defmodule ControlKeel.Cloud.SyncTest do
 
       refreshed = Repo.get!(ControlKeel.Mission.Finding, f.id)
       assert refreshed.synced_at != nil
+    end
+  end
+
+  # ── Newly-wired append-only schemas ──────────────────────────────────
+
+  describe "append-only schema registry" do
+    test "invocations, proof_bundles, session_events, task_checkpoints, and rollback_snapshots are syncable" do
+      kinds =
+        Sync.syncable_schemas()
+        |> Enum.map(fn {k, _} -> k end)
+
+      for k <- [
+            "invocation",
+            "proof_bundle",
+            "session_event",
+            "task_checkpoint",
+            "rollback_snapshot"
+          ] do
+        assert k in kinds
+      end
+    end
+
+    test "all five behave as append-only (lock_version in payload is ignored)" do
+      ws = workspace!("append-only")
+      s = session!(ws, "S1")
+      t = task!(s)
+      inv = invocation!(s, t)
+
+      # An editable record with a higher lock_version would be accepted as an
+      # update.  An append-only record without a newer updated_at is no_change
+      # regardless of lock_version.
+      envelope =
+        Sync.serialize_record({"invocation", inv})
+        |> Map.update!("payload", &Map.put(&1, "lock_version", 999))
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.no_change == 1
+      assert result.updated == 0
+    end
+  end
+
+  describe "collect_unsynced/2 — newly-wired schemas" do
+    test "collects unsynced invocations" do
+      ws = workspace!("inv-collect")
+      s = session!(ws, "S1")
+      t = task!(s)
+      inv = invocation!(s, t)
+
+      result = Sync.collect_unsynced(ws.id)
+      {kind, record} = Enum.find(result.records, fn {k, _} -> k == "invocation" end)
+      assert kind == "invocation"
+      assert record.id == inv.id
+      assert String.starts_with?(record.external_id, "inv_")
+    end
+
+    test "collects unsynced session_events" do
+      ws = workspace!("se-collect")
+      s = session!(ws, "S1")
+      t = task!(s)
+      ev = session_event!(s, t)
+
+      result = Sync.collect_unsynced(ws.id)
+
+      {kind, record} =
+        Enum.find(result.records, fn {k, r} -> k == "session_event" and r.id == ev.id end)
+
+      assert kind == "session_event"
+      assert record.id == ev.id
+      assert String.starts_with?(record.external_id, "se_")
+    end
+
+    test "collects unsynced task_checkpoints" do
+      ws = workspace!("tc-collect")
+      s = session!(ws, "S1")
+      t = task!(s)
+      cp = task_checkpoint!(s, t)
+
+      result = Sync.collect_unsynced(ws.id)
+      {kind, record} = Enum.find(result.records, fn {k, _} -> k == "task_checkpoint" end)
+      assert kind == "task_checkpoint"
+      assert record.id == cp.id
+      assert String.starts_with?(record.external_id, "tc_")
+    end
+
+    test "collects unsynced rollback_snapshots" do
+      ws = workspace!("rs-collect")
+      s = session!(ws, "S1")
+      t = task!(s)
+      snap = rollback_snapshot!(s, t)
+
+      result = Sync.collect_unsynced(ws.id)
+      {kind, record} = Enum.find(result.records, fn {k, _} -> k == "rollback_snapshot" end)
+      assert kind == "rollback_snapshot"
+      assert record.id == snap.id
+      assert String.starts_with?(record.external_id, "rs_")
+    end
+
+    test "collects unsynced proof_bundles" do
+      ws = workspace!("pb-collect")
+      s = session!(ws, "S1")
+      t = task!(s, "proof task")
+      {:ok, proof} = Mission.generate_proof_bundle(t.id)
+
+      result = Sync.collect_unsynced(ws.id)
+      {kind, record} = Enum.find(result.records, fn {k, _} -> k == "proof_bundle" end)
+      assert kind == "proof_bundle"
+      assert record.id == proof.id
+      assert String.starts_with?(record.external_id, "pb_")
+    end
+  end
+
+  describe "serialize_record/1 — newly-wired schemas" do
+    test "serializes an invocation with redacted metadata" do
+      ws = workspace!("inv-ser")
+      s = session!(ws, "S1")
+      t = task!(s)
+
+      {:ok, inv} =
+        Mission.create_invocation(%{
+          source: "test",
+          tool: "ck_route",
+          provider: "anthropic",
+          model: "claude-sonnet",
+          estimated_cost_cents: 50,
+          decision: "allow",
+          metadata: %{"api_key" => "sk-ant-test-key-1234567890abcdef"},
+          session_id: s.id,
+          task_id: t.id
+        })
+
+      envelope = Sync.serialize_record({"invocation", inv})
+
+      assert envelope["kind"] == "invocation"
+      assert envelope["external_id"] == inv.external_id
+      # The redactor scrubs sk-ant-* patterns in {:redact, :metadata} fields.
+      assert envelope["payload"]["metadata"]["api_key"] == "[REDACTED:sk-ant]"
+      assert envelope["refs"]["session_external_id"] == s.external_id
+    end
+
+    test "serializes a session_event with redacted body" do
+      ws = workspace!("se-ser")
+      s = session!(ws, "S1")
+      t = task!(s)
+
+      {:ok, ev} =
+        %SessionEvent{}
+        |> SessionEvent.changeset(%{
+          event_type: "tool_call",
+          actor: "agent",
+          summary: "called ck_route",
+          body: "Authorization: Bearer sk-ant-leaked-key-1234567890",
+          payload: %{"tool" => "ck_route"},
+          metadata: %{},
+          session_id: s.id,
+          task_id: t.id
+        })
+        |> Repo.insert()
+
+      envelope = Sync.serialize_record({"session_event", ev})
+
+      assert envelope["kind"] == "session_event"
+      # The redactor scrubs Authorization/Bearer patterns in {:redact, :body}.
+      assert String.contains?(envelope["payload"]["body"], "[REDACTED]")
+      refute String.contains?(envelope["payload"]["body"], "sk-ant-leaked-key")
+    end
+  end
+
+  describe "upsert_batch/1 — newly-wired schemas" do
+    test "inserts a new invocation from cloud" do
+      ws = workspace!("inv-upsert")
+      s = session!(ws, "S1")
+      t = task!(s)
+
+      envelope = %{
+        "external_id" => "inv_CLOUD_#{System.unique_integer([:positive])}",
+        "kind" => "invocation",
+        "payload" => %{
+          "source" => "cloud",
+          "tool" => "ck_validate",
+          "provider" => "openai",
+          "model" => "gpt-4",
+          "estimated_cost_cents" => 30,
+          "decision" => "allow",
+          "metadata" => %{},
+          "session_id" => s.id,
+          "task_id" => t.id
+        }
+      }
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.inserted == 1
+
+      imported = Repo.get_by!(Invocation, external_id: envelope["external_id"])
+      assert imported.tool == "ck_validate"
+    end
+
+    test "inserts a new session_event from cloud via session_external_id ref" do
+      ws = workspace!("se-upsert")
+      s = session!(ws, "S1")
+
+      envelope = %{
+        "external_id" => "se_CLOUD_#{System.unique_integer([:positive])}",
+        "kind" => "session_event",
+        "refs" => %{"session_external_id" => s.external_id},
+        "payload" => %{
+          "event_type" => "decision",
+          "actor" => "cloud",
+          "summary" => "cloud decision",
+          "body" => "",
+          "payload" => %{},
+          "metadata" => %{},
+          "session_id" => 999_999
+        }
+      }
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.inserted == 1
+
+      imported = Repo.get_by!(SessionEvent, external_id: envelope["external_id"])
+      assert imported.session_id == s.id
+    end
+
+    test "inserts a new task_checkpoint from cloud" do
+      ws = workspace!("tc-upsert")
+      s = session!(ws, "S1")
+      t = task!(s)
+
+      envelope = %{
+        "external_id" => "tc_CLOUD_#{System.unique_integer([:positive])}",
+        "kind" => "task_checkpoint",
+        "payload" => %{
+          "session_id" => s.id,
+          "task_id" => t.id,
+          "checkpoint_type" => "resume",
+          "summary" => "cloud checkpoint",
+          "payload" => %{},
+          "created_by" => "cloud"
+        }
+      }
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.inserted == 1
+
+      imported = Repo.get_by!(TaskCheckpoint, external_id: envelope["external_id"])
+      assert imported.summary == "cloud checkpoint"
+    end
+
+    test "inserts a new rollback_snapshot from cloud" do
+      ws = workspace!("rs-upsert")
+      s = session!(ws, "S1")
+      t = task!(s)
+
+      envelope = %{
+        "external_id" => "rs_CLOUD_#{System.unique_integer([:positive])}",
+        "kind" => "rollback_snapshot",
+        "payload" => %{
+          "session_id" => s.id,
+          "task_id" => t.id,
+          "commit_sha_before" => "aaa",
+          "commit_sha_after" => "bbb",
+          "status" => "available",
+          "rollback_method" => "git_revert",
+          "metadata" => %{}
+        }
+      }
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.inserted == 1
+
+      imported = Repo.get_by!(RollbackSnapshot, external_id: envelope["external_id"])
+      assert imported.commit_sha_before == "aaa"
+    end
+
+    test "idempotent: re-upserting the same invocation is no_change" do
+      ws = workspace!("inv-idem")
+      s = session!(ws, "S1")
+      t = task!(s)
+      inv = invocation!(s, t)
+
+      envelope = Sync.serialize_record({"invocation", inv})
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.no_change == 1
+      assert result.inserted == 0
+    end
+  end
+
+  describe "mark_synced/1 — newly-wired schemas" do
+    test "sets synced_at on invocations and session_events" do
+      ws = workspace!("mark-new")
+      s = session!(ws, "S1")
+      t = task!(s)
+      inv = invocation!(s, t)
+      ev = session_event!(s, t)
+
+      assert inv.synced_at == nil
+      assert ev.synced_at == nil
+
+      Sync.mark_synced([{"invocation", inv}, {"session_event", ev}])
+
+      assert Repo.get!(Invocation, inv.id).synced_at != nil
+      assert Repo.get!(SessionEvent, ev.id).synced_at != nil
     end
   end
 end

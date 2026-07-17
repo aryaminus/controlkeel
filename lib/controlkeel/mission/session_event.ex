@@ -2,6 +2,7 @@ defmodule ControlKeel.Mission.SessionEvent do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Cloud.Telemetry.Envelope
   alias ControlKeel.Mission.{Session, Task}
 
   schema "session_events" do
@@ -13,7 +14,6 @@ defmodule ControlKeel.Mission.SessionEvent do
     field :metadata, :map, default: %{}
     field :external_id, :string
     field :synced_at, :utc_datetime
-    field :lock_version, :integer, default: 1
     field :review_id, :integer
     field :finding_id, :integer
 
@@ -22,6 +22,8 @@ defmodule ControlKeel.Mission.SessionEvent do
 
     timestamps(type: :utc_datetime)
   end
+
+  @external_id_prefix "se_"
 
   def changeset(session_event, attrs) do
     session_event
@@ -47,8 +49,45 @@ defmodule ControlKeel.Mission.SessionEvent do
       :metadata,
       :session_id
     ])
+    |> maybe_generate_external_id()
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
     |> unique_constraint(:external_id)
+  end
+
+  @doc """
+  Allowlist of fields safe to ship via cloud sync. `body`, `payload`, and
+  `metadata` pass through the redactor because they can contain log lines,
+  tool output, or user-pasted content.
+  """
+  def sync_fields do
+    {:include,
+     [
+       :id,
+       :external_id,
+       :session_id,
+       :task_id,
+       :event_type,
+       :actor,
+       :summary,
+       {:redact, :body},
+       {:redact, :payload},
+       {:redact, :metadata},
+       :review_id,
+       :finding_id,
+       :synced_at,
+       :inserted_at,
+       :updated_at
+     ]}
+  end
+
+  defp maybe_generate_external_id(changeset) do
+    case get_field(changeset, :external_id) do
+      nil ->
+        put_change(changeset, :external_id, @external_id_prefix <> Envelope.ulid())
+
+      _ ->
+        changeset
+    end
   end
 end

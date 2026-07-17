@@ -2,6 +2,7 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Cloud.Telemetry.Envelope
   alias ControlKeel.Mission.{Finding, Session, Task}
 
   @valid_statuses ~w(available rolled_back expired unsafe)
@@ -26,6 +27,8 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
     timestamps(type: :utc_datetime)
   end
 
+  @external_id_prefix "rs_"
+
   def changeset(snapshot, attrs) do
     snapshot
     |> cast(attrs, [
@@ -46,8 +49,46 @@ defmodule ControlKeel.Mission.RollbackSnapshot do
     |> validate_required([:session_id, :task_id, :commit_sha_before, :status])
     |> validate_inclusion(:status, @valid_statuses)
     |> validate_inclusion(:rollback_method, @valid_methods)
+    |> maybe_generate_external_id()
     |> assoc_constraint(:session)
     |> assoc_constraint(:task)
     |> unique_constraint(:external_id)
+  end
+
+  @doc """
+  Allowlist of fields safe to ship via cloud sync. `safety_check` and
+  `metadata` pass through the redactor because they can contain diff content
+  or commit messages with embedded tokens.
+  """
+  def sync_fields do
+    {:include,
+     [
+       :id,
+       :external_id,
+       :session_id,
+       :task_id,
+       :finding_id,
+       :commit_sha_before,
+       :commit_sha_after,
+       :status,
+       :rollback_method,
+       {:redact, :safety_check},
+       :rolled_back_at,
+       :rolled_back_by,
+       {:redact, :metadata},
+       :synced_at,
+       :inserted_at,
+       :updated_at
+     ]}
+  end
+
+  defp maybe_generate_external_id(changeset) do
+    case get_field(changeset, :external_id) do
+      nil ->
+        put_change(changeset, :external_id, @external_id_prefix <> Envelope.ulid())
+
+      _ ->
+        changeset
+    end
   end
 end
