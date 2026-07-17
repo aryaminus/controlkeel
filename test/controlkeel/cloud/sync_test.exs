@@ -131,6 +131,11 @@ defmodule ControlKeel.Cloud.SyncTest do
     snap
   end
 
+  defp proof_bundle!(_session, task) do
+    {:ok, proof} = Mission.generate_proof_bundle(task.id)
+    proof
+  end
+
   describe "collect_unsynced/2" do
     test "returns unsynced findings for a workspace" do
       ws = workspace!("collect")
@@ -632,6 +637,60 @@ defmodule ControlKeel.Cloud.SyncTest do
       inv = invocation!(s, t)
 
       envelope = Sync.serialize_record({"invocation", inv})
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.no_change == 1
+      assert result.inserted == 0
+    end
+
+    test "idempotent: re-upserting the same proof_bundle is no_change" do
+      ws = workspace!("pb-idem")
+      s = session!(ws, "S1")
+      t = task!(s, "proof task")
+      proof = proof_bundle!(s, t)
+
+      envelope = Sync.serialize_record({"proof_bundle", proof})
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.no_change == 1
+      assert result.inserted == 0
+    end
+
+    test "idempotent: re-upserting the same session_event is no_change" do
+      ws = workspace!("se-idem")
+      s = session!(ws, "S1")
+      t = task!(s)
+      ev = session_event!(s, t)
+
+      envelope = Sync.serialize_record({"session_event", ev})
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.no_change == 1
+      assert result.inserted == 0
+    end
+
+    test "idempotent: re-upserting the same task_checkpoint is no_change" do
+      # TaskCheckpoint uses timestamps(updated_at: false) — the update_append_only
+      # path must not crash on the missing :updated_at struct field.
+      ws = workspace!("tc-idem")
+      s = session!(ws, "S1")
+      t = task!(s)
+      cp = task_checkpoint!(s, t)
+
+      envelope = Sync.serialize_record({"task_checkpoint", cp})
+
+      assert {:ok, result} = Sync.upsert_batch([envelope])
+      assert result.no_change == 1
+      assert result.inserted == 0
+    end
+
+    test "idempotent: re-upserting the same rollback_snapshot is no_change" do
+      ws = workspace!("rs-idem")
+      s = session!(ws, "S1")
+      t = task!(s)
+      snap = rollback_snapshot!(s, t)
+
+      envelope = Sync.serialize_record({"rollback_snapshot", snap})
 
       assert {:ok, result} = Sync.upsert_batch([envelope])
       assert result.no_change == 1

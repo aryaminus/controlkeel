@@ -526,29 +526,40 @@ defmodule ControlKeel.Repo.Migrations.HardenSchemaFksCloudSyncAndDropUnused do
   end
 
   defp remove_cloud_sync_columns do
-    alter table(:rollback_snapshots) do
-      remove :synced_at
-      remove :external_id
-    end
+    # Postgres supports ALTER TABLE … DROP COLUMN directly.  SQLite only
+    # gained DROP COLUMN in 3.35.0 (2021-03-12); older bundled versions that
+    # users may still run would raise.  Recreating five tables on rollback
+    # adds a large amount of fragile code for a rarely-used path, and the
+    # nullable columns are harmless to leave behind — the same philosophy
+    # used by ``remove_foreign_key_constraints/0`` above.  The indexes are
+    # always safe to drop.
+    if sqlite_repo?() do
+      :ok
+    else
+      alter table(:rollback_snapshots) do
+        remove :synced_at
+        remove :external_id
+      end
 
-    alter table(:task_checkpoints) do
-      remove :synced_at
-      remove :external_id
-    end
+      alter table(:task_checkpoints) do
+        remove :synced_at
+        remove :external_id
+      end
 
-    alter table(:session_events) do
-      remove :synced_at
-      remove :external_id
-    end
+      alter table(:session_events) do
+        remove :synced_at
+        remove :external_id
+      end
 
-    alter table(:proof_bundles) do
-      remove :synced_at
-      remove :external_id
-    end
+      alter table(:proof_bundles) do
+        remove :synced_at
+        remove :external_id
+      end
 
-    alter table(:invocations) do
-      remove :synced_at
-      remove :external_id
+      alter table(:invocations) do
+        remove :synced_at
+        remove :external_id
+      end
     end
   end
 

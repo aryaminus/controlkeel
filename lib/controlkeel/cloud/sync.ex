@@ -299,7 +299,10 @@ defmodule ControlKeel.Cloud.Sync do
 
   defp update_append_only(existing, payload) do
     incoming_updated_at = parse_datetime(Map.get(payload, "updated_at"))
-    local_updated_at = existing.updated_at
+    # TaskCheckpoint and other immutable records use timestamps(updated_at: false),
+    # so :updated_at is absent from the struct.  Map.get/2 returns nil safely,
+    # and we fall back to :inserted_at so the staleness comparison still works.
+    local_updated_at = Map.get(existing, :updated_at) || Map.get(existing, :inserted_at)
 
     cond do
       incoming_updated_at == nil ->
