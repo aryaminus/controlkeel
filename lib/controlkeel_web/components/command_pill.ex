@@ -14,6 +14,8 @@ defmodule ControlKeelWeb.CommandPill do
         phx-click="copy_command"
         phx-value-command={@command}
         class="cursor-pointer hover:text-primary transition-colors"
+        aria-label="Copy command"
+        title="Copy command"
       >
         <.icon name="hero-clipboard" class="w-4 h-4" />
       </button>
