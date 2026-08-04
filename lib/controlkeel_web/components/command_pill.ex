@@ -13,7 +13,8 @@ defmodule ControlKeelWeb.CommandPill do
         type="button"
         phx-click="copy_command"
         phx-value-command={@command}
-        class="cursor-pointer hover:text-primary transition-colors"
+        aria-label="Copy command"
+        class="cursor-pointer rounded hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
       >
         <.icon name="hero-clipboard" class="w-4 h-4" />
       </button>
