@@ -5,7 +5,7 @@ defmodule ControlKeel.Utils do
   Shallow key stringification: converts top-level keys to strings, leaves values untouched.
   """
   def stringify_keys(map) when is_map(map) do
-    Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
+    Map.new(map, fn {key, value} -> {to_string(key), value} end)
   end
 
   @doc """
@@ -13,7 +13,7 @@ defmodule ControlKeel.Utils do
   nested maps and lists. Non-map/non-list values pass through unchanged.
   """
   def stringify_keys_deep(map) when is_map(map) do
-    Enum.into(map, %{}, fn
+    Map.new(map, fn
       {key, value} when is_map(value) -> {to_string(key), stringify_keys_deep(value)}
       {key, value} -> {to_string(key), value}
     end)
@@ -27,7 +27,7 @@ defmodule ControlKeel.Utils do
   through unchanged. Returns `%{}` for non-map inputs.
   """
   def stringify_keys_deep_list(map) when is_map(map) do
-    Enum.into(map, %{}, fn {key, value} ->
+    Map.new(map, fn {key, value} ->
       {to_string(key), stringify_keys_deep_list_value(value)}
     end)
   end
