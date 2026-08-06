@@ -5621,7 +5621,8 @@ defmodule ControlKeel.Mission do
       |> Kernel.-(length(missing) * 12)
       |> maybe_subtract_score(scope_high and phase == "implementation_plan", 8)
       |> maybe_subtract_score(
-        execution_ready_phase and length(fields["validation_plan"]) == 0,
+        # ⚡ Bolt: Use pattern matching for O(1) list emptiness check instead of O(N) length()
+        execution_ready_phase and fields["validation_plan"] == [],
         10
       )
       |> clamp_score()
@@ -5712,7 +5713,8 @@ defmodule ControlKeel.Mission do
 
     missing =
       if phase in ["implementation_plan", "code_backed_plan"] and
-           length(fields["validation_plan"]) == 0 do
+           # ⚡ Bolt: O(1) empty list check
+           fields["validation_plan"] == [] do
         ["validation_plan" | missing]
       else
         missing
@@ -5878,7 +5880,8 @@ defmodule ControlKeel.Mission do
     )
     |> maybe_add_signal(
       phase in ["narrowed_decision", "implementation_plan"] and
-        length(fields["rejected_options"] || []) == 0,
+        # ⚡ Bolt: O(1) empty list check avoids full list traversal
+        (fields["rejected_options"] || []) == [],
       "Alternative check: what option are we rejecting, and why is that rejection evidence-backed?"
     )
     |> maybe_add_signal(

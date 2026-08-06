@@ -64,7 +64,8 @@ defmodule ControlKeel.Benchmark do
     total_suites = builtin_suite_count(Keyword.get(opts, :domain_pack))
 
     catch_rates = Enum.map(runs, & &1.catch_rate)
-    overheads = Enum.reject(Enum.map(runs, & &1.average_overhead_percent), &is_nil/1)
+    # ⚡ Bolt: Single pass via list comprehension avoids intermediate list GC allocation
+    overheads = for run <- runs, run.average_overhead_percent != nil, do: run.average_overhead_percent
 
     %{
       total_suites: total_suites,
@@ -405,8 +406,9 @@ defmodule ControlKeel.Benchmark do
     blocked = Enum.count(evaluated, &(&1.decision == "block"))
     matched = Enum.count(evaluated, & &1.matched_expected)
     completed = Enum.count(evaluated, &(&1.status == "completed"))
-    latencies = Enum.reject(Enum.map(evaluated, & &1.latency_ms), &is_nil/1)
-    overheads = Enum.reject(Enum.map(evaluated, & &1.overhead_percent), &is_nil/1)
+    # ⚡ Bolt: Single pass comprehension reduces GC overhead by avoiding intermediate list
+    latencies = for eval <- evaluated, eval.latency_ms != nil, do: eval.latency_ms
+    overheads = for eval <- evaluated, eval.overhead_percent != nil, do: eval.overhead_percent
     classification = classification_metrics_for_results(evaluated)
     token_cost = token_cost_metrics(evaluated)
     tool_use = tool_use_metrics(evaluated)
@@ -1124,8 +1126,9 @@ defmodule ControlKeel.Benchmark do
 
     caught_count = Enum.count(evaluated, &(&1.findings_count > 0))
     blocked_count = Enum.count(evaluated, &(&1.decision == "block"))
-    latencies = Enum.reject(Enum.map(evaluated, & &1.latency_ms), &is_nil/1)
-    overheads = Enum.reject(Enum.map(results, & &1.overhead_percent), &is_nil/1)
+    # ⚡ Bolt: Single pass comprehension reduces GC overhead by avoiding intermediate list
+    latencies = for eval <- evaluated, eval.latency_ms != nil, do: eval.latency_ms
+    overheads = for result <- results, result.overhead_percent != nil, do: result.overhead_percent
 
     %{
       status: aggregate_status(results),
