@@ -83,7 +83,7 @@ defmodule ControlKeel.MixProject do
       {:yaml_elixir, "~> 2.11"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:websockex, "~> 0.4.3"},
+      {:websockex, "~> 0.5.1"},
       {:bypass, "~> 2.1", only: :test},
       {:burrito, "~> 1.5.0", runtime: false}
     ]
