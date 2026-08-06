@@ -520,6 +520,7 @@ defmodule ControlKeelWeb.FindingsLive do
             type="button"
             class="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition"
             phx-click="close_fix"
+            aria-label="Close"
           >
             <.icon name="hero-x-mark" class="w-5 h-5" />
           </button>
