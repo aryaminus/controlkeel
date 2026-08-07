@@ -1,0 +1,3 @@
+## 2024-05-24 - [Avoid List Traversals and Allocations for Distinct Counts]
+**Learning:** Found a repeated Elixir anti-pattern in the codebase: `enumerable |> Enum.map(&field) |> Enum.uniq() |> length()`. This traverses the data three times and creates two intermediate lists (one mapped list, one unique list), only to discard them for a count. A similar issue existed with `length(Enum.filter(...))` which creates an intermediate list for counting.
+**Action:** Replace `Enum.map(&f) |> Enum.uniq() |> length()` with `MapSet.new(enumerable, &f) |> MapSet.size()` to avoid intermediate lists and leverage Erlang map performance directly. Replace `length(Enum.filter(...))` with `Enum.count(...)`.
