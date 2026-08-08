@@ -163,7 +163,7 @@ defmodule ControlKeel.MCP.ToolGroupTracker do
       total_calls = entries |> Enum.map(fn {_key, _ts, count} -> count end) |> Enum.sum()
 
       unique_tools =
-        entries |> Enum.map(fn {key, _ts, _count} -> key end) |> Enum.uniq() |> length()
+        entries |> Enum.uniq_by(fn {key, _ts, _count} -> key end) |> length()
 
       %{total_calls: total_calls, unique_tools: unique_tools}
     end

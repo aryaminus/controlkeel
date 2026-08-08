@@ -94,7 +94,7 @@ defmodule ControlKeel.Cloud.BaselineAnalyzer do
       )
       |> Repo.all()
 
-    sample_sessions = rows |> Enum.map(& &1.session_id) |> Enum.uniq() |> length()
+    sample_sessions = rows |> Enum.uniq_by(& &1.session_id) |> length()
 
     baseline =
       rows
