@@ -1,0 +1,3 @@
+## 2024-05-18 - Missing Focus States and Labels on Icon-Only Buttons
+**Learning:** Icon-only interactive elements, such as the copy button in `CommandPill` and the close button in flash messages (`core_components.ex`), are commonly missing structural focus states and labels which degrades keyboard accessibility. Without default outline/ring focus states, keyboard users are unaware when these elements receive focus, and without an ARIA label, screen readers will announce an empty button.
+**Action:** When implementing new custom interactive elements or icon-only buttons, always apply explicit keyboard focus styles (e.g., `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded`) and an appropriate `aria-label`.
