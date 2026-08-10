@@ -94,7 +94,8 @@ defmodule ControlKeel.Cloud.BaselineAnalyzer do
       )
       |> Repo.all()
 
-    sample_sessions = rows |> Enum.map(& &1.session_id) |> Enum.uniq() |> length()
+    # Performance: MapSet avoids intermediate list allocations
+    sample_sessions = rows |> MapSet.new(& &1.session_id) |> MapSet.size()
 
     baseline =
       rows
