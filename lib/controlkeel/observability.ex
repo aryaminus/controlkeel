@@ -524,7 +524,7 @@ defmodule ControlKeel.Observability do
       benchmark_drafts: drafts.count,
       approved_drafts: approved_drafts,
       materialized_scenarios: length(scenario_ids),
-      covered_scenarios: length(Enum.filter(scenario_ids, &(&1 in covered_ids))),
+      covered_scenarios: Enum.count(scenario_ids, &(&1 in covered_ids)),
       benchmark_runs: length(runs)
     }
 
