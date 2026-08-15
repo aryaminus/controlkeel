@@ -1,3 +1,0 @@
-## 2024-05-19 - Conditional Text Rendering Accessibility in Compact Components
-**Learning:** Components that use conditional text rendering (like the `user_menu` component showing a full name in default mode but only a single initial in `@compact` mode) lose their visual meaning and semantic context for screen readers when the text is truncated or omitted.
-**Action:** When designing components with a "compact" mode that removes descriptive text, always add an explicit `aria-label` that provides the full context, regardless of the visual mode, to ensure the element remains accessible to screen readers.
