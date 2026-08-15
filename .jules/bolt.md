@@ -1,0 +1,3 @@
+## 2026-08-15 - [Elixir MapSet and Enum.count Intermediate List Allocation Optimization]
+**Learning:** Using `length(Enum.filter(enumerable, condition))` and `enumerable |> Enum.map(transform) |> Enum.uniq() |> length()` causes intermediate lists to be allocated in memory, which adds noticeable GC overhead in high-throughput data processing pathways (like observability benchmarks and token tracking).
+**Action:** Always prefer `Enum.count/2` over `length(Enum.filter/2)`, and `MapSet.new/2 |> MapSet.size()` over `Enum.map/2 |> Enum.uniq/1 |> length/1` to compute lengths of filtered or mapped unique items without allocating intermediate data structures.
