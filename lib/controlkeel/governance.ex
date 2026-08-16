@@ -555,7 +555,8 @@ defmodule ControlKeel.Governance do
   end
 
   defp review_summary(decision, findings, fragments) do
-    files_reviewed = fragments |> Enum.map(& &1.path) |> Enum.uniq() |> length()
+    # Bolt: Replaced Enum.map/2 |> Enum.uniq/1 |> length/1 with MapSet.new/2 |> MapSet.size/1 to avoid intermediate list allocations
+    files_reviewed = fragments |> MapSet.new(& &1.path) |> MapSet.size()
     chunks_reviewed = length(fragments)
     added_lines_reviewed = Enum.reduce(fragments, 0, &(&1.added_line_count + &2))
 

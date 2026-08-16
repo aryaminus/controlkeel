@@ -162,8 +162,9 @@ defmodule ControlKeel.MCP.ToolGroupTracker do
     else
       total_calls = entries |> Enum.map(fn {_key, _ts, count} -> count end) |> Enum.sum()
 
+      # Bolt: Replaced Enum.map/2 |> Enum.uniq/1 |> length/1 with MapSet.new/2 |> MapSet.size/1 to avoid intermediate list allocations
       unique_tools =
-        entries |> Enum.map(fn {key, _ts, _count} -> key end) |> Enum.uniq() |> length()
+        entries |> MapSet.new(fn {key, _ts, _count} -> key end) |> MapSet.size()
 
       %{total_calls: total_calls, unique_tools: unique_tools}
     end
