@@ -265,9 +265,17 @@ defmodule ControlKeelWeb.Layouts do
     <div {@rest} class={"relative #{@class}"} id={@id}>
       <button
         type="button"
-        phx-click={JS.toggle(to: "##{@id}-popover")}
+        id={"#{@id}-button"}
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls={"#{@id}-popover"}
+        aria-label={if @compact, do: "User menu for #{@current_user.name || @current_user.email}", else: nil}
+        phx-click={
+          JS.toggle(to: "##{@id}-popover")
+          |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{@id}-button")
+        }
         class={[
-          "transition hover:bg-muted",
+          "transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
           if(@compact,
             do:
               "flex items-center gap-2 rounded-full px-1 py-1 text-sm font-semibold text-muted-foreground hover:text-foreground",
@@ -292,7 +300,10 @@ defmodule ControlKeelWeb.Layouts do
       </button>
       <div
         id={"#{@id}-popover"}
-        phx-click-away={JS.hide(to: "##{@id}-popover")}
+        phx-click-away={
+          JS.hide(to: "##{@id}-popover")
+          |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id}-button")
+        }
         class={"hidden absolute #{@popover_class} z-50 w-56 rounded-xl border bg-card p-3 shadow-2xl shadow-black/50 backdrop-blur-md"}
       >
         <p class="text-sm font-semibold text-foreground">
@@ -303,7 +314,10 @@ defmodule ControlKeelWeb.Layouts do
         <%= if @show_dashboard do %>
           <a
             href={~p"/dashboard"}
-            phx-click={JS.hide(to: "##{@id}-popover")}
+            phx-click={
+              JS.hide(to: "##{@id}-popover")
+              |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id}-button")
+            }
             class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <.icon name="hero-squares-2x2" class="size-4" /> Dashboard
