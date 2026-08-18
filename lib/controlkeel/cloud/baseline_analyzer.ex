@@ -94,7 +94,8 @@ defmodule ControlKeel.Cloud.BaselineAnalyzer do
       )
       |> Repo.all()
 
-    sample_sessions = rows |> Enum.map(& &1.session_id) |> Enum.uniq() |> length()
+    # Bolt: used MapSet to count unique sessions without intermediate list allocations
+    sample_sessions = MapSet.new(rows, & &1.session_id) |> MapSet.size()
 
     baseline =
       rows

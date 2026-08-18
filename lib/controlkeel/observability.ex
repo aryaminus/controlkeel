@@ -524,7 +524,8 @@ defmodule ControlKeel.Observability do
       benchmark_drafts: drafts.count,
       approved_drafts: approved_drafts,
       materialized_scenarios: length(scenario_ids),
-      covered_scenarios: length(Enum.filter(scenario_ids, &(&1 in covered_ids))),
+      # Bolt: used Enum.count/2 instead of length(Enum.filter/2) to avoid intermediate list allocation
+      covered_scenarios: Enum.count(scenario_ids, &(&1 in covered_ids)),
       benchmark_runs: length(runs)
     }
 
@@ -1698,7 +1699,8 @@ defmodule ControlKeel.Observability do
       input_tokens: sum_invocation_field(invocations, :input_tokens),
       cached_input_tokens: sum_invocation_field(invocations, :cached_input_tokens),
       output_tokens: sum_invocation_field(invocations, :output_tokens),
-      sessions: invocations |> Enum.map(& &1.session_id) |> Enum.uniq() |> length()
+      # Bolt: used MapSet to count unique sessions without intermediate list allocations
+      sessions: MapSet.new(invocations, & &1.session_id) |> MapSet.size()
     }
   end
 
@@ -1713,7 +1715,8 @@ defmodule ControlKeel.Observability do
         input_tokens: sum_invocation_field(group, :input_tokens),
         cached_input_tokens: sum_invocation_field(group, :cached_input_tokens),
         output_tokens: sum_invocation_field(group, :output_tokens),
-        sessions: group |> Enum.map(& &1.session_id) |> Enum.uniq() |> length()
+        # Bolt: used MapSet to count unique sessions without intermediate list allocations
+        sessions: MapSet.new(group, & &1.session_id) |> MapSet.size()
       }
     end)
     |> Enum.sort_by(&{&1.estimated_cost_cents, &1.invocations}, :desc)
@@ -1730,7 +1733,8 @@ defmodule ControlKeel.Observability do
       %{
         name: name,
         invocations: invocation_count,
-        sessions: group |> Enum.map(& &1.session_id) |> Enum.uniq() |> length(),
+        # Bolt: used MapSet to count unique sessions without intermediate list allocations
+        sessions: MapSet.new(group, & &1.session_id) |> MapSet.size(),
         estimated_cost_cents: total_cost,
         input_tokens: sum_invocation_field(group, :input_tokens),
         cached_input_tokens: sum_invocation_field(group, :cached_input_tokens),
@@ -2194,7 +2198,8 @@ defmodule ControlKeel.Observability do
       suite: benchmark_run_suite_slug(run),
       subjects: run.subjects || [],
       total_scenarios: run.total_scenarios,
-      observed_scenarios: run.results |> Enum.map(& &1.scenario_id) |> Enum.uniq() |> length(),
+      # Bolt: used MapSet to count unique scenarios without intermediate list allocations
+      observed_scenarios: MapSet.new(run.results, & &1.scenario_id) |> MapSet.size(),
       caught_count: run.caught_count,
       blocked_count: run.blocked_count,
       catch_rate: run.catch_rate || 0.0,
