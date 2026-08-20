@@ -1,0 +1,3 @@
+## YYYY-MM-DD - MapSet for count over Enum.map |> Enum.uniq |> length
+**Learning:** Elixir lists are linked lists. Doing `Enum.map |> Enum.uniq |> length` creates multiple intermediate lists and involves allocating new lists. A more performant way to count unique items in Elixir is to use `MapSet.new(collection, mapper) |> MapSet.size()`, which constructs a MapSet and returns its size without creating intermediate filtered lists.
+**Action:** Use `MapSet.new(enum, mapper) |> MapSet.size()` instead of `Enum.map |> Enum.uniq |> length`. Or `MapSet.new(enum) |> MapSet.size()` instead of `Enum.uniq |> length`.
