@@ -316,7 +316,7 @@ defmodule ControlKeelWeb.Layouts do
               JS.hide(to: "##{@id}-popover")
               |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
             }
-            class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <.icon name="hero-squares-2x2" class="size-4" /> Dashboard
           </a>
@@ -334,7 +334,7 @@ defmodule ControlKeelWeb.Layouts do
         --%>
         <a
           href={~p"/auth/logout"}
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-[var(--ck-danger)]"
+          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-[var(--ck-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Sign out
         </a>
@@ -450,7 +450,7 @@ defmodule ControlKeelWeb.Layouts do
           <a
             :if={action[:to]}
             href={action.to}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </a>
@@ -459,7 +459,7 @@ defmodule ControlKeelWeb.Layouts do
             :if={action[:form]}
             type="submit"
             form={action.form}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>
@@ -468,7 +468,7 @@ defmodule ControlKeelWeb.Layouts do
             :if={action[:event]}
             type="button"
             phx-click={action.event}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>

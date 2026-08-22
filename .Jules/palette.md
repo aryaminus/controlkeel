@@ -1,0 +1,3 @@
+## 2024-05-18 - Focus States on Custom Interactive Elements
+**Learning:** Custom interactive elements (like the "Copy fix prompt" button in finding components or inline action elements in layout dashboards) frequently lack default keyboard focus styles (`focus-visible:outline-none focus-visible:ring-2`) and basic cursor/hover states in this app's components, making them inaccessible to keyboard users and less discoverable.
+**Action:** Always verify keyboard accessibility (tabbing through) and add appropriate Tailwind focus ring utilities (`focus-visible:ring-primary` or similar) to any interactive element not using the core `<.button>` component.
