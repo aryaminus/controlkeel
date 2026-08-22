@@ -270,7 +270,8 @@ defmodule ControlKeel.Benchmark do
   # itself), so we skip the recompute and keep the export payload lean. The
   # explicit `benchmark compare <id>` command always computes a comparison.
   defp maybe_comparison(%Run{subjects: subjects} = run) when is_list(subjects) do
-    if length(Enum.uniq(subjects)) >= 2, do: compare_run(run), else: nil
+    # Bolt: MapSet avoids intermediate list allocations for uniqueness
+    if MapSet.new(subjects) |> MapSet.size() >= 2, do: compare_run(run), else: nil
   end
 
   defp maybe_comparison(_run), do: nil
