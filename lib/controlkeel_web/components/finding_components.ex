@@ -63,7 +63,7 @@ defmodule ControlKeelWeb.FindingComponents do
         <button
           :if={@copy_event && @fix["agent_prompt"]}
           type="button"
-          class="inline-flex items-center justify-center gap-[0.4rem] px-[1.25rem] py-[0.95rem] rounded-full bg-primary text-[#11170d] font-bold transition-[transform,box-shadow] duration-[160ms] ease-out hover:-translate-y-px hover:shadow-[0_12px_24px_rgba(196,240,66,0.24)]"
+          class="inline-flex items-center justify-center gap-[0.4rem] px-[1.25rem] py-[0.95rem] rounded-full bg-primary text-[#11170d] font-bold transition-[transform,box-shadow] duration-[160ms] ease-out hover:-translate-y-px hover:shadow-[0_12px_24px_rgba(196,240,66,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           phx-click={@copy_event}
           phx-value-id={@finding.id}
         >
@@ -72,7 +72,7 @@ defmodule ControlKeelWeb.FindingComponents do
         <button
           :if={@close_event}
           type="button"
-          class="uppercase tracking-[0.14em] text-xs text-primary font-semibold"
+          class="uppercase tracking-[0.14em] text-xs text-primary font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-2 py-1"
           phx-click={@close_event}
         >
           Close
