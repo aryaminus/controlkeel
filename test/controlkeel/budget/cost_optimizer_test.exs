@@ -30,7 +30,8 @@ defmodule ControlKeel.Budget.CostOptimizerTest do
       end
 
     assert {:ok, suggestions} = CostOptimizer.suggest("session_3", spending: spending)
-    cache_count = length(Enum.filter(suggestions, &(&1.type == :caching)))
+    # Bolt: Enum.count avoids intermediate list allocation
+    cache_count = Enum.count(suggestions, &(&1.type == :caching))
     assert cache_count >= 0
   end
 
@@ -41,7 +42,8 @@ defmodule ControlKeel.Budget.CostOptimizerTest do
       end
 
     assert {:ok, suggestions} = CostOptimizer.suggest("session_4", spending: spending)
-    local_count = length(Enum.filter(suggestions, &(&1.type == :local_model)))
+    # Bolt: Enum.count avoids intermediate list allocation
+    local_count = Enum.count(suggestions, &(&1.type == :local_model))
     assert local_count >= 0
   end
 
