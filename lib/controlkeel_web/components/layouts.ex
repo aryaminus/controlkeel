@@ -202,11 +202,11 @@ defmodule ControlKeelWeb.Layouts do
   defp nav_active?(_current_path, _path, _exact), do: false
 
   defp sidebar_link_class(true) do
-    "group flex items-center gap-3 rounded-xl bg-muted px-3 py-2.5 font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted"
+    "group flex items-center gap-3 rounded-xl bg-muted px-3 py-2.5 font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
   end
 
   defp sidebar_link_class(false) do
-    "group flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    "group flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
   end
 
   defp sidebar_icon_class(true), do: "size-4 text-primary"
@@ -240,11 +240,11 @@ defmodule ControlKeelWeb.Layouts do
   end
 
   defp subnav_link_class(true) do
-    "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted"
+    "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
   end
 
   defp subnav_link_class(false) do
-    "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
   end
 
   defp subnav_icon_class(true), do: "size-3.5 shrink-0 text-primary"
@@ -450,7 +450,7 @@ defmodule ControlKeelWeb.Layouts do
           <a
             :if={action[:to]}
             href={action.to}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </a>
@@ -459,7 +459,7 @@ defmodule ControlKeelWeb.Layouts do
             :if={action[:form]}
             type="submit"
             form={action.form}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>
@@ -468,7 +468,7 @@ defmodule ControlKeelWeb.Layouts do
             :if={action[:event]}
             type="button"
             phx-click={action.event}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>
