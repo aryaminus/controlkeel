@@ -2784,7 +2784,7 @@ defmodule ControlKeel.Mission do
     |> Enum.group_by(fn pattern -> {pattern["type"], pattern["code"]} end)
     |> Enum.map(fn {{type, code}, rows} ->
       severity = rows |> Enum.map(&(&1["severity"] || "low")) |> Enum.max_by(&severity_rank/1)
-      sessions = rows |> Enum.map(& &1["session_id"]) |> Enum.uniq()
+      session_count = rows |> MapSet.new(& &1["session_id"]) |> MapSet.size()
       titles = rows |> Enum.map(& &1["title"]) |> Enum.reject(&is_nil/1) |> Enum.uniq()
 
       %{
@@ -2792,7 +2792,8 @@ defmodule ControlKeel.Mission do
         "code" => code,
         "severity" => severity,
         "count" => length(rows),
-        "session_count" => length(sessions),
+        # Bolt: Avoid intermediate list allocation for distinct count
+        "session_count" => session_count,
         "titles" => Enum.take(titles, 3),
         "summary" => cluster_summary(rows),
         "examples" =>
