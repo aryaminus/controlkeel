@@ -84,9 +84,10 @@ defmodule ControlKeel.Governance.TechDebtDetector do
     |> Enum.reject(&tech_debt_rule?/1)
     |> Enum.group_by(& &1.rule_id)
     |> Enum.flat_map(fn {rule_id, items} ->
-      distinct_sessions = items |> Enum.map(& &1.session_id) |> Enum.uniq()
+      # Optimized: Use MapSet.new/2 instead of Enum.map/2 and Enum.uniq/1 to avoid intermediate list allocations
+      distinct_sessions = items |> MapSet.new(& &1.session_id)
 
-      if length(distinct_sessions) >= threshold do
+      if MapSet.size(distinct_sessions) >= threshold do
         [build_unresolved_pattern_signal(rule_id, items, distinct_sessions)]
       else
         []
@@ -150,7 +151,7 @@ defmodule ControlKeel.Governance.TechDebtDetector do
       recent_session_ids: Enum.sort(distinct_sessions),
       message:
         "Rule #{rule_id} fired #{length(items)} times across " <>
-          "#{length(distinct_sessions)} sessions without resolution"
+          "#{MapSet.size(distinct_sessions)} sessions without resolution"
     }
   end
 end
