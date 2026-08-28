@@ -4,9 +4,9 @@ defmodule ControlKeel.Mission do
   import Ecto.Query, warn: false
 
   alias Ecto.Multi
-  alias ControlKeel.Accounts
   alias ControlKeel.Scanner.AutoFix
   alias ControlKeel.Mission.DecisionGates
+  alias ControlKeel.Mission.ReviewOps
   alias ControlKeel.Mission.GovernedManifest
   alias ControlKeel.Intent.ExecutionBrief
   alias ControlKeel.Learning.OutcomeTracker
@@ -174,220 +174,17 @@ defmodule ControlKeel.Mission do
     update_task(task, %{metadata: merge_runtime_context(task.metadata || %{}, context)})
   end
 
-  def get_review(id), do: Repo.get(Review, id)
-  def get_review!(id), do: Repo.get!(Review, id)
-
-  def get_review_with_context(id) do
-    Review
-    |> Repo.get(id)
-    |> case do
-      nil ->
-        nil
-
-      review ->
-        Repo.preload(review, [:previous_review, :revisions, task: [], session: :workspace])
-    end
-  end
-
-  def list_reviews_for_session(session_id) when is_integer(session_id) do
-    Review
-    |> where([review], review.session_id == ^session_id)
-    |> order_by([review], desc: review.inserted_at, desc: review.id)
-    |> Repo.all()
-    |> Repo.preload([:previous_review, task: []])
-  end
-
-  def latest_review_for_task(task_id, review_type \\ nil)
-
-  def latest_review_for_task(task_id, nil) when is_integer(task_id) do
-    Review
-    |> where([review], review.task_id == ^task_id)
-    |> order_by([review], desc: review.inserted_at, desc: review.id)
-    |> limit(1)
-    |> Repo.one()
-  end
-
-  def latest_review_for_task(task_id, review_type)
-      when is_integer(task_id) and is_binary(review_type) do
-    Review
-    |> where([review], review.task_id == ^task_id and review.review_type == ^review_type)
-    |> order_by([review], desc: review.inserted_at, desc: review.id)
-    |> limit(1)
-    |> Repo.one()
-  end
-
-  def review_gate_status(%Task{} = task) do
-    gate = get_in(task.metadata || %{}, ["review_gate"]) || %{}
-
-    %{
-      "phase" => gate["phase"] || "execution",
-      "execution_ready" => Map.get(gate, "execution_ready", true),
-      "decision_gate" => gate["decision_gate"],
-      "governed_manifest" => gate["governed_manifest"],
-      "latest_review_id" => gate["latest_review_id"],
-      "latest_review_status" => gate["latest_review_status"],
-      "latest_review_type" => gate["latest_review_type"],
-      "latest_plan_phase" => gate["latest_plan_phase"],
-      "plan_quality_status" => gate["plan_quality_status"],
-      "plan_quality_score" => gate["plan_quality_score"],
-      "planning_depth" => gate["planning_depth"],
-      "grill_questions" => gate["grill_questions"] || [],
-      "decision_prompts" => gate["decision_prompts"] || [],
-      "diagnostic_findings" => decision_hygiene_findings(task)
-    }
-  end
-
-  def decision_hygiene_findings(%Task{} = task, attrs \\ %{}) do
-    gate = get_in(task.metadata || %{}, ["review_gate"]) || %{}
-    plan_quality = gate["plan_quality"] || %{}
-    plan_refinement = gate["plan_refinement"] || %{}
-
-    depth = plan_refinement["depth"] || gate["planning_depth"] || 1
-    scope_high = plan_quality["scope_high"]
-    missing = plan_quality["missing"] || []
-    validation_plan = plan_refinement["validation_plan"] || []
-
-    sunk_cost =
-      if depth >= 3 do
-        [
-          %{
-            "category" => "decision-hygiene",
-            "severity" => "medium",
-            "rule_id" => "planning.sunk_cost_signal",
-            "title" => "Sunk-cost risk: plan refinement depth is #{depth}",
-            "plain_message" =>
-              "This plan has been refined #{depth} times. Consider whether continued refinement is justified by new evidence, or whether the current plan should be approved, narrowed, or abandoned.",
-            "metadata" =>
-              Map.merge(attrs, %{
-                "diagnostic_source" => "mission_decision_hygiene",
-                "planning_depth" => depth,
-                "task_id" => task.id
-              })
-          }
-        ]
-      else
-        []
-      end
-
-    scope_without_evidence =
-      if scope_high == true and "validation_plan" in missing do
-        [
-          %{
-            "category" => "decision-hygiene",
-            "severity" => "high",
-            "rule_id" => "planning.scope_without_evidence",
-            "title" => "High-scope plan missing validation evidence",
-            "plain_message" =>
-              "The plan has high scope but no validation plan. Large changes without concrete verification steps are the strongest predictor of post-merge failures.",
-            "metadata" =>
-              Map.merge(attrs, %{
-                "diagnostic_source" => "mission_decision_hygiene",
-                "scope_high" => true,
-                "missing_fields" => missing,
-                "task_id" => task.id
-              })
-          }
-        ]
-      else
-        []
-      end
-
-    weak_verification =
-      if depth >= 2 and validation_plan == [] and plan_quality["execution_ready_phase"] == true do
-        [
-          %{
-            "category" => "decision-hygiene",
-            "severity" => "medium",
-            "rule_id" => "review.weak_verification_confidence",
-            "title" => "Execution-ready plan lacks verification steps",
-            "plain_message" =>
-              "The plan has reached execution-ready phase at depth #{depth} but still has no validation plan. Approval without verification evidence weakens the review gate.",
-            "metadata" =>
-              Map.merge(attrs, %{
-                "diagnostic_source" => "mission_decision_hygiene",
-                "planning_depth" => depth,
-                "execution_ready_phase" => true,
-                "task_id" => task.id
-              })
-          }
-        ]
-      else
-        []
-      end
-
-    sunk_cost ++ scope_without_evidence ++ weak_verification
-  end
-
-  def execution_ready?(%Task{} = task) do
-    review_gate_status(task)["execution_ready"] != false
-  end
-
-  def execution_ready?(task_id) when is_integer(task_id) do
-    case get_task(task_id) do
-      nil -> false
-      task -> execution_ready?(task)
-    end
-  end
-
-  def submit_review(attrs) do
-    with {:ok, normalized} <- normalize_review_submission(attrs) do
-      Multi.new()
-      |> maybe_supersede_pending_reviews(normalized)
-      |> Multi.insert(:review, Review.changeset(%Review{}, normalized.attrs))
-      |> maybe_track_task_review_gate(normalized)
-      |> maybe_track_review_runtime_context(normalized)
-      |> RepoRetry.transaction_with_busy_retry()
-      |> case do
-        {:ok, %{review: review}} ->
-          review = get_review_with_context(review.id)
-          record_review_memory(:submitted, review)
-          {:ok, review}
-
-        {:error, _step, reason, _changes} ->
-          {:error, reason}
-      end
-    end
-  end
-
-  def respond_review(review_or_id, attrs)
-
-  def respond_review(review_id, attrs) when is_integer(review_id) do
-    case get_review(review_id) do
-      nil -> {:error, :not_found}
-      review -> respond_review(review, attrs)
-    end
-  end
-
-  def respond_review(%Review{} = review, attrs) do
-    with {:ok, normalized} <- normalize_review_response(attrs) do
-      review_attrs = merge_review_response_attrs(review, normalized.review_attrs)
-
-      Multi.new()
-      |> Multi.update(:review, Review.changeset(review, review_attrs))
-      |> Multi.run(:review_audit_event, fn _repo, %{review: updated} ->
-        Accounts.record_review_decision_event(updated, %{
-          event_type: normalized.decision,
-          actor_source: Map.get(review_attrs, "reviewed_by"),
-          actor_identifier: Map.get(review_attrs, "reviewed_by"),
-          note: Map.get(review_attrs, "feedback_notes"),
-          recorded_at: Map.get(review_attrs, "responded_at")
-        })
-      end)
-      |> maybe_apply_review_response_gate(review, normalized)
-      |> RepoRetry.transaction_with_busy_retry()
-      |> case do
-        {:ok, %{review: updated}} ->
-          updated = get_review_with_context(updated.id)
-          action = if updated.status == "approved", do: :approved, else: :denied
-          record_review_memory(action, updated)
-          maybe_record_prompt_outcome(updated)
-          {:ok, updated}
-
-        {:error, _step, reason, _changes} ->
-          {:error, reason}
-      end
-    end
-  end
+  defdelegate review_gate_status(task), to: ReviewOps
+  defdelegate decision_hygiene_findings(task), to: ReviewOps
+  defdelegate decision_hygiene_findings(task, attrs), to: ReviewOps
+  defdelegate execution_ready?(arg), to: ReviewOps
+  defdelegate get_review(id), to: ReviewOps
+  defdelegate get_review!(id), to: ReviewOps
+  defdelegate get_review_with_context(id), to: ReviewOps
+  defdelegate list_reviews_for_session(session_id), to: ReviewOps
+  defdelegate latest_review_for_task(task_id, review_type \\ nil), to: ReviewOps
+  defdelegate submit_review(attrs), to: ReviewOps
+  defdelegate respond_review(review_or_id, attrs), to: ReviewOps
 
   def list_findings, do: Repo.all(Finding)
 
@@ -4562,7 +4359,8 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  defp record_review_memory(action, %Review{} = review) do
+  @doc false
+  def record_review_memory(action, %Review{} = review) do
     review = Repo.preload(review, task: [], session: :workspace)
 
     Memory.record(%{
@@ -4606,8 +4404,9 @@ defmodule ControlKeel.Mission do
   defp review_memory_title(:denied, review), do: "Review denied: #{review.title}"
   defp review_memory_title(_action, review), do: "Review updated: #{review.title}"
 
-  defp maybe_record_prompt_outcome(%Review{review_type: "plan", status: status} = review)
-       when status in ["approved", "denied"] do
+  @doc false
+  def maybe_record_prompt_outcome(%Review{review_type: "plan", status: status} = review)
+      when status in ["approved", "denied"] do
     depth =
       get_in(review.metadata || %{}, ["plan_refinement", "depth"]) ||
         get_in(review.metadata || %{}, ["planning_depth"]) ||
@@ -4638,7 +4437,7 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  defp maybe_record_prompt_outcome(_review), do: {:ok, :skipped}
+  def maybe_record_prompt_outcome(_review), do: {:ok, :skipped}
 
   defp review_memory_body(%Review{} = review) do
     [review.submission_body, review.feedback_notes]
@@ -4709,7 +4508,9 @@ defmodule ControlKeel.Mission do
   defp review_event_type(:denied), do: "review.denied"
   defp review_event_type(_action), do: "review.updated"
 
-  defp normalize_review_submission(attrs) when is_map(attrs) do
+  @doc false
+
+  def normalize_review_submission(attrs) when is_map(attrs) do
     attrs = Enum.into(attrs, %{}, fn {key, value} -> {to_string(key), value} end)
     runtime_context = merged_runtime_context(attrs)
 
@@ -4765,7 +4566,8 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  defp normalize_review_response(attrs) when is_map(attrs) do
+  @doc false
+  def normalize_review_response(attrs) when is_map(attrs) do
     attrs = Enum.into(attrs, %{}, fn {key, value} -> {to_string(key), value} end)
 
     with {:ok, decision} <-
@@ -4782,7 +4584,8 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  defp merge_review_response_attrs(%Review{} = review, review_attrs) do
+  @doc false
+  def merge_review_response_attrs(%Review{} = review, review_attrs) do
     review_attrs
     |> Map.update("metadata", review.metadata || %{}, fn metadata ->
       Map.merge(review.metadata || %{}, metadata || %{})
@@ -4792,7 +4595,8 @@ defmodule ControlKeel.Mission do
     end)
   end
 
-  defp maybe_supersede_pending_reviews(multi, normalized) do
+  @doc false
+  def maybe_supersede_pending_reviews(multi, normalized) do
     Multi.run(multi, :superseded_reviews, fn repo, _changes ->
       query = superseded_reviews_query(normalized)
       {count, _rows} = repo.update_all(query, set: [status: "superseded"])
@@ -4800,16 +4604,17 @@ defmodule ControlKeel.Mission do
     end)
   end
 
-  defp maybe_track_task_review_gate(
-         multi,
-         %{
-           task: %Task{} = task,
-           review_type: "plan",
-           plan_refinement: plan_refinement,
-           governed_manifest: governed_manifest
-         } =
-           _normalized
-       ) do
+  @doc false
+  def maybe_track_task_review_gate(
+        multi,
+        %{
+          task: %Task{} = task,
+          review_type: "plan",
+          plan_refinement: plan_refinement,
+          governed_manifest: governed_manifest
+        } =
+          _normalized
+      ) do
     Multi.update(multi, :task, fn %{review: review} ->
       metadata =
         (task.metadata || %{})
@@ -4820,26 +4625,28 @@ defmodule ControlKeel.Mission do
     end)
   end
 
-  defp maybe_track_task_review_gate(multi, _normalized), do: multi
+  def maybe_track_task_review_gate(multi, _normalized), do: multi
 
-  defp maybe_track_review_runtime_context(
-         multi,
-         %{runtime_context: runtime_context, task: task, session_id: session_id}
-       )
-       when is_map(runtime_context) and map_size(runtime_context) > 0 do
+  @doc false
+  def maybe_track_review_runtime_context(
+        multi,
+        %{runtime_context: runtime_context, task: task, session_id: session_id}
+      )
+      when is_map(runtime_context) and map_size(runtime_context) > 0 do
     multi
     |> maybe_update_runtime_task_context(task, runtime_context)
     |> maybe_update_runtime_session_context(session_id, runtime_context)
   end
 
-  defp maybe_track_review_runtime_context(multi, _normalized), do: multi
+  def maybe_track_review_runtime_context(multi, _normalized), do: multi
 
-  defp maybe_apply_review_response_gate(
-         multi,
-         %Review{task_id: task_id, review_type: "plan"} = review,
-         %{decision: decision}
-       )
-       when is_integer(task_id) do
+  @doc false
+  def maybe_apply_review_response_gate(
+        multi,
+        %Review{task_id: task_id, review_type: "plan"} = review,
+        %{decision: decision}
+      )
+      when is_integer(task_id) do
     Multi.run(multi, :task, fn repo, %{review: updated_review} ->
       case repo.get(Task, task_id) do
         nil ->
@@ -4886,7 +4693,7 @@ defmodule ControlKeel.Mission do
     end)
   end
 
-  defp maybe_apply_review_response_gate(multi, _review, _normalized), do: multi
+  def maybe_apply_review_response_gate(multi, _review, _normalized), do: multi
 
   defp superseded_reviews_query(%{task: %Task{id: task_id}, review_type: review_type}) do
     Review
