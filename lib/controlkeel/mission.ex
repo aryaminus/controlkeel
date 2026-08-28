@@ -40,7 +40,6 @@ defmodule ControlKeel.Mission do
   alias ControlKeel.Utils
 
   @findings_page_size 10
-  @proofs_page_size 20
   @plan_phases ~w(ticket research_packet design_options narrowed_decision implementation_plan code_backed_plan)
   @execution_ready_plan_phases ~w(implementation_plan code_backed_plan)
   @verified_completion_score_threshold 45
@@ -649,37 +648,11 @@ defmodule ControlKeel.Mission do
       "regression:#{normalized["engine"]}:#{normalized["flow_name"]}:#{invocation.id}"
   end
 
-  def get_proof_bundle(id), do: Repo.get(ProofBundle, id)
-  def get_proof_bundle!(id), do: Repo.get!(ProofBundle, id)
-
-  def get_proof_bundle_with_context(id) do
-    ProofBundle
-    |> Repo.get(id)
-    |> case do
-      nil ->
-        nil
-
-      proof ->
-        Repo.preload(proof, task: [], session: :workspace)
-    end
-  end
-
-  def latest_proof_bundle_for_task(task_id) when is_integer(task_id) do
-    ProofBundle
-    |> where([proof], proof.task_id == ^task_id)
-    |> order_by([proof], desc: proof.version, desc: proof.id)
-    |> limit(1)
-    |> Repo.one()
-  end
-
-  def latest_proof_bundles_for_session(session_id) when is_integer(session_id) do
-    ProofBundle
-    |> where([proof], proof.session_id == ^session_id)
-    |> order_by([proof], asc: proof.task_id, desc: proof.version, desc: proof.id)
-    |> Repo.all()
-    |> Enum.group_by(& &1.task_id)
-    |> Enum.into(%{}, fn {task_id, [latest | _rest]} -> {task_id, latest} end)
-  end
+  defdelegate get_proof_bundle(id), to: ControlKeel.Mission.ProofOps
+  defdelegate get_proof_bundle!(id), to: ControlKeel.Mission.ProofOps
+  defdelegate get_proof_bundle_with_context(id), to: ControlKeel.Mission.ProofOps
+  defdelegate latest_proof_bundle_for_task(task_id), to: ControlKeel.Mission.ProofOps
+  defdelegate latest_proof_bundles_for_session(session_id), to: ControlKeel.Mission.ProofOps
 
   def create_task_checkpoint(attrs) do
     %TaskCheckpoint{}
@@ -1156,29 +1129,7 @@ defmodule ControlKeel.Mission do
     }
   end
 
-  def browse_proof_bundles(opts \\ %{}) do
-    filters = normalize_proof_filters(opts)
-    base_query = proof_bundles_query(filters)
-    total_count = Repo.aggregate(base_query, :count, :id)
-    total_pages = max(div(total_count + @proofs_page_size - 1, @proofs_page_size), 1)
-    page = min(filters.page, total_pages)
-
-    entries =
-      base_query
-      |> order_by([proof, _task, _session, _workspace], desc: proof.generated_at, desc: proof.id)
-      |> limit(^@proofs_page_size)
-      |> offset(^((page - 1) * @proofs_page_size))
-      |> Repo.all()
-
-    %{
-      entries: entries,
-      filters: %{filters | page: page},
-      total_count: total_count,
-      total_pages: total_pages,
-      page: page,
-      page_size: @proofs_page_size
-    }
-  end
+  defdelegate browse_proof_bundles(opts \\ %{}), to: ControlKeel.Mission.ProofOps
 
   def auto_fix_for_finding(%Finding{} = finding), do: AutoFix.generate(finding)
 
@@ -6500,7 +6451,8 @@ defmodule ControlKeel.Mission do
     |> maybe_filter_finding_workspace(filters.workspace_ids)
   end
 
-  defp proof_bundles_query(filters) do
+  @doc false
+  def proof_bundles_query(filters) do
     from(proof in ProofBundle,
       join: task in assoc(proof, :task),
       join: session in assoc(proof, :session),
@@ -6536,7 +6488,8 @@ defmodule ControlKeel.Mission do
     }
   end
 
-  defp normalize_proof_filters(opts) do
+  @doc false
+  def normalize_proof_filters(opts) do
     opts =
       Enum.into(opts, %{}, fn {key, value} -> {to_string(key), value} end)
 
@@ -6624,10 +6577,11 @@ defmodule ControlKeel.Mission do
     )
   end
 
-  defp maybe_search_proofs(query, nil), do: query
-  defp maybe_search_proofs(query, ""), do: query
+  @doc false
+  def maybe_search_proofs(query, nil), do: query
+  def maybe_search_proofs(query, ""), do: query
 
-  defp maybe_search_proofs(query, value) do
+  def maybe_search_proofs(query, value) do
     pattern = "%" <> String.downcase(value) <> "%"
 
     from([proof, task, session, workspace] in query,
@@ -6722,45 +6676,50 @@ defmodule ControlKeel.Mission do
     from([_f, s, _w] in query, where: s.workspace_id in ^workspace_ids)
   end
 
-  defp maybe_filter_proof_workspace(query, nil), do: query
-  defp maybe_filter_proof_workspace(query, []), do: query
+  @doc false
+  def maybe_filter_proof_workspace(query, nil), do: query
+  def maybe_filter_proof_workspace(query, []), do: query
 
-  defp maybe_filter_proof_workspace(query, workspace_id) when is_integer(workspace_id) do
+  def maybe_filter_proof_workspace(query, workspace_id) when is_integer(workspace_id) do
     from([_proof, _task, session, _workspace] in query,
       where: session.workspace_id == ^workspace_id
     )
   end
 
-  defp maybe_filter_proof_workspace(query, workspace_ids) when is_list(workspace_ids) do
+  def maybe_filter_proof_workspace(query, workspace_ids) when is_list(workspace_ids) do
     from([_proof, _task, session, _workspace] in query,
       where: session.workspace_id in ^workspace_ids
     )
   end
 
-  defp maybe_filter_proof_session(query, nil), do: query
+  @doc false
+  def maybe_filter_proof_session(query, nil), do: query
 
-  defp maybe_filter_proof_session(query, session_id) do
+  def maybe_filter_proof_session(query, session_id) do
     from([proof, _task, _session, _workspace] in query, where: proof.session_id == ^session_id)
   end
 
-  defp maybe_filter_proof_task(query, nil), do: query
+  @doc false
+  def maybe_filter_proof_task(query, nil), do: query
 
-  defp maybe_filter_proof_task(query, task_id) do
+  def maybe_filter_proof_task(query, task_id) do
     from([proof, _task, _session, _workspace] in query, where: proof.task_id == ^task_id)
   end
 
-  defp maybe_filter_proof_ready(query, nil), do: query
+  @doc false
+  def maybe_filter_proof_ready(query, nil), do: query
 
-  defp maybe_filter_proof_ready(query, deploy_ready) do
+  def maybe_filter_proof_ready(query, deploy_ready) do
     from([proof, _task, _session, _workspace] in query,
       where: proof.deploy_ready == ^deploy_ready
     )
   end
 
-  defp maybe_filter_proof_risk(query, nil), do: query
-  defp maybe_filter_proof_risk(query, ""), do: query
+  @doc false
+  def maybe_filter_proof_risk(query, nil), do: query
+  def maybe_filter_proof_risk(query, ""), do: query
 
-  defp maybe_filter_proof_risk(query, risk_tier) do
+  def maybe_filter_proof_risk(query, risk_tier) do
     from([_proof, _task, session, _workspace] in query, where: session.risk_tier == ^risk_tier)
   end
 
