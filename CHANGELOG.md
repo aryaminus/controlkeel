@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.4.3 — 2026-08-28
+
+### What's changed
+
+- Merge pull request #134 from aryaminus/fix/p2-god-module-splits
+- Merge pull request #133 from aryaminus/fix/p2-streamable-http-mcp
+- Merge pull request #132 from aryaminus/fix/p2-llm-judge-harness
+- refactor: first god-module split — Mission.FindingOps + API.FindingController
+- feat(mcp): Streamable HTTP session semantics (Mcp-Session-Id lifecycle)
+- feat(benchmark): LLM-as-judge harness for eval_mode=llm_judge
+- Merge pull request #128 from aryaminus/fix/dogfood-mcp-cli-review-loop
+- fix(surface): token-surface deprecation, honest skills doctor signal, alias deprecated skills
+- fix(housekeeping): honest skills doctor signal, installer self-heal, token audit join
+- style: mix format
+- fix(audit): full P0+P1 remediation across governance, storage, policy, eval, CLI
+- feat: smart auto-approval for low-risk work
+- fix: inline-first approval flow across all clients
+- fix: actionable duplicate skill cleanup guidance + --prune-duplicates flag
+- fix: MCP/CLI review loop, ck_fs_find glob support, updater orphan cleanup
+
+## v0.4.2 — 2026-08-27
+
+### What's changed
+
+- Merge pull request #120 from aryaminus/refactor/web-policy-studio
+- Merge pull request #114 from aryaminus/refactor/web-deploy
+- Merge pull request #112 from aryaminus/refactor/web-benchmark
+- refactor/web-policy-studio: implement web-based policy management and rename tool-policy tab to agent-tools
+- refactor/web-policy-studio: add reusable modal component and refactor policy studio dialogs to use it
+- refactor/web-policy-studio: remove form binding from tool policy UI and introduce reusable rule_tag component
+- refactor/web-policy-studio: remove workspace role enforcement temporarily to permit viewer access pending centralized auth transition
+- refactor/web-policy-studio: add ability to toggle policy set assignment status and exclude disabled assignments from evaluation
+- refactor/web-policy-studio: validate policy precedence range and display detailed changeset errors in workspace settings
+- refactor/web-policy-studio: rename tool policy UI to agent tools and add breadcrumbs to workspace views
+- refactor/web-policy-studio: add support for breadcrumbs in dashboard layout
+- refactor/web-policy-studio: implement workspace-level policy
+- refactor/web-policy-studio: update policy studio layout
+- refactor/web-policy-studio: refine Policy Studio UI for better usability
+- refactor/web-policy-studio: update core components with error rendering, and simplify Policy Studio layout
+- refactor/web-policy-studio: add Policy Studio UI for creating policy sets
+- refactor/web-policy-studio: update Policy Studio to list global policy sets.
+- refactor/web-deploy: standardize deployment UI components
+- refactor/web-deploy: implement file write error handling in DeploymentAdvisor and add comprehensive LiveView test suite for deploy review.
+- refactor/web-deploy: replace global deployment page with session-scoped DeployReviewLive and move deployment advisor functionality to the session context.
+- refactor/web-deploy: add file copy event to mission control
+- refactor/web-deploy: improve deployment modal UI layout
+- refactor/web-deploy: migrate deployment UI from global route to session modal.
+- refactor/web-deploy: relocate deployment analysis to mission control session modal for improved path resolution
+- refactor/web-deploy: remove deployment advisor module and associated UI navigation components
+
 ## v0.4.1 — 2026-08-21
 
 ### What's changed

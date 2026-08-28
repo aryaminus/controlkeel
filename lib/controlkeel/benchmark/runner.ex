@@ -336,6 +336,43 @@ defmodule ControlKeel.Benchmark.Runner do
     |> Map.put("matched_expected", matched)
     |> Map.put("severity_weight", severity_weight(scenario))
     |> Map.put("weighted_score", if(matched, do: severity_weight(scenario), else: 0.0))
+    |> maybe_apply_llm_judge(scenario, matched)
+  end
+
+  # eval_mode=llm_judge: run the judge and record its verdict. The judge only
+  # OVERRIDES matched_expected for scenarios with no deterministic signal
+  # (empty expected_rules and blank expected_decision) — otherwise it is
+  # advisory metadata and deterministic matching stays authoritative.
+  defp maybe_apply_llm_judge(outcome, scenario, deterministic_matched) do
+    if get_in(scenario.metadata || %{}, ["eval_mode"]) == "llm_judge" do
+      case ControlKeel.Benchmark.LlmJudge.judge(scenario, outcome) do
+        {:ok, verdict} ->
+          matched =
+            if ControlKeel.Benchmark.LlmJudge.judge_decides?(scenario) do
+              verdict.verdict == "pass"
+            else
+              deterministic_matched
+            end
+
+          outcome
+          |> Map.put("matched_expected", matched)
+          |> Map.put("weighted_score", if(matched, do: severity_weight(scenario), else: 0.0))
+          |> Map.update("metadata", %{}, fn meta ->
+            meta
+            |> Map.put("llm_judge", %{
+              "verdict" => verdict.verdict,
+              "score" => verdict.score,
+              "rationale" => verdict.rationale
+            })
+          end)
+
+        {:error, reason} ->
+          outcome
+          |> Map.update("metadata", %{}, &Map.put(&1, "llm_judge_error", to_string(reason)))
+      end
+    else
+      outcome
+    end
   end
 
   defp severity_weight(%{metadata: metadata}) when is_map(metadata) do

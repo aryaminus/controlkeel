@@ -24,7 +24,7 @@ defmodule ControlKeel.Mission do
 
   alias ControlKeel.Mission.{
     Finding,
-    FindingAuditEvent,
+    FindingOps,
     Invocation,
     Planner,
     ProofBundle,
@@ -40,7 +40,6 @@ defmodule ControlKeel.Mission do
   alias ControlKeel.Utils
 
   @findings_page_size 10
-  @proofs_page_size 20
   @plan_phases ~w(ticket research_packet design_options narrowed_decision implementation_plan code_backed_plan)
   @execution_ready_plan_phases ~w(implementation_plan code_backed_plan)
   @verified_completion_score_threshold 45
@@ -649,37 +648,11 @@ defmodule ControlKeel.Mission do
       "regression:#{normalized["engine"]}:#{normalized["flow_name"]}:#{invocation.id}"
   end
 
-  def get_proof_bundle(id), do: Repo.get(ProofBundle, id)
-  def get_proof_bundle!(id), do: Repo.get!(ProofBundle, id)
-
-  def get_proof_bundle_with_context(id) do
-    ProofBundle
-    |> Repo.get(id)
-    |> case do
-      nil ->
-        nil
-
-      proof ->
-        Repo.preload(proof, task: [], session: :workspace)
-    end
-  end
-
-  def latest_proof_bundle_for_task(task_id) when is_integer(task_id) do
-    ProofBundle
-    |> where([proof], proof.task_id == ^task_id)
-    |> order_by([proof], desc: proof.version, desc: proof.id)
-    |> limit(1)
-    |> Repo.one()
-  end
-
-  def latest_proof_bundles_for_session(session_id) when is_integer(session_id) do
-    ProofBundle
-    |> where([proof], proof.session_id == ^session_id)
-    |> order_by([proof], asc: proof.task_id, desc: proof.version, desc: proof.id)
-    |> Repo.all()
-    |> Enum.group_by(& &1.task_id)
-    |> Enum.into(%{}, fn {task_id, [latest | _rest]} -> {task_id, latest} end)
-  end
+  defdelegate get_proof_bundle(id), to: ControlKeel.Mission.ProofOps
+  defdelegate get_proof_bundle!(id), to: ControlKeel.Mission.ProofOps
+  defdelegate get_proof_bundle_with_context(id), to: ControlKeel.Mission.ProofOps
+  defdelegate latest_proof_bundle_for_task(task_id), to: ControlKeel.Mission.ProofOps
+  defdelegate latest_proof_bundles_for_session(session_id), to: ControlKeel.Mission.ProofOps
 
   def create_task_checkpoint(attrs) do
     %TaskCheckpoint{}
@@ -1156,278 +1129,19 @@ defmodule ControlKeel.Mission do
     }
   end
 
-  def browse_proof_bundles(opts \\ %{}) do
-    filters = normalize_proof_filters(opts)
-    base_query = proof_bundles_query(filters)
-    total_count = Repo.aggregate(base_query, :count, :id)
-    total_pages = max(div(total_count + @proofs_page_size - 1, @proofs_page_size), 1)
-    page = min(filters.page, total_pages)
-
-    entries =
-      base_query
-      |> order_by([proof, _task, _session, _workspace], desc: proof.generated_at, desc: proof.id)
-      |> limit(^@proofs_page_size)
-      |> offset(^((page - 1) * @proofs_page_size))
-      |> Repo.all()
-
-    %{
-      entries: entries,
-      filters: %{filters | page: page},
-      total_count: total_count,
-      total_pages: total_pages,
-      page: page,
-      page_size: @proofs_page_size
-    }
-  end
+  defdelegate browse_proof_bundles(opts \\ %{}), to: ControlKeel.Mission.ProofOps
 
   def auto_fix_for_finding(%Finding{} = finding), do: AutoFix.generate(finding)
 
-  def approve_finding(finding_or_id, opts \\ [])
+  # ── Finding disposition (extracted to Mission.FindingOps) ────────────────────
 
-  def approve_finding(%Finding{} = finding, opts) when is_list(opts) do
-    metadata =
-      Map.merge(finding.metadata || %{}, %{
-        "approved_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
-      })
-
-    case update_finding_with_audit(
-           finding,
-           %{status: "approved", metadata: metadata},
-           :approved,
-           opts
-         ) do
-      {:ok, updated} ->
-        emit_finding_event(:approved, updated)
-        record_finding_memory(:approved, updated)
-        emit_platform_finding_event("finding.approved", updated)
-        {:ok, updated}
-
-      other ->
-        other
-    end
-  end
-
-  def approve_finding(id, opts) when is_integer(id) and is_list(opts) do
-    case get_finding(id) do
-      nil -> {:error, :not_found}
-      finding -> approve_finding(finding, opts)
-    end
-  end
-
-  def reject_finding(finding_or_id, reason \\ nil, opts \\ [])
-
-  def reject_finding(%Finding{} = finding, reason, opts) when is_list(opts) do
-    metadata =
-      finding.metadata
-      |> Kernel.||(%{})
-      |> Map.merge(%{
-        "rejected_at" => DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
-      })
-      |> maybe_put_metadata("rejection_reason", reason)
-
-    case update_finding_with_audit(
-           finding,
-           %{status: "rejected", metadata: metadata},
-           :rejected,
-           Keyword.put(opts, :reason, reason)
-         ) do
-      {:ok, updated} ->
-        emit_finding_event(:rejected, updated)
-        record_finding_memory(:rejected, updated)
-        emit_platform_finding_event("finding.rejected", updated)
-        {:ok, updated}
-
-      other ->
-        other
-    end
-  end
-
-  def reject_finding(id, reason, opts) when is_integer(id) and is_list(opts) do
-    case get_finding(id) do
-      nil -> {:error, :not_found}
-      finding -> reject_finding(finding, reason, opts)
-    end
-  end
-
-  def escalate_finding(finding_or_id, opts \\ [])
-
-  def escalate_finding(%Finding{} = finding, opts) when is_list(opts) do
-    metadata =
-      Map.merge(finding.metadata || %{}, %{
-        "escalated_at" =>
-          DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
-      })
-
-    case update_finding_with_audit(
-           finding,
-           %{status: "escalated", metadata: metadata},
-           :escalated,
-           opts
-         ) do
-      {:ok, updated} ->
-        emit_finding_event(:escalated, updated)
-        record_finding_memory(:escalated, updated)
-        {:ok, updated}
-
-      other ->
-        other
-    end
-  end
-
-  def escalate_finding(id, opts) when is_integer(id) and is_list(opts) do
-    case get_finding(id) do
-      nil -> {:error, :not_found}
-      finding -> escalate_finding(finding, opts)
-    end
-  end
-
-  @disposition_actions ~w(resolve dismiss escalate)
-  @disposition_statuses ~w(open blocked escalated)
-
-  @doc """
-  Disposition a single finding via a high-level action so agents (and bulk paths) can
-  resolve the findings they create instead of only filing compensating records:
-
-    * `"resolve"`  -> approved
-    * `"dismiss"`  -> rejected (records `opts[:reason]`)
-    * `"escalate"` -> escalated
-
-  Accepts a `%Finding{}` or an integer id. Returns `{:ok, finding}` / `{:error, reason}`.
-  """
-  def dispose_finding(action, finding_or_id, opts \\ [])
-
-  def dispose_finding(action, %Finding{} = finding, opts),
-    do: do_dispose_finding(action, finding, opts)
-
-  def dispose_finding(action, id, opts) when is_integer(id) do
-    case get_finding(id) do
-      nil -> {:error, :not_found}
-      finding -> do_dispose_finding(action, finding, opts)
-    end
-  end
-
-  defp do_dispose_finding("resolve", finding, opts), do: approve_finding(finding, opts)
-
-  defp do_dispose_finding("dismiss", finding, opts),
-    do: reject_finding(finding, Keyword.get(opts, :reason), opts)
-
-  defp do_dispose_finding("escalate", finding, opts), do: escalate_finding(finding, opts)
-  defp do_dispose_finding(_action, _finding, _opts), do: {:error, :invalid_action}
-
-  @doc """
-  Bulk-disposition findings in a session matching a filter map.
-
-  Filter keys: `:rule_id`, `:category`, `:statuses` (defaults to the active set
-  `~w(open blocked escalated)`), and `:reason` (recorded when dismissing). Only findings
-  currently in the matched statuses are touched, so the operation is idempotent. Returns
-  `{:ok, %{count: n, ids: [finding_id]}}`.
-  """
-  def dispose_session_findings(session_id, filter, action)
-      when is_integer(session_id) and action in @disposition_actions do
-    reason = Map.get(filter, :reason)
-    disposition_opts = Map.get(filter, :disposition_opts, [])
-
-    ids =
-      session_id
-      |> list_findings_for_session()
-      |> Enum.filter(&matches_disposition_filter?(&1, filter))
-      |> Enum.reduce([], fn finding, acc ->
-        case do_dispose_finding(action, finding, Keyword.put(disposition_opts, :reason, reason)) do
-          {:ok, updated} -> [updated.id | acc]
-          _ -> acc
-        end
-      end)
-      |> Enum.reverse()
-
-    {:ok, %{count: length(ids), ids: ids}}
-  end
-
-  def dispose_session_findings(_session_id, _filter, _action), do: {:error, :invalid_action}
-
-  @doc """
-  Bulk-disposition a list of finding ids via a single action (`resolve`,
-  `dismiss`, or `escalate`). Dismissals record `opts[:reason]` on the finding
-  metadata and audit event. Only findings currently in an active status
-  (`open`, `blocked`, `escalated`) are touched, so the operation is idempotent.
-  Returns `{:ok, %{count: n, ids: [finding_id]}}`.
-  """
-  def dispose_findings(ids, action, opts \\ []) when is_list(ids) do
-    if action in @disposition_actions do
-      disposition_opts = Keyword.put(opts, :reason, opts[:reason] && to_string(opts[:reason]))
-
-      ids =
-        Enum.reduce(ids, [], fn id, acc ->
-          with %Finding{status: status} <- get_finding(id),
-               true <- status in @disposition_statuses,
-               {:ok, updated} <- do_dispose_finding(action, id, disposition_opts) do
-            [updated.id | acc]
-          else
-            _ -> acc
-          end
-        end)
-        |> Enum.reverse()
-
-      {:ok, %{count: length(ids), ids: ids}}
-    else
-      {:error, :invalid_action}
-    end
-  end
-
-  defp matches_disposition_filter?(finding, filter) do
-    statuses = Map.get(filter, :statuses) || ~w(open blocked escalated)
-
-    finding.status in statuses and
-      disposition_filter_match?(finding.rule_id, Map.get(filter, :rule_id)) and
-      disposition_filter_match?(finding.category, Map.get(filter, :category))
-  end
-
-  defp disposition_filter_match?(_value, nil), do: true
-  defp disposition_filter_match?(value, expected), do: value == expected
-
-  @doc "List append-only audit events for a finding, oldest first."
-  @spec finding_audit_events(integer()) :: [FindingAuditEvent.t()]
-  def finding_audit_events(finding_id) when is_integer(finding_id) do
-    FindingAuditEvent
-    |> where([event], event.finding_id == ^finding_id)
-    |> order_by([event], asc: event.recorded_at, asc: event.id)
-    |> Repo.all()
-  end
-
-  # Atomically persist a finding status change and its append-only audit event.
-  # Mirrors the review-decision Multi in respond_review so the lineage guarantee
-  # holds even under a failed audit insert: the status update and the audit row
-  # commit together or roll back together (no status change without a trail).
-  defp update_finding_with_audit(finding, attrs, event_type, opts) do
-    Multi.new()
-    |> Multi.update(:finding, Finding.changeset(finding, attrs))
-    |> Multi.insert(:finding_audit_event, fn %{finding: updated} ->
-      FindingAuditEvent.changeset(
-        %FindingAuditEvent{},
-        finding_audit_attrs(event_type, finding, updated, opts)
-      )
-    end)
-    |> RepoRetry.transaction_with_busy_retry()
-    |> case do
-      {:ok, %{finding: updated}} -> {:ok, updated}
-      {:error, _step, reason, _changes} -> {:error, reason}
-    end
-  end
-
-  defp finding_audit_attrs(event_type, previous, updated, opts) do
-    actor_source = Keyword.get(opts, :actor_source) || "unknown"
-
-    %{
-      finding_id: updated.id,
-      event_type: Atom.to_string(event_type),
-      previous_status: previous.status,
-      new_status: updated.status,
-      reason: Keyword.get(opts, :reason),
-      actor_user_id: Keyword.get(opts, :actor_user_id),
-      actor_source: actor_source,
-      actor_identifier: Keyword.get(opts, :actor_identifier) || actor_source,
-      recorded_at: DateTime.utc_now() |> DateTime.truncate(:second)
-    }
-  end
+  defdelegate approve_finding(finding_or_id, opts \\ []), to: FindingOps
+  defdelegate reject_finding(finding_or_id, reason \\ nil, opts \\ []), to: FindingOps
+  defdelegate escalate_finding(finding_or_id, opts \\ []), to: FindingOps
+  defdelegate dispose_finding(action, finding_or_id, opts \\ []), to: FindingOps
+  defdelegate dispose_session_findings(session_id, filter, action), to: FindingOps
+  defdelegate dispose_findings(ids, action, opts \\ []), to: FindingOps
+  defdelegate finding_audit_events(finding_id), to: FindingOps
 
   @doc """
   Complete a task, gating on open/blocked findings and deploy readiness.
@@ -4876,7 +4590,7 @@ defmodule ControlKeel.Mission do
   defp task_memory_title(:updated, task), do: "Task updated: #{task.title}"
   defp task_memory_title(_action, task), do: "Task changed: #{task.title}"
 
-  defp record_finding_memory(action, %Finding{} = finding) do
+  def record_finding_memory(action, %Finding{} = finding) do
     case get_session_with_workspace(finding.session_id) do
       nil ->
         :ok
@@ -6450,7 +6164,7 @@ defmodule ControlKeel.Mission do
     )
   end
 
-  defp emit_platform_finding_event(event, finding) do
+  def emit_platform_finding_event(event, finding) do
     Platform.emit_event(
       event,
       %{
@@ -6472,7 +6186,7 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  defp emit_finding_event(action, %Finding{} = finding) do
+  def emit_finding_event(action, %Finding{} = finding) do
     :telemetry.execute(
       [:controlkeel, :finding, action],
       %{count: 1},
@@ -6737,7 +6451,8 @@ defmodule ControlKeel.Mission do
     |> maybe_filter_finding_workspace(filters.workspace_ids)
   end
 
-  defp proof_bundles_query(filters) do
+  @doc false
+  def proof_bundles_query(filters) do
     from(proof in ProofBundle,
       join: task in assoc(proof, :task),
       join: session in assoc(proof, :session),
@@ -6773,7 +6488,8 @@ defmodule ControlKeel.Mission do
     }
   end
 
-  defp normalize_proof_filters(opts) do
+  @doc false
+  def normalize_proof_filters(opts) do
     opts =
       Enum.into(opts, %{}, fn {key, value} -> {to_string(key), value} end)
 
@@ -6861,10 +6577,11 @@ defmodule ControlKeel.Mission do
     )
   end
 
-  defp maybe_search_proofs(query, nil), do: query
-  defp maybe_search_proofs(query, ""), do: query
+  @doc false
+  def maybe_search_proofs(query, nil), do: query
+  def maybe_search_proofs(query, ""), do: query
 
-  defp maybe_search_proofs(query, value) do
+  def maybe_search_proofs(query, value) do
     pattern = "%" <> String.downcase(value) <> "%"
 
     from([proof, task, session, workspace] in query,
@@ -6959,50 +6676,52 @@ defmodule ControlKeel.Mission do
     from([_f, s, _w] in query, where: s.workspace_id in ^workspace_ids)
   end
 
-  defp maybe_filter_proof_workspace(query, nil), do: query
-  defp maybe_filter_proof_workspace(query, []), do: query
+  @doc false
+  def maybe_filter_proof_workspace(query, nil), do: query
+  def maybe_filter_proof_workspace(query, []), do: query
 
-  defp maybe_filter_proof_workspace(query, workspace_id) when is_integer(workspace_id) do
+  def maybe_filter_proof_workspace(query, workspace_id) when is_integer(workspace_id) do
     from([_proof, _task, session, _workspace] in query,
       where: session.workspace_id == ^workspace_id
     )
   end
 
-  defp maybe_filter_proof_workspace(query, workspace_ids) when is_list(workspace_ids) do
+  def maybe_filter_proof_workspace(query, workspace_ids) when is_list(workspace_ids) do
     from([_proof, _task, session, _workspace] in query,
       where: session.workspace_id in ^workspace_ids
     )
   end
 
-  defp maybe_filter_proof_session(query, nil), do: query
+  @doc false
+  def maybe_filter_proof_session(query, nil), do: query
 
-  defp maybe_filter_proof_session(query, session_id) do
+  def maybe_filter_proof_session(query, session_id) do
     from([proof, _task, _session, _workspace] in query, where: proof.session_id == ^session_id)
   end
 
-  defp maybe_filter_proof_task(query, nil), do: query
+  @doc false
+  def maybe_filter_proof_task(query, nil), do: query
 
-  defp maybe_filter_proof_task(query, task_id) do
+  def maybe_filter_proof_task(query, task_id) do
     from([proof, _task, _session, _workspace] in query, where: proof.task_id == ^task_id)
   end
 
-  defp maybe_filter_proof_ready(query, nil), do: query
+  @doc false
+  def maybe_filter_proof_ready(query, nil), do: query
 
-  defp maybe_filter_proof_ready(query, deploy_ready) do
+  def maybe_filter_proof_ready(query, deploy_ready) do
     from([proof, _task, _session, _workspace] in query,
       where: proof.deploy_ready == ^deploy_ready
     )
   end
 
-  defp maybe_filter_proof_risk(query, nil), do: query
-  defp maybe_filter_proof_risk(query, ""), do: query
+  @doc false
+  def maybe_filter_proof_risk(query, nil), do: query
+  def maybe_filter_proof_risk(query, ""), do: query
 
-  defp maybe_filter_proof_risk(query, risk_tier) do
+  def maybe_filter_proof_risk(query, risk_tier) do
     from([_proof, _task, session, _workspace] in query, where: session.risk_tier == ^risk_tier)
   end
-
-  defp maybe_put_metadata(metadata, _key, nil), do: metadata
-  defp maybe_put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
   defp count_by_metadata(findings, key) do
     findings

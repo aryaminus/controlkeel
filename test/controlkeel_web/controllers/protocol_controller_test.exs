@@ -87,12 +87,97 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
       assert challenge =~ "/.well-known/oauth-protected-resource/mcp"
     end
 
-    test "returns 405 for GET and DELETE on /mcp", %{conn: conn} do
+    test "returns 405 for GET on /mcp (POST-only streamable server)", %{conn: conn} do
       conn = get(conn, "/mcp")
       assert %{"error" => "method_not_allowed"} = json_response(conn, 405)
+    end
 
+    test "initialize issues Mcp-Session-Id; tools/list accepts it; DELETE terminates", %{
+      conn: conn
+    } do
+      token = hosted_token_for("mcp:access")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize"
+        })
+
+      assert %{"result" => %{"serverInfo" => %{"name" => "controlkeel"}}} =
+               json_response(conn, 200)
+
+      [session_id] = get_resp_header(conn, "mcp-session-id")
+      assert is_binary(session_id) and session_id != ""
+
+      conn =
+        build_conn()
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> put_req_header("mcp-session-id", session_id)
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/list"
+        })
+
+      assert %{"result" => %{"tools" => _}} = json_response(conn, 200)
+
+      conn =
+        build_conn()
+        |> put_req_header("mcp-session-id", session_id)
+        |> delete("/mcp")
+
+      assert response(conn, 204)
+
+      conn =
+        build_conn()
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> put_req_header("mcp-session-id", session_id)
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 3,
+          method: "tools/list"
+        })
+
+      assert %{"error" => %{"code" => -32001}} = json_response(conn, 404)
+    end
+
+    test "unknown Mcp-Session-Id on a non-initialize request yields 404", %{conn: conn} do
+      token = hosted_token_for("mcp:access")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> put_req_header("mcp-session-id", "mcp_nonexistent")
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list"
+        })
+
+      assert %{"error" => %{"code" => -32001}} = json_response(conn, 404)
+    end
+
+    test "headerless non-initialize requests remain valid (stateless clients)", %{conn: conn} do
+      token = hosted_token_for("mcp:access")
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list"
+        })
+
+      assert %{"result" => %{"tools" => _}} = json_response(conn, 200)
+    end
+
+    test "DELETE without a session header yields 404", %{conn: conn} do
       conn = build_conn() |> delete("/mcp")
-      assert %{"error" => "method_not_allowed"} = json_response(conn, 405)
+      assert %{"error" => "session_not_found"} = json_response(conn, 404)
     end
 
     test "allows initialize and tools/list with a valid MCP access token", %{conn: conn} do

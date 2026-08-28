@@ -1,6 +1,8 @@
 defmodule ControlKeelWeb.ApiController do
   use ControlKeelWeb, :controller
 
+  import ControlKeelWeb.APIHelpers
+
   alias ControlKeel.Agent.ACPRegistry
   alias ControlKeel.Agent.Execution
   alias ControlKeel.Agent.Router
@@ -361,92 +363,6 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   # ─── Findings ────────────────────────────────────────────────────────────────
-
-  def list_findings(conn, params) do
-    opts =
-      params
-      |> Map.take(
-        ~w(session_id severity status category finding_family patch_status disclosure_status maintainer_scope)
-      )
-      |> Enum.into(%{})
-      |> Map.put("workspace_id", current_workspace_id(conn))
-
-    page = Mission.browse_findings(opts)
-
-    json(conn, %{
-      findings: Enum.map(page.entries, &finding_summary/1),
-      security_summary: page.security_summary,
-      filters: page.filters,
-      total: page.total_count,
-      page: page.page,
-      total_pages: page.total_pages
-    })
-  end
-
-  def finding_action(conn, %{"id" => id, "action" => action} = params) do
-    case Mission.get_finding(id) do
-      nil ->
-        conn |> put_status(:not_found) |> json(%{error: "finding not found"})
-
-      finding ->
-        with :ok <- authorize_finding_access(conn, finding, "findings:write") do
-          case action do
-            "approve" ->
-              {:ok, updated} = Mission.approve_finding(finding)
-              json(conn, %{finding: finding_summary(updated)})
-
-            "reject" ->
-              reason = Map.get(params, "reason")
-              {:ok, updated} = Mission.reject_finding(finding, reason)
-              json(conn, %{finding: finding_summary(updated)})
-
-            "escalate" ->
-              {:ok, updated} = Mission.escalate_finding(finding)
-              json(conn, %{finding: finding_summary(updated)})
-
-            _ ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "unknown action", valid_actions: ~w(approve reject escalate)})
-          end
-        else
-          {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
-        end
-    end
-  end
-
-  def create_finding(conn, params) do
-    session_id = Arguments.parse_integer(params["session_id"])
-
-    decision = Map.get(params, "decision", "warn")
-    status = if decision == "block", do: "blocked", else: "open"
-
-    attrs = %{
-      "session_id" => session_id,
-      "task_id" => Arguments.parse_integer(params["task_id"]),
-      "category" => Map.get(params, "category", "security"),
-      "severity" => Map.get(params, "severity", "medium"),
-      "rule_id" => Map.get(params, "rule_id", "agent.manual_review"),
-      "plain_message" => Map.get(params, "plain_message", ""),
-      "title" => Map.get(params, "title", Map.get(params, "rule_id", "Finding")),
-      "status" => status,
-      "auto_resolved" => false,
-      "metadata" => Map.get(params, "metadata", %{})
-    }
-
-    with :ok <- authorize_session_access(conn, session_id, "findings:write"),
-         {:ok, finding} <- Mission.create_finding(attrs) do
-      conn |> put_status(:created) |> json(%{finding: finding_summary(finding)})
-    else
-      {:error, :forbidden} ->
-        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
-
-      {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "invalid finding", details: changeset_errors(changeset)})
-    end
-  end
 
   # ─── Budget ──────────────────────────────────────────────────────────────────
 
@@ -1828,28 +1744,6 @@ defmodule ControlKeelWeb.ApiController do
     }
   end
 
-  defp finding_summary(finding) do
-    summary = %{
-      id: Map.get(finding, :id),
-      rule_id: finding.rule_id,
-      category: finding.category,
-      severity: finding.severity,
-      status: Map.get(finding, :status, "open"),
-      plain_message: finding.plain_message,
-      auto_fix_available: Map.get(finding, :auto_fix_available, false)
-    }
-
-    if ControlKeel.Governance.SecurityWorkflow.vulnerability_case?(finding) do
-      Map.put(
-        summary,
-        :security_lifecycle,
-        ControlKeel.Governance.SecurityWorkflow.vulnerability_case_summary(finding)
-      )
-    else
-      summary
-    end
-  end
-
   defp proof_summary(proof) do
     %{
       id: proof.id,
@@ -2164,33 +2058,6 @@ defmodule ControlKeelWeb.ApiController do
     |> to_string()
   end
 
-  defp changeset_errors(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
-
-  defp current_workspace_id(conn) do
-    case conn.assigns[:api_auth] do
-      %{type: :service_account, service_account: %{workspace_id: ws_id}} when is_integer(ws_id) ->
-        ws_id
-
-      _ ->
-        nil
-    end
-  end
-
-  defp parse_integer_param(value) when is_integer(value), do: {:ok, value}
-
-  defp parse_integer_param(value) do
-    case Integer.parse(to_string(value)) do
-      {parsed, ""} -> {:ok, parsed}
-      _ -> {:error, :invalid_integer}
-    end
-  end
-
   defp require_param(params, key) do
     case Map.get(params, key) do
       value when is_binary(value) and value != "" -> {:ok, value}
@@ -2263,61 +2130,6 @@ defmodule ControlKeelWeb.ApiController do
         authorize_session_access(conn, session_id, "reviews:write")
 
       true ->
-        :ok
-    end
-  end
-
-  defp authorize_finding_access(conn, finding, scope) do
-    with %{} = session <- Mission.get_session(finding.session_id) do
-      authorize_workspace_for_conn(conn, session.workspace_id, scope)
-    else
-      nil -> {:error, :not_found}
-    end
-  end
-
-  defp authorize_session_access(conn, session_id, scope) do
-    with {:ok, parsed_id} <- parse_integer_param(session_id),
-         %{} = session <- Mission.get_session(parsed_id) do
-      authorize_workspace_for_conn(conn, session.workspace_id, scope)
-    else
-      {:error, :invalid_integer} -> {:error, :not_found}
-      nil -> {:error, :not_found}
-    end
-  end
-
-  defp authorize_task_access(conn, task_id, scope) do
-    with {:ok, parsed_id} <- parse_integer_param(task_id),
-         %{} = task <- Mission.get_task(parsed_id),
-         %{} = session <- Mission.get_session(task.session_id) do
-      authorize_workspace_for_conn(conn, session.workspace_id, scope)
-    else
-      {:error, :invalid_integer} -> {:error, :not_found}
-      nil -> {:error, :not_found}
-    end
-  end
-
-  defp authorize_workspace_access(conn, workspace_id, scope) do
-    with {:ok, parsed_id} <- parse_integer_param(workspace_id) do
-      authorize_workspace_for_conn(conn, parsed_id, scope)
-    else
-      {:error, :invalid_integer} -> {:error, :not_found}
-    end
-  end
-
-  defp authorize_workspace_for_conn(conn, workspace_id, scope) do
-    case conn.assigns[:api_auth] do
-      %{type: :bootstrap} ->
-        :ok
-
-      %{type: :service_account, service_account: service_account} ->
-        if service_account.workspace_id == workspace_id and
-             Platform.service_account_has_scope?(service_account, scope) do
-          :ok
-        else
-          {:error, :forbidden}
-        end
-
-      _ ->
         :ok
     end
   end

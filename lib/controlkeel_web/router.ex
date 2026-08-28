@@ -217,9 +217,9 @@ defmodule ControlKeelWeb.Router do
     post "/tasks/:id/checks", ApiController, :task_checks
     post "/tasks/:id/report", ApiController, :report_task
     post "/validate", ApiController, :validate
-    get "/findings", ApiController, :list_findings
-    post "/findings", ApiController, :create_finding
-    post "/findings/:id/action", ApiController, :finding_action
+    get "/findings", API.FindingController, :list_findings
+    post "/findings", API.FindingController, :create_finding
+    post "/findings/:id/action", API.FindingController, :finding_action
     get "/proofs", ApiController, :list_proofs
     get "/proofs/:id", ApiController, :get_proof
     get "/benchmarks", ApiController, :list_benchmarks

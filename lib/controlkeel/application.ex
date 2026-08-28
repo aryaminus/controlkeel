@@ -81,6 +81,7 @@ defmodule ControlKeel.Application do
       db_maintenance_children() ++
       autonomy_scheduler_children() ++
       [ControlKeel.Cloud.RateLimiter, ControlKeel.Cloud.Usage.Meter] ++
+      [ControlKeel.Mcp.StreamableSessions] ++
       [
         {DNSCluster, query: Application.get_env(:controlkeel, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: ControlKeel.PubSub},
