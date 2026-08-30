@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.LayoutsTest do
     assert html =~ "sidebar-collapse-observability"
     assert html =~ "sidebar-chevron-observability"
     assert html =~ "aria-expanded=\"false\""
+    assert html =~ "aria-label=\"Toggle Observability menu\""
     assert html =~ "hidden"
     assert html =~ "Overview"
     assert html =~ "Learning loop"
@@ -24,6 +25,13 @@ defmodule ControlKeelWeb.LayoutsTest do
     assert html =~ "aria-expanded=\"true\""
     assert html =~ "rotate-90"
     assert anchor_for(html, "/observability") =~ "aria-current=\"page\""
+  end
+
+  test "sidebar links carry expected focus-visible styles" do
+    html = render_component(&Layouts.sidebar/1, current_path: "/dashboard")
+
+    assert html =~ "focus-visible:ring-offset-2"
+    assert html =~ "focus-visible:ring-offset-background"
   end
 
   test "sidebar highlights the matching child on deep observability paths" do
