@@ -16,6 +16,8 @@ defmodule ControlKeelWeb.Layouts do
 
   embed_templates "layouts/*"
 
+  @focus_ring "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+
   @doc """
   The dashboard sidebar: logo, primary nav, and external links.
 
@@ -62,6 +64,7 @@ defmodule ControlKeelWeb.Layouts do
                 data-sidebar-toggle
                 aria-expanded={(opened && "true") || "false"}
                 aria-controls={collapse_id}
+                aria-label={"Toggle #{item.label} menu"}
                 class={["w-full text-left cursor-pointer", sidebar_link_class(active)]}
               >
                 <.icon name={item.icon} class={sidebar_icon_class(active)} />
@@ -201,11 +204,11 @@ defmodule ControlKeelWeb.Layouts do
   defp nav_active?(_current_path, _path, _exact), do: false
 
   defp sidebar_link_class(true) do
-    "group flex items-center gap-3 rounded-xl bg-muted px-3 py-2.5 font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted"
+    "group flex items-center gap-3 rounded-xl bg-muted px-3 py-2.5 font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted #{@focus_ring}"
   end
 
   defp sidebar_link_class(false) do
-    "group flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    "group flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground #{@focus_ring}"
   end
 
   defp sidebar_icon_class(true), do: "size-4 text-primary"
@@ -239,11 +242,11 @@ defmodule ControlKeelWeb.Layouts do
   end
 
   defp subnav_link_class(true) do
-    "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted"
+    "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted #{@focus_ring}"
   end
 
   defp subnav_link_class(false) do
-    "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground #{@focus_ring}"
   end
 
   defp subnav_icon_class(true), do: "size-3.5 shrink-0 text-primary"
