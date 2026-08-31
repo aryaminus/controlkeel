@@ -121,6 +121,7 @@ defmodule ControlKeelWeb.MissionControlLive do
     {:noreply, socket |> assign(:selected_finding, nil) |> assign(:selected_fix, nil)}
   end
 
+  @impl true
   def handle_event("approve_finding", %{"id" => id}, socket) do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
@@ -214,13 +215,6 @@ defmodule ControlKeelWeb.MissionControlLive do
     end
   end
 
-  defp refresh_session_after_mutation(socket) do
-    case Mission.get_session_context(socket.assigns.session.id) do
-      nil -> socket
-      session -> safe_assign_session(socket, session)
-    end
-  end
-
   @impl true
   def handle_event("pause_task", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
@@ -242,6 +236,13 @@ defmodule ControlKeelWeb.MissionControlLive do
       {:noreply, socket |> put_flash(:info, "Task resumed.") |> safe_assign_session(session)}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
+    end
+  end
+
+  defp refresh_session_after_mutation(socket) do
+    case Mission.get_session_context(socket.assigns.session.id) do
+      nil -> socket
+      session -> safe_assign_session(socket, session)
     end
   end
 
