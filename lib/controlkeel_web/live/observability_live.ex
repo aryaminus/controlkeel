@@ -3,6 +3,7 @@ defmodule ControlKeelWeb.ObservabilityLive do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Observability
+  alias ControlKeel.Platform
   alias ControlKeelWeb.CommandPill
 
   on_mount ControlKeelWeb.CommandPill
@@ -20,7 +21,8 @@ defmodule ControlKeelWeb.ObservabilityLive do
            |> assign(:page_title, "Observability — #{run.session.title}")
            |> assign(:run, run)
            |> assign(:session_id, run.session.id)
-           |> assign(:session_title, run.session.title)}
+           |> assign(:session_title, run.session.title)
+           |> assign(:audit_exports, Platform.list_audit_exports(run.session.id))}
         else
           {:ok,
            socket
@@ -294,6 +296,44 @@ defmodule ControlKeelWeb.ObservabilityLive do
         </.link>
       </div>
 
+      <div
+        id="observability-audit-log-export"
+        class="rounded-xl px-4 py-3 border bg-[rgba(255,255,255,0.015)] space-y-2"
+      >
+        <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
+          Audit log export
+        </p>
+        <p class="text-muted-foreground text-sm leading-relaxed">
+          Checksummed audit artifact of record for this session, proofs embedded. The same export
+          behind <code class="text-primary font-semibold ml-1 text-xs">controlkeel audit-log</code>.
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <.link
+            :for={format <- ~w(json csv pdf)}
+            id={"observability-audit-export-#{format}"}
+            href={~p"/observability/sessions/#{@run.session.id}/audit-log/#{format}"}
+            class="rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
+          >
+            {String.upcase(format)}
+          </.link>
+        </div>
+        <%= if @audit_exports == [] do %>
+          <p class="text-muted-foreground text-xs">
+            No audit exports recorded yet — download one above and its checksum appears here.
+          </p>
+        <% else %>
+          <ul class="space-y-1 list-none p-0 m-0">
+            <%= for export <- @audit_exports do %>
+              <li class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span class="font-semibold uppercase">{export.format}</span>
+                <code class="font-mono break-all">{export.checksum}</code>
+                <span>{format_exported_at(export.generated_at)}</span>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="rounded-xl p-4 border bg-[rgba(255,255,255,0.015)] space-y-2">
           <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
@@ -358,6 +398,12 @@ defmodule ControlKeelWeb.ObservabilityLive do
 
   defp format_currency(cents) when is_integer(cents), do: (cents / 100) |> Float.round(2)
   defp format_currency(_cents), do: 0.0
+
+  defp format_exported_at(nil), do: "unknown time"
+
+  defp format_exported_at(%DateTime{} = at),
+    do: Calendar.strftime(at, "%Y-%m-%d %H:%M:%S UTC")
+
   defp format_frequency(map) when map == %{}, do: "none"
 
   defp format_frequency(map) when is_map(map) do

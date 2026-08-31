@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Mission
+  alias ControlKeel.Platform
 
   test "dedicated observability page renders session run details", %{conn: conn} do
     session = session_fixture(%{budget_cents: 2_000, daily_budget_cents: 2_000, spent_cents: 300})
@@ -85,5 +86,47 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert html =~ "mission-observability-open"
     assert html =~ "Open run observability"
     assert html =~ "/observability/sessions/#{session.id}"
+  end
+
+  test "observability page renders audit log export controls and checksums", %{conn: conn} do
+    session = session_fixture()
+    _finding = finding_fixture(%{session: session})
+
+    {:ok, view, html} = live(conn, ~p"/observability/sessions/#{session.id}")
+
+    assert has_element?(view, "#observability-audit-log-export")
+    assert has_element?(view, "#observability-audit-export-json")
+    assert has_element?(view, "#observability-audit-export-csv")
+    assert has_element?(view, "#observability-audit-export-pdf")
+    assert html =~ "/observability/sessions/#{session.id}/audit-log/json"
+    assert html =~ "No audit exports recorded yet"
+
+    assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "json")
+
+    {:ok, view, html} = live(conn, ~p"/observability/sessions/#{session.id}")
+
+    assert html =~ export.checksum
+    assert html =~ export.format
+  end
+
+  test "mission control header shows audit log export controls and latest checksum", %{
+    conn: conn
+  } do
+    session = session_fixture()
+
+    {:ok, view, html} = live(conn, ~p"/sessions/#{session.id}")
+
+    assert has_element?(view, "#mission-audit-export-json")
+    assert has_element?(view, "#mission-audit-export-csv")
+    assert has_element?(view, "#mission-audit-export-pdf")
+    assert html =~ "/observability/sessions/#{session.id}/audit-log/csv"
+    refute html =~ "Last export"
+
+    assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "csv")
+
+    {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}")
+
+    assert html =~ "Last export (csv)"
+    assert html =~ export.checksum
   end
 end

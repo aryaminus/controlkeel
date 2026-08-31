@@ -171,6 +171,11 @@ defmodule ControlKeelWeb.Router do
     # Session export is auth-gated via Plugs.RequireSessionAuth (mirrors
     # LiveAuth.require_cloud_auth plus org ownership of the session).
     get "/observability/sessions/:id/export.json", ObservabilityController, :export_session
+
+    # Audit-log artifact of record (json/csv/pdf), same auth gate as above.
+    get "/observability/sessions/:id/audit-log/:format",
+        ObservabilityController,
+        :export_audit_log
   end
 
   scope "/api/v1", ControlKeelWeb do

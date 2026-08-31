@@ -7,6 +7,7 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeel.Observability
+  alias ControlKeel.Platform
   alias ControlKeel.Proxy
   alias ControlKeelWeb.FindingComponents
   alias ControlKeelWeb.ReleaseReadiness
@@ -245,12 +246,31 @@ defmodule ControlKeelWeb.MissionControlLive do
             {@session.objective}
           </p>
         </div>
-        <.link
-          navigate={~p"/sessions/#{@session.id}/deploy-review"}
-          class="inline-flex shrink-0 items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
-        >
-          <.icon name="hero-cloud-arrow-up" class="size-4" /> Deployment Advisor
-        </.link>
+        <div class="flex flex-col sm:items-end gap-2 shrink-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Audit log
+            </span>
+            <.link
+              :for={format <- ~w(json csv pdf)}
+              id={"mission-audit-export-#{format}"}
+              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
+              class="rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
+            >
+              {String.upcase(format)}
+            </.link>
+          </div>
+          <p :if={@latest_audit_export} class="text-xs text-muted-foreground">
+            Last export ({@latest_audit_export.format}):
+            <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
+          </p>
+          <.link
+            navigate={~p"/sessions/#{@session.id}/deploy-review"}
+            class="inline-flex shrink-0 items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+          >
+            <.icon name="hero-cloud-arrow-up" class="size-4" /> Deployment Advisor
+          </.link>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-5">
@@ -1070,6 +1090,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         :active_tasks,
         Enum.count(session.tasks || [], &(&1.status in ["queued", "in_progress"]))
       )
+      |> assign(:latest_audit_export, nil)
       |> assign(:task_graph, %{tasks: session.tasks || [], edges: []})
   end
 
@@ -1105,6 +1126,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
       compliance_score: compliance_score(session.findings),
       latest_proofs: Mission.latest_proof_bundles_for_session(session.id),
+      latest_audit_export: Platform.list_audit_exports(session.id, 1) |> List.first(),
       observability: Observability.session_run(session),
       current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
       current_memory_hits: current_memory_hits(session),

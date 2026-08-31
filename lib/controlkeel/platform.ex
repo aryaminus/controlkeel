@@ -6,7 +6,7 @@ defmodule ControlKeel.Platform do
   alias Ecto.Multi
   alias ControlKeel.{AuditExports, Budget, Mission, Repo}
   alias ControlKeel.Mission.Decomposition
-  alias ControlKeel.Mission.{ProofBundle, Session, Task}
+  alias ControlKeel.Mission.{ProofBundle, Session, SessionTranscript, Task}
 
   alias ControlKeel.Platform.{
     Export,
@@ -764,7 +764,9 @@ defmodule ControlKeel.Platform do
     end
   end
 
-  def export_audit_log(session_id, format) when format in ["json", "csv", "pdf"] do
+  def export_audit_log(session_id, format), do: export_audit_log(session_id, format, [])
+
+  def export_audit_log(session_id, format, opts) when format in ["json", "csv", "pdf"] do
     with %Session{} = session <- Mission.get_session_context(session_id),
          {:ok, audit_log} <- Mission.audit_log(session_id),
          graph <- ensure_session_graph(session_id),
@@ -784,11 +786,41 @@ defmodule ControlKeel.Platform do
         workspace_id: session.workspace_id
       )
 
+      record_audit_export_event(session, export, Keyword.get(opts, :actor, "platform"))
+
       {:ok, %{export: export, payload: payload}}
     else
       nil -> {:error, :not_found}
       {:error, _reason} = error -> error
     end
+  end
+
+  def list_audit_exports(session_id, limit \\ 5) when is_integer(session_id) do
+    Export
+    |> where([e], e.session_id == ^session_id)
+    |> order_by([e], desc: e.id)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  defp record_audit_export_event(%Session{} = session, %Export{} = export, actor) do
+    checksum_prefix = String.slice(export.checksum || "", 0, 12)
+
+    _ =
+      SessionTranscript.record(%{
+        "session_id" => session.id,
+        "event_type" => "audit.exported",
+        "actor" => actor,
+        "summary" => "Audit log exported (#{export.format}) — checksum #{checksum_prefix}",
+        "payload" => %{
+          "format" => export.format,
+          "checksum" => export.checksum,
+          "audit_export_id" => export.id
+        },
+        "metadata" => %{}
+      })
+
+    :ok
   end
 
   def persist_proof_generated(%ProofBundle{} = proof) do
