@@ -60,6 +60,7 @@ defmodule ControlKeelWeb.Layouts do
                 type="button"
                 id={"sidebar-toggle-#{label_id}"}
                 data-sidebar-toggle
+                aria-label={"Toggle #{item.label} menu"}
                 aria-expanded={(opened && "true") || "false"}
                 aria-controls={collapse_id}
                 class={["w-full text-left cursor-pointer", sidebar_link_class(active)]}
