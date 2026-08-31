@@ -96,9 +96,18 @@ defmodule ControlKeelWeb.ObservabilityTimelineLive do
                     </p>
                     <p class="text-sm font-semibold">{event.event_type}</p>
                   </div>
-                  <span class={neutral_pill_class()}>
-                    {format_datetime(event.inserted_at, "unknown time")}
-                  </span>
+                  <div class="flex items-center gap-3 shrink-0">
+                    <.link
+                      :if={event.proof_id}
+                      navigate={~p"/proofs/#{event.proof_id}"}
+                      class="text-xs text-primary font-semibold hover:opacity-80 transition-opacity"
+                    >
+                      Proof #{event.proof_id} →
+                    </.link>
+                    <span class={neutral_pill_class()}>
+                      {format_datetime(event.inserted_at, "unknown time")}
+                    </span>
+                  </div>
                 </div>
                 <p class="text-sm leading-relaxed">{event.summary}</p>
                 <%= if event.body not in [nil, ""] do %>

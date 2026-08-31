@@ -244,7 +244,7 @@ defmodule ControlKeelWeb.ObservabilityLive do
                 </p>
                 <p class="text-base font-semibold">{@run.proofs.count}</p>
                 <.link
-                  navigate={~p"/proofs"}
+                  navigate={~p"/proofs?#{%{"session_id" => @run.session.id}}"}
                   class="text-xs text-primary font-semibold hover:opacity-80 transition-opacity"
                 >
                   Open →

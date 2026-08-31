@@ -447,4 +447,70 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       assert html =~ "needs review"
     end
   end
+
+  describe "complete task" do
+    test "completes an eligible task and surfaces the new proof", %{conn: conn} do
+      session = session_fixture(%{risk_tier: "low", title: "Complete success session"})
+      task = task_fixture(%{session: session, status: "in_progress", title: "Do the work"})
+
+      {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}")
+      assert has_element?(view, "#task-complete-#{task.id}")
+      assert has_element?(view, "#current-task-complete-#{task.id}")
+
+      updated_html =
+        view
+        |> element("#task-complete-#{task.id}")
+        |> render_click()
+
+      assert updated_html =~ "Task completed:"
+      assert updated_html =~ "Do the work"
+
+      assert ControlKeel.Mission.get_task!(task.id).status in ["done", "verified"]
+
+      proof = ControlKeel.Mission.latest_proof_bundle_for_task(task.id)
+      assert proof
+      assert updated_html =~ "/proofs/#{proof.id}"
+    end
+
+    test "surfaces unresolved findings when completion is blocked", %{conn: conn} do
+      session = session_fixture(%{risk_tier: "low"})
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      finding_fixture(%{session: session, status: "open", title: "Blocking finding"})
+
+      {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}")
+
+      updated_html =
+        view
+        |> element("#task-complete-#{task.id}")
+        |> render_click()
+
+      assert updated_html =~ "unresolved finding"
+      assert ControlKeel.Mission.get_task!(task.id).status == "blocked"
+    end
+
+    test "surfaces the proof-not-ready reason for high-risk sessions", %{conn: conn} do
+      session = session_fixture(%{risk_tier: "high", title: "Proof gate session"})
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}")
+
+      updated_html =
+        view
+        |> element("#task-complete-#{task.id}")
+        |> render_click()
+
+      assert updated_html =~ "not deploy-ready"
+      assert ControlKeel.Mission.get_task!(task.id).status == "in_progress"
+    end
+
+    test "completed tasks do not show a Complete button", %{conn: conn} do
+      session = session_fixture()
+      done_task = task_fixture(%{session: session, status: "done", title: "Already done"})
+
+      {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}")
+
+      refute has_element?(view, "#task-complete-#{done_task.id}")
+    end
+  end
 end

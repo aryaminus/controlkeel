@@ -187,6 +187,41 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   @impl true
+  def handle_event("complete_task", %{"id" => id}, socket) do
+    with {:ok, task_id} <- parse_id(id),
+         {:ok, task} <- Mission.complete_task(task_id) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Task completed: #{task.title}.")
+       |> refresh_session_after_mutation()}
+    else
+      {:error, :unresolved_findings, findings} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "#{length(findings)} unresolved finding(s) must be approved or resolved before marking this task done."
+         )}
+
+      {:error, :proof_not_ready, reason} when is_binary(reason) ->
+        {:noreply, put_flash(socket, :error, reason)}
+
+      {:error, :invalid_id} ->
+        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
+
+      _error ->
+        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
+    end
+  end
+
+  defp refresh_session_after_mutation(socket) do
+    case Mission.get_session_context(socket.assigns.session.id) do
+      nil -> socket
+      session -> safe_assign_session(socket, session)
+    end
+  end
+
+  @impl true
   def handle_event("pause_task", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
          {:ok, _result} <- Mission.pause_task(task_id, "mission_control"),
@@ -603,6 +638,16 @@ defmodule ControlKeelWeb.MissionControlLive do
             <p class="text-sm text-muted-foreground mt-1">{@current_task.validation_gate}</p>
             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 pt-4 border-t">
               <button
+                :if={@current_task.status not in ["done", "verified"]}
+                id={"current-task-complete-#{@current_task.id}"}
+                type="button"
+                class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
+                phx-click="complete_task"
+                phx-value-id={@current_task.id}
+              >
+                Complete
+              </button>
+              <button
                 id={"current-task-generate-proof-#{@current_task.id}"}
                 type="button"
                 class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 hover:text-primary cursor-pointer"
@@ -769,6 +814,16 @@ defmodule ControlKeelWeb.MissionControlLive do
                         View proof
                       </.link>
                     <% end %>
+                    <button
+                      :if={task.status not in ["done", "verified"]}
+                      id={"task-complete-#{task.id}"}
+                      type="button"
+                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
+                      phx-click="complete_task"
+                      phx-value-id={task.id}
+                    >
+                      Complete
+                    </button>
                     <button
                       id={"task-generate-proof-#{task.id}"}
                       type="button"

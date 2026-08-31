@@ -50,6 +50,15 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert html =~ "Observation review"
   end
 
+  test "observability page links the proofs card pre-filtered to the session", %{conn: conn} do
+    session = session_fixture()
+    task_fixture(%{session: session})
+
+    {:ok, _view, html} = live(conn, ~p"/observability/sessions/#{session.id}")
+
+    assert html =~ "/proofs?session_id=#{session.id}"
+  end
+
   test "dedicated observability page redirects missing sessions", %{conn: conn} do
     assert {:error,
             {:live_redirect, %{to: "/", flash: %{"error" => "Session observability not found."}}}} =
