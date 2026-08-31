@@ -3,11 +3,13 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   alias ControlKeel.Analytics
   alias ControlKeel.Agent.AutonomyLoop
+  alias ControlKeel.Governance
   alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeel.Observability
   alias ControlKeel.Proxy
   alias ControlKeelWeb.FindingComponents
+  alias ControlKeelWeb.ReleaseReadiness
   alias ControlKeelWeb.ShipReadiness
 
   @refresh_interval_ms 2_000
@@ -35,7 +37,8 @@ defmodule ControlKeelWeb.MissionControlLive do
            |> assign(:launched, Map.get(params, "launched") == "1")
            |> assign(:selected_finding, nil)
            |> assign(:selected_fix, nil)
-           |> safe_assign_session(session)}
+           |> safe_assign_session(session)
+           |> assign_release_readiness(release_form_defaults(), false)}
         else
           {:ok,
            socket
@@ -54,7 +57,8 @@ defmodule ControlKeelWeb.MissionControlLive do
          |> assign(:launched, Map.get(params, "launched") == "1")
          |> assign(:selected_finding, nil)
          |> assign(:selected_fix, nil)
-         |> safe_assign_session(session)}
+         |> safe_assign_session(session)
+         |> assign_release_readiness(release_form_defaults(), false)}
     end
   end
 
@@ -63,8 +67,17 @@ defmodule ControlKeelWeb.MissionControlLive do
     if connected?(socket), do: schedule_refresh()
 
     case Mission.get_session_context(socket.assigns.session.id) do
-      nil -> {:noreply, socket}
-      session -> {:noreply, assign_session(socket, session)}
+      nil ->
+        {:noreply, socket}
+
+      session ->
+        {:noreply,
+         socket
+         |> assign_session(session)
+         |> assign_release_readiness(
+           socket.assigns[:release_form_params] || release_form_defaults(),
+           false
+         )}
     end
   end
 
@@ -159,6 +172,17 @@ defmodule ControlKeelWeb.MissionControlLive do
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
     end
+  end
+
+  @impl true
+  def handle_event("check_release_readiness", %{"release" => params}, socket) do
+    form_params = Map.merge(release_form_defaults(), params)
+
+    {:noreply,
+     socket
+     |> assign(:release_form_params, form_params)
+     |> assign_release_readiness(form_params, true)
+     |> put_flash(:info, "Release readiness checked.")}
   end
 
   @impl true
@@ -425,6 +449,12 @@ defmodule ControlKeelWeb.MissionControlLive do
         autonomy_profile={@autonomy_profile}
         outcome_profile={@outcome_profile}
         agent_outcomes={@ship_agent_outcomes}
+      />
+
+      <ReleaseReadiness.release_readiness
+        readiness={@release_readiness}
+        form={@release_form}
+        session_id={@session.id}
       />
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -1138,6 +1168,67 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
+
+  defp release_form_defaults do
+    %{
+      "smoke_status" => "",
+      "smoke_run" => "",
+      "artifact_source" => "",
+      "sha" => "",
+      "provenance_verified" => "false"
+    }
+  end
+
+  # Release readiness is isolated (like safe_assign_session) so a gate failure
+  # can never take down the periodic refresh loop. Background refreshes pass
+  # `record_telemetry: false`; only explicit operator checks record telemetry.
+  defp assign_release_readiness(socket, form_params, record_telemetry) do
+    readiness =
+      socket.assigns.session.id
+      |> release_readiness_opts(form_params)
+      |> Map.put(:record_telemetry, record_telemetry)
+      |> Governance.release_readiness()
+      |> case do
+        {:ok, readiness} -> readiness
+        {:error, _reason} -> nil
+      end
+
+    socket
+    |> assign(:release_readiness, readiness)
+    |> assign(:release_form, to_form(form_params, as: :release))
+  rescue
+    e ->
+      require Logger
+      Logger.warning("MissionControlLive release readiness rescued: #{inspect(e)}")
+
+      socket
+      |> assign(:release_readiness, nil)
+      |> assign(:release_form, to_form(form_params, as: :release))
+  end
+
+  defp release_readiness_opts(session_id, params) do
+    %{
+      session_id: session_id,
+      sha: blank_to_nil(params["sha"]),
+      smoke: %{
+        "status" => blank_to_nil(params["smoke_status"]),
+        "run_id" => blank_to_nil(params["smoke_run"])
+      },
+      provenance: %{
+        "verified" => params["provenance_verified"] in [true, "true"],
+        "artifact_source" => blank_to_nil(params["artifact_source"])
+      }
+    }
+  end
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(_value), do: nil
 
   defp current_task(tasks) do
     Enum.find(tasks, &(&1.status == "in_progress")) ||
