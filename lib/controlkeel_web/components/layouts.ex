@@ -62,7 +62,8 @@ defmodule ControlKeelWeb.Layouts do
                 data-sidebar-toggle
                 aria-expanded={(opened && "true") || "false"}
                 aria-controls={collapse_id}
-                class={["w-full text-left cursor-pointer", sidebar_link_class(active)]}
+                aria-label={"Toggle #{item.label} menu"}
+                class={["w-full text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl", sidebar_link_class(active)]}
               >
                 <.icon name={item.icon} class={sidebar_icon_class(active)} />
                 <span class="flex-1">{item.label}</span>
