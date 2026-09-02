@@ -319,7 +319,7 @@ defmodule ControlKeelWeb.ObservabilityLive do
         </div>
         <%= if @audit_exports == [] do %>
           <p class="text-muted-foreground text-xs">
-            No audit exports recorded yet — download one above and its checksum appears here.
+            No audit exports recorded yet — download one above, then reload to see its checksum here.
           </p>
         <% else %>
           <ul class="space-y-1 list-none p-0 m-0">
