@@ -56,6 +56,11 @@ defmodule ControlKeelWeb.ObservabilityController do
         |> put_status(:bad_request)
         |> json(%{error: "format must be json, csv, or pdf"})
 
+      {:error, :invalid_session_id} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "session id must be an integer"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
@@ -81,7 +86,7 @@ defmodule ControlKeelWeb.ObservabilityController do
   defp parse_session_id(id) do
     case Integer.parse(id) do
       {session_id, ""} -> {:ok, session_id}
-      _ -> {:error, :not_found}
+      _ -> {:error, :invalid_session_id}
     end
   end
 end
