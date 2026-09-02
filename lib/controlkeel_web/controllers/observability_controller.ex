@@ -1,6 +1,8 @@
 defmodule ControlKeelWeb.ObservabilityController do
   use ControlKeelWeb, :controller
 
+  require Logger
+
   # Mirrors LiveAuth.require_cloud_auth: passthrough in local mode, requires a
   # signed-in user in cloud/self_hosted, and verifies org ownership of the
   # session's workspace to prevent cross-org data leakage (CK-AUTH-001).
@@ -65,9 +67,11 @@ defmodule ControlKeelWeb.ObservabilityController do
         |> json(%{error: "pdf_export_unavailable"})
 
       {:error, reason} ->
+        Logger.error("audit export failed: #{inspect(reason)}")
+
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{error: inspect(reason)})
+        |> json(%{error: "audit export failed"})
     end
   end
 
