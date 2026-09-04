@@ -3031,6 +3031,8 @@ defmodule ControlKeel.Observability do
   end
 
   defp timeline_event(event) do
+    payload = event_value(event, :payload) || %{}
+
     %{
       id: event_value(event, :id),
       event_type: event_value(event, :event_type) || "event",
@@ -3038,6 +3040,7 @@ defmodule ControlKeel.Observability do
       summary: event_value(event, :summary) || "No summary",
       body: event_value(event, :body),
       task_id: event_value(event, :task_id),
+      proof_id: payload["proof_id"],
       inserted_at: format_datetime(event_value(event, :inserted_at))
     }
   end

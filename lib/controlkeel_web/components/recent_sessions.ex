@@ -30,7 +30,7 @@ defmodule ControlKeelWeb.RecentSessions do
                 </p>
                 <span class={health_pill_class(run.health)}>{run.health}</span>
               </div>
-              <dl class="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3 text-xs">
+              <dl class="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-3 text-xs">
                 <div>
                   <dt class="text-muted-foreground">Findings</dt>
                   <dd class="mt-0.5 font-medium text-foreground">
@@ -38,6 +38,16 @@ defmodule ControlKeelWeb.RecentSessions do
                     <span :if={run.blocked_findings > 0}>
                       · {run.blocked_findings} blocked
                     </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-muted-foreground">Proofs</dt>
+                  <dd class="mt-0.5 font-medium text-foreground">
+                    <%= if (Map.get(run, :proof_bundles) || 0) > 0 do %>
+                      {run.proof_bundles} bundles
+                    <% else %>
+                      <span class="font-normal text-muted-foreground">No proofs yet</span>
+                    <% end %>
                   </dd>
                 </div>
                 <div>

@@ -3,11 +3,14 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   alias ControlKeel.Analytics
   alias ControlKeel.Agent.AutonomyLoop
+  alias ControlKeel.Governance
   alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeel.Observability
+  alias ControlKeel.Platform
   alias ControlKeel.Proxy
   alias ControlKeelWeb.FindingComponents
+  alias ControlKeelWeb.ReleaseReadiness
   alias ControlKeelWeb.ShipReadiness
 
   @refresh_interval_ms 2_000
@@ -35,7 +38,8 @@ defmodule ControlKeelWeb.MissionControlLive do
            |> assign(:launched, Map.get(params, "launched") == "1")
            |> assign(:selected_finding, nil)
            |> assign(:selected_fix, nil)
-           |> safe_assign_session(session)}
+           |> safe_assign_session(session)
+           |> assign_release_readiness(release_form_defaults(), false)}
         else
           {:ok,
            socket
@@ -54,7 +58,8 @@ defmodule ControlKeelWeb.MissionControlLive do
          |> assign(:launched, Map.get(params, "launched") == "1")
          |> assign(:selected_finding, nil)
          |> assign(:selected_fix, nil)
-         |> safe_assign_session(session)}
+         |> safe_assign_session(session)
+         |> assign_release_readiness(release_form_defaults(), false)}
     end
   end
 
@@ -63,8 +68,11 @@ defmodule ControlKeelWeb.MissionControlLive do
     if connected?(socket), do: schedule_refresh()
 
     case Mission.get_session_context(socket.assigns.session.id) do
-      nil -> {:noreply, socket}
-      session -> {:noreply, assign_session(socket, session)}
+      nil ->
+        {:noreply, socket}
+
+      session ->
+        {:noreply, socket |> assign_session(session)}
     end
   end
 
@@ -107,6 +115,7 @@ defmodule ControlKeelWeb.MissionControlLive do
     {:noreply, socket |> assign(:selected_finding, nil) |> assign(:selected_fix, nil)}
   end
 
+  @impl true
   def handle_event("approve_finding", %{"id" => id}, socket) do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
@@ -117,7 +126,10 @@ defmodule ControlKeelWeb.MissionControlLive do
 
         session ->
           {:noreply,
-           socket |> put_flash(:info, "Finding approved.") |> safe_assign_session(session)}
+           socket
+           |> put_flash(:info, "Finding approved.")
+           |> safe_assign_session(session)
+           |> refresh_release_readiness()}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
@@ -141,7 +153,10 @@ defmodule ControlKeelWeb.MissionControlLive do
 
         session ->
           {:noreply,
-           socket |> put_flash(:info, "Finding rejected.") |> safe_assign_session(session)}
+           socket
+           |> put_flash(:info, "Finding rejected.")
+           |> safe_assign_session(session)
+           |> refresh_release_readiness()}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
@@ -155,9 +170,56 @@ defmodule ControlKeelWeb.MissionControlLive do
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
       {:noreply,
-       socket |> put_flash(:info, "Proof bundle generated.") |> safe_assign_session(session)}
+       socket
+       |> put_flash(:info, "Proof bundle generated.")
+       |> safe_assign_session(session)
+       |> refresh_release_readiness()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
+    end
+  end
+
+  @impl true
+  def handle_event("check_release_readiness", %{"release" => params}, socket) do
+    form_params = Map.merge(release_form_defaults(), params)
+
+    socket =
+      socket
+      |> assign(:release_form_params, form_params)
+      |> assign_release_readiness(form_params, true)
+
+    {:noreply,
+     case socket.assigns.release_readiness do
+       nil -> socket
+       _readiness -> put_flash(socket, :info, "Release readiness checked.")
+     end}
+  end
+
+  @impl true
+  def handle_event("complete_task", %{"id" => id}, socket) do
+    with {:ok, task_id} <- parse_id(id),
+         {:ok, task} <- Mission.complete_task(task_id) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Task completed: #{task.title}.")
+       |> refresh_session_after_mutation()}
+    else
+      {:error, :unresolved_findings, findings} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "#{length(findings)} unresolved finding(s) must be approved or resolved before marking this task done."
+         )}
+
+      {:error, :proof_not_ready, reason} when is_binary(reason) ->
+        {:noreply, put_flash(socket, :error, reason)}
+
+      {:error, :invalid_id} ->
+        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
+
+      _error ->
+        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
     end
   end
 
@@ -167,7 +229,11 @@ defmodule ControlKeelWeb.MissionControlLive do
          {:ok, _result} <- Mission.pause_task(task_id, "mission_control"),
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply, socket |> put_flash(:info, "Task paused.") |> safe_assign_session(session)}
+      {:noreply,
+       socket
+       |> put_flash(:info, "Task paused.")
+       |> safe_assign_session(session)
+       |> refresh_release_readiness()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
     end
@@ -179,9 +245,23 @@ defmodule ControlKeelWeb.MissionControlLive do
          {:ok, _result} <- Mission.resume_task(task_id, "mission_control"),
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply, socket |> put_flash(:info, "Task resumed.") |> safe_assign_session(session)}
+      {:noreply,
+       socket
+       |> put_flash(:info, "Task resumed.")
+       |> safe_assign_session(session)
+       |> refresh_release_readiness()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
+    end
+  end
+
+  defp refresh_session_after_mutation(socket) do
+    case Mission.get_session_context(socket.assigns.session.id) do
+      nil ->
+        socket
+
+      session ->
+        socket |> safe_assign_session(session) |> refresh_release_readiness()
     end
   end
 
@@ -221,12 +301,31 @@ defmodule ControlKeelWeb.MissionControlLive do
             {@session.objective}
           </p>
         </div>
-        <.link
-          navigate={~p"/sessions/#{@session.id}/deploy-review"}
-          class="inline-flex shrink-0 items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
-        >
-          <.icon name="hero-cloud-arrow-up" class="size-4" /> Deployment Advisor
-        </.link>
+        <div class="flex flex-col sm:items-end gap-2 shrink-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Audit log
+            </span>
+            <.link
+              :for={format <- ~w(json csv pdf)}
+              id={"mission-audit-export-#{format}"}
+              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
+              class="rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
+            >
+              {String.upcase(format)}
+            </.link>
+          </div>
+          <p :if={@latest_audit_export} class="text-xs text-muted-foreground">
+            Last export ({@latest_audit_export.format}):
+            <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
+          </p>
+          <.link
+            navigate={~p"/sessions/#{@session.id}/deploy-review"}
+            class="inline-flex shrink-0 items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+          >
+            <.icon name="hero-cloud-arrow-up" class="size-4" /> Deployment Advisor
+          </.link>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-5">
@@ -427,6 +526,12 @@ defmodule ControlKeelWeb.MissionControlLive do
         agent_outcomes={@ship_agent_outcomes}
       />
 
+      <ReleaseReadiness.release_readiness
+        readiness={@release_readiness}
+        form={@release_form}
+        session_id={@session.id}
+      />
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20">
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
@@ -552,6 +657,16 @@ defmodule ControlKeelWeb.MissionControlLive do
             </div>
             <p class="text-sm text-muted-foreground mt-1">{@current_task.validation_gate}</p>
             <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 pt-4 border-t">
+              <button
+                :if={@current_task.status not in ["done", "verified"]}
+                id={"current-task-complete-#{@current_task.id}"}
+                type="button"
+                class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
+                phx-click="complete_task"
+                phx-value-id={@current_task.id}
+              >
+                Complete
+              </button>
               <button
                 id={"current-task-generate-proof-#{@current_task.id}"}
                 type="button"
@@ -719,6 +834,16 @@ defmodule ControlKeelWeb.MissionControlLive do
                         View proof
                       </.link>
                     <% end %>
+                    <button
+                      :if={task.status not in ["done", "verified"]}
+                      id={"task-complete-#{task.id}"}
+                      type="button"
+                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
+                      phx-click="complete_task"
+                      phx-value-id={task.id}
+                    >
+                      Complete
+                    </button>
                     <button
                       id={"task-generate-proof-#{task.id}"}
                       type="button"
@@ -1040,6 +1165,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         :active_tasks,
         Enum.count(session.tasks || [], &(&1.status in ["queued", "in_progress"]))
       )
+      |> assign(:latest_audit_export, nil)
       |> assign(:task_graph, %{tasks: session.tasks || [], edges: []})
   end
 
@@ -1075,6 +1201,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
       compliance_score: compliance_score(session.findings),
       latest_proofs: Mission.latest_proof_bundles_for_session(session.id),
+      latest_audit_export: Platform.list_audit_exports(session.id, 1) |> List.first(),
       observability: Observability.session_run(session),
       current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
       current_memory_hits: current_memory_hits(session),
@@ -1138,6 +1265,75 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
+
+  defp release_form_defaults do
+    %{
+      "smoke_status" => "",
+      "smoke_run" => "",
+      "artifact_source" => "",
+      "sha" => "",
+      "provenance_verified" => "false"
+    }
+  end
+
+  # Release readiness is isolated (like safe_assign_session) so a gate failure
+  # can never take down the periodic refresh loop. Mutation-triggered refreshes
+  # pass `record_telemetry: false`; only explicit operator checks record telemetry.
+  defp assign_release_readiness(socket, form_params, record_telemetry) do
+    readiness =
+      socket.assigns.session.id
+      |> release_readiness_opts(form_params)
+      |> Map.put(:record_telemetry, record_telemetry)
+      |> Governance.release_readiness()
+      |> case do
+        {:ok, readiness} -> readiness
+        {:error, _reason} -> nil
+      end
+
+    socket
+    |> assign(:release_readiness, readiness)
+    |> assign(:release_form, to_form(form_params, as: :release))
+  rescue
+    e ->
+      require Logger
+      Logger.warning("MissionControlLive release readiness rescued: #{inspect(e)}")
+
+      socket
+      |> assign(:release_readiness, nil)
+      |> assign(:release_form, to_form(form_params, as: :release))
+  end
+
+  defp refresh_release_readiness(socket) do
+    assign_release_readiness(
+      socket,
+      socket.assigns[:release_form_params] || release_form_defaults(),
+      false
+    )
+  end
+
+  defp release_readiness_opts(session_id, params) do
+    %{
+      session_id: session_id,
+      sha: blank_to_nil(params["sha"]),
+      smoke: %{
+        "status" => blank_to_nil(params["smoke_status"]),
+        "run_id" => blank_to_nil(params["smoke_run"])
+      },
+      provenance: %{
+        "verified" => params["provenance_verified"] in [true, "true"],
+        "artifact_source" => blank_to_nil(params["artifact_source"])
+      }
+    }
+  end
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(_value), do: nil
 
   defp current_task(tasks) do
     Enum.find(tasks, &(&1.status == "in_progress")) ||

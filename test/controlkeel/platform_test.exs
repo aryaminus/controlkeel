@@ -5,7 +5,9 @@ defmodule ControlKeel.PlatformTest do
   import ControlKeel.PlatformFixtures
 
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.SessionEvent
   alias ControlKeel.Platform
+  alias ControlKeel.Repo
   alias ControlKeel.Scanner.FastPath
 
   setup do
@@ -238,5 +240,32 @@ defmodule ControlKeel.PlatformTest do
     assert pdf_export.format == "pdf"
     assert pdf_export.artifact_path_or_ref
     assert pdf_payload =~ "%PDF-FAKE"
+  end
+
+  test "export records an audit.exported timeline event and lists exports newest first" do
+    session = session_fixture()
+    _finding = finding_fixture(%{session: session})
+
+    assert {:ok, %{export: json_export}} =
+             Platform.export_audit_log(session.id, "json", actor: "cli")
+
+    assert {:ok, %{export: csv_export}} = Platform.export_audit_log(session.id, "csv")
+
+    event =
+      Repo.one(
+        from e in SessionEvent,
+          where:
+            e.session_id == ^session.id and e.event_type == "audit.exported" and
+              e.payload["audit_export_id"] == ^json_export.id
+      )
+
+    assert event.actor == "cli"
+    assert event.payload["format"] == "json"
+    assert event.payload["checksum"] == json_export.checksum
+    assert event.payload["audit_export_id"] == json_export.id
+
+    exports = Platform.list_audit_exports(session.id)
+    assert Enum.map(exports, & &1.id) == [csv_export.id, json_export.id]
+    assert Enum.map(Platform.list_audit_exports(session.id, 1), & &1.id) == [csv_export.id]
   end
 end
