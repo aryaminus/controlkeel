@@ -116,6 +116,8 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
 
     assert html =~ export.checksum
     assert html =~ export.format
+    assert html =~ Calendar.strftime(export.generated_at, "%Y-%m-%d %H:%M:%S UTC")
+    refute html =~ "unknown time"
   end
 
   test "mission control header shows audit log export controls and latest checksum", %{

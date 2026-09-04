@@ -404,6 +404,9 @@ defmodule ControlKeelWeb.ObservabilityLive do
   defp format_exported_at(%DateTime{} = at),
     do: Calendar.strftime(at, "%Y-%m-%d %H:%M:%S UTC")
 
+  defp format_exported_at(%NaiveDateTime{} = at),
+    do: Calendar.strftime(at, "%Y-%m-%d %H:%M:%S UTC")
+
   defp format_frequency(map) when map == %{}, do: "none"
 
   defp format_frequency(map) when is_map(map) do
