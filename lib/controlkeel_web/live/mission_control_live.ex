@@ -72,13 +72,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         {:noreply, socket}
 
       session ->
-        {:noreply,
-         socket
-         |> assign_session(session)
-         |> assign_release_readiness(
-           socket.assigns[:release_form_params] || release_form_defaults(),
-           false
-         )}
+        {:noreply, socket |> assign_session(session)}
     end
   end
 
@@ -132,7 +126,10 @@ defmodule ControlKeelWeb.MissionControlLive do
 
         session ->
           {:noreply,
-           socket |> put_flash(:info, "Finding approved.") |> safe_assign_session(session)}
+           socket
+           |> put_flash(:info, "Finding approved.")
+           |> safe_assign_session(session)
+           |> refresh_release_readiness()}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
@@ -156,7 +153,10 @@ defmodule ControlKeelWeb.MissionControlLive do
 
         session ->
           {:noreply,
-           socket |> put_flash(:info, "Finding rejected.") |> safe_assign_session(session)}
+           socket
+           |> put_flash(:info, "Finding rejected.")
+           |> safe_assign_session(session)
+           |> refresh_release_readiness()}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
@@ -170,7 +170,10 @@ defmodule ControlKeelWeb.MissionControlLive do
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
       {:noreply,
-       socket |> put_flash(:info, "Proof bundle generated.") |> safe_assign_session(session)}
+       socket
+       |> put_flash(:info, "Proof bundle generated.")
+       |> safe_assign_session(session)
+       |> refresh_release_readiness()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
     end
@@ -180,11 +183,16 @@ defmodule ControlKeelWeb.MissionControlLive do
   def handle_event("check_release_readiness", %{"release" => params}, socket) do
     form_params = Map.merge(release_form_defaults(), params)
 
+    socket =
+      socket
+      |> assign(:release_form_params, form_params)
+      |> assign_release_readiness(form_params, true)
+
     {:noreply,
-     socket
-     |> assign(:release_form_params, form_params)
-     |> assign_release_readiness(form_params, true)
-     |> put_flash(:info, "Release readiness checked.")}
+     case socket.assigns.release_readiness do
+       nil -> socket
+       _readiness -> put_flash(socket, :info, "Release readiness checked.")
+     end}
   end
 
   @impl true
@@ -221,7 +229,11 @@ defmodule ControlKeelWeb.MissionControlLive do
          {:ok, _result} <- Mission.pause_task(task_id, "mission_control"),
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply, socket |> put_flash(:info, "Task paused.") |> safe_assign_session(session)}
+      {:noreply,
+       socket
+       |> put_flash(:info, "Task paused.")
+       |> safe_assign_session(session)
+       |> refresh_release_readiness()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
     end
@@ -233,7 +245,11 @@ defmodule ControlKeelWeb.MissionControlLive do
          {:ok, _result} <- Mission.resume_task(task_id, "mission_control"),
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply, socket |> put_flash(:info, "Task resumed.") |> safe_assign_session(session)}
+      {:noreply,
+       socket
+       |> put_flash(:info, "Task resumed.")
+       |> safe_assign_session(session)
+       |> refresh_release_readiness()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
     end
@@ -241,8 +257,11 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   defp refresh_session_after_mutation(socket) do
     case Mission.get_session_context(socket.assigns.session.id) do
-      nil -> socket
-      session -> safe_assign_session(socket, session)
+      nil ->
+        socket
+
+      session ->
+        socket |> safe_assign_session(session) |> refresh_release_readiness()
     end
   end
 
@@ -1258,8 +1277,8 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   # Release readiness is isolated (like safe_assign_session) so a gate failure
-  # can never take down the periodic refresh loop. Background refreshes pass
-  # `record_telemetry: false`; only explicit operator checks record telemetry.
+  # can never take down the periodic refresh loop. Mutation-triggered refreshes
+  # pass `record_telemetry: false`; only explicit operator checks record telemetry.
   defp assign_release_readiness(socket, form_params, record_telemetry) do
     readiness =
       socket.assigns.session.id
@@ -1282,6 +1301,14 @@ defmodule ControlKeelWeb.MissionControlLive do
       socket
       |> assign(:release_readiness, nil)
       |> assign(:release_form, to_form(form_params, as: :release))
+  end
+
+  defp refresh_release_readiness(socket) do
+    assign_release_readiness(
+      socket,
+      socket.assigns[:release_form_params] || release_form_defaults(),
+      false
+    )
   end
 
   defp release_readiness_opts(session_id, params) do

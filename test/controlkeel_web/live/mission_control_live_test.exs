@@ -437,6 +437,44 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       assert release_readiness_event_count(session.id) == 1
     end
 
+    test "auto-refresh keeps the cached verdict and explicit check re-evaluates it", %{
+      conn: conn
+    } do
+      session = session_fixture()
+      approved_done_task_with_proof(session)
+
+      {:ok, view, html} = live(conn, ~p"/sessions/#{session.id}")
+      assert html =~ "needs review"
+
+      finding_fixture(%{
+        session: session,
+        title: "Late-breaking blocking finding",
+        severity: "high",
+        status: "open"
+      })
+
+      send(view.pid, :refresh)
+      refreshed_html = render(view)
+      refute refreshed_html =~ "1 blocking finding(s) remain unresolved."
+
+      updated_html =
+        view
+        |> element("#release-readiness-form")
+        |> render_submit(%{
+          "release" => %{
+            "smoke_status" => "success",
+            "smoke_run" => "https://ci.example.com/run/3",
+            "artifact_source" => "github-actions",
+            "provenance_verified" => "true"
+          }
+        })
+
+      assert updated_html =~ "1 blocking finding(s) remain unresolved."
+
+      status_html = view |> element("#release-readiness-status") |> render()
+      assert status_html =~ "blocked"
+    end
+
     test "shows a neutral empty state when no proof bundle exists", %{conn: conn} do
       session = session_fixture()
       task_fixture(%{session: session, status: "in_progress"})
