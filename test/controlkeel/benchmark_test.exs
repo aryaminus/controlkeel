@@ -789,6 +789,177 @@ defmodule ControlKeel.BenchmarkTest do
     assert comparison["summary"]["best_subject"] == "controlkeel_validate"
   end
 
+  describe "exports benchmark runs as an EvalPort/OpenEval bundle" do
+    test "emits a {suite, result_set} bundle conforming to the field mapping agreed in aryaminus/controlkeel#121" do
+      run =
+        benchmark_run_fixture(%{
+          "suite" => "host_comparison_v1",
+          "subjects" => "null_policy_baseline,controlkeel_validate",
+          "baseline_subject" => "null_policy_baseline",
+          "scenario_slugs" => "copilot_inline_stripe_key,opencode_jwt_none_algorithm"
+        })
+
+      assert {:ok, output} = Benchmark.export_run(run.id, "openeval")
+      assert {:ok, bundle} = Jason.decode(output)
+
+      # One bundle document, not a bare ResultSet -- see the "bundle vs split"
+      # discussion in the issue thread (comment #5472049681 / #5472583749).
+      assert Map.keys(bundle) |> Enum.sort() == ["result_set", "suite"]
+
+      # --- EvalSuite -------------------------------------------------
+      suite = bundle["suite"]
+      assert suite["version"] == Benchmark.openeval_spec_version()
+      assert suite["id"] == "host_comparison_v1"
+      assert suite["name"] == "Host Comparison v1"
+      # Suite.version is an integer (`field :version, :integer, default: 1`);
+      # EvalPort's own `version` fields are strings throughout the spec, so
+      # this must be `to_string/1`'d rather than overloading EvalSuite.version
+      # (which is the *spec* version, not ControlKeel's suite version).
+      assert suite["metadata"]["controlkeel_suite_version"] == "1"
+      refute Map.has_key?(suite, "version_here_would_be_wrong")
+
+      test_cases = Map.new(suite["test_cases"], &{&1["id"], &1})
+      assert map_size(test_cases) == 12, "the full suite travels with the run's results"
+
+      # A scenario with a named rule: Scenario.expected_rules maps to one
+      # Grader{type: "custom"} per rule id, preserving per-rule diagnostics.
+      with_rule = test_cases["copilot_inline_stripe_key"]
+      assert with_rule["input"] =~ "STRIPE_SECRET_KEY"
+      assert with_rule["graders"] == ["secret.hardcoded_credential"]
+      assert with_rule["expected_output"] == "block"
+      assert with_rule["metadata"]["controlkeel_path"] == "config/payments.py"
+      assert with_rule["metadata"]["controlkeel_split"] == "public"
+      assert "security" in with_rule["tags"]
+
+      # A decision-only scenario (expected_rules == []): falls back to the
+      # shared controlkeel.policy_decision grader instead of a rule id.
+      decision_only = test_cases["opencode_jwt_none_algorithm"]
+      assert decision_only["graders"] == ["controlkeel.policy_decision"]
+      assert decision_only["expected_output"] == "block"
+
+      grader_ids = Map.new(suite["graders"], &{&1["id"], &1})
+      assert grader_ids["secret.hardcoded_credential"]["type"] == "custom"
+
+      assert grader_ids["secret.hardcoded_credential"]["params"]["handler"] ==
+               "controlkeel.policy_rule"
+
+      assert grader_ids["controlkeel.policy_decision"]["params"]["handler"] ==
+               "controlkeel.policy_decision"
+
+      # graders referenced by every test case must exist in suite["graders"]
+      # (EvalPort's own validate_suite treats a dangling reference as invalid).
+      referenced = suite["test_cases"] |> Enum.flat_map(& &1["graders"]) |> Enum.uniq()
+      assert Enum.all?(referenced, &Map.has_key?(grader_ids, &1))
+
+      # --- ResultSet ---------------------------------------------------
+      result_set = bundle["result_set"]
+      assert result_set["version"] == Benchmark.openeval_spec_version()
+      assert result_set["suite_id"] == "host_comparison_v1"
+      assert result_set["suite_version"] == "1"
+      assert result_set["run_id"] == to_string(run.id)
+      assert {:ok, _, _} = DateTime.from_iso8601(result_set["started_at"])
+
+      assert result_set["runner"] == %{
+               "name" => "controlkeel",
+               "version" => Application.spec(:controlkeel, :vsn) |> to_string()
+             }
+
+      assert result_set["summary"]["subjects"] == ["null_policy_baseline", "controlkeel_validate"]
+      assert result_set["summary"]["baseline_subject"] == "null_policy_baseline"
+
+      # Two scenarios x two subjects, flattened into one results list, each
+      # tagged with its subject (the bundle is addressed by run, not subject).
+      results = result_set["results"]
+      assert length(results) == 4
+
+      by_subject_and_case =
+        Map.new(results, &{{&1["metadata"]["controlkeel_subject"], &1["test_case_id"]}, &1})
+
+      # controlkeel_validate genuinely detects the hardcoded Stripe key and
+      # blocks -- both the rule grader and the aggregated `passed` reflect it.
+      validated_rule = by_subject_and_case[{"controlkeel_validate", "copilot_inline_stripe_key"}]
+      assert validated_rule["passed"] == true
+
+      assert [%{"grader_id" => "secret.hardcoded_credential", "passed" => true, "score" => 1.0}] =
+               validated_rule["grader_results"]
+
+      validated_decision =
+        by_subject_and_case[{"controlkeel_validate", "opencode_jwt_none_algorithm"}]
+
+      assert validated_decision["passed"] == true
+
+      assert [%{"grader_id" => "controlkeel.policy_decision", "passed" => true}] =
+               validated_decision["grader_results"]
+
+      # null_policy_baseline finds nothing and never blocks, so it fails both
+      # the rule grader and the decision grader -- Result.passed reflects it.
+      baseline_rule = by_subject_and_case[{"null_policy_baseline", "copilot_inline_stripe_key"}]
+      assert baseline_rule["passed"] == false
+
+      baseline_decision =
+        by_subject_and_case[{"null_policy_baseline", "opencode_jwt_none_algorithm"}]
+
+      assert baseline_decision["passed"] == false
+    end
+
+    test "makes the format match exhaustive: an unrecognized format errors instead of silently falling back to JSON" do
+      run =
+        benchmark_run_fixture(%{
+          "subjects" => "controlkeel_validate",
+          "baseline_subject" => "controlkeel_validate",
+          "scenario_slugs" => "hardcoded_api_key_python_webhook"
+        })
+
+      assert {:error, :unknown_format} = Benchmark.export_run(run.id, "openevals")
+      assert {:error, :unknown_format} = Benchmark.export_run(run.id, "yaml")
+      assert {:ok, _} = Benchmark.export_run(run.id, "openeval")
+      assert {:ok, _} = Benchmark.export_run(run.id, "json")
+      assert {:ok, _} = Benchmark.export_run(run.id, "csv")
+    end
+
+    test "excludes results still awaiting manual import so a pending case isn't reported as a failure",
+         %{tmp_dir: tmp_dir} do
+      write_benchmark_subjects!(tmp_dir, [
+        %{
+          "id" => "manual_subject",
+          "label" => "Manual Subject",
+          "type" => "manual_import"
+        }
+      ])
+
+      {:ok, run} =
+        Benchmark.run_suite(
+          %{
+            "suite" => "vibe_failures_v1",
+            "subjects" => "manual_subject",
+            "baseline_subject" => "manual_subject",
+            "scenario_slugs" => "hardcoded_api_key_python_webhook"
+          },
+          tmp_dir
+        )
+
+      [pending_result] = run.results
+      assert pending_result.status == "awaiting_import"
+
+      assert {:ok, output} = Benchmark.export_run(run.id, "openeval")
+      assert {:ok, bundle} = Jason.decode(output)
+
+      # The suite (the full built-in suite, not just the scenarios this run
+      # actually exercised) still travels with the bundle -- it describes
+      # the shape a Suite defines, not this run's outcomes -- but a result
+      # that never actually ran must not appear in `result_set.results`:
+      # mapping it as-is would evaluate every rule grader `matched=false`
+      # and report "failed" for work that hasn't happened yet.
+      # See aryaminus/controlkeel#153 review.
+      assert "hardcoded_api_key_python_webhook" in Enum.map(
+               bundle["suite"]["test_cases"],
+               & &1["id"]
+             )
+
+      assert bundle["result_set"]["results"] == []
+    end
+  end
+
   test "loads the host comparison suite for cross-host benchmarking" do
     suite = benchmark_suite_fixture("host_comparison_v1")
 

@@ -666,14 +666,18 @@ defmodule ControlKeel.CLI.Catalog do
         ],
         help_topic: "benchmarks",
         inputs: [:flags, :file, :project_binding],
-        outputs: [:text, :json, :csv, :file],
+        outputs: [:text, :json, :csv, :openeval, :file],
         safety: %{local_write: true, mutates: true, dry_run: true},
         related_mcp_tools: ["ck_regression_result"],
         related_skills: ["benchmark-operator"],
         examples: [
           "controlkeel eval run --suite governance-regression",
           "controlkeel benchmark run --suite host_comparison_v1 --subjects null_policy_baseline,controlkeel_validate --baseline-subject null_policy_baseline",
-          "controlkeel benchmark compare <run-id> --json"
+          "controlkeel benchmark compare <run-id> --json",
+          # --format openeval emits ONE bundle document, not a bare ResultSet:
+          # {"suite": <EvalSuite>, "result_set": <ResultSet>}, conforming to
+          # the EvalPort/OpenEval interchange spec (github.com/adhabnr-ux/evalport).
+          "controlkeel benchmark export <run-id> --format openeval"
         ]
       ),
       spec(

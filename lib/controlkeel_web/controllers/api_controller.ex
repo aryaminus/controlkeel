@@ -586,6 +586,26 @@ defmodule ControlKeelWeb.ApiController do
   def export_benchmark_run(conn, %{"id" => id} = params) do
     format = Map.get(params, "format", "json")
 
+    # `--format openeval` (aryaminus/controlkeel#121) is CLI-only for now:
+    # this endpoint group has no workspace scoping yet (#142), and wiring the
+    # flag here is deliberately deferred until that lands rather than
+    # shipping tests now that would need redoing once it's scoped. Reject
+    # explicitly instead of silently emitting the bundle over an unscoped
+    # HTTP endpoint.
+    if format in ["openeval", :openeval] do
+      conn
+      |> put_status(:not_implemented)
+      |> json(%{
+        error:
+          "format=openeval is not available on this endpoint yet (tracked in #142); " <>
+            "use `controlkeel benchmark export <run-id> --format openeval` instead"
+      })
+    else
+      do_export_benchmark_run(conn, id, format)
+    end
+  end
+
+  defp do_export_benchmark_run(conn, id, format) do
     with {:ok, run_id} <- parse_integer_param(id),
          {:ok, output} <- Benchmark.export_run(run_id, format) do
       case format do
@@ -607,6 +627,11 @@ defmodule ControlKeelWeb.ApiController do
 
       {:error, :not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "benchmark run not found"})
+
+      {:error, :unknown_format} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "unknown export format: #{inspect(format)}"})
     end
   end
 
