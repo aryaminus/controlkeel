@@ -220,6 +220,56 @@ defmodule ControlKeelWeb.SkillsLiveTest do
     assert link_html =~ "mode=full"
   end
 
+  test "scope selector follows target, download link appears, bootstrap allows gated project", %{
+    conn: conn
+  } do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-skills-ux-live-#{System.unique_integer([:positive])}"
+      )
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(tmp_dir)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp_dir)
+    end)
+
+    {:ok, view, html} = live(conn, ~p"/skills")
+
+    assert html =~ "Marketplace bundle"
+    assert html =~ "Skills bundle"
+
+    render_submit(form(view, "#skills-project-form", project: %{"project_root" => tmp_dir}))
+
+    gated_html = render(view)
+    assert gated_html =~ "gated"
+    assert has_element?(view, "#skills-bootstrap-button")
+
+    render_change(
+      form(view, "#skills-action-form",
+        skill_action: %{"target" => "claude-plugin", "scope" => "project"}
+      )
+    )
+
+    action_html = render(view)
+    assert action_html =~ "User (unsupported)"
+    assert action_html =~ "Project (unsupported)"
+    refute action_html =~ "Export (unsupported)"
+
+    export_html = render_click(element(view, "#skills-export-button"))
+    assert export_html =~ "Exported claude-plugin bundle"
+    assert has_element?(view, "#skills-download-bundle")
+
+    link_html = element(view, "#skills-download-bundle") |> render()
+    assert link_html =~ "target=claude-plugin"
+
+    boot_html = render_click(element(view, "#skills-bootstrap-button"))
+    assert boot_html =~ "Bootstrapped project"
+    assert render(view) =~ "allowed"
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 end

@@ -249,6 +249,7 @@ defmodule ControlKeelWeb.Router do
     get "/skills/targets", ApiController, :list_skill_targets
     get "/skills/token-audit", ApiController, :token_audit
     post "/skills/token-audit", ApiController, :token_audit
+    get "/skills/download-bundle", ApiController, :download_skill_bundle
     post "/skills/export", ApiController, :export_skills
     post "/skills/install", ApiController, :install_skills
     post "/skills/prune-duplicates", ApiController, :prune_skill_duplicates

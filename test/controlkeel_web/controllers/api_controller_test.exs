@@ -1061,6 +1061,46 @@ defmodule ControlKeelWeb.ApiControllerTest do
       conn = build_conn() |> get(~p"/api/v1/skills/token-audit?mode=bogus")
       assert %{"error" => _} = json_response(conn, 422)
     end
+
+    test "downloads a valid zip of an exported skill bundle", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("skills-download-bundle")
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_dir)
+      end)
+
+      conn =
+        post(conn, ~p"/api/v1/skills/export", %{
+          target: "open-standard",
+          project_root: tmp_dir,
+          scope: "export"
+        })
+
+      assert %{"plan" => %{"target" => "open-standard"}} = json_response(conn, 200)
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/download-bundle?target=open-standard&project_root=#{tmp_dir}")
+
+      assert ["attachment; filename=\"controlkeel-open-standard.zip\"" | _] =
+               get_resp_header(conn, "content-disposition")
+
+      zip = response(conn, 200)
+      assert byte_size(zip) > 0
+      assert {:ok, files} = :zip.unzip(zip, [:memory])
+      names = Enum.map(files, fn {name, _data} -> to_string(name) end)
+      assert ".controlkeel-manifest.json" in names
+      assert Enum.any?(names, &String.contains?(&1, "controlkeel-governance"))
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/download-bundle?target=missing-bundle&project_root=#{tmp_dir}")
+
+      assert %{"error" => "bundle not found — export it first"} = json_response(conn, 404)
+
+      conn = build_conn() |> get(~p"/api/v1/skills/download-bundle?project_root=#{tmp_dir}")
+      assert %{"error" => "`target` is required"} = json_response(conn, 422)
+    end
   end
 
   describe "benchmark API" do

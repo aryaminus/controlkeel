@@ -1578,6 +1578,42 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  def download_skill_bundle(conn, params) do
+    target = Map.get(params, "target")
+    project_root = Path.expand(Map.get(params, "project_root", File.cwd!()))
+    dist_dir = Path.join([project_root, "controlkeel", "dist", to_string(target || "")])
+
+    cond do
+      is_nil(target) or target == "" ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "`target` is required"})
+
+      not File.dir?(dist_dir) ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "bundle not found — export it first"})
+
+      true ->
+        entries =
+          dist_dir
+          |> Path.join("**/*")
+          |> Path.wildcard(match_dot: true)
+          |> Enum.filter(&File.regular?/1)
+          |> Enum.map(fn file ->
+            {Path.relative_to(file, dist_dir) |> to_charlist(), File.read!(file)}
+          end)
+
+        {:ok, {_zip_name, zip_bin}} = :zip.create(~c"#{target}.zip", entries, [:memory])
+
+        conn
+        |> put_resp_content_type("application/zip")
+        |> put_resp_header(
+          "content-disposition",
+          ~s(attachment; filename="controlkeel-#{target}.zip")
+        )
+        |> send_resp(200, zip_bin)
+    end
+  end
+
   # ─── Agent Router ─────────────────────────────────────────────────────────────
 
   def route_agent(conn, params) do

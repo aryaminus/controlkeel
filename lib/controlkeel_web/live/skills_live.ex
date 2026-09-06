@@ -2,10 +2,14 @@ defmodule ControlKeelWeb.SkillsLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.MCP.Tools.CkTokenAudit
+  alias ControlKeel.Project.Local
   alias ControlKeel.ProviderBroker
   alias ControlKeel.Skills
+  alias ControlKeel.Skills.SkillTarget
 
   @audit_modes ~w(full skills rules tools)
+  @all_scopes ["export", "user", "project"]
+  @scope_labels %{"export" => "Export", "user" => "User", "project" => "Project"}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -16,8 +20,9 @@ defmodule ControlKeelWeb.SkillsLive do
      |> assign(:page_title, "Skills Studio")
      |> assign(:selected, nil)
      |> assign(:last_result, nil)
+     |> assign(:last_export_target, nil)
      |> assign(:target_options, target_options())
-     |> assign(:scope_options, [{"Export", "export"}, {"User", "user"}, {"Project", "project"}])
+     |> assign(:scope_options, scope_options("open-standard"))
      |> assign_analysis(project_root)
      |> assign_doctor(project_root)
      |> assign(:project_form, project_form(project_root))
@@ -90,7 +95,31 @@ defmodule ControlKeelWeb.SkillsLive do
   end
 
   def handle_event("update_action_form", %{"skill_action" => params}, socket) do
-    {:noreply, assign(socket, :action_form, action_form(params))}
+    params = normalize_action_params(params)
+
+    {:noreply,
+     socket
+     |> assign(:action_form, action_form(params))
+     |> assign(:scope_options, scope_options(params["target"]))}
+  end
+
+  def handle_event("bootstrap_project", _params, socket) do
+    project_root = socket.assigns.project_root
+
+    case Local.load_or_bootstrap(project_root, %{}, ephemeral_ok: true) do
+      {:ok, _binding, _session, mode} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :info,
+           "Bootstrapped project (#{mode}). Project-local skills are allowed now."
+         )
+         |> assign_analysis(project_root)
+         |> assign_doctor(project_root)}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to bootstrap project: #{inspect(reason)}")}
+    end
   end
 
   def handle_event("copy_command", %{"command" => command}, socket) do
@@ -172,6 +201,7 @@ defmodule ControlKeelWeb.SkillsLive do
 
   def handle_event("export", params, socket) do
     project_root = socket.assigns.project_root
+    params = normalize_action_params(params)
     target = params["target"]
     scope = params["scope"]
 
@@ -184,17 +214,23 @@ defmodule ControlKeelWeb.SkillsLive do
           {:error, "Failed to export skills: #{inspect(reason)}"}
       end
 
+    last_export_target =
+      if elem(result, 0) == :info, do: target, else: socket.assigns.last_export_target
+
     {:noreply,
      socket
      |> put_flash(elem(result, 0), elem(result, 1))
      |> assign(:last_result, result)
+     |> assign(:last_export_target, last_export_target)
      |> assign(:action_form, action_form(params))
+     |> assign(:scope_options, scope_options(target))
      |> assign_analysis(project_root)
      |> assign_doctor(project_root)}
   end
 
   def handle_event("install", params, socket) do
     project_root = socket.assigns.project_root
+    params = normalize_action_params(params)
     target = params["target"]
     scope = params["scope"]
 
@@ -208,7 +244,15 @@ defmodule ControlKeelWeb.SkillsLive do
               ""
             end
 
-          {:info, "Installed #{install.target} skills to #{destination}.#{agent_line}"}
+          marketplace_line =
+            if Map.has_key?(install, :marketplace_destination) do
+              " Marketplace: #{install.marketplace_destination}."
+            else
+              ""
+            end
+
+          {:info,
+           "Installed #{install.target} skills to #{destination}.#{agent_line}#{marketplace_line}"}
 
         {:ok, %ControlKeel.Skills.SkillExportPlan{} = plan} ->
           {:info, "Prepared #{plan.target} bundle at #{plan.output_dir}."}
@@ -222,6 +266,7 @@ defmodule ControlKeelWeb.SkillsLive do
      |> put_flash(elem(result, 0), elem(result, 1))
      |> assign(:last_result, result)
      |> assign(:action_form, action_form(params))
+     |> assign(:scope_options, scope_options(target))
      |> assign_analysis(project_root)
      |> assign_doctor(project_root)}
   end
@@ -353,6 +398,18 @@ defmodule ControlKeelWeb.SkillsLive do
               Local skills
             </p>
             <strong>{if @trusted_project?, do: "allowed", else: "gated"}</strong>
+            <p :if={not @trusted_project?} class="text-xs text-muted-foreground mt-2">
+              Project-local skills are skipped until ControlKeel trusts this project. Bootstrapping writes a project binding and allows them.
+            </p>
+            <button
+              :if={not @trusted_project?}
+              type="button"
+              id="skills-bootstrap-button"
+              phx-click="bootstrap_project"
+              class="mt-3 inline-flex items-center justify-center gap-[0.4rem] px-4 py-2 rounded-full border bg-transparent text-sm font-semibold transition-[transform,background] duration-150 ease-in-out hover:bg-card hover:-translate-y-px cursor-pointer"
+            >
+              Bootstrap project
+            </button>
           </div>
 
           <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
@@ -445,7 +502,16 @@ defmodule ControlKeelWeb.SkillsLive do
               </p>
             <% end %>
 
-            <div class="flex items-center justify-end gap-4 mt-4">
+            <div class="flex flex-wrap items-center justify-end gap-4 mt-4">
+              <a
+                :if={@last_export_target}
+                id="skills-download-bundle"
+                href={"/api/v1/skills/download-bundle?project_root=#{URI.encode_www_form(@project_root)}&target=#{@last_export_target}"}
+                download={"controlkeel-#{@last_export_target}.zip"}
+                class="inline-flex items-center justify-center gap-[0.4rem] px-5 py-[0.95rem] rounded-full border bg-transparent font-semibold transition-[transform,background] duration-150 ease-in-out hover:bg-card hover:-translate-y-px cursor-pointer"
+              >
+                Download bundle
+              </a>
               <button
                 type="button"
                 class="inline-flex items-center justify-center gap-[0.4rem] px-5 py-[0.95rem] rounded-full bg-primary text-[#11170d] font-bold transition-[transform,box-shadow] duration-150 ease-in-out hover:-translate-y-px hover:shadow-[0_12px_24px_rgba(196,240,66,0.24)] cursor-pointer"
@@ -731,12 +797,58 @@ defmodule ControlKeelWeb.SkillsLive do
             <p class="text-muted-foreground mb-2">
               Required CK MCP tools: {format_targets(@selected.required_mcp_tools)}
             </p>
-            <p class="text-muted-foreground mb-2">
-              Native locations: {format_paths(get_in(@selected.install_state, ["native_locations"]))}
-            </p>
+            <details class="mb-2">
+              <summary class="cursor-pointer text-muted-foreground select-none">
+                Locations ({length(selected_native_locations(@selected))})
+              </summary>
+              <ul class="grid gap-1 mt-2 pl-1 list-none">
+                <%= for location <- selected_native_locations(@selected) do %>
+                  <li class="flex gap-2 items-baseline">
+                    <span class="text-[#d2ffe7] text-xs">✓</span>
+                    <span class="text-muted-foreground font-mono text-xs break-all">{location}</span>
+                  </li>
+                <% end %>
+                <li
+                  :if={selected_native_locations(@selected) == []}
+                  class="text-muted-foreground text-xs"
+                >
+                  not installed
+                </li>
+              </ul>
+            </details>
             <p class="text-muted-foreground mb-2">
               Exported targets: {format_targets(get_in(@selected.install_state, ["exported_targets"]))}
             </p>
+            <%= if selected_export_manifests(@selected, @export_manifests) != [] do %>
+              <details class="mb-2">
+                <summary class="cursor-pointer text-muted-foreground select-none">
+                  Export manifests ({length(selected_export_manifests(@selected, @export_manifests))})
+                </summary>
+                <div class="grid gap-3 mt-2">
+                  <%= for %{manifest: manifest} <- selected_export_manifests(@selected, @export_manifests) do %>
+                    <article class="border border-[rgba(255,255,255,0.07)] rounded-[1.1rem] p-3 bg-[rgba(255,255,255,0.03)]">
+                      <p class="font-semibold text-sm">{manifest["target"]} ({manifest["scope"]})</p>
+                      <p class="text-muted-foreground text-xs mt-1">Writes:</p>
+                      <ul class="grid gap-[0.15rem] mt-1">
+                        <%= for write <- manifest["writes"] || [] do %>
+                          <li class="text-muted-foreground font-mono text-xs break-all">
+                            [{write["kind"]}] {write["path"]}
+                          </li>
+                        <% end %>
+                      </ul>
+                      <%= if manifest["instructions"] not in [nil, []] do %>
+                        <p class="text-muted-foreground text-xs mt-2">Instructions:</p>
+                        <ul class="grid gap-[0.15rem] mt-1">
+                          <%= for instruction <- manifest["instructions"] do %>
+                            <li class="text-muted-foreground text-xs break-all">{instruction}</li>
+                          <% end %>
+                        </ul>
+                      <% end %>
+                    </article>
+                  <% end %>
+                </div>
+              </details>
+            <% end %>
             <%= if @selected.resources != [] do %>
               <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mt-4">
                 Resources
@@ -845,6 +957,7 @@ defmodule ControlKeelWeb.SkillsLive do
                   <th class="text-left py-2 pr-4">Target</th>
                   <th class="text-left py-2 pr-4">Default scope</th>
                   <th class="text-left py-2 pr-4">Native</th>
+                  <th class="text-left py-2 pr-4">Bundle</th>
                   <th class="text-left py-2 pr-4">Release asset</th>
                 </tr>
               </thead>
@@ -857,6 +970,11 @@ defmodule ControlKeelWeb.SkillsLive do
                     </td>
                     <td class="py-2 pr-4">{target.default_scope}</td>
                     <td class="py-2 pr-4">{if target.native, do: "yes", else: "fallback"}</td>
+                    <td class="py-2 pr-4">
+                      <span class="border rounded-full px-3 py-[0.45rem] text-[0.8rem] #{bundle_pill_class(target.id)}">
+                        {bundle_type(target.id)}
+                      </span>
+                    </td>
                     <td class="py-2 pr-4">
                       {if target.release_bundle, do: "published", else: "local only"}
                     </td>
@@ -1046,20 +1164,74 @@ defmodule ControlKeelWeb.SkillsLive do
   defp project_form(project_root), do: to_form(%{"project_root" => project_root}, as: :project)
 
   defp action_form(params \\ %{"target" => "open-standard", "scope" => "export"}) do
+    params = normalize_action_params(params)
     to_form(params, as: :skill_action)
   end
 
+  defp normalize_action_params(%{"target" => target} = params) when is_binary(target) do
+    case SkillTarget.get(target) do
+      %SkillTarget{supported_scopes: supported, default_scope: default} ->
+        scope = if params["scope"] in supported, do: params["scope"], else: default
+        Map.put(params, "scope", scope)
+
+      nil ->
+        params
+    end
+  end
+
+  defp normalize_action_params(params), do: params
+
+  defp scope_options(target_id) do
+    case SkillTarget.get(target_id) do
+      %SkillTarget{supported_scopes: supported} ->
+        Enum.map(@all_scopes, fn scope ->
+          label = Map.get(@scope_labels, scope, scope)
+
+          if scope in supported do
+            {label, scope}
+          else
+            [key: "#{label} (unsupported)", value: scope, disabled: true]
+          end
+        end)
+
+      nil ->
+        Enum.map(@all_scopes, &{Map.get(@scope_labels, &1, &1), &1})
+    end
+  end
+
   defp target_options do
-    Enum.map(Skills.targets(), fn target -> {target.label, target.id} end)
+    Enum.map(Skills.targets(), fn target ->
+      {target.label <> bundle_type_suffix(target.id), target.id}
+    end)
+  end
+
+  defp bundle_type_suffix(target_id) do
+    if String.ends_with?(target_id, "-plugin"),
+      do: " · Marketplace bundle",
+      else: " · Skills bundle"
+  end
+
+  defp bundle_type(target_id) do
+    if String.ends_with?(target_id, "-plugin"), do: "Marketplace", else: "Skills"
+  end
+
+  defp bundle_pill_class(target_id) do
+    if String.ends_with?(target_id, "-plugin"),
+      do: "bg-[rgba(255,207,107,0.12)] text-[#fff0bf]",
+      else: "bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
+  end
+
+  defp selected_native_locations(selected),
+    do: get_in(selected.install_state, ["native_locations"]) || []
+
+  defp selected_export_manifests(selected, manifests) do
+    exported = get_in(selected.install_state, ["exported_targets"]) || []
+    Enum.filter(manifests, &(&1.manifest["target"] in exported))
   end
 
   defp format_targets([]), do: "none"
   defp format_targets(nil), do: "none"
   defp format_targets(values), do: Enum.join(values, ", ")
-
-  defp format_paths([]), do: "not installed"
-  defp format_paths(nil), do: "not installed"
-  defp format_paths(paths), do: Enum.join(paths, ", ")
 
   defp scope_pill_class("builtin"), do: "bg-[rgba(255,143,107,0.12)] text-[#ffd6cb]"
   defp scope_pill_class("user"), do: "bg-[rgba(255,207,107,0.12)] text-[#fff0bf]"
