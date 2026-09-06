@@ -139,6 +139,87 @@ defmodule ControlKeelWeb.SkillsLiveTest do
     refute has_element?(view, "#prune-duplicates-modal")
   end
 
+  test "token audit renders sortable per-mode tables", %{conn: conn} do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-skills-audit-live-#{System.unique_integer([:positive])}"
+      )
+
+    home_dir = Path.join(tmp_dir, "home")
+    project_root = Path.join(tmp_dir, "project")
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(home_dir)
+    File.mkdir_p!(Path.join(project_root, ".agents/skills/aaa-skill"))
+    File.mkdir_p!(Path.join(project_root, ".agents/skills/zzz-skill"))
+
+    previous_home = System.get_env("HOME")
+    previous_ck_home = System.get_env("CONTROLKEEL_HOME")
+
+    System.put_env("HOME", home_dir)
+    System.put_env("CONTROLKEEL_HOME", home_dir)
+
+    on_exit(fn ->
+      restore_env("HOME", previous_home)
+      restore_env("CONTROLKEEL_HOME", previous_ck_home)
+      File.rm_rf!(tmp_dir)
+    end)
+
+    File.write!(Path.join(project_root, "AGENTS.md"), String.duplicate("word ", 60))
+
+    File.write!(
+      Path.join(project_root, ".agents/skills/aaa-skill/SKILL.md"),
+      "---\nname: aaa-skill\ndescription: Small audit fixture skill.\n---\n# A\nbody\n"
+    )
+
+    File.write!(
+      Path.join(project_root, ".agents/skills/zzz-skill/SKILL.md"),
+      "---\nname: zzz-skill\ndescription: Larger audit fixture skill.\n---\n# Z\n" <>
+        String.duplicate("padding word ", 120)
+    )
+
+    {:ok, view, _html} = live(conn, ~p"/skills")
+
+    render_submit(form(view, "#skills-project-form", project: %{"project_root" => project_root}))
+
+    rules_html = render_click(element(view, "#audit-mode-rules"))
+    assert has_element?(view, "#audit-rules-table tbody tr")
+    assert rules_html =~ "AGENTS.md"
+    assert rules_html =~ "Rule files"
+
+    render_click(element(view, "#audit-mode-skills"))
+    assert has_element?(view, "#audit-skills-table tbody tr")
+    skills_html = render(view)
+    assert skills_html =~ "aaa-skill"
+    assert skills_html =~ "zzz-skill"
+
+    default_sorted = element(view, "#audit-skills-table") |> render()
+    assert Regex.match?(~r/zzz-skill.*aaa-skill/s, default_sorted)
+
+    name_desc = render_click(element(view, "#audit-skills-sort-name"))
+    assert Regex.match?(~r/zzz-skill.*aaa-skill/s, name_desc)
+
+    name_asc = render_click(element(view, "#audit-skills-sort-name"))
+    assert Regex.match?(~r/aaa-skill.*zzz-skill/s, name_asc)
+
+    tools_html = render_click(element(view, "#audit-mode-tools"))
+    assert has_element?(view, "#audit-tools-table tbody tr")
+    assert has_element?(view, "#audit-groups-table tbody tr")
+    assert tools_html =~ "CK_TOOL_GROUPS"
+    assert tools_html =~ "Group savings"
+
+    full_html = render_click(element(view, "#audit-mode-full"))
+    assert has_element?(view, "#audit-rules-table tbody tr")
+    assert has_element?(view, "#audit-skills-table tbody tr")
+    assert has_element?(view, "#audit-download-link")
+    assert full_html =~ "Download JSON"
+
+    link_html = element(view, "#audit-download-link") |> render()
+    assert link_html =~ "download=1"
+    assert link_html =~ "mode=full"
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 end

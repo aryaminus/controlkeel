@@ -998,6 +998,69 @@ defmodule ControlKeelWeb.ApiControllerTest do
       refute File.exists?(Path.dirname(user_skill))
       assert File.exists?(project_skill)
     end
+
+    test "token audit returns per-mode payloads and download headers", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("skills-token-audit")
+      home_dir = Path.join(tmp_dir, "home")
+      project_root = Path.join(tmp_dir, "project")
+
+      File.mkdir_p!(home_dir)
+      File.mkdir_p!(Path.join(project_root, ".agents/skills/demo-skill"))
+
+      restore = set_provider_home(home_dir)
+
+      on_exit(fn ->
+        restore.()
+        File.rm_rf!(tmp_dir)
+      end)
+
+      File.write!(Path.join(project_root, "AGENTS.md"), String.duplicate("word ", 60))
+
+      File.write!(
+        Path.join(project_root, ".agents/skills/demo-skill/SKILL.md"),
+        "---\nname: demo-skill\ndescription: Demo skill for audit fixture.\n---\n# Demo\nbody text\n"
+      )
+
+      conn = get(conn, ~p"/api/v1/skills/token-audit?project_root=#{project_root}&mode=rules")
+      body = json_response(conn, 200)
+
+      assert body["status"] in ["optimal", "oversized"]
+      assert body["estimated_tokens"] > 0
+      assert Enum.any?(body["rule_files"], &String.ends_with?(&1["path"], "AGENTS.md"))
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/token-audit", %{project_root: project_root, mode: "skills"})
+
+      body = json_response(conn, 200)
+      assert Enum.any?(body["skills"], &(&1["name"] == "demo-skill"))
+      assert body["effective_skill_count"] >= 1
+      assert is_list(body["recommendations"])
+
+      conn = build_conn() |> get(~p"/api/v1/skills/token-audit?mode=tools")
+      body = json_response(conn, 200)
+
+      assert body["tool_count"] > 0
+      assert is_map(body["group_savings"])
+      assert body["group_savings"]["core_governance"]["savings_tokens"] >= 0
+      assert is_list(body["tools"])
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/token-audit?project_root=#{project_root}&download=1")
+
+      body = json_response(conn, 200)
+
+      assert Map.has_key?(body, "rule_files")
+      assert Map.has_key?(body, "skills")
+      assert Map.has_key?(body, "total_skill_tokens")
+
+      assert ["attachment; filename=\"token-audit-full.json\"" | _] =
+               get_resp_header(conn, "content-disposition")
+
+      conn = build_conn() |> get(~p"/api/v1/skills/token-audit?mode=bogus")
+      assert %{"error" => _} = json_response(conn, 422)
+    end
   end
 
   describe "benchmark API" do

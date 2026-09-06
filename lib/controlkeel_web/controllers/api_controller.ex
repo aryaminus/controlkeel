@@ -17,6 +17,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Mission.Decomposition
   alias ControlKeel.MCP.Arguments
   alias ControlKeel.MCP.Tools.CkContext
+  alias ControlKeel.MCP.Tools.CkTokenAudit
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.ProviderBroker
@@ -1562,6 +1563,21 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  def token_audit(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    mode = Map.get(params, "mode", "full")
+
+    case CkTokenAudit.call(%{"project_root" => project_root, "mode" => mode}) do
+      {:ok, result} ->
+        conn
+        |> maybe_token_audit_download(params, mode)
+        |> json(result)
+
+      {:error, {:invalid_arguments, message}} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
+    end
+  end
+
   # ─── Agent Router ─────────────────────────────────────────────────────────────
 
   def route_agent(conn, params) do
@@ -1615,6 +1631,17 @@ defmodule ControlKeelWeb.ApiController do
   defp skill_prune_group_summary(group) do
     %{host_dir: group.host_dir, skills: group.skills}
   end
+
+  defp maybe_token_audit_download(conn, %{"download" => download}, mode)
+       when download in [true, "1", "true"],
+       do:
+         put_resp_header(
+           conn,
+           "content-disposition",
+           ~s(attachment; filename="token-audit-#{mode}.json")
+         )
+
+  defp maybe_token_audit_download(conn, _params, _mode), do: conn
 
   defp fetch_review(review_id) do
     case Mission.get_review(review_id) do

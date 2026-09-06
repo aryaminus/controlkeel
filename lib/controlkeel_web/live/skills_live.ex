@@ -1,8 +1,11 @@
 defmodule ControlKeelWeb.SkillsLive do
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.MCP.Tools.CkTokenAudit
   alias ControlKeel.ProviderBroker
   alias ControlKeel.Skills
+
+  @audit_modes ~w(full skills rules tools)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -20,6 +23,11 @@ defmodule ControlKeelWeb.SkillsLive do
      |> assign(:project_form, project_form(project_root))
      |> assign(:action_form, action_form())
      |> assign(:prune_preview, nil)
+     |> assign(:audit_mode, "full")
+     |> assign(:audit_mode_options, @audit_modes)
+     |> assign(:audit_result, nil)
+     |> assign(:audit_error, nil)
+     |> assign(:audit_sort, %{})
      |> assign(:skill_search, "")
      |> assign(:target_search, "")}
   end
@@ -125,6 +133,41 @@ defmodule ControlKeelWeb.SkillsLive do
      )
      |> assign_analysis(project_root)
      |> assign_doctor(project_root)}
+  end
+
+  def handle_event("run_audit", %{"mode" => mode}, socket) do
+    mode = if mode in @audit_modes, do: mode, else: "full"
+
+    case CkTokenAudit.call(%{"project_root" => socket.assigns.project_root, "mode" => mode}) do
+      {:ok, result} ->
+        {:noreply,
+         socket
+         |> assign(:audit_mode, mode)
+         |> assign(:audit_result, result)
+         |> assign(:audit_error, nil)
+         |> assign(:audit_sort, %{})}
+
+      {:error, {:invalid_arguments, message}} ->
+        {:noreply,
+         socket
+         |> assign(:audit_mode, mode)
+         |> assign(:audit_result, nil)
+         |> assign(:audit_error, message)}
+    end
+  end
+
+  def handle_event("sort_audit", %{"table" => table, "key" => key}, socket) do
+    {current_key, current_dir} =
+      Map.get(socket.assigns.audit_sort, table, {"estimated_tokens", :desc})
+
+    {key, dir} =
+      cond do
+        current_key == key and current_dir == :desc -> {key, :asc}
+        current_key == key and current_dir == :asc -> {key, :desc}
+        true -> {key, :desc}
+      end
+
+    {:noreply, assign(socket, :audit_sort, Map.put(socket.assigns.audit_sort, table, {key, dir}))}
   end
 
   def handle_event("export", params, socket) do
@@ -425,6 +468,251 @@ defmodule ControlKeelWeb.SkillsLive do
               </button>
             </div>
           </.form>
+        </div>
+
+        <div
+          class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6"
+          id="token-audit-section"
+        >
+          <p class="text-lg font-semibold text-primary tracking-[0.14em] uppercase">
+            Token Audit
+          </p>
+          <p class="text-muted-foreground text-sm mt-1">
+            Rule-file, skill, and tool-schema token overhead for this project root.
+          </p>
+
+          <div class="flex flex-wrap items-center gap-2 mt-4 mb-4">
+            <%= for mode <- @audit_mode_options do %>
+              <button
+                type="button"
+                id={"audit-mode-#{mode}"}
+                phx-click="run_audit"
+                phx-value-mode={mode}
+                class={
+                  if @audit_mode == mode do
+                    "rounded-full bg-primary px-4 py-2 text-sm font-bold text-[#11170d] transition hover:-translate-y-px cursor-pointer"
+                  else
+                    "rounded-full border bg-transparent px-4 py-2 text-sm font-semibold transition hover:bg-card cursor-pointer"
+                  end
+                }
+              >
+                {String.capitalize(mode)}
+              </button>
+            <% end %>
+            <%= if @audit_result do %>
+              <a
+                href={"/api/v1/skills/token-audit?project_root=#{URI.encode_www_form(@project_root)}&mode=#{@audit_mode}&download=1"}
+                download={"token-audit-#{@audit_mode}.json"}
+                id="audit-download-link"
+                class="rounded-full border bg-transparent px-4 py-2 text-sm font-semibold transition hover:bg-card cursor-pointer"
+              >
+                Download JSON
+              </a>
+            <% end %>
+          </div>
+
+          <div :if={@audit_error} class="text-[#ffd6cb] text-sm mb-4">
+            {@audit_error}
+          </div>
+
+          <div :if={is_nil(@audit_result)} class="text-muted-foreground text-sm">
+            Run an audit to see the token breakdown. Click a column header to sort a table.
+          </div>
+
+          <%= if @audit_result do %>
+            <div class="flex flex-wrap gap-2 mb-4">
+              <%= for chip <- audit_summary_chips(@audit_mode, @audit_result) do %>
+                <span class="border rounded-full px-3 py-[0.45rem] text-xs bg-[rgba(255,255,255,0.05)]">
+                  {chip}
+                </span>
+              <% end %>
+            </div>
+
+            <%= if @audit_mode in ~w(full rules) and @audit_result["rule_files"] not in [nil, []] do %>
+              <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+                Rule files ({length(@audit_result["rule_files"])})
+              </p>
+              <div class="overflow-x-auto mb-6">
+                <table class="min-w-full text-sm" id="audit-rules-table">
+                  <thead>
+                    <tr class="text-foreground">
+                      <.audit_th table="rules" key="path" sort={@audit_sort} label="File" />
+                      <.audit_th table="rules" key="word_count" sort={@audit_sort} label="Words" />
+                      <.audit_th table="rules" key="char_count" sort={@audit_sort} label="Chars" />
+                      <.audit_th
+                        table="rules"
+                        key="estimated_tokens"
+                        sort={@audit_sort}
+                        label="Tokens"
+                      />
+                      <th class="text-left py-2 pr-4">Oversized</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for rule <- audit_sorted(@audit_result["rule_files"], "rules", @audit_sort) do %>
+                      <tr>
+                        <td class="py-2 pr-4 font-mono text-xs">
+                          {Path.relative_to(rule["path"], @project_root)}
+                        </td>
+                        <td class="py-2 pr-4">{rule["word_count"]}</td>
+                        <td class="py-2 pr-4">{rule["char_count"]}</td>
+                        <td class="py-2 pr-4">{rule["estimated_tokens"]}</td>
+                        <td class="py-2 pr-4">
+                          {if rule["oversized"], do: "yes", else: "no"}
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% end %>
+
+            <%= if @audit_mode in ~w(full skills) do %>
+              <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+                Skills ({audit_skill_rows(@audit_result) |> length()} effective of {@audit_result[
+                  "installed_skill_copies"
+                ] || 0} copies)
+              </p>
+              <div class="overflow-x-auto mb-6">
+                <table class="min-w-full text-sm" id="audit-skills-table">
+                  <thead>
+                    <tr class="text-foreground">
+                      <.audit_th
+                        table="skills"
+                        key="name"
+                        sort={@audit_sort}
+                        label="Skill"
+                        id="audit-skills-sort-name"
+                      />
+                      <.audit_th table="skills" key="location" sort={@audit_sort} label="Location" />
+                      <.audit_th table="skills" key="word_count" sort={@audit_sort} label="Words" />
+                      <.audit_th
+                        table="skills"
+                        key="estimated_tokens"
+                        sort={@audit_sort}
+                        label="Tokens"
+                      />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for skill <- audit_sorted(audit_skill_rows(@audit_result), "skills", @audit_sort) do %>
+                      <tr>
+                        <td class="py-2 pr-4">{skill["name"]}</td>
+                        <td class="py-2 pr-4 font-mono text-xs">{skill["location"]}</td>
+                        <td class="py-2 pr-4">{skill["word_count"]}</td>
+                        <td class="py-2 pr-4">{skill["estimated_tokens"]}</td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+
+              <%= if audit_duplicates(@audit_result) != [] do %>
+                <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+                  Duplicate skill groups ({length(audit_duplicates(@audit_result))})
+                </p>
+                <div class="overflow-x-auto mb-6">
+                  <table class="min-w-full text-sm" id="audit-duplicates-table">
+                    <thead>
+                      <tr class="text-foreground">
+                        <th class="text-left py-2 pr-4">Skill</th>
+                        <th class="text-left py-2 pr-4">Copies</th>
+                        <th class="text-left py-2 pr-4">Wasted tokens</th>
+                        <th class="text-left py-2 pr-4">Locations</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <%= for dup <- audit_duplicates(@audit_result) do %>
+                        <tr>
+                          <td class="py-2 pr-4">{dup["name"]}</td>
+                          <td class="py-2 pr-4">{dup["count"]}</td>
+                          <td class="py-2 pr-4 text-[#ffd6cb]">{dup["duplicate_tokens"]}</td>
+                          <td class="py-2 pr-4 font-mono text-xs">
+                            {Enum.join(dup["locations"] || [], ", ")}
+                          </td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                </div>
+              <% end %>
+            <% end %>
+
+            <%= if @audit_mode == "tools" do %>
+              <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+                Tool schemas ({@audit_result["tool_count"]} tools · {@audit_result["total_tokens"]} tokens)
+              </p>
+              <div class="overflow-x-auto mb-6">
+                <table class="min-w-full text-sm" id="audit-tools-table">
+                  <thead>
+                    <tr class="text-foreground">
+                      <.audit_th table="tools" key="name" sort={@audit_sort} label="Tool" />
+                      <.audit_th table="tools" key="char_count" sort={@audit_sort} label="Chars" />
+                      <.audit_th
+                        table="tools"
+                        key="estimated_tokens"
+                        sort={@audit_sort}
+                        label="Tokens"
+                      />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for tool <- audit_sorted(@audit_result["tools"], "tools", @audit_sort) do %>
+                      <tr>
+                        <td class="py-2 pr-4 font-mono text-xs">{tool["name"]}</td>
+                        <td class="py-2 pr-4">{tool["char_count"]}</td>
+                        <td class="py-2 pr-4">{tool["estimated_tokens"]}</td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+                Group savings
+              </p>
+              <div class="overflow-x-auto mb-2">
+                <table class="min-w-full text-sm" id="audit-groups-table">
+                  <thead>
+                    <tr class="text-foreground">
+                      <th class="text-left py-2 pr-4">Groups</th>
+                      <th class="text-left py-2 pr-4">Tools</th>
+                      <th class="text-left py-2 pr-4">Group tokens</th>
+                      <th class="text-left py-2 pr-4">Savings</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for {name, group} <- audit_group_savings(@audit_result) do %>
+                      <tr>
+                        <td class="py-2 pr-4">
+                          <span class="font-mono text-xs">
+                            CK_TOOL_GROUPS={Enum.join(group["groups"], ",")}
+                          </span>
+                          <span class="text-muted-foreground text-xs">({name})</span>
+                        </td>
+                        <td class="py-2 pr-4">{group["tool_count"]}</td>
+                        <td class="py-2 pr-4">{group["group_tokens"]}</td>
+                        <td class="py-2 pr-4 text-[#d2ffe7]">
+                          {group["savings_tokens"]} tokens ({group["savings_percent"]}%)
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% end %>
+
+            <%= if audit_recommendations(@audit_result) != [] do %>
+              <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+                Recommendations
+              </p>
+              <ul class="text-muted-foreground text-sm list-disc px-4 grid gap-1">
+                <%= for recommendation <- audit_recommendations(@audit_result) do %>
+                  <li>{recommendation}</li>
+                <% end %>
+              </ul>
+            <% end %>
+          <% end %>
         </div>
 
         <%= if @selected do %>
@@ -788,4 +1076,93 @@ defmodule ControlKeelWeb.SkillsLive do
 
   defp pluralize(word, 1), do: word
   defp pluralize(word, _), do: word <> "s"
+
+  attr :table, :string, required: true
+  attr :key, :string, required: true
+  attr :sort, :map, required: true
+  attr :label, :string, required: true
+  attr :id, :string, default: nil
+
+  defp audit_th(assigns) do
+    ~H"""
+    <th
+      class="text-left py-2 pr-4 cursor-pointer select-none hover:text-primary transition-colors"
+      id={@id}
+      phx-click="sort_audit"
+      phx-value-table={@table}
+      phx-value-key={@key}
+    >
+      {@label}{audit_sort_indicator(@sort, @table, @key)}
+    </th>
+    """
+  end
+
+  defp audit_sorted(rows, table, sort_state, default_key \\ "estimated_tokens") do
+    {key, dir} = Map.get(sort_state, table, {default_key, :desc})
+    Enum.sort_by(rows || [], &audit_sort_value(&1, key), dir)
+  end
+
+  defp audit_sort_value(row, key) do
+    case Map.get(row, key) do
+      value when is_number(value) -> {0, value}
+      value when is_binary(value) -> {1, String.downcase(value)}
+      _ -> {2, ""}
+    end
+  end
+
+  defp audit_sort_indicator(sort_state, table, key) do
+    case Map.get(sort_state, table) do
+      {^key, :desc} -> " ↓"
+      {^key, :asc} -> " ↑"
+      _ -> ""
+    end
+  end
+
+  defp audit_skill_rows(result),
+    do: result["effective_skills"] || result["skills"] || []
+
+  defp audit_duplicates(result),
+    do: result["skill_duplicates"] || result["duplicates"] || []
+
+  defp audit_recommendations(result),
+    do: List.wrap(result["recommendations"]) ++ List.wrap(result["skill_recommendations"])
+
+  defp audit_group_savings(result) do
+    result["group_savings"]
+    |> Kernel.||(%{})
+    |> Enum.sort_by(fn {_name, group} -> -group["savings_tokens"] end)
+  end
+
+  defp audit_summary_chips(mode, result) do
+    case mode do
+      "rules" ->
+        [
+          "status: #{result["status"]}",
+          "#{result["total_words"]} words",
+          "#{result["estimated_tokens"]} tokens"
+        ]
+
+      "skills" ->
+        [
+          "#{result["installed_skill_copies"]} copies → #{result["effective_skill_count"]} effective",
+          "#{result["total_skill_tokens"]} skill tokens",
+          "#{result["duplicate_token_count"]} wasted tokens"
+        ]
+
+      "tools" ->
+        [
+          "#{result["tool_count"]} tools",
+          "#{result["total_tokens"]} tokens",
+          "avg #{result["avg_tokens_per_tool"]}/tool"
+        ]
+
+      _ ->
+        [
+          "#{result["estimated_tokens"]} total tokens",
+          "#{result["rule_tokens"]} rule tokens",
+          "#{result["total_skill_tokens"]} skill tokens",
+          "#{result["duplicate_token_count"]} wasted tokens"
+        ]
+    end
+  end
 end
