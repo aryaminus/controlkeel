@@ -987,7 +987,7 @@ defmodule ControlKeelWeb.SkillsLive do
                     <td class="py-2 pr-4">{target.default_scope}</td>
                     <td class="py-2 pr-4">{if target.native, do: "yes", else: "fallback"}</td>
                     <td class="py-2 pr-4">
-                      <span class="border rounded-full px-3 py-[0.45rem] text-[0.8rem] #{bundle_pill_class(target.id)}">
+                      <span class={"border rounded-full px-3 py-[0.45rem] text-[0.8rem] #{bundle_pill_class(target.id)}"}>
                         {bundle_type(target.id)}
                       </span>
                     </td>
