@@ -1540,7 +1540,7 @@ defmodule ControlKeelWeb.ApiController do
   def prune_skill_duplicates(conn, params) do
     project_root = Map.get(params, "project_root", File.cwd!())
 
-    if params["confirm"] == true do
+    if ControlKeel.Utils.truthy?(Map.get(params, "confirm")) do
       {:ok, %{removed: removed, kept_project_groups: groups}} =
         Skills.prune_duplicate_skills(project_root)
 

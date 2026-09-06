@@ -139,6 +139,61 @@ defmodule ControlKeelWeb.SkillsLiveTest do
     refute has_element?(view, "#prune-duplicates-modal")
   end
 
+  test "prune confirm refuses when project root changed since preview", %{conn: conn} do
+    tmp_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-skills-prune-stale-#{System.unique_integer([:positive])}"
+      )
+
+    home_dir = Path.join(tmp_dir, "home")
+    project_root = Path.join(tmp_dir, "project")
+    other_root = Path.join(tmp_dir, "other-project")
+
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(home_dir)
+    File.mkdir_p!(project_root)
+    File.mkdir_p!(other_root)
+
+    previous_home = System.get_env("HOME")
+    previous_ck_home = System.get_env("CONTROLKEEL_HOME")
+    previous_trust = System.get_env("CONTROLKEEL_TRUST_PROJECT_SKILLS")
+
+    System.put_env("HOME", home_dir)
+    System.put_env("CONTROLKEEL_HOME", home_dir)
+    System.put_env("CONTROLKEEL_TRUST_PROJECT_SKILLS", "1")
+
+    on_exit(fn ->
+      restore_env("HOME", previous_home)
+      restore_env("CONTROLKEEL_HOME", previous_ck_home)
+      restore_env("CONTROLKEEL_TRUST_PROJECT_SKILLS", previous_trust)
+      File.rm_rf!(tmp_dir)
+    end)
+
+    source =
+      :code.priv_dir(:controlkeel)
+      |> to_string()
+      |> Path.join("skills/controlkeel-governance/SKILL.md")
+      |> File.read!()
+
+    user_skill = Path.join(home_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+    File.mkdir_p!(Path.dirname(user_skill))
+    File.write!(user_skill, source)
+
+    {:ok, view, _html} = live(conn, ~p"/skills")
+
+    render_submit(form(view, "#skills-project-form", project: %{"project_root" => project_root}))
+    render_click(element(view, "#skills-prune-button"))
+    assert has_element?(view, "#prune-duplicates-modal")
+
+    render_submit(form(view, "#skills-project-form", project: %{"project_root" => other_root}))
+
+    html = render_click(element(view, "#skills-prune-confirm"))
+    assert html =~ "Project root changed since the preview"
+    refute has_element?(view, "#prune-duplicates-modal")
+    assert File.exists?(user_skill)
+  end
+
   test "token audit renders sortable per-mode tables", %{conn: conn} do
     tmp_dir =
       Path.join(

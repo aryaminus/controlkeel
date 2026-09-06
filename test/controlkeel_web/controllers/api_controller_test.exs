@@ -997,6 +997,24 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert body["removed_count"] == 1
       refute File.exists?(Path.dirname(user_skill))
       assert File.exists?(project_skill)
+
+      # string confirm (form-encoded parity) also executes
+      File.mkdir_p!(Path.dirname(user_skill))
+      File.write!(user_skill, source)
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/prune-duplicates", %{
+          project_root: project_root,
+          confirm: "true"
+        })
+
+      body = json_response(conn, 200)
+
+      assert body["pruned"] == true
+      assert body["removed_count"] == 1
+      refute File.exists?(Path.dirname(user_skill))
+      assert File.exists?(project_skill)
     end
 
     test "token audit returns per-mode payloads and download headers", %{conn: conn} do

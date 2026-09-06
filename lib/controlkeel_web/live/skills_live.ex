@@ -138,6 +138,7 @@ defmodule ControlKeelWeb.SkillsLive do
         |> assign(:prune_preview, nil)
         |> put_flash(:info, "No user-level duplicate skill copies to prune.")
       else
+        preview = Map.put(preview, :project_root, socket.assigns.project_root)
         assign(socket, :prune_preview, preview)
       end
 
@@ -149,19 +150,34 @@ defmodule ControlKeelWeb.SkillsLive do
   end
 
   def handle_event("confirm_prune", _params, socket) do
-    project_root = socket.assigns.project_root
-    {:ok, %{removed: removed}} = Skills.prune_duplicate_skills(project_root)
-    count = length(removed)
+    case socket.assigns.prune_preview do
+      %{project_root: previewed_root} ->
+        if previewed_root != socket.assigns.project_root do
+          {:noreply,
+           socket
+           |> assign(:prune_preview, nil)
+           |> put_flash(
+             :error,
+             "Project root changed since the preview. Re-run the prune preview."
+           )}
+        else
+          {:ok, %{removed: removed}} = Skills.prune_duplicate_skills(previewed_root)
+          count = length(removed)
 
-    {:noreply,
-     socket
-     |> assign(:prune_preview, nil)
-     |> put_flash(
-       :info,
-       "Pruned #{count} user-level duplicate skill #{pluralize("copy", count)}."
-     )
-     |> assign_analysis(project_root)
-     |> assign_doctor(project_root)}
+          {:noreply,
+           socket
+           |> assign(:prune_preview, nil)
+           |> put_flash(
+             :info,
+             "Pruned #{count} user-level duplicate skill #{pluralize("copy", count)}."
+           )
+           |> assign_analysis(previewed_root)
+           |> assign_doctor(previewed_root)}
+        end
+
+      _preview_without_root ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("run_audit", %{"mode" => mode}, socket) do
