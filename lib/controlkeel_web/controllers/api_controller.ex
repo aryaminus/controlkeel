@@ -26,6 +26,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Scanner.FastPath
   alias ControlKeel.Skills
   alias ControlKeel.Skills.Registry
+  alias ControlKeel.Skills.SkillTarget
 
   def action(conn, _opts) do
     agent_json? = agent_json_requested?(conn)
@@ -1586,6 +1587,9 @@ defmodule ControlKeelWeb.ApiController do
     cond do
       is_nil(target) or target == "" ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: "`target` is required"})
+
+      is_nil(SkillTarget.get(target)) ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
 
       not File.dir?(dist_dir) ->
         conn

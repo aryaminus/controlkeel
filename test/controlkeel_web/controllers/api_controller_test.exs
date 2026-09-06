@@ -1094,12 +1094,18 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       conn =
         build_conn()
-        |> get(~p"/api/v1/skills/download-bundle?target=missing-bundle&project_root=#{tmp_dir}")
+        |> get(~p"/api/v1/skills/download-bundle?target=claude-plugin&project_root=#{tmp_dir}")
 
       assert %{"error" => "bundle not found — export it first"} = json_response(conn, 404)
 
       conn = build_conn() |> get(~p"/api/v1/skills/download-bundle?project_root=#{tmp_dir}")
       assert %{"error" => "`target` is required"} = json_response(conn, 422)
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/download-bundle?target=../..&project_root=#{tmp_dir}")
+
+      assert %{"error" => "unknown skill target"} = json_response(conn, 422)
     end
   end
 
