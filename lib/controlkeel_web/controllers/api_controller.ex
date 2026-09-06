@@ -17,6 +17,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Mission.Decomposition
   alias ControlKeel.MCP.Arguments
   alias ControlKeel.MCP.Tools.CkContext
+  alias ControlKeel.MCP.Tools.CkTokenAudit
   alias ControlKeel.Mission
   alias ControlKeel.Platform
   alias ControlKeel.ProviderBroker
@@ -25,6 +26,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Scanner.FastPath
   alias ControlKeel.Skills
   alias ControlKeel.Skills.Registry
+  alias ControlKeel.Skills.SkillTarget
 
   def action(conn, _opts) do
     agent_json? = agent_json_requested?(conn)
@@ -1386,13 +1388,13 @@ defmodule ControlKeelWeb.ApiController do
     project_root = Map.get(params, "project_root")
     format = Map.get(params, "format", "json")
     target = Map.get(params, "target")
-    analysis = Registry.analyze(project_root)
+    validation = Skills.validate(project_root, report_identical_duplicates: true)
 
     skills =
       if is_binary(target) and target != "" do
-        Enum.filter(analysis.skills, &(target in (&1.compatibility_targets || [])))
+        Enum.filter(validation.skills, &(target in (&1.compatibility_targets || [])))
       else
-        analysis.skills
+        validation.skills
       end
 
     entries =
@@ -1416,11 +1418,22 @@ defmodule ControlKeelWeb.ApiController do
         }
       end)
 
+    identical_count =
+      Enum.count(validation.diagnostics, &(&1.code == "duplicate_skill_copy"))
+
+    shadowed_count =
+      Enum.count(validation.diagnostics, &(&1.code == "shadowed_skill"))
+
     result = %{
       skills: entries,
       total: length(entries),
-      trusted_project_skills: analysis.trusted_project?,
-      diagnostics: Enum.map(analysis.diagnostics, &diagnostic_summary/1)
+      trusted_project_skills: validation.trusted_project?,
+      diagnostics: Enum.map(validation.diagnostics, &diagnostic_summary/1),
+      valid?: validation.valid?,
+      identical_count: identical_count,
+      shadowed_count: shadowed_count,
+      warning_count: validation.warning_count,
+      error_count: validation.error_count
     }
 
     result =
@@ -1524,6 +1537,87 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  def prune_skill_duplicates(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+
+    if ControlKeel.Utils.truthy?(Map.get(params, "confirm")) do
+      {:ok, %{removed: removed, kept_project_groups: groups}} =
+        Skills.prune_duplicate_skills(project_root)
+
+      json(conn, %{
+        pruned: true,
+        removed_count: length(removed),
+        removed: removed,
+        kept_project_groups: Enum.map(groups, &skill_prune_group_summary/1)
+      })
+    else
+      preview = Skills.prune_duplicate_skills_preview(project_root)
+
+      json(conn, %{
+        pruned: false,
+        user_level: preview.user_level,
+        user_level_count: preview.user_level_count,
+        kept_project_groups: Enum.map(preview.project_groups, &skill_prune_group_summary/1),
+        identical_count: preview.identical_count,
+        shadowed_count: preview.shadowed_count
+      })
+    end
+  end
+
+  def token_audit(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+    mode = Map.get(params, "mode", "full")
+
+    case CkTokenAudit.call(%{"project_root" => project_root, "mode" => mode}) do
+      {:ok, result} ->
+        conn
+        |> maybe_token_audit_download(params, mode)
+        |> json(result)
+
+      {:error, {:invalid_arguments, message}} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: message})
+    end
+  end
+
+  def download_skill_bundle(conn, params) do
+    target = Map.get(params, "target")
+    project_root = Path.expand(Map.get(params, "project_root", File.cwd!()))
+    dist_dir = Path.join([project_root, "controlkeel", "dist", to_string(target || "")])
+
+    cond do
+      is_nil(target) or target == "" ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "`target` is required"})
+
+      is_nil(SkillTarget.get(target)) ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
+
+      not File.dir?(dist_dir) ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "bundle not found — export it first"})
+
+      true ->
+        entries =
+          dist_dir
+          |> Path.join("**/*")
+          |> Path.wildcard(match_dot: true)
+          |> Enum.filter(&File.regular?/1)
+          |> Enum.map(fn file ->
+            {Path.relative_to(file, dist_dir) |> to_charlist(), File.read!(file)}
+          end)
+
+        {:ok, {_zip_name, zip_bin}} = :zip.create(~c"#{target}.zip", entries, [:memory])
+
+        conn
+        |> put_resp_content_type("application/zip")
+        |> put_resp_header(
+          "content-disposition",
+          ~s(attachment; filename="controlkeel-#{target}.zip")
+        )
+        |> send_resp(200, zip_bin)
+    end
+  end
+
   # ─── Agent Router ─────────────────────────────────────────────────────────────
 
   def route_agent(conn, params) do
@@ -1573,6 +1667,21 @@ defmodule ControlKeelWeb.ApiController do
       release_bundle: target.release_bundle
     }
   end
+
+  defp skill_prune_group_summary(group) do
+    %{host_dir: group.host_dir, skills: group.skills}
+  end
+
+  defp maybe_token_audit_download(conn, %{"download" => download}, mode)
+       when download in [true, "1", "true"],
+       do:
+         put_resp_header(
+           conn,
+           "content-disposition",
+           ~s(attachment; filename="token-audit-#{mode}.json")
+         )
+
+  defp maybe_token_audit_download(conn, _params, _mode), do: conn
 
   defp fetch_review(review_id) do
     case Mission.get_review(review_id) do
