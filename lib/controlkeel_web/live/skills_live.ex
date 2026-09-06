@@ -19,6 +19,7 @@ defmodule ControlKeelWeb.SkillsLive do
      |> assign_doctor(project_root)
      |> assign(:project_form, project_form(project_root))
      |> assign(:action_form, action_form())
+     |> assign(:prune_preview, nil)
      |> assign(:skill_search, "")
      |> assign(:target_search, "")}
   end
@@ -89,6 +90,41 @@ defmodule ControlKeelWeb.SkillsLive do
      socket
      |> push_event("copy-to-clipboard", %{text: command})
      |> put_flash(:info, "Copied command to clipboard.")}
+  end
+
+  def handle_event("preview_prune", _params, socket) do
+    preview = Skills.prune_duplicate_skills_preview(socket.assigns.project_root)
+
+    socket =
+      if preview.user_level == [] do
+        socket
+        |> assign(:prune_preview, nil)
+        |> put_flash(:info, "No user-level duplicate skill copies to prune.")
+      else
+        assign(socket, :prune_preview, preview)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("cancel_prune", _params, socket) do
+    {:noreply, assign(socket, :prune_preview, nil)}
+  end
+
+  def handle_event("confirm_prune", _params, socket) do
+    project_root = socket.assigns.project_root
+    {:ok, %{removed: removed}} = Skills.prune_duplicate_skills(project_root)
+    count = length(removed)
+
+    {:noreply,
+     socket
+     |> assign(:prune_preview, nil)
+     |> put_flash(
+       :info,
+       "Pruned #{count} user-level duplicate skill #{pluralize("copy", count)}."
+     )
+     |> assign_analysis(project_root)
+     |> assign_doctor(project_root)}
   end
 
   def handle_event("export", params, socket) do
@@ -293,6 +329,15 @@ defmodule ControlKeelWeb.SkillsLive do
             <p class="text-xs text-muted-foreground">
               {@identical_count} identical · {@shadowed_count} shadowed
             </p>
+            <button
+              :if={@identical_count > 0}
+              type="button"
+              id="skills-prune-button"
+              phx-click="preview_prune"
+              class="mt-3 inline-flex items-center justify-center gap-[0.4rem] px-4 py-2 rounded-full border bg-transparent text-sm font-semibold transition-[transform,background] duration-150 ease-in-out hover:bg-card hover:-translate-y-px cursor-pointer"
+            >
+              Prune user-level duplicates
+            </button>
           </div>
         </div>
 
@@ -583,6 +628,71 @@ defmodule ControlKeelWeb.SkillsLive do
                 </p>
               </article>
             <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div :if={@prune_preview} id="prune-duplicates-modal" class="relative z-50">
+        <div
+          class="fixed inset-0 bg-overlay/70 backdrop-blur-sm transition-opacity"
+          phx-click="cancel_prune"
+          aria-label="Close modal"
+        />
+
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+          <div class="w-full max-w-lg rounded-2xl border bg-card/95 p-6 shadow-card max-h-[80vh] overflow-y-auto">
+            <h2 class="text-lg font-semibold text-foreground mb-1">Prune user-level duplicates</h2>
+            <p class="text-sm text-muted-foreground mb-4">
+              Only identical copies under your home directory are removed automatically.
+              Shadowed copies with differing content are never removed.
+            </p>
+
+            <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+              Will be removed ({@prune_preview.user_level_count})
+            </p>
+            <ul class="grid gap-1 mb-4">
+              <li
+                :for={dir <- @prune_preview.user_level}
+                class="text-xs font-mono text-[#ffd6cb] break-all"
+              >
+                {dir}
+              </li>
+            </ul>
+
+            <%= if @prune_preview.project_groups != [] do %>
+              <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase mb-2">
+                Kept (project host-specific)
+              </p>
+              <ul class="grid gap-1 mb-2">
+                <li
+                  :for={group <- @prune_preview.project_groups}
+                  class="text-xs text-muted-foreground"
+                >
+                  {group.host_dir}/skills/: {Enum.join(group.skills, ", ")}
+                </li>
+              </ul>
+              <p class="text-xs text-muted-foreground mb-4">
+                Keep your primary host + .agents/skills/.
+              </p>
+            <% end %>
+
+            <div class="flex justify-end gap-3 mt-2">
+              <button
+                type="button"
+                phx-click="cancel_prune"
+                class="rounded-full border bg-transparent px-5 py-2 text-sm font-semibold transition hover:bg-card cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="skills-prune-confirm"
+                phx-click="confirm_prune"
+                class="rounded-full bg-primary px-5 py-2 text-sm font-bold text-[#11170d] transition hover:-translate-y-px cursor-pointer"
+              >
+                Remove {@prune_preview.user_level_count} user-level copies
+              </button>
+            </div>
           </div>
         </div>
       </div>

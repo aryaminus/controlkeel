@@ -1535,6 +1535,33 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
+  def prune_skill_duplicates(conn, params) do
+    project_root = Map.get(params, "project_root", File.cwd!())
+
+    if params["confirm"] == true do
+      {:ok, %{removed: removed, kept_project_groups: groups}} =
+        Skills.prune_duplicate_skills(project_root)
+
+      json(conn, %{
+        pruned: true,
+        removed_count: length(removed),
+        removed: removed,
+        kept_project_groups: Enum.map(groups, &skill_prune_group_summary/1)
+      })
+    else
+      preview = Skills.prune_duplicate_skills_preview(project_root)
+
+      json(conn, %{
+        pruned: false,
+        user_level: preview.user_level,
+        user_level_count: preview.user_level_count,
+        kept_project_groups: Enum.map(preview.project_groups, &skill_prune_group_summary/1),
+        identical_count: preview.identical_count,
+        shadowed_count: preview.shadowed_count
+      })
+    end
+  end
+
   # ─── Agent Router ─────────────────────────────────────────────────────────────
 
   def route_agent(conn, params) do
@@ -1583,6 +1610,10 @@ defmodule ControlKeelWeb.ApiController do
       supported_scopes: target.supported_scopes,
       release_bundle: target.release_bundle
     }
+  end
+
+  defp skill_prune_group_summary(group) do
+    %{host_dir: group.host_dir, skills: group.skills}
   end
 
   defp fetch_review(review_id) do

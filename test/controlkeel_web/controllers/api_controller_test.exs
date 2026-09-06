@@ -939,6 +939,65 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert install["target"] == "open-standard"
       assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     end
+
+    test "previews and prunes only user-level skill duplicates", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("skills-prune")
+      home_dir = Path.join(tmp_dir, "home")
+      project_root = Path.join(tmp_dir, "project")
+
+      File.mkdir_p!(home_dir)
+      File.mkdir_p!(project_root)
+
+      restore_home = set_provider_home(home_dir)
+      previous_trust = System.get_env("CONTROLKEEL_TRUST_PROJECT_SKILLS")
+      System.put_env("CONTROLKEEL_TRUST_PROJECT_SKILLS", "1")
+
+      on_exit(fn ->
+        restore_home.()
+        restore_env("CONTROLKEEL_TRUST_PROJECT_SKILLS", previous_trust)
+        File.rm_rf!(tmp_dir)
+      end)
+
+      source =
+        :code.priv_dir(:controlkeel)
+        |> to_string()
+        |> Path.join("skills/controlkeel-governance/SKILL.md")
+        |> File.read!()
+
+      user_skill = Path.join(home_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+      File.mkdir_p!(Path.dirname(user_skill))
+      File.write!(user_skill, source)
+
+      project_skill = Path.join(project_root, ".claude/skills/controlkeel-governance/SKILL.md")
+      File.mkdir_p!(Path.dirname(project_skill))
+      File.write!(project_skill, source)
+
+      conn =
+        post(conn, ~p"/api/v1/skills/prune-duplicates", %{project_root: project_root})
+
+      body = json_response(conn, 200)
+
+      assert body["pruned"] == false
+      assert body["user_level_count"] == 1
+      assert hd(body["user_level"]) =~ "controlkeel-governance"
+
+      assert [%{"host_dir" => ".claude", "skills" => ["controlkeel-governance"]}] =
+               body["kept_project_groups"]
+
+      assert File.exists?(user_skill)
+      assert File.exists?(project_skill)
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/prune-duplicates", %{project_root: project_root, confirm: true})
+
+      body = json_response(conn, 200)
+
+      assert body["pruned"] == true
+      assert body["removed_count"] == 1
+      refute File.exists?(Path.dirname(user_skill))
+      assert File.exists?(project_skill)
+    end
   end
 
   describe "benchmark API" do

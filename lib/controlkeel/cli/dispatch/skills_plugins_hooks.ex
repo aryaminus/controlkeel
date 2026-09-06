@@ -239,7 +239,7 @@ defmodule ControlKeel.CLI.Dispatch.SkillsPluginsHooks do
 
     prune_result =
       if options[:prune_duplicates] == true and duplicate_copy_count > 0 do
-        prune_duplicate_skills(root, analysis)
+        prune_duplicate_skills(root)
       else
         []
       end
@@ -347,83 +347,31 @@ defmodule ControlKeel.CLI.Dispatch.SkillsPluginsHooks do
   # Finds duplicate skill copies and removes user-level copies (always redundant).
   # Project-level host-specific copies are listed but not removed — the user's
   # primary host directory is kept, compat .agents/skills/ is kept.
-  defp prune_duplicate_skills(project_root, analysis) do
-    user_home =
-      System.get_env("CONTROLKEEL_HOME") || System.get_env("HOME") || System.user_home!()
+  defp prune_duplicate_skills(project_root) do
+    {:ok, %{removed: removed, kept_project_groups: groups}} =
+      Skills.prune_duplicate_skills(project_root)
 
-    # Collect all skill locations from diagnostics
-    duplicate_diagnostics =
-      analysis.diagnostics
-      |> Enum.filter(&(&1.code == "duplicate_skill_copy"))
+    user_lines =
+      if removed != [] do
+        ["", "✓ Pruned #{length(removed)} user-level duplicate skill copy(s):"] ++
+          Enum.map(removed, &"  rm -rf #{&1}")
+      else
+        []
+      end
 
-    if duplicate_diagnostics == [] do
+    project_lines =
+      if groups != [] do
+        ["", "ℹ️  Project-level host-specific copies (kept — your primary host needs these):"] ++
+          Enum.flat_map(groups, &["  #{&1.host_dir}/skills/: #{Enum.join(&1.skills, ", ")}"]) ++
+          ["  # To remove extras: keep only your primary host dir + .agents/skills/"]
+      else
+        []
+      end
+
+    if user_lines == [] and project_lines == [] do
       ["No duplicate skill copies found."]
     else
-      # Group by skill name from the path
-      grouped =
-        duplicate_diagnostics
-        |> Enum.map(fn diag ->
-          skill_path = diag.path || ""
-          skill_name = skill_path |> Path.split() |> List.last()
-          {skill_name, skill_path}
-        end)
-        |> Enum.group_by(fn {name, _path} -> name end, fn {_name, path} -> path end)
-
-      # Separate user-level (always waste) from project-level
-      {user_paths, project_paths} =
-        grouped
-        |> Enum.flat_map(fn {_name, paths} -> paths end)
-        |> Enum.split_with(&String.starts_with?(&1, user_home))
-
-      # Remove user-level copies (always redundant — hosts load project-level)
-      pruned_user =
-        if user_paths != [] do
-          removed =
-            user_paths
-            |> Enum.reject(&(File.exists?(Path.join(&1, "SKILL.md")) == false))
-            |> Enum.map(fn path ->
-              File.rm_rf!(path)
-              path
-            end)
-
-          if removed != [] do
-            count = length(removed)
-
-            ["", "✓ Pruned #{count} user-level duplicate skill copy(s):"] ++
-              Enum.map(removed, &"  rm -rf #{&1}")
-          else
-            []
-          end
-        else
-          []
-        end
-
-      # List project-level duplicates (not auto-removed)
-      pruned_project =
-        if project_paths != [] do
-          grouped_project =
-            project_paths
-            |> Enum.group_by(fn path ->
-              # Extract the host dir (e.g., .claude, .codex)
-              relative = Path.relative_to(path, project_root)
-              relative |> Path.split() |> List.first()
-            end)
-
-          lines =
-            grouped_project
-            |> Enum.flat_map(fn {host_dir, paths} ->
-              skill_names = Enum.map(paths, &Path.basename/1) |> Enum.join(", ")
-              ["  #{host_dir}/skills/: #{skill_names}"]
-            end)
-
-          ["", "ℹ️  Project-level host-specific copies (kept — your primary host needs these):"] ++
-            lines ++
-            ["  # To remove extras: keep only your primary host dir + .agents/skills/"]
-        else
-          []
-        end
-
-      pruned_user ++ pruned_project
+      user_lines ++ project_lines
     end
   end
 end
