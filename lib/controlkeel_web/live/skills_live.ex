@@ -211,20 +211,64 @@ defmodule ControlKeelWeb.SkillsLive do
             <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase">
               Total skills
             </p>
-            <strong>{length(@skills)}</strong>
+            <strong>{@total_skills || length(@skills)}</strong>
           </div>
           <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
             <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase">
               Skill warnings
             </p>
-            <strong>{Enum.count(@diagnostics, &(&1.level == "warn"))}</strong>
+            <strong>{@warning_count || Enum.count(@diagnostics, &(&1.level == "warn"))}</strong>
           </div>
           <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
             <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase">
               Skill errors
             </p>
-            <strong>{Enum.count(@diagnostics, &(&1.level == "error"))}</strong>
+            <strong>{@error_count || Enum.count(@diagnostics, &(&1.level == "error"))}</strong>
           </div>
+          <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
+            <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase">
+              Health
+            </p>
+            <div class="flex items-center gap-2 mt-1">
+              <span class={
+                if @valid?,
+                  do:
+                    "border rounded-full px-3 py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]",
+                  else:
+                    "border rounded-full px-3 py-[0.45rem] text-[0.8rem] bg-[rgba(255,143,107,0.12)] text-[#ffd6cb]"
+              }>
+                {if @valid?, do: "✓ valid", else: "✗ needs fix"}
+              </span>
+            </div>
+            <p class="text-xs text-muted-foreground mt-2">
+              {@total_skills || length(@skills)} total · {@warning_count || 0} warnings · {@error_count ||
+                0} errors
+            </p>
+            <p :if={@validated_at} class="text-xs text-muted-foreground">
+              validated {Calendar.strftime(@validated_at, "%H:%M:%S UTC")}
+            </p>
+          </div>
+
+          <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
+            <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase">
+              Identical copies
+            </p>
+            <strong class={if @identical_count > 0, do: "text-[#fff0bf]", else: "text-[#d2ffe7]"}>
+              {@identical_count}
+            </strong>
+            <p class="text-xs text-muted-foreground">expected distribution</p>
+          </div>
+
+          <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
+            <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase">
+              Shadowed copies
+            </p>
+            <strong class={if @shadowed_count > 0, do: "text-[#ffd6cb]", else: "text-[#d2ffe7]"}>
+              {@shadowed_count}
+            </strong>
+            <p class="text-xs text-muted-foreground">needs fix</p>
+          </div>
+
           <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
             <p class="text-xs font-semibold text-primary tracking-[0.14em] uppercase">
               Local skills
@@ -246,6 +290,9 @@ defmodule ControlKeelWeb.SkillsLive do
             <strong class={if @duplicate_copy_count > 0, do: "text-[#ffd6cb]", else: ""}>
               {@duplicate_copy_count}
             </strong>
+            <p class="text-xs text-muted-foreground">
+              {@identical_count} identical · {@shadowed_count} shadowed
+            </p>
           </div>
         </div>
 
@@ -494,9 +541,26 @@ defmodule ControlKeelWeb.SkillsLive do
         </div>
 
         <div class="border rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
-          <p class="text-lg font-semibold text-primary tracking-[0.14em] uppercase mb-4">
+          <p class="text-lg font-semibold text-primary tracking-[0.14em] uppercase mb-2">
             Skill diagnostics
           </p>
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span class="border rounded-full px-3 py-[0.45rem] text-xs bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]">
+              valid? {if @valid?, do: "✓ yes", else: "✗ no"} · {@total_skills} total · {@warning_count} warnings · {@error_count} errors
+            </span>
+            <span class="border rounded-full px-3 py-[0.45rem] text-xs bg-[rgba(255,207,107,0.12)] text-[#fff0bf]">
+              shadowed_skill: {@shadowed_count}
+            </span>
+            <span class="border rounded-full px-3 py-[0.45rem] text-xs bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]">
+              duplicate_skill_copy: {@identical_count} identical
+            </span>
+            <span
+              :if={@validated_at}
+              class="border rounded-full px-3 py-[0.45rem] text-xs text-muted-foreground"
+            >
+              validated {Calendar.strftime(@validated_at, "%H:%M:%S UTC")}
+            </span>
+          </div>
           <div :if={@diagnostics == []} class="text-muted-foreground">
             No skill diagnostics were recorded.
           </div>
@@ -527,16 +591,21 @@ defmodule ControlKeelWeb.SkillsLive do
   end
 
   defp assign_analysis(socket, project_root) do
-    analysis = Skills.analyze(project_root, report_identical_duplicates: true)
+    validation = Skills.validate(project_root, report_identical_duplicates: true)
 
     socket
     |> assign(:project_root, project_root)
-    |> assign(:skills, analysis.skills)
-    |> assign(:filtered_skills, analysis.skills)
-    |> assign(:diagnostics, analysis.diagnostics)
+    |> assign(:skills, validation.skills)
+    |> assign(:filtered_skills, validation.skills)
+    |> assign(:diagnostics, validation.diagnostics)
     |> assign(:targets, Skills.targets())
     |> assign(:filtered_targets, Skills.targets())
-    |> assign(:trusted_project?, analysis.trusted_project?)
+    |> assign(:trusted_project?, validation.trusted_project?)
+    |> assign(:valid?, validation.valid?)
+    |> assign(:total_skills, validation.total)
+    |> assign(:warning_count, validation.warning_count)
+    |> assign(:error_count, validation.error_count)
+    |> assign(:validated_at, DateTime.utc_now())
     |> assign(:skill_search, "")
     |> assign(:target_search, "")
   end
@@ -560,12 +629,19 @@ defmodule ControlKeelWeb.SkillsLive do
     duplicate_copy_count =
       Enum.count(socket.assigns.diagnostics, &(&1.code == "duplicate_skill_copy"))
 
+    identical_count = duplicate_copy_count
+
+    shadowed_count =
+      Enum.count(socket.assigns.diagnostics, &(&1.code == "shadowed_skill"))
+
     socket
     |> assign(:provider_status, provider_status)
     |> assign(:bootstrap_mode, provider_status["bootstrap"]["mode"])
     |> assign(:attachable_clients, attachable_clients)
     |> assign(:headless_runtimes, headless_runtimes)
     |> assign(:duplicate_copy_count, duplicate_copy_count)
+    |> assign(:identical_count, identical_count)
+    |> assign(:shadowed_count, shadowed_count)
     |> assign(:export_manifests, Skills.export_manifests(project_root))
   end
 

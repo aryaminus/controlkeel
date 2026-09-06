@@ -1386,13 +1386,13 @@ defmodule ControlKeelWeb.ApiController do
     project_root = Map.get(params, "project_root")
     format = Map.get(params, "format", "json")
     target = Map.get(params, "target")
-    analysis = Registry.analyze(project_root)
+    validation = Skills.validate(project_root, report_identical_duplicates: true)
 
     skills =
       if is_binary(target) and target != "" do
-        Enum.filter(analysis.skills, &(target in (&1.compatibility_targets || [])))
+        Enum.filter(validation.skills, &(target in (&1.compatibility_targets || [])))
       else
-        analysis.skills
+        validation.skills
       end
 
     entries =
@@ -1416,11 +1416,22 @@ defmodule ControlKeelWeb.ApiController do
         }
       end)
 
+    identical_count =
+      Enum.count(validation.diagnostics, &(&1.code == "duplicate_skill_copy"))
+
+    shadowed_count =
+      Enum.count(validation.diagnostics, &(&1.code == "shadowed_skill"))
+
     result = %{
       skills: entries,
       total: length(entries),
-      trusted_project_skills: analysis.trusted_project?,
-      diagnostics: Enum.map(analysis.diagnostics, &diagnostic_summary/1)
+      trusted_project_skills: validation.trusted_project?,
+      diagnostics: Enum.map(validation.diagnostics, &diagnostic_summary/1),
+      valid?: validation.valid?,
+      identical_count: identical_count,
+      shadowed_count: shadowed_count,
+      warning_count: validation.warning_count,
+      error_count: validation.error_count
     }
 
     result =
