@@ -3209,9 +3209,8 @@ defmodule ControlKeel.Mission do
       Enum.count(regression_runs, &(get_in(&1.metadata, ["regression", "outcome"]) == "skipped"))
 
     engines =
-      regression_runs
-      |> Enum.group_by(&(get_in(&1.metadata, ["regression", "engine"]) || "unknown"))
-      |> Enum.into(%{}, fn {engine, rows} -> {engine, length(rows)} end)
+      # Bolt: Optimize list allocation by using frequencies_by instead of group_by |> length
+      Enum.frequencies_by(regression_runs, &(get_in(&1.metadata, ["regression", "engine"]) || "unknown"))
 
     latest_failures =
       regression_runs
@@ -4395,13 +4394,11 @@ defmodule ControlKeel.Mission do
     %{
       "total" => length(invocations),
       "providers" =>
-        invocations
-        |> Enum.group_by(&(&1.provider || "unknown"))
-        |> Enum.into(%{}, fn {provider, rows} -> {provider, length(rows)} end),
+        # Bolt: Optimize list allocation by using frequencies_by instead of group_by |> length
+        Enum.frequencies_by(invocations, &(&1.provider || "unknown")),
       "tools" =>
-        invocations
-        |> Enum.group_by(&(&1.tool || "unknown"))
-        |> Enum.into(%{}, fn {tool, rows} -> {tool, length(rows)} end),
+        # Bolt: Optimize list allocation by using frequencies_by instead of group_by |> length
+        Enum.frequencies_by(invocations, &(&1.tool || "unknown")),
       "cost_cents" => total_cost,
       "latest_run_at" =>
         invocations
