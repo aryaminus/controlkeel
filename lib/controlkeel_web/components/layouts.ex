@@ -528,6 +528,12 @@ defmodule ControlKeelWeb.Layouts do
         exact: true
       },
       %{
+        label: "Reviews",
+        href: ~p"/sessions/#{session_id}/reviews",
+        icon: "hero-clipboard-document-check",
+        exact: true
+      },
+      %{
         label: "Release readiness",
         href: ~p"/sessions/#{session_id}/release-readiness",
         icon: "hero-shield-check",
