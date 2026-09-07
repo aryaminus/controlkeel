@@ -3209,9 +3209,9 @@ defmodule ControlKeel.Mission do
       Enum.count(regression_runs, &(get_in(&1.metadata, ["regression", "outcome"]) == "skipped"))
 
     engines =
+      # ⚡ Bolt: Use Enum.frequencies_by/2 to avoid intermediate list allocations
       regression_runs
-      |> Enum.group_by(&(get_in(&1.metadata, ["regression", "engine"]) || "unknown"))
-      |> Enum.into(%{}, fn {engine, rows} -> {engine, length(rows)} end)
+      |> Enum.frequencies_by(&(get_in(&1.metadata, ["regression", "engine"]) || "unknown"))
 
     latest_failures =
       regression_runs
@@ -4395,13 +4395,13 @@ defmodule ControlKeel.Mission do
     %{
       "total" => length(invocations),
       "providers" =>
+        # ⚡ Bolt: Use Enum.frequencies_by/2 to avoid intermediate list allocations
         invocations
-        |> Enum.group_by(&(&1.provider || "unknown"))
-        |> Enum.into(%{}, fn {provider, rows} -> {provider, length(rows)} end),
+        |> Enum.frequencies_by(&(&1.provider || "unknown")),
       "tools" =>
+        # ⚡ Bolt: Use Enum.frequencies_by/2 to avoid intermediate list allocations
         invocations
-        |> Enum.group_by(&(&1.tool || "unknown"))
-        |> Enum.into(%{}, fn {tool, rows} -> {tool, length(rows)} end),
+        |> Enum.frequencies_by(&(&1.tool || "unknown")),
       "cost_cents" => total_cost,
       "latest_run_at" =>
         invocations
