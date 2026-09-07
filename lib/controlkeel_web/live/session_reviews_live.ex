@@ -41,19 +41,8 @@ defmodule ControlKeelWeb.SessionReviewsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="space-y-8">
-      <.page_title title={"Review queue: #{@session.title}"} />
-
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <span>{@review_counts.total} total</span>
-        <span aria-hidden="true" class="size-1.5 rounded-full bg-warning" />
-        <span>{@review_counts.pending} pending</span>
-        <span aria-hidden="true" class="size-1.5 rounded-full bg-success" />
-        <span>{@review_counts.total - @review_counts.pending} resolved</span>
-      </div>
-
-      <div class="bg-card border rounded-2xl shadow-card overflow-clip">
-        <table class="min-w-full divide-y divide-border text-left text-sm">
+    <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+      <table class="min-w-full divide-y divide-border text-left text-sm">
           <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
             <tr>
               <th class="px-5 py-3 font-semibold">Review</th>
@@ -101,7 +90,6 @@ defmodule ControlKeelWeb.SessionReviewsLive do
           </tbody>
         </table>
       </div>
-    </div>
     """
   end
 
