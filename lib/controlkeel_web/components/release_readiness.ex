@@ -13,7 +13,7 @@ defmodule ControlKeelWeb.ReleaseReadiness do
 
   def release_readiness(assigns) do
     ~H"""
-    <section id="mission-release-readiness" class="rounded-2xl border bg-card p-5 shadow-card mt-6">
+    <section id="mission-release-readiness" class="space-y-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <.section_title>Release readiness</.section_title>
         <span
@@ -24,19 +24,19 @@ defmodule ControlKeelWeb.ReleaseReadiness do
           {status_label(@readiness["status"])}
         </span>
       </div>
-      <p class="text-sm text-muted-foreground mt-2">
+      <p class="text-sm text-muted-foreground">
         Ship / no-ship gate over proof state, findings, smoke evidence, and artifact provenance —
         the same gate behind <code class="font-mono bg-muted px-1.5 py-0.5 rounded text-xs">controlkeel release-ready</code>.
       </p>
 
       <%= if is_nil(@readiness) do %>
-        <p class="mt-4 text-sm text-muted-foreground" id="release-readiness-unavailable">
+        <p class="text-sm text-muted-foreground" id="release-readiness-unavailable">
           Release readiness could not be evaluated for this session yet. Submit the evidence below to run the gate.
         </p>
       <% else %>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          <div class="rounded-2xl bg-muted p-4">
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="rounded-2xl border bg-card p-5 shadow-card">
+            <p class="text-sm font-medium text-muted-foreground mb-2">
               Release-candidate proof
             </p>
             <%= if @readiness["proof"] do %>
@@ -66,8 +66,8 @@ defmodule ControlKeelWeb.ReleaseReadiness do
               </p>
             <% end %>
           </div>
-          <div class="rounded-2xl bg-muted p-4">
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">
+          <div class="rounded-2xl border bg-card p-5 shadow-card">
+            <p class="text-sm font-medium text-muted-foreground mb-2">
               Unresolved findings
             </p>
             <div class="flex flex-wrap items-center gap-1.5">
@@ -91,7 +91,7 @@ defmodule ControlKeelWeb.ReleaseReadiness do
               </span>
             </div>
             <.link
-              navigate={~p"/findings?#{%{"session_id" => @session_id, "status" => "open"}}"}
+              navigate={~p"/sessions/#{@session_id}/findings"}
               class="inline-flex items-center gap-1 mt-3 text-sm font-medium text-muted-foreground transition hover:text-primary"
             >
               View open findings <.icon name="hero-arrow-up-right" class="size-3" />
@@ -100,12 +100,12 @@ defmodule ControlKeelWeb.ReleaseReadiness do
         </div>
 
         <%= if @readiness["status"] == "ready" do %>
-          <p class="mt-4 text-sm text-success" id="release-readiness-summary">
+          <p class="text-sm text-success" id="release-readiness-summary">
             {@readiness["summary"]}
           </p>
         <% else %>
-          <div class="mt-4" id="release-readiness-reasons">
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">
+          <div id="release-readiness-reasons">
+            <p class="text-sm font-medium text-muted-foreground mb-2">
               Unmet gate conditions
             </p>
             <ul class="space-y-1 text-sm text-muted-foreground list-disc ml-5">
@@ -117,10 +117,8 @@ defmodule ControlKeelWeb.ReleaseReadiness do
         <% end %>
       <% end %>
 
-      <div class="mt-5 border-t pt-5">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
-          Release evidence
-        </p>
+      <div class="border-t pt-5">
+        <.card_title class="mb-3">Release evidence</.card_title>
         <.form
           for={@form}
           id="release-readiness-form"
@@ -133,21 +131,18 @@ defmodule ControlKeelWeb.ReleaseReadiness do
             label="Smoke status"
             options={[{"Not run yet", ""}, {"Passed", "success"}, {"Failed", "failed"}]}
           />
-          <.input
+          <.input_component
             field={@form[:smoke_run]}
-            type="text"
             label="Smoke run URL or note"
             placeholder="https://ci.example.com/run/1234"
           />
-          <.input
+          <.input_component
             field={@form[:artifact_source]}
-            type="text"
             label="Artifact source"
             placeholder="github-actions"
           />
-          <.input
+          <.input_component
             field={@form[:sha]}
-            type="text"
             label="Commit SHA"
             placeholder="release commit (optional)"
           />
@@ -156,7 +151,7 @@ defmodule ControlKeelWeb.ReleaseReadiness do
             type="checkbox"
             label="Artifact provenance verified"
           />
-          <div>
+          <div class="self-end">
             <.button type="submit" variant="default">
               <.icon name="hero-shield-check" class="size-4" /> Check release readiness
             </.button>
