@@ -8,7 +8,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Mission
   alias ControlKeel.Observability
   alias ControlKeel.Proxy
-  alias ControlKeelWeb.FindingComponents
   alias ControlKeelWeb.ReleaseReadiness
   alias ControlKeelWeb.ShipReadiness
 
@@ -35,8 +34,6 @@ defmodule ControlKeelWeb.MissionControlLive do
            |> assign(:page_title, session.title)
            |> assign(:project_root, project_root)
            |> assign(:launched, Map.get(params, "launched") == "1")
-           |> assign(:selected_finding, nil)
-           |> assign(:selected_fix, nil)
            |> safe_assign_session(session)
            |> assign_release_readiness(release_form_defaults(), false)}
         else
@@ -55,8 +52,6 @@ defmodule ControlKeelWeb.MissionControlLive do
          |> assign(:page_title, session.title)
          |> assign(:project_root, project_root)
          |> assign(:launched, Map.get(params, "launched") == "1")
-         |> assign(:selected_finding, nil)
-         |> assign(:selected_fix, nil)
          |> safe_assign_session(session)
          |> assign_release_readiness(release_form_defaults(), false)}
     end
@@ -72,93 +67,6 @@ defmodule ControlKeelWeb.MissionControlLive do
 
       session ->
         {:noreply, socket |> assign_session(session)}
-    end
-  end
-
-  @impl true
-  def handle_event("view_fix", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <-
-           Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
-      fix = Mission.auto_fix_for_finding(finding)
-      emit_autofix_event(:viewed, finding, fix)
-
-      {:noreply,
-       socket
-       |> assign(:selected_finding, finding)
-       |> assign(:selected_fix, fix)}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "ControlKeel could not load that fix.")}
-    end
-  end
-
-  @impl true
-  def handle_event("copy_fix_prompt", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <- socket.assigns.selected_finding,
-         %{"agent_prompt" => prompt} = fix <- socket.assigns.selected_fix,
-         true <- is_binary(prompt) and prompt != "" do
-      emit_autofix_event(:copied, finding, fix)
-
-      {:noreply,
-       socket
-       |> push_event("copy-to-clipboard", %{text: prompt})
-       |> put_flash(:info, "Fix prompt copied to the clipboard.")}
-    else
-      _error -> {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("close_fix", _params, socket) do
-    {:noreply, socket |> assign(:selected_finding, nil) |> assign(:selected_fix, nil)}
-  end
-
-  @impl true
-  def handle_event("approve_finding", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
-         {:ok, _updated} <- Mission.approve_finding(finding, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
-        nil ->
-          {:noreply, socket}
-
-        session ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Finding approved.")
-           |> safe_assign_session(session)
-           |> refresh_release_readiness()}
-      end
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
-    end
-  end
-
-  @impl true
-  def handle_event("reject_finding", params, socket) do
-    id = params["id"]
-
-    reason =
-      params["reason"]
-      |> then(&if is_binary(&1) and String.trim(&1) != "", do: String.trim(&1), else: nil)
-
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
-         {:ok, _updated} <- Mission.reject_finding(finding, reason, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
-        nil ->
-          {:noreply, socket}
-
-        session ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Finding rejected.")
-           |> safe_assign_session(session)
-           |> refresh_release_readiness()}
-      end
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
     end
   end
 
@@ -690,97 +598,6 @@ defmodule ControlKeelWeb.MissionControlLive do
           </a>
         </div>
       </div>
-
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-          Findings feed
-        </p>
-        <%= if @session.findings == [] do %>
-          <p class="text-sm text-muted-foreground mt-3">
-            No findings yet. ControlKeel is monitoring every agent action.
-          </p>
-        <% else %>
-          <div class="space-y-4 mt-3">
-            <%= for finding <- @session.findings do %>
-              <article class="p-4 rounded-2xl border bg-muted/[0.03] space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <h3>{finding.title}</h3>
-                  <div class="flex gap-2 items-center">
-                    <span class={[
-                      "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                      finding.severity in ["critical", "high"] &&
-                        "bg-destructive/10 text-destructive ring-destructive/20",
-                      finding.severity in ["medium", "moderate"] &&
-                        "bg-[var(--ck-warning)]/10 text-[var(--ck-warning)] ring-[var(--ck-warning)]/20",
-                      finding.severity in ["low"] &&
-                        "bg-[var(--ck-success)]/10 text-[var(--ck-success)] ring-[var(--ck-success)]/20",
-                      finding.severity not in ["critical", "high", "medium", "moderate", "low"] &&
-                        "bg-muted text-muted-foreground ring-border"
-                    ]}>
-                      {finding.severity}
-                    </span>
-                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-muted text-muted-foreground ring-border">
-                      {finding.status}
-                    </span>
-                  </div>
-                </div>
-                <p class="text-sm text-muted-foreground">{finding.plain_message}</p>
-                <p class="text-xs text-muted-foreground">
-                  {Mission.finding_human_gate_hint(finding)}
-                </p>
-                <div class="flex justify-between items-center text-xs text-muted-foreground border-t pt-2">
-                  <span>{finding.category}</span>
-                  <span class="font-mono tabular-nums tracking-tight">
-                    {event_timestamp(finding.inserted_at)}
-                  </span>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 border-t pt-2">
-                  <button
-                    type="button"
-                    class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 hover:text-primary cursor-pointer"
-                    phx-click="view_fix"
-                    phx-value-id={finding.id}
-                  >
-                    View fix
-                  </button>
-                  <%= if finding.status in ["open", "blocked"] do %>
-                    <button
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
-                      phx-click="approve_finding"
-                      phx-value-id={finding.id}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 hover:text-destructive cursor-pointer"
-                      phx-click="reject_finding"
-                      phx-value-id={finding.id}
-                    >
-                      Reject
-                    </button>
-                  <% end %>
-                  <.link
-                    navigate={~p"/findings?#{%{"session_id" => @session.id, "q" => finding.rule_id}}"}
-                    class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-                  >
-                    Open in browser
-                  </.link>
-                </div>
-              </article>
-            <% end %>
-          </div>
-        <% end %>
-      </div>
-
-      <FindingComponents.autofix_panel
-        :if={@selected_finding && @selected_fix}
-        finding={@selected_finding}
-        fix={@selected_fix}
-        copy_event="copy_fix_prompt"
-        close_event="close_fix"
-      />
     </section>
     """
   end
@@ -810,12 +627,6 @@ defmodule ControlKeelWeb.MissionControlLive do
     brief = stringify_keys(session.execution_brief || %{})
     compiler = stringify_keys(Map.get(brief, "compiler", %{}))
 
-    selected_finding =
-      case socket.assigns[:selected_finding] do
-        %{id: id} -> Enum.find(session.findings, &(&1.id == id))
-        _ -> nil
-      end
-
     {autonomy_profile, outcome_profile, improvement_loop, ship_outcome_metrics,
      ship_agent_outcomes} =
       safe_ship_profile(session)
@@ -828,8 +639,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       brief: brief,
       boundary_summary: Intent.boundary_summary(brief),
       compiler: compiler,
-      selected_finding: selected_finding,
-      selected_fix: maybe_regenerate_fix(selected_finding),
       active_findings: Enum.count(session.findings, &(&1.status in ["open", "blocked"])),
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
       compliance_score: compliance_score(session.findings),
@@ -1068,25 +877,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp format_domain_pack("Not specified"), do: "Not specified"
   defp format_domain_pack(nil), do: "Not specified"
   defp format_domain_pack(domain_pack), do: Intent.pack_label(domain_pack)
-  defp maybe_regenerate_fix(nil), do: nil
-  defp maybe_regenerate_fix(finding), do: Mission.auto_fix_for_finding(finding)
 
   defp stringify_keys(map) when is_map(map) do
     Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
-  end
-
-  defp emit_autofix_event(action, finding, fix) do
-    :telemetry.execute(
-      [:controlkeel, :autofix, action],
-      %{count: 1},
-      %{
-        finding_id: finding.id,
-        session_id: finding.session_id,
-        rule_id: finding.rule_id,
-        supported: fix["supported"],
-        fix_kind: fix["fix_kind"]
-      }
-    )
   end
 
   defp compliance_score([]), do: 100
@@ -1100,20 +893,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp donut_color(score) when score >= 80, do: "#22c55e"
   defp donut_color(score) when score >= 50, do: "#f59e0b"
   defp donut_color(_score), do: "#ef4444"
-
-  defp parse_id(value) do
-    case Integer.parse(to_string(value)) do
-      {parsed, ""} -> {:ok, parsed}
-      _ -> {:error, :invalid_id}
-    end
-  end
-
-  defp actor_opts(socket) do
-    case socket.assigns[:current_user] do
-      nil -> [actor_source: "web", actor_identifier: "web"]
-      user -> [actor_source: "web", actor_user_id: user.id, actor_identifier: user.email]
-    end
-  end
 
   defp default_session_metrics(session_id) do
     %{

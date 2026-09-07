@@ -522,6 +522,12 @@ defmodule ControlKeelWeb.Layouts do
         exact: true
       },
       %{
+        label: "Findings",
+        href: ~p"/sessions/#{session_id}/findings",
+        icon: "hero-shield-exclamation",
+        exact: true
+      },
+      %{
         label: "Deploy review",
         href: ~p"/sessions/#{session_id}/deploy-review",
         icon: "hero-cloud-arrow-up",

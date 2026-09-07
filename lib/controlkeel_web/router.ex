@@ -129,6 +129,8 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/sessions/:id", MissionControlLive, :show
       live "/sessions/:id/tasks", SessionTasksLive, :index
+      live "/sessions/:id/findings", SessionFindingsLive, :index
+      live "/sessions/:id/findings/:finding_id", SessionFindingLive, :show
       live "/sessions/:id/reviews", SessionReviewsLive, :index
       live "/sessions/:id/deploy-review", DeployReviewLive, :show
       live "/sessions/:sid/reviews/:rid", ReviewLive, :show
