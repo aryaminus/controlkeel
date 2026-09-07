@@ -520,6 +520,12 @@ defmodule ControlKeelWeb.Layouts do
         href: ~p"/sessions/#{session_id}/tasks",
         icon: "hero-clipboard-document-list",
         exact: true
+      },
+      %{
+        label: "Deploy review",
+        href: ~p"/sessions/#{session_id}/deploy-review",
+        icon: "hero-cloud-arrow-up",
+        exact: true
       }
     ]
   end
