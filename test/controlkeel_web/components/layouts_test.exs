@@ -56,6 +56,28 @@ defmodule ControlKeelWeb.LayoutsTest do
     refute html =~ "phx-click"
   end
 
+  test "session_sidebar renders back link to sessions, title, id, risk tier, and Overview" do
+    html =
+      render_component(&Layouts.session_sidebar/1,
+        current_path: "/sessions/42",
+        session_id: "42",
+        session_title: "Refactor auth engine",
+        session_risk: "high"
+      )
+
+    assert html =~ ~s(href="/sessions")
+    assert html =~ "Sessions"
+    assert html =~ "Refactor auth engine"
+    assert html =~ "#42"
+    assert html =~ "high"
+    assert anchor_for(html, "/sessions/42") =~ "aria-current=\"page\""
+    assert html =~ "Overview"
+    refute html =~ ~s(href="/findings)
+    refute html =~ ~s(href="/proofs)
+    refute html =~ ~s(href="/sessions/42/reviews")
+    refute html =~ ~s(href="/sessions/42/deploy-review")
+  end
+
   defp anchor_for(html, href) do
     case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>.*?</a>|s, html) do
       nil -> ""
