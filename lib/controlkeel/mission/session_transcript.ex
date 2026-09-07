@@ -27,10 +27,18 @@ defmodule ControlKeel.Mission.SessionTranscript do
   def recent_events(session_id, opts \\ []) when is_integer(session_id) do
     limit = Keyword.get(opts, :limit, @recent_limit)
 
-    SessionEvent
-    |> where([event], event.session_id == ^session_id)
-    |> order_by([event], desc: event.inserted_at, desc: event.id)
-    |> limit(^limit)
+    query =
+      SessionEvent
+      |> where([event], event.session_id == ^session_id)
+      |> order_by([event], desc: event.inserted_at, desc: event.id)
+
+    query =
+      case limit do
+        :all -> query
+        _ -> query |> limit(^limit)
+      end
+
+    query
     |> Repo.all()
     |> Enum.map(&event_entry/1)
   end

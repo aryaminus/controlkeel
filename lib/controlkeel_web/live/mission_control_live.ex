@@ -457,52 +457,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       </div>
 
       <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
-            Recent transcript
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-              {@current_transcript_summary["total_events"] || 0} events
-            </span>
-            <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-              {length(@current_recent_events)} recent
-            </span>
-          </div>
-        </div>
-        <%= if @current_recent_events == [] do %>
-          <p class="text-sm text-muted-foreground mt-4">No transcript events recorded yet.</p>
-        <% else %>
-          <ul class="space-y-2 list-none p-0 m-0 mt-4">
-            <%= for event <- @current_recent_events do %>
-              <li class="rounded-2xl border bg-muted/[0.03] px-4 py-3 transition hover:bg-muted/[0.05]">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <strong class="text-sm text-foreground">{event["summary"]}</strong>
-                  <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2 py-0.5 text-[0.65rem] text-muted-foreground">
-                    {event["event_type"]}
-                  </span>
-                </div>
-                <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span class="inline-flex items-center rounded-md border border-input bg-background px-1.5 py-0.5">
-                    {event["actor"]}
-                  </span>
-                  <span class="font-mono tabular-nums tracking-tight">
-                    {event_timestamp(event["inserted_at"])}
-                  </span>
-                </div>
-              </li>
-            <% end %>
-          </ul>
-        <% end %>
-        <details class="mt-4">
-          <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary cursor-pointer select-none">
-            View transcript summary JSON
-          </summary>
-          <pre class="p-4 max-h-96 overflow-auto border rounded-2xl bg-muted/[0.03] text-sm text-[#f2e6c9] font-mono whitespace-pre-wrap break-all leading-relaxed mt-4">{Jason.encode!(@current_transcript_summary, pretty: true)}</pre>
-        </details>
-      </div>
-
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
           Resume packet
         </p>
@@ -620,8 +574,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       observability: Observability.session_run(session),
       current_memory_hits: current_memory_hits(session),
       current_workspace_context: Mission.workspace_context(session),
-      current_recent_events: Mission.list_session_events(session.id),
-      current_transcript_summary: Mission.transcript_summary(session.id),
       current_resume_packet: current_resume_packet(session),
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent")),
@@ -709,11 +661,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         end
     end
   end
-
-  defp event_timestamp(nil), do: "unknown"
-
-  defp event_timestamp(%DateTime{} = timestamp),
-    do: Calendar.strftime(timestamp, "%Y-%m-%d %H:%M:%S UTC")
 
   # Ship-readiness verdict, derived from the session's improvement loop signals.
   defp ship_verdict(improvement_loop, _outcome_metrics) do
