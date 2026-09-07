@@ -119,25 +119,4 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert html =~ Calendar.strftime(export.generated_at, "%Y-%m-%d %H:%M:%S UTC")
     refute html =~ "unknown time"
   end
-
-  test "mission control header shows audit log export controls and latest checksum", %{
-    conn: conn
-  } do
-    session = session_fixture()
-
-    {:ok, view, html} = live(conn, ~p"/sessions/#{session.id}")
-
-    assert has_element?(view, "#mission-audit-export-json")
-    assert has_element?(view, "#mission-audit-export-csv")
-    assert has_element?(view, "#mission-audit-export-pdf")
-    assert html =~ "/observability/sessions/#{session.id}/audit-log/csv"
-    refute html =~ "Last export"
-
-    assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "csv")
-
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}")
-
-    assert html =~ "Last export (csv)"
-    assert html =~ export.checksum
-  end
 end

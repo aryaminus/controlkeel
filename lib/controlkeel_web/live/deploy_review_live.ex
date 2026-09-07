@@ -1,6 +1,6 @@
 defmodule ControlKeelWeb.DeployReviewLive do
   @moduledoc """
-  Deployment Advisor for a session's project: stack analysis, hosting cost
+  Deploy review for a session's project: stack analysis, hosting cost
   estimates, deployment file preview and confirmed write, and per-stack
   guides. Routed at `/sessions/:id/deploy-review`.
   """
@@ -56,7 +56,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
       end
 
     socket
-    |> assign(:page_title, "#{session.title} — Deployment Advisor")
+    |> assign(:page_title, "#{session.title} — Deploy review")
     |> assign(:session, session)
     |> assign(:project_root, resolved_root)
     |> assign(:analysis, analysis)
@@ -222,7 +222,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
     ~H"""
     <div class="space-y-8">
       <.page_title
-        title="Deployment Advisor"
+        title="Deploy review"
         subtitle={"Project deploy review for #{@session.title}."}
       />
 

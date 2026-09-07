@@ -1,6 +1,6 @@
 defmodule ControlKeelWeb.DeploymentComponents do
   @moduledoc """
-  Deployment Advisor page sections rendered from `DeployReviewLive`. Events
+  Deploy review page sections rendered from `DeployReviewLive`. Events
   (`set_tab`, `select_tier`, `select_db_tier`, `toggle_db`, `set_bandwidth`,
   `set_storage`, `estimate_costs`, `preview_files`, `arm_write`,
   `cancel_write`, `confirm_write_files`, `copy_generated_file`) are handled by
