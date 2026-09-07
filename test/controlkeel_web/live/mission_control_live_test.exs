@@ -4,11 +4,9 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
   import ControlKeel.IntentFixtures
   import Phoenix.LiveViewTest
   import ControlKeel.MissionFixtures
-  import Ecto.Query
 
   alias ControlKeel.Analytics
   alias ControlKeel.Mission
-  alias ControlKeel.Repo
 
   test "mission control renders proxy endpoints", %{conn: conn} do
     session = session_fixture()
@@ -124,5 +122,4 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "Outcome alignment"
     assert html =~ "Ship verdict session"
   end
-
 end

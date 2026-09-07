@@ -534,6 +534,12 @@ defmodule ControlKeelWeb.Layouts do
         exact: true
       },
       %{
+        label: "Transcript",
+        href: ~p"/sessions/#{session_id}/transcript",
+        icon: "hero-chat-bubble-bottom-center-text",
+        exact: true
+      },
+      %{
         label: "Release readiness",
         href: ~p"/sessions/#{session_id}/release-readiness",
         icon: "hero-shield-check",
