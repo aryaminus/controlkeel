@@ -514,6 +514,12 @@ defmodule ControlKeelWeb.Layouts do
         href: ~p"/sessions/#{session_id}",
         icon: "hero-squares-2x2",
         exact: true
+      },
+      %{
+        label: "Tasks",
+        href: ~p"/sessions/#{session_id}/tasks",
+        icon: "hero-clipboard-document-list",
+        exact: true
       }
     ]
   end

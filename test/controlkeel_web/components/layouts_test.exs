@@ -56,7 +56,7 @@ defmodule ControlKeelWeb.LayoutsTest do
     refute html =~ "phx-click"
   end
 
-  test "session_sidebar renders back link to sessions, title, id, risk tier, and Overview" do
+  test "session_sidebar renders back link to sessions, title, id, risk tier, Overview, and Tasks" do
     html =
       render_component(&Layouts.session_sidebar/1,
         current_path: "/sessions/42",
@@ -72,10 +72,26 @@ defmodule ControlKeelWeb.LayoutsTest do
     assert html =~ "high"
     assert anchor_for(html, "/sessions/42") =~ "aria-current=\"page\""
     assert html =~ "Overview"
+    assert anchor_for(html, "/sessions/42/tasks") != ""
+    refute anchor_for(html, "/sessions/42/tasks") =~ "aria-current=\"page\""
+    assert html =~ "Tasks"
     refute html =~ ~s(href="/findings)
     refute html =~ ~s(href="/proofs)
     refute html =~ ~s(href="/sessions/42/reviews")
     refute html =~ ~s(href="/sessions/42/deploy-review")
+  end
+
+  test "session_sidebar highlights Tasks when on /sessions/:id/tasks" do
+    html =
+      render_component(&Layouts.session_sidebar/1,
+        current_path: "/sessions/42/tasks",
+        session_id: "42",
+        session_title: "Refactor auth engine",
+        session_risk: "high"
+      )
+
+    assert anchor_for(html, "/sessions/42/tasks") =~ "aria-current=\"page\""
+    refute anchor_for(html, "/sessions/42") =~ "aria-current=\"page\""
   end
 
   defp anchor_for(html, href) do

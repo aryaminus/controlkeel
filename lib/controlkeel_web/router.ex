@@ -128,6 +128,7 @@ defmodule ControlKeelWeb.Router do
         ControlKeelWeb.LayoutDefaults
       ] do
       live "/sessions/:id", MissionControlLive, :show
+      live "/sessions/:id/tasks", SessionTasksLive, :index
       live "/sessions/:id/reviews", SessionReviewsLive, :index
       live "/sessions/:id/deploy-review", DeployReviewLive, :show
       live "/sessions/:sid/reviews/:rid", ReviewLive, :show
