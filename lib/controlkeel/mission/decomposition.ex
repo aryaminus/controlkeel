@@ -225,11 +225,11 @@ defmodule ControlKeel.Mission.Decomposition do
     end
   end
 
+  # ⚡ Bolt: Replace Enum.group_by/2 |> Enum.reject/2 |> Enum.into/2 (with length/1) with Enum.frequencies_by/2 and Map.delete/2 to avoid intermediate list allocations
   defp count_by(entries, key) do
     entries
-    |> Enum.group_by(&Map.get(&1, key))
-    |> Enum.reject(fn {value, _rows} -> is_nil(value) end)
-    |> Enum.into(%{}, fn {value, rows} -> {value, length(rows)} end)
+    |> Enum.frequencies_by(&Map.get(&1, key))
+    |> Map.delete(nil)
   end
 
   defp normalize_string(value) when is_binary(value) do

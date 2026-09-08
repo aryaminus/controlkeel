@@ -1452,11 +1452,11 @@ defmodule ControlKeel.Benchmark do
   defp percentage(_count, 0), do: 0.0
   defp percentage(count, total), do: Float.round(count / total * 100, 1)
 
+  # ⚡ Bolt: Replace Enum.group_by/2 |> Enum.reject/2 |> Enum.into/2 (with length/1) with Enum.frequencies_by/2 and Map.delete/2 to avoid intermediate list allocations
   defp count_by(values, mapper) do
     values
-    |> Enum.group_by(mapper)
-    |> Enum.reject(fn {key, _rows} -> is_nil(key) end)
-    |> Enum.into(%{}, fn {key, rows} -> {key, length(rows)} end)
+    |> Enum.frequencies_by(mapper)
+    |> Map.delete(nil)
   end
 
   defp maybe_channel(channels, true, channel), do: [channel | channels]
