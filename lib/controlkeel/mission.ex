@@ -722,14 +722,14 @@ defmodule ControlKeel.Mission do
         nil
 
       session ->
-        Repo.preload(session, [
-          :workspace,
+        Repo.preload(session,
+          workspace: :org,
           tasks: from(t in Task, order_by: t.position),
           task_edges: from(edge in ControlKeel.Platform.TaskEdge, order_by: edge.id),
           findings: from(f in Finding, order_by: [desc: f.inserted_at]),
           invocations: from(i in Invocation, order_by: [desc: i.inserted_at]),
           reviews: from(r in Review, order_by: [desc: r.inserted_at, desc: r.id])
-        ])
+        )
     end
   end
 

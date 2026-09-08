@@ -331,8 +331,11 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
 
       assert html =~ "Organization and workspace"
       assert html =~ "admin or owner of at least one organization"
-      refute html =~ "Owned Org"
-      refute html =~ ">Core<"
+      # Scope to main content: the sidebar context switcher legitimately
+      # lists orgs the user belongs to (including member/viewer roles).
+      main = view |> element("main") |> render()
+      refute main =~ "Owned Org"
+      refute main =~ ">Core<"
       refute has_element?(view, "#onboarding-workspace-select option[value=\"#{ws.id}\"]")
 
       html =
@@ -340,7 +343,8 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
           form(view, "form", launch: %{"occupation" => "founder", "agent" => "claude"})
         )
 
-      refute html =~ "Owned Org"
+      main = view |> element("main") |> render()
+      refute main =~ "Owned Org"
       assert html =~ "Choose the domain and primary agent"
 
       # The /organizations index still lists the org for the member.

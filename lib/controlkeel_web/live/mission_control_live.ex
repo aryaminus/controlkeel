@@ -1156,6 +1156,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       socket
       |> assign(:session, session)
       |> assign(:workspace, session.workspace)
+      |> assign(:org, session.workspace && session.workspace.org)
       |> assign(:page_title, session.title)
       |> assign(
         :active_findings,
@@ -1189,6 +1190,7 @@ defmodule ControlKeelWeb.MissionControlLive do
     assign(socket,
       session: session,
       workspace: session.workspace,
+      org: session.workspace.org,
       session_metrics:
         Analytics.session_metrics(session.id) || default_session_metrics(session.id),
       brief: brief,

@@ -551,4 +551,26 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       refute has_element?(view, "#task-complete-#{done_task.id}")
     end
   end
+
+  test "sidebar is scoped to the session", %{conn: conn} do
+    session = session_fixture()
+    task_fixture(%{session: session})
+
+    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}")
+
+    sidebar = view |> element("#sidebar-nav") |> render()
+
+    assert sidebar =~ ~s(href="/sessions/#{session.id}")
+    assert sidebar =~ "Overview"
+    assert anchor_active?(sidebar, "/sessions/#{session.id}")
+    refute sidebar =~ "Policy Studio"
+    refute sidebar =~ "/organizations/"
+  end
+
+  defp anchor_active?(html, href) do
+    case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>|, html) do
+      nil -> false
+      [anchor] -> anchor =~ ~s(aria-current="page")
+    end
+  end
 end
