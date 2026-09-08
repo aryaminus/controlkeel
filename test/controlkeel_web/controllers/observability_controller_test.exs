@@ -177,7 +177,9 @@ defmodule ControlKeelWeb.ObservabilityControllerTest do
     test "returns 422 for a non-integer session id", %{conn: conn} do
       conn = get(conn, "/observability/sessions/not-a-number/audit-log/json")
 
-      assert json_response(conn, :unprocessable_entity) == %{"error" => "session id must be an integer"}
+      assert json_response(conn, :unprocessable_entity) == %{
+               "error" => "session id must be an integer"
+             }
     end
   end
 

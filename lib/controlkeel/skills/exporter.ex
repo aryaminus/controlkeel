@@ -34,7 +34,8 @@ defmodule ControlKeel.Skills.Exporter do
           root,
           target.id,
           Keyword.get(opts, :scope, target.default_scope),
-          writes
+          writes,
+          instructions
         )
 
       {:ok,
@@ -53,7 +54,7 @@ defmodule ControlKeel.Skills.Exporter do
     end
   end
 
-  def write_export_manifest(root, target_id, scope, writes) do
+  def write_export_manifest(root, target_id, scope, writes, instructions \\ []) do
     manifest_path = Path.join(root, ".controlkeel-manifest.json")
 
     payload = %{
@@ -69,7 +70,8 @@ defmodule ControlKeel.Skills.Exporter do
             "path" => Map.get(write, "path"),
             "kind" => Map.get(write, "kind")
           }
-        end)
+        end),
+      "instructions" => List.wrap(instructions)
     }
 
     File.write!(manifest_path, Jason.encode!(payload, pretty: true) <> "\n")

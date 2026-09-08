@@ -939,6 +939,192 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert install["target"] == "open-standard"
       assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     end
+
+    test "previews and prunes only user-level skill duplicates", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("skills-prune")
+      home_dir = Path.join(tmp_dir, "home")
+      project_root = Path.join(tmp_dir, "project")
+
+      File.mkdir_p!(home_dir)
+      File.mkdir_p!(project_root)
+
+      restore_home = set_provider_home(home_dir)
+      previous_trust = System.get_env("CONTROLKEEL_TRUST_PROJECT_SKILLS")
+      System.put_env("CONTROLKEEL_TRUST_PROJECT_SKILLS", "1")
+
+      on_exit(fn ->
+        restore_home.()
+        restore_env("CONTROLKEEL_TRUST_PROJECT_SKILLS", previous_trust)
+        File.rm_rf!(tmp_dir)
+      end)
+
+      source =
+        :code.priv_dir(:controlkeel)
+        |> to_string()
+        |> Path.join("skills/controlkeel-governance/SKILL.md")
+        |> File.read!()
+
+      user_skill = Path.join(home_dir, ".agents/skills/controlkeel-governance/SKILL.md")
+      File.mkdir_p!(Path.dirname(user_skill))
+      File.write!(user_skill, source)
+
+      project_skill = Path.join(project_root, ".claude/skills/controlkeel-governance/SKILL.md")
+      File.mkdir_p!(Path.dirname(project_skill))
+      File.write!(project_skill, source)
+
+      conn =
+        post(conn, ~p"/api/v1/skills/prune-duplicates", %{project_root: project_root})
+
+      body = json_response(conn, 200)
+
+      assert body["pruned"] == false
+      assert body["user_level_count"] == 1
+      assert hd(body["user_level"]) =~ "controlkeel-governance"
+
+      assert [%{"host_dir" => ".claude", "skills" => ["controlkeel-governance"]}] =
+               body["kept_project_groups"]
+
+      assert File.exists?(user_skill)
+      assert File.exists?(project_skill)
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/prune-duplicates", %{project_root: project_root, confirm: true})
+
+      body = json_response(conn, 200)
+
+      assert body["pruned"] == true
+      assert body["removed_count"] == 1
+      refute File.exists?(Path.dirname(user_skill))
+      assert File.exists?(project_skill)
+
+      # string confirm (form-encoded parity) also executes
+      File.mkdir_p!(Path.dirname(user_skill))
+      File.write!(user_skill, source)
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/prune-duplicates", %{
+          project_root: project_root,
+          confirm: "true"
+        })
+
+      body = json_response(conn, 200)
+
+      assert body["pruned"] == true
+      assert body["removed_count"] == 1
+      refute File.exists?(Path.dirname(user_skill))
+      assert File.exists?(project_skill)
+    end
+
+    test "token audit returns per-mode payloads and download headers", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("skills-token-audit")
+      home_dir = Path.join(tmp_dir, "home")
+      project_root = Path.join(tmp_dir, "project")
+
+      File.mkdir_p!(home_dir)
+      File.mkdir_p!(Path.join(project_root, ".agents/skills/demo-skill"))
+
+      restore = set_provider_home(home_dir)
+
+      on_exit(fn ->
+        restore.()
+        File.rm_rf!(tmp_dir)
+      end)
+
+      File.write!(Path.join(project_root, "AGENTS.md"), String.duplicate("word ", 60))
+
+      File.write!(
+        Path.join(project_root, ".agents/skills/demo-skill/SKILL.md"),
+        "---\nname: demo-skill\ndescription: Demo skill for audit fixture.\n---\n# Demo\nbody text\n"
+      )
+
+      conn = get(conn, ~p"/api/v1/skills/token-audit?project_root=#{project_root}&mode=rules")
+      body = json_response(conn, 200)
+
+      assert body["status"] in ["optimal", "oversized"]
+      assert body["estimated_tokens"] > 0
+      assert Enum.any?(body["rule_files"], &String.ends_with?(&1["path"], "AGENTS.md"))
+
+      conn =
+        build_conn()
+        |> post(~p"/api/v1/skills/token-audit", %{project_root: project_root, mode: "skills"})
+
+      body = json_response(conn, 200)
+      assert Enum.any?(body["skills"], &(&1["name"] == "demo-skill"))
+      assert body["effective_skill_count"] >= 1
+      assert is_list(body["recommendations"])
+
+      conn = build_conn() |> get(~p"/api/v1/skills/token-audit?mode=tools")
+      body = json_response(conn, 200)
+
+      assert body["tool_count"] > 0
+      assert is_map(body["group_savings"])
+      assert body["group_savings"]["core_governance"]["savings_tokens"] >= 0
+      assert is_list(body["tools"])
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/token-audit?project_root=#{project_root}&download=1")
+
+      body = json_response(conn, 200)
+
+      assert Map.has_key?(body, "rule_files")
+      assert Map.has_key?(body, "skills")
+      assert Map.has_key?(body, "total_skill_tokens")
+
+      assert ["attachment; filename=\"token-audit-full.json\"" | _] =
+               get_resp_header(conn, "content-disposition")
+
+      conn = build_conn() |> get(~p"/api/v1/skills/token-audit?mode=bogus")
+      assert %{"error" => _} = json_response(conn, 422)
+    end
+
+    test "downloads a valid zip of an exported skill bundle", %{conn: conn} do
+      tmp_dir = provider_tmp_dir("skills-download-bundle")
+
+      on_exit(fn ->
+        File.rm_rf!(tmp_dir)
+      end)
+
+      conn =
+        post(conn, ~p"/api/v1/skills/export", %{
+          target: "open-standard",
+          project_root: tmp_dir,
+          scope: "export"
+        })
+
+      assert %{"plan" => %{"target" => "open-standard"}} = json_response(conn, 200)
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/download-bundle?target=open-standard&project_root=#{tmp_dir}")
+
+      assert ["attachment; filename=\"controlkeel-open-standard.zip\"" | _] =
+               get_resp_header(conn, "content-disposition")
+
+      zip = response(conn, 200)
+      assert byte_size(zip) > 0
+      assert {:ok, files} = :zip.unzip(zip, [:memory])
+      names = Enum.map(files, fn {name, _data} -> to_string(name) end)
+      assert ".controlkeel-manifest.json" in names
+      assert Enum.any?(names, &String.contains?(&1, "controlkeel-governance"))
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/download-bundle?target=claude-plugin&project_root=#{tmp_dir}")
+
+      assert %{"error" => "bundle not found — export it first"} = json_response(conn, 404)
+
+      conn = build_conn() |> get(~p"/api/v1/skills/download-bundle?project_root=#{tmp_dir}")
+      assert %{"error" => "`target` is required"} = json_response(conn, 422)
+
+      conn =
+        build_conn()
+        |> get(~p"/api/v1/skills/download-bundle?target=../..&project_root=#{tmp_dir}")
+
+      assert %{"error" => "unknown skill target"} = json_response(conn, 422)
+    end
   end
 
   describe "benchmark API" do

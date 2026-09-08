@@ -7,6 +7,7 @@ defmodule ControlKeel.Skills do
   alias ControlKeel.Skills.Exporter
   alias ControlKeel.Skills.Installer
   alias ControlKeel.Skills.Manifest
+  alias ControlKeel.Skills.Pruner
   alias ControlKeel.Skills.Registry
   alias ControlKeel.Skills.SkillTarget
 
@@ -45,4 +46,10 @@ defmodule ControlKeel.Skills do
   def install(target, project_root \\ File.cwd!(), opts \\ []) do
     Installer.install(target, project_root, opts)
   end
+
+  def prune_duplicate_skills_preview(project_root \\ File.cwd!()),
+    do: Pruner.preview(project_root)
+
+  def prune_duplicate_skills(project_root \\ File.cwd!()),
+    do: Pruner.prune(project_root)
 end
