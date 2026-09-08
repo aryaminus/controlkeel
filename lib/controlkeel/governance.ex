@@ -237,7 +237,18 @@ defmodule ControlKeel.Governance do
           end
 
         telemetry =
-          record_release_event(session, status, latest_proof, smoke, provenance, reasons, opts)
+          if record_telemetry?(opts),
+            do:
+              record_release_event(
+                session,
+                status,
+                latest_proof,
+                smoke,
+                provenance,
+                reasons,
+                opts
+              ),
+            else: nil
 
         {:ok,
          %{
@@ -1006,6 +1017,13 @@ defmodule ControlKeel.Governance do
 
   defp maybe_add_reason(reasons, true, reason), do: reasons ++ [reason]
   defp maybe_add_reason(reasons, false, _reason), do: reasons
+
+  defp record_telemetry?(opts) do
+    case opts["record_telemetry"] || opts[:record_telemetry] do
+      nil -> true
+      value -> Utils.truthy?(value)
+    end
+  end
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
