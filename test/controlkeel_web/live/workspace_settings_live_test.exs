@@ -75,6 +75,20 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       refute has_element?(view, "#workspace-tool-policy-form")
     end
 
+    test "sidebar is scoped to the workspace" do
+      {org, ws} = org_workspace()
+
+      {:ok, view, _html} =
+        live(build_conn(), ~p"/organizations/#{org.slug}/workspaces/#{ws.id}/settings")
+
+      sidebar = view |> element("#sidebar-nav") |> render()
+
+      assert sidebar =~ "Overview"
+      assert sidebar =~ ~s(href="/organizations/#{org.slug}/workspaces/#{ws.id}")
+      assert sidebar =~ ~s(href="/organizations/#{org.slug}/workspaces/#{ws.id}/settings")
+      refute sidebar =~ "Policy Studio"
+    end
+
     test "unknown tab params fall back to the policies tab" do
       {org, ws} = org_workspace()
 

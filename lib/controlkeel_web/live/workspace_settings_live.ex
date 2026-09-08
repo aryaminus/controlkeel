@@ -34,6 +34,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
        socket
        |> assign(:page_title, "Settings — #{workspace.name}")
        |> assign(:workspace, workspace)
+       |> assign(:org, workspace.org)
        |> assign(
          :breadcrumbs,
          [
