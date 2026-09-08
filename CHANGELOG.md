@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.9 — 2026-09-08
+
+### What's changed
+
+- Merge pull request #156 from aryaminus/refactor/skills-web
+- refactor/skills-web: wrap bundle pill class string interpolation in tuple for correct HEEx attribute rendering
+- refactor/skills-web: implement web-based skills health diagnostics, duplicate pruning, and token auditing in the Skills Studio
+- refactor/skills-web: validate skill target in download-bundle endpoint and add corresponding error handling test
+- refactor/skills-web: implement project bootstrapping, export bundle downloads, and dynamic scope selection in Skills UI
+- refactor/skills-web: implement web-based token audit API and UI for analyzing project rule files, skills, and tools
+- refactor/skills-web: move skill pruning logic to dedicated Pruner module and expose via API and CLI
+- refactor/skills-web: expand skill diagnostic reporting in UI
+
 ## v0.4.8 — 2026-09-08
 
 ### What's changed
