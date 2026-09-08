@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.4.8 — 2026-09-08
+
+### What's changed
+
+- Merge pull request #150 from aryaminus/refactor/proofs-web
+- refactor/skills-web: integrate automatic release readiness refresh into session mutation flows to ensure UI consistency
+- refactor/skills-web: fix observability timestamp formatting
+- refactor/proofs-web: return 422 error for non-integer session IDs in observability controller
+- refactor/proofs-web: clarify instructions for viewing audit export checksums in observability UI
+- refactor/proofs-web: log audit export errors and return sanitized error message to client
+- refactor/proofs-web: reorder helper functions in mission_control_live.ex
+- refactor/proofs-web: implement task completion workflow with validation gates and link proofs in observability timelines
+- refactor/proofs-web: add audit log export UI, controller endpoints, and session transcript event logging
+- refactor/proofs-web: add release readiness gate component and analytics tracking to mission control
+
 ## v0.4.7 — 2026-08-29
 
 ### What's changed
