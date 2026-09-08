@@ -223,7 +223,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
   end
 
-  describe "org settings modal" do
+  describe "org settings page" do
     setup do
       owner = create_user!("owner-set@example.com")
       {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Setco", slug: "setco"})
@@ -237,26 +237,23 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, org: org, owner: owner, admin: admin, member: member}
     end
 
-    test "settings action appears in the dashboard header and opens the modal", %{owner: owner} do
-      {:ok, view, html} = live(conn_for(owner), ~p"/organizations/setco?tab=members")
+    test "settings link appears in the org sidebar and navigates to settings page", %{
+      owner: owner
+    } do
+      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/setco")
 
-      refute html =~ "org-settings-modal"
-      assert render(view) =~ ~s(id="dashboard-page-action")
-      assert render(view) =~ "phx-click=\"open_settings\""
+      assert render(view) =~ "Settings"
+      assert render(view) =~ ~s(href="/organizations/setco/settings")
 
-      view |> render_click("open_settings")
-      assert render(view) =~ "org-settings-modal"
-      assert render(view) =~ "Organization name"
+      {:ok, settings_view, _html} = live(conn_for(owner), ~p"/organizations/setco/settings")
+      assert render(settings_view) =~ "Organization settings"
+      assert render(settings_view) =~ "Organization name"
     end
 
-    test "owner opens the modal and saves the org name", %{org: org, owner: owner} do
-      {:ok, view, html} = live(conn_for(owner), ~p"/organizations/setco?tab=members")
+    test "owner can save the org name via settings page", %{org: org, owner: owner} do
+      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/setco/settings")
 
-      # Modal is absent until opened.
-      refute html =~ "org-settings-modal"
-
-      view |> render_click("open_settings")
-      assert render(view) =~ "org-settings-modal"
+      assert render(view) =~ "Organization settings"
       assert render(view) =~ "Organization name"
 
       view
@@ -269,38 +266,41 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert Accounts.get_org(org.id).name == "Setco Renamed"
     end
 
-    test "admin can open the modal but status and budget are owner-locked", %{admin: admin} do
-      {:ok, view, _html} = live(conn_for(admin), ~p"/organizations/setco?tab=members")
+    test "admin can view the settings page but status and budget are owner-locked", %{
+      admin: admin
+    } do
+      {:ok, view, _html} = live(conn_for(admin), ~p"/organizations/setco/settings")
 
-      view |> render_click("open_settings")
       html = render(view)
 
-      assert html =~ "org-settings-modal"
+      assert html =~ "Organization settings"
       assert html =~ "Only owners can change status."
       assert html =~ "Only owners can change budget."
     end
 
-    test "non-admin members do not see the settings button", %{member: member} do
-      {:ok, _view, html} = live(conn_for(member), ~p"/organizations/setco?tab=members")
+    test "non-admin members do not see the settings link", %{member: member} do
+      {:ok, _view, html} = live(conn_for(member), ~p"/organizations/setco")
 
-      refute html =~ "open_settings"
+      refute html =~ "/organizations/setco/settings"
     end
 
     test "non-admin member cannot save settings via a forged event", %{
       org: org,
       member: member
     } do
-      # Members can mount the org detail LiveView; the button is hidden, but the
+      # Members can mount the settings LiveView; the inputs are locked, but the
       # server must still reject a forged `save_settings` event so they cannot
       # rename the org or touch owner-only fields.
-      {:ok, view, _html} = live(conn_for(member), ~p"/organizations/setco?tab=members")
+      {:ok, view, _html} = live(conn_for(member), ~p"/organizations/setco/settings")
 
-      view
-      |> render_click("save_settings", %{
-        "settings" => %{"name" => "Hacked", "status" => "disabled", "budget_cents" => "999"}
-      })
+      html =
+        view
+        |> render_click("save_settings", %{
+          "settings" => %{"name" => "Hacked", "status" => "disabled", "budget_cents" => "999"}
+        })
 
-      refute render(view) =~ "Settings saved."
+      refute html =~ "Settings saved."
+      assert html =~ "have permission to change organization settings"
       reloaded = Accounts.get_org(org.id)
       assert reloaded.name == "Setco"
       assert reloaded.status == "active"

@@ -1,11 +1,7 @@
 defmodule ControlKeelWeb.OrganizationsLive do
   @moduledoc """
-  `/organizations` — list and create organizations.
-
-  Local mode (no user) shows every org in the DB and creates bare Org rows.
-  Cloud/self_hosted mode shows only orgs where the signed-in user has an
-  active membership, and creates an org plus an owner membership in one
-  transaction. Create happens in an inline modal — no separate route.
+  `/organizations` — nested accordion of organizations → workspaces → sessions.
+  Replaces previous grid view; content moved from `/home`.
   """
 
   use ControlKeelWeb, :live_view
@@ -17,42 +13,92 @@ defmodule ControlKeelWeb.OrganizationsLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    orgs = list_orgs(socket)
     local_mode = Mode.current() == :local
 
-    socket =
-      socket
-      |> assign(:page_title, "Organizations")
-      |> assign(:local_mode, local_mode)
-      |> assign(:page_action, %{label: "New Organization", event: "new_org", icon: "hero-plus"})
-      |> assign(:show_create_modal, false)
-      |> assign(:changeset, Org.changeset(%Org{}, %{}))
-      |> assign_form(Org.changeset(%Org{}, %{}))
+    workspaces_by_org =
+      Map.new(orgs, fn org -> {org.id, load_workspaces(org.id)} end)
 
-    {:ok, assign(socket, :orgs, list_orgs_for_socket(socket))}
+    sessions_by_workspace =
+      workspaces_by_org
+      |> Map.values()
+      |> List.flatten()
+      |> Map.new(fn ws -> {ws.id, load_sessions(ws.id)} end)
+
+    changeset = Org.changeset(%Org{}, %{})
+
+    {:ok,
+     socket
+     |> assign(:page_title, "Organizations")
+     |> assign(:current_path, "/organizations")
+     |> assign(:local_mode, local_mode)
+     |> assign(:show_create_modal, false)
+     |> assign(:changeset, changeset)
+     |> assign_form(changeset)
+     |> assign(:orgs, orgs)
+     |> assign(:workspaces_by_org, workspaces_by_org)
+     |> assign(:sessions_by_workspace, sessions_by_workspace)
+     |> assign(:expanded_orgs, MapSet.new())
+     |> assign(:expanded_workspaces, MapSet.new())}
   end
 
   defp assign_form(socket, changeset) do
     assign(socket, :form, to_form(changeset, as: :org))
   end
 
-  defp list_orgs_for_socket(socket) do
-    cond do
-      Mode.current() == :local ->
-        # Local mode has no membership concept — every row gets role: nil.
-        Accounts.list_orgs(status: "active")
-        |> Enum.map(fn org ->
-          %{org: org, role: nil, member_count: Accounts.count_memberships_for_org(org.id)}
-        end)
+  @impl true
+  def handle_event("toggle_org", %{"org_id" => org_id}, socket) do
+    org_id = parse_id(org_id)
+    expanded_orgs = socket.assigns.expanded_orgs
+    workspaces_by_org = socket.assigns.workspaces_by_org
 
-      user = socket.assigns[:current_user] ->
-        Accounts.list_orgs_for_user(user.id)
-        |> Enum.map(fn row ->
-          Map.put(row, :member_count, Accounts.count_memberships_for_org(row.org.id))
-        end)
+    {expanded_orgs, workspaces_by_org} =
+      if MapSet.member?(expanded_orgs, org_id) do
+        {MapSet.delete(expanded_orgs, org_id), workspaces_by_org}
+      else
+        expanded = MapSet.put(expanded_orgs, org_id)
 
-      true ->
-        []
-    end
+        workspaces_by_org =
+          if Map.has_key?(workspaces_by_org, org_id) do
+            workspaces_by_org
+          else
+            Map.put(workspaces_by_org, org_id, load_workspaces(org_id))
+          end
+
+        {expanded, workspaces_by_org}
+      end
+
+    {:noreply,
+     socket
+     |> assign(:expanded_orgs, expanded_orgs)
+     |> assign(:workspaces_by_org, workspaces_by_org)}
+  end
+
+  def handle_event("toggle_workspace", %{"workspace_id" => ws_id}, socket) do
+    ws_id = parse_id(ws_id)
+    expanded_workspaces = socket.assigns.expanded_workspaces
+    sessions_by_workspace = socket.assigns.sessions_by_workspace
+
+    {expanded_workspaces, sessions_by_workspace} =
+      if MapSet.member?(expanded_workspaces, ws_id) do
+        {MapSet.delete(expanded_workspaces, ws_id), sessions_by_workspace}
+      else
+        expanded = MapSet.put(expanded_workspaces, ws_id)
+
+        sessions_by_workspace =
+          if Map.has_key?(sessions_by_workspace, ws_id) do
+            sessions_by_workspace
+          else
+            Map.put(sessions_by_workspace, ws_id, load_sessions(ws_id))
+          end
+
+        {expanded, sessions_by_workspace}
+      end
+
+    {:noreply,
+     socket
+     |> assign(:expanded_workspaces, expanded_workspaces)
+     |> assign(:sessions_by_workspace, sessions_by_workspace)}
   end
 
   @impl true
@@ -97,18 +143,52 @@ defmodule ControlKeelWeb.OrganizationsLive do
 
     case create_org_for_current_mode(socket, params, create_default_workspace?) do
       {:ok, _org, true} ->
+        orgs = list_orgs(socket)
+
         {:noreply,
          socket
          |> put_flash(:info, "Organization created with a default workspace.")
          |> assign(:show_create_modal, false)
-         |> assign(:orgs, list_orgs_for_socket(socket))}
+         |> assign(:orgs, orgs)
+         |> assign(
+           :workspaces_by_org,
+           Map.new(orgs, fn org -> {org.id, load_workspaces(org.id)} end)
+         )
+         |> assign(
+           :sessions_by_workspace,
+           Map.new(
+             List.flatten(
+               Map.values(Map.new(orgs, fn org -> {org.id, load_workspaces(org.id)} end))
+             ),
+             fn ws ->
+               {ws.id, load_sessions(ws.id)}
+             end
+           )
+         )}
 
       {:ok, _org, false} ->
+        orgs = list_orgs(socket)
+
         {:noreply,
          socket
          |> put_flash(:info, "Organization created.")
          |> assign(:show_create_modal, false)
-         |> assign(:orgs, list_orgs_for_socket(socket))}
+         |> assign(:orgs, orgs)
+         |> assign(
+           :workspaces_by_org,
+           Map.new(orgs, fn org -> {org.id, load_workspaces(org.id)} end)
+         )
+         |> assign(
+           :sessions_by_workspace,
+           Map.new(
+             List.flatten(
+               Map.values(Map.new(orgs, fn org -> {org.id, load_workspaces(org.id)} end))
+             ),
+             fn ws ->
+               {ws.id, load_sessions(ws.id)}
+             end
+           )
+         )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, :changeset, changeset) |> assign_form(changeset)}
@@ -186,60 +266,164 @@ defmodule ControlKeelWeb.OrganizationsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <section class="w-full">
-      <%= if @orgs == [] do %>
-        <section class="rounded-2xl border bg-card p-12 text-center shadow-card">
-          <.icon name="hero-building-office-2" class="mx-auto size-10 text-muted-foreground" />
-          <p class="mt-4 text-base font-medium text-foreground">No organizations yet.</p>
-          <p class="mt-1 text-sm text-muted-foreground">
-            <%= if @local_mode do %>
-              In local mode only the default organization is available.
-            <% else %>
-              Create an organization to group workspaces, members, and budgets.
-            <% end %>
-          </p>
-        </section>
-      <% else %>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <%= for row <- @orgs do %>
-            <.link
-              navigate={~p"/organizations/#{row.org.slug}"}
-              class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex min-w-0 items-center gap-2">
-                  <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <.icon name="hero-building-office-2" class="size-4" />
+    <div class="mx-auto max-w-4xl space-y-8">
+      <div class="px-1">
+        <p class="text-sm leading-6 text-muted-foreground">
+          Welcome to your ControlKeel home. Browse all organizations in one place — expand any organization to reveal its workspaces, and expand a workspace to explore its sessions.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-between px-1">
+        <h2 class="text-sm font-semibold text-foreground">Organizations</h2>
+        <button
+          type="button"
+          phx-click="new_org"
+          class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+        >
+          <.icon name="hero-plus" class="size-4" /> New Organization
+        </button>
+      </div>
+
+      <section class="rounded-2xl border bg-card shadow-card overflow-hidden">
+        <div class="divide-y">
+          <%= if @orgs == [] do %>
+            <p class="px-5 py-10 text-center text-sm text-muted-foreground sm:px-6">
+              No organizations yet.
+            </p>
+          <% else %>
+            <%= for org <- @orgs do %>
+              <% expanded_org? = MapSet.member?(@expanded_orgs, org.id) %>
+              <% workspaces = Map.get(@workspaces_by_org, org.id) %>
+              <div class="bg-card">
+                <button
+                  type="button"
+                  phx-click="toggle_org"
+                  phx-value-org_id={org.id}
+                  class="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-muted/40 sm:px-6"
+                >
+                  <span class="min-w-0 text-left">
+                    <span class="block truncate text-sm font-semibold text-foreground">
+                      {org.name}
+                    </span>
+                    <span class="mt-1 inline-flex rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                      {length(workspaces || [])} {if length(workspaces || []) == 1,
+                        do: "workspace",
+                        else: "workspaces"}
+                    </span>
                   </span>
-                  <h3 class="truncate text-base font-semibold text-foreground transition group-hover:text-primary">
-                    {row.org.name}
-                  </h3>
-                </div>
-                <span class={[
-                  "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                  row.org.status == "active" && "bg-success/10 text-success ring-success/20",
-                  row.org.status != "active" && "bg-muted text-muted-foreground ring-border"
-                ]}>
-                  {row.org.status}
-                </span>
-              </div>
+                  <span class="ml-3 flex shrink-0 items-center gap-2">
+                    <.link
+                      navigate={~p"/organizations/#{org.slug}"}
+                      class="inline-flex items-center rounded-full border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                      onclick="event.stopPropagation()"
+                    >
+                      Open
+                    </.link>
+                    <.icon
+                      name="hero-chevron-down"
+                      class={[
+                        "size-4 shrink-0 text-muted-foreground transition-transform",
+                        expanded_org? && "rotate-180"
+                      ]}
+                    />
+                  </span>
+                </button>
 
-              <p class="mt-3 font-mono text-xs text-muted-foreground">{row.org.slug}</p>
+                <div :if={expanded_org?} class="border-t bg-muted/10">
+                  <div class="px-5 py-3 sm:px-6">
+                    <%= cond do %>
+                      <% is_nil(workspaces) -> %>
+                        <p class="py-4 text-center text-sm text-muted-foreground">
+                          Loading workspaces…
+                        </p>
+                      <% workspaces == [] -> %>
+                        <p class="rounded-xl border border-dashed bg-card px-4 py-6 text-center text-sm text-muted-foreground">
+                          No workspaces in this organization.
+                        </p>
+                      <% true -> %>
+                        <div class="space-y-2">
+                          <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Workspaces
+                          </p>
+                          <%= for ws <- workspaces do %>
+                            <% expanded_ws? = MapSet.member?(@expanded_workspaces, ws.id) %>
+                            <% sessions = Map.get(@sessions_by_workspace, ws.id) %>
+                            <div>
+                              <button
+                                type="button"
+                                phx-click="toggle_workspace"
+                                phx-value-workspace_id={ws.id}
+                                class="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-muted/40"
+                              >
+                                <span class="flex min-w-0 items-center gap-2.5">
+                                  <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info">
+                                    <.icon name="hero-squares-2x2" class="size-4" />
+                                  </span>
+                                  <span class="min-w-0 text-left">
+                                    <span class="block truncate text-sm font-medium text-foreground">
+                                      {ws.name}
+                                    </span>
+                                    <span
+                                      :if={sessions && length(sessions) > 0}
+                                      class="mt-1 inline-flex rounded-full border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                                    >
+                                      {length(sessions)} sessions
+                                    </span>
+                                  </span>
+                                </span>
+                                <span class="ml-3 flex shrink-0 items-center gap-2">
+                                  <.icon
+                                    name="hero-chevron-down"
+                                    class={[
+                                      "size-4 text-muted-foreground transition-transform",
+                                      expanded_ws? && "rotate-180"
+                                    ]}
+                                  />
+                                </span>
+                              </button>
 
-              <div class="mt-4 flex items-center justify-between border-t pt-3">
-                <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <.icon name="hero-users" class="size-3.5" />
-                  <span>{row.member_count} {(row.member_count == 1 && "member") || "members"}</span>
+                              <div :if={expanded_ws?} class="px-3 py-3">
+                                <%= cond do %>
+                                  <% is_nil(sessions) -> %>
+                                    <p class="py-3 text-center text-sm text-muted-foreground">
+                                      Loading sessions…
+                                    </p>
+                                  <% sessions == [] -> %>
+                                    <p class="rounded-lg border border-dashed bg-card px-3 py-4 text-center text-sm text-muted-foreground">
+                                      No sessions in this workspace.
+                                    </p>
+                                  <% true -> %>
+                                    <div class="space-y-1.5">
+                                      <p class="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Sessions
+                                      </p>
+                                      <%= for s <- sessions do %>
+                                        <.link
+                                          navigate={~p"/sessions/#{s.id}"}
+                                          class="flex items-center justify-between px-3 py-2.5 transition hover:bg-muted/40 border-b border-border last:border-none"
+                                        >
+                                          <p class="truncate text-sm font-medium text-foreground">
+                                            {s.title}
+                                          </p>
+                                        </.link>
+                                      <% end %>
+                                    </div>
+                                <% end %>
+                              </div>
+                            </div>
+                          <% end %>
+                        </div>
+                    <% end %>
+                  </div>
                 </div>
-                <.role_badge role={row.role} />
               </div>
-            </.link>
+            <% end %>
           <% end %>
         </div>
-      <% end %>
+      </section>
 
       <.create_modal :if={@show_create_modal} form={@form} local_mode={@local_mode} />
-    </section>
+    </div>
     """
   end
 
@@ -356,20 +540,37 @@ defmodule ControlKeelWeb.OrganizationsLive do
     """
   end
 
-  attr :role, :string, default: nil
+  defp list_orgs(socket) do
+    cond do
+      Mode.current() == :local ->
+        Accounts.list_orgs(status: "active")
 
-  defp role_badge(%{role: nil} = assigns), do: ~H""
+      user = socket.assigns[:current_user] ->
+        Accounts.list_orgs_for_user(user.id)
+        |> Enum.map(& &1.org)
 
-  defp role_badge(assigns) do
-    ~H"""
-    <span class={[
-      "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-      @role == "owner" && "bg-primary/10 text-primary ring-primary/20",
-      @role == "admin" && "bg-info/10 text-info ring-info/20",
-      @role in ["member", "viewer"] && "bg-muted text-muted-foreground ring-border"
-    ]}>
-      {@role}
-    </span>
-    """
+      true ->
+        []
+    end
   end
+
+  defp load_workspaces(org_id) do
+    Mission.list_workspaces_for_org(org_id)
+  end
+
+  defp load_sessions(workspace_id) do
+    Mission.list_sessions_for_workspace(workspace_id)
+    |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
+  end
+
+  defp parse_id(id) when is_integer(id), do: id
+
+  defp parse_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> int
+      _ -> id
+    end
+  end
+
+  defp parse_id(id), do: id
 end
