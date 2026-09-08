@@ -24,6 +24,11 @@ defmodule ControlKeelWeb.Layouts do
   """
   attr :current_user, :any, default: nil
   attr :current_path, :string, default: nil
+  attr :org, :any, default: nil
+  attr :workspace, :any, default: nil
+  attr :session, :any, default: nil
+  attr :can_manage, :any, default: nil
+  attr :local_mode, :boolean, default: false
 
   def sidebar(assigns) do
     assigns = assign_new(assigns, :mode, fn -> ControlKeel.Runtime.Mode.current() end)
@@ -34,64 +39,81 @@ defmodule ControlKeelWeb.Layouts do
       class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
     >
       <.link navigate={~p"/dashboard"} class="flex items-center gap-3 px-3 py-4">
-        <span class="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
           <.icon name="hero-bolt-solid" class="size-5" />
         </span>
-        <span>
-          <span class="block text-sm font-semibold tracking-wide text-foreground">ControlKeel</span>
-          <span class="block text-xs text-muted-foreground">Governance memory</span>
-        </span>
+        <span class="block font-semibold tracking-wide text-foreground">ControlKeel</span>
       </.link>
+
+      <.sidebar_context_switcher
+        current_user={@current_user}
+        org={@org}
+        workspace={@workspace}
+        session={@session}
+        current_path={@current_path}
+      />
 
       <nav
         id="sidebar-nav"
         phx-hook="SidebarNav"
         class="mt-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 overscroll-contain text-sm"
       >
-        <%= for item <- nav_items() do %>
-          <% active = nav_active?(@current_path, item.href) %>
+        <%= for item <- sidebar_nav_items(assigns) do %>
+          <% active =
+            if item[:href],
+              do: nav_active?(@current_path, item.href, Map.get(item, :exact, false)),
+              else: false %>
           <% label_id = Phoenix.Naming.underscore(item.label) %>
-          <%= if item[:children] do %>
-            <% opened = active %>
-            <% collapse_id = "sidebar-collapse-#{label_id}" %>
-            <% chevron_id = "sidebar-chevron-#{label_id}" %>
-            <div class="flex flex-col gap-1">
+          <%= cond do %>
+            <% item[:children] -> %>
+              <% opened = active %>
+              <% collapse_id = "sidebar-collapse-#{label_id}" %>
+              <% chevron_id = "sidebar-chevron-#{label_id}" %>
+              <div class="flex flex-col gap-1">
+                <button
+                  type="button"
+                  id={"sidebar-toggle-#{label_id}"}
+                  data-sidebar-toggle
+                  aria-expanded={(opened && "true") || "false"}
+                  aria-controls={collapse_id}
+                  class={["w-full text-left cursor-pointer", sidebar_link_class(active)]}
+                >
+                  <.icon name={item.icon} class={sidebar_icon_class(active)} />
+                  <span class="flex-1">{item.label}</span>
+                  <span
+                    id={chevron_id}
+                    class={[
+                      "inline-flex shrink-0 transition-transform duration-200 text-muted-foreground",
+                      opened && "rotate-90"
+                    ]}
+                  >
+                    <.icon name="hero-chevron-right" class="size-4 shrink-0" />
+                  </span>
+                </button>
+                <div id={collapse_id} class={unless opened, do: "hidden"}>
+                  <.sidebar_children
+                    children={item.children}
+                    current_path={@current_path}
+                    parent_href={item.href}
+                  />
+                </div>
+              </div>
+            <% item[:event] -> %>
               <button
                 type="button"
-                id={"sidebar-toggle-#{label_id}"}
-                data-sidebar-toggle
-                aria-expanded={(opened && "true") || "false"}
-                aria-controls={collapse_id}
-                class={["w-full text-left cursor-pointer", sidebar_link_class(active)]}
+                phx-click={item.event}
+                class={sidebar_link_class(active)}
               >
-                <.icon name={item.icon} class={sidebar_icon_class(active)} />
-                <span class="flex-1">{item.label}</span>
-                <span
-                  id={chevron_id}
-                  class={[
-                    "inline-flex shrink-0 transition-transform duration-200 text-muted-foreground",
-                    opened && "rotate-90"
-                  ]}
-                >
-                  <.icon name="hero-chevron-right" class="size-4 shrink-0" />
-                </span>
+                <.icon name={item.icon} class={sidebar_icon_class(active)} /> {item.label}
               </button>
-              <div id={collapse_id} class={unless opened, do: "hidden"}>
-                <.sidebar_children
-                  children={item.children}
-                  current_path={@current_path}
-                  parent_href={item.href}
-                />
-              </div>
-            </div>
-          <% else %>
-            <.link
-              navigate={item.href}
-              aria-current={active && "page"}
-              class={sidebar_link_class(active)}
-            >
-              <.icon name={item.icon} class={sidebar_icon_class(active)} /> {item.label}
-            </.link>
+            <% true -> %>
+              <.link
+                navigate={item.href}
+                aria-current={active && "page"}
+                class={sidebar_link_class(active)}
+              >
+                <.icon name={item.icon} class={sidebar_icon_class(active)} /> {item.label}
+              </.link>
           <% end %>
         <% end %>
       </nav>
@@ -124,6 +146,294 @@ defmodule ControlKeelWeb.Layouts do
       </div>
     </aside>
     """
+  end
+
+  @doc """
+  Org/workspace/session switcher in the sidebar header.
+
+  Dropdown accordion mirroring the `/organizations` browser: org rows expand
+  to workspaces, workspaces expand to sessions. Expansion and the popover
+  itself are pure client-side JS (toggle/click-away), so the component works
+  from any LiveView without owning server events. The `ContextSwitcher` hook
+  flies the popover out to the right when viewport space allows, otherwise
+  it drops down below the button.
+  """
+
+  attr :current_user, :any, default: nil
+  attr :org, :any, default: nil
+  attr :workspace, :any, default: nil
+  attr :session, :any, default: nil
+  attr :current_path, :string, default: nil
+
+  def sidebar_context_switcher(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:orgs, fn ->
+        cond do
+          ControlKeel.Runtime.Mode.current() == :local ->
+            ControlKeel.Accounts.list_orgs(status: "active")
+
+          user = assigns[:current_user] ->
+            ControlKeel.Accounts.list_orgs_for_user(user.id) |> Enum.map(& &1.org)
+
+          true ->
+            []
+        end
+      end)
+      |> assign_new(:workspaces_by_org, fn assigns ->
+        Map.new(assigns.orgs, fn org ->
+          {org.id, ControlKeel.Mission.list_workspaces_for_org(org.id)}
+        end)
+      end)
+      |> assign_new(:sessions_by_workspace, fn assigns ->
+        assigns.workspaces_by_org
+        |> Map.values()
+        |> List.flatten()
+        |> Map.new(fn ws ->
+          {ws.id, ControlKeel.Mission.list_sessions_for_workspace(ws.id)}
+        end)
+      end)
+      |> assign(:switcher_title, switcher_title(assigns))
+
+    ~H"""
+    <div
+      :if={@orgs != []}
+      id="sidebar-context-switcher"
+      phx-hook="ContextSwitcher"
+      class="relative px-3"
+    >
+      <button
+        type="button"
+        data-context-switcher-toggle
+        phx-click={
+          JS.toggle(to: "#sidebar-context-switcher-popover")
+          |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+        }
+        aria-haspopup="menu"
+        aria-expanded="false"
+        class="flex w-full items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 text-left shadow-sm transition hover:bg-muted"
+      >
+        <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <.icon name="hero-building-office-2" class="size-4" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-sm font-semibold text-foreground">
+            {@switcher_title}
+          </span>
+        </span>
+        <.icon name="hero-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
+      </button>
+
+      <div
+        id="sidebar-context-switcher-popover"
+        data-context-switcher-popover
+        phx-click-away={JS.hide(to: "#sidebar-context-switcher-popover")}
+        class="hidden absolute left-3 top-full z-50 max-h-[28rem] w-72 overflow-y-auto rounded-xl border bg-card p-2 shadow-2xl shadow-black/50 backdrop-blur-md"
+      >
+        <%= for org <- @orgs do %>
+          <% workspaces = Map.get(@workspaces_by_org, org.id, []) %>
+          <% current_org? = @org && @org.id == org.id %>
+          <div class="flex flex-col">
+            <div class="flex items-center gap-1">
+              <button
+                type="button"
+                phx-click={JS.toggle(to: "#switcher-org-#{org.id}-workspaces")}
+                aria-label={"Toggle workspaces for #{org.name}"}
+                class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-muted"
+              >
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-md bg-info/10 text-info">
+                  <.icon name="hero-squares-2x2" class="size-3.5" />
+                </span>
+                <span class={[
+                  "min-w-0 flex-1 truncate text-sm",
+                  current_org? && "font-semibold text-primary",
+                  !current_org? && "font-medium text-foreground"
+                ]}>
+                  {org.name}
+                </span>
+                <span class="shrink-0 text-[10px] font-medium text-muted-foreground">
+                  {length(workspaces)}
+                </span>
+                <.icon name="hero-chevron-down" class="size-3.5 shrink-0 text-muted-foreground" />
+              </button>
+              <.link
+                navigate={~p"/organizations/#{org.slug}"}
+                aria-label={"Open #{org.name}"}
+                class="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-primary"
+              >
+                <.icon name="hero-arrow-right" class="size-3.5" />
+              </.link>
+            </div>
+
+            <div id={"switcher-org-#{org.id}-workspaces"} class="hidden pl-3">
+              <%= if workspaces == [] do %>
+                <p class="px-2 py-1.5 text-xs text-muted-foreground">No workspaces.</p>
+              <% else %>
+                <%= for ws <- workspaces do %>
+                  <% sessions = Map.get(@sessions_by_workspace, ws.id, []) %>
+                  <% current_ws? = @workspace && @workspace.id == ws.id %>
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      phx-click={JS.toggle(to: "#switcher-ws-#{ws.id}-sessions")}
+                      aria-label={"Toggle sessions for #{ws.name}"}
+                      class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-muted"
+                    >
+                      <span class="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <.icon name="hero-rocket-launch" class="size-3.5" />
+                      </span>
+                      <span class={[
+                        "min-w-0 flex-1 truncate text-sm",
+                        current_ws? && "font-semibold text-primary",
+                        !current_ws? && "font-medium text-foreground"
+                      ]}>
+                        {ws.name}
+                      </span>
+                      <span class="shrink-0 text-[10px] font-medium text-muted-foreground">
+                        {length(sessions)}
+                      </span>
+                      <.icon
+                        name="hero-chevron-down"
+                        class="size-3.5 shrink-0 text-muted-foreground"
+                      />
+                    </button>
+                    <.link
+                      navigate={~p"/organizations/#{org.slug}/workspaces/#{ws.id}/sessions"}
+                      aria-label={"Open sessions for #{ws.name}"}
+                      class="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-primary"
+                    >
+                      <.icon name="hero-arrow-right" class="size-3.5" />
+                    </.link>
+                  </div>
+
+                  <div id={"switcher-ws-#{ws.id}-sessions"} class="hidden pl-6">
+                    <%= if sessions == [] do %>
+                      <p class="px-2 py-1.5 text-xs text-muted-foreground">No sessions.</p>
+                    <% else %>
+                      <%= for session <- sessions do %>
+                        <.link
+                          navigate={~p"/sessions/#{session.id}"}
+                          class={[
+                            "block truncate rounded-lg px-2 py-1.5 text-xs transition hover:bg-muted",
+                            @current_path == "/sessions/#{session.id}" &&
+                              "font-semibold text-primary",
+                            @current_path != "/sessions/#{session.id}" &&
+                              "text-muted-foreground hover:text-foreground"
+                          ]}
+                        >
+                          {session.title}
+                        </.link>
+                      <% end %>
+                    <% end %>
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  # Switcher button shows the deepest current context only:
+  # session title > workspace name > org name, falling back to the
+  # generic label (with org count) when no context is set.
+  defp switcher_title(%{session: %{title: title}}) when is_binary(title) and title != "",
+    do: title
+
+  defp switcher_title(%{workspace: %{name: name}}) when is_binary(name) and name != "",
+    do: name
+
+  defp switcher_title(%{org: %{name: name}}) when is_binary(name) and name != "",
+    do: name
+
+  defp switcher_title(_), do: "Organizations"
+
+  # Session pages (/sessions/:id*) set :session; MissionControl also sets
+  # :workspace and :org for the context switcher, so the session branch must
+  # match before the org/workspace branches.
+  defp sidebar_nav_items(%{session: %{} = session} = assigns) do
+    session_nav_items(session, assigns)
+  end
+
+  # Workspace pages set both :org and :workspace (WorkspaceDetail/Settings).
+  defp sidebar_nav_items(%{org: %{}, workspace: %{} = ws} = assigns) do
+    workspace_nav_items(ws, assigns)
+  end
+
+  defp sidebar_nav_items(%{org: %{} = org} = assigns) do
+    org_nav_items(org, assigns)
+  end
+
+  defp sidebar_nav_items(_assigns), do: nav_items()
+
+  # Session nav is intentionally minimal for now: Overview links back to
+  # mission control. Sub-page items land as the session sidebar grows.
+  defp session_nav_items(session, _assigns) do
+    [
+      %{
+        label: "Overview",
+        href: ~p"/sessions/#{session.id}",
+        icon: "hero-squares-2x2",
+        exact: true
+      }
+    ]
+  end
+
+  defp workspace_nav_items(workspace, _assigns) do
+    org = workspace.org
+    slug = org && org.slug
+
+    if slug do
+      [
+        %{
+          label: "Overview",
+          href: ~p"/organizations/#{slug}/workspaces/#{workspace.id}",
+          icon: "hero-squares-2x2",
+          exact: true
+        },
+        %{
+          label: "Sessions",
+          href: ~p"/organizations/#{slug}/workspaces/#{workspace.id}/sessions",
+          icon: "hero-rocket-launch",
+          exact: true
+        },
+        %{
+          label: "Settings",
+          href: ~p"/organizations/#{slug}/workspaces/#{workspace.id}/settings",
+          icon: "hero-cog-6-tooth",
+          exact: true
+        }
+      ]
+    else
+      [
+        %{label: "Overview", href: ~p"/organizations", icon: "hero-squares-2x2", exact: true}
+      ]
+    end
+  end
+
+  defp org_nav_items(org, assigns) do
+    overview = %{
+      label: "Overview",
+      href: ~p"/organizations/#{org.slug}",
+      icon: "hero-squares-2x2",
+      exact: true
+    }
+
+    if assigns[:can_manage] || assigns[:local_mode] do
+      [
+        overview,
+        %{
+          label: "Settings",
+          href: ~p"/organizations/#{org.slug}/settings",
+          icon: "hero-cog-6-tooth",
+          exact: true
+        }
+      ]
+    else
+      [overview]
+    end
   end
 
   defp nav_items do
@@ -187,8 +497,6 @@ defmodule ControlKeelWeb.Layouts do
       }
     ]
   end
-
-  defp nav_active?(current_path, path, exact \\ false)
 
   defp nav_active?(current_path, path, true) when is_binary(current_path) and is_binary(path) do
     current_path == path

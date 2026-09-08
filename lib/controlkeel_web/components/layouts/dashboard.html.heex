@@ -1,5 +1,13 @@
 <div class="h-screen flex overflow-hidden">
-  <.sidebar current_user={@current_user} current_path={@current_path} />
+  <.sidebar
+    current_user={@current_user}
+    current_path={@current_path}
+    org={assigns[:org]}
+    workspace={assigns[:workspace]}
+    session={assigns[:session]}
+    can_manage={assigns[:can_manage]}
+    local_mode={assigns[:local_mode]}
+  />
 
   <div class="flex flex-1 flex-col overflow-hidden">
     <.dashboard_header

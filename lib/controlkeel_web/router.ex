@@ -112,15 +112,25 @@ defmodule ControlKeelWeb.Router do
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
       live "/organizations", OrganizationsLive, :index
-      live "/organizations/:slug", OrganizationDetailLive, :index
-      live "/organizations/:slug/workspaces/:id", WorkspaceDetailLive, :index
-      live "/organizations/:slug/workspaces/:id/settings", WorkspaceSettingsLive, :show
       live "/workspaces/:id/repos", WorkspaceReposLive, :index
       live "/workspaces/:id/service-accounts", WorkspaceServiceAccountsLive, :index
       live "/workspaces/:id/webhooks", WorkspaceWebhooksLive, :index
       live "/workspaces/:id/tool-policy", WorkspaceToolPolicyLive, :edit
       live "/policies", PolicyStudioLive, :index
       live "/skills", SkillsLive, :index
+    end
+
+    live_session :org,
+      layout: {ControlKeelWeb.Layouts, :dashboard},
+      on_mount: [
+        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
+        ControlKeelWeb.LayoutDefaults
+      ] do
+      live "/organizations/:slug", OrganizationDetailLive, :index
+      live "/organizations/:slug/settings", OrganizationSettingsLive, :show
+      live "/organizations/:slug/workspaces/:id", WorkspaceDetailLive, :index
+      live "/organizations/:slug/workspaces/:id/sessions", WorkspaceSessionsLive, :index
+      live "/organizations/:slug/workspaces/:id/settings", WorkspaceSettingsLive, :show
     end
 
     # Observability section routes use the shared :dashboard framework layout;

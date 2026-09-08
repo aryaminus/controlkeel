@@ -93,6 +93,31 @@ Hooks.SidebarNav = {
   }
 }
 
+Hooks.ContextSwitcher = {
+  mounted() {
+    this.observer = new MutationObserver(() => this.maybePlace())
+    this.observer.observe(this.el, {attributes: true, subtree: true, attributeFilter: ["class"]})
+    window.addEventListener("resize", () => this.maybePlace())
+  },
+  updated() {
+    this.maybePlace()
+  },
+  destroyed() {
+    this.observer.disconnect()
+  },
+  maybePlace() {
+    const popover = this.el.querySelector("[data-context-switcher-popover]")
+    if (!popover || popover.classList.contains("hidden")) return
+    const button = this.el.querySelector("[data-context-switcher-toggle]")
+    const rect = button ? button.getBoundingClientRect() : null
+    // w-72 popover (288px) + 8px gap; falls back to below the button.
+    const fitsRight = rect
+      ? window.innerWidth - rect.right >= 296
+      : window.innerWidth >= 640
+    popover.classList.toggle("context-switcher-right", fitsRight)
+  }
+}
+
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
