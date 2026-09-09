@@ -149,17 +149,13 @@ defmodule ControlKeelWeb.Layouts do
     """
   end
 
-  @doc """
-  Split context switchers sharing one trigger/popover shell:
-
-  * `org_switcher/1` — dashboard header, org scope only.
-  * `workspace_switcher/1` — sidebar on workspace pages.
-  * `session_switcher/1` — sidebar on session pages.
-
-  Popover open/close is pure client-side JS (toggle/click-away). The
-  `ContextSwitcher` hook flies the popover out to the right when viewport
-  space allows, otherwise it drops down below the button.
-  """
+  # Split context switchers sharing one trigger/popover shell:
+  # `org_switcher/1` (sidebar branding block), `workspace_switcher/1`
+  # (sidebar on workspace pages), `session_switcher/1` (sidebar on
+  # session pages). Popover open/close is pure client-side JS
+  # (toggle/click-away). The `ContextSwitcher` hook flies the popover
+  # out to the right when viewport space allows, otherwise it drops
+  # down below the button.
 
   # Shared org lookup for the switchers: all active orgs in local mode,
   # the user's orgs in cloud mode.
