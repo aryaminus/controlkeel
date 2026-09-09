@@ -123,13 +123,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-8">
-      <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div class="space-y-2">
-          <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-            Organization settings
-          </h1>
-        </div>
-      </div>
+      <.page_title title="Organization settings" />
 
       <section class="rounded-2xl border bg-card p-5 shadow-card">
         <.section_title>General</.section_title>

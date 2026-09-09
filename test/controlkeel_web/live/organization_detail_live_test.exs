@@ -38,6 +38,13 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
   defp conn_for(user),
     do: build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
 
+  defp anchor_for(html, href) do
+    case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>.*?</a>|s, html) do
+      nil -> ""
+      [match] -> match
+    end
+  end
+
   describe "org settings page" do
     setup do
       owner = create_user!("owner-set@example.com")
@@ -154,6 +161,34 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       refute render(view) =~ "core-workspace"
       refute render(view) =~ ~s(id="role-form-")
       refute render(view) =~ "No members yet."
+    end
+
+    test "overview shows stats, recent sessions, top workspaces, and actions", %{
+      owner: owner,
+      workspace: ws
+    } do
+      {:ok, session} =
+        ControlKeel.Mission.create_session(%{
+          title: "Fix payments",
+          objective: "Trace failure",
+          risk_tier: "high",
+          status: "active",
+          workspace_id: ws.id
+        })
+
+      {:ok, view, html} = live(conn_for(owner), ~p"/organizations/tabco")
+
+      # Stat cards.
+      assert html =~ "Recent sessions"
+      assert html =~ "Top workspaces"
+      # Recent session links to its page with the workspace name.
+      assert anchor_for(html, "/sessions/#{session.id}") =~ "Fix payments"
+      assert html =~ "Core Workspace"
+      # Quick actions link to the scoped routes.
+      assert html =~ ~s(href="/organizations/tabco/workspaces")
+      assert html =~ ~s(href="/organizations/tabco/members")
+      # Members snapshot links out.
+      assert render(view) =~ "Manage members"
     end
 
     test "unknown tab value falls back to overview", %{owner: owner} do

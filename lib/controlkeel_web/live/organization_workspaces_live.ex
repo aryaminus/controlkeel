@@ -134,21 +134,11 @@ defmodule ControlKeelWeb.OrganizationWorkspacesLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-6">
-      <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-        Workspaces
-      </h1>
-
       <div class="flex items-center justify-between gap-3">
-        <p class="text-sm text-muted-foreground">
-          Workspaces group sessions, findings, and budgets under this organization.
-        </p>
-        <button
-          type="button"
-          phx-click="new_workspace"
-          class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
-        >
+        <.page_title title="Workspaces" />
+        <.button phx-click="new_workspace">
           <.icon name="hero-plus" class="size-4" /> New Workspace
-        </button>
+        </.button>
       </div>
 
       <%= if @workspaces == [] do %>
@@ -156,7 +146,7 @@ defmodule ControlKeelWeb.OrganizationWorkspacesLive do
           <.icon name="hero-squares-2x2" class="mx-auto size-10 text-muted-foreground" />
           <p class="mt-4 text-base font-medium text-foreground">No workspaces yet.</p>
           <p class="mt-1 text-sm text-muted-foreground">
-            Workspaces group sessions, findings, and budgets under this organization.
+            Create your first workspace to get started.
           </p>
         </section>
       <% else %>

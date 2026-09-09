@@ -280,9 +280,7 @@ defmodule ControlKeelWeb.OrganizationMembersLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-6">
-      <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-        Members
-      </h1>
+      <.page_title title="Members" />
 
       <%= if @invite_token do %>
         <div class="rounded-2xl border border-primary/30 bg-primary/10 p-5">
