@@ -127,6 +127,8 @@ defmodule ControlKeelWeb.Router do
         ControlKeelWeb.LayoutDefaults
       ] do
       live "/organizations/:slug", OrganizationDetailLive, :index
+      live "/organizations/:slug/workspaces", OrganizationWorkspacesLive, :index
+      live "/organizations/:slug/members", OrganizationMembersLive, :index
       live "/organizations/:slug/settings", OrganizationSettingsLive, :show
       live "/organizations/:slug/workspaces/:id", WorkspaceDetailLive, :index
       live "/organizations/:slug/workspaces/:id/sessions", WorkspaceSessionsLive, :index

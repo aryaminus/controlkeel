@@ -96,7 +96,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       assert html =~ org.slug
 
       assert html =~ ~s(href="/organizations/#{org.slug}")
-      assert html =~ "Overview"
+      assert html =~ "Workspaces"
+      assert html =~ "Members"
       refute html =~ "Policy Studio"
     end
 

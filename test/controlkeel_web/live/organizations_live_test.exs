@@ -112,13 +112,18 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
       assert html =~ ~p"/organizations/#{org.slug}"
     end
 
-    test "cloud mode renders the user's org row", %{conn: conn, user: user} do
+    test "cloud mode renders the user's role per org row", %{conn: conn, user: user} do
       {:ok, _} = Accounts.create_org_with_owner(user.id, %{name: "Owned", slug: "owned"})
 
       {:ok, _view, html} = live(conn, ~p"/organizations")
 
+      # The owner role badge is rendered for the user's org (not a placeholder).
+      # Assert on the owner-specific styling and role text rather than a literal
+      # `>owner<`, since HEEx renders the role text on its own line.
       assert html =~ "Owned"
-      assert html =~ "workspaces"
+      assert html =~ "ring-primary/20"
+      assert html =~ "owner"
+      refute html =~ "—"
     end
 
     test "save inserts an org plus an owner membership for the current user", %{

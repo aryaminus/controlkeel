@@ -268,6 +268,64 @@ defmodule ControlKeelWeb.LayoutsTest do
     assert main_html =~ ~s(id="sidebar-org-switcher")
   end
 
+  test "org sidebar shows Overview, Workspaces, and Members with tab-aware highlighting" do
+    use_local_mode()
+
+    {:ok, org} = ControlKeel.Accounts.create_org(%{name: "Switchco", slug: "switchco-nav"})
+
+    members_html =
+      render_component(&Layouts.sidebar/1,
+        current_path: "/organizations/switchco-nav",
+        org: org,
+        active_tab: :members
+      )
+
+    assert members_html =~ "Overview"
+    assert members_html =~ "Workspaces"
+    assert members_html =~ "Members"
+
+    assert members_html =~
+             ~r|href="/organizations/switchco-nav/members"[^>]*aria-current="page"|
+
+    default_html =
+      render_component(&Layouts.sidebar/1,
+        current_path: "/organizations/switchco-nav",
+        org: org
+      )
+
+    assert default_html =~
+             ~r|href="/organizations/switchco-nav"[^>]*aria-current="page"|
+
+    workspaces_html =
+      render_component(&Layouts.sidebar/1,
+        current_path: "/organizations/switchco-nav",
+        org: org,
+        active_tab: :workspaces
+      )
+
+    assert workspaces_html =~
+             ~r|href="/organizations/switchco-nav/workspaces"[^>]*aria-current="page"|
+  end
+
+  test "org sidebar does not highlight Overview on the settings page" do
+    use_local_mode()
+
+    {:ok, org} = ControlKeel.Accounts.create_org(%{name: "Switchco", slug: "switchco-set"})
+
+    html =
+      render_component(&Layouts.sidebar/1,
+        current_path: "/organizations/switchco-set/settings",
+        org: org,
+        can_manage: true
+      )
+
+    assert html =~
+             ~r|href="/organizations/switchco-set/settings"[^>]*aria-current="page"|
+
+    refute html =~
+             ~r|href="/organizations/switchco-set"[^>]*aria-current="page"|
+  end
+
   test "dashboard header does not render the org switcher" do
     html = render_component(&Layouts.dashboard_header/1, current_path: "/dashboard")
 
