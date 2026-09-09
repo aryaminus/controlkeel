@@ -1,3 +1,3 @@
-## 2026-08-19 - Elixir List Allocation Overhead
-**Learning:** Chaining `Enum.map/2` into `Enum.uniq/1` then `length/1` (or `Enum.filter/2` into `length/1`) forces unnecessary intermediate list allocations in Elixir, adding hidden overhead.
-**Action:** Use `MapSet.new/2 |> MapSet.size()` and `Enum.count/2` to skip intermediate lists and reduce GC pressure.
+## 2024-05-24 - Elixir Enum.frequencies_by vs Enum.group_by
+**Learning:** Using `Enum.group_by/2` followed by `Enum.into(%{}, fn {k, v} -> {k, length(v)} end)` creates unnecessary intermediate list allocations for the grouped items, which increases GC pressure.
+**Action:** Use `Enum.frequencies_by/2` directly to count occurrences more efficiently without creating intermediate lists.
