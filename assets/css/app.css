@@ -144,3 +144,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Context switcher flyout: applied by the ContextSwitcher hook when the
+   w-72 popover fits in the viewport to the right of the toggle button.
+   Overrides the default below-the-button placement. */
+.context-switcher-popover.context-switcher-right {
+  left: 100%;
+  top: 0;
+  margin-left: 0.5rem;
+}

@@ -38,18 +38,19 @@ defmodule ControlKeelWeb.Layouts do
       id="app-sidebar"
       class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
     >
-      <.link navigate={~p"/dashboard"} class="flex items-center gap-3 px-3 py-4">
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-          <.icon name="hero-bolt-solid" class="size-5" />
-        </span>
-        <span class="block font-semibold tracking-wide text-foreground">ControlKeel</span>
-      </.link>
+      <.org_switcher current_user={@current_user} org={@org} />
 
-      <.sidebar_context_switcher
-        current_user={@current_user}
+      <.session_switcher
+        :if={@session}
         org={@org}
         workspace={@workspace}
         session={@session}
+        current_path={@current_path}
+      />
+      <.workspace_switcher
+        :if={!@session && @workspace}
+        org={@org}
+        workspace={@workspace}
         current_path={@current_path}
       />
 
@@ -149,188 +150,272 @@ defmodule ControlKeelWeb.Layouts do
   end
 
   @doc """
-  Org/workspace/session switcher in the sidebar header.
+  Split context switchers sharing one trigger/popover shell:
 
-  Dropdown accordion mirroring the `/organizations` browser: org rows expand
-  to workspaces, workspaces expand to sessions. Expansion and the popover
-  itself are pure client-side JS (toggle/click-away), so the component works
-  from any LiveView without owning server events. The `ContextSwitcher` hook
-  flies the popover out to the right when viewport space allows, otherwise
-  it drops down below the button.
+  * `org_switcher/1` — dashboard header, org scope only.
+  * `workspace_switcher/1` — sidebar on workspace pages.
+  * `session_switcher/1` — sidebar on session pages.
+
+  Popover open/close is pure client-side JS (toggle/click-away). The
+  `ContextSwitcher` hook flies the popover out to the right when viewport
+  space allows, otherwise it drops down below the button.
   """
 
+  # Shared org lookup for the switchers: all active orgs in local mode,
+  # the user's orgs in cloud mode.
+  defp switcher_orgs(current_user) do
+    user_id = if is_map(current_user), do: Map.get(current_user, :id), else: nil
+
+    cond do
+      ControlKeel.Runtime.Mode.current() == :local ->
+        ControlKeel.Accounts.list_orgs(status: "active")
+
+      not is_nil(user_id) ->
+        ControlKeel.Accounts.list_orgs_for_user(user_id) |> Enum.map(& &1.org)
+
+      true ->
+        []
+    end
+  end
+
+  @doc """
+  Organization switcher merged into the sidebar branding block: the
+  ControlKeel logo with the current org name as subtitle. Clicking
+  toggles the flat org list popover. Without orgs it renders as a
+  plain dashboard link.
+  """
   attr :current_user, :any, default: nil
+  attr :org, :any, default: nil
+
+  def org_switcher(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:orgs, fn assigns -> switcher_orgs(assigns[:current_user]) end)
+      |> assign(:switcher_title, switcher_title(assigns))
+
+    ~H"""
+    <div id="sidebar-org-switcher" phx-hook="ContextSwitcher" class="relative px-3 py-3">
+      <div class="flex w-full items-center gap-3 text-left">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+          <.icon name="hero-bolt-solid" class="size-5" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold tracking-wide text-foreground">ControlKeel</span>
+          <span :if={@org} class="block truncate text-xs text-muted-foreground">
+            {@switcher_title}
+          </span>
+        </div>
+        <button
+          type="button"
+          phx-click={
+            JS.toggle(to: "#sidebar-org-switcher-popover")
+            |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+          }
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <.icon name="hero-chevron-up-down" class="size-4 shrink-0" />
+        </button>
+      </div>
+      <div
+        id="sidebar-org-switcher-popover"
+        data-context-switcher-popover
+        phx-click-away={JS.hide(to: "#sidebar-org-switcher-popover")}
+        class="hidden absolute left-3 top-full z-50 max-h-[28rem] w-72 overflow-y-auto rounded-xl border bg-card p-2 shadow-2xl shadow-black/50 backdrop-blur-md context-switcher-popover"
+      >
+        <%= for org <- @orgs do %>
+          <% current? = is_map(@org) and Map.get(@org, :id) == org.id %>
+          <.link
+            navigate={~p"/organizations/#{org.slug}"}
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            <span class="min-w-0 flex-1 truncate">{org.name}</span>
+            <.icon :if={current?} name="hero-check" class="size-4 shrink-0" />
+          </.link>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Workspace switcher for the sidebar on workspace pages: the current
+  workspace name with a parent org back-row and a flat list of the
+  org's workspaces.
+  """
+  attr :org, :any, default: nil
+  attr :workspace, :any, default: nil
+  attr :current_path, :string, default: nil
+
+  def workspace_switcher(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:scope_workspaces, fn assigns ->
+        case assigns[:org] do
+          %{id: id} when not is_nil(id) ->
+            ControlKeel.Mission.list_workspaces_for_org(id)
+
+          _ ->
+            []
+        end
+      end)
+      |> assign(:switcher_title, switcher_title(assigns))
+      |> assign(:switcher_parent, switcher_parent(assigns))
+      |> assign(:org_slug, switcher_org_slug(assigns))
+
+    ~H"""
+    <.switcher_shell
+      :if={@workspace != nil}
+      id="sidebar-workspace-switcher"
+      popover_id="sidebar-workspace-switcher-popover"
+      container_class="relative px-3"
+      inner_class="py-2"
+      popover_class="left-3 top-full"
+      title={@switcher_title}
+      parent={@switcher_parent}
+    >
+      <%= if @scope_workspaces == [] or is_nil(@org_slug) do %>
+        <p class="px-2 py-1.5 text-xs text-muted-foreground">No workspaces.</p>
+      <% else %>
+        <%= for ws <- @scope_workspaces do %>
+          <% current? = is_map(@workspace) and Map.get(@workspace, :id) == ws.id %>
+          <.link
+            navigate={~p"/organizations/#{@org_slug}/workspaces/#{ws.id}"}
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:bg-muted"
+          >
+            <span class="min-w-0 flex-1 truncate">{ws.name}</span>
+            <.icon :if={current?} name="hero-check" class="size-4 shrink-0" />
+          </.link>
+        <% end %>
+      <% end %>
+    </.switcher_shell>
+    """
+  end
+
+  @doc """
+  Session switcher for the sidebar on session pages: the current session
+  title with a parent workspace back-row and a flat list of the
+  workspace's sessions, newest first.
+  """
   attr :org, :any, default: nil
   attr :workspace, :any, default: nil
   attr :session, :any, default: nil
   attr :current_path, :string, default: nil
 
-  def sidebar_context_switcher(assigns) do
+  def session_switcher(assigns) do
     assigns =
       assigns
-      |> assign_new(:orgs, fn ->
-        cond do
-          ControlKeel.Runtime.Mode.current() == :local ->
-            ControlKeel.Accounts.list_orgs(status: "active")
+      |> assign_new(:scope_workspace, &switcher_workspace/1)
+      |> assign_new(:scope_sessions, fn assigns ->
+        case assigns.scope_workspace do
+          %{id: id} when not is_nil(id) ->
+            ControlKeel.Mission.list_sessions_for_workspace(id)
+            |> Enum.sort_by(& &1.inserted_at, {:desc, DateTime})
 
-          user = assigns[:current_user] ->
-            ControlKeel.Accounts.list_orgs_for_user(user.id) |> Enum.map(& &1.org)
-
-          true ->
+          _ ->
             []
         end
       end)
-      |> assign_new(:workspaces_by_org, fn assigns ->
-        Map.new(assigns.orgs, fn org ->
-          {org.id, ControlKeel.Mission.list_workspaces_for_org(org.id)}
-        end)
-      end)
-      |> assign_new(:sessions_by_workspace, fn assigns ->
-        assigns.workspaces_by_org
-        |> Map.values()
-        |> List.flatten()
-        |> Map.new(fn ws ->
-          {ws.id, ControlKeel.Mission.list_sessions_for_workspace(ws.id)}
-        end)
-      end)
       |> assign(:switcher_title, switcher_title(assigns))
+      |> assign(:switcher_parent, switcher_parent(assigns))
 
     ~H"""
-    <div
-      :if={@orgs != []}
-      id="sidebar-context-switcher"
-      phx-hook="ContextSwitcher"
-      class="relative px-3"
+    <.switcher_shell
+      :if={@session != nil}
+      id="sidebar-session-switcher"
+      popover_id="sidebar-session-switcher-popover"
+      container_class="relative px-3"
+      inner_class="py-2"
+      popover_class="left-3 top-full"
+      title={@switcher_title}
+      parent={@switcher_parent}
     >
-      <button
-        type="button"
-        data-context-switcher-toggle
-        phx-click={
-          JS.toggle(to: "#sidebar-context-switcher-popover")
-          |> JS.toggle_attribute({"aria-expanded", "true", "false"})
-        }
-        aria-haspopup="menu"
-        aria-expanded="false"
-        class="flex w-full items-center gap-2.5 rounded-xl border bg-card px-2.5 py-2 text-left shadow-sm transition hover:bg-muted"
-      >
-        <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <.icon name="hero-building-office-2" class="size-4" />
-        </span>
-        <span class="min-w-0 flex-1">
-          <span class="block truncate text-sm font-semibold text-foreground">
-            {@switcher_title}
-          </span>
-        </span>
-        <.icon name="hero-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
-      </button>
-
-      <div
-        id="sidebar-context-switcher-popover"
-        data-context-switcher-popover
-        phx-click-away={JS.hide(to: "#sidebar-context-switcher-popover")}
-        class="hidden absolute left-3 top-full z-50 max-h-[28rem] w-72 overflow-y-auto rounded-xl border bg-card p-2 shadow-2xl shadow-black/50 backdrop-blur-md"
-      >
-        <%= for org <- @orgs do %>
-          <% workspaces = Map.get(@workspaces_by_org, org.id, []) %>
-          <% current_org? = @org && @org.id == org.id %>
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1">
-              <button
-                type="button"
-                phx-click={JS.toggle(to: "#switcher-org-#{org.id}-workspaces")}
-                aria-label={"Toggle workspaces for #{org.name}"}
-                class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-muted"
-              >
-                <span class="flex size-6 shrink-0 items-center justify-center rounded-md bg-info/10 text-info">
-                  <.icon name="hero-squares-2x2" class="size-3.5" />
-                </span>
-                <span class={[
-                  "min-w-0 flex-1 truncate text-sm",
-                  current_org? && "font-semibold text-primary",
-                  !current_org? && "font-medium text-foreground"
-                ]}>
-                  {org.name}
-                </span>
-                <span class="shrink-0 text-[10px] font-medium text-muted-foreground">
-                  {length(workspaces)}
-                </span>
-                <.icon name="hero-chevron-down" class="size-3.5 shrink-0 text-muted-foreground" />
-              </button>
-              <.link
-                navigate={~p"/organizations/#{org.slug}"}
-                aria-label={"Open #{org.name}"}
-                class="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-primary"
-              >
-                <.icon name="hero-arrow-right" class="size-3.5" />
-              </.link>
-            </div>
-
-            <div id={"switcher-org-#{org.id}-workspaces"} class="hidden pl-3">
-              <%= if workspaces == [] do %>
-                <p class="px-2 py-1.5 text-xs text-muted-foreground">No workspaces.</p>
-              <% else %>
-                <%= for ws <- workspaces do %>
-                  <% sessions = Map.get(@sessions_by_workspace, ws.id, []) %>
-                  <% current_ws? = @workspace && @workspace.id == ws.id %>
-                  <div class="flex items-center gap-1">
-                    <button
-                      type="button"
-                      phx-click={JS.toggle(to: "#switcher-ws-#{ws.id}-sessions")}
-                      aria-label={"Toggle sessions for #{ws.name}"}
-                      class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-muted"
-                    >
-                      <span class="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                        <.icon name="hero-rocket-launch" class="size-3.5" />
-                      </span>
-                      <span class={[
-                        "min-w-0 flex-1 truncate text-sm",
-                        current_ws? && "font-semibold text-primary",
-                        !current_ws? && "font-medium text-foreground"
-                      ]}>
-                        {ws.name}
-                      </span>
-                      <span class="shrink-0 text-[10px] font-medium text-muted-foreground">
-                        {length(sessions)}
-                      </span>
-                      <.icon
-                        name="hero-chevron-down"
-                        class="size-3.5 shrink-0 text-muted-foreground"
-                      />
-                    </button>
-                    <.link
-                      navigate={~p"/organizations/#{org.slug}/workspaces/#{ws.id}/sessions"}
-                      aria-label={"Open sessions for #{ws.name}"}
-                      class="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-primary"
-                    >
-                      <.icon name="hero-arrow-right" class="size-3.5" />
-                    </.link>
-                  </div>
-
-                  <div id={"switcher-ws-#{ws.id}-sessions"} class="hidden pl-6">
-                    <%= if sessions == [] do %>
-                      <p class="px-2 py-1.5 text-xs text-muted-foreground">No sessions.</p>
-                    <% else %>
-                      <%= for session <- sessions do %>
-                        <.link
-                          navigate={~p"/sessions/#{session.id}"}
-                          class={[
-                            "block truncate rounded-lg px-2 py-1.5 text-xs transition hover:bg-muted",
-                            @current_path == "/sessions/#{session.id}" &&
-                              "font-semibold text-primary",
-                            @current_path != "/sessions/#{session.id}" &&
-                              "text-muted-foreground hover:text-foreground"
-                          ]}
-                        >
-                          {session.title}
-                        </.link>
-                      <% end %>
-                    <% end %>
-                  </div>
-                <% end %>
-              <% end %>
-            </div>
-          </div>
+      <%= if @scope_sessions == [] do %>
+        <p class="px-2 py-1.5 text-xs text-muted-foreground">No sessions.</p>
+      <% else %>
+        <%= for s <- @scope_sessions do %>
+          <% current? = @current_path == "/sessions/#{s.id}" %>
+          <.link
+            navigate={~p"/sessions/#{s.id}"}
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition hover:bg-muted"
+          >
+            <span class="min-w-0 flex-1 truncate">{s.title}</span>
+            <.icon :if={current?} name="hero-check" class="size-4 shrink-0" />
+          </.link>
         <% end %>
+      <% end %>
+    </.switcher_shell>
+    """
+  end
+
+  # Org slug for workspace overview links, nil-safe for partial assigns.
+  defp switcher_org_slug(%{org: org}) when is_map(org), do: Map.get(org, :slug)
+  defp switcher_org_slug(_), do: nil
+
+  # Workspace in scope for the session switcher: the assigned workspace
+  # when present, otherwise the session's own workspace.
+  defp switcher_workspace(%{workspace: workspace}) when is_map(workspace), do: workspace
+
+  defp switcher_workspace(%{session: session}) when is_map(session) do
+    workspace = Map.get(session, :workspace)
+    if is_map(workspace), do: workspace, else: nil
+  end
+
+  defp switcher_workspace(_), do: nil
+
+  # Shared trigger + popover shell for the three switchers. The
+  # `ContextSwitcher` hook flies the popover out to the right when viewport
+  # space allows, otherwise it drops down below the button.
+  attr :id, :string, required: true
+  attr :popover_id, :string, required: true
+  attr :container_class, :string, required: true
+  attr :inner_class, :string, default: ""
+  attr :popover_class, :string, required: true
+  attr :title, :string, required: true
+  attr :parent, :map, default: nil
+  slot :inner_block, required: true
+
+  defp switcher_shell(assigns) do
+    ~H"""
+    <div id={@id} phx-hook="ContextSwitcher" class={@container_class}>
+      <div class={@inner_class}>
+        <.link
+          :if={@parent}
+          navigate={@parent.path}
+          aria-label={"Back to #{@parent.name}"}
+          class="text-xs cursor-pointer flex items-center gap-3 px-3 py-2.5 font-medium text-muted-foreground transition hover:bg-muted rounded-xl"
+        >
+          <.icon name="hero-arrow-left" class="size-3 shrink-0" />
+          <span class="truncate">{@parent.name}</span>
+        </.link>
+        <button
+          type="button"
+          data-context-switcher-toggle
+          phx-click={
+            JS.toggle(to: "##{@popover_id}")
+            |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+          }
+          aria-haspopup="menu"
+          aria-expanded="false"
+          class="w-full text-left text-sm cursor-pointer flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-foreground ring-border transition hover:bg-muted"
+        >
+          <.icon name="hero-building-office-2" class={sidebar_icon_class(true)} />
+          <span class="flex-1">{@title}</span>
+          <span class="inline-flex shrink-0 text-muted-foreground">
+            <.icon name="hero-chevron-up-down" class="size-4 shrink-0" />
+          </span>
+        </button>
+      </div>
+      <div
+        id={@popover_id}
+        data-context-switcher-popover
+        phx-click-away={JS.hide(to: "##{@popover_id}")}
+        class={[
+          "hidden absolute z-50 max-h-[28rem] w-72 overflow-y-auto rounded-xl border bg-card p-2 shadow-2xl shadow-black/50 backdrop-blur-md context-switcher-popover",
+          @popover_class
+        ]}
+      >
+        {render_slot(@inner_block)}
       </div>
     </div>
     """
@@ -349,6 +434,44 @@ defmodule ControlKeelWeb.Layouts do
     do: name
 
   defp switcher_title(_), do: "Organizations"
+
+  # Immediate parent scope for the trigger back-row: session scope shows
+  # the workspace, workspace scope shows the org. Returns
+  # %{name:, path:} or nil when the parent cannot be resolved.
+  defp switcher_parent(assigns) do
+    session_parent(assigns) || scope_parent(assigns)
+  end
+
+  defp session_parent(%{session: session}) when is_map(session) do
+    workspace = Map.get(session, :workspace)
+
+    if is_map(workspace) and is_binary(Map.get(workspace, :name)) and
+         Map.get(workspace, :name) != "" do
+      org = Map.get(workspace, :org)
+      slug = if is_map(org), do: Map.get(org, :slug), else: nil
+
+      if is_binary(slug) and slug != "" and not is_nil(Map.get(workspace, :id)) do
+        %{
+          name: Map.get(workspace, :name),
+          path: "/organizations/#{slug}/workspaces/#{Map.get(workspace, :id)}"
+        }
+      end
+    end
+  end
+
+  defp session_parent(_), do: nil
+
+  defp scope_parent(%{workspace: workspace, org: org})
+       when is_map(workspace) and is_map(org) do
+    name = Map.get(org, :name)
+    slug = Map.get(org, :slug)
+
+    if is_binary(name) and name != "" and is_binary(slug) and slug != "" do
+      %{name: name, path: "/organizations/#{slug}"}
+    end
+  end
+
+  defp scope_parent(_), do: nil
 
   # Session pages (/sessions/:id*) set :session; MissionControl also sets
   # :workspace and :org for the context switcher, so the session branch must
