@@ -29,7 +29,6 @@ defmodule ControlKeelWeb.Layouts do
   attr :session, :any, default: nil
   attr :can_manage, :any, default: nil
   attr :local_mode, :boolean, default: false
-  attr :active_tab, :atom, default: nil
 
   def sidebar(assigns) do
     assigns = assign_new(assigns, :mode, fn -> ControlKeel.Runtime.Mode.current() end)
@@ -62,9 +61,9 @@ defmodule ControlKeelWeb.Layouts do
       >
         <%= for item <- sidebar_nav_items(assigns) do %>
           <% active =
-            if Map.has_key?(item, :active),
-              do: item.active,
-              else: nav_active?(@current_path, item[:href], Map.get(item, :exact, false)) %>
+            if item[:href],
+              do: nav_active?(@current_path, item.href, Map.get(item, :exact, false)),
+              else: false %>
           <% label_id = Phoenix.Naming.underscore(item.label) %>
           <%= cond do %>
             <% item[:children] -> %>
@@ -518,12 +517,6 @@ defmodule ControlKeelWeb.Layouts do
           exact: true
         },
         %{
-          label: "Sessions",
-          href: ~p"/organizations/#{slug}/workspaces/#{workspace.id}/sessions",
-          icon: "hero-rocket-launch",
-          exact: true
-        },
-        %{
           label: "Settings",
           href: ~p"/organizations/#{slug}/workspaces/#{workspace.id}/settings",
           icon: "hero-cog-6-tooth",
@@ -537,47 +530,15 @@ defmodule ControlKeelWeb.Layouts do
     end
   end
 
-  defp org_nav_items(org, assigns) do
-    tab = assigns[:active_tab] || :overview
-    overview_href = ~p"/organizations/#{org.slug}"
-
-    items = [
+  defp org_nav_items(org, _assigns) do
+    [
       %{
         label: "Overview",
-        href: overview_href,
-        icon: "hero-home",
-        exact: true,
-        active: tab == :overview and assigns[:current_path] == overview_href
-      },
-      %{
-        label: "Workspaces",
-        href: ~p"/organizations/#{org.slug}/workspaces",
+        href: ~p"/organizations/#{org.slug}",
         icon: "hero-squares-2x2",
-        exact: true,
-        active: tab == :workspaces
-      },
-      %{
-        label: "Members",
-        href: ~p"/organizations/#{org.slug}/members",
-        icon: "hero-users",
-        exact: true,
-        active: tab == :members
+        exact: true
       }
     ]
-
-    if assigns[:can_manage] || assigns[:local_mode] do
-      items ++
-        [
-          %{
-            label: "Settings",
-            href: ~p"/organizations/#{org.slug}/settings",
-            icon: "hero-cog-6-tooth",
-            exact: true
-          }
-        ]
-    else
-      items
-    end
   end
 
   defp nav_items do

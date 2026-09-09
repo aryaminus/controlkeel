@@ -90,15 +90,6 @@ defmodule ControlKeelWeb.Router do
 
     # Cloud-auth gated: in cloud/self_hosted mode requires active membership.
     # In local mode the on_mount hook is a passthrough.
-    live_session :home,
-      layout: {ControlKeelWeb.Layouts, :public},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.LayoutDefaults
-      ] do
-      live "/home", HomeLive, :index
-    end
-
     live_session :cloud_auth,
       layout: {ControlKeelWeb.Layouts, :dashboard},
       on_mount: [
@@ -136,11 +127,7 @@ defmodule ControlKeelWeb.Router do
         ControlKeelWeb.LayoutDefaults
       ] do
       live "/organizations/:slug", OrganizationDetailLive, :index
-      live "/organizations/:slug/workspaces", OrganizationWorkspacesLive, :index
-      live "/organizations/:slug/members", OrganizationMembersLive, :index
-      live "/organizations/:slug/settings", OrganizationSettingsLive, :show
       live "/organizations/:slug/workspaces/:id", WorkspaceDetailLive, :index
-      live "/organizations/:slug/workspaces/:id/sessions", WorkspaceSessionsLive, :index
       live "/organizations/:slug/workspaces/:id/settings", WorkspaceSettingsLive, :show
     end
 

@@ -48,45 +48,23 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
   end
 
   describe "local mode" do
-    test "renders workspace default information without the sessions table" do
+    test "renders workspace default information and its sessions" do
       {:ok, org} = Accounts.create_org(%{name: "Wslocal", slug: "wslocal"})
       ws = create_workspace(%{name: "Core", slug: "core", industry: "web", org_id: org.id})
 
-      create_session!(ws.id, %{title: "First session"})
-      create_session!(ws.id, %{title: "Second session"})
+      s1 = create_session!(ws.id, %{title: "First session"})
+      s2 = create_session!(ws.id, %{title: "Second session"})
 
-      {:ok, view, html} = live(build_conn(), ~p"/organizations/#{org.slug}/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/organizations/#{org.slug}/workspaces/#{ws.id}")
 
       assert html =~ "Core"
       assert html =~ "core"
       # Meta line presents workspace facts inline, not as stat columns.
+      assert html =~ "2 total"
       assert html =~ "No monthly budget"
-      # Sessions moved to the dedicated sessions page. Scope to main content:
-      # the sidebar context switcher legitimately lists session titles.
-      main = view |> element("main") |> render()
-      refute main =~ "First session"
-      refute main =~ "2 total"
-    end
-
-    test "sessions page lists the workspace sessions with a scoped sidebar" do
-      {:ok, org} = Accounts.create_org(%{name: "WsSess", slug: "wssess"})
-      ws = create_workspace(%{name: "Core", slug: "core", industry: "web", org_id: org.id})
-
-      create_session!(ws.id, %{title: "First session"})
-      create_session!(ws.id, %{title: "Second session"})
-
-      {:ok, view, html} =
-        live(build_conn(), ~p"/organizations/#{org.slug}/workspaces/#{ws.id}/sessions")
-
+      # Session rows render in the sessions-style table.
       assert html =~ "First session"
       assert html =~ "Second session"
-      assert html =~ "2 total"
-
-      sidebar = view |> element("#sidebar-nav") |> render()
-      assert sidebar =~ ~s(href="/organizations/#{org.slug}/workspaces/#{ws.id}/sessions")
-      assert sidebar =~ "Overview"
-      assert sidebar =~ "Settings"
-      refute sidebar =~ "Policy Studio"
     end
 
     test "renders applied policy sets with rules revealed on hover markup", %{} do
@@ -139,12 +117,11 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert html =~ ", disabled"
     end
 
-    test "shows an empty state on the sessions page when the workspace has none" do
+    test "shows an empty state when the workspace has no sessions" do
       {:ok, org} = Accounts.create_org(%{name: "Empty Org", slug: "empty-org"})
       ws = create_workspace(%{name: "Empty", slug: "empty", industry: "web", org_id: org.id})
 
-      {:ok, _view, html} =
-        live(build_conn(), ~p"/organizations/empty-org/workspaces/#{ws.id}/sessions")
+      {:ok, _view, html} = live(build_conn(), ~p"/organizations/empty-org/workspaces/#{ws.id}")
 
       assert html =~ "No sessions yet."
     end
