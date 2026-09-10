@@ -452,7 +452,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
           Workspaces
         </.link>
         <.link
-          patch={~p"/organizations/#{@org.slug}?tab=members"}
+          patch={~p"/#{@org.slug}?tab=members"}
           class={tab_class(@active_tab == :members)}
         >
           Members

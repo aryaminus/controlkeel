@@ -269,7 +269,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "non-admin members are redirected from settings", %{member: member} do
-      assert {:error, {:redirect, %{to: "/setco"}}} =
+      assert {:error, {:live_redirect, %{to: "/setco"}}} =
                live(conn_for(member), ~p"/setco/settings")
     end
   end
@@ -326,7 +326,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert render(view) =~ "core-workspace"
 
       view
-      |> element("a[data-phx-link=\"patch\"][href=\"/organizations/tabco?tab=members\"]")
+      |> element("a[data-phx-link=\"patch\"][href=\"/tabco?tab=members\"]")
       |> render_click()
 
       html = render(view)

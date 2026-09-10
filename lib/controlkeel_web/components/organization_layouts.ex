@@ -5,7 +5,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   use ControlKeelWeb, :html
 
-  import ControlKeelWeb.Layouts, only: [dashboard_header: 1, flash_group: 1, user_menu: 1]
+  import ControlKeelWeb.Layouts, only: [flash_group: 1, user_menu: 1]
 
   embed_templates "organization_layouts/*"
 
@@ -25,21 +25,17 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       id="app-sidebar"
       class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
     >
-      <.link navigate={~p"/dashboard"} class="flex items-center gap-3 px-3 pt-3 pb-2">
+      <div class="flex items-center gap-3 p-3">
         <span class="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
           <.icon name="hero-bolt-solid" class="size-5" />
         </span>
-        <span class="block text-sm font-semibold tracking-wide text-foreground">ControlKeel</span>
-      </.link>
-
-      <nav id="sidebar-org-nav" class="mt-2 flex flex-1 flex-col gap-1 px-3 text-sm">
-        <div class="flex items-center gap-3 px-3 py-4 text-foreground">
-          <.icon name="hero-building-office-2" class={organization_nav_icon_class(true)} />
-          <span class="min-w-0 truncate text-sm text-foreground">
-            {@nav_org.name}
-          </span>
+        <div class="flex flex-col gap-0.5">
+          <span class="block text-sm font-semibold tracking-wide text-foreground">ControlKeel</span>
+          <span class="block text-xs font-medium text-muted-foreground">{@nav_org.name}</span>
         </div>
+      </div>
 
+      <nav id="sidebar-org-nav" class="mt-4 flex flex-1 flex-col gap-1 px-3 text-sm">
         <%= for item <- @nav_items do %>
           <% active = organization_nav_active?(@current_path, @current_query, item) %>
           <.link
@@ -80,6 +76,152 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       </div>
     </aside>
     """
+  end
+
+  attr :current_path, :string, default: nil
+  attr :page_action, :any, default: nil
+
+  attr :breadcrumbs, :list,
+    default: nil,
+    doc: """
+    Explicit crumbs (`%{label: ..., to: ...}`, `to: nil` renders plain text).
+    Overrides the path-derived trail — use when path segments are opaque ids
+    or have no route.
+    """
+
+  def breadcrumbs_header(assigns) do
+    actions =
+      cond do
+        is_nil(assigns.page_action) -> []
+        is_list(assigns.page_action) -> assigns.page_action
+        true -> [assigns.page_action]
+      end
+
+    assigns =
+      assigns
+      |> assign(:actions, actions)
+      |> assign(:trail, breadcrumb_items(assigns))
+
+    ~H"""
+    <div class="flex w-full items-center justify-between border-b p-4">
+      <nav :if={@current_path && @current_path != "/"} aria-label="Breadcrumb">
+        <ol class="flex items-center gap-1.5 text-sm">
+          <%= for {{label, path}, idx} <- Enum.with_index(@trail) do %>
+            <li class="flex items-center gap-1.5">
+              <.icon :if={idx > 0} name="hero-chevron-right" class="size-3 text-muted-foreground" />
+              <%= if path do %>
+                <.link
+                  navigate={path}
+                  class="text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+                >
+                  {label}
+                </.link>
+              <% else %>
+                <span class="font-medium text-muted-foreground">{label}</span>
+              <% end %>
+            </li>
+          <% end %>
+        </ol>
+      </nav>
+      <div :if={@actions != []} class="flex items-center gap-2" id="dashboard-page-action">
+        <%= for action <- @actions do %>
+          <a
+            :if={action[:to]}
+            href={action.to}
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+          >
+            <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
+          </a>
+
+          <button
+            :if={action[:form]}
+            type="submit"
+            form={action.form}
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+          >
+            <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
+          </button>
+
+          <button
+            :if={action[:event]}
+            type="button"
+            phx-click={action.event}
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+          >
+            <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
+          </button>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  def breadcums_header(assigns), do: breadcrumbs_header(assigns)
+
+  @label_map %{
+    "dashboard" => "Dashboard",
+    "sessions" => "Sessions",
+    "findings" => "Findings",
+    "benchmarks" => "Benchmarks",
+    "proofs" => "Proofs",
+    "reviews" => "Reviews",
+    "organizations" => "Organizations",
+    "workspaces" => "Workspaces",
+    "policies" => "Policy Studio",
+    "skills" => "Skills",
+    "cloud" => "Cloud",
+    "observability" => "Observability",
+    "repos" => "Repos",
+    "service-accounts" => "Service Accounts",
+    "webhooks" => "Webhooks",
+    "tool-policy" => "Tool Policy",
+    "start" => "New Session",
+    "runs" => "Runs",
+    "telemetry" => "Telemetry",
+    "projects" => "Projects",
+    "settings" => "Settings"
+  }
+
+  defp breadcrumb_items(%{breadcrumbs: [_ | _] = crumbs}) do
+    Enum.map(crumbs, fn
+      %{label: label, to: to} -> {label, to}
+      %{label: label} -> {label, nil}
+    end)
+  end
+
+  defp breadcrumb_items(assigns) do
+    Enum.map(breadcrumb_trail(assigns.current_path), fn
+      {label, _path, true} -> {label, nil}
+      {label, path, false} -> {label, path}
+    end)
+  end
+
+  defp breadcrumb_trail(nil), do: []
+
+  defp breadcrumb_trail(current_path) do
+    segments = String.split(current_path, "/", trim: true)
+
+    segments
+    |> Enum.with_index()
+    |> Enum.map(fn {segment, idx} ->
+      path = "/" <> Enum.join(Enum.take(segments, idx + 1), "/")
+      label = Map.get(@label_map, segment, segment_name(segment))
+      is_final = idx == length(segments) - 1
+      {label, path, is_final}
+    end)
+  end
+
+  defp segment_name(segment) do
+    segment
+    |> String.replace("-", " ")
+    |> title_case()
+  end
+
+  defp title_case(string) do
+    string
+    |> String.split(" ")
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join(" ")
   end
 
   defp organization_nav_items(org) do
