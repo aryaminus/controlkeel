@@ -1,0 +1,24 @@
+<div class="h-screen flex overflow-hidden">
+  <.organization_sidebar
+    current_user={@current_user}
+    current_path={@current_path}
+    current_query={@current_query}
+    nav_org={@nav_org}
+  />
+
+  <div class="flex flex-1 flex-col overflow-hidden">
+    <.dashboard_header
+      current_path={@current_path}
+      page_action={@page_action}
+      breadcrumbs={@breadcrumbs}
+    />
+
+    <main class="flex-1 overflow-y-auto">
+      <div class="px-4 pt-6 pb-12 sm:px-8 lg:px-8 container mx-auto">
+        {@inner_content}
+      </div>
+    </main>
+  </div>
+</div>
+
+<.flash_group flash={@flash} />

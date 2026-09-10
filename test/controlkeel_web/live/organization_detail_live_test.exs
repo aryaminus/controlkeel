@@ -237,27 +237,16 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, org: org, owner: owner, admin: admin, member: member}
     end
 
-    test "settings action appears in the dashboard header and opens the modal", %{owner: owner} do
-      {:ok, view, html} = live(conn_for(owner), ~p"/organizations/setco?tab=members")
+    test "settings page renders at the organization settings route", %{owner: owner} do
+      {:ok, _view, html} = live(conn_for(owner), ~p"/organizations/setco/settings")
 
+      assert html =~ "Organization Settings"
+      assert html =~ "Organization name"
       refute html =~ "org-settings-modal"
-      assert render(view) =~ ~s(id="dashboard-page-action")
-      assert render(view) =~ "phx-click=\"open_settings\""
-
-      view |> render_click("open_settings")
-      assert render(view) =~ "org-settings-modal"
-      assert render(view) =~ "Organization name"
     end
 
-    test "owner opens the modal and saves the org name", %{org: org, owner: owner} do
-      {:ok, view, html} = live(conn_for(owner), ~p"/organizations/setco?tab=members")
-
-      # Modal is absent until opened.
-      refute html =~ "org-settings-modal"
-
-      view |> render_click("open_settings")
-      assert render(view) =~ "org-settings-modal"
-      assert render(view) =~ "Organization name"
+    test "owner saves the org name from the settings page", %{org: org, owner: owner} do
+      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/setco/settings")
 
       view
       |> element("#org-settings-form")
@@ -269,41 +258,19 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert Accounts.get_org(org.id).name == "Setco Renamed"
     end
 
-    test "admin can open the modal but status and budget are owner-locked", %{admin: admin} do
-      {:ok, view, _html} = live(conn_for(admin), ~p"/organizations/setco?tab=members")
+    test "admin can view settings but status and budget are owner-locked", %{admin: admin} do
+      {:ok, view, html} = live(conn_for(admin), ~p"/organizations/setco/settings")
 
-      view |> render_click("open_settings")
+      assert html =~ "Organization Settings"
       html = render(view)
 
-      assert html =~ "org-settings-modal"
       assert html =~ "Only owners can change status."
       assert html =~ "Only owners can change budget."
     end
 
-    test "non-admin members do not see the settings button", %{member: member} do
-      {:ok, _view, html} = live(conn_for(member), ~p"/organizations/setco?tab=members")
-
-      refute html =~ "open_settings"
-    end
-
-    test "non-admin member cannot save settings via a forged event", %{
-      org: org,
-      member: member
-    } do
-      # Members can mount the org detail LiveView; the button is hidden, but the
-      # server must still reject a forged `save_settings` event so they cannot
-      # rename the org or touch owner-only fields.
-      {:ok, view, _html} = live(conn_for(member), ~p"/organizations/setco?tab=members")
-
-      view
-      |> render_click("save_settings", %{
-        "settings" => %{"name" => "Hacked", "status" => "disabled", "budget_cents" => "999"}
-      })
-
-      refute render(view) =~ "Settings saved."
-      reloaded = Accounts.get_org(org.id)
-      assert reloaded.name == "Setco"
-      assert reloaded.status == "active"
+    test "non-admin members are redirected from settings", %{member: member} do
+      assert {:error, {:redirect, %{to: "/organizations/setco"}}} =
+               live(conn_for(member), ~p"/organizations/setco/settings")
     end
   end
 
@@ -359,7 +326,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert render(view) =~ "core-workspace"
 
       view
-      |> element("a[href=\"/organizations/tabco?tab=members\"]")
+      |> element("a[data-phx-link=\"patch\"][href=\"/organizations/tabco?tab=members\"]")
       |> render_click()
 
       html = render(view)
@@ -370,6 +337,15 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     test "unknown tab value falls back to workspaces", %{owner: owner} do
       {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/tabco?tab=wat")
       assert render(view) =~ "core-workspace"
+    end
+
+    test "sidebar renders the org nav on the org page", %{owner: owner} do
+      {:ok, _view, html} = live(conn_for(owner), ~p"/organizations/tabco")
+
+      assert html =~ "sidebar-org-nav"
+      assert html =~ "Tabco"
+      refute html =~ ~s(href="/organizations/tabco?tab=sessions")
+      assert html =~ ~s(href="/organizations/tabco/settings")
     end
   end
 
