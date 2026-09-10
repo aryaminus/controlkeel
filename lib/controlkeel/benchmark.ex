@@ -1454,9 +1454,9 @@ defmodule ControlKeel.Benchmark do
 
   defp count_by(values, mapper) do
     values
-    |> Enum.group_by(mapper)
-    |> Enum.reject(fn {key, _rows} -> is_nil(key) end)
-    |> Enum.into(%{}, fn {key, rows} -> {key, length(rows)} end)
+    # ⚡ Bolt: Use Enum.frequencies_by/2 + Map.delete/2 instead of Enum.group_by/2 + Enum.reject/2 + Enum.into/2 to reduce intermediate allocations
+    |> Enum.frequencies_by(mapper)
+    |> Map.delete(nil)
   end
 
   defp maybe_channel(channels, true, channel), do: [channel | channels]

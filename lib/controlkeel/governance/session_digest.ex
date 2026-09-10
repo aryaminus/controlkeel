@@ -138,8 +138,8 @@ defmodule ControlKeel.Governance.SessionDigest do
 
   defp count_by_field(records, field) do
     records
-    |> Enum.group_by(&Map.get(&1, field))
-    |> Enum.map(fn {k, v} -> {k, length(v)} end)
+    # ⚡ Bolt: Use Enum.frequencies_by/2 instead of Enum.group_by/2 + Enum.map/2 to reduce intermediate allocations
+    |> Enum.frequencies_by(&Map.get(&1, field))
     |> Enum.sort_by(fn {_k, v} -> v end, :desc)
     |> Enum.take(5)
     |> Map.new()
