@@ -344,8 +344,18 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
 
       assert html =~ "sidebar-org-nav"
       assert html =~ "Tabco"
-      refute html =~ ~s(href="/organizations/tabco?tab=sessions")
+      refute html =~ ~s(href="/tabco?tab=sessions")
       assert html =~ ~s(href="/tabco/settings")
+    end
+
+    test "sidebar renders organization switcher with user's orgs in cloud mode", %{owner: owner} do
+      {:ok, _other_org} = Accounts.create_org_with_owner(owner.id, %{name: "Second Org", slug: "second-org"})
+      {:ok, _view, html} = live(conn_for(owner), ~p"/tabco")
+
+      assert html =~ "sidebar-org-switcher"
+      assert html =~ ~s(href="/tabco")
+      assert html =~ ~s(href="/second-org")
+      assert html =~ ~s(href="/organizations")
     end
   end
 

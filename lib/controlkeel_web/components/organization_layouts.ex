@@ -7,6 +7,8 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   import ControlKeelWeb.Layouts, only: [flash_group: 1, user_menu: 1]
 
+  alias ControlKeel.Accounts
+
   embed_templates "organization_layouts/*"
 
   attr :current_user, :any, default: nil
@@ -15,24 +17,137 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :nav_org, :map, required: true
 
   def organization_sidebar(assigns) do
+    mode = ControlKeel.Runtime.Mode.current()
+
     assigns =
       assigns
-      |> assign_new(:mode, fn -> ControlKeel.Runtime.Mode.current() end)
+      |> assign_new(:mode, fn -> mode end)
       |> assign(:nav_items, organization_nav_items(assigns.nav_org))
+      |> assign_new(:user_orgs, fn ->
+        case assigns[:current_user] do
+          %{id: user_id} when is_integer(user_id) and mode != :local ->
+            orgs =
+              Accounts.list_orgs_for_user(user_id)
+              |> Enum.map(& &1.org)
+
+            if assigns[:nav_org] && not Enum.any?(orgs, &(&1.id == assigns.nav_org.id)) do
+              [assigns.nav_org | orgs]
+            else
+              orgs
+            end
+
+          _ ->
+            if assigns[:nav_org], do: [assigns.nav_org], else: []
+        end
+      end)
 
     ~H"""
     <aside
       id="app-sidebar"
       class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
     >
-      <div class="flex items-center gap-3 p-3">
-        <span class="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-          <.icon name="hero-bolt-solid" class="size-5" />
-        </span>
-        <div class="flex flex-col gap-0.5">
-          <span class="block text-sm font-semibold tracking-wide text-foreground">ControlKeel</span>
-          <span class="block text-xs font-medium text-muted-foreground">{@nav_org.name}</span>
-        </div>
+      <div class="p-3">
+        <%= if @current_user != nil and @mode != :local do %>
+          <div class="relative" id="sidebar-org-switcher">
+            <div class="flex w-full items-center justify-between rounded-xl p-1.5">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                  <.icon name="hero-bolt-solid" class="size-5" />
+                </span>
+                <div class="flex flex-col gap-0.5 min-w-0">
+                  <span class="block text-sm font-semibold tracking-wide text-foreground">
+                    ControlKeel
+                  </span>
+                  <span class="block text-xs font-medium text-muted-foreground truncate">
+                    {@nav_org.name}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                id="org-switcher-button"
+                phx-click={
+                  JS.toggle(to: "#sidebar-org-switcher-popover")
+                  |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+                }
+                aria-haspopup="menu"
+                aria-expanded="false"
+                aria-label="Switch organization"
+                class="group rounded-lg p-1 transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <.icon
+                  name="hero-chevron-up-down"
+                  class="size-6 shrink-0 text-muted-foreground transition group-hover:text-foreground"
+                />
+              </button>
+            </div>
+
+            <div
+              id="sidebar-org-switcher-popover"
+              phx-click-away={
+                JS.hide(to: "#sidebar-org-switcher-popover")
+                |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+              }
+              class="hidden absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
+            >
+              <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
+                Organizations
+              </div>
+              <div class="max-h-60 overflow-y-auto space-y-0.5">
+                <%= for org <- @user_orgs do %>
+                  <% active = org.id == @nav_org.id %>
+                  <.link
+                    navigate={~p"/#{org.slug}"}
+                    phx-click={
+                      JS.hide(to: "#sidebar-org-switcher-popover")
+                      |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+                    }
+                    class={[
+                      "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
+                      active && "bg-muted font-medium text-foreground",
+                      !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    ]}
+                  >
+                    <div class="flex items-center gap-2 min-w-0">
+                      <.icon
+                        name="hero-building-office-2"
+                        class="size-4 shrink-0 text-muted-foreground"
+                      />
+                      <span class="truncate">{org.name}</span>
+                    </div>
+                    <.icon :if={active} name="hero-check" class="size-4 shrink-0 text-primary" />
+                  </.link>
+                <% end %>
+              </div>
+
+              <div class="my-1 border-t"></div>
+
+              <.link
+                navigate={~p"/organizations"}
+                phx-click={
+                  JS.hide(to: "#sidebar-org-switcher-popover")
+                  |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+                }
+                class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <.icon name="hero-squares-2x2" class="size-3.5" /> All organizations
+              </.link>
+            </div>
+          </div>
+        <% else %>
+          <div class="flex items-center gap-3 p-1.5">
+            <span class="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+              <.icon name="hero-bolt-solid" class="size-5" />
+            </span>
+            <div class="flex flex-col gap-0.5">
+              <span class="block text-sm font-semibold tracking-wide text-foreground">
+                ControlKeel
+              </span>
+              <span class="block text-xs font-medium text-muted-foreground">{@nav_org.name}</span>
+            </div>
+          </div>
+        <% end %>
       </div>
 
       <nav id="sidebar-org-nav" class="mt-4 flex flex-1 flex-col gap-1 px-3 text-sm">
@@ -48,7 +163,10 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         <% end %>
       </nav>
 
-      <div class="flex flex-col justify-end border-t mt-2 px-3 py-2">
+      <div
+        :if={@mode == :local or @current_user == nil}
+        class="flex flex-col justify-end border-t mt-2 px-3 py-2"
+      >
         <a
           href={~p"/getting-started"}
           target="_blank"
@@ -65,15 +183,15 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         >
           <.icon name="hero-code-bracket" class="size-4" /> GitHub
         </a>
-
-        <.user_menu
-          :if={@current_user != nil and @mode != :local}
-          id="sidebar-user-menu"
-          current_user={@current_user}
-          class="mt-3 border-t pt-3"
-          popover_class="bottom-20 right-4"
-        />
       </div>
+
+      <.user_menu
+        :if={@current_user != nil and @mode != :local}
+        id="sidebar-user-menu"
+        current_user={@current_user}
+        class="border-t p-3"
+        popover_class="bottom-20 right-4"
+      />
     </aside>
     """
   end
