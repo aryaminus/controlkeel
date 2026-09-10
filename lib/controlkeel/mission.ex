@@ -106,8 +106,19 @@ defmodule ControlKeel.Mission do
   def list_workspaces_for_org(org_id),
     do: Repo.all(from w in Workspace, where: w.org_id == ^org_id)
 
+  def list_workspaces_for_orgs(org_ids) when is_list(org_ids),
+    do: Repo.all(from w in Workspace, where: w.org_id in ^org_ids, order_by: w.name)
+
   def list_sessions_for_workspace(workspace_id),
     do: Repo.all(from s in Session, where: s.workspace_id == ^workspace_id)
+
+  def list_sessions_for_workspaces(workspace_ids) when is_list(workspace_ids),
+    do:
+      Repo.all(
+        from s in Session,
+          where: s.workspace_id in ^workspace_ids,
+          order_by: [desc: s.inserted_at]
+      )
 
   @doc """
   Returns true when a session (mission) already uses `name` as its title,

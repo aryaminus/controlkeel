@@ -38,7 +38,7 @@ defmodule ControlKeelWeb.Plugs.BrowserAuthPlugsTest do
       |> Map.put(:request_path, "/auth/login")
       |> RequireCloudMode.call([])
 
-    assert redirected_to(conn, 302) == "/dashboard"
+    assert redirected_to(conn, 302) == "/"
     assert conn.halted
   end
 
@@ -83,7 +83,7 @@ defmodule ControlKeelWeb.Plugs.BrowserAuthPlugsTest do
       |> Phoenix.Controller.fetch_flash()
       |> RequireCloudMode.call([])
 
-    assert redirected_to(conn, 302) == "/dashboard"
+    assert redirected_to(conn, 302) == "/"
     assert conn.halted
 
     assert get_session(conn, "phoenix_flash")["info"] ==

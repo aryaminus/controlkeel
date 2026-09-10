@@ -81,7 +81,7 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
         |> init_test_session(%{oauth_provider: "github", oauth_session_params: %{}})
         |> get("/auth/github/callback", %{"code" => "good"})
 
-      assert redirected_to(conn, 302) == "/dashboard"
+      assert redirected_to(conn, 302) == "/"
       assert get_session(conn, "phoenix_flash")["info"] == "Signed in with GitHub."
       assert Accounts.get_user_by_email("user@example.com")
       assert get_session(conn, :current_user_id)

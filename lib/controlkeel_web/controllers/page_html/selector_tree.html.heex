@@ -1,0 +1,152 @@
+<section class="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-16 space-y-4">
+  <.page_title title="Select organization workspace and sessions" />
+
+  <%= if @tree == [] do %>
+    <section class="rounded-2xl border bg-card p-12 text-center shadow-card">
+      <.icon name="hero-building-office-2" class="mx-auto size-10 text-muted-foreground" />
+      <p class="mt-4 text-base font-medium text-foreground">No organizations yet.</p>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Create an organization to group workspaces, members, and budgets.
+      </p>
+      <div class="mt-6 flex items-center justify-center gap-3">
+        <.link
+          navigate={~p"/organizations"}
+          class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90"
+        >
+          <.icon name="hero-plus" class="size-4" /> Create organization
+        </.link>
+        <.link
+          navigate={~p"/sessions/start"}
+          class="inline-flex items-center gap-2 rounded-full border bg-muted px-5 py-2 text-sm font-semibold transition hover:border-primary/40 hover:bg-accent"
+        >
+          <.icon name="hero-rocket-launch" class="size-4" /> Start a session
+        </.link>
+      </div>
+    </section>
+  <% else %>
+    <div class="flex flex-col gap-4">
+      <%= for node <- @tree do %>
+        <% session_count = Enum.sum(Enum.map(node.workspaces, &length(&1.sessions))) %>
+        <details
+          open
+          id={"home-org-#{node.org.id}"}
+          class="group rounded-2xl border bg-card shadow-card"
+        >
+          <summary class="flex cursor-pointer list-none items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <.icon name="hero-building-office-2" class="size-4" />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-base font-semibold text-foreground">
+                <.link
+                  navigate={~p"/organizations/#{node.org.slug}"}
+                  class="rounded-sm transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {node.org.name}
+                </.link>
+              </span>
+            </span>
+            <span class="hidden shrink-0 text-xs text-muted-foreground sm:block">
+              {length(node.workspaces)}
+              {(length(node.workspaces) == 1 && "workspace") || "workspaces"} · {session_count} {(session_count ==
+                                                                                                    1 &&
+                                                                                                    "session") ||
+                "sessions"}
+            </span>
+            <span class={[
+              "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+              node.org.status == "active" && "bg-success/10 text-success ring-success/20",
+              node.org.status != "active" && "bg-muted text-muted-foreground ring-border"
+            ]}>
+              {node.org.status}
+            </span>
+            <.icon
+              name="hero-chevron-right"
+              class="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
+            />
+          </summary>
+
+          <div class="border-t px-5 py-4">
+            <%= if node.workspaces == [] do %>
+              <p class="px-1 text-sm text-muted-foreground">No workspaces yet.</p>
+            <% else %>
+              <div class="ml-2 flex flex-col gap-3 border-l border-border pl-4 sm:ml-4 sm:pl-6">
+                <%= for ws_node <- node.workspaces do %>
+                  <details
+                    id={"home-workspace-#{ws_node.workspace.id}"}
+                    class="group/ws rounded-xl border bg-background/40"
+                  >
+                    <summary class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                      <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <.icon name="hero-squares-2x2" class="size-4" />
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-semibold text-foreground">
+                          <.link
+                            navigate={
+                              ~p"/organizations/#{node.org.slug}/workspaces/#{ws_node.workspace.id}"
+                            }
+                            class="rounded-sm transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            {ws_node.workspace.name}
+                          </.link>
+                        </span>
+                      </span>
+                      <span class="hidden shrink-0 text-xs text-muted-foreground sm:block">
+                        {length(ws_node.sessions)}
+                        {(length(ws_node.sessions) == 1 && "session") || "sessions"}
+                      </span>
+                      <span class={[
+                        "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+                        ws_node.workspace.status == "active" &&
+                          "bg-success/10 text-success ring-success/20",
+                        ws_node.workspace.status != "active" &&
+                          "bg-muted text-muted-foreground ring-border"
+                      ]}>
+                        {ws_node.workspace.status}
+                      </span>
+                      <.icon
+                        name="hero-chevron-right"
+                        class="size-3.5 shrink-0 text-muted-foreground transition-transform group-open/ws:rotate-90"
+                      />
+                    </summary>
+
+                    <div class="border-t px-3 py-2">
+                      <%= if ws_node.sessions == [] do %>
+                        <p class="px-2 py-2 text-sm text-muted-foreground">No sessions yet.</p>
+                      <% else %>
+                        <%= for session <- ws_node.sessions do %>
+                          <.link
+                            navigate={~p"/sessions/#{session.id}"}
+                            class="group/session flex items-center gap-2.5 rounded-lg px-2 py-2 transition hover:bg-muted"
+                          >
+                            <.icon
+                              name="hero-rocket-launch"
+                              class="size-3.5 shrink-0 text-muted-foreground/70 group-hover/session:text-primary"
+                            />
+                            <span class="min-w-0 flex-1 truncate text-sm text-foreground/90">
+                              {session.title}
+                            </span>
+                            <span class={[
+                              "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+                              session.status == "active" &&
+                                "bg-success/10 text-success ring-success/20",
+                              session.status != "active" &&
+                                "bg-muted text-muted-foreground ring-border"
+                            ]}>
+                              {session.status}
+                            </span>
+                          </.link>
+                        <% end %>
+                      <% end %>
+                    </div>
+                  </details>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
+    </div>
+  <% end %>
+</section>
