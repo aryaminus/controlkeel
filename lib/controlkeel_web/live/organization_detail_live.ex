@@ -1,6 +1,6 @@
 defmodule ControlKeelWeb.OrganizationDetailLive do
   @moduledoc """
-  Member management for an org at `/organizations/:slug`.
+  Member management for an org at `/:org_slug`.
 
   Admin+owner only. Allows:
     - List active and pending memberships (preloaded with the user)
@@ -29,7 +29,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   @valid_roles ~w(owner admin member viewer)
 
   @impl true
-  def mount(%{"slug" => slug}, _session, socket) do
+  def mount(%{"org_slug" => slug}, _session, socket) do
     case Accounts.get_org_by_slug(slug) do
       nil ->
         {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
@@ -446,7 +446,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
       <div class="flex border-b border-border">
         <.link
-          patch={~p"/organizations/#{@org.slug}"}
+          patch={~p"/#{@org.slug}"}
           class={tab_class(@active_tab == :workspaces)}
         >
           Workspaces
@@ -992,9 +992,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
       {"Finance", "finance"}
     ]
   end
-
-  defp org_tab_path(slug, :workspaces), do: ~p"/organizations/#{slug}"
-  defp org_tab_path(slug, tab), do: ~p"/organizations/#{slug}?tab=#{tab}"
 
   defp normalize_tab(tab) when tab in ["members"], do: :members
   defp normalize_tab(_tab), do: :workspaces

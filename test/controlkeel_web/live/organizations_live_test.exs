@@ -109,7 +109,7 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
 
       assert html =~ "Mine"
       refute html =~ "Theirs"
-      assert html =~ ~p"/organizations/#{org.slug}"
+      assert html =~ ~p"/#{org.slug}"
     end
 
     test "cloud mode renders the user's role per org row", %{conn: conn, user: user} do

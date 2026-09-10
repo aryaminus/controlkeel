@@ -43,7 +43,7 @@ defmodule ControlKeelWeb.PageControllerTest do
     test "redirects to the default organization page", %{conn: conn} do
       conn = get(conn, ~p"/")
 
-      assert redirected_to(conn) == ~p"/organizations/#{LocalDefaults.default_org_slug()}"
+      assert redirected_to(conn) == ~p"/#{LocalDefaults.default_org_slug()}"
     end
 
     test "provisions the default org on first visit", %{conn: conn} do
@@ -107,7 +107,7 @@ defmodule ControlKeelWeb.PageControllerTest do
       assert body =~ "Acme Corp"
       assert body =~ "Platform"
       assert body =~ "Launch checklist"
-      assert body =~ ~p"/organizations/#{org.slug}"
+      assert body =~ ~p"/#{org.slug}"
       assert body =~ ~p"/organizations/#{org.slug}/workspaces/#{workspace.id}"
       assert body =~ ~p"/sessions/#{session.id}"
       refute body =~ "Turn team knowledge into"

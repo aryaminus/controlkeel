@@ -19,7 +19,7 @@ defmodule ControlKeelWeb.PageController do
       # local install provisions the org on first visit.
       Mode.current() == :local ->
         _ = LocalDefaults.ensure()
-        redirect(conn, to: ~p"/organizations/#{LocalDefaults.default_org_slug()}")
+        redirect(conn, to: ~p"/#{LocalDefaults.default_org_slug()}")
 
       # Signed-in cloud/self_hosted users get their org → workspace →
       # session selector tree instead of the marketing landing.

@@ -62,7 +62,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "owner row is locked (disabled)", %{conn: conn, memberships: ms} do
-      {:ok, view, _html} = live(conn, ~p"/organizations/acme?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/acme?tab=members")
 
       form = element(view, "#role-form-#{ms.owner.id}") |> render()
       assert form =~ "disabled"
@@ -75,7 +75,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       conn: conn,
       memberships: ms
     } do
-      {:ok, view, _html} = live(conn, ~p"/organizations/acme?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/acme?tab=members")
 
       form = element(view, "#role-form-#{ms.admin.id}") |> render()
       refute form =~ "disabled"
@@ -87,7 +87,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "admin can self-demit to viewer", %{conn: conn, memberships: ms} do
-      {:ok, view, _html} = live(conn, ~p"/organizations/acme?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/acme?tab=members")
 
       view
       |> element("#role-form-#{ms.admin.id}")
@@ -102,7 +102,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       conn: conn,
       memberships: ms
     } do
-      {:ok, view, _html} = live(conn, ~p"/organizations/acme?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/acme?tab=members")
 
       for target <- [:member, :viewer] do
         form = element(view, "#role-form-#{ms[target].id}") |> render()
@@ -118,7 +118,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       conn: conn,
       memberships: ms
     } do
-      {:ok, view, _html} = live(conn, ~p"/organizations/acme?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/acme?tab=members")
 
       # Sanity: admin can manage before the change.
       assert render(view) =~ ~s(id="role-form-#{ms.member.id}")
@@ -142,7 +142,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       conn: conn,
       memberships: ms
     } do
-      {:ok, view, _html} = live(conn, ~p"/organizations/acme?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/acme?tab=members")
 
       view
       |> element("#role-form-#{ms.member.id}")
@@ -167,7 +167,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "sole owner cannot change their own role (locked)", %{conn: conn, owner_m: owner_m} do
-      {:ok, view, _html} = live(conn, ~p"/organizations/omega?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/omega?tab=members")
 
       form = element(view, "#role-form-#{owner_m.id}") |> render()
       assert form =~ "disabled"
@@ -180,7 +180,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       second = create_user!("owner-b@example.com")
       add_active_membership(second.id, org_id, "owner")
 
-      {:ok, view, _html} = live(conn, ~p"/organizations/omega?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/omega?tab=members")
 
       form = element(view, "#role-form-#{owner_m.id}") |> render()
       refute form =~ "disabled"
@@ -197,7 +197,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       second = create_user!("owner-c@example.com")
       add_active_membership(second.id, owner_m.org_id, "owner")
 
-      {:ok, view, _html} = live(conn, ~p"/organizations/omega?tab=members")
+      {:ok, view, _html} = live(conn, ~p"/omega?tab=members")
 
       # Sanity: management controls present before the change.
       html_before = render(view)
@@ -238,7 +238,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "settings page renders at the organization settings route", %{owner: owner} do
-      {:ok, _view, html} = live(conn_for(owner), ~p"/organizations/setco/settings")
+      {:ok, _view, html} = live(conn_for(owner), ~p"/setco/settings")
 
       assert html =~ "Organization Settings"
       assert html =~ "Organization name"
@@ -246,7 +246,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "owner saves the org name from the settings page", %{org: org, owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/setco/settings")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/setco/settings")
 
       view
       |> element("#org-settings-form")
@@ -259,7 +259,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "admin can view settings but status and budget are owner-locked", %{admin: admin} do
-      {:ok, view, html} = live(conn_for(admin), ~p"/organizations/setco/settings")
+      {:ok, view, html} = live(conn_for(admin), ~p"/setco/settings")
 
       assert html =~ "Organization Settings"
       html = render(view)
@@ -269,8 +269,8 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "non-admin members are redirected from settings", %{member: member} do
-      assert {:error, {:redirect, %{to: "/organizations/setco"}}} =
-               live(conn_for(member), ~p"/organizations/setco/settings")
+      assert {:error, {:redirect, %{to: "/setco"}}} =
+               live(conn_for(member), ~p"/setco/settings")
     end
   end
 
@@ -298,7 +298,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       owner: owner,
       workspace: ws
     } do
-      {:ok, view, html} = live(conn_for(owner), ~p"/organizations/tabco")
+      {:ok, view, html} = live(conn_for(owner), ~p"/tabco")
 
       assert html =~ "Workspaces"
       assert html =~ "?tab=members"
@@ -314,7 +314,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "members tab lists memberships", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/tabco?tab=members")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco?tab=members")
 
       html = render(view)
       assert html =~ "tab-owner@example.com"
@@ -322,7 +322,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "clicking the Members tab switches content", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/tabco")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco")
       assert render(view) =~ "core-workspace"
 
       view
@@ -335,17 +335,17 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "unknown tab value falls back to workspaces", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/tabco?tab=wat")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco?tab=wat")
       assert render(view) =~ "core-workspace"
     end
 
     test "sidebar renders the org nav on the org page", %{owner: owner} do
-      {:ok, _view, html} = live(conn_for(owner), ~p"/organizations/tabco")
+      {:ok, _view, html} = live(conn_for(owner), ~p"/tabco")
 
       assert html =~ "sidebar-org-nav"
       assert html =~ "Tabco"
       refute html =~ ~s(href="/organizations/tabco?tab=sessions")
-      assert html =~ ~s(href="/organizations/tabco/settings")
+      assert html =~ ~s(href="/tabco/settings")
     end
   end
 
@@ -358,7 +358,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "cloud mode opens the create form", %{owner: owner} do
-      {:ok, view, html} = live(conn_for(owner), ~p"/organizations/wsco")
+      {:ok, view, html} = live(conn_for(owner), ~p"/wsco")
 
       refute html =~ "new-workspace-modal"
 
@@ -372,7 +372,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "cloud mode creates a workspace and lists it", %{org: org, owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/wsco")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
 
       view |> render_click("new_workspace")
 
@@ -397,7 +397,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "blank slug is auto-generated from the name", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/wsco")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
 
       view |> render_click("new_workspace")
 
@@ -429,7 +429,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
           org_id: org.id
         })
 
-      {:ok, view, _html} = live(conn_for(owner), ~p"/organizations/wsco")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
 
       view |> render_click("new_workspace")
 
@@ -467,7 +467,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "modal shows the local-mode notice instead of the form", %{org: _org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/organizations/local-ws-org")
+      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org")
 
       view |> render_click("new_workspace")
       modal = render(view)
@@ -479,7 +479,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "forged save_workspace event is rejected in local mode", %{org: org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/organizations/local-ws-org")
+      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org")
 
       view
       |> render_click("save_workspace", %{
@@ -514,11 +514,11 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "workspaces is the default tab and members shows the local-mode notice", %{org: _org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/organizations/local-org")
+      {:ok, view, _html} = live(build_conn(), ~p"/local-org")
       assert render(view) =~ "Workspaces"
       refute render(view) =~ "Member management is not available in local mode."
 
-      {:ok, view, _html} = live(build_conn(), ~p"/organizations/local-org?tab=members")
+      {:ok, view, _html} = live(build_conn(), ~p"/local-org?tab=members")
       html = render(view)
 
       assert html =~ "Member management is not available in local mode."

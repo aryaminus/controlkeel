@@ -1,6 +1,6 @@
 defmodule ControlKeelWeb.OrganizationSettingsLive do
   @moduledoc """
-  Organization settings at `/organizations/:slug/settings`.
+  Organization settings at `/:org_slug/settings`.
 
   Local mode is unrestricted. Cloud and self-hosted mode require an active
   admin or owner membership for the organization.
@@ -12,7 +12,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   alias ControlKeel.Runtime.Mode
 
   @impl true
-  def mount(%{"slug" => slug}, _session, socket) do
+  def mount(%{"org_slug" => slug}, _session, socket) do
     case Accounts.get_org_by_slug(slug) do
       nil ->
         {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
@@ -54,7 +54,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
                      socket,
                      :error,
                      "You don't have permission to change organization settings.",
-                     ~p"/organizations/#{org.slug}"
+                     ~p"/#{org.slug}"
                    )}
                 end
             end

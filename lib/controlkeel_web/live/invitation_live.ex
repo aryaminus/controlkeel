@@ -55,7 +55,7 @@ defmodule ControlKeelWeb.InvitationLive do
          socket.assigns.state == :ready do
       case Accounts.accept_invitation(socket.assigns.token, socket.assigns.current_user.id) do
         {:ok, _membership} ->
-          {:noreply, redirect(socket, to: ~p"/organizations/#{socket.assigns.org.slug}")}
+          {:noreply, redirect(socket, to: ~p"/#{socket.assigns.org.slug}")}
 
         {:error, :invalid_token} ->
           {:noreply, assign(socket, :state, :invalid)}

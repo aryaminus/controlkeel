@@ -86,13 +86,13 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     [
       %{
         label: "Overview",
-        href: ~p"/organizations/#{org.slug}",
+        href: ~p"/#{org.slug}",
         tab: nil,
         icon: "hero-squares-2x2"
       },
       %{
         label: "Settings",
-        href: ~p"/organizations/#{org.slug}/settings",
+        href: ~p"/#{org.slug}/settings",
         tab: "settings",
         icon: "hero-cog-6-tooth"
       }

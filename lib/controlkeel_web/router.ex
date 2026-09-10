@@ -123,16 +123,6 @@ defmodule ControlKeelWeb.Router do
       live "/skills", SkillsLive, :index
     end
 
-    live_session :organization,
-      layout: {ControlKeelWeb.OrganizationLayouts, :organization},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.OrganizationLayoutDefaults
-      ] do
-      live "/organizations/:slug", OrganizationDetailLive, :index
-      live "/organizations/:slug/settings", OrganizationSettingsLive, :edit
-    end
-
     # Observability section routes use the shared :dashboard framework layout;
     # each page renders its own heading. LayoutDefaults sets shared layout
     # assigns (@current_path, @page_action) for active-link highlighting.
@@ -171,6 +161,16 @@ defmodule ControlKeelWeb.Router do
       live "/observability/sessions/:id/memory", ObservabilityMemoryLive, :show
       live "/observability/sessions/:id/timeline", ObservabilityTimelineLive, :show
       live "/observability/sessions/:id", ObservabilityLive, :show
+    end
+
+    live_session :organization,
+      layout: {ControlKeelWeb.OrganizationLayouts, :organization},
+      on_mount: [
+        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
+        ControlKeelWeb.OrganizationLayoutDefaults
+      ] do
+      live "/:org_slug", OrganizationDetailLive, :index
+      live "/:org_slug/settings", OrganizationSettingsLive, :edit
     end
   end
 
