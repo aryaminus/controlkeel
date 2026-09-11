@@ -30,7 +30,6 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
        |> assign(
          :breadcrumbs,
          [
-           %{label: "Organizations", to: ~p"/organizations"},
            %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
            %{
              label: workspace.name,
