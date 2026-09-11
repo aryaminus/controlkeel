@@ -55,7 +55,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       s1 = create_session!(ws.id, %{title: "First session"})
       s2 = create_session!(ws.id, %{title: "Second session"})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/organizations/#{org.slug}/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}")
 
       assert html =~ "Core"
       assert html =~ "core"
@@ -89,7 +89,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       {:ok, _assignment} = ControlKeel.Platform.apply_policy_set(ws.id, set.id, %{precedence: 10})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/organizations/#{org.slug}/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}")
 
       assert html =~ "Applied policies"
       assert html =~ "precedence 10"
@@ -110,7 +110,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "enabled" => false
         })
 
-      {:ok, _view, html} = live(build_conn(), ~p"/organizations/disws/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/disws/workspaces/#{ws.id}")
 
       assert html =~ "paused-set"
       assert html =~ "precedence 7"
@@ -121,7 +121,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, org} = Accounts.create_org(%{name: "Empty Org", slug: "empty-org"})
       ws = create_workspace(%{name: "Empty", slug: "empty", industry: "web", org_id: org.id})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/organizations/empty-org/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/empty-org/workspaces/#{ws.id}")
 
       assert html =~ "No sessions yet."
     end
@@ -130,7 +130,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/organizations/none/workspaces/999999")
+               live(build_conn(), ~p"/none/workspaces/999999")
 
       assert msg =~ "Workspace not found."
     end
@@ -139,7 +139,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/organizations/none/workspaces/not-a-number")
+               live(build_conn(), ~p"/none/workspaces/not-a-number")
 
       assert msg =~ "Invalid workspace id."
     end
@@ -151,7 +151,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
         create_workspace(%{name: "Belongs To A", slug: "a-ws", industry: "web", org_id: org_a.id})
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/organizations/org-b/workspaces/#{ws.id}")
+               live(build_conn(), ~p"/org-b/workspaces/#{ws.id}")
 
       assert msg =~ "does not belong to this organization"
     end
@@ -185,7 +185,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_org_id" => org.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/organizations/scopeco/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(conn, ~p"/scopeco/workspaces/#{ws.id}")
 
       assert html =~ "Scoped"
       assert html =~ "Scoped"
@@ -216,7 +216,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_org_id" => org.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/organizations/viewco/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(conn, ~p"/viewco/workspaces/#{ws.id}")
 
       assert html =~ "Viewable"
     end
@@ -239,7 +239,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
         })
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/organizations/a/workspaces/#{ws_a.id}")
+               live(conn, ~p"/a/workspaces/#{ws_a.id}")
 
       assert msg =~ "Workspace belongs to a different organization."
     end

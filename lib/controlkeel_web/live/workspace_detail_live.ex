@@ -1,6 +1,6 @@
 defmodule ControlKeelWeb.WorkspaceDetailLive do
   @moduledoc """
-  Workspace detail page at `/organizations/:slug/workspaces/:id`.
+  Workspace detail page at `/:org_slug/workspaces/:id`.
 
   Shows the workspace's default information (name, slug, industry, agent,
   compliance profile, monthly budget, status) and the sessions that belong to
@@ -21,7 +21,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
   alias ControlKeel.Runtime.Mode
 
   @impl true
-  def mount(%{"id" => id, "slug" => slug} = _params, _session, socket) do
+  def mount(%{"id" => id, "org_slug" => slug} = _params, _session, socket) do
     with {ws_id, ""} <- Integer.parse(id),
          %Workspace{} = workspace <- Repo.get(Workspace, ws_id) |> Repo.preload(:org),
          :ok <- check_org_slug(workspace, %{slug: slug}),
@@ -33,6 +33,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
        socket
        |> assign(:page_title, workspace.name)
        |> assign(:workspace, workspace)
+       |> assign(:nav_org, workspace.org)
        |> assign(
          :breadcrumbs,
          [
@@ -112,7 +113,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
 
         <div>
           <.link
-            navigate={~p"/organizations/#{@workspace.org.slug}/workspaces/#{@workspace.id}/settings"}
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.id}/settings"}
             class="inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:border-primary/40 hover:text-primary"
           >
             <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
@@ -214,7 +215,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
 
                 <.link
                   navigate={
-                    ~p"/organizations/#{@workspace.org.slug}/workspaces/#{@workspace.id}/settings?tab=agent_tools"
+                    ~p"/#{@workspace.org.slug}/workspaces/#{@workspace.id}/settings?tab=agent_tools"
                   }
                   class="text-xs font-medium text-primary transition hover:text-primary/80"
                 >

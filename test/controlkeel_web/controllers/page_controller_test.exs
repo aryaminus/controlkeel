@@ -108,7 +108,7 @@ defmodule ControlKeelWeb.PageControllerTest do
       assert body =~ "Platform"
       assert body =~ "Launch checklist"
       assert body =~ ~p"/#{org.slug}"
-      assert body =~ ~p"/organizations/#{org.slug}/workspaces/#{workspace.id}"
+      assert body =~ ~p"/#{org.slug}/workspaces/#{workspace.id}"
       assert body =~ ~p"/sessions/#{session.id}"
       refute body =~ "Turn team knowledge into"
     end
