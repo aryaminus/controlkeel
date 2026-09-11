@@ -249,9 +249,6 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
 
   defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
 
-  defp check_workspace_access(%Workspace{org_id: nil}, _),
-    do: {:error, "Workspace is not bound to an org."}
-
   defp check_workspace_access(%Workspace{org_id: ws_org}, %{
          current_org_id: org_id,
          current_membership: m

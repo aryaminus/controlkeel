@@ -232,9 +232,6 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
 
   defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
 
-  defp check_workspace_access(%Workspace{org_id: nil}, _assigns),
-    do: {:error, "Workspace is not bound to an org yet."}
-
   defp check_workspace_access(%Workspace{org_id: ws_org_id}, %{
          current_org_id: org_id,
          current_membership: membership
