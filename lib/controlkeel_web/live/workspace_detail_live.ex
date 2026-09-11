@@ -1,6 +1,6 @@
 defmodule ControlKeelWeb.WorkspaceDetailLive do
   @moduledoc """
-  Workspace detail page at `/:org_slug/workspaces/:id`.
+  Workspace detail page at `/:org_slug/workspaces/:ws_slug`.
 
   Shows the workspace's default information (name, slug, industry, agent,
   compliance profile, monthly budget, status) and the sessions that belong to

@@ -1,11 +1,11 @@
 defmodule ControlKeelWeb.WorkspaceSettingsLive do
   @moduledoc """
-  Workspace settings at `/:org_slug/workspaces/:id/settings`.
+  Workspace settings at `/:org_slug/workspaces/:ws_slug/settings`.
 
   Secondary navigation over setting groups. Two groups today: Policies
   (rule-set assignments, parity with `controlkeel policy-set apply`) and
   Tool policy (the MCP gate editor also available standalone at
-  `/:org_slug/workspaces/:id/tool-policy`).
+  `/:org_slug/workspaces/:ws_slug/tool-policy`).
   """
 
   use ControlKeelWeb, :live_view
