@@ -349,7 +349,9 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "sidebar renders organization switcher with user's orgs in cloud mode", %{owner: owner} do
-      {:ok, _other_org} = Accounts.create_org_with_owner(owner.id, %{name: "Second Org", slug: "second-org"})
+      {:ok, _other_org} =
+        Accounts.create_org_with_owner(owner.id, %{name: "Second Org", slug: "second-org"})
+
       {:ok, _view, html} = live(conn_for(owner), ~p"/tabco")
 
       assert html =~ "sidebar-org-switcher"

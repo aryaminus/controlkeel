@@ -261,21 +261,11 @@ defmodule ControlKeelWeb.Layouts do
 
   def user_menu(assigns) do
     ~H"""
-    <div
-      {@rest}
-      class={"relative #{@class}"}
-      id={@id}
-      phx-click-away={
-        JS.hide(to: "##{@id}-popover")
-        |> JS.remove_class("rotate-180", to: "##{@id}-chevron")
-        |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
-      }
-    >
+    <div {@rest} class={"relative #{@class}"} id={@id}>
       <button
         type="button"
         phx-click={
           JS.toggle(to: "##{@id}-popover")
-          |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
           |> JS.toggle_attribute({"aria-expanded", "true", "false"})
         }
         aria-haspopup="menu"
@@ -302,13 +292,15 @@ defmodule ControlKeelWeb.Layouts do
               {@current_user.name || @current_user.email}
             </span>
           </span>
-          <span id={"#{@id}-chevron"} class="transition-transform duration-200">
-            <.icon name="hero-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
-          </span>
+          <.icon name="hero-chevron-down" class="size-4 shrink-0 text-muted-foreground" />
         <% end %>
       </button>
       <div
         id={"#{@id}-popover"}
+        phx-click-away={
+          JS.hide(to: "##{@id}-popover")
+          |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
+        }
         class={"hidden absolute #{@popover_class} z-50 w-56 rounded-xl border bg-card p-3 shadow-2xl shadow-black/50 backdrop-blur-md"}
       >
         <p class="text-sm font-semibold text-foreground">
@@ -317,38 +309,17 @@ defmodule ControlKeelWeb.Layouts do
         <p class="mt-0.5 text-xs text-muted-foreground">{@current_user.email}</p>
         <div class="my-2 border-t"></div>
         <%= if @show_dashboard do %>
-          <.link
-            navigate={~p"/"}
+          <a
+            href={~p"/dashboard"}
             phx-click={
               JS.hide(to: "##{@id}-popover")
               |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
             }
             class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
-            <.icon name="hero-home" class="size-4" /> Home
-          </.link>
+            <.icon name="hero-squares-2x2" class="size-4" /> Dashboard
+          </a>
         <% end %>
-
-        <a
-          href={~p"/getting-started"}
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-book-open" class="size-4" /> Docs
-        </a>
-
-        <a
-          href="https://github.com/aryaminus/controlkeel"
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-code-bracket" class="size-4" /> GitHub
-        </a>
-
-        <div class="my-2 border-t"></div>
-
         <%!-- TODO: Settings button disabled — it was a no-op that only closed the
              popover. Re-enable and wire to a user settings modal/dialog when functional.
         <button
