@@ -147,7 +147,7 @@ defmodule ControlKeel.Mission do
   end
 
   def get_workspace_by_slug(slug) when is_binary(slug) do
-    Repo.get_by(Workspace, slug: slug)
+    Repo.get_by(Workspace, slug: slug |> String.trim() |> String.downcase())
   end
 
   def get_task(id), do: Repo.get(Task, id)

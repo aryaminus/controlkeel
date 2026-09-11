@@ -1,6 +1,6 @@
 defmodule ControlKeelWeb.WorkspaceReposLive do
   @moduledoc """
-  Workspace GitHub repository bindings at `/workspaces/:id/repos`.
+  Workspace GitHub repository bindings at `/:org_slug/workspaces/:ws_slug/repos`.
 
   Admin+owner of the workspace's org can bind / unbind / list
   `WorkspaceGithubRepo` records. The page rejects access if the workspace
@@ -10,31 +10,43 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Repo
 
   @impl true
-  def mount(%{"id" => ws_id_param}, _session, socket) do
-    with {ws_id, ""} <- Integer.parse(ws_id_param),
-         %Workspace{} = workspace <- Repo.get(Workspace, ws_id),
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug}, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
+         :ok <- check_org_slug(workspace, %{slug: slug}),
          :ok <- check_workspace_access(workspace, socket.assigns) do
       {:ok,
        socket
        |> assign(:page_title, "Repositories — #{workspace.name}")
        |> assign(:workspace, workspace)
+       |> assign(:nav_org, workspace.org)
+       |> assign(
+         :breadcrumbs,
+         [
+           %{label: "Organizations", to: ~p"/organizations"},
+           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+           %{
+             label: workspace.name,
+             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+           },
+           %{label: "Repositories", to: nil}
+         ]
+       )
        |> assign(:repos, Mission.list_github_repos(workspace.id))
        |> assign(:bind_form, to_form(empty_bind_params(), as: :bind))
        |> assign(:bind_error, nil)}
     else
-      :error ->
-        {:ok, redirect_with_flash(socket, :error, "Invalid workspace id.", ~p"/cloud/projects")}
-
       nil ->
-        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/cloud/projects")}
+        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
 
       {:error, reason} ->
-        {:ok, redirect_with_flash(socket, :error, reason, ~p"/cloud/projects")}
+        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
     end
   end
 
@@ -210,6 +222,15 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
   end
 
   # ── Private ─────────────────────────────────────────────────────────
+
+  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
+    case Accounts.get_org_by_slug(slug) do
+      %Org{id: ^org_id} -> :ok
+      _ -> {:error, "Workspace does not belong to this organization."}
+    end
+  end
+
+  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
 
   defp check_workspace_access(%Workspace{org_id: nil}, _assigns),
     do: {:error, "Workspace is not bound to an org yet."}

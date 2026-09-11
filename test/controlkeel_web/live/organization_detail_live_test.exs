@@ -304,7 +304,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "?tab=members"
       assert render(view) =~ "core-workspace"
       # The workspace card links to its nested detail route.
-      assert render(view) =~ ~s(href="/tabco/workspaces/#{ws.id}")
+      assert render(view) =~ ~s(href="/tabco/workspaces/#{ws.slug}")
       # Workspaces table shows budget and status.
       assert render(view) =~ "$123.45"
       assert render(view) =~ "active"

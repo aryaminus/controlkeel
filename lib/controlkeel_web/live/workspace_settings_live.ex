@@ -14,6 +14,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   alias ControlKeel.Accounts.Org
   alias ControlKeel.Accounts.WorkspaceToolPolicy
   alias ControlKeel.MCP.ToolGroups
+  alias ControlKeel.Mission
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform
   alias ControlKeel.Repo
@@ -22,9 +23,9 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   @tabs ["policies", "agent_tools"]
 
   @impl true
-  def mount(%{"id" => id, "org_slug" => slug} = _params, _session, socket) do
-    with {ws_id, ""} <- Integer.parse(id),
-         %Workspace{} = workspace <- Repo.get(Workspace, ws_id) |> Repo.preload(:org),
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
          :ok <- check_org_slug(workspace, %{slug: slug}),
          :ok <- check_workspace_access(workspace, socket.assigns) do
       tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
@@ -42,7 +43,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
            %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
            %{
              label: workspace.name,
-             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.id}"
+             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
            },
            %{label: "Settings", to: nil}
          ]
@@ -60,9 +61,6 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
        )
        |> refresh_policy_assigns()}
     else
-      :error ->
-        {:ok, redirect_with_flash(socket, :error, "Invalid workspace id.", ~p"/organizations")}
-
       nil ->
         {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
 
@@ -84,7 +82,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
     {:noreply,
      push_patch(socket,
        to:
-         ~p"/#{socket.assigns.workspace.org.slug}/workspaces/#{socket.assigns.workspace.id}/settings?tab=#{tab}"
+         ~p"/#{socket.assigns.workspace.org.slug}/workspaces/#{socket.assigns.workspace.slug}/settings?tab=#{tab}"
      )}
   end
 

@@ -55,7 +55,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       s1 = create_session!(ws.id, %{title: "First session"})
       s2 = create_session!(ws.id, %{title: "Second session"})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
 
       assert html =~ "Core"
       assert html =~ "core"
@@ -65,6 +65,15 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       # Session rows render in the sessions-style table.
       assert html =~ "First session"
       assert html =~ "Second session"
+    end
+
+    test "resolves the workspace slug case-insensitively" do
+      {:ok, org} = Accounts.create_org(%{name: "Wscase", slug: "wscase"})
+      _ws = create_workspace(%{name: "Core", slug: "core", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/CORE")
+
+      assert html =~ "Core"
     end
 
     test "renders applied policy sets with rules revealed on hover markup", %{} do
@@ -89,7 +98,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       {:ok, _assignment} = ControlKeel.Platform.apply_policy_set(ws.id, set.id, %{precedence: 10})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
 
       assert html =~ "Applied policies"
       assert html =~ "precedence 10"
@@ -110,7 +119,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "enabled" => false
         })
 
-      {:ok, _view, html} = live(build_conn(), ~p"/disws/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/disws/workspaces/#{ws.slug}")
 
       assert html =~ "paused-set"
       assert html =~ "precedence 7"
@@ -121,27 +130,27 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, org} = Accounts.create_org(%{name: "Empty Org", slug: "empty-org"})
       ws = create_workspace(%{name: "Empty", slug: "empty", industry: "web", org_id: org.id})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/empty-org/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(build_conn(), ~p"/empty-org/workspaces/#{ws.slug}")
 
       assert html =~ "No sessions yet."
     end
 
-    test "redirects for an unknown workspace id" do
+    test "redirects for an unknown workspace slug" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/999999")
+               live(build_conn(), ~p"/none/workspaces/no-such-ws")
 
       assert msg =~ "Workspace not found."
     end
 
-    test "redirects for a non-numeric id" do
+    test "redirects for an unknown workspace slug regardless of case" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/not-a-number")
+               live(build_conn(), ~p"/none/workspaces/NO-SUCH-WS")
 
-      assert msg =~ "Invalid workspace id."
+      assert msg =~ "Workspace not found."
     end
 
     test "redirects when the workspace belongs to a different org slug" do
@@ -151,7 +160,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
         create_workspace(%{name: "Belongs To A", slug: "a-ws", industry: "web", org_id: org_a.id})
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/org-b/workspaces/#{ws.id}")
+               live(build_conn(), ~p"/org-b/workspaces/#{ws.slug}")
 
       assert msg =~ "does not belong to this organization"
     end
@@ -185,7 +194,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_org_id" => org.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/scopeco/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(conn, ~p"/scopeco/workspaces/#{ws.slug}")
 
       assert html =~ "Scoped"
       assert html =~ "Scoped"
@@ -216,7 +225,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_org_id" => org.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/viewco/workspaces/#{ws.id}")
+      {:ok, _view, html} = live(conn, ~p"/viewco/workspaces/#{ws.slug}")
 
       assert html =~ "Viewable"
     end
@@ -239,7 +248,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
         })
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/a/workspaces/#{ws_a.id}")
+               live(conn, ~p"/a/workspaces/#{ws_a.slug}")
 
       assert msg =~ "Workspace belongs to a different organization."
     end

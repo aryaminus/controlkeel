@@ -129,10 +129,7 @@ defmodule ControlKeelWeb.Router do
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
       live "/organizations", OrganizationsLive, :index
-      live "/workspaces/:id/repos", WorkspaceReposLive, :index
-      live "/workspaces/:id/service-accounts", WorkspaceServiceAccountsLive, :index
-      live "/workspaces/:id/webhooks", WorkspaceWebhooksLive, :index
-      live "/workspaces/:id/tool-policy", WorkspaceToolPolicyLive, :edit
+
       live "/policies", PolicyStudioLive, :index
       live "/skills", SkillsLive, :index
     end
@@ -189,8 +186,12 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/:org_slug", OrganizationDetailLive, :index
       live "/:org_slug/settings", OrganizationSettingsLive, :edit
-      live "/:org_slug/workspaces/:id", WorkspaceDetailLive, :index
-      live "/:org_slug/workspaces/:id/settings", WorkspaceSettingsLive, :show
+      live "/:org_slug/workspaces/:ws_slug", WorkspaceDetailLive, :index
+      live "/:org_slug/workspaces/:ws_slug/settings", WorkspaceSettingsLive, :show
+      live "/:org_slug/workspaces/:ws_slug/repos", WorkspaceReposLive, :index
+      live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
+      live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
     end
   end
 

@@ -68,7 +68,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {org, ws} = org_workspace()
 
       {:ok, view, html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       assert html =~ "Workspace settings"
       assert has_element?(view, "#workspace-policy-apply-form")
@@ -81,7 +81,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, view, _html} =
         live(
           build_conn(),
-          ~p"/#{org.slug}/workspaces/#{ws.id}/settings?tab=nonsense"
+          ~p"/#{org.slug}/workspaces/#{ws.slug}/settings?tab=nonsense"
         )
 
       assert has_element?(view, "#workspace-policy-apply-form")
@@ -93,7 +93,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, view, _html} =
         live(
           build_conn(),
-          ~p"/#{org.slug}/workspaces/#{ws.id}/settings?tab=agent_tools"
+          ~p"/#{org.slug}/workspaces/#{ws.slug}/settings?tab=agent_tools"
         )
 
       assert has_element?(view, "#workspace-tool-policy-form")
@@ -104,7 +104,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {org, ws} = org_workspace()
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       view
       |> element("button[phx-value-tab='agent_tools']")
@@ -112,7 +112,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
       assert_patch(
         view,
-        ~p"/#{org.slug}/workspaces/#{ws.id}/settings?tab=agent_tools"
+        ~p"/#{org.slug}/workspaces/#{ws.slug}/settings?tab=agent_tools"
       )
 
       assert has_element?(view, "#workspace-tool-policy-form")
@@ -121,7 +121,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       |> element("button[phx-value-tab='policies']")
       |> render_click()
 
-      assert_patch(view, ~p"/#{org.slug}/workspaces/#{ws.id}/settings?tab=policies")
+      assert_patch(view, ~p"/#{org.slug}/workspaces/#{ws.slug}/settings?tab=policies")
       assert has_element?(view, "#workspace-policy-apply-form")
     end
 
@@ -130,7 +130,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       set = policy_set_fixture!("no-rm-rf")
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       html = submit_apply(view, %{"policy_set_id" => "#{set.id}", "precedence" => "10"})
 
@@ -152,7 +152,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 10})
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       # The set is already applied so it is not in the dropdown; remove then
       # re-apply with a new precedence through the form.
@@ -167,7 +167,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       set = policy_set_fixture!("bad-prec")
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       html = submit_apply(view, %{"policy_set_id" => "#{set.id}", "precedence" => "abc"})
 
@@ -180,7 +180,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       set = policy_set_fixture!("huge-prec")
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       html =
         submit_apply(view, %{
@@ -201,7 +201,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 5})
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       html = render_click(view, "remove_policy_set", %{"policy-set-id" => "#{set.id}"})
 
@@ -217,7 +217,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{"enabled" => false})
 
       {:ok, view, html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       assert html =~ "paused-set"
       assert html =~ "precedence 100"
@@ -237,7 +237,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 25})
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       html =
         render_click(
@@ -262,7 +262,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 15, enabled: false})
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       assert has_element?(
                view,
@@ -293,7 +293,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 1})
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       html = render_click(view, "toggle_assignment", %{"policy-set-id" => "999999"})
 
@@ -305,7 +305,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {org, ws} = org_workspace()
 
       {:ok, view, _html} =
-        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.id}/settings")
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
 
       html = render_click(view, "remove_policy_set", %{"policy-set-id" => "abc"})
 
@@ -318,7 +318,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, view, html} =
         live(
           build_conn(),
-          ~p"/#{org.slug}/workspaces/#{ws.id}/settings?tab=agent_tools"
+          ~p"/#{org.slug}/workspaces/#{ws.slug}/settings?tab=agent_tools"
         )
 
       assert html =~ "No tools selected."
@@ -356,7 +356,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, view, _html} =
         live(
           build_conn(),
-          ~p"/#{org.slug}/workspaces/#{ws.id}/settings?tab=agent_tools"
+          ~p"/#{org.slug}/workspaces/#{ws.slug}/settings?tab=agent_tools"
         )
 
       view
@@ -386,7 +386,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {:ok, view, _html} =
         live(
           build_conn(),
-          ~p"/#{org.slug}/workspaces/#{ws.id}/settings?tab=agent_tools"
+          ~p"/#{org.slug}/workspaces/#{ws.slug}/settings?tab=agent_tools"
         )
 
       # Stored tools are shown as chips on mount.
@@ -409,11 +409,11 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       assert WorkspaceToolPolicy.decode_tools(policy) == []
     end
 
-    test "redirects for an unknown workspace id" do
+    test "redirects for an unknown workspace slug" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/999999/settings")
+               live(build_conn(), ~p"/none/workspaces/no-such-ws/settings")
 
       assert msg =~ "Workspace not found."
     end
@@ -422,7 +422,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       {_org_a, ws} = org_workspace()
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/other-org/workspaces/#{ws.id}/settings")
+               live(build_conn(), ~p"/other-org/workspaces/#{ws.slug}/settings")
 
       assert msg =~ "does not belong to this organization"
     end
@@ -465,7 +465,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
           "current_org_id" => org.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/adminco/workspaces/#{ws.id}/settings")
+      {:ok, _view, html} = live(conn, ~p"/adminco/workspaces/#{ws.slug}/settings")
 
       assert html =~ "Workspace settings"
     end
@@ -490,7 +490,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
         })
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/viewerco/workspaces/#{ws.id}/settings")
+               live(conn, ~p"/viewerco/workspaces/#{ws.slug}/settings")
 
       assert msg =~ "Admin or owner role required."
     end

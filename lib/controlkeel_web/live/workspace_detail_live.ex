@@ -21,13 +21,13 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
   alias ControlKeel.Runtime.Mode
 
   @impl true
-  def mount(%{"id" => id, "org_slug" => slug} = _params, _session, socket) do
-    with {ws_id, ""} <- Integer.parse(id),
-         %Workspace{} = workspace <- Repo.get(Workspace, ws_id) |> Repo.preload(:org),
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
          :ok <- check_org_slug(workspace, %{slug: slug}),
          :ok <- check_workspace_access(workspace, socket.assigns) do
-      sessions = Mission.list_all_sessions(ws_id)
-      tool_policy = Accounts.get_workspace_tool_policy(ws_id)
+      sessions = Mission.list_all_sessions(workspace.id)
+      tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
 
       {:ok,
        socket
@@ -43,13 +43,10 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
          ]
        )
        |> assign(:sessions, sessions)
-       |> assign(:policy_assignments, Platform.list_workspace_policy_assignments(ws_id))
+       |> assign(:policy_assignments, Platform.list_workspace_policy_assignments(workspace.id))
        |> assign(:tool_policy_mode, tool_policy.mode)
        |> assign(:tool_policy_tools, WorkspaceToolPolicy.decode_tools(tool_policy))}
     else
-      :error ->
-        {:ok, redirect_with_flash(socket, :error, "Invalid workspace id.", ~p"/organizations")}
-
       nil ->
         {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
 
@@ -113,7 +110,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
 
         <div>
           <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.id}/settings"}
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/settings"}
             class="inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:border-primary/40 hover:text-primary"
           >
             <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
@@ -215,7 +212,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
 
                 <.link
                   navigate={
-                    ~p"/#{@workspace.org.slug}/workspaces/#{@workspace.id}/settings?tab=agent_tools"
+                    ~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/settings?tab=agent_tools"
                   }
                   class="text-xs font-medium text-primary transition hover:text-primary/80"
                 >
