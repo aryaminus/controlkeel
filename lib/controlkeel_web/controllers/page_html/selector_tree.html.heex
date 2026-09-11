@@ -27,12 +27,11 @@
     <div class="flex flex-col gap-4">
       <%= for node <- @tree do %>
         <% session_count = Enum.sum(Enum.map(node.workspaces, &length(&1.sessions))) %>
-        <details
-          open
+        <div
           id={"home-org-#{node.org.id}"}
-          class="group rounded-2xl border bg-card shadow-card"
+          class="rounded-2xl border bg-card shadow-card"
         >
-          <summary class="flex cursor-pointer list-none items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
+          <div class="flex items-center gap-3 p-5">
             <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               <.icon name="hero-building-office-2" class="size-4" />
             </span>
@@ -47,10 +46,8 @@
               </span>
             </span>
             <span class="hidden shrink-0 text-xs text-muted-foreground sm:block">
-              {length(node.workspaces)}
-              {(length(node.workspaces) == 1 && "workspace") || "workspaces"} · {session_count} {(session_count ==
-                                                                                                    1 &&
-                                                                                                    "session") ||
+              {length(node.workspaces)} {(length(node.workspaces) == 1 && "workspace") ||
+                "workspaces"} · {session_count} {(session_count == 1 && "session") ||
                 "sessions"}
             </span>
             <span class={[
@@ -60,23 +57,38 @@
             ]}>
               {node.org.status}
             </span>
-            <.icon
-              name="hero-chevron-right"
-              class="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
-            />
-          </summary>
+            <button
+              type="button"
+              aria-expanded="true"
+              aria-controls={"home-org-body-#{node.org.id}"}
+              aria-label={"Toggle #{node.org.name} workspaces"}
+              phx-click={
+                JS.toggle(to: "#home-org-body-#{node.org.id}")
+                |> JS.toggle_class("rotate-90", to: "#home-org-chevron-#{node.org.id}")
+                |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+              }
+              class="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span
+                id={"home-org-chevron-#{node.org.id}"}
+                class="flex size-4 shrink-0 rotate-90 text-muted-foreground transition-transform"
+              >
+                <.icon name="hero-chevron-right" class="size-4" />
+              </span>
+            </button>
+          </div>
 
-          <div class="border-t px-5 py-4">
+          <div id={"home-org-body-#{node.org.id}"} class="border-t px-5 py-4">
             <%= if node.workspaces == [] do %>
               <p class="px-1 text-sm text-muted-foreground">No workspaces yet.</p>
             <% else %>
               <div class="ml-2 flex flex-col gap-3 border-l border-border pl-4 sm:ml-4 sm:pl-6">
                 <%= for ws_node <- node.workspaces do %>
-                  <details
+                  <div
                     id={"home-workspace-#{ws_node.workspace.id}"}
-                    class="group/ws rounded-xl border bg-background/40"
+                    class="rounded-xl border bg-background/40"
                   >
-                    <summary class="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                    <div class="flex items-center gap-3 p-4">
                       <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                         <.icon name="hero-squares-2x2" class="size-4" />
                       </span>
@@ -105,13 +117,34 @@
                       ]}>
                         {ws_node.workspace.status}
                       </span>
-                      <.icon
-                        name="hero-chevron-right"
-                        class="size-3.5 shrink-0 text-muted-foreground transition-transform group-open/ws:rotate-90"
-                      />
-                    </summary>
+                      <button
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls={"home-workspace-body-#{ws_node.workspace.id}"}
+                        aria-label={"Toggle #{ws_node.workspace.name} sessions"}
+                        phx-click={
+                          JS.toggle(to: "#home-workspace-body-#{ws_node.workspace.id}")
+                          |> JS.toggle_class(
+                            "rotate-90",
+                            to: "#home-workspace-chevron-#{ws_node.workspace.id}"
+                          )
+                          |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+                        }
+                        class="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span
+                          id={"home-workspace-chevron-#{ws_node.workspace.id}"}
+                          class="flex size-3.5 shrink-0 text-muted-foreground transition-transform"
+                        >
+                          <.icon name="hero-chevron-right" class="size-3.5" />
+                        </span>
+                      </button>
+                    </div>
 
-                    <div class="border-t px-3 py-2">
+                    <div
+                      id={"home-workspace-body-#{ws_node.workspace.id}"}
+                      class="hidden border-t px-3 py-2"
+                    >
                       <%= if ws_node.sessions == [] do %>
                         <p class="px-2 py-2 text-sm text-muted-foreground">No sessions yet.</p>
                       <% else %>
@@ -140,12 +173,12 @@
                         <% end %>
                       <% end %>
                     </div>
-                  </details>
+                  </div>
                 <% end %>
               </div>
             <% end %>
           </div>
-        </details>
+        </div>
       <% end %>
     </div>
   <% end %>

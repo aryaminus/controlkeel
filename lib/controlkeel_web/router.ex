@@ -163,6 +163,8 @@ defmodule ControlKeelWeb.Router do
       live "/observability/sessions/:id", ObservabilityLive, :show
     end
 
+    # NB: keep this block last in the scope — ":org_slug" matches any single
+    # segment, so routes added below it would be silently swallowed.
     live_session :organization,
       layout: {ControlKeelWeb.OrganizationLayouts, :organization},
       on_mount: [

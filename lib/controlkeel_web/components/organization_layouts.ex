@@ -256,8 +256,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     """
   end
 
-  def breadcums_header(assigns), do: breadcrumbs_header(assigns)
-
   @label_map %{
     "dashboard" => "Dashboard",
     "sessions" => "Sessions",

@@ -95,6 +95,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       {:noreply,
        socket
        |> assign(:org, org)
+       |> assign(:nav_org, org)
+       |> assign(:page_title, "Organization Settings - #{org.name}")
        |> assign(:settings_form, settings_form(org, budget_cents))
        |> assign(:settings_error, nil)
        |> put_flash(:info, "Settings saved.")}
