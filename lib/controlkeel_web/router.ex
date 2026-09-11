@@ -55,6 +55,23 @@ defmodule ControlKeelWeb.Router do
   pipeline :proxy_api do
   end
 
+  # Protocol endpoints live above the browser scope on purpose: the
+  # ":org_slug" live route below matches any single-segment GET, so scopes
+  # defined after it (like this one) would lose "GET /mcp" to it. Keep
+  # single-segment protocol GETs ahead of the browser scope.
+  scope "/", ControlKeelWeb do
+    pipe_through :protocol_api
+
+    get "/.well-known/oauth-protected-resource/mcp", ProtocolController, :protected_resource_mcp
+    get "/.well-known/oauth-protected-resource", ProtocolController, :protected_resource_alias
+    get "/.well-known/oauth-authorization-server", ProtocolController, :authorization_server
+    get "/.well-known/agent-card.json", ProtocolController, :a2a_card
+    get "/.well-known/agent.json", ProtocolController, :a2a_card
+    post "/oauth/token", OAuthController, :token
+    get "/mcp", ProtocolController, :mcp_get
+    delete "/mcp", ProtocolController, :mcp_delete
+  end
+
   scope "/", ControlKeelWeb do
     pipe_through :browser
 
@@ -164,7 +181,9 @@ defmodule ControlKeelWeb.Router do
     end
 
     # NB: keep this block last in the scope — ":org_slug" matches any single
-    # segment, so routes added below it would be silently swallowed.
+    # segment, so routes added below it would be silently swallowed. For the
+    # same reason, single-segment protocol GETs must stay ahead of the
+    # browser scope (see above).
     live_session :organization,
       layout: {ControlKeelWeb.OrganizationLayouts, :organization},
       on_mount: [
@@ -280,19 +299,6 @@ defmodule ControlKeelWeb.Router do
     post "/gemini/:proxy_token/v1beta/chat/completions", ProxyController, :gemini_chat_completions
     get "/gemini/:proxy_token/v1beta/openai/models", ProxyController, :gemini_models
     get "/openai/:proxy_token/v1/realtime", ProxySocketController, :openai_realtime
-  end
-
-  scope "/", ControlKeelWeb do
-    pipe_through :protocol_api
-
-    get "/.well-known/oauth-protected-resource/mcp", ProtocolController, :protected_resource_mcp
-    get "/.well-known/oauth-protected-resource", ProtocolController, :protected_resource_alias
-    get "/.well-known/oauth-authorization-server", ProtocolController, :authorization_server
-    get "/.well-known/agent-card.json", ProtocolController, :a2a_card
-    get "/.well-known/agent.json", ProtocolController, :a2a_card
-    post "/oauth/token", OAuthController, :token
-    get "/mcp", ProtocolController, :mcp_get
-    delete "/mcp", ProtocolController, :mcp_delete
   end
 
   scope "/", ControlKeelWeb do
