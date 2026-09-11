@@ -36,6 +36,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
        |> assign(:page_title, "Settings — #{workspace.name}")
        |> assign(:workspace, workspace)
        |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
        |> assign(
          :breadcrumbs,
          [

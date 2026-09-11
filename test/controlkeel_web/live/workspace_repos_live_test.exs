@@ -47,6 +47,10 @@ defmodule ControlKeelWeb.WorkspaceReposLiveTest do
 
     assert html =~ "GitHub repositories"
     assert html =~ "ReposCo"
+    # Sidebar shows workspace nav with the current page active.
+    assert html =~ "sidebar-org-nav"
+    assert html =~ ~s(href="/reposco/workspaces/core/settings")
+    assert html =~ "aria-current=\"page\""
   end
 
   test "wrong org slug redirects to organizations" do

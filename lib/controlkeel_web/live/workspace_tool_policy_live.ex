@@ -33,6 +33,7 @@ defmodule ControlKeelWeb.WorkspaceToolPolicyLive do
        |> assign(:page_title, "Tool policy — #{workspace.name}")
        |> assign(:workspace, workspace)
        |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
        |> assign(
          :breadcrumbs,
          [

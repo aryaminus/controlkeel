@@ -47,6 +47,10 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLiveTest do
 
     assert html =~ "Service accounts"
     assert html =~ "SaCo"
+    # Sidebar shows workspace nav with the current page active.
+    assert html =~ "sidebar-org-nav"
+    assert html =~ ~s(href="/saco/workspaces/core/webhooks")
+    assert html =~ "aria-current=\"page\""
   end
 
   test "wrong org slug redirects to organizations" do

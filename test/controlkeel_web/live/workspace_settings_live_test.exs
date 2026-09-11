@@ -513,7 +513,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
         })
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/seta/workspaces/#{ws_a.id}/settings")
+               live(conn, ~p"/seta/workspaces/#{ws_a.slug}/settings")
 
       assert msg =~ "Workspace belongs to a different organization."
     end

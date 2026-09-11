@@ -34,6 +34,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
        |> assign(:page_title, workspace.name)
        |> assign(:workspace, workspace)
        |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
        |> assign(
          :breadcrumbs,
          [

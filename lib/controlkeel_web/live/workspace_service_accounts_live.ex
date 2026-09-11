@@ -30,6 +30,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
        |> assign(:page_title, "Service accounts — #{workspace.name}")
        |> assign(:workspace, workspace)
        |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
        |> assign(
          :breadcrumbs,
          [

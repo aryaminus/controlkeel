@@ -47,6 +47,10 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLiveTest do
 
     assert html =~ "Webhooks"
     assert html =~ "WhCo"
+    # Sidebar shows workspace nav with the current page active.
+    assert html =~ "sidebar-org-nav"
+    assert html =~ ~s(href="/whco/workspaces/core/tool-policy")
+    assert html =~ "aria-current=\"page\""
   end
 
   test "wrong org slug redirects to organizations" do

@@ -47,6 +47,10 @@ defmodule ControlKeelWeb.WorkspaceToolPolicyLiveTest do
 
     assert html =~ "Tool policy"
     assert html =~ "TpCo"
+    # Sidebar shows workspace nav with the current page active.
+    assert html =~ "sidebar-org-nav"
+    assert html =~ ~s(href="/tpco/workspaces/core/repos")
+    assert html =~ "aria-current=\"page\""
   end
 
   test "wrong org slug redirects to organizations" do

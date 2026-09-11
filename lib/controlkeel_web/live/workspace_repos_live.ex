@@ -26,6 +26,7 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
        |> assign(:page_title, "Repositories — #{workspace.name}")
        |> assign(:workspace, workspace)
        |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
        |> assign(
          :breadcrumbs,
          [
