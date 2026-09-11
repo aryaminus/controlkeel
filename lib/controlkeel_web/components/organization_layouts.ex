@@ -128,19 +128,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                 </.link>
               <% end %>
             </div>
-
-            <div class="my-1 border-t"></div>
-
-            <.link
-              navigate={~p"/organizations"}
-              phx-click={
-                JS.hide(to: "#sidebar-org-switcher-popover")
-                |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
-              }
-              class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            >
-              <.icon name="hero-squares-2x2" class="size-3.5" /> All organizations
-            </.link>
           </div>
         </div>
       </div>
@@ -236,7 +223,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           <% end %>
         </ol>
       </nav>
-      <div :if={@actions != []} class="flex items-center gap-2" id="dashboard-page-action">
+      <div :if={@actions != []} class="flex items-center gap-2" id="organization-page-action">
         <%= for action <- @actions do %>
           <a
             :if={action[:to]}

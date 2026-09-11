@@ -357,7 +357,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "sidebar-org-switcher"
       assert html =~ ~s(href="/tabco")
       assert html =~ ~s(href="/second-org")
-      assert html =~ ~s(href="/organizations")
+      refute html =~ ~s(href="/organizations")
     end
   end
 
