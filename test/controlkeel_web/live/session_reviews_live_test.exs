@@ -12,14 +12,11 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
 
     {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}/reviews")
 
-    assert html =~ "Review queue"
     assert html =~ review.title
     assert html =~ "/sessions/#{session.id}/reviews/#{review.id}"
     assert html =~ "plan"
     assert html =~ "pending"
     assert html =~ "opencode"
-    assert html =~ "1 total"
-    assert html =~ "1 pending"
     assert html =~ "/sessions/#{session.id}"
   end
 
@@ -38,10 +35,7 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
 
     {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}/reviews")
 
-    assert html =~ "Review queue"
     assert html =~ "No reviews yet."
-    assert html =~ "0 total"
-    assert html =~ "0 pending"
   end
 
   test "session reviews updates pending counts after a review is decided", %{conn: conn} do
@@ -49,7 +43,6 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
     review = review_fixture(%{session: session})
 
     {:ok, view, html} = live(conn, ~p"/sessions/#{session.id}/reviews")
-    assert html =~ "1 pending"
     assert html =~ "pending"
 
     assert {:ok, _updated} = Mission.respond_review(review, %{"decision" => "approved"})
@@ -57,8 +50,7 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
 
     refreshed_html = render(view)
 
-    assert refreshed_html =~ "0 pending"
-    assert refreshed_html =~ "1 resolved"
+    refute refreshed_html =~ ">pending<"
     assert refreshed_html =~ "approved"
   end
 

@@ -3,14 +3,10 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   alias ControlKeel.Analytics
   alias ControlKeel.Agent.AutonomyLoop
-  alias ControlKeel.Governance
   alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeel.Observability
-  alias ControlKeel.Platform
   alias ControlKeel.Proxy
-  alias ControlKeelWeb.FindingComponents
-  alias ControlKeelWeb.ReleaseReadiness
   alias ControlKeelWeb.ShipReadiness
 
   @refresh_interval_ms 2_000
@@ -36,10 +32,7 @@ defmodule ControlKeelWeb.MissionControlLive do
            |> assign(:page_title, session.title)
            |> assign(:project_root, project_root)
            |> assign(:launched, Map.get(params, "launched") == "1")
-           |> assign(:selected_finding, nil)
-           |> assign(:selected_fix, nil)
-           |> safe_assign_session(session)
-           |> assign_release_readiness(release_form_defaults(), false)}
+           |> safe_assign_session(session)}
         else
           {:ok,
            socket
@@ -56,10 +49,7 @@ defmodule ControlKeelWeb.MissionControlLive do
          |> assign(:page_title, session.title)
          |> assign(:project_root, project_root)
          |> assign(:launched, Map.get(params, "launched") == "1")
-         |> assign(:selected_finding, nil)
-         |> assign(:selected_fix, nil)
-         |> safe_assign_session(session)
-         |> assign_release_readiness(release_form_defaults(), false)}
+         |> safe_assign_session(session)}
     end
   end
 
@@ -73,195 +63,6 @@ defmodule ControlKeelWeb.MissionControlLive do
 
       session ->
         {:noreply, socket |> assign_session(session)}
-    end
-  end
-
-  @impl true
-  def handle_event("view_fix", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <-
-           Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
-      fix = Mission.auto_fix_for_finding(finding)
-      emit_autofix_event(:viewed, finding, fix)
-
-      {:noreply,
-       socket
-       |> assign(:selected_finding, finding)
-       |> assign(:selected_fix, fix)}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "ControlKeel could not load that fix.")}
-    end
-  end
-
-  @impl true
-  def handle_event("copy_fix_prompt", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <- socket.assigns.selected_finding,
-         %{"agent_prompt" => prompt} = fix <- socket.assigns.selected_fix,
-         true <- is_binary(prompt) and prompt != "" do
-      emit_autofix_event(:copied, finding, fix)
-
-      {:noreply,
-       socket
-       |> push_event("copy-to-clipboard", %{text: prompt})
-       |> put_flash(:info, "Fix prompt copied to the clipboard.")}
-    else
-      _error -> {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("close_fix", _params, socket) do
-    {:noreply, socket |> assign(:selected_finding, nil) |> assign(:selected_fix, nil)}
-  end
-
-  @impl true
-  def handle_event("approve_finding", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
-         {:ok, _updated} <- Mission.approve_finding(finding, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
-        nil ->
-          {:noreply, socket}
-
-        session ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Finding approved.")
-           |> safe_assign_session(session)
-           |> refresh_release_readiness()}
-      end
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
-    end
-  end
-
-  @impl true
-  def handle_event("reject_finding", params, socket) do
-    id = params["id"]
-
-    reason =
-      params["reason"]
-      |> then(&if is_binary(&1) and String.trim(&1) != "", do: String.trim(&1), else: nil)
-
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
-         {:ok, _updated} <- Mission.reject_finding(finding, reason, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
-        nil ->
-          {:noreply, socket}
-
-        session ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Finding rejected.")
-           |> safe_assign_session(session)
-           |> refresh_release_readiness()}
-      end
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
-    end
-  end
-
-  @impl true
-  def handle_event("generate_proof", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         {:ok, _proof} <- Mission.generate_proof_bundle(task_id),
-         session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Proof bundle generated.")
-       |> safe_assign_session(session)
-       |> refresh_release_readiness()}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
-    end
-  end
-
-  @impl true
-  def handle_event("check_release_readiness", %{"release" => params}, socket) do
-    form_params = Map.merge(release_form_defaults(), params)
-
-    socket =
-      socket
-      |> assign(:release_form_params, form_params)
-      |> assign_release_readiness(form_params, true)
-
-    {:noreply,
-     case socket.assigns.release_readiness do
-       nil -> socket
-       _readiness -> put_flash(socket, :info, "Release readiness checked.")
-     end}
-  end
-
-  @impl true
-  def handle_event("complete_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         {:ok, task} <- Mission.complete_task(task_id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task completed: #{task.title}.")
-       |> refresh_session_after_mutation()}
-    else
-      {:error, :unresolved_findings, findings} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "#{length(findings)} unresolved finding(s) must be approved or resolved before marking this task done."
-         )}
-
-      {:error, :proof_not_ready, reason} when is_binary(reason) ->
-        {:noreply, put_flash(socket, :error, reason)}
-
-      {:error, :invalid_id} ->
-        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
-
-      _error ->
-        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
-    end
-  end
-
-  @impl true
-  def handle_event("pause_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         {:ok, _result} <- Mission.pause_task(task_id, "mission_control"),
-         session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task paused.")
-       |> safe_assign_session(session)
-       |> refresh_release_readiness()}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
-    end
-  end
-
-  @impl true
-  def handle_event("resume_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         {:ok, _result} <- Mission.resume_task(task_id, "mission_control"),
-         session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task resumed.")
-       |> safe_assign_session(session)
-       |> refresh_release_readiness()}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
-    end
-  end
-
-  defp refresh_session_after_mutation(socket) do
-    case Mission.get_session_context(socket.assigns.session.id) do
-      nil ->
-        socket
-
-      session ->
-        socket |> safe_assign_session(session) |> refresh_release_readiness()
     end
   end
 
@@ -292,40 +93,13 @@ defmodule ControlKeelWeb.MissionControlLive do
           </div>
         </div>
       <% end %>
-      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
-        <div class="space-y-1 min-w-0">
-          <h2 class="text-2xl font-semibold text-primary leading-6 tracking-wide uppercase">
-            {@session.title}
-          </h2>
-          <p class="text-muted-foreground">
-            {@session.objective}
-          </p>
-        </div>
-        <div class="flex flex-col sm:items-end gap-2 shrink-0">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Audit log
-            </span>
-            <.link
-              :for={format <- ~w(json csv pdf)}
-              id={"mission-audit-export-#{format}"}
-              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
-              class="rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-            >
-              {String.upcase(format)}
-            </.link>
-          </div>
-          <p :if={@latest_audit_export} class="text-xs text-muted-foreground">
-            Last export ({@latest_audit_export.format}):
-            <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
-          </p>
-          <.link
-            navigate={~p"/sessions/#{@session.id}/deploy-review"}
-            class="inline-flex shrink-0 items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
-          >
-            <.icon name="hero-cloud-arrow-up" class="size-4" /> Deployment Advisor
-          </.link>
-        </div>
+      <div class="space-y-1 min-w-0 mb-12">
+        <h2 class="text-2xl font-semibold text-primary leading-6 tracking-wide uppercase">
+          {@session.title}
+        </h2>
+        <p class="text-muted-foreground">
+          {@session.objective}
+        </p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-5">
@@ -526,12 +300,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         agent_outcomes={@ship_agent_outcomes}
       />
 
-      <ReleaseReadiness.release_readiness
-        readiness={@release_readiness}
-        form={@release_form}
-        session_id={@session.id}
-      />
-
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20">
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
@@ -632,253 +400,6 @@ defmodule ControlKeelWeb.MissionControlLive do
             </div>
           </div>
         </div>
-
-        <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 lg:col-span-2">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary pb-3 border-b">
-            Current task context
-          </p>
-          <%= if @current_task do %>
-            <div class="flex items-center justify-between gap-4 mt-4">
-              <div class="flex items-center gap-3 min-w-0">
-                <span class={[
-                  "size-2.5 rounded-full inline-block shrink-0",
-                  @current_task.status in ["done", "verified"] && "bg-[var(--ck-success)]",
-                  @current_task.status == "in_progress" && "bg-primary",
-                  @current_task.status == "queued" && "bg-[var(--ck-warning)]",
-                  @current_task.status == "paused" && "bg-info",
-                  @current_task.status == "blocked" && "bg-destructive"
-                ]}>
-                </span>
-                <strong class="truncate">{@current_task.title}</strong>
-              </div>
-              <span class={task_status_pill_class(@current_task.status)}>
-                {task_status_label(@current_task)}
-              </span>
-            </div>
-            <p class="text-sm text-muted-foreground mt-1">{@current_task.validation_gate}</p>
-            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 pt-4 border-t">
-              <button
-                :if={@current_task.status not in ["done", "verified"]}
-                id={"current-task-complete-#{@current_task.id}"}
-                type="button"
-                class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
-                phx-click="complete_task"
-                phx-value-id={@current_task.id}
-              >
-                Complete
-              </button>
-              <button
-                id={"current-task-generate-proof-#{@current_task.id}"}
-                type="button"
-                class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 hover:text-primary cursor-pointer"
-                phx-click="generate_proof"
-                phx-value-id={@current_task.id}
-              >
-                Generate proof
-              </button>
-              <button
-                :if={@current_task.status in ["queued", "in_progress", "blocked"]}
-                id={"current-task-pause-#{@current_task.id}"}
-                type="button"
-                class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-                phx-click="pause_task"
-                phx-value-id={@current_task.id}
-              >
-                Pause
-              </button>
-              <button
-                :if={@current_task.status == "paused"}
-                id={"current-task-resume-#{@current_task.id}"}
-                type="button"
-                class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-                phx-click="resume_task"
-                phx-value-id={@current_task.id}
-              >
-                Resume
-              </button>
-              <.link
-                :if={Map.get(@latest_proofs, @current_task.id)}
-                navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, @current_task.id).id}"}
-                class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-              >
-                View proof
-              </.link>
-            </div>
-            <%= if @current_proof_summary do %>
-              <div class="flex flex-wrap gap-2 mt-3">
-                <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-                  v{@current_proof_summary["version"]}
-                </span>
-                <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-                  risk {@current_proof_summary["risk_score"]}
-                </span>
-                <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-                  {task_verification_label(@current_task, @current_proof_summary)}
-                </span>
-                <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-                  {if @current_proof_summary["deploy_ready"],
-                    do: "deploy ready",
-                    else: "review required"}
-                </span>
-              </div>
-            <% else %>
-              <p :if={done_unverified?(@current_task)} class="text-sm text-muted-foreground mt-1">
-                Execution finished, but CK has not verified this task yet. Add checks or regenerate proof.
-              </p>
-            <% end %>
-          <% else %>
-            <p class="text-sm text-muted-foreground mt-1">No active task context is available yet.</p>
-          <% end %>
-
-          <p class="mt-8 pt-6 border-t text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Task dependencies
-          </p>
-          <%= if @task_graph.edges == [] do %>
-            <p class="text-sm text-muted-foreground mt-1" id="mission-task-deps-empty">
-              No dependency edges are recorded yet. When tasks include architecture, feature, and release tracks, edges appear here. The checklist below stays ordered by position.
-            </p>
-          <% else %>
-            <div class="mt-4 space-y-6">
-              <ul class="space-y-2 list-none p-0 m-0 mt-2" id="mission-task-edges">
-                <%= for edge <- @task_graph.edges do %>
-                  <li>
-                    {Map.get(@task_title_by_id, edge.from_task_id, "Task #{edge.from_task_id}")}
-                    <span class="text-muted-foreground"> → </span>
-                    {Map.get(@task_title_by_id, edge.to_task_id, "Task #{edge.to_task_id}")}
-                    <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2 py-0.5 text-[0.65rem] text-muted-foreground ml-1.5">
-                      {edge.dependency_type}
-                    </span>
-                  </li>
-                <% end %>
-              </ul>
-              <div class="mt-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-                  Ready (dependencies satisfied)
-                </p>
-                <p class="text-sm text-muted-foreground mt-1" id="mission-task-ready">
-                  <%= if @task_graph.ready_task_ids == [] do %>
-                    No tasks are ready to advance right now.
-                  <% else %>
-                    {Enum.map_join(@task_graph.ready_task_ids, ", ", fn id ->
-                      Map.get(@task_title_by_id, id, "Task #{id}")
-                    end)}
-                  <% end %>
-                </p>
-              </div>
-            </div>
-          <% end %>
-
-          <p class="mt-8 pt-6 border-t text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Task checklist
-          </p>
-          <ol class="space-y-3 list-none p-0 m-0 mt-3" id="mission-task-checklist">
-            <%= for task <- @session.tasks do %>
-              <li class="p-4 rounded-2xl border bg-muted/[0.03] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class={[
-                      "size-2.5 rounded-full inline-block shrink-0",
-                      task.status in ["done", "verified"] && "bg-[var(--ck-success)]",
-                      task.status == "in_progress" && "bg-primary",
-                      task.status == "queued" && "bg-[var(--ck-warning)]",
-                      task.status == "paused" && "bg-info",
-                      task.status == "blocked" && "bg-destructive"
-                    ]}>
-                    </span>
-                    <strong>{task.title}</strong>
-                    <span class={task_status_pill_class(task.status)}>
-                      {task_status_label(task)}
-                    </span>
-                  </div>
-                  <p class="text-sm text-muted-foreground">{task.validation_gate}</p>
-                  <%= if task.rollback_boundary do %>
-                    <p class="text-xs text-muted-foreground mt-0.5">
-                      Rollback: {task.rollback_boundary}
-                    </p>
-                  <% end %>
-                  <%= if task.status == "in_progress" and @active_findings > 0 do %>
-                    <p class="text-sm text-[var(--ck-warning)] mt-1">
-                      {@active_findings} unresolved finding{if @active_findings != 1, do: "s"} — review before marking done
-                    </p>
-                  <% end %>
-                  <%= for prompt <- task_decision_prompts(task) do %>
-                    <p class="text-xs text-muted-foreground mt-0.5">
-                      {prompt}
-                    </p>
-                  <% end %>
-                </div>
-                <div class="flex flex-col items-start md:items-end gap-1 shrink-0">
-                  <%= if task.confidence_score do %>
-                    <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2 py-0.5 text-[0.7rem] text-muted-foreground">
-                      {trunc(task.confidence_score * 100)}% confidence
-                    </span>
-                  <% end %>
-                  <span
-                    :if={Map.get(@latest_proofs, task.id)}
-                    class="text-xs text-muted-foreground"
-                  >
-                    {task_verification_label(task, Map.get(@latest_proofs, task.id))}
-                  </span>
-                  <span
-                    :if={done_unverified?(task) and is_nil(Map.get(@latest_proofs, task.id))}
-                    class="text-xs text-muted-foreground"
-                  >
-                    needs verification evidence
-                  </span>
-                  <div class="flex flex-wrap items-center justify-start md:justify-end gap-2 mt-1">
-                    <%= if Map.get(@latest_proofs, task.id) do %>
-                      <.link
-                        navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"}
-                        class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-                      >
-                        View proof
-                      </.link>
-                    <% end %>
-                    <button
-                      :if={task.status not in ["done", "verified"]}
-                      id={"task-complete-#{task.id}"}
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
-                      phx-click="complete_task"
-                      phx-value-id={task.id}
-                    >
-                      Complete
-                    </button>
-                    <button
-                      id={"task-generate-proof-#{task.id}"}
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 hover:text-primary cursor-pointer"
-                      phx-click="generate_proof"
-                      phx-value-id={task.id}
-                    >
-                      Generate proof
-                    </button>
-                    <button
-                      :if={task.status in ["queued", "in_progress", "blocked"]}
-                      id={"task-pause-#{task.id}"}
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-                      phx-click="pause_task"
-                      phx-value-id={task.id}
-                    >
-                      Pause
-                    </button>
-                    <button
-                      :if={task.status == "paused"}
-                      id={"task-resume-#{task.id}"}
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-                      phx-click="resume_task"
-                      phx-value-id={task.id}
-                    >
-                      Resume
-                    </button>
-                  </div>
-                </div>
-              </li>
-            <% end %>
-          </ol>
-        </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -933,52 +454,6 @@ defmodule ControlKeelWeb.MissionControlLive do
             </ul>
           <% end %>
         </div>
-      </div>
-
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
-            Recent transcript
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-              {@current_transcript_summary["total_events"] || 0} events
-            </span>
-            <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-              {length(@current_recent_events)} recent
-            </span>
-          </div>
-        </div>
-        <%= if @current_recent_events == [] do %>
-          <p class="text-sm text-muted-foreground mt-4">No transcript events recorded yet.</p>
-        <% else %>
-          <ul class="space-y-2 list-none p-0 m-0 mt-4">
-            <%= for event <- @current_recent_events do %>
-              <li class="rounded-2xl border bg-muted/[0.03] px-4 py-3 transition hover:bg-muted/[0.05]">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <strong class="text-sm text-foreground">{event["summary"]}</strong>
-                  <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2 py-0.5 text-[0.65rem] text-muted-foreground">
-                    {event["event_type"]}
-                  </span>
-                </div>
-                <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span class="inline-flex items-center rounded-md border border-input bg-background px-1.5 py-0.5">
-                    {event["actor"]}
-                  </span>
-                  <span class="font-mono tabular-nums tracking-tight">
-                    {event_timestamp(event["inserted_at"])}
-                  </span>
-                </div>
-              </li>
-            <% end %>
-          </ul>
-        <% end %>
-        <details class="mt-4">
-          <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary cursor-pointer select-none">
-            View transcript summary JSON
-          </summary>
-          <pre class="p-4 max-h-96 overflow-auto border rounded-2xl bg-muted/[0.03] text-sm text-[#f2e6c9] font-mono whitespace-pre-wrap break-all leading-relaxed mt-4">{Jason.encode!(@current_transcript_summary, pretty: true)}</pre>
-        </details>
       </div>
 
       <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
@@ -1051,97 +526,6 @@ defmodule ControlKeelWeb.MissionControlLive do
           </a>
         </div>
       </div>
-
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-          Findings feed
-        </p>
-        <%= if @session.findings == [] do %>
-          <p class="text-sm text-muted-foreground mt-3">
-            No findings yet. ControlKeel is monitoring every agent action.
-          </p>
-        <% else %>
-          <div class="space-y-4 mt-3">
-            <%= for finding <- @session.findings do %>
-              <article class="p-4 rounded-2xl border bg-muted/[0.03] space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <h3>{finding.title}</h3>
-                  <div class="flex gap-2 items-center">
-                    <span class={[
-                      "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                      finding.severity in ["critical", "high"] &&
-                        "bg-destructive/10 text-destructive ring-destructive/20",
-                      finding.severity in ["medium", "moderate"] &&
-                        "bg-[var(--ck-warning)]/10 text-[var(--ck-warning)] ring-[var(--ck-warning)]/20",
-                      finding.severity in ["low"] &&
-                        "bg-[var(--ck-success)]/10 text-[var(--ck-success)] ring-[var(--ck-success)]/20",
-                      finding.severity not in ["critical", "high", "medium", "moderate", "low"] &&
-                        "bg-muted text-muted-foreground ring-border"
-                    ]}>
-                      {finding.severity}
-                    </span>
-                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-muted text-muted-foreground ring-border">
-                      {finding.status}
-                    </span>
-                  </div>
-                </div>
-                <p class="text-sm text-muted-foreground">{finding.plain_message}</p>
-                <p class="text-xs text-muted-foreground">
-                  {Mission.finding_human_gate_hint(finding)}
-                </p>
-                <div class="flex justify-between items-center text-xs text-muted-foreground border-t pt-2">
-                  <span>{finding.category}</span>
-                  <span class="font-mono tabular-nums tracking-tight">
-                    {event_timestamp(finding.inserted_at)}
-                  </span>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 border-t pt-2">
-                  <button
-                    type="button"
-                    class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 hover:text-primary cursor-pointer"
-                    phx-click="view_fix"
-                    phx-value-id={finding.id}
-                  >
-                    View fix
-                  </button>
-                  <%= if finding.status in ["open", "blocked"] do %>
-                    <button
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-[var(--ck-success)]/15 text-[var(--ck-success)] border border-[var(--ck-success)]/30 hover:bg-[var(--ck-success)]/25 hover:text-[var(--ck-success)] cursor-pointer"
-                      phx-click="approve_finding"
-                      phx-value-id={finding.id}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition bg-destructive/15 text-destructive border border-destructive/30 hover:bg-destructive/25 hover:text-destructive cursor-pointer"
-                      phx-click="reject_finding"
-                      phx-value-id={finding.id}
-                    >
-                      Reject
-                    </button>
-                  <% end %>
-                  <.link
-                    navigate={~p"/findings?#{%{"session_id" => @session.id, "q" => finding.rule_id}}"}
-                    class="inline-flex items-center rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground cursor-pointer"
-                  >
-                    Open in browser
-                  </.link>
-                </div>
-              </article>
-            <% end %>
-          </div>
-        <% end %>
-      </div>
-
-      <FindingComponents.autofix_panel
-        :if={@selected_finding && @selected_fix}
-        finding={@selected_finding}
-        fix={@selected_fix}
-        copy_event="copy_fix_prompt"
-        close_event="close_fix"
-      />
     </section>
     """
   end
@@ -1165,22 +549,11 @@ defmodule ControlKeelWeb.MissionControlLive do
         :active_tasks,
         Enum.count(session.tasks || [], &(&1.status in ["queued", "in_progress"]))
       )
-      |> assign(:latest_audit_export, nil)
-      |> assign(:task_graph, %{tasks: session.tasks || [], edges: []})
   end
 
   defp assign_session(socket, session) do
     brief = stringify_keys(session.execution_brief || %{})
     compiler = stringify_keys(Map.get(brief, "compiler", %{}))
-
-    selected_finding =
-      case socket.assigns[:selected_finding] do
-        %{id: id} -> Enum.find(session.findings, &(&1.id == id))
-        _ -> nil
-      end
-
-    task_graph = Mission.session_task_graph(session.id)
-    task_title_by_id = Map.new(task_graph.tasks, &{&1.id, &1.title})
 
     {autonomy_profile, outcome_profile, improvement_loop, ship_outcome_metrics,
      ship_agent_outcomes} =
@@ -1194,23 +567,14 @@ defmodule ControlKeelWeb.MissionControlLive do
       brief: brief,
       boundary_summary: Intent.boundary_summary(brief),
       compiler: compiler,
-      current_task: current_task(session.tasks),
-      selected_finding: selected_finding,
-      selected_fix: maybe_regenerate_fix(selected_finding),
       active_findings: Enum.count(session.findings, &(&1.status in ["open", "blocked"])),
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
       compliance_score: compliance_score(session.findings),
       latest_proofs: Mission.latest_proof_bundles_for_session(session.id),
-      latest_audit_export: Platform.list_audit_exports(session.id, 1) |> List.first(),
       observability: Observability.session_run(session),
-      current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
       current_memory_hits: current_memory_hits(session),
       current_workspace_context: Mission.workspace_context(session),
-      current_recent_events: Mission.list_session_events(session.id),
-      current_transcript_summary: Mission.transcript_summary(session.id),
       current_resume_packet: current_resume_packet(session),
-      task_graph: task_graph,
-      task_title_by_id: task_title_by_id,
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent")),
       proxy_urls: Proxy.endpoint_urls(session),
@@ -1266,75 +630,6 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
 
-  defp release_form_defaults do
-    %{
-      "smoke_status" => "",
-      "smoke_run" => "",
-      "artifact_source" => "",
-      "sha" => "",
-      "provenance_verified" => "false"
-    }
-  end
-
-  # Release readiness is isolated (like safe_assign_session) so a gate failure
-  # can never take down the periodic refresh loop. Mutation-triggered refreshes
-  # pass `record_telemetry: false`; only explicit operator checks record telemetry.
-  defp assign_release_readiness(socket, form_params, record_telemetry) do
-    readiness =
-      socket.assigns.session.id
-      |> release_readiness_opts(form_params)
-      |> Map.put(:record_telemetry, record_telemetry)
-      |> Governance.release_readiness()
-      |> case do
-        {:ok, readiness} -> readiness
-        {:error, _reason} -> nil
-      end
-
-    socket
-    |> assign(:release_readiness, readiness)
-    |> assign(:release_form, to_form(form_params, as: :release))
-  rescue
-    e ->
-      require Logger
-      Logger.warning("MissionControlLive release readiness rescued: #{inspect(e)}")
-
-      socket
-      |> assign(:release_readiness, nil)
-      |> assign(:release_form, to_form(form_params, as: :release))
-  end
-
-  defp refresh_release_readiness(socket) do
-    assign_release_readiness(
-      socket,
-      socket.assigns[:release_form_params] || release_form_defaults(),
-      false
-    )
-  end
-
-  defp release_readiness_opts(session_id, params) do
-    %{
-      session_id: session_id,
-      sha: blank_to_nil(params["sha"]),
-      smoke: %{
-        "status" => blank_to_nil(params["smoke_status"]),
-        "run_id" => blank_to_nil(params["smoke_run"])
-      },
-      provenance: %{
-        "verified" => params["provenance_verified"] in [true, "true"],
-        "artifact_source" => blank_to_nil(params["artifact_source"])
-      }
-    }
-  end
-
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp blank_to_nil(_value), do: nil
-
   defp current_task(tasks) do
     Enum.find(tasks, &(&1.status == "in_progress")) ||
       Enum.find(tasks, &(&1.status == "paused")) ||
@@ -1366,11 +661,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         end
     end
   end
-
-  defp event_timestamp(nil), do: "unknown"
-
-  defp event_timestamp(%DateTime{} = timestamp),
-    do: Calendar.strftime(timestamp, "%Y-%m-%d %H:%M:%S UTC")
 
   # Ship-readiness verdict, derived from the session's improvement loop signals.
   defp ship_verdict(improvement_loop, _outcome_metrics) do
@@ -1411,26 +701,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp workspace_status_label(%{"available" => true}), do: "available"
   defp workspace_status_label(_context), do: "unavailable"
 
-  defp task_status_label(%{status: "verified"}), do: "verified"
-  defp task_status_label(%{status: "done"}), do: "done, unverified"
-
-  defp task_status_label(%{status: status}) when is_binary(status),
-    do: String.replace(status, "_", " ")
-
-  defp task_status_label(_task), do: "unknown"
-
-  defp task_status_pill_class("verified"),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
-
-  defp task_status_pill_class("done"),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(255,207,107,0.12)] text-[#fff0bf]"
-
-  defp task_status_pill_class(_status),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
-
   defp obs_health_pill_class("red"),
     do:
       "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(255,143,107,0.12)] text-[#ffd6cb]"
@@ -1442,43 +712,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp obs_health_pill_class(_status),
     do:
       "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
-
-  defp done_unverified?(%{status: "done"}), do: true
-  defp done_unverified?(_task), do: false
-
-  defp task_verification_label(_task, %{"verification_status" => "strong"}),
-    do: "verification strong"
-
-  defp task_verification_label(_task, %{"verification_status" => "moderate"}),
-    do: "verification moderate"
-
-  defp task_verification_label(_task, %{"verification_status" => "weak"}), do: "verification weak"
-
-  defp task_verification_label(_task, %{
-         bundle: %{"verification_assessment" => %{"status" => "strong"}}
-       }),
-       do: "verification strong"
-
-  defp task_verification_label(
-         _task,
-         %{bundle: %{"verification_assessment" => %{"status" => "moderate"}}}
-       ),
-       do: "verification moderate"
-
-  defp task_verification_label(_task, %{
-         bundle: %{"verification_assessment" => %{"status" => "weak"}}
-       }),
-       do: "verification weak"
-
-  defp task_verification_label(task, _proof_summary),
-    do: if(done_unverified?(task), do: "unverified", else: "verification pending")
-
-  defp task_decision_prompts(task) do
-    task
-    |> Mission.review_gate_status()
-    |> Map.get("decision_prompts", [])
-    |> Enum.take(2)
-  end
 
   defp format_currency(cents), do: cents |> Kernel./(100) |> Float.round(2)
 
@@ -1496,25 +729,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp format_domain_pack("Not specified"), do: "Not specified"
   defp format_domain_pack(nil), do: "Not specified"
   defp format_domain_pack(domain_pack), do: Intent.pack_label(domain_pack)
-  defp maybe_regenerate_fix(nil), do: nil
-  defp maybe_regenerate_fix(finding), do: Mission.auto_fix_for_finding(finding)
 
   defp stringify_keys(map) when is_map(map) do
     Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
-  end
-
-  defp emit_autofix_event(action, finding, fix) do
-    :telemetry.execute(
-      [:controlkeel, :autofix, action],
-      %{count: 1},
-      %{
-        finding_id: finding.id,
-        session_id: finding.session_id,
-        rule_id: finding.rule_id,
-        supported: fix["supported"],
-        fix_kind: fix["fix_kind"]
-      }
-    )
   end
 
   defp compliance_score([]), do: 100
@@ -1528,20 +745,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp donut_color(score) when score >= 80, do: "#22c55e"
   defp donut_color(score) when score >= 50, do: "#f59e0b"
   defp donut_color(_score), do: "#ef4444"
-
-  defp parse_id(value) do
-    case Integer.parse(to_string(value)) do
-      {parsed, ""} -> {:ok, parsed}
-      _ -> {:error, :invalid_id}
-    end
-  end
-
-  defp actor_opts(socket) do
-    case socket.assigns[:current_user] do
-      nil -> [actor_source: "web", actor_identifier: "web"]
-      user -> [actor_source: "web", actor_user_id: user.id, actor_identifier: user.email]
-    end
-  end
 
   defp default_session_metrics(session_id) do
     %{

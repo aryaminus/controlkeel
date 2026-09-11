@@ -56,6 +56,57 @@ defmodule ControlKeelWeb.LayoutsTest do
     refute html =~ "phx-click"
   end
 
+  test "session_sidebar renders back link to sessions, title, id, risk tier, Overview, Tasks, Findings, Reviews, Release readiness, and Deploy review" do
+    html =
+      render_component(&Layouts.session_sidebar/1,
+        current_path: "/sessions/42",
+        session_id: "42",
+        session_title: "Refactor auth engine",
+        session_risk: "high"
+      )
+
+    assert html =~ ~s(href="/sessions")
+    assert html =~ "Sessions"
+    assert html =~ "Refactor auth engine"
+    assert html =~ "#42"
+    assert html =~ "high"
+    assert anchor_for(html, "/sessions/42") =~ "aria-current=\"page\""
+    assert html =~ "Overview"
+    assert anchor_for(html, "/sessions/42/tasks") != ""
+    refute anchor_for(html, "/sessions/42/tasks") =~ "aria-current=\"page\""
+    assert html =~ "Tasks"
+    assert anchor_for(html, "/sessions/42/findings") != ""
+    refute anchor_for(html, "/sessions/42/findings") =~ "aria-current=\"page\""
+    assert html =~ "Findings"
+    assert anchor_for(html, "/sessions/42/reviews") != ""
+    refute anchor_for(html, "/sessions/42/reviews") =~ "aria-current=\"page\""
+    assert html =~ "Reviews"
+    assert anchor_for(html, "/sessions/42/transcript") != ""
+    refute anchor_for(html, "/sessions/42/transcript") =~ "aria-current=\"page\""
+    assert html =~ "Transcript"
+    assert anchor_for(html, "/sessions/42/release-readiness") != ""
+    refute anchor_for(html, "/sessions/42/release-readiness") =~ "aria-current=\"page\""
+    assert html =~ "Release readiness"
+    assert anchor_for(html, "/sessions/42/deploy-review") != ""
+    refute anchor_for(html, "/sessions/42/deploy-review") =~ "aria-current=\"page\""
+    assert html =~ "Deploy review"
+    refute html =~ ~s(href="/findings)
+    refute html =~ ~s(href="/proofs)
+  end
+
+  test "session_sidebar highlights Tasks when on /sessions/:id/tasks" do
+    html =
+      render_component(&Layouts.session_sidebar/1,
+        current_path: "/sessions/42/tasks",
+        session_id: "42",
+        session_title: "Refactor auth engine",
+        session_risk: "high"
+      )
+
+    assert anchor_for(html, "/sessions/42/tasks") =~ "aria-current=\"page\""
+    refute anchor_for(html, "/sessions/42") =~ "aria-current=\"page\""
+  end
+
   defp anchor_for(html, href) do
     case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>.*?</a>|s, html) do
       nil -> ""

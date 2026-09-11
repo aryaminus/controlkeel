@@ -99,15 +99,11 @@ defmodule ControlKeelWeb.Router do
       live "/dashboard", DashboardLive, :index
       live "/sessions", MissionsLive, :index
       live "/sessions/start", OnboardingLive, :new
-      live "/sessions/:id", MissionControlLive, :show
-      live "/sessions/:id/reviews", SessionReviewsLive, :index
-      live "/sessions/:id/deploy-review", DeployReviewLive, :show
       live "/findings", FindingsLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
       live "/proofs", ProofBrowserLive, :index
       live "/proofs/:id", ProofBrowserLive, :show
-      live "/sessions/:sid/reviews/:rid", ReviewLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
@@ -121,6 +117,25 @@ defmodule ControlKeelWeb.Router do
       live "/workspaces/:id/tool-policy", WorkspaceToolPolicyLive, :edit
       live "/policies", PolicyStudioLive, :index
       live "/skills", SkillsLive, :index
+    end
+
+    # Session-scoped routes use the dedicated :session framework layout with session_sidebar.
+    # LayoutDefaults sets shared layout assigns (@current_path, @session_id) for nav highlighting.
+    live_session :session,
+      layout: {ControlKeelWeb.Layouts, :session},
+      on_mount: [
+        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
+        ControlKeelWeb.LayoutDefaults
+      ] do
+      live "/sessions/:id", MissionControlLive, :show
+      live "/sessions/:id/tasks", SessionTasksLive, :index
+      live "/sessions/:id/findings", SessionFindingsLive, :index
+      live "/sessions/:id/findings/:finding_id", SessionFindingLive, :show
+      live "/sessions/:id/release-readiness", SessionReleaseReadinessLive, :show
+      live "/sessions/:id/transcript", SessionTranscriptLive, :index
+      live "/sessions/:id/reviews", SessionReviewsLive, :index
+      live "/sessions/:id/deploy-review", DeployReviewLive, :show
+      live "/sessions/:sid/reviews/:rid", ReviewLive, :show
     end
 
     # Observability section routes use the shared :dashboard framework layout;

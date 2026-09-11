@@ -251,6 +251,309 @@ defmodule ControlKeelWeb.Layouts do
   defp subnav_icon_class(false),
     do: "size-3.5 shrink-0 text-muted-foreground/70 group-hover:text-primary"
 
+  @doc """
+  The session sidebar: back to sessions link, session title/id/risk tier,
+  and session-scoped navigation links.
+  """
+  attr :current_user, :any, default: nil
+  attr :current_path, :string, default: nil
+  attr :session, :any, default: nil
+  attr :session_id, :any, default: nil
+  attr :session_title, :string, default: nil
+  attr :session_risk, :string, default: nil
+
+  def session_sidebar(assigns) do
+    session = assigns[:session]
+
+    assigns =
+      assigns
+      |> assign_new(:mode, fn -> ControlKeel.Runtime.Mode.current() end)
+      |> assign_new(:resolved_session_id, fn ->
+        cond do
+          assigns[:session_id] ->
+            to_string(assigns[:session_id])
+
+          is_struct(session) ->
+            id = Map.get(session, :id)
+            if id, do: to_string(id), else: nil
+
+          is_map(session) ->
+            id = session[:id] || session["id"]
+            if id, do: to_string(id), else: nil
+
+          assigns[:current_path] ->
+            extract_session_id(assigns[:current_path])
+
+          true ->
+            nil
+        end
+      end)
+      |> assign_new(:resolved_session_title, fn ->
+        cond do
+          assigns[:session_title] && assigns[:session_title] != "" ->
+            assigns[:session_title]
+
+          is_struct(session) ->
+            Map.get(session, :title)
+
+          is_map(session) ->
+            session[:title] || session["title"]
+
+          true ->
+            nil
+        end
+      end)
+      |> assign_new(:resolved_session_risk, fn ->
+        cond do
+          assigns[:session_risk] && assigns[:session_risk] != "" ->
+            to_string(assigns[:session_risk])
+
+          is_struct(session) ->
+            risk = Map.get(session, :risk_tier) || Map.get(session, :risk_level)
+            if risk, do: to_string(risk), else: nil
+
+          is_map(session) ->
+            risk =
+              session[:risk_tier] || session["risk_tier"] || session[:risk_level] ||
+                session["risk_level"]
+
+            if risk, do: to_string(risk), else: nil
+
+          true ->
+            nil
+        end
+      end)
+
+    ~H"""
+    <aside
+      id="app-sidebar"
+      class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
+    >
+      <div class="px-3 pt-4 pb-2">
+        <.link
+          navigate={~p"/sessions"}
+          class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground group"
+        >
+          <.icon
+            name="hero-arrow-left"
+            class="size-4 shrink-0 text-muted-foreground group-hover:text-foreground transition"
+          />
+          <span>Sessions</span>
+        </.link>
+      </div>
+
+      <div class="px-3 py-2 border-b mx-3 mb-2">
+        <div class="flex items-center gap-2.5">
+          <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <.icon name="hero-rocket-launch" class="size-4" />
+          </span>
+          <span
+            class="min-w-0 flex-1 truncate font-semibold text-sm text-foreground"
+            title={
+              @resolved_session_title || (@resolved_session_id && "Session ##{@resolved_session_id}") ||
+                "Session"
+            }
+          >
+            {@resolved_session_title || (@resolved_session_id && "Session ##{@resolved_session_id}") ||
+              "Session"}
+          </span>
+        </div>
+        <div
+          :if={@resolved_session_id}
+          class="flex items-center gap-2 mt-1.5 pl-9 text-xs text-muted-foreground"
+        >
+          <span class="font-mono font-medium">#{@resolved_session_id}</span>
+          <span
+            :if={@resolved_session_risk}
+            class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground uppercase tracking-wider"
+          >
+            {@resolved_session_risk}
+          </span>
+        </div>
+      </div>
+
+      <nav
+        id="sidebar-nav"
+        phx-hook="SidebarNav"
+        class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 overscroll-contain text-sm"
+      >
+        <%= if @resolved_session_id do %>
+          <%= for item <- session_nav_items(@resolved_session_id) do %>
+            <% active = nav_active?(@current_path, item.href, Map.get(item, :exact, false)) %>
+            <% label_id = Phoenix.Naming.underscore(item.label) %>
+            <%= if item[:children] do %>
+              <% opened = active or nav_active?(@current_path, item.href, false) %>
+              <% collapse_id = "sidebar-collapse-#{label_id}" %>
+              <% chevron_id = "sidebar-chevron-#{label_id}" %>
+              <div class="flex flex-col gap-1">
+                <button
+                  type="button"
+                  id={"sidebar-toggle-#{label_id}"}
+                  data-sidebar-toggle
+                  aria-expanded={(opened && "true") || "false"}
+                  aria-controls={collapse_id}
+                  class={["w-full text-left cursor-pointer", sidebar_link_class(active)]}
+                >
+                  <.icon name={item.icon} class={sidebar_icon_class(active)} />
+                  <span class="flex-1">{item.label}</span>
+                  <span
+                    id={chevron_id}
+                    class={[
+                      "inline-flex shrink-0 transition-transform duration-200 text-muted-foreground",
+                      opened && "rotate-90"
+                    ]}
+                  >
+                    <.icon name="hero-chevron-right" class="size-4 shrink-0" />
+                  </span>
+                </button>
+                <div id={collapse_id} class={unless opened, do: "hidden"}>
+                  <.session_sidebar_children
+                    children={item.children}
+                    current_path={@current_path}
+                    parent_href={item.href}
+                  />
+                </div>
+              </div>
+            <% else %>
+              <.link
+                navigate={item.href}
+                aria-current={active && "page"}
+                class={sidebar_link_class(active)}
+              >
+                <.icon name={item.icon} class={sidebar_icon_class(active)} /> {item.label}
+              </.link>
+            <% end %>
+          <% end %>
+        <% end %>
+      </nav>
+
+      <div class="flex flex-col gap-1 border-t mt-2 px-3 py-2">
+        <a
+          href={~p"/getting-started"}
+          target="_blank"
+          rel="noopener"
+          class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <.icon name="hero-book-open" class="size-4" /> Docs
+        </a>
+        <a
+          href="https://github.com/aryaminus/controlkeel"
+          target="_blank"
+          rel="noopener"
+          class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <.icon name="hero-code-bracket" class="size-4" /> GitHub
+        </a>
+
+        <.user_menu
+          :if={@current_user != nil and @mode != :local}
+          id="sidebar-user-menu"
+          current_user={@current_user}
+          class="mt-3 border-t pt-3"
+          popover_class="bottom-20 right-4"
+        />
+      </div>
+    </aside>
+    """
+  end
+
+  attr :children, :list, required: true
+  attr :current_path, :string, default: nil
+  attr :parent_href, :string, required: true
+
+  def session_sidebar_children(assigns) do
+    ~H"""
+    <div data-sidebar-subnav class="mt-1 flex flex-col gap-0.5 pl-4 border-l border-border ml-4">
+      <%= for child <- @children do %>
+        <%= if child[:group] do %>
+          <p class="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            {child.group}
+          </p>
+        <% else %>
+          <% active =
+            nav_active?(@current_path, child.href, Map.get(child, :exact, child.href == @parent_href)) %>
+          <%= if child[:external] do %>
+            <a
+              id={child[:id]}
+              href={child.href}
+              target="_blank"
+              rel="noopener"
+              class={subnav_link_class(false)}
+            >
+              <.icon name={child.icon} class={subnav_icon_class(false)} /> {child.label}
+            </a>
+          <% else %>
+            <.link
+              id={child[:id]}
+              navigate={child.href}
+              aria-current={active && "page"}
+              class={subnav_link_class(active)}
+            >
+              <.icon name={child.icon} class={subnav_icon_class(active)} /> {child.label}
+            </.link>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp extract_session_id(path) when is_binary(path) do
+    case Regex.run(~r{/(?:sessions|observability/sessions)/([^/?#]+)}, path) do
+      [_, id] -> id
+      _ -> nil
+    end
+  end
+
+  defp extract_session_id(_), do: nil
+
+  defp session_nav_items(session_id) do
+    [
+      %{
+        label: "Overview",
+        href: ~p"/sessions/#{session_id}",
+        icon: "hero-squares-2x2",
+        exact: true
+      },
+      %{
+        label: "Tasks",
+        href: ~p"/sessions/#{session_id}/tasks",
+        icon: "hero-clipboard-document-list",
+        exact: true
+      },
+      %{
+        label: "Findings",
+        href: ~p"/sessions/#{session_id}/findings",
+        icon: "hero-shield-exclamation",
+        exact: true
+      },
+      %{
+        label: "Reviews",
+        href: ~p"/sessions/#{session_id}/reviews",
+        icon: "hero-clipboard-document-check",
+        exact: true
+      },
+      %{
+        label: "Transcript",
+        href: ~p"/sessions/#{session_id}/transcript",
+        icon: "hero-chat-bubble-bottom-center-text",
+        exact: true
+      },
+      %{
+        label: "Release readiness",
+        href: ~p"/sessions/#{session_id}/release-readiness",
+        icon: "hero-shield-check",
+        exact: true
+      },
+      %{
+        label: "Deploy review",
+        href: ~p"/sessions/#{session_id}/deploy-review",
+        icon: "hero-cloud-arrow-up",
+        exact: true
+      }
+    ]
+  end
+
   attr :id, :string, required: true
   attr :current_user, :any, required: true
   attr :compact, :boolean, default: false
