@@ -7,8 +7,10 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
 
   @doc """
   Checks for a Bearer token when `CONTROLKEEL_API_TOKEN` is set.
-  When the env var is not set, all requests pass through (local dev default).
-  Returns 401 JSON on mismatch.
+  When the env var is not set (local dev default), unauthenticated requests
+  are only accepted from loopback peers; anything else gets a 403. Bound
+  tokens are validated as bootstrap or service-account credentials.
+  Returns 401 JSON on token mismatch.
   """
   def init(opts), do: opts
 
@@ -18,7 +20,14 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
         if configured_token() do
           unauthorized(conn)
         else
-          conn
+          # No token configured (local default). The API is still reachable,
+          # but only from this machine — a server bound to a non-loopback
+          # interface without a configured token must not serve remote peers.
+          if loopback_peer?(conn) do
+            conn
+          else
+            forbidden_nonlocal_peer(conn)
+          end
         end
 
       provided ->
@@ -35,15 +44,15 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
                 })
 
               {:error, :unauthorized} ->
-                if configured_token() do
-                  unauthorized(conn)
-                else
-                  unauthorized(conn)
-                end
+                unauthorized(conn)
             end
         end
     end
   end
+
+  defp loopback_peer?(%Plug.Conn{remote_ip: {127, _, _, _}}), do: true
+  defp loopback_peer?(%Plug.Conn{remote_ip: {0, 0, 0, 0, 0, 0, 0, 1}}), do: true
+  defp loopback_peer?(_conn), do: false
 
   defp configured_token do
     Application.get_env(:controlkeel, :api_token)
@@ -60,6 +69,13 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
     conn
     |> put_status(:unauthorized)
     |> Phoenix.Controller.json(%{error: "unauthorized"})
+    |> halt()
+  end
+
+  defp forbidden_nonlocal_peer(conn) do
+    conn
+    |> put_status(:forbidden)
+    |> Phoenix.Controller.json(%{error: "forbidden_nonlocal_peer"})
     |> halt()
   end
 end

@@ -55,6 +55,7 @@ jobs:
         run: mix test
         timeout-minutes: 30
       - run: sh -n scripts/install.sh
+      - run: sh -n scripts/release_smoke.sh
       - run: python3 -m py_compile scripts/bump_version.py scripts/render_release_notes.py
       - run: node --check packages/npm/controlkeel/bin/controlkeel.js
       - run: node --check packages/npm/controlkeel/lib/install.js

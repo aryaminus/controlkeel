@@ -1260,21 +1260,24 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   def bootstrap_project(conn, params) do
-    project_root = Map.get(params, "project_root", File.cwd!())
-    overrides = Map.take(params, ~w(agent))
-    ephemeral_ok? = Map.get(params, "ephemeral_ok", true)
+    with {:ok, project_root} <- authorized_project_root(conn, params) do
+      overrides = Map.take(params, ~w(agent))
+      ephemeral_ok? = Map.get(params, "ephemeral_ok", true)
 
-    case Local.load_or_bootstrap(project_root, overrides, ephemeral_ok: ephemeral_ok?) do
-      {:ok, binding, session, mode} ->
-        json(conn, %{
-          binding: binding,
-          session: session_summary(session),
-          mode: mode,
-          provider_status: ProviderBroker.status(project_root)
-        })
+      case Local.load_or_bootstrap(project_root, overrides, ephemeral_ok: ephemeral_ok?) do
+        {:ok, binding, session, mode} ->
+          json(conn, %{
+            binding: binding,
+            session: session_summary(session),
+            mode: mode,
+            provider_status: ProviderBroker.status(project_root)
+          })
 
-      {:error, reason} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
     end
   end
 
@@ -1385,129 +1388,141 @@ defmodule ControlKeelWeb.ApiController do
   # ─── Skills ───────────────────────────────────────────────────────────────────
 
   def list_skills(conn, params) do
-    project_root = Map.get(params, "project_root")
-    format = Map.get(params, "format", "json")
-    target = Map.get(params, "target")
-    validation = Skills.validate(project_root, report_identical_duplicates: true)
+    with {:ok, project_root} <- authorized_project_root(conn, params) do
+      format = Map.get(params, "format", "json")
+      target = Map.get(params, "target")
+      validation = Skills.validate(project_root, report_identical_duplicates: true)
 
-    skills =
-      if is_binary(target) and target != "" do
-        Enum.filter(validation.skills, &(target in (&1.compatibility_targets || [])))
-      else
-        validation.skills
-      end
+      skills =
+        if is_binary(target) and target != "" do
+          Enum.filter(validation.skills, &(target in (&1.compatibility_targets || [])))
+        else
+          validation.skills
+        end
 
-    entries =
-      Enum.map(skills, fn s ->
-        %{
-          name: s.name,
-          description: s.description,
-          scope: s.scope,
-          allowed_tools: s.allowed_tools,
-          disallowed_tools: s.disallowed_tools,
-          required_mcp_tools: s.required_mcp_tools,
-          context: s.context,
-          agent: s.agent,
-          paths: s.paths,
-          license: s.license,
-          compatibility: s.compatibility,
-          compatibility_targets: s.compatibility_targets,
-          source: s.source,
-          install_state: s.install_state,
-          diagnostics: Enum.map(s.diagnostics, &diagnostic_summary/1)
-        }
-      end)
+      entries =
+        Enum.map(skills, fn s ->
+          %{
+            name: s.name,
+            description: s.description,
+            scope: s.scope,
+            allowed_tools: s.allowed_tools,
+            disallowed_tools: s.disallowed_tools,
+            required_mcp_tools: s.required_mcp_tools,
+            context: s.context,
+            agent: s.agent,
+            paths: s.paths,
+            license: s.license,
+            compatibility: s.compatibility,
+            compatibility_targets: s.compatibility_targets,
+            source: s.source,
+            install_state: s.install_state,
+            diagnostics: Enum.map(s.diagnostics, &diagnostic_summary/1)
+          }
+        end)
 
-    identical_count =
-      Enum.count(validation.diagnostics, &(&1.code == "duplicate_skill_copy"))
+      identical_count =
+        Enum.count(validation.diagnostics, &(&1.code == "duplicate_skill_copy"))
 
-    shadowed_count =
-      Enum.count(validation.diagnostics, &(&1.code == "shadowed_skill"))
+      shadowed_count =
+        Enum.count(validation.diagnostics, &(&1.code == "shadowed_skill"))
 
-    result = %{
-      skills: entries,
-      total: length(entries),
-      trusted_project_skills: validation.trusted_project?,
-      diagnostics: Enum.map(validation.diagnostics, &diagnostic_summary/1),
-      valid?: validation.valid?,
-      identical_count: identical_count,
-      shadowed_count: shadowed_count,
-      warning_count: validation.warning_count,
-      error_count: validation.error_count
-    }
+      result = %{
+        skills: entries,
+        total: length(entries),
+        trusted_project_skills: validation.trusted_project?,
+        diagnostics: Enum.map(validation.diagnostics, &diagnostic_summary/1),
+        valid?: validation.valid?,
+        identical_count: identical_count,
+        shadowed_count: shadowed_count,
+        warning_count: validation.warning_count,
+        error_count: validation.error_count
+      }
 
-    result =
-      if format == "xml" do
-        Map.put(result, :prompt_block, Registry.prompt_block(project_root))
-      else
-        result
-      end
+      result =
+        if format == "xml" do
+          Map.put(result, :prompt_block, Registry.prompt_block(project_root))
+        else
+          result
+        end
 
-    json(conn, result)
+      json(conn, result)
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
+    end
   end
 
   def get_skill(conn, %{"name" => name} = params) do
-    project_root = Map.get(params, "project_root")
+    with {:ok, project_root} <- authorized_project_root(conn, params) do
+      case Registry.get(name, project_root) do
+        nil ->
+          conn |> put_status(:not_found) |> json(%{error: "skill not found"})
 
-    case Registry.get(name, project_root) do
-      nil ->
-        conn |> put_status(:not_found) |> json(%{error: "skill not found"})
-
-      skill ->
-        json(conn, %{
-          skill: %{
-            name: skill.name,
-            description: skill.description,
-            scope: skill.scope,
-            allowed_tools: skill.allowed_tools,
-            disallowed_tools: skill.disallowed_tools,
-            required_mcp_tools: skill.required_mcp_tools,
-            context: skill.context,
-            agent: skill.agent,
-            paths: skill.paths,
-            hooks: skill.hooks,
-            model: skill.model,
-            effort: skill.effort,
-            shell: skill.shell,
-            license: skill.license,
-            compatibility: skill.compatibility,
-            compatibility_targets: skill.compatibility_targets,
-            source: skill.source,
-            resources: skill.resources,
-            diagnostics: Enum.map(skill.diagnostics, &diagnostic_summary/1),
-            install_state: skill.install_state,
-            body: skill.body
-          }
-        })
+        skill ->
+          json(conn, %{
+            skill: %{
+              name: skill.name,
+              description: skill.description,
+              scope: skill.scope,
+              allowed_tools: skill.allowed_tools,
+              disallowed_tools: skill.disallowed_tools,
+              required_mcp_tools: skill.required_mcp_tools,
+              context: skill.context,
+              agent: skill.agent,
+              paths: skill.paths,
+              hooks: skill.hooks,
+              model: skill.model,
+              effort: skill.effort,
+              shell: skill.shell,
+              license: skill.license,
+              compatibility: skill.compatibility,
+              compatibility_targets: skill.compatibility_targets,
+              source: skill.source,
+              resources: skill.resources,
+              diagnostics: Enum.map(skill.diagnostics, &diagnostic_summary/1),
+              install_state: skill.install_state,
+              body: skill.body
+            }
+          })
+      end
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
     end
   end
 
   def list_skill_targets(conn, params) do
-    project_root = Map.get(params, "project_root", File.cwd!())
-
-    json(conn, %{
-      targets: Enum.map(Skills.targets(), &skill_target_summary/1),
-      agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1),
-      registry_status: ACPRegistry.status(),
-      installation_channels: Distribution.install_channels(),
-      provider_status: ProviderBroker.status(project_root)
-    })
+    with {:ok, project_root} <- authorized_project_root(conn, params) do
+      json(conn, %{
+        targets: Enum.map(Skills.targets(), &skill_target_summary/1),
+        agents: Enum.map(Skills.agent_integrations(), &agent_integration_summary/1),
+        registry_status: ACPRegistry.status(),
+        installation_channels: Distribution.install_channels(),
+        provider_status: ProviderBroker.status(project_root)
+      })
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
+    end
   end
 
   def list_agents(conn, params) do
-    project_root = Map.get(params, "project_root", File.cwd!())
-    doctor = Execution.doctor(project_root)
-    json(conn, %{agents: doctor["agents"], doctor: doctor})
+    with {:ok, project_root} <- authorized_project_root(conn, params) do
+      doctor = Execution.doctor(project_root)
+      json(conn, %{agents: doctor["agents"], doctor: doctor})
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
+    end
   end
 
   def export_skills(conn, params) do
     target = Map.get(params, "target", "open-standard")
-    project_root = Map.get(params, "project_root", File.cwd!())
     scope = Map.get(params, "scope")
 
-    case Skills.export(target, project_root, scope: scope) do
-      {:ok, plan} ->
-        json(conn, %{plan: skill_export_plan_summary(plan)})
+    with {:ok, project_root} <- authorized_project_root(conn, params),
+         {:ok, plan} <- Skills.export(target, project_root, scope: scope) do
+      json(conn, %{plan: skill_export_plan_summary(plan)})
+    else
+      {:error, :project_root_not_authorized} ->
+        forbidden_project_root(conn)
 
       {:error, :unknown_target} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
@@ -1519,27 +1534,36 @@ defmodule ControlKeelWeb.ApiController do
 
   def install_skills(conn, params) do
     target = Map.get(params, "target", "open-standard")
-    project_root = Map.get(params, "project_root", File.cwd!())
     scope = Map.get(params, "scope")
 
-    case Skills.install(target, project_root, scope: scope) do
-      {:ok, %ControlKeel.Skills.SkillExportPlan{} = plan} ->
-        json(conn, %{plan: skill_export_plan_summary(plan)})
+    with {:ok, project_root} <- authorized_project_root(conn, params) do
+      case Skills.install(target, project_root, scope: scope) do
+        {:ok, %ControlKeel.Skills.SkillExportPlan{} = plan} ->
+          json(conn, %{plan: skill_export_plan_summary(plan)})
 
-      {:ok, result} ->
-        json(conn, %{install: result})
+        {:ok, result} ->
+          json(conn, %{install: result})
 
-      {:error, :unknown_target} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
+        {:error, :unknown_target} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
 
-      {:error, reason} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
     end
   end
 
   def prune_skill_duplicates(conn, params) do
-    project_root = Map.get(params, "project_root", File.cwd!())
+    with {:ok, project_root} <- authorized_project_root(conn, params) do
+      prune_skill_duplicates_for_root(conn, project_root, params)
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
+    end
+  end
 
+  defp prune_skill_duplicates_for_root(conn, project_root, params) do
     if ControlKeel.Utils.truthy?(Map.get(params, "confirm")) do
       {:ok, %{removed: removed, kept_project_groups: groups}} =
         Skills.prune_duplicate_skills(project_root)
@@ -1565,14 +1589,16 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   def token_audit(conn, params) do
-    project_root = Map.get(params, "project_root", File.cwd!())
     mode = Map.get(params, "mode", "full")
 
-    case CkTokenAudit.call(%{"project_root" => project_root, "mode" => mode}) do
-      {:ok, result} ->
-        conn
-        |> maybe_token_audit_download(params, mode)
-        |> json(result)
+    with {:ok, project_root} <- authorized_project_root(conn, params),
+         {:ok, result} <- CkTokenAudit.call(%{"project_root" => project_root, "mode" => mode}) do
+      conn
+      |> maybe_token_audit_download(params, mode)
+      |> json(result)
+    else
+      {:error, :project_root_not_authorized} ->
+        forbidden_project_root(conn)
 
       {:error, {:invalid_arguments, message}} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: message})
@@ -1581,40 +1607,45 @@ defmodule ControlKeelWeb.ApiController do
 
   def download_skill_bundle(conn, params) do
     target = Map.get(params, "target")
-    project_root = Path.expand(Map.get(params, "project_root", File.cwd!()))
-    dist_dir = Path.join([project_root, "controlkeel", "dist", to_string(target || "")])
 
-    cond do
-      is_nil(target) or target == "" ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: "`target` is required"})
+    with {:ok, raw_root} <- authorized_project_root(conn, params) do
+      project_root = Path.expand(raw_root)
+      dist_dir = Path.join([project_root, "controlkeel", "dist", to_string(target || "")])
 
-      is_nil(SkillTarget.get(target)) ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
+      cond do
+        is_nil(target) or target == "" ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: "`target` is required"})
 
-      not File.dir?(dist_dir) ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "bundle not found — export it first"})
+        is_nil(SkillTarget.get(target)) ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: "unknown skill target"})
 
-      true ->
-        entries =
-          dist_dir
-          |> Path.join("**/*")
-          |> Path.wildcard(match_dot: true)
-          |> Enum.filter(&File.regular?/1)
-          |> Enum.map(fn file ->
-            {Path.relative_to(file, dist_dir) |> to_charlist(), File.read!(file)}
-          end)
+        not File.dir?(dist_dir) ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "bundle not found — export it first"})
 
-        {:ok, {_zip_name, zip_bin}} = :zip.create(~c"#{target}.zip", entries, [:memory])
+        true ->
+          entries =
+            dist_dir
+            |> Path.join("**/*")
+            |> Path.wildcard(match_dot: true)
+            |> Enum.filter(&File.regular?/1)
+            |> Enum.map(fn file ->
+              {Path.relative_to(file, dist_dir) |> to_charlist(), File.read!(file)}
+            end)
 
-        conn
-        |> put_resp_content_type("application/zip")
-        |> put_resp_header(
-          "content-disposition",
-          ~s(attachment; filename="controlkeel-#{target}.zip")
-        )
-        |> send_resp(200, zip_bin)
+          {:ok, {_zip_name, zip_bin}} = :zip.create(~c"#{target}.zip", entries, [:memory])
+
+          conn
+          |> put_resp_content_type("application/zip")
+          |> put_resp_header(
+            "content-disposition",
+            ~s(attachment; filename="controlkeel-#{target}.zip")
+          )
+          |> send_resp(200, zip_bin)
+      end
+    else
+      {:error, :project_root_not_authorized} -> forbidden_project_root(conn)
     end
   end
 
@@ -1645,6 +1676,14 @@ defmodule ControlKeelWeb.ApiController do
 
   defp maybe_put_opt(opts, _key, nil), do: opts
   defp maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  # Unauthenticated (local no-token) callers may only operate on the server's
+  # governed project root; any other supplied root is rejected.
+  defp forbidden_project_root(conn) do
+    conn
+    |> put_status(:forbidden)
+    |> json(%{error: "project_root not authorized for unauthenticated requests"})
+  end
 
   defp diagnostic_summary(diagnostic) do
     %{

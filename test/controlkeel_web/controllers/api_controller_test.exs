@@ -658,6 +658,19 @@ defmodule ControlKeelWeb.ApiControllerTest do
   end
 
   describe "skills API" do
+    # These tests pass arbitrary tmp project roots; unauthenticated local
+    # callers are pinned to the governed root, so authenticate as bootstrap.
+    setup do
+      token = "api-controller-skills-test-token"
+      Application.put_env(:controlkeel, :api_token, token)
+
+      on_exit(fn ->
+        Application.delete_env(:controlkeel, :api_token)
+      end)
+
+      {:ok, conn: put_req_header(build_conn(), "authorization", "Bearer " <> token)}
+    end
+
     test "lists skills and targets with compatibility metadata", %{conn: conn} do
       conn = get(conn, ~p"/api/v1/skills")
       body = json_response(conn, 200)
@@ -673,7 +686,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert "codex" in skill["compatibility_targets"]
       assert is_map(skill["install_state"])
 
-      conn = build_conn() |> get(~p"/api/v1/skills/targets")
+      conn = get(conn, ~p"/api/v1/skills/targets")
       response = json_response(conn, 200)
       targets = response["targets"]
       agents = response["agents"]
@@ -916,7 +929,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert is_list(detail["resources"])
 
       conn =
-        build_conn()
+        conn
         |> post(~p"/api/v1/skills/export", %{
           target: "claude-plugin",
           project_root: tmp_dir,
@@ -928,7 +941,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert File.exists?(Path.join(plan["output_dir"], ".claude-plugin/plugin.json"))
 
       conn =
-        build_conn()
+        conn
         |> post(~p"/api/v1/skills/install", %{
           target: "open-standard",
           project_root: tmp_dir,
@@ -988,7 +1001,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert File.exists?(project_skill)
 
       conn =
-        build_conn()
+        conn
         |> post(~p"/api/v1/skills/prune-duplicates", %{project_root: project_root, confirm: true})
 
       body = json_response(conn, 200)
@@ -1003,7 +1016,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       File.write!(user_skill, source)
 
       conn =
-        build_conn()
+        conn
         |> post(~p"/api/v1/skills/prune-duplicates", %{
           project_root: project_root,
           confirm: "true"
@@ -1047,7 +1060,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(body["rule_files"], &String.ends_with?(&1["path"], "AGENTS.md"))
 
       conn =
-        build_conn()
+        conn
         |> post(~p"/api/v1/skills/token-audit", %{project_root: project_root, mode: "skills"})
 
       body = json_response(conn, 200)
@@ -1055,7 +1068,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert body["effective_skill_count"] >= 1
       assert is_list(body["recommendations"])
 
-      conn = build_conn() |> get(~p"/api/v1/skills/token-audit?mode=tools")
+      conn = get(conn, ~p"/api/v1/skills/token-audit?mode=tools")
       body = json_response(conn, 200)
 
       assert body["tool_count"] > 0
@@ -1064,7 +1077,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert is_list(body["tools"])
 
       conn =
-        build_conn()
+        conn
         |> get(~p"/api/v1/skills/token-audit?project_root=#{project_root}&download=1")
 
       body = json_response(conn, 200)
@@ -1076,7 +1089,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert ["attachment; filename=\"token-audit-full.json\"" | _] =
                get_resp_header(conn, "content-disposition")
 
-      conn = build_conn() |> get(~p"/api/v1/skills/token-audit?mode=bogus")
+      conn = get(conn, ~p"/api/v1/skills/token-audit?mode=bogus")
       assert %{"error" => _} = json_response(conn, 422)
     end
 
@@ -1097,7 +1110,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert %{"plan" => %{"target" => "open-standard"}} = json_response(conn, 200)
 
       conn =
-        build_conn()
+        conn
         |> get(~p"/api/v1/skills/download-bundle?target=open-standard&project_root=#{tmp_dir}")
 
       assert ["attachment; filename=\"controlkeel-open-standard.zip\"" | _] =
@@ -1111,16 +1124,16 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(names, &String.contains?(&1, "controlkeel-governance"))
 
       conn =
-        build_conn()
+        conn
         |> get(~p"/api/v1/skills/download-bundle?target=claude-plugin&project_root=#{tmp_dir}")
 
       assert %{"error" => "bundle not found — export it first"} = json_response(conn, 404)
 
-      conn = build_conn() |> get(~p"/api/v1/skills/download-bundle?project_root=#{tmp_dir}")
+      conn = get(conn, ~p"/api/v1/skills/download-bundle?project_root=#{tmp_dir}")
       assert %{"error" => "`target` is required"} = json_response(conn, 422)
 
       conn =
-        build_conn()
+        conn
         |> get(~p"/api/v1/skills/download-bundle?target=../..&project_root=#{tmp_dir}")
 
       assert %{"error" => "unknown skill target"} = json_response(conn, 422)
@@ -1658,10 +1671,17 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       restore = set_provider_home(home_dir)
 
+      # /bootstrap with an arbitrary root requires bootstrap auth in local mode.
+      bootstrap_token = "api-bootstrap-endpoint-test-token"
+      Application.put_env(:controlkeel, :api_token, bootstrap_token)
+
       on_exit(fn ->
+        Application.delete_env(:controlkeel, :api_token)
         restore.()
         File.rm_rf!(tmp_dir)
       end)
+
+      conn = put_req_header(conn, "authorization", "Bearer " <> bootstrap_token)
 
       conn =
         post(conn, ~p"/api/v1/providers/default", %{
@@ -1672,7 +1692,7 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert %{"status" => %{"selected_source" => "heuristic"}} = json_response(conn, 200)
 
       conn =
-        post(build_conn(), ~p"/api/v1/bootstrap", %{
+        post(conn, ~p"/api/v1/bootstrap", %{
           project_root: project_root,
           agent: "codex"
         })

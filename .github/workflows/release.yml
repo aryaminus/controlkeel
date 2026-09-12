@@ -106,9 +106,26 @@ jobs:
           #   cosign verify-blob <file> --certificate <file>.pem --signature <file>.sig \
           #     --certificate-identity-regexp '^https://github.com/aryaminus/controlkeel/.github/workflows/release.yml@refs/tags/v[0-9].*'  \
           #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          # Fulcio/the tlog are network services and occasionally reset connections;
+          # retry each artifact so one transient blip cannot fail the release.
+          sign_with_retry() {
+            f="$1"
+            attempt=1
+            while [ "$attempt" -le 3 ]; do
+              if cosign sign-blob "$f" --output-signature "$f.sig" --output-certificate "$f.pem" --yes; then
+                return 0
+              fi
+              echo "signing $f failed (attempt $attempt/3); retrying in 10s" >&2
+              attempt=$((attempt + 1))
+              sleep 10
+            done
+            echo "signing $f failed after 3 attempts" >&2
+            return 1
+          }
+
           for f in dist/*; do
             if [ -f "$f" ]; then
-              cosign sign-blob "$f" --output-signature "$f.sig" --output-certificate "$f.pem" --yes
+              sign_with_retry "$f"
             fi
           done
       - uses: actions/upload-artifact@v4

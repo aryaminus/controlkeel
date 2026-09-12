@@ -72,6 +72,45 @@ defmodule ControlKeelWeb.APIHelpers do
     end
   end
 
+  @doc """
+  Resolves the `project_root` an API caller may operate on.
+
+  Authenticated callers (bootstrap token or service account) may pass any
+  root, preserving CLI/automation workflows.
+
+  Unauthenticated callers (local no-token default) are pinned to the
+  server's governed root: an absent param resolves to it, and a supplied
+  root that resolves elsewhere is rejected with
+  `{:error, :project_root_not_authorized}`. This keeps the skills/config
+  endpoints from becoming arbitrary-filesystem read/write primitives.
+  """
+  def authorized_project_root(conn, params) do
+    supplied = Map.get(params, "project_root")
+
+    case conn.assigns[:api_auth] do
+      %{type: auth_type} when auth_type in [:bootstrap, :service_account] ->
+        {:ok, supplied || File.cwd!()}
+
+      _ ->
+        governed_root = ControlKeel.Project.Root.resolve(File.cwd!())
+
+        case supplied do
+          nil ->
+            {:ok, governed_root}
+
+          root when is_binary(root) and root != "" ->
+            if ControlKeel.Project.Root.resolve(root) == governed_root do
+              {:ok, governed_root}
+            else
+              {:error, :project_root_not_authorized}
+            end
+
+          _ ->
+            {:error, :project_root_not_authorized}
+        end
+    end
+  end
+
   @doc false
   def current_workspace_id(conn) do
     case conn.assigns[:api_auth] do
