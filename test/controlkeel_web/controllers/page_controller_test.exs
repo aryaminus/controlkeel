@@ -188,4 +188,18 @@ defmodule ControlKeelWeb.PageControllerTest do
     assert body =~ "Other supported agents"
     assert body =~ "Project rescue"
   end
+
+  describe "legacy org redirects" do
+    test "GET /organizations/:slug redirects to /:slug", %{conn: conn} do
+      conn = get(conn, "/organizations/acme-corp")
+
+      assert redirected_to(conn, 302) == "/acme-corp"
+    end
+
+    test "GET /organizations/:slug/settings redirects to /:slug/settings", %{conn: conn} do
+      conn = get(conn, "/organizations/acme-corp/settings")
+
+      assert redirected_to(conn, 302) == "/acme-corp/settings"
+    end
+  end
 end
