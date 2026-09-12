@@ -341,6 +341,8 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
   # centralized auth lands (CLI/web parity PR).
   # View access: local mode is open; cloud mode requires membership of the
   # workspace's org (no role requirement — role gates live on write surfaces).
+  # `current_org_id` / `current_membership` are set from the URL `org_slug`
+  # by `OrganizationLayoutDefaults.on_mount`, not from browser session.
   defp check_workspace_access(workspace, assigns) do
     if Mode.current() == :local do
       :ok

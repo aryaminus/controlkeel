@@ -5,22 +5,20 @@ defmodule ControlKeelWeb.LiveAuth do
   Two hooks:
 
     * `:require_cloud_auth` — in cloud/self_hosted mode requires a signed-in
-      user (`current_user`). Org membership is loaded opportunistically but is
-      NOT required; org onboarding is handled by a separate route. In local
-      mode this is a passthrough so local single-user deployments are
-      unaffected.
+      user (`current_user`). Org context is resolved per-URL from `org_slug`
+      by each LiveView, NOT from session; org onboarding is handled by a
+      separate route. In local mode this is a passthrough so local
+      single-user deployments are unaffected.
 
-    * `:load_if_available` — loads user/membership from session without gating.
-      Use for pages that are public in local mode but show org-scoped data when
-      a membership is present (e.g. home page).
+    * `:load_if_available` — loads user from session without gating.
+      Use for pages that are public in local mode.
 
   Both hooks assign:
-    * `:current_user`       — `%Accounts.User{}` or `nil`
-    * `:current_org_id`     — integer org id or `nil`
-    * `:current_membership` — `%Accounts.Membership{}` or `nil`
+    * `:current_user` — `%Accounts.User{}` or `nil`
 
-  These override whatever the LoadCurrentUser plug may have already put in
-  socket.assigns (they carry the same values from the same source).
+  Org context (`:current_org_id` / `:current_membership`) is NOT assigned
+  here. Org-scoped pages derive it per-URL from `org_slug` in
+  `OrganizationLayoutDefaults.on_mount`.
   """
 
   import Phoenix.LiveView,
@@ -119,16 +117,7 @@ defmodule ControlKeelWeb.LiveAuth do
             Map.get(session, "current_user_id") ||
             Map.get(session, :current_user_id)
 
-        org_id =
-          socket.assigns[:current_org_id] ||
-            Map.get(session, "current_org_id") ||
-            Map.get(session, :current_org_id)
-
         user = if is_integer(user_id), do: Accounts.get_user(user_id)
-
-        membership =
-          if user && is_integer(org_id),
-            do: Accounts.get_active_membership(user.id, org_id)
 
         # Session idle timeout — check last_active timestamp from session.
         # When idle exceeds the configured threshold, redirect to login.
@@ -140,8 +129,6 @@ defmodule ControlKeelWeb.LiveAuth do
         socket =
           socket
           |> assign(:current_user, user)
-          |> assign(:current_org_id, org_id)
-          |> assign(:current_membership, membership)
           |> assign(:session_last_active, parse_timestamp(last_active))
 
         check_session_idle(socket)

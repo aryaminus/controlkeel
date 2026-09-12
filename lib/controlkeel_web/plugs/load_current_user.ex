@@ -1,5 +1,5 @@
 defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
-  @moduledoc "Loads the signed-in user and org membership from the browser session."
+  @moduledoc "Loads the signed-in user from the browser session."
 
   import Plug.Conn
 
@@ -11,25 +11,16 @@ defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
     if session_expired?(conn) do
       conn
       |> delete_session(:current_user_id)
-      |> delete_session(:current_org_id)
       |> delete_session(:session_last_active)
       |> assign(:current_user, nil)
-      |> assign(:current_org_id, nil)
-      |> assign(:current_membership, nil)
     else
       user_id = get_session(conn, :current_user_id)
-      org_id = get_session(conn, :current_org_id)
 
       user = if is_integer(user_id), do: Accounts.get_user(user_id)
-
-      membership =
-        if user && is_integer(org_id), do: Accounts.get_active_membership(user.id, org_id)
 
       conn
       |> maybe_refresh_session_last_active(user)
       |> assign(:current_user, user)
-      |> assign(:current_org_id, org_id)
-      |> assign(:current_membership, membership)
     end
   end
 

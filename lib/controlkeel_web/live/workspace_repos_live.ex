@@ -4,7 +4,7 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
 
   Admin+owner of the workspace's org can bind / unbind / list
   `WorkspaceGithubRepo` records. The page rejects access if the workspace
-  belongs to a different org than the visitor's current_org_id.
+  belongs to a different org than the URL org or the visitor lacks membership.
   """
 
   use ControlKeelWeb, :live_view

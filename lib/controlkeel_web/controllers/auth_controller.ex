@@ -19,7 +19,6 @@ defmodule ControlKeelWeb.AuthController do
   def logout(conn, _params) do
     conn
     |> delete_session(:current_user_id)
-    |> delete_session(:current_org_id)
     |> delete_session(:oauth_state)
     |> delete_session(:oauth_provider)
     |> delete_session(:oauth_session_params)

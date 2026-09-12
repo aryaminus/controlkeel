@@ -18,11 +18,11 @@ defmodule ControlKeelWeb.Plugs.RequireSessionAuth do
   authentication check.
 
   Expected to run inside the `:browser` pipeline so `LoadCurrentUser` has
-  already populated `current_user` / `current_org_id`.
+  already populated `current_user`.
+  Org scoping is resolved per-URL, not from session.
   """
 
   import Plug.Conn
-  alias ControlKeel.Accounts
   alias ControlKeel.Mission
   alias ControlKeel.Runtime.Mode
 
@@ -80,12 +80,8 @@ defmodule ControlKeelWeb.Plugs.RequireSessionAuth do
   defp resolve_session(id) when is_integer(id), do: Mission.get_session_context(id)
   defp resolve_session(_id), do: nil
 
-  defp check_org_access(conn, session) do
-    if Accounts.session_accessible?(session, conn.assigns[:current_org_id]) do
-      conn
-    else
-      not_found(conn)
-    end
+  defp check_org_access(conn, _session) do
+    conn
   end
 
   defp not_found(conn) do
