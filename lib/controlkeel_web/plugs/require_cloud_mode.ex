@@ -3,12 +3,12 @@ defmodule ControlKeelWeb.Plugs.RequireCloudMode do
   Redirects users away from routes that are not useful in the current mode.
 
   Three cases:
-    * Already-signed-in users visiting `/auth/login` are redirected to
-      `/dashboard` to avoid re-login loops (any mode).
+    * Already-signed-in users visiting `/auth/login` are redirected to `/`
+      to avoid re-login loops (any mode).
     * In local mode (no OAuth/SSO), any `/auth/*` path is a dead end and
-      redirects to `/dashboard` with an informational flash.
+      redirects to `/` with an informational flash.
     * In local mode, `/invitations/*` paths are cloud-only features and
-      redirect to `/dashboard`.
+      redirect to `/`.
   """
 
   import Plug.Conn
@@ -26,13 +26,13 @@ defmodule ControlKeelWeb.Plugs.RequireCloudMode do
     cond do
       signed_in_visiting_login?(conn) ->
         conn
-        |> redirect(to: "/dashboard")
+        |> redirect(to: "/")
         |> halt()
 
       local_mode_blocked_path?(conn) ->
         conn
         |> put_flash(:info, "This feature is not available in local mode.")
-        |> redirect(to: "/dashboard")
+        |> redirect(to: "/")
         |> halt()
 
       true ->

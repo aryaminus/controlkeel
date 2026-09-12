@@ -56,7 +56,9 @@ RUN mix deps.compile
 
 COPY lib lib
 COPY priv priv
+COPY assets assets
 RUN mix compile
+RUN mix assets.setup && mix assets.deploy
 
 COPY config/runtime.exs config/
 RUN mix release

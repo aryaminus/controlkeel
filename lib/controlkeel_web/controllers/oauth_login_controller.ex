@@ -64,7 +64,7 @@ defmodule ControlKeelWeb.OAuthLoginController do
           if invitation_token do
             ~p"/invitations/#{invitation_token}"
           else
-            ~p"/dashboard"
+            ~p"/"
           end
       )
     else

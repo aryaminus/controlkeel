@@ -870,7 +870,7 @@ defmodule ControlKeelWeb.OnboardingLive do
         %{
           text:
             "This organization has no workspaces yet. Create a workspace before starting a session.",
-          link: ~p"/organizations/#{selected_org_slug(assigns)}",
+          link: ~p"/#{selected_org_slug(assigns)}",
           link_text: "Manage workspaces"
         }
 

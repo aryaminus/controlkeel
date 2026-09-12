@@ -203,7 +203,7 @@ defmodule ControlKeelWeb.OrganizationsLive do
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <%= for row <- @orgs do %>
             <.link
-              navigate={~p"/organizations/#{row.org.slug}"}
+              navigate={~p"/#{row.org.slug}"}
               class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
             >
               <div class="flex items-start justify-between gap-3">

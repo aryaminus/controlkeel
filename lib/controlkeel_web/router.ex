@@ -55,6 +55,23 @@ defmodule ControlKeelWeb.Router do
   pipeline :proxy_api do
   end
 
+  # Protocol endpoints live above the browser scope on purpose: the
+  # ":org_slug" live route below matches any single-segment GET, so scopes
+  # defined after it (like this one) would lose "GET /mcp" to it. Keep
+  # single-segment protocol GETs ahead of the browser scope.
+  scope "/", ControlKeelWeb do
+    pipe_through :protocol_api
+
+    get "/.well-known/oauth-protected-resource/mcp", ProtocolController, :protected_resource_mcp
+    get "/.well-known/oauth-protected-resource", ProtocolController, :protected_resource_alias
+    get "/.well-known/oauth-authorization-server", ProtocolController, :authorization_server
+    get "/.well-known/agent-card.json", ProtocolController, :a2a_card
+    get "/.well-known/agent.json", ProtocolController, :a2a_card
+    post "/oauth/token", OAuthController, :token
+    get "/mcp", ProtocolController, :mcp_get
+    delete "/mcp", ProtocolController, :mcp_delete
+  end
+
   scope "/", ControlKeelWeb do
     pipe_through :browser
 
@@ -112,7 +129,7 @@ defmodule ControlKeelWeb.Router do
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
       live "/organizations", OrganizationsLive, :index
-      live "/organizations/:slug", OrganizationDetailLive, :index
+
       live "/organizations/:slug/workspaces/:id", WorkspaceDetailLive, :index
       live "/organizations/:slug/workspaces/:id/settings", WorkspaceSettingsLive, :show
       live "/workspaces/:id/repos", WorkspaceReposLive, :index
@@ -161,6 +178,27 @@ defmodule ControlKeelWeb.Router do
       live "/observability/sessions/:id/memory", ObservabilityMemoryLive, :show
       live "/observability/sessions/:id/timeline", ObservabilityTimelineLive, :show
       live "/observability/sessions/:id", ObservabilityLive, :show
+    end
+
+    # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
+    # shape is the most-shared URL in docs/Slack/CI, so keep it as a redirect
+    # rather than a 404. Two-segment, so the single-segment ":org_slug" live
+    # route below does not swallow it — kept above that block for readability.
+    get "/organizations/:slug", PageController, :org_legacy_redirect
+    get "/organizations/:slug/settings", PageController, :org_legacy_redirect
+
+    # NB: keep this block last in the scope — ":org_slug" matches any single
+    # segment, so routes added below it would be silently swallowed. For the
+    # same reason, single-segment protocol GETs must stay ahead of the
+    # browser scope (see above).
+    live_session :organization,
+      layout: {ControlKeelWeb.OrganizationLayouts, :organization},
+      on_mount: [
+        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
+        ControlKeelWeb.OrganizationLayoutDefaults
+      ] do
+      live "/:org_slug", OrganizationDetailLive, :index
+      live "/:org_slug/settings", OrganizationSettingsLive, :edit
     end
   end
 
@@ -268,19 +306,6 @@ defmodule ControlKeelWeb.Router do
     post "/gemini/:proxy_token/v1beta/chat/completions", ProxyController, :gemini_chat_completions
     get "/gemini/:proxy_token/v1beta/openai/models", ProxyController, :gemini_models
     get "/openai/:proxy_token/v1/realtime", ProxySocketController, :openai_realtime
-  end
-
-  scope "/", ControlKeelWeb do
-    pipe_through :protocol_api
-
-    get "/.well-known/oauth-protected-resource/mcp", ProtocolController, :protected_resource_mcp
-    get "/.well-known/oauth-protected-resource", ProtocolController, :protected_resource_alias
-    get "/.well-known/oauth-authorization-server", ProtocolController, :authorization_server
-    get "/.well-known/agent-card.json", ProtocolController, :a2a_card
-    get "/.well-known/agent.json", ProtocolController, :a2a_card
-    post "/oauth/token", OAuthController, :token
-    get "/mcp", ProtocolController, :mcp_get
-    delete "/mcp", ProtocolController, :mcp_delete
   end
 
   scope "/", ControlKeelWeb do
