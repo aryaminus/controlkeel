@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.11 — 2026-09-12
+
+### What's changed
+
+- fix(governance): pin review submissions to explicit project root
+
 ## v0.4.10 — 2026-09-12
 
 ### What's changed
