@@ -17,9 +17,10 @@ defmodule ControlKeel.Repo.Migrations.AddOrgFkToWorkspaces do
     WHERE org_id IS NOT NULL AND org_id NOT IN (SELECT id FROM orgs)
     """)
 
-    if sqlite_repo?() do
-      rebuild_workspaces_with_fk()
-    else
+    # The earlier AddOrgToWorkspaces migration creates this foreign key on
+    # SQLite. Rebuilding the referenced parent table here would execute child
+    # ON DELETE actions when the old table is dropped.
+    unless sqlite_repo?() do
       # On Postgres, 20260524142342_add_org_to_workspaces already added
       # `references(:orgs, on_delete: :nilify_all)` which creates the same FK
       # with name workspaces_org_id_fkey. Guard the ADD so migrate is
@@ -39,76 +40,10 @@ defmodule ControlKeel.Repo.Migrations.AddOrgFkToWorkspaces do
   end
 
   def down do
-    if sqlite_repo?() do
-      rebuild_workspaces_without_fk()
-    else
+    # SQLite's foreign key predates this migration, so rollback must retain it.
+    unless sqlite_repo?() do
       execute("ALTER TABLE workspaces DROP CONSTRAINT workspaces_org_id_fkey")
     end
-  end
-
-  defp rebuild_workspaces_with_fk do
-    execute("""
-    CREATE TABLE workspaces_new (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL,
-      industry TEXT NOT NULL,
-      agent TEXT NOT NULL,
-      budget_cents INTEGER NOT NULL DEFAULT 0,
-      compliance_profile TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'draft',
-      org_id INTEGER REFERENCES orgs(id) ON DELETE SET NULL,
-      inserted_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-    """)
-
-    execute("""
-    INSERT INTO workspaces_new (id, name, slug, industry, agent, budget_cents, compliance_profile, status, org_id, inserted_at, updated_at)
-    SELECT id, name, slug, industry, agent, budget_cents, compliance_profile, status, org_id, inserted_at, updated_at
-    FROM workspaces
-    """)
-
-    execute("DROP TABLE workspaces")
-    execute("ALTER TABLE workspaces_new RENAME TO workspaces")
-
-    recreate_indexes()
-  end
-
-  defp rebuild_workspaces_without_fk do
-    execute("""
-    CREATE TABLE workspaces_old (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL,
-      industry TEXT NOT NULL,
-      agent TEXT NOT NULL,
-      budget_cents INTEGER NOT NULL DEFAULT 0,
-      compliance_profile TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'draft',
-      org_id INTEGER,
-      inserted_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-    """)
-
-    execute("""
-    INSERT INTO workspaces_old (id, name, slug, industry, agent, budget_cents, compliance_profile, status, org_id, inserted_at, updated_at)
-    SELECT id, name, slug, industry, agent, budget_cents, compliance_profile, status, org_id, inserted_at, updated_at
-    FROM workspaces
-    """)
-
-    execute("DROP TABLE workspaces")
-    execute("ALTER TABLE workspaces_old RENAME TO workspaces")
-
-    recreate_indexes()
-  end
-
-  defp recreate_indexes do
-    create unique_index(:workspaces, [:slug])
-    create index(:workspaces, [:industry])
-    create index(:workspaces, [:agent])
-    create index(:workspaces, [:org_id])
   end
 
   defp sqlite_repo?, do: repo().__adapter__() == Ecto.Adapters.SQLite3
