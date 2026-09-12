@@ -130,12 +130,6 @@ defmodule ControlKeelWeb.Router do
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
       live "/organizations", OrganizationsLive, :index
 
-      live "/organizations/:slug/workspaces/:id", WorkspaceDetailLive, :index
-      live "/organizations/:slug/workspaces/:id/settings", WorkspaceSettingsLive, :show
-      live "/workspaces/:id/repos", WorkspaceReposLive, :index
-      live "/workspaces/:id/service-accounts", WorkspaceServiceAccountsLive, :index
-      live "/workspaces/:id/webhooks", WorkspaceWebhooksLive, :index
-      live "/workspaces/:id/tool-policy", WorkspaceToolPolicyLive, :edit
       live "/policies", PolicyStudioLive, :index
       live "/skills", SkillsLive, :index
     end
@@ -187,6 +181,15 @@ defmodule ControlKeelWeb.Router do
     get "/organizations/:slug", PageController, :org_legacy_redirect
     get "/organizations/:slug/settings", PageController, :org_legacy_redirect
 
+    # Legacy workspace URLs (pre-/:org_slug/workspaces/:ws_slug consolidation):
+    # detail/settings lived under /organizations/:slug/workspaces/:id* and the
+    # tab pages under /workspaces/:id/*. Numeric ids resolve via
+    # LegacyController to the slug-based URL. Multi-segment, so the
+    # single-segment ":org_slug" live route below does not swallow them.
+    get "/organizations/:slug/workspaces/:id", LegacyController, :workspace
+    get "/organizations/:slug/workspaces/:id/settings", LegacyController, :workspace
+    get "/workspaces/:id/*rest", LegacyController, :workspace
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
@@ -199,6 +202,12 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/:org_slug", OrganizationDetailLive, :index
       live "/:org_slug/settings", OrganizationSettingsLive, :edit
+      live "/:org_slug/workspaces/:ws_slug", WorkspaceDetailLive, :index
+      live "/:org_slug/workspaces/:ws_slug/settings", WorkspaceSettingsLive, :show
+      live "/:org_slug/workspaces/:ws_slug/repos", WorkspaceReposLive, :index
+      live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
+      live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
     end
   end
 

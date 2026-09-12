@@ -485,7 +485,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <%= for ws <- @workspaces do %>
               <.link
-                href={~p"/organizations/#{@org.slug}/workspaces/#{ws.id}"}
+                 href={~p"/#{@org.slug}/workspaces/#{ws.slug}"}
                 class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
               >
                 <div class="flex items-start justify-between gap-3">

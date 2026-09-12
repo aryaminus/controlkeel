@@ -13,6 +13,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :current_path, :string, default: nil
   attr :current_query, :string, default: nil
   attr :nav_org, :map, required: true
+  attr :nav_workspace, :any, default: nil
 
   def organization_sidebar(assigns) do
     mode = ControlKeel.Runtime.Mode.current()
@@ -20,7 +21,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     assigns =
       assigns
       |> assign_new(:mode, fn -> mode end)
-      |> assign(:nav_items, organization_nav_items(assigns.nav_org))
+      |> assign(:nav_items, sidebar_nav_items(assigns))
       |> assign_new(:user_orgs, fn ->
         case assigns[:current_user] do
           %{id: user_id} when is_integer(user_id) and mode != :local ->
@@ -134,7 +135,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
       <nav id="sidebar-org-nav" class="mt-4 flex flex-1 flex-col gap-1 px-3 text-sm">
         <%= for item <- @nav_items do %>
-          <% active = organization_nav_active?(@current_path, @current_query, item) %>
+          <% active = sidebar_item_active?(@current_path, @current_query, item) %>
           <.link
             navigate={item.href}
             aria-current={active && "page"}
@@ -337,6 +338,61 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-cog-6-tooth"
       }
     ]
+  end
+
+  defp sidebar_nav_items(%{nav_workspace: nil} = assigns),
+    do: organization_nav_items(assigns.nav_org)
+
+  defp sidebar_nav_items(%{nav_workspace: workspace} = assigns),
+    do: workspace_nav_items(assigns.nav_org.slug, workspace.slug)
+
+  defp workspace_nav_items(org_slug, ws_slug) do
+    [
+      %{
+        label: "Overview",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}",
+        scope: :workspace,
+        icon: "hero-squares-2x2"
+      },
+      %{
+        label: "Settings",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/settings",
+        scope: :workspace,
+        icon: "hero-cog-6-tooth"
+      },
+      %{
+        label: "Repositories",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/repos",
+        scope: :workspace,
+        icon: "hero-code-bracket"
+      },
+      %{
+        label: "Service accounts",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/service-accounts",
+        scope: :workspace,
+        icon: "hero-key"
+      },
+      %{
+        label: "Webhooks",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/webhooks",
+        scope: :workspace,
+        icon: "hero-bolt"
+      },
+      %{
+        label: "Tool policy",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/tool-policy",
+        scope: :workspace,
+        icon: "hero-shield-check"
+      }
+    ]
+  end
+
+  defp sidebar_item_active?(current_path, _current_query, %{scope: :workspace} = item) do
+    is_binary(current_path) && current_path == item.href
+  end
+
+  defp sidebar_item_active?(current_path, current_query, item) do
+    organization_nav_active?(current_path, current_query, item)
   end
 
   defp organization_nav_active?(current_path, current_query, item) do
