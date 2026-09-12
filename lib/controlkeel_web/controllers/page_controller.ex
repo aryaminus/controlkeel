@@ -83,4 +83,18 @@ defmodule ControlKeelWeb.PageController do
   def developers(conn, _params) do
     render(conn, :developers)
   end
+
+  # Legacy /organizations/:slug URLs (removed when org routes were simplified
+  # to /:slug). Single action serves both routes; the /settings suffix is
+  # detected from the request path. `slug` is a single router segment (no
+  # slashes), and the target is always same-origin via the "/#{slug}" prefix,
+  # so this cannot become an open redirect.
+  def org_legacy_redirect(conn, %{"slug" => slug}) do
+    target =
+      if String.ends_with?(conn.request_path, "/settings"),
+        do: "/#{slug}/settings",
+        else: "/#{slug}"
+
+    redirect(conn, to: target)
+  end
 end

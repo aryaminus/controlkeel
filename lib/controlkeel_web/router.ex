@@ -174,6 +174,13 @@ defmodule ControlKeelWeb.Router do
       live "/observability/sessions/:id", ObservabilityLive, :show
     end
 
+    # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
+    # shape is the most-shared URL in docs/Slack/CI, so keep it as a redirect
+    # rather than a 404. Two-segment, so the single-segment ":org_slug" live
+    # route below does not swallow it — kept above that block for readability.
+    get "/organizations/:slug", PageController, :org_legacy_redirect
+    get "/organizations/:slug/settings", PageController, :org_legacy_redirect
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
