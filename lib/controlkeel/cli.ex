@@ -2503,9 +2503,8 @@ defmodule ControlKeel.CLI do
   end
 
   def resolve_project_root(options, project_root) do
-    options[:project_root] ||
-      project_root
-      |> Root.resolve()
+    (options[:project_root] || project_root)
+    |> Root.resolve()
   end
 
   def maybe_line(nil, _prefix), do: []

@@ -1535,6 +1535,14 @@ defmodule ControlKeel.MCP.Protocol do
             "type" => ["integer", "string"],
             "description" => "Task identifier within the session for scoped operations."
           },
+          "project_root" => %{
+            "type" => "string",
+            "description" =>
+              "Absolute path to the project root this submission belongs to. " <>
+                "Pass it when one MCP server serves several repos (e.g. an IDE-wide " <>
+                "CONTROLKEEL_PROJECT_ROOT) so the review pins to the intended " <>
+                "project instead of inheriting the server's working directory."
+          },
           "title" => %{
             "type" => "string",
             "description" => "Human-readable title for display and search."

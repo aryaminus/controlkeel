@@ -18,8 +18,9 @@ defmodule ControlKeel.MCP.Tools.CkReviewSubmit do
     review_attrs =
       Map.take(
         arguments,
-        ~w(session_id task_id title review_type submission_body annotations feedback_notes submitted_by metadata previous_review_id plan_phase hypothesis expected_signal research_summary codebase_findings prior_art_summary alignment_context consulted_roles options_considered selected_option rejected_options implementation_steps validation_plan code_snippets agent_spec_id task_spec_id agent_role task_scope out_of_scope business_rules domain_terms persona_or_actor_context allowed_actions prohibited_actions robustness_requirements linked_policy_packs linked_benchmark_suites promotion_gates allowed_semantic_changes forbidden_semantic_changes invariant_boundaries requires_reapproval_if harness_quality_checks scope_estimate)
+        ~w(session_id task_id title review_type submission_body annotations feedback_notes submitted_by metadata previous_review_id plan_phase hypothesis expected_signal research_summary codebase_findings prior_art_summary alignment_context consulted_roles options_considered selected_option rejected_options implementation_steps validation_plan code_snippets agent_spec_id task_spec_id agent_role task_scope out_of_scope business_rules domain_terms persona_or_actor_context allowed_actions prohibited_actions robustness_requirements linked_policy_packs linked_benchmark_suites promotion_gates allowed_semantic_changes forbidden_semantic_changes invariant_boundaries requires_reapproval_if harness_quality_checks scope_estimate project_root)
       )
+      |> maybe_pin_project_root(arguments)
 
     auto_approve_requested = Map.get(arguments, "auto_approve", false)
     auto_approve_reason = Map.get(arguments, "auto_approve_reason", "")
@@ -88,6 +89,25 @@ defmodule ControlKeel.MCP.Tools.CkReviewSubmit do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # An explicit project_root must win over the ambient
+  # CONTROLKEEL_PROJECT_ROOT/File.cwd!() fallback so a host running one MCP
+  # server across repos (e.g. an IDE-wide CONTROLKEEL_PROJECT_ROOT) can still
+  # pin a submission to the intended project's governed session.
+  defp maybe_pin_project_root(review_attrs, arguments) do
+    case Map.get(arguments, "project_root") do
+      root when is_binary(root) and root != "" ->
+        review_attrs
+        |> Map.put("project_root", root)
+        |> put_in(
+          [Access.key("metadata", %{}), Access.key("runtime_context", %{}), "project_root"],
+          root
+        )
+
+      _ ->
+        review_attrs
     end
   end
 
