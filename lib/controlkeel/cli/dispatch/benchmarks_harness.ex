@@ -308,6 +308,12 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
 
       {:error, :not_found} ->
         {:error, "Benchmark run was not found."}
+
+      {:error, :unknown_format} ->
+        {:error,
+         "Unknown --format #{inspect(options[:format])}. Supported formats: json, csv, openeval " <>
+           "(openeval emits a bundle {\"suite\": <EvalSuite>, \"result_set\": <ResultSet>} conforming " <>
+           "to https://github.com/adhabnr-ux/evalport spec/SPEC.md)."}
     end
   end
 

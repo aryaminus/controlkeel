@@ -22,6 +22,21 @@ defmodule ControlKeel.Benchmark do
   @recent_runs_limit 12
   @busy_retry_backoff_ms [0, 1_000, 3_000, 7_000, 15_000]
 
+  # The OpenEval/EvalPort spec version this `--format openeval` export targets
+  # (see https://github.com/adhabnr-ux/evalport spec/SPEC.md "Version" header).
+  # Pinned once here and asserted in the fixture-backed export test so a spec
+  # bump is a one-line diff and CI catches drift instead of us silently
+  # emitting a stale `version` field forever. Kept in sync with
+  # OPENEVAL_VERSION in evalport's own Python SDK (sdk/python/openeval/types.py).
+  @openeval_spec_version "1.0.0-rc.4"
+
+  @doc """
+  The EvalPort/OpenEval spec version `--format openeval` targets. Exposed so
+  tests assert against the single source of truth instead of duplicating the
+  literal (see `@openeval_spec_version` above).
+  """
+  def openeval_spec_version, do: @openeval_spec_version
+
   def list_suites(opts \\ []) do
     ensure_builtin_suites()
     include_internal = Keyword.get(opts, :include_internal, false)
@@ -195,10 +210,20 @@ defmodule ControlKeel.Benchmark do
         {:error, :not_found}
 
       run ->
+        # Exhaustive on purpose: an earlier version of this fell through an
+        # unmatched-string catch-all straight to the ControlKeel JSON export,
+        # so a typo'd `--format openevals` (or any other unrecognized string)
+        # silently produced ControlKeel JSON instead of failing at the point
+        # of the mistake -- the caller would only discover it several steps
+        # later when that JSON failed EvalPort's own `validate_result_set`.
         case format do
           "csv" -> {:ok, export_csv(run)}
           :csv -> {:ok, export_csv(run)}
-          _ -> {:ok, Jason.encode!(run_export(run), pretty: true)}
+          "json" -> {:ok, Jason.encode!(run_export(run), pretty: true)}
+          :json -> {:ok, Jason.encode!(run_export(run), pretty: true)}
+          "openeval" -> {:ok, Jason.encode!(openeval_export(run), pretty: true)}
+          :openeval -> {:ok, Jason.encode!(openeval_export(run), pretty: true)}
+          _ -> {:error, :unknown_format}
         end
     end
   end
@@ -1415,6 +1440,229 @@ defmodule ControlKeel.Benchmark do
         end)
     }
   end
+
+  # --- EvalPort / OpenEval export (`--format openeval`) -----------------
+  #
+  # Produces a single bundle document `{"suite": <EvalSuite>, "result_set":
+  # <ResultSet>}` from one run, per aryaminus/controlkeel#121: the CLI is
+  # addressed by run id, `run.suite.scenarios` is already preloaded (see
+  # `run_matrix/1`), and shipping the suite alongside the results it explains
+  # is the portability property EvalPort exists for -- two commands emitting
+  # a `ResultSet` and an `EvalSuite` separately would be two chances for
+  # someone to pair a `ResultSet` with a stale `EvalSuite`.
+  #
+  # Field mapping (agreed in the issue thread):
+  #   Suite{slug,name,description,metadata}    -> EvalSuite{id,name,description,metadata}
+  #   Suite.version (integer)                   -> metadata.controlkeel_suite_version (string) / ResultSet.suite_version (string)
+  #   Scenario.content                          -> TestCase.input
+  #   Scenario.slug                             -> TestCase.id
+  #   Scenario.expected_rules (rule ids)         -> one Grader{type: "custom", params: %{handler: "controlkeel.policy_rule"}} per rule,
+  #                                                  id == rule id, referenced by every TestCase whose expected_rules includes it
+  #   Scenario.expected_decision (block/warn)    -> TestCase.expected_output, PLUS (only when expected_rules == []) a shared
+  #                                                  Grader{id: "controlkeel.policy_decision", type: "custom"} asserting the
+  #                                                  decision, since there is no rule id to assert instead
+  #   Scenario.{path,kind,split,incident_label,
+  #             category} + metadata            -> TestCase.metadata (controlkeel_-prefixed) + TestCase.tags
+  #   Result per (run, scenario, subject)        -> one Result in the run's single ResultSet; findings (by rule_id) drive
+  #                                                  per-rule GraderResult.passed for fidelity with `Runner.finalize/2`'s
+  #                                                  superset-tolerant, all-of rule match; decision drives the
+  #                                                  controlkeel.policy_decision GraderResult for expected_rules == [] scenarios
+  #   Run.{subjects,baseline_subject,
+  #         catch_rate,median_latency_ms}        -> ResultSet.{runner,summary}
+  #
+  # Multiple subjects land in ONE flat `results` list (the bundle is
+  # addressed by run, not by subject); each Result carries
+  # `metadata.controlkeel_subject` so a consumer can regroup by subject.
+  defp openeval_export(%Run{} = run) do
+    %{
+      "suite" => openeval_suite(run.suite),
+      "result_set" => openeval_result_set(run)
+    }
+  end
+
+  defp openeval_suite(%Suite{} = suite) do
+    scenarios = Enum.sort_by(suite.scenarios, & &1.position)
+
+    %{
+      "version" => @openeval_spec_version,
+      "id" => suite.slug,
+      "name" => suite.name,
+      "description" => suite.description,
+      "test_cases" => Enum.map(scenarios, &openeval_test_case/1),
+      "graders" => openeval_graders(scenarios),
+      "metadata" =>
+        Map.put(suite.metadata || %{}, "controlkeel_suite_version", to_string(suite.version))
+    }
+  end
+
+  defp openeval_test_case(%Scenario{} = scenario) do
+    %{
+      "id" => scenario.slug,
+      "input" => scenario.content,
+      "graders" => openeval_test_case_grader_ids(scenario),
+      "expected_output" => scenario.expected_decision,
+      "tags" => openeval_tags(scenario),
+      "metadata" => openeval_test_case_metadata(scenario)
+    }
+  end
+
+  defp openeval_test_case_grader_ids(%Scenario{expected_rules: []}) do
+    ["controlkeel.policy_decision"]
+  end
+
+  defp openeval_test_case_grader_ids(%Scenario{expected_rules: rules}) when is_list(rules) do
+    rules
+  end
+
+  defp openeval_test_case_metadata(%Scenario{} = scenario) do
+    %{}
+    |> maybe_put("controlkeel_path", scenario.path)
+    |> maybe_put("controlkeel_kind", scenario.kind)
+    |> maybe_put("controlkeel_split", scenario.split)
+    |> maybe_put("controlkeel_category", scenario.category)
+    |> maybe_put("controlkeel_incident_label", scenario.incident_label)
+    |> Map.merge(prefix_metadata(scenario.metadata))
+  end
+
+  defp openeval_tags(%Scenario{} = scenario) do
+    [scenario.category, scenario.split]
+    |> Enum.concat(List.wrap(get_in(scenario.metadata || %{}, ["risk_tier"])))
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.uniq()
+  end
+
+  # One suite-level Grader per distinct rule id referenced across all
+  # scenarios' `expected_rules`, plus the shared `controlkeel.policy_decision`
+  # fallback grader when any scenario has an empty `expected_rules` (see
+  # `openeval_test_case_grader_ids/1`). Built from the scenario set so the
+  # `graders` list never dangles a reference a test case actually uses,
+  # which is exactly what EvalPort's own `validate_suite` checks for.
+  defp openeval_graders(scenarios) when is_list(scenarios) do
+    rule_graders =
+      scenarios
+      |> Enum.flat_map(& &1.expected_rules)
+      |> Enum.uniq()
+      |> Enum.sort()
+      |> Enum.map(fn rule_id ->
+        %{
+          "id" => rule_id,
+          "type" => "custom",
+          "params" => %{"handler" => "controlkeel.policy_rule"}
+        }
+      end)
+
+    decision_grader =
+      if Enum.any?(scenarios, &(&1.expected_rules == [])) do
+        [
+          %{
+            "id" => "controlkeel.policy_decision",
+            "type" => "custom",
+            "params" => %{"handler" => "controlkeel.policy_decision"}
+          }
+        ]
+      else
+        []
+      end
+
+    rule_graders ++ decision_grader
+  end
+
+  defp openeval_result_set(%Run{} = run) do
+    %{
+      "version" => @openeval_spec_version,
+      "suite_id" => run.suite.slug,
+      "suite_version" => to_string(run.suite.version),
+      "run_id" => to_string(run.id),
+      "started_at" => openeval_timestamp(run.started_at),
+      "completed_at" => run.finished_at && openeval_timestamp(run.finished_at),
+      "results" =>
+        run.results
+        # Only results that actually ran get a Result -- e.g. an
+        # `awaiting_import` result (pending manual import) has no payload,
+        # so every rule grader would evaluate `matched=false` and the
+        # bundle would report "failed" for work that never happened. This
+        # mirrors the `evaluated` convention `subject_metrics/2` already
+        # established below (`status in ["completed", "failed",
+        # "timed_out"]`) -- see aryaminus/controlkeel#153 review.
+        |> Enum.filter(&(&1.status in ["completed", "failed", "timed_out"]))
+        |> Enum.map(&openeval_result/1),
+      "runner" => %{"name" => "controlkeel", "version" => controlkeel_version()},
+      "summary" => %{
+        "subjects" => run.subjects,
+        "baseline_subject" => run.baseline_subject,
+        "catch_rate" => run.catch_rate,
+        "median_latency_ms" => run.median_latency_ms
+      }
+    }
+  end
+
+  defp openeval_result(%Result{} = result) do
+    grader_results = openeval_grader_results(result)
+
+    %{
+      "test_case_id" => result.scenario.slug,
+      "passed" => Enum.all?(grader_results, & &1["passed"]),
+      "grader_results" => grader_results,
+      "duration_ms" => result.latency_ms,
+      "metadata" => %{"controlkeel_subject" => result.subject}
+    }
+  end
+
+  # Faithful to `Runner.finalize/2`'s rule match: an expected rule id counts
+  # as matched if it appears among the fired findings' rule ids (superset
+  # tolerant -- extra findings never break the match), which is why this
+  # reads `result.payload["findings"]` rather than reusing
+  # `result.matched_expected` (that field also folds in decision_match,
+  # which is asserted separately below only for `expected_rules == []`).
+  defp openeval_grader_results(%Result{scenario: %Scenario{expected_rules: []}} = result) do
+    expected = result.scenario.expected_decision
+    decision_match = is_nil(expected) or expected == "" or result.decision == expected
+
+    [
+      %{
+        "grader_id" => "controlkeel.policy_decision",
+        "type" => "custom",
+        "score" => if(decision_match, do: 1.0, else: 0.0),
+        "passed" => decision_match,
+        "reason" => "decision=#{result.decision || "n/a"}, findings=#{result.findings_count}"
+      }
+    ]
+  end
+
+  defp openeval_grader_results(%Result{} = result) do
+    actual_rules =
+      result.payload
+      |> Kernel.||(%{})
+      |> Map.get("findings", [])
+      |> Enum.map(& &1["rule_id"])
+      |> MapSet.new()
+
+    reason = "decision=#{result.decision || "n/a"}, findings=#{result.findings_count}"
+
+    Enum.map(result.scenario.expected_rules, fn rule_id ->
+      matched = MapSet.member?(actual_rules, rule_id)
+
+      %{
+        "grader_id" => rule_id,
+        "type" => "custom",
+        "score" => if(matched, do: 1.0, else: 0.0),
+        "passed" => matched,
+        "reason" => reason
+      }
+    end)
+  end
+
+  defp openeval_timestamp(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, _key, ""), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp prefix_metadata(metadata) when is_map(metadata) do
+    Map.new(metadata, fn {key, value} -> {"controlkeel_#{key}", value} end)
+  end
+
+  defp prefix_metadata(_metadata), do: %{}
 
   defp export_csv(run) do
     header =
