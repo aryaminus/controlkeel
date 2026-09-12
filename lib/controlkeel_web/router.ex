@@ -188,7 +188,6 @@ defmodule ControlKeelWeb.Router do
     # single-segment ":org_slug" live route below does not swallow them.
     get "/organizations/:slug/workspaces/:id", LegacyController, :workspace
     get "/organizations/:slug/workspaces/:id/settings", LegacyController, :workspace
-    get "/workspaces/:id", LegacyController, :workspace
     get "/workspaces/:id/*rest", LegacyController, :workspace
 
     # NB: keep this block last in the scope — ":org_slug" matches any single
