@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.13 — 2026-09-12
+
+### What's changed
+
+- fix(security,ci): API local-mode authz boundary + release surface smoke
+
 ## v0.4.12 — 2026-09-12
 
 ### What's changed
