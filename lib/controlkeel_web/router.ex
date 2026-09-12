@@ -181,6 +181,16 @@ defmodule ControlKeelWeb.Router do
     get "/organizations/:slug", PageController, :org_legacy_redirect
     get "/organizations/:slug/settings", PageController, :org_legacy_redirect
 
+    # Legacy workspace URLs (pre-/:org_slug/workspaces/:ws_slug consolidation):
+    # detail/settings lived under /organizations/:slug/workspaces/:id* and the
+    # tab pages under /workspaces/:id/*. Numeric ids resolve via
+    # LegacyController to the slug-based URL. Multi-segment, so the
+    # single-segment ":org_slug" live route below does not swallow them.
+    get "/organizations/:slug/workspaces/:id", LegacyController, :workspace
+    get "/organizations/:slug/workspaces/:id/settings", LegacyController, :workspace
+    get "/workspaces/:id", LegacyController, :workspace
+    get "/workspaces/:id/*rest", LegacyController, :workspace
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
