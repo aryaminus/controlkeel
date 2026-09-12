@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.10 — 2026-09-12
+
+### What's changed
+
+- fix(migration): preserve SQLite workspace FK without parent rebuild
+
 ## v0.4.9 — 2026-09-08
 
 ### What's changed
