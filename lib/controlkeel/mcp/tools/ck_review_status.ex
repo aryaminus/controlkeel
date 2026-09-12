@@ -8,7 +8,8 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
   @wait_timeout_seconds 1
 
   def call(arguments) when is_map(arguments) do
-    with {:ok, review} <- resolve_review(arguments) do
+    with {:ok, review} <- resolve_review(arguments),
+         :ok <- scope_review_to_session(review, arguments) do
       plan_refinement = get_in(review_metadata(review), ["plan_refinement"]) || %{}
 
       {:ok,
@@ -49,6 +50,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
       Map.has_key?(arguments, "task_id") ->
         with {:ok, task_id} <-
                Arguments.normalize_integer(Map.get(arguments, "task_id"), "task_id"),
+             :ok <- scope_task_to_session(task_id, arguments),
              review when not is_nil(review) <-
                Mission.latest_review_for_task(task_id, Map.get(arguments, "review_type", "plan")) do
           {:ok, Mission.get_review_with_context(review.id)}
@@ -59,6 +61,40 @@ defmodule ControlKeel.MCP.Tools.CkReviewStatus do
 
       true ->
         {:error, {:invalid_arguments, "`review_id` or `task_id` is required"}}
+    end
+  end
+
+  # An explicit session_id scopes the lookup: cross-session reads are denied
+  # instead of silently served. Absent session_id preserves old behavior.
+  defp scope_review_to_session(review, arguments) do
+    case Map.get(arguments, "session_id") do
+      nil ->
+        :ok
+
+      raw ->
+        with {:ok, session_id} <- Arguments.normalize_integer(raw, "session_id") do
+          if review.session_id == session_id do
+            :ok
+          else
+            {:error, {:invalid_arguments, "Review does not belong to the given session"}}
+          end
+        end
+    end
+  end
+
+  defp scope_task_to_session(task_id, arguments) do
+    case Map.get(arguments, "session_id") do
+      nil ->
+        :ok
+
+      raw ->
+        with {:ok, session_id} <- Arguments.normalize_integer(raw, "session_id") do
+          case Mission.get_task(task_id) do
+            %{session_id: ^session_id} -> :ok
+            nil -> {:error, {:invalid_arguments, "No review found for task"}}
+            _ -> {:error, {:invalid_arguments, "Task does not belong to the given session"}}
+          end
+        end
     end
   end
 

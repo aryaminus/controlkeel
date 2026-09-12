@@ -1,26 +1,45 @@
 defmodule ControlKeel.CLI.Dispatch.MemoryContinuity do
   @moduledoc false
 
+  alias ControlKeel.CLI.Output
   alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Project.Binding
   alias ControlKeel.Project.Root
   import ControlKeel.CLI, except: [run_command: 2]
 
-  def run_command(%{command: :session_list}, _project_root) do
-    sessions = Mission.list_recent_sessions(20)
+  def run_command(%{command: :session_list, options: options}, _project_root) do
+    with {:ok, format} <- effective_cli_format(options) do
+      sessions = Mission.list_recent_sessions(20)
 
-    lines =
-      if sessions == [] do
-        ["No missions found. Start one with: controlkeel init"]
-      else
-        ["Recent missions:"] ++
+      payload = %{
+        "sessions" =>
           Enum.map(sessions, fn session ->
-            "##{session.id} #{session.title} — #{session.risk_tier} risk — workspace ##{session.workspace_id}"
+            %{
+              "id" => session.id,
+              "title" => session.title,
+              "risk_tier" => session.risk_tier,
+              "workspace_id" => session.workspace_id
+            }
           end)
-      end
+      }
 
-    {:ok, lines}
+      Output.render_format(format, payload, fn _ ->
+        if sessions == [] do
+          ["No missions found. Start one with: controlkeel init"]
+        else
+          ["Recent missions:"] ++
+            Enum.map(sessions, fn session ->
+              "##{session.id} #{session.title} — #{session.risk_tier} risk — workspace ##{session.workspace_id}"
+            end)
+        end
+      end)
+    end
+  end
+
+  # Back-compat: dispatch without options.
+  def run_command(%{command: :session_list} = parsed, root) do
+    run_command(Map.put(parsed, :options, []), root)
   end
 
   def run_command(%{command: :session_switch, args: [session_id]}, project_root) do

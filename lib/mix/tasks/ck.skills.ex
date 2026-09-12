@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Ck.Skills do
     Mix.Task.run("app.start")
 
     with {:ok, parsed} <- CLI.parse(["skills" | args]),
-         {:ok, lines} <- CLI.run_command(parsed, File.cwd!()) do
+         {:ok, lines} <- CLI.run_command(parsed, ControlKeel.Project.Root.resolve(File.cwd!())) do
       Enum.each(lines, fn line -> Mix.shell().info(line) end)
     else
       {:error, message} -> Mix.raise(message)

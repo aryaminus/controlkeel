@@ -1,35 +1,56 @@
 defmodule ControlKeel.CLI.Dispatch.SandboxSecurityCodeMode do
   @moduledoc false
 
+  alias ControlKeel.CLI.Output
   alias ControlKeel.Governance.PreCommitHook
   alias ControlKeel.ExecutionSandbox
   alias ControlKeel.Runtime.Paths
   import ControlKeel.CLI, except: [run_command: 2]
 
-  def run_command(%{command: :sandbox_status}, _project_root) do
-    adapters = ExecutionSandbox.supported_adapters()
+  def run_command(%{command: :sandbox_status, options: options}, _project_root) do
+    with {:ok, format} <- effective_cli_format(options) do
+      adapters = ExecutionSandbox.supported_adapters()
 
-    current_adapter_name = ExecutionSandbox.adapter_name([])
+      current_adapter_name = ExecutionSandbox.adapter_name([])
 
-    current =
-      Map.get(
-        Enum.find(adapters, fn a -> a[:id] == current_adapter_name end) || %{},
-        :name,
-        "Unknown"
-      )
+      current =
+        Map.get(
+          Enum.find(adapters, fn a -> a[:id] == current_adapter_name end) || %{},
+          :name,
+          "Unknown"
+        )
 
-    adapter_lines =
-      Enum.map(adapters, fn adapter ->
-        available = if adapter[:available], do: "available", else: "not available"
-        marker = if adapter[:id] == ExecutionSandbox.adapter_name([]), do: " (active)", else: ""
-        "  #{adapter[:name]} [#{adapter[:id]}]: #{available}#{marker}"
+      payload = %{
+        "active" => current,
+        "adapters" =>
+          Enum.map(adapters, fn adapter ->
+            %{
+              "id" => adapter[:id],
+              "name" => adapter[:name],
+              "available" => !!adapter[:available]
+            }
+          end)
+      }
+
+      adapter_lines =
+        Enum.map(adapters, fn adapter ->
+          available = if adapter[:available], do: "available", else: "not available"
+          marker = if adapter[:id] == ExecutionSandbox.adapter_name([]), do: " (active)", else: ""
+          "  #{adapter[:name]} [#{adapter[:id]}]: #{available}#{marker}"
+        end)
+
+      Output.render_format(format, payload, fn _ ->
+        [
+          "Execution sandbox adapters:",
+          "Active: #{current}"
+        ] ++ adapter_lines
       end)
+    end
+  end
 
-    {:ok,
-     [
-       "Execution sandbox adapters:",
-       "Active: #{current}"
-     ] ++ adapter_lines}
+  # Back-compat: dispatch without options.
+  def run_command(%{command: :sandbox_status} = parsed, root) do
+    run_command(Map.put(parsed, :options, []), root)
   end
 
   def run_command(%{command: :sandbox_config, options: %{adapter: adapter}}, _project_root) do

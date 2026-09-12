@@ -10,11 +10,20 @@ defmodule ControlKeel.MCP.Tools.CkGitStatus do
     opts = []
 
     opts =
-      if Map.has_key?(arguments, "session_id"),
-        do: [{:session_id, Map.get(arguments, "session_id")} | opts],
-        else: opts
+      case Map.get(arguments, "session_id") do
+        nil ->
+          opts
+
+        raw ->
+          case Arguments.normalize_integer(raw, "session_id") do
+            {:ok, session_id} -> [{:session_id, session_id} | opts]
+            {:error, reason} -> throw({:invalid_session_id, reason})
+          end
+      end
 
     Workflow.status(project_root, opts)
+  catch
+    {:invalid_session_id, reason} -> {:error, reason}
   end
 
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}

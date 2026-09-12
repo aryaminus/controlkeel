@@ -15,39 +15,35 @@ defmodule ControlKeel.MCP.Tools.CkSessionDigest do
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
 
   defp do_call(arguments) do
-    session_id = Arguments.parse_integer(arguments["session_id"])
-    mode = Map.get(arguments, "mode", "generate")
+    with {:ok, session} <- Arguments.fetch_session(arguments) do
+      id = session.id
+      mode = Map.get(arguments, "mode", "generate")
 
-    case session_id do
-      nil ->
-        {:error, {:invalid_arguments, "`session_id` is required"}}
+      case mode do
+        "generate" ->
+          digest_type = Map.get(arguments, "digest_type", "session")
 
-      id when is_integer(id) ->
-        case mode do
-          "generate" ->
-            digest_type = Map.get(arguments, "digest_type", "session")
+          case DigestEngine.generate(id, digest_type: digest_type) do
+            {:ok, digest} ->
+              {:ok, format_digest(digest)}
 
-            case DigestEngine.generate(id, digest_type: digest_type) do
-              {:ok, digest} ->
-                {:ok, format_digest(digest)}
+            {:error, reason} ->
+              {:error, reason}
+          end
 
-              {:error, reason} ->
-                {:error, reason}
-            end
+        "latest" ->
+          case DigestEngine.latest(id) do
+            nil -> {:ok, %{"message" => "No digest found for this session"}}
+            digest -> {:ok, format_digest(digest)}
+          end
 
-          "latest" ->
-            case DigestEngine.latest(id) do
-              nil -> {:ok, %{"message" => "No digest found for this session"}}
-              digest -> {:ok, format_digest(digest)}
-            end
+        "list" ->
+          digests = DigestEngine.list(id)
+          {:ok, %{"digests" => Enum.map(digests, &format_digest/1), "count" => length(digests)}}
 
-          "list" ->
-            digests = DigestEngine.list(id)
-            {:ok, %{"digests" => Enum.map(digests, &format_digest/1), "count" => length(digests)}}
-
-          _ ->
-            {:error, {:invalid_arguments, "mode must be generate, latest, or list"}}
-        end
+        _ ->
+          {:error, {:invalid_arguments, "mode must be generate, latest, or list"}}
+      end
     end
   end
 

@@ -261,6 +261,29 @@ defmodule ControlKeel.CLI.Catalog do
   defp command_path(:outcome_score), do: "outcome score <agent-id>"
   defp command_path(:outcome_leaderboard), do: "outcome leaderboard"
 
+  defp command_path(:pause), do: "pause <task-id>"
+  defp command_path(:resume), do: "resume <task-id>"
+  defp command_path(:approve), do: "approve <finding-id>"
+  defp command_path(:proof), do: "proof <id>"
+  defp command_path(:proof_verify), do: "proof verify <id>"
+  defp command_path(:audit_log), do: "audit-log <session-id>"
+  defp command_path(:graph_show), do: "graph show <session-id>"
+  defp command_path(:webhook_replay), do: "webhook replay <id>"
+  defp command_path(:sandbox_config), do: "sandbox config <adapter>"
+  defp command_path(:service_account_create), do: "service-account create"
+  defp command_path(:service_account_list), do: "service-account list"
+  defp command_path(:service_account_revoke), do: "service-account revoke <id>"
+  defp command_path(:service_account_rotate), do: "service-account rotate <id>"
+  defp command_path(:policy_set_create), do: "policy-set create"
+  defp command_path(:policy_set_list), do: "policy-set list"
+  defp command_path(:policy_set_apply), do: "policy-set apply <workspace-id> <policy-set-id>"
+  defp command_path(:workspace_tool_policy_get), do: "workspace tool-policy get"
+  defp command_path(:workspace_tool_policy_set), do: "workspace tool-policy set"
+  defp command_path(:org_budget_set), do: "org budget set <slug>"
+  defp command_path(:org_budget_show), do: "org budget show <slug>"
+  defp command_path(:org_invite), do: "org invite <slug>"
+  defp command_path(:org_members), do: "org members <slug>"
+
   defp command_path(command) do
     command
     |> Atom.to_string()
@@ -358,6 +381,7 @@ defmodule ControlKeel.CLI.Catalog do
           :approve,
           :proofs,
           :proof,
+          :proof_verify,
           :audit_log,
           :release_ready,
           :progress,

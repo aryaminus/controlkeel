@@ -30,7 +30,7 @@ defmodule ControlKeel.CLI.JsonModeTest do
       assert payload["status"] == "error"
       assert is_binary(payload["error"])
       assert payload["code"] == "command_error"
-      assert payload["command"] == "proof"
+      assert payload["command"] == "proof <id>"
       assert is_binary(payload["version"])
     end
 

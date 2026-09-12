@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Ck.Status do
 
       parsed = parse!(["status" | args])
 
-      case CLI.run_command(parsed, File.cwd!()) do
+      case CLI.run_command(parsed, ControlKeel.Project.Root.resolve(File.cwd!())) do
         {:ok, lines} ->
           Enum.each(lines, fn line -> Mix.shell().info(line) end)
 

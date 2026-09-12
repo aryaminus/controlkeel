@@ -2,6 +2,7 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
   @moduledoc false
 
   alias ControlKeel.Learning.OutcomeTracker
+  alias ControlKeel.MCP.Arguments
 
   @allowed_modes ~w(record get_session get_leaderboard)
 
@@ -54,16 +55,11 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
 
   defp normalize(arguments) do
-    with {:ok, mode} <- mode(arguments) do
+    with {:ok, mode} <- mode(arguments),
+         {:ok, session_id} <- normalize_session_id(arguments, mode) do
       cond do
-        mode == "record" and is_nil(Map.get(arguments, "session_id")) ->
-          {:error, {:invalid_arguments, "`session_id` is required for record mode"}}
-
         mode == "record" and is_nil(Map.get(arguments, "outcome")) ->
           {:error, {:invalid_arguments, "`outcome` is required for record mode"}}
-
-        mode == "get_session" and is_nil(Map.get(arguments, "session_id")) ->
-          {:error, {:invalid_arguments, "`session_id` is required for get_session mode"}}
 
         mode == "get_leaderboard" and is_nil(Map.get(arguments, "workspace_id")) ->
           {:error, {:invalid_arguments, "`workspace_id` is required for get_leaderboard mode"}}
@@ -77,7 +73,7 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
           {:ok,
            %{
              "mode" => mode,
-             "session_id" => Map.get(arguments, "session_id"),
+             "session_id" => session_id,
              "outcome" => Map.get(arguments, "outcome"),
              "agent_id" => Map.get(arguments, "agent_id"),
              "task_type" => Map.get(arguments, "task_type"),
@@ -88,6 +84,25 @@ defmodule ControlKeel.MCP.Tools.CkOutcomeTracker do
            }}
       end
     end
+  end
+
+  # record/get_session operate on a real session: normalize the id and
+  # verify it exists instead of passing raw input straight through.
+  defp normalize_session_id(arguments, mode) when mode in ["record", "get_session"] do
+    case Arguments.resolve_session_id(arguments) do
+      {:ok, session_id} ->
+        case ControlKeel.Mission.get_session(session_id) do
+          nil -> {:error, {:invalid_arguments, "Session not found"}}
+          _session -> {:ok, session_id}
+        end
+
+      {:error, _} ->
+        {:error, {:invalid_arguments, "`session_id` is required for #{mode} mode"}}
+    end
+  end
+
+  defp normalize_session_id(arguments, _mode) do
+    {:ok, Map.get(arguments, "session_id")}
   end
 
   defp mode(arguments) do

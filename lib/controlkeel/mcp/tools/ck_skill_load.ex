@@ -20,7 +20,9 @@ defmodule ControlKeel.MCP.Tools.CkSkillLoad do
     session_id = Map.get(arguments, "session_id")
     target = TargetResolver.resolve(project_root, Map.get(arguments, "target"))
 
-    case Registry.get(name, project_root) do
+    # Same trust view as ck_skill_list and tools/list: advertised names
+    # must resolve here.
+    case Registry.get(name, project_root, trust_project_skills: true) do
       nil ->
         {:error,
          {:invalid_arguments,

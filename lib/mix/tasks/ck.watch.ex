@@ -26,6 +26,7 @@ defmodule Mix.Tasks.Ck.Watch do
 
   @impl true
   def run(args) do
+    ControlKeel.Runtime.Defaults.bind_inspection_database()
     Mix.Task.run("app.start")
 
     {opts, _, _} = OptionParser.parse(args, strict: [interval: :integer])

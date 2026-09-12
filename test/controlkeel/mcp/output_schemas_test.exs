@@ -251,4 +251,40 @@ defmodule ControlKeel.MCP.OutputSchemasTest do
       end
     end
   end
+
+  describe "skill/attach output schemas match real payloads (no drift)" do
+    test "ck_skill_list keys match its declared schema" do
+      assert {:ok, payload} =
+               ControlKeel.MCP.Tools.CkSkillList.call(%{"project_root" => File.cwd!()})
+
+      declared =
+        OutputSchemas.schema_for("ck_skill_list")["properties"] |> Map.keys() |> MapSet.new()
+
+      actual = payload |> Map.keys() |> MapSet.new()
+
+      assert MapSet.subset?(actual, declared),
+             "ck_skill_list payload keys drifted.\n  payload: #{inspect(Enum.sort(MapSet.to_list(actual)))}\n  schema:  #{inspect(Enum.sort(MapSet.to_list(declared)))}"
+    end
+
+    test "ck_skill_load keys match its declared schema" do
+      assert {:ok, list} =
+               ControlKeel.MCP.Tools.CkSkillList.call(%{"project_root" => File.cwd!()})
+
+      [first | _] = list["skills"]
+
+      assert {:ok, payload} =
+               ControlKeel.MCP.Tools.CkSkillLoad.call(%{
+                 "name" => first["name"],
+                 "project_root" => File.cwd!()
+               })
+
+      declared =
+        OutputSchemas.schema_for("ck_skill_load")["properties"] |> Map.keys() |> MapSet.new()
+
+      actual = payload |> Map.keys() |> MapSet.new()
+
+      assert MapSet.subset?(actual, declared),
+             "ck_skill_load payload keys drifted.\n  payload: #{inspect(Enum.sort(MapSet.to_list(actual)))}\n  schema:  #{inspect(Enum.sort(MapSet.to_list(declared)))}"
+    end
+  end
 end

@@ -41,10 +41,29 @@ defmodule ControlKeel.Skills.ClaudeHooks do
     """
   end
 
+  # Portable binary resolution shared by every hook that shells out:
+  # CONTROLKEEL_BIN wins, then the repo-local bin/controlkeel shim, then
+  # PATH. Never a bare `controlkeel` (breaks on GUI-launched hosts where
+  # PATH lacks the install dir).
+  defp ck_resolve do
+    """
+    ck_bin() {
+      if [ -n "${CONTROLKEEL_BIN:-}" ] && [ -x "$CONTROLKEEL_BIN" ]; then printf '%s' "$CONTROLKEEL_BIN"; return 0; fi
+      _root="${CK_PROJECT_ROOT:-}"
+      if [ -z "$_root" ] && command -v git >/dev/null 2>&1; then _root=$(git rev-parse --show-toplevel 2>/dev/null || true); fi
+      if [ -n "$_root" ] && [ -x "$_root/bin/controlkeel" ]; then printf '%s' "$_root/bin/controlkeel"; return 0; fi
+      if command -v controlkeel >/dev/null 2>&1; then command -v controlkeel; return 0; fi
+      return 1
+    }
+    """
+  end
+
   defp permission_request_hook do
     """
     #!/usr/bin/env sh
-    controlkeel review plan submit --stdin --submitted-by claude-code
+    #{ck_resolve()}
+    BIN=$(ck_bin) || exit 0
+    "$BIN" review plan submit --stdin --submitted-by claude-code
     """
   end
 
@@ -106,7 +125,9 @@ defmodule ControlKeel.Skills.ClaudeHooks do
   defp session_start_hook do
     """
     #!/usr/bin/env sh
-    controlkeel context --json >/dev/null 2>&1 || true
+    #{ck_resolve()}
+    BIN=$(ck_bin) || BIN=""
+    [ -n "$BIN" ] && "$BIN" context --json >/dev/null 2>&1 || true
     printf '{"systemMessage":"ControlKeel available. Start with ck_context to load mission state."}'
     """
   end
@@ -114,7 +135,10 @@ defmodule ControlKeel.Skills.ClaudeHooks do
   defp stop_hook do
     """
     #!/usr/bin/env sh
-    blocked=$(controlkeel context --json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("active_findings",{}).get("blocked",0))' 2>/dev/null || echo 0)
+    #{ck_resolve()}
+    BIN=$(ck_bin) || BIN=""
+    blocked=0
+    if [ -n "$BIN" ]; then blocked=$("$BIN" context --json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("active_findings",{}).get("blocked",0))' 2>/dev/null || echo 0); fi
     [ "$blocked" = "0" ] && exit 0
     printf '{"decision":"block","reason":"ControlKeel has blocked findings. Call ck_context, resolve them, then complete the turn."}'
     """
@@ -151,11 +175,14 @@ defmodule ControlKeel.Skills.ClaudeHooks do
   defp user_prompt_submit_hook do
     """
     #!/usr/bin/env sh
+    #{ck_resolve()}
+    BIN=$(ck_bin) || BIN=""
     input=$(cat)
     prompt=$(printf '%s' "$input" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("prompt",""))' 2>/dev/null || echo "")
     [ -z "$prompt" ] && exit 0
     printf '%s' "$prompt" | grep -qE '(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|BEGIN (RSA|OPENSSH|PGP) PRIVATE KEY)' && printf '{"decision":"block","reason":"Potential secret in prompt. Remove credentials before continuing."}' && exit 0
-    blocked=$(controlkeel context --json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("active_findings",{}).get("blocked",0))' 2>/dev/null || echo 0)
+    blocked=0
+    if [ -n "$BIN" ]; then blocked=$("$BIN" context --json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("active_findings",{}).get("blocked",0))' 2>/dev/null || echo 0); fi
     [ "${blocked:-0}" != "0" ] && [ "${blocked:-0}" != "" ] && printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"WARNING: %s blocked finding(s) active. Call ck_context and resolve them before proceeding."}}' "$blocked" || true
     """
   end

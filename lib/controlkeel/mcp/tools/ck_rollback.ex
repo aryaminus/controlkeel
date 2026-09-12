@@ -15,71 +15,73 @@ defmodule ControlKeel.MCP.Tools.CkRollback do
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
 
   defp do_call(arguments) do
-    session_id = Arguments.parse_integer(arguments["session_id"])
-    mode = Map.get(arguments, "mode", "status")
-    project_root = project_root(arguments)
+    with {:ok, session} <- Arguments.fetch_session(arguments) do
+      id = session.id
+      mode = Map.get(arguments, "mode", "status")
+      project_root = session_project_root(session, arguments)
 
-    case session_id do
-      nil ->
-        {:error, {:invalid_arguments, "`session_id` is required"}}
+      case mode do
+        "checkpoint" ->
+          task_id = Arguments.parse_integer(arguments["task_id"])
 
-      id when is_integer(id) ->
-        case mode do
-          "checkpoint" ->
-            task_id = Arguments.parse_integer(arguments["task_id"])
+          case task_id do
+            nil ->
+              {:error, {:invalid_arguments, "`task_id` is required for checkpoint mode"}}
 
-            case task_id do
-              nil ->
-                {:error, {:invalid_arguments, "`task_id` is required for checkpoint mode"}}
-
-              tid ->
+            tid ->
+              with :ok <- Arguments.validate_task(tid, id) do
                 case RollbackExecutor.checkpoint(id, tid, project_root: project_root) do
                   {:ok, snapshot} -> {:ok, format_snapshot(snapshot)}
                   {:error, reason} -> {:error, reason}
                 end
-            end
+              end
+          end
 
-          "execute" ->
-            task_id = Arguments.parse_integer(arguments["task_id"])
-            reason = Map.get(arguments, "reason", "Operator-initiated rollback")
+        "execute" ->
+          task_id = Arguments.parse_integer(arguments["task_id"])
+          reason = Map.get(arguments, "reason", "Operator-initiated rollback")
 
-            case task_id do
-              nil ->
-                {:error, {:invalid_arguments, "`task_id` is required for execute mode"}}
+          case task_id do
+            nil ->
+              {:error, {:invalid_arguments, "`task_id` is required for execute mode"}}
 
-              tid ->
+            tid ->
+              with :ok <- Arguments.validate_task(tid, id) do
                 case RollbackExecutor.execute(id, tid, project_root: project_root, reason: reason) do
                   {:ok, snapshot} -> {:ok, format_snapshot(snapshot)}
                   {:error, reason} -> {:error, reason}
                 end
-            end
+              end
+          end
 
-          "status" ->
-            task_id = Arguments.parse_integer(arguments["task_id"])
+        "status" ->
+          task_id = Arguments.parse_integer(arguments["task_id"])
 
-            case task_id do
-              nil ->
-                {:error, {:invalid_arguments, "`task_id` is required for status mode"}}
+          case task_id do
+            nil ->
+              {:error, {:invalid_arguments, "`task_id` is required for status mode"}}
 
-              tid ->
+            tid ->
+              with :ok <- Arguments.validate_task(tid, id) do
                 case RollbackExecutor.status(id, tid) do
                   nil -> {:ok, %{"message" => "No snapshot found"}}
                   snapshot -> {:ok, format_snapshot(snapshot)}
                 end
-            end
+              end
+          end
 
-          "list" ->
-            snapshots = RollbackExecutor.list(id)
+        "list" ->
+          snapshots = RollbackExecutor.list(id)
 
-            {:ok,
-             %{
-               "snapshots" => Enum.map(snapshots, &format_snapshot/1),
-               "count" => length(snapshots)
-             }}
+          {:ok,
+           %{
+             "snapshots" => Enum.map(snapshots, &format_snapshot/1),
+             "count" => length(snapshots)
+           }}
 
-          _ ->
-            {:error, {:invalid_arguments, "mode must be checkpoint, execute, status, or list"}}
-        end
+        _ ->
+          {:error, {:invalid_arguments, "mode must be checkpoint, execute, status, or list"}}
+      end
     end
   end
 
@@ -98,10 +100,21 @@ defmodule ControlKeel.MCP.Tools.CkRollback do
     }
   end
 
-  defp project_root(arguments) do
-    case Map.get(arguments, "project_root") do
-      value when is_binary(value) and value != "" -> value
-      _ -> File.cwd!()
+  # Session runtime_context wins over the explicit arg, which wins over cwd —
+  # same precedence as ck_worktree_switch, so one MCP server across repos
+  # still operates on the session's own checkout.
+  defp session_project_root(session, arguments) do
+    runtime_root = get_in(session.metadata || %{}, ["runtime_context", "project_root"])
+
+    cond do
+      is_binary(runtime_root) and runtime_root != "" ->
+        Path.expand(runtime_root)
+
+      is_binary(arguments["project_root"]) and arguments["project_root"] != "" ->
+        Path.expand(arguments["project_root"])
+
+      true ->
+        File.cwd!()
     end
   end
 end

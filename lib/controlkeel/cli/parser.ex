@@ -54,14 +54,26 @@ defmodule ControlKeel.CLI.Parser do
     json: :boolean,
     project_root: :string
   ]
-  @findings_switches [severity: :string, status: :string, format: :string, json: :boolean]
-  @findings_translate_switches [session_id: :integer, severity: :string, json: :boolean]
+  @findings_switches [
+    severity: :string,
+    status: :string,
+    format: :string,
+    json: :boolean,
+    project_root: :string
+  ]
+  @findings_translate_switches [
+    session_id: :integer,
+    severity: :string,
+    json: :boolean,
+    project_root: :string
+  ]
   @proofs_switches [
     session_id: :integer,
     task_id: :integer,
     deploy_ready: :boolean,
     format: :string,
-    json: :boolean
+    json: :boolean,
+    project_root: :string
   ]
   @mcp_switches [project_root: :string, json: :boolean]
   @memory_search_switches [session_id: :integer, type: :string, json: :boolean]
@@ -88,7 +100,12 @@ defmodule ControlKeel.CLI.Parser do
     enforce: :boolean,
     json: :boolean
   ]
-  @progress_switches [session_id: :integer, format: :string, json: :boolean]
+  @progress_switches [
+    session_id: :integer,
+    format: :string,
+    json: :boolean,
+    project_root: :string
+  ]
   @skills_list_switches [project_root: :string, target: :string, format: :string, json: :boolean]
   @skills_validate_switches [project_root: :string, json: :boolean]
   @skills_export_switches [project_root: :string, target: :string, scope: :string, json: :boolean]
@@ -130,10 +147,17 @@ defmodule ControlKeel.CLI.Parser do
     baseline_subject: :string,
     scenario_slugs: :string,
     dry_run: :boolean,
-    execute: :boolean
+    execute: :boolean,
+    project_root: :string
   ]
-  @obs_import_switches [dry_run: :boolean, persist: :boolean, format: :string, json: :boolean]
-  @audit_log_switches [format: :string, json: :boolean]
+  @obs_import_switches [
+    dry_run: :boolean,
+    persist: :boolean,
+    format: :string,
+    json: :boolean,
+    project_root: :string
+  ]
+  @audit_log_switches [format: :string, json: :boolean, project_root: :string]
   @service_account_create_switches [
     workspace_id: :integer,
     name: :string,
@@ -761,6 +785,9 @@ defmodule ControlKeel.CLI.Parser do
       ["proof", id] ->
         {:ok, %{command: :proof, options: %{}, args: [id]}}
 
+      ["proof", "verify", id] ->
+        {:ok, %{command: :proof_verify, options: %{}, args: [id]}}
+
       ["audit-log", session_id | rest] ->
         parse_audit_log(session_id, rest)
 
@@ -1155,12 +1182,15 @@ defmodule ControlKeel.CLI.Parser do
   end
 
   defp parse_provider_set_fallback_chain(argv) do
-    case OptionParser.parse(argv, strict: []) do
-      {_options, providers, []} when providers != [] ->
-        {:ok, %{command: :provider_set_fallback_chain, options: %{}, args: providers}}
+    case OptionParser.parse(argv, strict: [json: :boolean, project_root: :string]) do
+      {options, providers, []} when providers != [] ->
+        {:ok, %{command: :provider_set_fallback_chain, options: options, args: providers}}
+
+      {options, [], []} ->
+        {:ok, %{command: :provider_set_fallback_chain, options: options, args: []}}
 
       _ ->
-        {:ok, %{command: :provider_set_fallback_chain, options: %{}, args: []}}
+        {:error, ControlKeel.CLI.usage_text()}
     end
   end
 

@@ -16,32 +16,29 @@ defmodule ControlKeel.MCP.Tools.CkExternalService do
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
 
   defp do_call(arguments) do
-    session_id = Arguments.parse_integer(arguments["session_id"])
-    mode = Map.get(arguments, "mode", "summary")
+    with {:ok, session} <- Arguments.fetch_session(arguments) do
+      id = session.id
+      mode = Map.get(arguments, "mode", "summary")
 
-    case session_id do
-      nil ->
-        {:error, {:invalid_arguments, "`session_id` is required"}}
+      case mode do
+        "record" ->
+          attrs = %{
+            session_id: id,
+            task_id: Arguments.parse_integer(arguments["task_id"]),
+            service_name: arguments["service_name"],
+            interaction_type: arguments["interaction_type"] || "api_call",
+            method: arguments["method"],
+            endpoint: arguments["endpoint"],
+            status_code: Arguments.parse_integer(arguments["status_code"]),
+            request_size_bytes: Arguments.parse_integer(arguments["request_size_bytes"]) || 0,
+            response_size_bytes: Arguments.parse_integer(arguments["response_size_bytes"]) || 0,
+            latency_ms: Arguments.parse_integer(arguments["latency_ms"]),
+            tokens_used: Arguments.parse_integer(arguments["tokens_used"]) || 0,
+            cost_cents: Arguments.parse_integer(arguments["cost_cents"]) || 0,
+            metadata: arguments["metadata"] || %{}
+          }
 
-      id when is_integer(id) ->
-        case mode do
-          "record" ->
-            attrs = %{
-              session_id: id,
-              task_id: Arguments.parse_integer(arguments["task_id"]),
-              service_name: arguments["service_name"],
-              interaction_type: arguments["interaction_type"] || "api_call",
-              method: arguments["method"],
-              endpoint: arguments["endpoint"],
-              status_code: Arguments.parse_integer(arguments["status_code"]),
-              request_size_bytes: Arguments.parse_integer(arguments["request_size_bytes"]) || 0,
-              response_size_bytes: Arguments.parse_integer(arguments["response_size_bytes"]) || 0,
-              latency_ms: Arguments.parse_integer(arguments["latency_ms"]),
-              tokens_used: Arguments.parse_integer(arguments["tokens_used"]) || 0,
-              cost_cents: Arguments.parse_integer(arguments["cost_cents"]) || 0,
-              metadata: arguments["metadata"] || %{}
-            }
-
+          with :ok <- Arguments.validate_task(attrs.task_id, id) do
             case ExternalServiceTracker.record(attrs) do
               {:ok, interaction} ->
                 {:ok, format_interaction(interaction)}
@@ -49,23 +46,24 @@ defmodule ControlKeel.MCP.Tools.CkExternalService do
               {:error, changeset} ->
                 {:error, {:invalid_arguments, Utils.format_changeset_errors(changeset)}}
             end
+          end
 
-          "summary" ->
-            {:ok, ExternalServiceTracker.summary(id)}
+        "summary" ->
+          {:ok, ExternalServiceTracker.summary(id)}
 
-          "rate_limit_status" ->
-            {:ok, ExternalServiceTracker.rate_limit_status(id)}
+        "rate_limit_status" ->
+          {:ok, ExternalServiceTracker.rate_limit_status(id)}
 
-          "top_services" ->
-            limit = Arguments.parse_integer(arguments["limit"]) || 10
-            services = ExternalServiceTracker.top_services(id, limit: limit)
-            {:ok, %{"services" => services, "count" => length(services)}}
+        "top_services" ->
+          limit = Arguments.parse_integer(arguments["limit"]) || 10
+          services = ExternalServiceTracker.top_services(id, limit: limit)
+          {:ok, %{"services" => services, "count" => length(services)}}
 
-          _ ->
-            {:error,
-             {:invalid_arguments,
-              "mode must be record, summary, rate_limit_status, or top_services"}}
-        end
+        _ ->
+          {:error,
+           {:invalid_arguments,
+            "mode must be record, summary, rate_limit_status, or top_services"}}
+      end
     end
   end
 

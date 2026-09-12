@@ -1706,6 +1706,12 @@ defmodule ControlKeel.MCP.Protocol do
             "type" => ["integer", "string"],
             "description" => "Task identifier within the session for scoped operations."
           },
+          "session_id" => %{
+            "type" => ["integer", "string"],
+            "description" =>
+              "Optional session scope: when supplied, lookups for a review or task " <>
+                "in another session are denied instead of served."
+          },
           "review_type" => %{"type" => "string", "enum" => ["plan", "diff", "completion"]}
         }
       }
@@ -1728,6 +1734,12 @@ defmodule ControlKeel.MCP.Protocol do
           "review_id" => %{
             "type" => ["integer", "string"],
             "description" => "Unique identifier of the review to query or act on."
+          },
+          "session_id" => %{
+            "type" => ["integer", "string"],
+            "description" =>
+              "Optional session scope: when supplied, decisions on a review " <>
+                "from another session are denied instead of applied."
           },
           "decision" => %{
             "type" => "string",

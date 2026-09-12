@@ -15,54 +15,55 @@ defmodule ControlKeel.MCP.Tools.CkCopilot do
   def call(_arguments), do: {:error, {:invalid_arguments, "Tool arguments must be an object"}}
 
   defp do_call(arguments) do
-    session_id = Arguments.parse_integer(arguments["session_id"])
-    mode = Map.get(arguments, "mode", "history")
+    with {:ok, session} <- Arguments.fetch_session(arguments) do
+      session_id = session.id
+      mode = Map.get(arguments, "mode", "history")
 
-    case session_id do
-      nil ->
-        {:error, {:invalid_arguments, "`session_id` is required"}}
+      case mode do
+        "subscribe" ->
+          CopilotChannel.subscribe(session_id)
+          {:ok, %{"status" => "subscribed", "session_id" => session_id}}
 
-      id when is_integer(id) ->
-        case mode do
-          "subscribe" ->
-            CopilotChannel.subscribe(id)
-            {:ok, %{"status" => "subscribed", "session_id" => id}}
+        "publish" ->
+          event_type = arguments["event_type"]
+          payload = arguments["payload"] || %{}
 
-          "publish" ->
-            event_type = arguments["event_type"]
-            payload = arguments["payload"] || %{}
+          case event_type do
+            nil ->
+              {:error, {:invalid_arguments, "`event_type` is required for publish mode"}}
 
-            case event_type do
-              nil ->
-                {:error, {:invalid_arguments, "`event_type` is required for publish mode"}}
-
-              et
-              when et in ~w(human.viewing human.editing human.approving human.commenting agent.status agent.progress) ->
-                CopilotChannel.publish(id, et, payload,
+            et
+            when et in ~w(human.viewing human.editing human.approving human.commenting agent.status agent.progress) ->
+              with :ok <-
+                     Arguments.validate_task(
+                       Arguments.parse_integer(arguments["task_id"]),
+                       session_id
+                     ) do
+                CopilotChannel.publish(session_id, et, payload,
                   actor: arguments["actor"] || "unknown",
                   task_id: Arguments.parse_integer(arguments["task_id"])
                 )
 
-                {:ok, %{"status" => "published", "session_id" => id, "event_type" => et}}
+                {:ok, %{"status" => "published", "session_id" => session_id, "event_type" => et}}
+              end
 
-              _ ->
-                {:error,
-                 {:invalid_arguments,
-                  "Invalid event_type. Must be one of: human.viewing, human.editing, human.approving, human.commenting, agent.status, agent.progress"}}
-            end
+            _ ->
+              {:error,
+               {:invalid_arguments,
+                "Invalid event_type. Must be one of: human.viewing, human.editing, human.approving, human.commenting, agent.status, agent.progress"}}
+          end
 
-          "presence" ->
-            {:ok, CopilotChannel.presence(id)}
+        "presence" ->
+          {:ok, CopilotChannel.presence(session_id)}
 
-          "history" ->
-            limit = Arguments.parse_integer(arguments["limit"]) || 50
-            {:ok, events} = CopilotChannel.history(id, limit: limit)
-            {:ok, %{"events" => Enum.map(events, &format_event/1), "count" => length(events)}}
+        "history" ->
+          limit = Arguments.parse_integer(arguments["limit"]) || 50
+          {:ok, events} = CopilotChannel.history(session_id, limit: limit)
+          {:ok, %{"events" => Enum.map(events, &format_event/1), "count" => length(events)}}
 
-          _ ->
-            {:error,
-             {:invalid_arguments, "mode must be subscribe, publish, presence, or history"}}
-        end
+        _ ->
+          {:error, {:invalid_arguments, "mode must be subscribe, publish, presence, or history"}}
+      end
     end
   end
 

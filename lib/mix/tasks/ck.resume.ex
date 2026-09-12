@@ -6,10 +6,11 @@ defmodule Mix.Tasks.Ck.Resume do
   @shortdoc "Resume a paused or blocked task"
 
   def run([task_id]) do
+    ControlKeel.Runtime.Defaults.bind_inspection_database()
     Mix.Task.run("app.start")
 
     with {:ok, parsed} <- CLI.parse(["resume", task_id]),
-         {:ok, lines} <- CLI.run_command(parsed, File.cwd!()) do
+         {:ok, lines} <- CLI.run_command(parsed, ControlKeel.Project.Root.resolve(File.cwd!())) do
       Enum.each(lines, fn line -> Mix.shell().info(line) end)
     else
       {:error, message} -> Mix.raise(message)

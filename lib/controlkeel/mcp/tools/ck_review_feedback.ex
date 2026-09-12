@@ -9,6 +9,7 @@ defmodule ControlKeel.MCP.Tools.CkReviewFeedback do
     with {:ok, review_id} <- Arguments.required_integer(arguments, "review_id"),
          {:ok, decision} <- required_decision(arguments),
          {:ok, review} <- fetch_review(review_id),
+         :ok <- scope_review_to_session(review, arguments),
          {:ok, updated} <- respond_review(review, decision, arguments) do
       {:ok,
        %{
@@ -34,6 +35,32 @@ defmodule ControlKeel.MCP.Tools.CkReviewFeedback do
     case Mission.get_review(review_id) do
       nil -> fallback_review(review_id)
       review -> {:ok, review}
+    end
+  end
+
+  # An explicit session_id scopes the decision: cross-session approve/deny
+  # is denied. Absent session_id preserves old behavior. Fallback (CLI)
+  # reviews carry no session, so they fail closed when scoped.
+  defp scope_review_to_session(%{fallback_review_id: _}, arguments) do
+    case Map.get(arguments, "session_id") do
+      nil -> :ok
+      _ -> {:error, {:invalid_arguments, "Review does not belong to the given session"}}
+    end
+  end
+
+  defp scope_review_to_session(review, arguments) do
+    case Map.get(arguments, "session_id") do
+      nil ->
+        :ok
+
+      raw ->
+        with {:ok, session_id} <- Arguments.normalize_integer(raw, "session_id") do
+          if Map.get(review, :session_id) == session_id do
+            :ok
+          else
+            {:error, {:invalid_arguments, "Review does not belong to the given session"}}
+          end
+        end
     end
   end
 

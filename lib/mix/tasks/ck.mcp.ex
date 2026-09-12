@@ -17,7 +17,7 @@ defmodule Mix.Tasks.Ck.Mcp do
 
     parsed = parse!(["mcp" | args])
 
-    case CLI.run_command(parsed, File.cwd!()) do
+    case CLI.run_command(parsed, ControlKeel.Project.Root.resolve(File.cwd!())) do
       :ok ->
         :ok
 

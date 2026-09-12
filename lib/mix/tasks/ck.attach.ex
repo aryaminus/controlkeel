@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Ck.Attach do
 
     parsed = parse!(["attach" | args])
 
-    case CLI.run_command(parsed, File.cwd!()) do
+    case CLI.run_command(parsed, ControlKeel.Project.Root.resolve(File.cwd!())) do
       {:ok, lines} ->
         Enum.each(lines, fn line -> Mix.shell().info(line) end)
 

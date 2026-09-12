@@ -18,9 +18,12 @@ defmodule ControlKeel.MCP.Tools.CkSkillList do
     target_family = TargetResolver.family(project_root, target)
     include_duplicates = Map.get(arguments, "include_duplicate_copies", false)
 
+    # tools/list advertises project skills with trust forced on; list with
+    # the same view so advertised names always resolve in ck_skill_load.
     analysis =
       Registry.analyze(project_root,
-        report_identical_duplicates: include_duplicates
+        report_identical_duplicates: include_duplicates,
+        trust_project_skills: true
       )
 
     skills =

@@ -506,19 +506,49 @@ defmodule ControlKeel.MCP.OutputSchemas do
             "properties" => %{
               "name" => %{"type" => "string"},
               "description" => %{"type" => "string"},
-              "scope" => %{"type" => "string"}
+              "scope" => %{"type" => "string"},
+              "allowed_tools" => %{"type" => "array"},
+              "required_mcp_tools" => %{"type" => "array"},
+              "license" => %{"type" => "string"},
+              "compatibility" => %{"type" => "array"},
+              "compatibility_targets" => %{"type" => "array"},
+              "path" => %{"type" => "string"},
+              "source" => %{"type" => "string"},
+              "owner" => %{"type" => "string"},
+              "content_hash" => %{"type" => "string"},
+              "install_state" => %{"type" => "string"},
+              "diagnostics" => %{"type" => "array"}
             }
           }
         },
-        "total" => %{"type" => "integer"}
+        "total" => %{"type" => "integer"},
+        "target" => %{"type" => "string"},
+        "target_family" => %{"type" => "string"},
+        "trusted_project_skills" => %{"type" => "boolean"},
+        "diagnostics" => %{"type" => "array"},
+        "usage_hint" => %{"type" => "string"},
+        "prompt_block" => %{"type" => "string"}
       }
     },
     "ck_skill_load" => %{
       "type" => "object",
       "properties" => %{
         "name" => %{"type" => "string"},
+        "description" => %{"type" => "string"},
+        "target" => %{"type" => "string"},
+        "target_family" => %{"type" => "string"},
+        "scope" => %{"type" => "string"},
+        "allowed_tools" => %{"type" => "array"},
+        "required_mcp_tools" => %{"type" => "array"},
+        "compatibility" => %{"type" => "array"},
+        "compatibility_targets" => %{"type" => "array"},
+        "source" => %{"type" => "string"},
+        "activation" => %{"type" => "string"},
+        "diagnostics" => %{"type" => "array"},
+        "agent_metadata" => %{"type" => "object"},
         "content" => %{"type" => "string"},
-        "resources" => %{"type" => "array", "items" => %{"type" => "string"}}
+        "resources" => %{"type" => "array", "items" => %{"type" => "string"}},
+        "result_schema" => %{"type" => "object"}
       }
     },
     "ck_skill_validate" => %{
@@ -556,10 +586,10 @@ defmodule ControlKeel.MCP.OutputSchemas do
     "ck_attach" => %{
       "type" => "object",
       "properties" => %{
-        "attached" => %{"type" => "boolean"},
         "host" => %{"type" => "string"},
-        "files_created" => %{"type" => "array", "items" => %{"type" => "string"}},
-        "hooks_installed" => %{"type" => "array", "items" => %{"type" => "string"}}
+        "status" => %{"type" => "string"},
+        "lines" => %{"type" => "array", "items" => %{"type" => "string"}},
+        "next_steps" => %{"type" => "array", "items" => %{"type" => "string"}}
       }
     },
     "ck_session_digest" => %{

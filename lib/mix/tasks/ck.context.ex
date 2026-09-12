@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Ck.Context do
 
       parsed = parse!(["context" | args])
 
-      case CLI.run_command(parsed, File.cwd!()) do
+      case CLI.run_command(parsed, ControlKeel.Project.Root.resolve(File.cwd!())) do
         {:ok, lines} ->
           emit_lines(lines, quiet_json?)
 

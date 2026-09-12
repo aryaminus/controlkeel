@@ -4,6 +4,7 @@ defmodule ControlKeel.CLI.Dispatch.ProvidersBudget do
   alias ControlKeel.Budget.CostOptimizer
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.WorkspaceToolPolicy
+  alias ControlKeel.CLI.Output
   alias ControlKeel.ProviderBroker
   alias ControlKeel.ProviderBroker.Config
   import ControlKeel.CLI, except: [run_command: 2]
@@ -201,14 +202,18 @@ defmodule ControlKeel.CLI.Dispatch.ProvidersBudget do
   end
 
   def run_command(
-        %{command: :provider_set_fallback_chain, args: providers},
+        %{command: :provider_set_fallback_chain, args: providers, options: options},
         _project_root
       )
       when providers != [] do
-    case Config.set_fallback_chain(providers) do
-      {:ok, _config} ->
-        {:ok, ["Fallback chain set: #{Enum.join(providers, " → ")}"]}
+    with {:ok, format} <- effective_cli_format(options),
+         {:ok, _config} <- Config.set_fallback_chain(providers) do
+      payload = %{"fallback_chain" => providers}
 
+      Output.render_format(format, payload, fn _ ->
+        ["Fallback chain set: #{Enum.join(providers, " → ")}"]
+      end)
+    else
       {:error, {:unknown_providers, bad}} ->
         {:error,
          "Unknown provider(s): #{Enum.join(bad, ", ")}. Allowed: #{Enum.join(Config.allowed_providers(), ", ")}"}
@@ -216,6 +221,10 @@ defmodule ControlKeel.CLI.Dispatch.ProvidersBudget do
       {:error, reason} ->
         {:error, "Failed to set fallback chain: #{inspect(reason)}"}
     end
+  end
+
+  def run_command(%{command: :provider_set_fallback_chain} = parsed, root) do
+    run_command(Map.put(parsed, :options, []), root)
   end
 
   def run_command(%{command: :provider_set_fallback_chain, args: []}, _project_root) do

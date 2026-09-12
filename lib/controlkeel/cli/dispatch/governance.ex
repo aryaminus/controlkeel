@@ -56,7 +56,8 @@ defmodule ControlKeel.CLI.Dispatch.Governance do
 
   def run_command(%{command: :validate, options: options}, project_root) do
     with {:ok, format} <- effective_cli_format(options),
-         {:ok, _binding, default_session, _mode} <- ensure_local_project(project_root) do
+         {:ok, _binding, default_session, _mode} <-
+           ensure_local_project(options[:project_root] || project_root) do
       content = options[:content]
 
       if not is_binary(content) or String.trim(content) == "" do
@@ -86,7 +87,8 @@ defmodule ControlKeel.CLI.Dispatch.Governance do
 
   def run_command(%{command: :findings, options: options}, project_root) do
     with {:ok, format} <- effective_cli_format(options),
-         {:ok, _binding, session, _mode} <- ensure_local_project(project_root) do
+         {:ok, _binding, session, _mode} <-
+           ensure_local_project(options[:project_root] || project_root) do
       findings =
         Mission.list_session_findings(session.id, %{
           severity: options[:severity],
@@ -178,7 +180,8 @@ defmodule ControlKeel.CLI.Dispatch.Governance do
 
   def run_command(%{command: :proofs, options: options}, project_root) do
     with {:ok, format} <- effective_cli_format(options),
-         {:ok, _binding, session, _mode} <- ensure_local_project(project_root) do
+         {:ok, _binding, session, _mode} <-
+           ensure_local_project(options[:project_root] || project_root) do
       browser =
         Mission.browse_proof_bundles(%{
           session_id: options[:session_id] || session.id,
