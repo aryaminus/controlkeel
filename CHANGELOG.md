@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.12 — 2026-09-12
+
+### What's changed
+
+- merge: integrate v0.4.11 version bump under audit fixes
+- fix(cli,mcp,skills): close audit gaps across command/tool/hook surfaces
+
 ## v0.4.11 — 2026-09-12
 
 ### What's changed
