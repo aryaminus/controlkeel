@@ -354,9 +354,13 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
   defp check_cloud_workspace_access(%Workspace{org_id: nil}, _),
     do: {:error, "Workspace is not bound to an org."}
 
-  defp check_cloud_workspace_access(%Workspace{org_id: ws_org}, %{current_org_id: org_id})
-       when is_integer(ws_org) and ws_org == org_id,
-       do: :ok
+  defp check_cloud_workspace_access(%Workspace{org_id: ws_org}, %{
+         current_org_id: org_id,
+         current_membership: membership
+       })
+       when is_integer(ws_org) and ws_org == org_id do
+    if membership, do: :ok, else: {:error, "Workspace belongs to a different organization."}
+  end
 
   defp check_cloud_workspace_access(_, _),
     do: {:error, "Workspace belongs to a different organization."}
