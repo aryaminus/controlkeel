@@ -15,7 +15,7 @@ defmodule ControlKeel.Repo.AddOrgFkToWorkspacesMigrationTest do
     start_supervised!(
       {MigrationRepo,
        database: database,
-       pool_size: 2,
+       pool_size: 1,
        busy_timeout: 5_000,
        stacktrace: true,
        show_sensitive_data_on_connection_error: true}
@@ -23,10 +23,14 @@ defmodule ControlKeel.Repo.AddOrgFkToWorkspacesMigrationTest do
 
     repo = MigrationRepo
 
-    query!(repo, "PRAGMA foreign_keys = OFF")
-    create_pre_migration_schema!(repo)
-    seed_pre_migration_data!(repo)
-    query!(repo, "PRAGMA foreign_keys = ON")
+    # PRAGMA foreign_keys is per-connection: keep OFF/seed/ON on the same
+    # checkout so the dangling seed row can't land on a guarded connection.
+    repo.checkout(fn ->
+      query!(repo, "PRAGMA foreign_keys = OFF")
+      create_pre_migration_schema!(repo)
+      seed_pre_migration_data!(repo)
+      query!(repo, "PRAGMA foreign_keys = ON")
+    end)
 
     assert :ok =
              Ecto.Migrator.up(repo, @migration_version, AddOrgFkToWorkspaces, log: false)
