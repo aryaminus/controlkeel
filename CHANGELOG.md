@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.15 — 2026-09-13
+
+### What's changed
+
+- Merge pull request #153 from adhabnr-ux/add-openeval-export
+- Fix: restore benchmark_test.exs content clobbered by prior push
+- Add regression test: awaiting_import exclusion is per-result, not run-wide
+- Add regression test + revert cosmetic diff in benchmark_test.exs (review)
+- Fix openeval export including awaiting-import results as failures (review)
+- fix: correct decorative comment separators mangled in prior push
+- test: cover EvalPort/OpenEval bundle export
+- Reject format=openeval on the unscoped HTTP export endpoint (tracked in #146)
+- Fix: complete benchmark.ex content (prior commit only included the first chunk)
+- Add openeval_export/1 and make export_run/2's format match exhaustive
+- Surface {:error, :unknown_format} from the benchmark export CLI command
+- Add EvalPort/OpenEval export format to benchmark run export
+
 ## v0.4.14 — 2026-09-13
 
 ### What's changed
