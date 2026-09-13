@@ -101,7 +101,7 @@ defmodule ControlKeelWeb.LiveAuth do
 
   defp handle_membership_event(
          {:membership_changed, %{user_id: uid, org_id: org_id}},
-         %{assigns: %{current_user: %{id: uid}}} = socket
+         %{assigns: %{current_user: %{id: uid}, current_org_id: org_id}} = socket
        ) do
     # Role changed but the membership is still active (revocation is handled
     # by the clause above): refresh the socket's membership in place so the
@@ -118,6 +118,13 @@ defmodule ControlKeelWeb.LiveAuth do
          |> put_flash(:info, "Your access has changed. Please sign in again.")
          |> push_navigate(to: "/auth/login")}
     end
+  end
+
+  defp handle_membership_event(
+         {:membership_changed, %{user_id: uid, org_id: _org_id}},
+         %{assigns: %{current_user: %{id: uid}}} = socket
+       ) do
+    {:cont, socket}
   end
 
   defp handle_membership_event(:sign_out_everywhere, %{assigns: %{current_user: _user}} = socket) do

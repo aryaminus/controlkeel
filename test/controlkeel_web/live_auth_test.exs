@@ -67,6 +67,50 @@ defmodule ControlKeelWeb.LiveAuthTest do
     refute html =~ "Join or create an organization"
   end
 
+  test "role changes from another org do not overwrite the current org membership" do
+    {:ok, org_a} =
+      Accounts.create_org(%{name: "Org A", slug: "org-a-#{System.unique_integer([:positive])}"})
+
+    {:ok, org_b} =
+      Accounts.create_org(%{name: "Org B", slug: "org-b-#{System.unique_integer([:positive])}"})
+
+    {:ok, user} =
+      Accounts.create_user(%{email: "multi-#{System.unique_integer([:positive])}@example.com"})
+
+    %Accounts.Membership{}
+    |> Accounts.Membership.changeset(%{
+      user_id: user.id,
+      org_id: org_a.id,
+      role: "viewer",
+      status: "active"
+    })
+    |> Repo.insert!()
+
+    %Accounts.Membership{}
+    |> Accounts.Membership.changeset(%{
+      user_id: user.id,
+      org_id: org_b.id,
+      role: "admin",
+      status: "active"
+    })
+    |> Repo.insert!()
+
+    conn =
+      build_conn()
+      |> Plug.Test.init_test_session(%{current_user_id: user.id, current_org_id: org_a.id})
+
+    {:ok, view, html} = live(conn, ~p"/cloud/projects")
+    refute html =~ "+ Create workspace"
+
+    Phoenix.PubSub.broadcast(
+      ControlKeel.PubSub,
+      Accounts.membership_topic(user.id),
+      {:membership_changed, %{user_id: user.id, org_id: org_b.id}}
+    )
+
+    refute render(view) =~ "+ Create workspace"
+  end
+
   test "unauthenticated users are still sent to login, not /organizations" do
     assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/proofs")
   end
