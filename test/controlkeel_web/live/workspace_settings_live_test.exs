@@ -517,5 +517,32 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
       assert msg =~ "Workspace belongs to a different organization."
     end
+
+    test "a user-only session still enforces org access (issue #141, R5)" do
+      # Production shape: the session map carries only current_user_id —
+      # nothing ever writes current_org_id. The gate must resolve authority
+      # from (user, resource) without a seeded org.
+      owner_a = create_user!("settings-noseed-a@example.com")
+
+      {:ok, org_a} =
+        Accounts.create_org_with_owner(owner_a.id, %{name: "NoSeedA", slug: "noseeda"})
+
+      ws_a =
+        create_workspace(%{name: "Secret2", slug: "secret2", industry: "web", org_id: org_a.id})
+
+      owner_b = create_user!("settings-noseed-b@example.com")
+
+      {:ok, _org_b} =
+        Accounts.create_org_with_owner(owner_b.id, %{name: "NoSeedB", slug: "noseedb"})
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{"current_user_id" => owner_b.id})
+
+      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
+               live(conn, ~p"/noseeda/workspaces/#{ws_a.slug}/settings")
+
+      assert msg =~ "Workspace belongs to a different organization."
+    end
   end
 end
