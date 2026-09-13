@@ -1,5 +1,12 @@
 defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
-  @moduledoc "Loads the signed-in user and org membership from the browser session."
+  @moduledoc """
+  Loads the signed-in user and org membership from the browser session.
+
+  When the session carries a user but no org (the production norm — issue
+  #141), the first active membership's org is derived as the default and
+  persisted back to the session. Downstream access gates must still resolve
+  authority from (user, resource); this value is a default hint only.
+  """
 
   import Plug.Conn
 
@@ -21,6 +28,23 @@ defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
       org_id = get_session(conn, :current_org_id)
 
       user = if is_integer(user_id), do: Accounts.get_user(user_id)
+
+      # Production never writes current_org_id (issue #141): when the
+      # session carries no org, derive the default (first active
+      # membership) and persist it so subsequent requests carry a real
+      # value. Access decisions must not rely on this hint — the shared
+      # gates resolve authority from (user, resource) instead.
+      org_id =
+        if is_nil(org_id) && user,
+          do: Accounts.default_org_for_user(user.id),
+          else: org_id
+
+      {conn, org_id} =
+        if org_id && is_nil(get_session(conn, :current_org_id)) do
+          {put_session(conn, :current_org_id, org_id), org_id}
+        else
+          {conn, org_id}
+        end
 
       membership =
         if user && is_integer(org_id), do: Accounts.get_active_membership(user.id, org_id)

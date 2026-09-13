@@ -10,12 +10,12 @@ defmodule ControlKeelWeb.ObservabilityLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    org_id = socket.assigns[:current_org_id]
+    current_user = socket.assigns[:current_user]
     socket = socket |> assign(:session_id, nil) |> assign(:session_title, nil)
 
     case Observability.session_run(id) do
       {:ok, run} ->
-        if Accounts.session_accessible?(run.session, org_id) do
+        if Accounts.session_accessible?(run.session, current_user) do
           {:ok,
            socket
            |> assign(:page_title, "Observability — #{run.session.title}")

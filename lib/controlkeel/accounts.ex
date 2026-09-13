@@ -634,27 +634,63 @@ defmodule ControlKeel.Accounts do
   end
 
   @doc """
-  Shared session-access gate for org-scoped surfaces.
+  Shared web-tier session-access gate (issue #141, R2).
 
-  Returns `true` when `session` is accessible from `org_id`:
+  Unlike the cookie-scoped check it replaces, the decision is keyed on the
+  runtime mode and the signed-in user — never on an ambient org id (which
+  production never writes, so it fail-opened every cloud read path):
 
-    * `org_id` is `nil` (local mode, or no org selected) — passthrough.
-    * otherwise the session's workspace must belong to the org.
+    * local mode → `true` (single-user deployment, no user model);
+    * cloud/self_hosted → the session's workspace must authorize `user`
+      via `authorize_cloud_execution/2` with at least viewer membership in
+      an active org. A missing user **denies**.
 
-  Every web surface that renders org-scoped session data should route its
-  access decision through this predicate instead of copying the
-  workspace-membership check per view (issue #83).
+  Callers pass `socket.assigns[:current_user]` / `conn.assigns[:current_user]`.
   """
-  @spec session_accessible?(%{workspace_id: integer() | nil}, integer() | nil) :: boolean()
-  def session_accessible?(_session, nil), do: true
-
-  def session_accessible?(%{workspace_id: ws_id}, org_id) when is_integer(org_id) do
-    org_id
-    |> list_workspaces_for_org()
-    |> Enum.any?(&(&1.id == ws_id))
+  @spec session_accessible?(%{workspace_id: integer() | nil} | nil, map() | nil) :: boolean()
+  def session_accessible?(session, user) do
+    cond do
+      ControlKeel.Runtime.Mode.current() == :local -> true
+      is_nil(user) -> false
+      true -> session_authorized?(session, user)
+    end
   end
 
-  def session_accessible?(_session, _org_id), do: true
+  defp session_authorized?(%{workspace_id: workspace_id}, %{id: user_id})
+       when is_integer(workspace_id) and is_integer(user_id) do
+    case authorize_cloud_execution(workspace_id, user_id: user_id, required_role: "viewer") do
+      {:ok, :authorized} -> true
+      _ -> false
+    end
+  end
+
+  defp session_authorized?(_session, _user), do: false
+
+  @doc """
+  First active membership's org id for a user, or `nil`.
+
+  Used as the default-org hint where the browser session never recorded one
+  (production never writes `current_org_id` — issue #141). Access decisions
+  must not rely on this; the shared gates above resolve authority from
+  `(user, resource)` instead.
+  """
+  @spec default_org_for_user(integer()) :: integer() | nil
+  def default_org_for_user(user_id) when is_integer(user_id) do
+    case list_memberships_for_user(user_id, status: "active") do
+      [%Membership{org_id: org_id} | _] -> org_id
+      _ -> nil
+    end
+  end
+
+  @doc "True when the user holds at least one active org membership."
+  @spec any_active_membership?(integer()) :: boolean()
+  def any_active_membership?(user_id) when is_integer(user_id) do
+    Membership
+    |> where([m], m.user_id == ^user_id and m.status == "active")
+    |> limit(1)
+    |> Repo.one()
+    |> is_struct(Membership)
+  end
 
   @doc """
   List workspaces visible to a user through their active memberships.

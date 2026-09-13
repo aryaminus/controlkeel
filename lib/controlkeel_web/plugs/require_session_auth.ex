@@ -51,6 +51,8 @@ defmodule ControlKeelWeb.Plugs.RequireSessionAuth do
     |> halt()
   end
 
+  defp authorize_session_access(%Plug.Conn{halted: true} = conn), do: conn
+
   defp authorize_session_access(conn) do
     case session_id(conn) do
       nil ->
@@ -81,7 +83,7 @@ defmodule ControlKeelWeb.Plugs.RequireSessionAuth do
   defp resolve_session(_id), do: nil
 
   defp check_org_access(conn, session) do
-    if Accounts.session_accessible?(session, conn.assigns[:current_org_id]) do
+    if Accounts.session_accessible?(session, conn.assigns[:current_user]) do
       conn
     else
       not_found(conn)
