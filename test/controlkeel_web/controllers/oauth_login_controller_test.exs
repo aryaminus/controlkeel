@@ -105,6 +105,69 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
     end
   end
 
+  describe "login session shape and cross-org enforcement (issue #141, R5)" do
+    import ControlKeel.MissionFixtures,
+      only: [workspace_fixture: 1, session_fixture: 1]
+
+    alias ControlKeel.Repo
+
+    test "real callback session carries no org and still enforces cross-org denial", %{
+      conn: conn
+    } do
+      # Drive the actual OAuth callback (mock provider): this is the session
+      # shape production produces — user id only, never an org.
+      login_conn =
+        conn
+        |> init_test_session(%{oauth_provider: "github", oauth_session_params: %{}})
+        |> get("/auth/github/callback", %{"code" => "good"})
+
+      assert redirected_to(login_conn, 302) == "/"
+
+      user_id = get_session(login_conn, :current_user_id)
+      assert is_integer(user_id)
+      # Locks the production shape: nothing writes current_org_id at login.
+      assert get_session(login_conn, :current_org_id) == nil
+
+      user = Accounts.get_user(user_id)
+
+      {:ok, org_a} =
+        Accounts.create_org(%{
+          name: "R5 Org A",
+          slug: "r5a-#{System.unique_integer([:positive])}"
+        })
+
+      {:ok, org_b} =
+        Accounts.create_org(%{
+          name: "R5 Org B",
+          slug: "r5b-#{System.unique_integer([:positive])}"
+        })
+
+      # Invite accepted after login: membership in org B only.
+      %Accounts.Membership{}
+      |> Accounts.Membership.changeset(%{
+        user_id: user.id,
+        org_id: org_b.id,
+        role: "viewer",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      session_a = session_fixture(%{workspace: workspace_fixture(%{org_id: org_a.id})})
+      session_b = session_fixture(%{workspace: workspace_fixture(%{org_id: org_b.id})})
+
+      # Replay exactly what the callback wrote — no hand-seeded org.
+      authed =
+        build_conn()
+        |> Plug.Test.init_test_session(%{current_user_id: user_id})
+
+      cross = get(authed, ~p"/observability/sessions/#{session_a.id}/export.json")
+      assert json_response(cross, :not_found) == %{"error" => "session not found"}
+
+      own = get(authed, ~p"/observability/sessions/#{session_b.id}/export.json")
+      assert json_response(own, :ok)["integrity"]["session_id"] == session_b.id
+    end
+  end
+
   defmodule TestOAuthProviderAdapter do
     @behaviour ControlKeel.Accounts.OAuthProviders
 

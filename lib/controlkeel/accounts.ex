@@ -641,9 +641,10 @@ defmodule ControlKeel.Accounts do
   production never writes, so it fail-opened every cloud read path):
 
     * local mode → `true` (single-user deployment, no user model);
-    * cloud/self_hosted → the session's workspace must authorize `user`
-      via `authorize_cloud_execution/2` with at least viewer membership in
-      an active org. A missing user **denies**.
+    * cloud/self_hosted → the session's workspace must be org-bound and
+      must authorize `user` via `authorize_cloud_execution/2` (viewer+,
+      active org+membership). A missing user, a missing workspace, or an
+      unaffiliated workspace (no owner to authorize against) **denies**.
 
   Callers pass `socket.assigns[:current_user]` / `conn.assigns[:current_user]`.
   """
@@ -658,8 +659,14 @@ defmodule ControlKeel.Accounts do
 
   defp session_authorized?(%{workspace_id: workspace_id}, %{id: user_id})
        when is_integer(workspace_id) and is_integer(user_id) do
-    case authorize_cloud_execution(workspace_id, user_id: user_id, required_role: "viewer") do
-      {:ok, :authorized} -> true
+    # Unaffiliated workspaces have no owning org, so nobody can vouch for
+    # access: deny in cloud mode rather than inheriting authorize_cloud_execution/2's
+    # permissive default (an orphan-claim flow is the follow-up, tracked on #141).
+    with %Workspace{org_id: org_id} when is_integer(org_id) <- Repo.get(Workspace, workspace_id),
+         {:ok, :authorized} <-
+           authorize_cloud_execution(workspace_id, user_id: user_id, required_role: "viewer") do
+      true
+    else
       _ -> false
     end
   end

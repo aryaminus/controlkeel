@@ -93,6 +93,11 @@ defmodule ControlKeelWeb.Router do
     # to avoid conflicts (e.g. /auth/logout matching /auth/:provider).
     get "/auth/logout", AuthController, :logout
     get "/auth/invitation/:token", AuthController, :start_invitation
+    # Explicit org switch (issue #141, R4): the only writer of
+    # current_org_id. Carries a short-lived signed token minted by the
+    # LiveView (plain GETs can't carry CSRF); the controller re-verifies
+    # user + membership before writing.
+    get "/auth/org/:org_id", AuthController, :switch_org
 
     # OAuth provider sign-in (parameterized — catches /auth/google, /auth/github, etc.)
     get "/auth/:provider/request", OAuthLoginController, :request
