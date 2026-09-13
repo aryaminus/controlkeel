@@ -731,4 +731,81 @@ defmodule ControlKeel.AccountsTest do
       assert {:error, :not_found} = Accounts.update_membership_role(999_999, "member", owner.id)
     end
   end
+
+  describe "session_accessible?/2 (issue #141, R2)" do
+    import ControlKeel.MissionFixtures, only: [workspace_fixture: 1, session_fixture: 1]
+
+    setup do
+      {:ok, org_a} =
+        Accounts.create_org(%{name: "Org A", slug: "org-a-#{System.unique_integer([:positive])}"})
+
+      {:ok, org_b} =
+        Accounts.create_org(%{name: "Org B", slug: "org-b-#{System.unique_integer([:positive])}"})
+
+      {:ok, user} =
+        Accounts.create_user(%{email: "r2-#{System.unique_integer([:positive])}@example.com"})
+
+      %Membership{}
+      |> Membership.changeset(%{
+        user_id: user.id,
+        org_id: org_a.id,
+        role: "viewer",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      ws_a = workspace_fixture(%{org_id: org_a.id})
+      ws_b = workspace_fixture(%{org_id: org_b.id})
+      session_a = session_fixture(%{workspace: ws_a})
+      session_b = session_fixture(%{workspace: ws_b})
+
+      %{user: user, org_a: org_a, org_b: org_b, session_a: session_a, session_b: session_b}
+    end
+
+    test "local mode is a passthrough even with no user", %{session_a: session} do
+      assert Accounts.session_accessible?(session, nil)
+    end
+
+    test "cloud mode denies a missing user", %{session_a: session} do
+      with_cloud_mode(fn ->
+        refute Accounts.session_accessible?(session, nil)
+      end)
+    end
+
+    test "cloud mode allows an active member of the owning org", %{
+      user: user,
+      session_a: session
+    } do
+      with_cloud_mode(fn ->
+        assert Accounts.session_accessible?(session, user)
+      end)
+    end
+
+    test "cloud mode denies cross-org access", %{user: user, session_b: session} do
+      with_cloud_mode(fn ->
+        refute Accounts.session_accessible?(session, user)
+      end)
+    end
+
+    test "cloud mode denies a session with no workspace", %{user: user} do
+      with_cloud_mode(fn ->
+        refute Accounts.session_accessible?(%{workspace_id: nil}, user)
+      end)
+    end
+
+    defp with_cloud_mode(fun) do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      try do
+        fun.()
+      after
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end
+    end
+  end
 end

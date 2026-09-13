@@ -5,10 +5,12 @@ defmodule ControlKeelWeb.LiveAuth do
   Two hooks:
 
     * `:require_cloud_auth` — in cloud/self_hosted mode requires a signed-in
-      user (`current_user`). Org membership is loaded opportunistically but is
-      NOT required; org onboarding is handled by a separate route. In local
-      mode this is a passthrough so local single-user deployments are
-      unaffected.
+      user (`current_user`) **with at least one active membership**; users
+      without any membership are redirected to `/organizations` (the
+      onboarding surface, which is exempt so they can join or create an
+      org) instead of proceeding with effectively global read access
+      (issue #141, R3). In local mode this is a passthrough so local
+      single-user deployments are unaffected.
 
     * `:load_if_available` — loads user/membership from session without gating.
       Use for pages that are public in local mode but show org-scoped data when
@@ -39,10 +41,24 @@ defmodule ControlKeelWeb.LiveAuth do
     else
       socket = load_auth(socket, session)
 
-      if socket.assigns[:current_user] do
-        {:cont, attach_membership_eviction(socket)}
-      else
-        {:halt, redirect(socket, to: "/auth/login")}
+      cond do
+        is_nil(socket.assigns[:current_user]) ->
+          {:halt, redirect(socket, to: "/auth/login")}
+
+        # `/organizations` is the onboarding surface (org list + create +
+        # invite acceptance): a membership-less user is allowed there so they
+        # can join or create an org. Everywhere else requires membership.
+        socket.view == ControlKeelWeb.OrganizationsLive ->
+          {:cont, attach_membership_eviction(socket)}
+
+        not Accounts.any_active_membership?(socket.assigns.current_user.id) ->
+          {:halt,
+           socket
+           |> put_flash(:info, "Join or create an organization to continue.")
+           |> redirect(to: "/organizations")}
+
+        true ->
+          {:cont, attach_membership_eviction(socket)}
       end
     end
   end
@@ -84,14 +100,24 @@ defmodule ControlKeelWeb.LiveAuth do
   end
 
   defp handle_membership_event(
-         {:membership_changed, %{user_id: uid, role: new_role}},
-         %{assigns: %{current_user: %{id: uid}, current_membership: %{role: prev_role}}} = socket
-       )
-       when new_role != prev_role do
-    {:halt,
-     socket
-     |> put_flash(:info, "Your role changed. Please sign in again to refresh.")
-     |> push_navigate(to: "/auth/login")}
+         {:membership_changed, %{user_id: uid, org_id: org_id}},
+         %{assigns: %{current_user: %{id: uid}}} = socket
+       ) do
+    # Role changed but the membership is still active (revocation is handled
+    # by the clause above): refresh the socket's membership in place so the
+    # assigns never carry a stale elevated role, and let the page rebind its
+    # own permission-derived UI without bouncing to login. Falls back to
+    # re-login if the membership is gone entirely.
+    case Accounts.get_active_membership(uid, org_id) do
+      %Accounts.Membership{} = membership ->
+        {:halt, assign(socket, :current_membership, membership)}
+
+      _ ->
+        {:halt,
+         socket
+         |> put_flash(:info, "Your access has changed. Please sign in again.")
+         |> push_navigate(to: "/auth/login")}
+    end
   end
 
   defp handle_membership_event(:sign_out_everywhere, %{assigns: %{current_user: _user}} = socket) do
@@ -125,6 +151,15 @@ defmodule ControlKeelWeb.LiveAuth do
             Map.get(session, :current_org_id)
 
         user = if is_integer(user_id), do: Accounts.get_user(user_id)
+
+        # Production never writes current_org_id (issue #141): when the
+        # session carries no org, derive the default (first active
+        # membership) so org-scoped consumers have a real value. This is a
+        # default hint only — access decisions resolve (user, resource).
+        org_id =
+          if is_nil(org_id) && user,
+            do: Accounts.default_org_for_user(user.id),
+            else: org_id
 
         membership =
           if user && is_integer(org_id),

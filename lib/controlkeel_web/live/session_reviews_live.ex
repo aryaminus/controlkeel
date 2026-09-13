@@ -8,7 +8,7 @@ defmodule ControlKeelWeb.SessionReviewsLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    org_id = socket.assigns[:current_org_id]
+    current_user = socket.assigns[:current_user]
 
     case Mission.get_session_context(id) do
       nil ->
@@ -17,8 +17,8 @@ defmodule ControlKeelWeb.SessionReviewsLive do
          |> put_flash(:error, "Session not found.")
          |> push_navigate(to: ~p"/")}
 
-      session when not is_nil(org_id) and not is_nil(session) ->
-        if Accounts.session_accessible?(session, org_id) do
+      session when not is_nil(session) ->
+        if Accounts.session_accessible?(session, current_user) do
           {:ok, mount_session(socket, session)}
         else
           {:ok,
@@ -26,9 +26,6 @@ defmodule ControlKeelWeb.SessionReviewsLive do
            |> put_flash(:error, "Session not found.")
            |> push_navigate(to: ~p"/")}
         end
-
-      session ->
-        {:ok, mount_session(socket, session)}
     end
   end
 
