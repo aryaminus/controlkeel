@@ -144,6 +144,23 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
       assert membership.role == "owner"
     end
 
+    test "default org is active and switching redirects to the signed switch URL", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, first} = Accounts.create_org_with_owner(user.id, %{name: "First", slug: "first"})
+      {:ok, second} = Accounts.create_org_with_owner(user.id, %{name: "Second", slug: "second"})
+
+      {:ok, view, html} = live(conn, ~p"/organizations")
+
+      # Default = first active membership; the other row offers a switch.
+      assert html =~ "org-active-#{first.id}"
+      assert has_element?(view, "#org-switch-#{second.id}")
+
+      assert {:error, {:redirect, %{to: "/auth/org/" <> _}}} =
+               view |> element("#org-switch-#{second.id}") |> render_click()
+    end
+
     test "index redirects to login when there is no signed-in user" do
       conn = build_conn() |> Plug.Test.init_test_session(%{})
 
