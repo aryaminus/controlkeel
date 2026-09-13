@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.4.14 — 2026-09-13
+
+### What's changed
+
+- Merge pull request #172 from aryaminus/fix/migration-fk-flake
+- fix(migration-test): pin FK setup to single connection to stop pool flake
+- Merge pull request #168 from aryaminus/feat/org-workspace-routes
+- Merge pull request #166 from aryaminus/feat/context-switcher-sidebar
+- feat/org-workspace-routes: drop redundant bare workspace legacy route covered by glob
+- feat/org-workspace-routes: add legacy redirects for pre-consolidation workspace URLs
+- Merge branch 'feat/context-switcher-sidebar' of github.com:aryaminus/controlkeel into feat/org-workspace-routes
+- feat: add legacy redirects for /organizations/:slug URLs
+- feat/org-workspace-routes: update workspace routes to use ws_slug instead of id in path documentation
+- feat/org-workspace-routes: remove redundant workspace org validation checks from live views
+- feat/org-workspace-routes: remove Organizations breadcrumb from all workspace LiveViews
+- feat/org-workspace-routes: add workspace-specific navigation sidebar to organization layouts
+- feat/org-workspace-routes: migrate workspace routes and lookups from ID to slug-based identification
+- feat/org-workspace-routes: simplify route structure by removing redundant /organizations prefix from workspace paths
+- feat: move protocol routes before the browser scope to prevent routing conflicts with org slugs
+- feat: implement organization-scoped navigation and replace the global dashboard entry with an org selector landing page
+- refactor: remove all organizations link from sidebar and rename organization page action ID
+- refactor: update user menu and organization switcher UI components and fix Docker build asset compilation
+- feat: add organization switcher to sidebar and update user menu with documentation links
+- refactor: streamline organization sidebar layout and replace dashboard header with breadcrumbs component
+- refactor: simplify route structure by removing the /organizations prefix from organization URLs
+- refactor: move organization settings from modal to dedicated route with a persistent sidebar navigation layout
+- refactor: replace global dashboard with org-scoped navigation and root-level organization/workspace selector tree
+
 ## v0.4.13 — 2026-09-12
 
 ### What's changed
