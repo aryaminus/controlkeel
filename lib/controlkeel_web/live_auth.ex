@@ -124,7 +124,12 @@ defmodule ControlKeelWeb.LiveAuth do
          {:membership_changed, %{user_id: uid, org_id: _org_id}},
          %{assigns: %{current_user: %{id: uid}}} = socket
        ) do
-    {:cont, socket}
+    # Cross-org event: irrelevant to this socket, and no LiveView handles
+    # {:membership_changed, ...} directly (this hook is the sole consumer),
+    # so consume it here. Returning :cont would leak the message into the
+    # module's handle_info/2, which crashes views that define no clause for
+    # it (e.g. CloudProjectsLive only handles :refresh).
+    {:halt, socket}
   end
 
   defp handle_membership_event(:sign_out_everywhere, %{assigns: %{current_user: _user}} = socket) do
