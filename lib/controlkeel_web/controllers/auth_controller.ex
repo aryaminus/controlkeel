@@ -82,7 +82,9 @@ defmodule ControlKeelWeb.AuthController do
   defp safe_return_to(nil), do: "/organizations"
 
   defp safe_return_to(path) when is_binary(path) do
-    if String.starts_with?(path, "/") and not String.starts_with?(path, "//"),
+    if String.starts_with?(path, "/") and
+         not String.starts_with?(path, "//") and
+         not String.contains?(path, "\\"),
       do: path,
       else: "/organizations"
   end

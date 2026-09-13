@@ -95,6 +95,45 @@ defmodule ControlKeelWeb.AuthControllerTest do
       assert get_session(conn, :current_org_id) == org.id
     end
 
+    test "scheme-relative return_to is rejected", %{user: user, org_a: org} do
+      token = switch_token(user.id, org.id)
+
+      conn =
+        authed_conn(user.id)
+        |> get("/auth/org/#{org.id}?t=#{token}&return_to=//evil.example/phish")
+
+      assert redirected_to(conn, 302) == "/organizations"
+      assert get_session(conn, :current_org_id) == org.id
+    end
+
+    test "backslash return_to is rejected", %{user: user, org_a: org} do
+      token = switch_token(user.id, org.id)
+
+      conn =
+        authed_conn(user.id)
+        |> get("/auth/org/#{org.id}?t=#{token}&return_to=/\\evil.example/phish")
+
+      assert redirected_to(conn, 302) == "/organizations"
+      assert get_session(conn, :current_org_id) == org.id
+    end
+
+    test "encoded return_to bypass variants are rejected", %{user: user, org_a: org} do
+      token = switch_token(user.id, org.id)
+
+      conn =
+        authed_conn(user.id)
+        |> get("/auth/org/#{org.id}?t=#{token}&return_to=%2F%2Fevil.example/phish")
+
+      assert redirected_to(conn, 302) == "/organizations"
+
+      conn =
+        authed_conn(user.id)
+        |> get("/auth/org/#{org.id}?t=#{token}&return_to=%2F%5Cevil.example/phish")
+
+      assert redirected_to(conn, 302) == "/organizations"
+      assert get_session(conn, :current_org_id) == org.id
+    end
+
     test "non-member org is refused without switching", %{user: user, org_a: default, org_b: org} do
       token = switch_token(user.id, org.id)
 
