@@ -30,46 +30,13 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case Accounts.get_org_by_slug(slug) do
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
-
-      org ->
-        mode = Mode.current()
-        user = socket.assigns[:current_user]
-
-        cond do
-          mode == :local ->
-            mount_ok(socket, org)
-
-          is_nil(user) ->
-            {:ok,
-             redirect_with_flash(
-               socket,
-               :error,
-               "Sign in to view this organization.",
-               ~p"/auth/login"
-             )}
-
-          true ->
-            case Accounts.get_active_membership(user.id, org.id) do
-              nil ->
-                {:ok,
-                 redirect_with_flash(
-                   socket,
-                   :error,
-                   "You're not a member of that organization.",
-                   ~p"/organizations"
-                 )}
-
-              membership ->
-                mount_ok(socket, org, membership)
-            end
-        end
+    case ControlKeelWeb.OrgAuth.authorize_org(socket, slug) do
+      {:ok, socket, org, membership} -> mount_ok(socket, org, membership)
+      {:halt, socket} -> {:ok, socket}
     end
   end
 
-  defp mount_ok(socket, org, membership \\ nil) do
+  defp mount_ok(socket, org, membership) do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
     member_count = Accounts.count_memberships_for_org(org.id)
@@ -1109,12 +1076,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     do: target.role in ["member", "viewer"] and target.user_id != uid
 
   defp can_revoke?(_, _, _), do: false
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
-  end
 
   defp validate_email(""), do: {:error, "Email is required"}
 
