@@ -13,56 +13,18 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case Accounts.get_org_by_slug(slug) do
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
+    opts = [
+      forbidden_path: "/#{slug}",
+      forbidden_message: "You don't have permission to change organization settings."
+    ]
 
-      org ->
-        mode = Mode.current()
-        user = socket.assigns[:current_user]
-
-        cond do
-          mode == :local ->
-            mount_ok(socket, org)
-
-          is_nil(user) ->
-            {:ok,
-             redirect_with_flash(
-               socket,
-               :error,
-               "Sign in to view this organization.",
-               ~p"/auth/login"
-             )}
-
-          true ->
-            case Accounts.get_active_membership(user.id, org.id) do
-              nil ->
-                {:ok,
-                 redirect_with_flash(
-                   socket,
-                   :error,
-                   "You're not a member of that organization.",
-                   ~p"/organizations"
-                 )}
-
-              membership ->
-                if Accounts.role_at_least?(membership.role, "admin") do
-                  mount_ok(socket, org, membership)
-                else
-                  {:ok,
-                   redirect_with_flash(
-                     socket,
-                     :error,
-                     "You don't have permission to change organization settings.",
-                     ~p"/#{org.slug}"
-                   )}
-                end
-            end
-        end
+    case ControlKeelWeb.OrgAuth.authorize_org(socket, slug, "admin", opts) do
+      {:ok, socket, org, membership} -> mount_ok(socket, org, membership)
+      {:halt, socket} -> {:ok, socket}
     end
   end
 
-  defp mount_ok(socket, org, membership \\ nil) do
+  defp mount_ok(socket, org, membership) do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
     is_owner = local_mode || (membership && membership.role == "owner")
@@ -144,12 +106,6 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       _ ->
         {:error, "Budget must be a non-negative integer in cents."}
     end
-  end
-
-  defp redirect_with_flash(socket, kind, message, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, message)
-    |> Phoenix.LiveView.push_navigate(to: path)
   end
 
   @impl true

@@ -60,7 +60,7 @@ defmodule ControlKeelWeb.WorkspaceToolPolicyLiveTest do
     assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
              live(conn_for(owner, org), ~p"/other/workspaces/#{ws.slug}/tool-policy")
 
-    assert msg =~ "does not belong to this organization"
+    assert msg =~ "Organization not found."
   end
 
   test "unknown workspace slug redirects to organizations" do

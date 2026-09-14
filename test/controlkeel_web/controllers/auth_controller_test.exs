@@ -21,7 +21,6 @@ defmodule ControlKeelWeb.AuthControllerTest do
       conn
       |> init_test_session(%{
         current_user_id: 123,
-        current_org_id: 456,
         oauth_provider: "google",
         pending_invitation_token: "abc"
       })
@@ -29,7 +28,6 @@ defmodule ControlKeelWeb.AuthControllerTest do
 
     assert redirected_to(conn, 302) == "/auth/login"
     refute get_session(conn, :current_user_id)
-    refute get_session(conn, :current_org_id)
     refute get_session(conn, :oauth_provider)
     refute get_session(conn, :pending_invitation_token)
   end

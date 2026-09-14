@@ -424,7 +424,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
                live(build_conn(), ~p"/other-org/workspaces/#{ws.slug}/settings")
 
-      assert msg =~ "does not belong to this organization"
+      assert msg =~ "Organization not found."
     end
   end
 
@@ -515,7 +515,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
                live(conn, ~p"/seta/workspaces/#{ws_a.slug}/settings")
 
-      assert msg =~ "Workspace belongs to a different organization."
+      assert msg =~ "You're not a member of that organization."
     end
   end
 end

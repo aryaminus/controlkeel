@@ -11,58 +11,41 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Org
   alias ControlKeel.Accounts.WorkspaceToolPolicy
   alias ControlKeel.MCP.ToolGroups
   alias ControlKeel.Mission
-  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform
-  alias ControlKeel.Repo
-  alias ControlKeel.Runtime.Mode
+  alias ControlKeelWeb.OrgAuth
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
-    with %Workspace{} = workspace <-
-           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
-         :ok <- check_org_slug(workspace, %{slug: slug}),
-         :ok <- check_workspace_access(workspace, socket.assigns) do
-      sessions = Mission.list_all_sessions(workspace.id)
-      tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
+    case OrgAuth.authorize_workspace(socket, slug, ws_slug) do
+      {:ok, socket, _org, workspace, _membership} ->
+        sessions = Mission.list_all_sessions(workspace.id)
+        tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
 
-      {:ok,
-       socket
-       |> assign(:page_title, workspace.name)
-       |> assign(:workspace, workspace)
-       |> assign(:nav_org, workspace.org)
-       |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{label: workspace.name, to: nil}
-         ]
-       )
-       |> assign(:sessions, sessions)
-       |> assign(:policy_assignments, Platform.list_workspace_policy_assignments(workspace.id))
-       |> assign(:tool_policy_mode, tool_policy.mode)
-       |> assign(:tool_policy_tools, WorkspaceToolPolicy.decode_tools(tool_policy))}
-    else
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+        {:ok,
+         socket
+         |> assign(:page_title, workspace.name)
+         |> assign(:workspace, workspace)
+         |> assign(:nav_org, workspace.org)
+         |> assign(:nav_workspace, workspace)
+         |> assign(
+           :breadcrumbs,
+           [
+             %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+             %{label: workspace.name, to: nil}
+           ]
+         )
+         |> assign(:sessions, sessions)
+         |> assign(:policy_assignments, Platform.list_workspace_policy_assignments(workspace.id))
+         |> assign(:tool_policy_mode, tool_policy.mode)
+         |> assign(:tool_policy_tools, WorkspaceToolPolicy.decode_tools(tool_policy))}
 
-      {:error, reason} ->
-        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+      {:halt, socket} ->
+        {:ok, socket}
     end
   end
-
-  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
-    case Accounts.get_org_by_slug(slug) do
-      %Org{id: ^org_id} -> :ok
-      _ -> {:error, "Workspace does not belong to this organization."}
-    end
-  end
-
-  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
 
   @impl true
   def render(assigns) do
@@ -336,32 +319,6 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
     """
   end
 
-  # TODO(auth): the workspace lookup + access checks below are duplicated
-  # across workspace LiveViews. Extract into a shared on_mount hook when
-  # centralized auth lands (CLI/web parity PR).
-  # View access: local mode is open; cloud mode requires membership of the
-  # workspace's org (no role requirement — role gates live on write surfaces).
-  defp check_workspace_access(workspace, assigns) do
-    if Mode.current() == :local do
-      :ok
-    else
-      check_cloud_workspace_access(workspace, assigns)
-    end
-  end
-
-  defp check_cloud_workspace_access(%Workspace{org_id: nil}, _),
-    do: {:error, "Workspace is not bound to an org."}
-
-  defp check_cloud_workspace_access(%Workspace{org_id: ws_org}, %{current_org_id: org_id})
-       when is_integer(ws_org) and ws_org == org_id,
-       do: :ok
-
-  defp check_cloud_workspace_access(_, _),
-    do: {:error, "Workspace belongs to a different organization."}
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> put_flash(kind, msg)
-    |> push_navigate(to: path)
-  end
+  # Access is authorized per-URL in `ControlKeelWeb.OrgAuth`: any active
+  # member may view (role gates live on write surfaces).
 end
