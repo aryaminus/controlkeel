@@ -11,12 +11,9 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
   import Phoenix.Component, only: [assign: 3, assign_new: 3]
   import Phoenix.LiveView, only: [attach_hook: 4]
 
-  alias ControlKeel.Accounts
-
-  def on_mount(_arg, params, _session, socket) do
+  def on_mount(_arg, _params, _session, socket) do
     socket =
       socket
-      |> assign_url_org(params)
       |> assign(:current_path, nil)
       |> assign(:current_query, nil)
       |> assign_new(:nav_org, fn -> nil end)
@@ -34,28 +31,4 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
 
     {:cont, socket}
   end
-
-  # URL is the source of truth for org context on `/:org_slug/...` routes.
-  # Runs after `LiveAuth` (see router order), so `current_user` is already
-  # loaded. Overrides the legacy `nil` session-derived assigns so workspace
-  # LiveViews matching on `%{current_org_id: org_id}` keep working untouched.
-  defp assign_url_org(socket, %{"org_slug" => slug}) when is_binary(slug) do
-    case Accounts.get_org_by_slug(slug) do
-      nil ->
-        socket
-
-      org ->
-        membership =
-          case socket.assigns[:current_user] do
-            %{id: user_id} -> Accounts.get_active_membership(user_id, org.id)
-            _ -> nil
-          end
-
-        socket
-        |> assign(:current_org_id, org.id)
-        |> assign(:current_membership, membership)
-    end
-  end
-
-  defp assign_url_org(socket, _params), do: socket
 end
