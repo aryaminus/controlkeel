@@ -22,14 +22,14 @@ defmodule ControlKeelWeb.Plugs.BrowserAuthPlugsTest do
     {:ok, conn: conn, org: org, user: user, membership: membership}
   end
 
-  test "LoadCurrentUser assigns user and active membership", %{
+  test "LoadCurrentUser assigns user only (org resolves per-URL)", %{
     conn: conn,
-    user: user,
-    membership: membership
+    user: user
   } do
     conn = LoadCurrentUser.call(conn, [])
     assert conn.assigns.current_user.id == user.id
-    assert conn.assigns.current_membership.id == membership.id
+    refute Map.has_key?(conn.assigns, :current_org_id)
+    refute Map.has_key?(conn.assigns, :current_membership)
   end
 
   test "RequireCloudMode redirects signed-in visitors away from /auth/login", %{conn: conn} do

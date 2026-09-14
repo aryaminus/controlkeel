@@ -29,31 +29,31 @@ defmodule ControlKeelWeb.WorkspaceToolPolicyLive do
          |> assign(:workspace, workspace)
          |> assign(:nav_org, workspace.org)
          |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{
-             label: workspace.name,
-             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
-           },
-           %{label: "Tool policy", to: nil}
-         ]
-       )
-       |> assign(:policy, policy)
-       |> assign(:modes, WorkspaceToolPolicy.modes())
-       |> assign(
-         :form,
-         to_form(
-           %{
-             "mode" => policy.mode,
-             "tools" => Enum.join(tools, "\n")
-           },
-           as: :policy
+         |> assign(
+           :breadcrumbs,
+           [
+             %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+             %{
+               label: workspace.name,
+               to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+             },
+             %{label: "Tool policy", to: nil}
+           ]
          )
-       )
-       |> assign(:saved, false)
-       |> assign(:error, nil)}
+         |> assign(:policy, policy)
+         |> assign(:modes, WorkspaceToolPolicy.modes())
+         |> assign(
+           :form,
+           to_form(
+             %{
+               "mode" => policy.mode,
+               "tools" => Enum.join(tools, "\n")
+             },
+             as: :policy
+           )
+         )
+         |> assign(:saved, false)
+         |> assign(:error, nil)}
 
       {:halt, socket} ->
         {:ok, socket}
