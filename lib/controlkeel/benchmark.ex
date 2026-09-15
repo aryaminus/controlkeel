@@ -1701,10 +1701,10 @@ defmodule ControlKeel.Benchmark do
   defp percentage(count, total), do: Float.round(count / total * 100, 1)
 
   defp count_by(values, mapper) do
+    # ⚡ Bolt Optimization: Use Enum.frequencies_by instead of Enum.group_by + length mapping to avoid intermediate list allocations and reduce GC pressure.
     values
-    |> Enum.group_by(mapper)
-    |> Enum.reject(fn {key, _rows} -> is_nil(key) end)
-    |> Enum.into(%{}, fn {key, rows} -> {key, length(rows)} end)
+    |> Enum.frequencies_by(mapper)
+    |> Map.delete(nil)
   end
 
   defp maybe_channel(channels, true, channel), do: [channel | channels]
