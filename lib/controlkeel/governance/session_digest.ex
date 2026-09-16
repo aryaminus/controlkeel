@@ -137,9 +137,9 @@ defmodule ControlKeel.Governance.SessionDigest do
   end
 
   defp count_by_field(records, field) do
+    # ⚡ Bolt: Enum.frequencies_by/2 avoids intermediate list allocations compared to group_by + length
     records
-    |> Enum.group_by(&Map.get(&1, field))
-    |> Enum.map(fn {k, v} -> {k, length(v)} end)
+    |> Enum.frequencies_by(&Map.get(&1, field))
     |> Enum.sort_by(fn {_k, v} -> v end, :desc)
     |> Enum.take(5)
     |> Map.new()
