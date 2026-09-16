@@ -60,7 +60,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLiveTest do
     assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
              live(conn_for(owner, org), ~p"/other/workspaces/#{ws.slug}/service-accounts")
 
-    assert msg =~ "Organization not found."
+    assert msg =~ "does not belong to this organization"
   end
 
   test "unknown workspace slug redirects to organizations" do
