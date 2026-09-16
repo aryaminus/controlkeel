@@ -38,11 +38,13 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
       org ->
         case OrgAccess.check(org, socket.assigns[:current_user]) do
           :ok ->
-            mount_ok(
-              socket,
-              org,
-              Accounts.get_active_membership(socket.assigns.current_user.id, org.id)
-            )
+            membership =
+              case socket.assigns[:current_user] do
+                %{id: user_id} -> Accounts.get_active_membership(user_id, org.id)
+                _ -> nil
+              end
+
+            mount_ok(socket, org, membership)
 
           {:error, :forbidden} ->
             {:ok,
