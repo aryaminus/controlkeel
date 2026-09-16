@@ -67,6 +67,38 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert html =~ "Second session"
     end
 
+    test "breadcrumb shows a workspace switcher listing sibling workspaces" do
+      {:ok, org} = Accounts.create_org(%{name: "Wsswitch", slug: "wsswitch"})
+      ws1 = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
+      _ws2 = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws1.slug}")
+
+      assert html =~ "breadcrumb-ws-switcher-popover"
+      assert html =~ "Switch workspace"
+      assert html =~ ~p"/#{org.slug}/workspaces/beta"
+    end
+
+    test "workspace switcher preserves the subpage when switching" do
+      {:ok, org} = Accounts.create_org(%{name: "Wssub", slug: "wssub"})
+      ws1 = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
+      _ws2 = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws1.slug}/repos")
+
+      assert html =~ "breadcrumb-ws-switcher-popover"
+      assert html =~ "#{org.slug}/workspaces/beta/repos"
+    end
+
+    test "breadcrumb omits the workspace switcher with a single workspace" do
+      {:ok, org} = Accounts.create_org(%{name: "Wssolo", slug: "wssolo"})
+      ws = create_workspace(%{name: "Solo", slug: "solo", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+
+      refute html =~ "breadcrumb-ws-switcher-popover"
+    end
+
     test "resolves the workspace slug case-insensitively" do
       {:ok, org} = Accounts.create_org(%{name: "Wscase", slug: "wscase"})
       _ws = create_workspace(%{name: "Core", slug: "core", industry: "web", org_id: org.id})
