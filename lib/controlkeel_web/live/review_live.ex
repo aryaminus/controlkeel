@@ -26,7 +26,7 @@ defmodule ControlKeelWeb.ReviewLive do
           {:noreply, review_not_found(socket)}
 
         %{session_id: ^session_id} = review ->
-          if Accounts.session_accessible?(review.session, socket.assigns[:current_org_id]) do
+          if Accounts.session_accessible?(review.session, socket.assigns[:current_user]) do
             {:noreply, assign_review(socket, review)}
           else
             {:noreply, review_not_found(socket)}

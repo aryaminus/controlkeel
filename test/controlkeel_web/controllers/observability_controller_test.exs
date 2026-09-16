@@ -25,6 +25,68 @@ defmodule ControlKeelWeb.ObservabilityControllerTest do
     end
   end
 
+  describe "cloud mode with a user-only session (issue #141, R5)" do
+    # Production never writes current_org_id to the browser session — the
+    # session map carries only current_user_id. These tests construct the
+    # conn that way (no seeded org) and prove the plug derives the default
+    # org and the gate still denies cross-org access.
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      {:ok, org_a} =
+        Accounts.create_org(%{name: "Org A", slug: "r5-a-#{System.unique_integer([:positive])}"})
+
+      {:ok, org_b} =
+        Accounts.create_org(%{name: "Org B", slug: "r5-b-#{System.unique_integer([:positive])}"})
+
+      {:ok, user} =
+        Accounts.create_user(%{email: "r5-#{System.unique_integer([:positive])}@example.com"})
+
+      %Accounts.Membership{}
+      |> Accounts.Membership.changeset(%{
+        user_id: user.id,
+        org_id: org_b.id,
+        role: "viewer",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      ws_a = workspace_fixture(%{org_id: org_a.id})
+      ws_b = workspace_fixture(%{org_id: org_b.id})
+      session_a = session_fixture(%{workspace: ws_a})
+      session_b = session_fixture(%{workspace: ws_b})
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{current_user_id: user.id})
+
+      {:ok, conn: conn, session_a: session_a, session_b: session_b}
+    end
+
+    test "cross-org export is denied without a seeded org", %{conn: conn, session_a: session} do
+      conn = get(conn, ~p"/observability/sessions/#{session.id}/export.json")
+      assert json_response(conn, :not_found) == %{"error" => "session not found"}
+    end
+
+    test "own-org export works through the plug-derived default org", %{
+      conn: conn,
+      session_b: session
+    } do
+      conn = get(conn, ~p"/observability/sessions/#{session.id}/export.json")
+      body = json_response(conn, :ok)
+      assert body["integrity"]["session_id"] == session.id
+    end
+  end
+
   describe "GET /observability/sessions/:id/export.json (cloud mode)" do
     setup do
       original = Application.get_env(:controlkeel, :runtime_mode)

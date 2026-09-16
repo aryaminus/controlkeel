@@ -17,7 +17,7 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   @impl true
   def mount(%{"id" => id} = params, _session, socket) do
-    org_id = socket.assigns[:current_org_id]
+    current_user = socket.assigns[:current_user]
 
     case Mission.get_session_context(id) do
       nil ->
@@ -26,8 +26,8 @@ defmodule ControlKeelWeb.MissionControlLive do
          |> put_flash(:error, "Session not found.")
          |> push_navigate(to: ~p"/")}
 
-      session when not is_nil(org_id) and not is_nil(session) ->
-        if ControlKeel.Accounts.session_accessible?(session, org_id) do
+      session when not is_nil(session) ->
+        if ControlKeel.Accounts.session_accessible?(session, current_user) do
           if connected?(socket), do: schedule_refresh()
           project_root = socket.endpoint.config(:project_root) || File.cwd!()
 
@@ -46,20 +46,6 @@ defmodule ControlKeelWeb.MissionControlLive do
            |> put_flash(:error, "Session not found.")
            |> push_navigate(to: ~p"/")}
         end
-
-      session ->
-        if connected?(socket), do: schedule_refresh()
-        project_root = socket.endpoint.config(:project_root) || File.cwd!()
-
-        {:ok,
-         socket
-         |> assign(:page_title, session.title)
-         |> assign(:project_root, project_root)
-         |> assign(:launched, Map.get(params, "launched") == "1")
-         |> assign(:selected_finding, nil)
-         |> assign(:selected_fix, nil)
-         |> safe_assign_session(session)
-         |> assign_release_readiness(release_form_defaults(), false)}
     end
   end
 

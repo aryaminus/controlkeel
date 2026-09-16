@@ -214,4 +214,66 @@ defmodule ControlKeelWeb.ReviewLiveTest do
     assert html =~ "Review not found"
     refute html =~ "Should be invisible cross-org"
   end
+
+  test "review live denies cross-org access with a user-only session (issue #141, R5)", %{
+    conn: conn
+  } do
+    # Same shape as above, but the session map carries only current_user_id —
+    # the production shape, since nothing ever writes current_org_id. The
+    # socket must derive the default org (org B) and still deny the org-A
+    # review.
+    original = Application.get_env(:controlkeel, :runtime_mode)
+    Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+    on_exit(fn ->
+      if is_nil(original) do
+        Application.delete_env(:controlkeel, :runtime_mode)
+      else
+        Application.put_env(:controlkeel, :runtime_mode, original)
+      end
+    end)
+
+    alias ControlKeel.Accounts
+    alias ControlKeel.Repo
+
+    {:ok, my_org} =
+      Accounts.create_org(%{name: "Mine", slug: "mine2-#{System.unique_integer([:positive])}"})
+
+    {:ok, user} =
+      Accounts.create_user(%{email: "me2-#{System.unique_integer([:positive])}@example.com"})
+
+    %Accounts.Membership{}
+    |> Accounts.Membership.changeset(%{
+      user_id: user.id,
+      org_id: my_org.id,
+      role: "viewer",
+      status: "active"
+    })
+    |> Repo.insert!()
+
+    {:ok, other_org} =
+      Accounts.create_org(%{
+        name: "Theirs",
+        slug: "theirs2-#{System.unique_integer([:positive])}"
+      })
+
+    other_workspace = workspace_fixture(%{org_id: other_org.id})
+    other_session = session_fixture(%{workspace: other_workspace})
+
+    task = task_fixture(%{session: other_session, status: "queued", title: "No-seed plan"})
+
+    assert {:ok, review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "submission_body" => "Should be invisible without seeded org"
+             })
+
+    conn = conn |> Plug.Test.init_test_session(%{current_user_id: user.id})
+
+    {:ok, _view, html} = live(conn, ~p"/sessions/#{other_session.id}/reviews/#{review.id}")
+
+    assert html =~ "Review not found"
+    refute html =~ "Should be invisible without seeded org"
+  end
 end
