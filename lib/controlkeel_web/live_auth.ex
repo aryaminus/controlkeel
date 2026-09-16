@@ -90,6 +90,14 @@ defmodule ControlKeelWeb.LiveAuth do
   end
 
   defp handle_membership_event(
+         {:membership_changed, %{user_id: uid, org_id: changed_org_id}},
+         %{assigns: %{current_user: %{id: uid}, current_org_id: current_org_id}} = socket
+       )
+       when changed_org_id != current_org_id do
+    {:halt, socket}
+  end
+
+  defp handle_membership_event(
          {:membership_changed, %{user_id: uid, status: "revoked"}},
          %{assigns: %{current_user: %{id: uid}}} = socket
        ) do
