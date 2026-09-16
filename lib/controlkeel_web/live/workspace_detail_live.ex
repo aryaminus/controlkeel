@@ -18,7 +18,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform
   alias ControlKeel.Repo
-  alias ControlKeel.Runtime.Mode
+  alias ControlKeelWeb.WorkspaceAccess
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -336,28 +336,15 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
     """
   end
 
-  # TODO(auth): the workspace lookup + access checks below are duplicated
-  # across workspace LiveViews. Extract into a shared on_mount hook when
-  # centralized auth lands (CLI/web parity PR).
-  # View access: local mode is open; cloud mode requires membership of the
-  # workspace's org (no role requirement — role gates live on write surfaces).
+  # Workspace read surface: org-bound workspace + any active membership,
+  # resolved from (user, resource) via the shared gate.
   defp check_workspace_access(workspace, assigns) do
-    if Mode.current() == :local do
-      :ok
-    else
-      check_cloud_workspace_access(workspace, assigns)
+    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
+      :ok -> :ok
+      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, _} -> {:error, "Workspace belongs to a different organization."}
     end
   end
-
-  defp check_cloud_workspace_access(%Workspace{org_id: nil}, _),
-    do: {:error, "Workspace is not bound to an org."}
-
-  defp check_cloud_workspace_access(%Workspace{org_id: ws_org}, %{current_org_id: org_id})
-       when is_integer(ws_org) and ws_org == org_id,
-       do: :ok
-
-  defp check_cloud_workspace_access(_, _),
-    do: {:error, "Workspace belongs to a different organization."}
 
   defp redirect_with_flash(socket, kind, msg, path) do
     socket

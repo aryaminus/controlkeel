@@ -18,6 +18,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
   alias ControlKeel.Platform
   alias ControlKeel.Platform.ServiceAccount
   alias ControlKeel.Repo
+  alias ControlKeelWeb.WorkspaceAccess
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug}, _session, socket) do
@@ -260,18 +261,16 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
 
   defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
 
-  defp check_workspace_access(%Workspace{org_id: ws_org}, %{
-         current_org_id: org_id,
-         current_membership: m
-       })
-       when is_integer(ws_org) and ws_org == org_id do
-    if m && Accounts.role_at_least?(m.role, "admin"),
-      do: :ok,
-      else: {:error, "Admin or owner role required."}
+  # Workspace admin surface: org-bound workspace + active admin/owner
+  # membership, resolved from (user, resource) via the shared gate.
+  defp check_workspace_access(workspace, assigns) do
+    case WorkspaceAccess.check(workspace, assigns[:current_user], "admin") do
+      :ok -> :ok
+      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
+      {:error, :needs_admin} -> {:error, "Admin or owner role required."}
+    end
   end
-
-  defp check_workspace_access(_, _),
-    do: {:error, "Workspace belongs to a different organization."}
 
   defp format_dt(nil), do: "never"
   defp format_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
