@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.4.16 — 2026-09-16
+
+### What's changed
+
+- Merge pull request #176 from aryaminus/security/close-141-r4-r5
+- Merge pull request #175 from aryaminus/security/workspace-guards-r1
+- Merge pull request #174 from aryaminus/security/session-gate-r2-r3
+- security(web): handle membership change event for organization context
+- fix(auth): consume cross-org membership events in live auth hook
+- security(web): harden switch return_to and add deny-path coverage
+- security(web): explicit org switcher, unaffiliated deny, OAuth-path regression (#141 R4+R5)
+- security(web): shared workspace-access gate, user-scoped page guards (#141 R1)
+- fix(auth): ignore cross-org membership events in live auth hook
+- security(web): user-keyed session gate + membership-required cloud auth
+
 ## v0.4.15 — 2026-09-13
 
 ### What's changed
