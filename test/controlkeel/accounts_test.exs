@@ -793,6 +793,21 @@ defmodule ControlKeel.AccountsTest do
       end)
     end
 
+    test "cloud mode denies when the workspace row is missing", %{user: user} do
+      with_cloud_mode(fn ->
+        refute Accounts.session_accessible?(%{workspace_id: -1}, user)
+      end)
+    end
+
+    test "cloud mode denies unaffiliated workspaces (no owning org)", %{user: user} do
+      unbound = workspace_fixture(%{})
+      session = session_fixture(%{workspace: unbound})
+
+      with_cloud_mode(fn ->
+        refute Accounts.session_accessible?(session, user)
+      end)
+    end
+
     defp with_cloud_mode(fun) do
       original = Application.get_env(:controlkeel, :runtime_mode)
       Application.put_env(:controlkeel, :runtime_mode, :cloud)

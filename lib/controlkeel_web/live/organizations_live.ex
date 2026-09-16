@@ -56,6 +56,28 @@ defmodule ControlKeelWeb.OrganizationsLive do
   end
 
   @impl true
+  def handle_event("switch_org", %{"org_id" => org_id}, socket) do
+    # Membership-verified here; the controller re-verifies before writing.
+    # The switch travels as a short-lived signed token (not a raw id) so the
+    # controller GET cannot be forged or replayed across users — LiveView
+    # events are CSRF-safe by session, plain controller GETs are not.
+    with %{id: user_id} <- socket.assigns[:current_user],
+         {org_id, ""} <- Integer.parse(to_string(org_id || "")),
+         %Accounts.Membership{} <- Accounts.get_active_membership(user_id, org_id) do
+      token =
+        Phoenix.Token.sign(ControlKeelWeb.Endpoint, "org-switch", %{
+          user_id: user_id,
+          org_id: org_id
+        })
+
+      {:noreply, redirect(socket, to: ~p"/auth/org/#{org_id}?#{%{t: token}}")}
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, "Organization not found or unavailable.")}
+    end
+  end
+
+  @impl true
   def handle_event("new_org", _params, socket) do
     changeset = Org.changeset(%Org{}, %{})
 
@@ -202,19 +224,19 @@ defmodule ControlKeelWeb.OrganizationsLive do
       <% else %>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <%= for row <- @orgs do %>
-            <.link
-              navigate={~p"/#{row.org.slug}"}
-              class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
-            >
+            <div class="group rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card">
               <div class="flex items-start justify-between gap-3">
-                <div class="flex min-w-0 items-center gap-2">
+                <.link
+                  navigate={~p"/#{row.org.slug}"}
+                  class="flex min-w-0 items-center gap-2"
+                >
                   <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <.icon name="hero-building-office-2" class="size-4" />
                   </span>
                   <h3 class="truncate text-base font-semibold text-foreground transition group-hover:text-primary">
                     {row.org.name}
                   </h3>
-                </div>
+                </.link>
                 <span class={[
                   "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
                   row.org.status == "active" && "bg-success/10 text-success ring-success/20",
@@ -231,9 +253,31 @@ defmodule ControlKeelWeb.OrganizationsLive do
                   <.icon name="hero-users" class="size-3.5" />
                   <span>{row.member_count} {(row.member_count == 1 && "member") || "members"}</span>
                 </div>
-                <.role_badge role={row.role} />
+                <div class="flex items-center gap-2">
+                  <.role_badge role={row.role} />
+                  <%= if not @local_mode do %>
+                    <%= if @current_org_id == row.org.id do %>
+                      <span
+                        id={"org-active-#{row.org.id}"}
+                        class="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/30"
+                      >
+                        Active
+                      </span>
+                    <% else %>
+                      <button
+                        id={"org-switch-#{row.org.id}"}
+                        type="button"
+                        phx-click="switch_org"
+                        phx-value-org_id={row.org.id}
+                        class="rounded-full border border-input px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:border-primary hover:text-primary cursor-pointer"
+                      >
+                        Make active
+                      </button>
+                    <% end %>
+                  <% end %>
+                </div>
               </div>
-            </.link>
+            </div>
           <% end %>
         </div>
       <% end %>
