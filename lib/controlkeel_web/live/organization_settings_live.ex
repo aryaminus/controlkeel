@@ -10,17 +10,43 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Runtime.Mode
+  alias ControlKeelWeb.OrgAccess
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    opts = [
-      forbidden_path: "/#{slug}",
-      forbidden_message: "You don't have permission to change organization settings."
-    ]
+    case Accounts.get_org_by_slug(slug) do
+      nil ->
+        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
 
-    case ControlKeelWeb.OrgAuth.authorize_org(socket, slug, "admin", opts) do
-      {:ok, socket, org, membership} -> mount_ok(socket, org, membership)
-      {:halt, socket} -> {:ok, socket}
+      org ->
+        case OrgAccess.check(org, socket.assigns[:current_user], "admin") do
+          :ok ->
+            membership =
+              case socket.assigns[:current_user] do
+                %{id: user_id} -> Accounts.get_active_membership(user_id, org.id)
+                _ -> nil
+              end
+
+            mount_ok(socket, org, membership)
+
+          {:error, :forbidden} ->
+            {:ok,
+             redirect_with_flash(
+               socket,
+               :error,
+               "Sign in to view this organization.",
+               ~p"/auth/login"
+             )}
+
+          {:error, :needs_admin} ->
+            {:ok,
+             redirect_with_flash(
+               socket,
+               :error,
+               "You don't have permission to change organization settings.",
+               ~p"/#{slug}"
+             )}
+        end
     end
   end
 
@@ -84,6 +110,12 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       },
       as: :settings
     )
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> put_flash(kind, msg)
+    |> push_navigate(to: path)
   end
 
   defp maybe_add_owner_field(attrs, _key, _value, false), do: attrs

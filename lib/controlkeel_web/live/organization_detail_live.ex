@@ -25,14 +25,38 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   alias ControlKeel.Mission
   alias ControlKeel.Repo
   alias ControlKeel.Runtime.Mode
+  alias ControlKeelWeb.OrgAccess
 
   @valid_roles ~w(owner admin member viewer)
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case ControlKeelWeb.OrgAuth.authorize_org(socket, slug) do
-      {:ok, socket, org, membership} -> mount_ok(socket, org, membership)
-      {:halt, socket} -> {:ok, socket}
+    case Accounts.get_org_by_slug(slug) do
+      nil ->
+        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
+
+      org ->
+        case OrgAccess.check(org, socket.assigns[:current_user]) do
+          :ok ->
+            mount_ok(
+              socket,
+              org,
+              Accounts.get_active_membership(socket.assigns.current_user.id, org.id)
+            )
+
+          {:error, :forbidden} ->
+            {:ok,
+             redirect_with_flash(
+               socket,
+               :error,
+               "Sign in to view this organization.",
+               ~p"/auth/login"
+             )}
+
+          {:error, :needs_admin} ->
+            {:ok,
+             redirect_with_flash(socket, :error, "You don't have permission.", ~p"/organizations")}
+        end
     end
   end
 
@@ -995,6 +1019,12 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   defp count_active_owners(memberships) do
     Enum.count(memberships, &(&1.role == "owner" and &1.status == "active"))
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> put_flash(kind, msg)
+    |> push_navigate(to: path)
   end
 
   defp tab_class(active?) do
