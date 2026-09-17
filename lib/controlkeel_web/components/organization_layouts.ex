@@ -276,7 +276,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                     <%= for ws <- @sibling_workspaces do %>
                       <% active = ws.slug == @nav_workspace.slug %>
                       <.link
-                        navigate={
+                        href={
                           sibling_workspace_path(
                             @current_path,
                             @current_query,
