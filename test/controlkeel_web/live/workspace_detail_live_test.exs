@@ -253,4 +253,39 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert msg =~ "Workspace belongs to a different organization."
     end
   end
+
+  describe "breadcrumb workspace switcher" do
+    test "overview lists sibling workspaces as overview links" do
+      {:ok, org} = Accounts.create_org(%{name: "Sworg", slug: "sworg"})
+      ws_a = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
+      ws_b = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws_a.slug}")
+
+      assert html =~ ~s(aria-label="Switch workspace")
+      assert html =~ "Beta"
+      assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws_b.slug}")
+    end
+
+    test "hides the switcher when the org has a single workspace" do
+      {:ok, org} = Accounts.create_org(%{name: "Swone", slug: "swone"})
+      ws = create_workspace(%{name: "Solo", slug: "solo", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+
+      refute html =~ ~s(aria-label="Switch workspace")
+    end
+
+    test "subpages route siblings to their overview, not the subpage" do
+      {:ok, org} = Accounts.create_org(%{name: "Swsub", slug: "swsub"})
+      ws_a = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
+      ws_b = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws_a.slug}/repos")
+
+      assert html =~ ~s(aria-label="Switch workspace")
+      assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws_b.slug}")
+      refute html =~ "/#{org.slug}/workspaces/#{ws_b.slug}/repos"
+    end
+  end
 end

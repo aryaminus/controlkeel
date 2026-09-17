@@ -1750,4 +1750,30 @@ defmodule ControlKeel.MissionTest do
       assert Mission.blocking_findings_for_session(session.id) == []
     end
   end
+
+  describe "list_workspaces_for_org_recent_first/1" do
+    test "returns only that org's workspaces, most-recent-first" do
+      {:ok, org} =
+        ControlKeel.Accounts.create_org(%{
+          name: "Recent",
+          slug: "recent-#{System.unique_integer([:positive])}"
+        })
+
+      {:ok, other_org} =
+        ControlKeel.Accounts.create_org(%{
+          name: "Recent Other",
+          slug: "recent-other-#{System.unique_integer([:positive])}"
+        })
+
+      old = workspace_fixture(%{org_id: org.id, name: "Old workspace"})
+      new = workspace_fixture(%{org_id: org.id, name: "New workspace"})
+      _other = workspace_fixture(%{org_id: other_org.id, name: "Other workspace"})
+
+      assert [%{id: new_id}, %{id: old_id}] =
+               Mission.list_workspaces_for_org_recent_first(org.id)
+
+      assert new_id == new.id
+      assert old_id == old.id
+    end
+  end
 end
