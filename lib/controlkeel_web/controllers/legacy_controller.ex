@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.LegacyController do
 
   use ControlKeelWeb, :controller
 
+  alias ControlKeel.Mission.Session
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Repo
   alias ControlKeelWeb.FallbackController
@@ -42,10 +43,49 @@ defmodule ControlKeelWeb.LegacyController do
       else: {:ok, ""}
   end
 
+  def session(conn, %{"id" => id} = params) do
+    with %Session{} = session <- fetch_session_record(id),
+         %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} <-
+           Repo.preload(session, workspace: :org) do
+      query =
+        case conn.query_string do
+          "" -> ""
+          query -> "?#{query}"
+        end
+
+      redirect(
+        conn,
+        to:
+          "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}#{session_subpath(params, conn)}#{query}"
+      )
+    else
+      _ -> FallbackController.not_found(conn, params)
+    end
+  end
+
+  # The route is explicit per subpage (`/reviews`, `/deploy-review`,
+  # `/reviews/:rid`), so the suffix is detected from the request path — same
+  # approach as the workspace `/settings` suffix above.
+  defp session_subpath(%{"rid" => rid}, _conn) when is_binary(rid), do: "/reviews/#{rid}"
+
+  defp session_subpath(_params, conn) do
+    cond do
+      String.ends_with?(conn.request_path, "/reviews") -> "/reviews"
+      String.ends_with?(conn.request_path, "/deploy-review") -> "/deploy-review"
+      true -> ""
+    end
+  end
+
   # `Repo.get/2` raises on uncastable ids (e.g. `/workspaces/abc`); treat
   # those as unknown rather than a 400/500.
   defp fetch_workspace(id) do
     Repo.get(Workspace, id)
+  rescue
+    Ecto.Query.CastError -> nil
+  end
+
+  defp fetch_session_record(id) do
+    Repo.get(Session, id)
   rescue
     Ecto.Query.CastError -> nil
   end

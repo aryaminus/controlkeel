@@ -726,6 +726,18 @@ defmodule ControlKeel.Mission do
     |> Repo.all()
   end
 
+  @doc """
+  Lightweight id/title list of the sessions in a workspace, newest first.
+  Used for the session switcher (no task/finding preloads).
+  """
+  def list_sibling_sessions(workspace_id) do
+    Session
+    |> where([s], s.workspace_id == ^workspace_id)
+    |> order_by(desc: :inserted_at)
+    |> select([s], %{id: s.id, title: s.title})
+    |> Repo.all()
+  end
+
   def get_session_with_details!(id) do
     Session
     |> Repo.get!(id)

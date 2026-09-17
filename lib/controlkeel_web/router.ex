@@ -121,15 +121,11 @@ defmodule ControlKeelWeb.Router do
       live "/dashboard", DashboardLive, :index
       live "/sessions", MissionsLive, :index
       live "/sessions/start", OnboardingLive, :new
-      live "/sessions/:id", MissionControlLive, :show
-      live "/sessions/:id/reviews", SessionReviewsLive, :index
-      live "/sessions/:id/deploy-review", DeployReviewLive, :show
       live "/findings", FindingsLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
       live "/proofs", ProofBrowserLive, :index
       live "/proofs/:id", ProofBrowserLive, :show
-      live "/sessions/:sid/reviews/:rid", ReviewLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
@@ -195,6 +191,17 @@ defmodule ControlKeelWeb.Router do
     get "/organizations/:slug/workspaces/:id/settings", LegacyController, :workspace
     get "/workspaces/:id/*rest", LegacyController, :workspace
 
+    # Legacy session URLs (pre-org-scope consolidation): `/sessions/:id` and
+    # its `/reviews` and `/deploy-review` subpages now live at
+    # `/:org_slug/workspaces/:ws_slug/sessions/:id/*`, so resolve the numeric
+    # id (preloading workspace + org) and redirect, preserving the query
+    # string. Unknown ids or subpaths 404, mirroring the old routes which had
+    # no match for them.
+    get "/sessions/:id", LegacyController, :session
+    get "/sessions/:id/reviews", LegacyController, :session
+    get "/sessions/:id/deploy-review", LegacyController, :session
+    get "/sessions/:id/reviews/:rid", LegacyController, :session
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
@@ -213,6 +220,10 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
       live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
       live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
     end
   end
 
