@@ -204,7 +204,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
     trail = breadcrumb_items(assigns)
     workspace_root = workspace_root_path(assigns[:nav_org], assigns[:nav_workspace])
-    workspace_idx = workspace_crumb_index(trail, workspace_root)
+    workspace_idx = workspace_crumb_index(trail, workspace_root, assigns[:current_path])
     siblings = assigns[:sibling_workspaces] || []
 
     assigns =
@@ -275,7 +275,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                     <%= for ws <- @sibling_workspaces do %>
                       <% active = ws.slug == @nav_workspace.slug %>
                       <.link
-                        navigate={sibling_workspace_path(@current_path, @nav_org.slug, ws.slug)}
+                        navigate={~p"/#{@nav_org.slug}/workspaces/#{ws.slug}"}
                         phx-click={
                           JS.hide(to: "#breadcrumb-ws-switcher-popover")
                           |> JS.set_attribute({"aria-expanded", "false"},
@@ -379,32 +379,26 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   defp workspace_root_path(_, _), do: nil
 
-  # The workspace crumb is the linked workspace root on subpages, or the
-  # final plain-text crumb on the workspace overview page.
-  defp workspace_crumb_index(_trail, nil), do: nil
+  # The workspace crumb is the linked workspace root on subpages. On the
+  # workspace overview page the trail ends with the workspace name as
+  # plain text, so fall back to the final crumb — but only while standing
+  # on the workspace root. A trailing plain-text crumb on any other path
+  # is a subpage label and must never capture the switcher.
+  defp workspace_crumb_index(_trail, nil, _current_path), do: nil
 
-  defp workspace_crumb_index(trail, root) do
+  defp workspace_crumb_index(trail, root, current_path) do
     Enum.find_index(trail, fn {_label, path} -> path == root end) ||
-      workspace_current_index(trail)
+      overview_index(trail, root, current_path)
   end
 
-  defp workspace_current_index(trail) do
+  defp overview_index(trail, root, root) do
     case List.last(trail) do
       {_label, nil} -> length(trail) - 1
       _ -> nil
     end
   end
 
-  # Switching workspaces preserves the subpage (e.g. repos stays on repos).
-  defp sibling_workspace_path(current_path, org_slug, ws_slug) do
-    case String.split(current_path || "", "/", trim: true) do
-      [^org_slug, "workspaces", _current_ws | rest] ->
-        "/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/")
-
-      _ ->
-        "/#{org_slug}/workspaces/#{ws_slug}"
-    end
-  end
+  defp overview_index(_trail, _root, _current_path), do: nil
 
   defp breadcrumb_trail(nil), do: []
 

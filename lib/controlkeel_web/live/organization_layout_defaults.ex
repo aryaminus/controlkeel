@@ -23,6 +23,7 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
       |> assign_new(:page_action, fn -> nil end)
       |> assign_new(:breadcrumbs, fn -> nil end)
       |> assign_new(:sibling_workspaces, fn -> [] end)
+      |> assign_new(:sibling_workspaces_org_id, fn -> nil end)
       |> attach_hook(:__organization_current_path__, :handle_params, fn _params, uri, socket ->
         parsed = URI.parse(uri)
 
@@ -38,15 +39,22 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
 
   # Workspace pages get the org's workspace list for the breadcrumb switcher.
   # Org-level pages keep the default (`[]`) so no switcher renders.
+  # Memoized per org: `handle_params` fires on every patch within the same
+  # LiveView, but the org-scoped list can't change without a remount
+  # (cross-view navigation remounts and resets the assigns).
+  defp maybe_assign_sibling_workspaces(
+         %{assigns: %{sibling_workspaces_org_id: org_id, nav_org: %{id: org_id}}} = socket
+       )
+       when is_integer(org_id),
+       do: socket
+
   defp maybe_assign_sibling_workspaces(
          %{assigns: %{nav_workspace: %{slug: _}, nav_org: %{id: org_id}}} = socket
-       ) do
-    siblings =
-      org_id
-      |> Mission.list_workspaces_for_org()
-      |> Enum.sort_by(& &1.inserted_at, {:desc, NaiveDateTime})
-
-    assign(socket, :sibling_workspaces, siblings)
+       )
+       when is_integer(org_id) do
+    socket
+    |> assign(:sibling_workspaces, Mission.list_workspaces_for_org_recent_first(org_id))
+    |> assign(:sibling_workspaces_org_id, org_id)
   end
 
   defp maybe_assign_sibling_workspaces(socket), do: socket

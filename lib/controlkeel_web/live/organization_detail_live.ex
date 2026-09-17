@@ -2,7 +2,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   @moduledoc """
   Member management for an org at `/:org_slug`.
 
-  Admin+owner only. Allows:
+  Any active member (viewer+) may view. Allows:
     - List active and pending memberships (preloaded with the user)
     - Invite a new member by email + role (creates pending Membership;
       raw invitation token is displayed once for copy-paste, since the
@@ -10,12 +10,14 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     - Revoke a membership (last-owner protected)
     - Change a role (last-owner protected)
 
+  Invite/revoke/role change are admin+ only, gated by `can_manage`.
+
   ## Access
 
-  Resolved per-URL via `Accounts.get_active_membership(user.id, org.id)`
-  (NOT the session's pinned `current_membership`). Local mode has no
-  membership table and is unrestricted. Cloud/self_hosted requires the
-  signed-in user to hold an active admin+ membership for this specific
+  Resolved per-URL via `ControlKeelWeb.OrgAccess.check(org, user)`
+  (default `"viewer"` role; NOT the session's pinned `current_membership`).
+  Local mode has no membership table and is unrestricted. Cloud/self_hosted
+  requires the signed-in user to hold an active membership for this specific
   org; others are redirected to `/organizations`.
   """
 
@@ -936,7 +938,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   defp maybe_add_action(actions, action), do: actions ++ [action]
 
   defp invite_page_action(local_mode, can_manage) do
-    if local_mode || not can_manage do
+    if local_mode || !can_manage do
       nil
     else
       %{label: "Invite member", event: "open_invite", icon: "hero-plus"}
