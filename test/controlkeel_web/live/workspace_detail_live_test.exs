@@ -276,7 +276,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       refute html =~ ~s(aria-label="Switch workspace")
     end
 
-    test "subpages route siblings to their overview, not the subpage" do
+    test "subpages keep the subpage when switching workspaces" do
       {:ok, org} = Accounts.create_org(%{name: "Swsub", slug: "swsub"})
       ws_a = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
       ws_b = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
@@ -284,8 +284,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws_a.slug}/repos")
 
       assert html =~ ~s(aria-label="Switch workspace")
-      assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws_b.slug}")
-      refute html =~ "/#{org.slug}/workspaces/#{ws_b.slug}/repos"
+      assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws_b.slug}/repos")
     end
   end
 end

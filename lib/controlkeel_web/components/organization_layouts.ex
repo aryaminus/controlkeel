@@ -193,6 +193,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :nav_org, :any, default: nil
   attr :nav_workspace, :any, default: nil
   attr :sibling_workspaces, :list, default: []
+  attr :current_query, :any, default: nil
 
   def breadcrumbs_header(assigns) do
     actions =
@@ -275,7 +276,14 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                     <%= for ws <- @sibling_workspaces do %>
                       <% active = ws.slug == @nav_workspace.slug %>
                       <.link
-                        navigate={~p"/#{@nav_org.slug}/workspaces/#{ws.slug}"}
+                        navigate={
+                          sibling_workspace_path(
+                            @current_path,
+                            @current_query,
+                            @nav_org.slug,
+                            ws.slug
+                          )
+                        }
                         phx-click={
                           JS.hide(to: "#breadcrumb-ws-switcher-popover")
                           |> JS.set_attribute({"aria-expanded", "false"},
@@ -399,6 +407,29 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   defp overview_index(_trail, _root, _current_path), do: nil
+
+  # Workspace URL replacer: swaps the workspace slug segment, keeping the
+  # subpage and query string, so e.g. repos stays on repos. Falls back to
+  # the workspace overview when the current path is outside
+  # `:org_slug/workspaces/:ws_slug/*`. Subpage shapes are dynamic, so this
+  # builds a plain string (no `~p` verification); only the ws segment is
+  # ever rewritten.
+  defp sibling_workspace_path(current_path, current_query, org_slug, ws_slug) do
+    base =
+      case String.split(current_path || "", "/", trim: true) do
+        [^org_slug, "workspaces", _current_ws | rest] ->
+          "/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/")
+
+        _ ->
+          "/#{org_slug}/workspaces/#{ws_slug}"
+      end
+
+    if current_query && current_query != "" do
+      base <> "?" <> current_query
+    else
+      base
+    end
+  end
 
   defp breadcrumb_trail(nil), do: []
 
