@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.17 — 2026-09-17
+
+### What's changed
+
+- a11y(web): shared focus-ring + distinct aria-labels on sidebar controls (#169)
+- perf(elixir): replace group_by+length with frequencies_by in count paths (#170)
+- perf(elixir): replace group_by+length with frequencies_by in count paths
+- a11y(web): shared focus-ring + distinct aria-labels on sidebar controls
+
 ## v0.4.16 — 2026-09-16
 
 ### What's changed
