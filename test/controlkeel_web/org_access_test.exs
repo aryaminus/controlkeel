@@ -47,7 +47,7 @@ defmodule ControlKeelWeb.OrgAccessTest do
 
   test "local mode is open, even without a user", %{org: org} do
     Application.put_env(:controlkeel, :runtime_mode, :local)
-    assert OrgAccess.check(org, nil, "admin") == :ok
+    assert OrgAccess.check(org, nil, "admin") == {:ok, nil}
   end
 
   test "cloud mode denies a missing user", %{org: org} do
@@ -62,8 +62,9 @@ defmodule ControlKeelWeb.OrgAccessTest do
 
   test "cloud mode authorizes members at the viewer gate", %{org: org, viewer: viewer} do
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    assert OrgAccess.check(org, viewer) == :ok
-    assert OrgAccess.check(org, viewer, "viewer") == :ok
+
+    assert {:ok, %Accounts.Membership{role: "viewer"}} = OrgAccess.check(org, viewer)
+    assert {:ok, %Accounts.Membership{role: "viewer"}} = OrgAccess.check(org, viewer, "viewer")
   end
 
   test "cloud mode rejects viewers and members at the admin gate", %{
@@ -78,7 +79,7 @@ defmodule ControlKeelWeb.OrgAccessTest do
 
   test "cloud mode authorizes admins at the admin gate", %{org: org, admin: admin} do
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    assert OrgAccess.check(org, admin, "admin") == :ok
+    assert {:ok, %Accounts.Membership{role: "admin"}} = OrgAccess.check(org, admin, "admin")
   end
 
   test "cloud mode denies outsiders at every gate", %{org: org, outsider: outsider} do

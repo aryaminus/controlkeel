@@ -45,6 +45,8 @@ defmodule ControlKeel.Accounts.Membership do
     timestamps(type: :utc_datetime)
   end
 
+  @type t :: %__MODULE__{}
+
   @valid_roles ~w(owner admin member viewer)
   @valid_statuses ~w(pending active revoked)
 
