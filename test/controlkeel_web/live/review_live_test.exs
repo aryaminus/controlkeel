@@ -6,10 +6,6 @@ defmodule ControlKeelWeb.ReviewLiveTest do
 
   alias ControlKeel.Mission
 
-  defp review_path(org, ws, session_id, review_id) do
-    "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session_id}/reviews/#{review_id}"
-  end
-
   test "review live renders alignment context from plan refinement", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
@@ -39,7 +35,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
              })
 
     {:ok, _view, html} =
-      live(conn, review_path(org, ws, review.session_id, review.id))
+      live(conn, org_session_path(org, ws, %{id: review.session_id}, "/reviews/#{review.id}"))
 
     assert html =~ "Human context gathered before execution"
     assert html =~ "PM confirmed the rollout should stay behind approval gates."
@@ -73,7 +69,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
              })
 
     {:ok, _view, html} =
-      live(conn, review_path(org, ws, review.session_id, review.id))
+      live(conn, org_session_path(org, ws, %{id: review.session_id}, "/reviews/#{review.id}"))
 
     assert html =~ "Agent execution guardrails"
     assert html =~ "Allowed semantic changes"
@@ -102,7 +98,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
              })
 
     {:ok, _view, html} =
-      live(conn, review_path(org, ws, review.session_id, review.id))
+      live(conn, org_session_path(org, ws, %{id: review.session_id}, "/reviews/#{review.id}"))
 
     assert html =~ "Respond"
     assert html =~ "Pending"
@@ -154,7 +150,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
              })
 
     {:ok, view, html} =
-      live(conn, review_path(org, ws, parent.session_id, parent.id))
+      live(conn, org_session_path(org, ws, %{id: parent.session_id}, "/reviews/#{parent.id}"))
 
     assert html =~ "Revisions"
     assert html =~ "Later resubmissions of this review"
@@ -300,7 +296,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
              })
 
     {:ok, _view, html} =
-      live(conn, review_path(org, ws, review.session_id, review.id))
+      live(conn, org_session_path(org, ws, %{id: review.session_id}, "/reviews/#{review.id}"))
 
     assert html =~ "sidebar-org-nav"
     assert html =~ "Deploy review"

@@ -44,6 +44,14 @@ defmodule ControlKeel.MissionFixtures do
     {org, workspace, session}
   end
 
+  @doc """
+  Org-scoped session path (`/:org_slug/workspaces/:ws_slug/sessions/:id`
+  plus optional suffix such as `"/reviews"`).
+  """
+  def org_session_path(org, ws, session, extra \\ "") do
+    "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}#{extra}"
+  end
+
   def session_fixture(attrs \\ %{}) do
     attrs = Map.new(attrs)
     workspace = Map.get_lazy(attrs, :workspace, fn -> workspace_fixture() end)

@@ -6,19 +6,15 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
 
   alias ControlKeel.Mission
 
-  defp session_path(org, ws, session, extra) do
-    "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}#{extra}"
-  end
-
   test "session reviews lists the reviews for the session", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     review = review_fixture(%{session: session, submitted_by: "opencode"})
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session, "/reviews"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/reviews"))
 
     assert html =~ "Review queue"
     assert html =~ review.title
-    assert html =~ session_path(org, ws, session, "/reviews/#{review.id}")
+    assert html =~ org_session_path(org, ws, session, "/reviews/#{review.id}")
     assert html =~ "plan"
     assert html =~ "pending"
     assert html =~ "opencode"
@@ -29,13 +25,13 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
   test "session reviews render the session sidebar with Reviews active", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session, "/reviews"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/reviews"))
 
     assert html =~ "sidebar-org-nav"
     assert html =~ "Deploy review"
     refute html =~ "Service accounts"
 
-    reviews_href = session_path(org, ws, session, "/reviews")
+    reviews_href = org_session_path(org, ws, session, "/reviews")
     assert html =~ ~s(href="#{reviews_href}")
   end
 
@@ -44,7 +40,7 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
     task = task_fixture(%{session: session, title: "Risky plan task"})
     review_fixture(%{session: session, task: task})
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session, "/reviews"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/reviews"))
 
     assert html =~ "Risky plan task"
   end
@@ -52,7 +48,7 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
   test "session reviews shows an empty state", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session, "/reviews"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/reviews"))
 
     assert html =~ "Review queue"
     assert html =~ "No reviews yet."
@@ -64,7 +60,7 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
     {org, ws, session} = org_bound_session_fixture()
     review = review_fixture(%{session: session})
 
-    {:ok, view, html} = live(conn, session_path(org, ws, session, "/reviews"))
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/reviews"))
     assert html =~ "1 pending"
     assert html =~ "pending"
 
@@ -95,7 +91,7 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
     other = session_fixture(%{workspace: ws, title: "Second session"})
 
     {:ok, _view, html} =
-      live(conn, session_path(org, ws, session, "/reviews"))
+      live(conn, org_session_path(org, ws, session, "/reviews"))
 
     assert html =~ "breadcrumb-session-switcher-button"
     assert html =~ "Second session"

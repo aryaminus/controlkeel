@@ -217,17 +217,50 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     session_idx = session_crumb_index(trail, session_root, assigns[:current_path])
     session_siblings = assigns[:sibling_sessions] || []
 
+    show_ws_switcher = !is_nil(workspace_idx) and length(siblings) > 1
+    show_session_switcher = !is_nil(session_idx) and length(session_siblings) > 1
+
+    current_path = assigns[:current_path]
+    current_query = assigns[:current_query]
+    org_slug = assigns[:nav_org] && assigns.nav_org.slug
+    ws_slug = assigns[:nav_workspace] && assigns.nav_workspace.slug
+
+    ws_items =
+      if show_ws_switcher do
+        Enum.map(siblings, fn ws ->
+          %{
+            label: ws.name,
+            href: sibling_workspace_path(current_path, current_query, org_slug, ws.slug),
+            active: ws.slug == ws_slug
+          }
+        end)
+      else
+        []
+      end
+
+    session_items =
+      if show_session_switcher do
+        Enum.map(session_siblings, fn sess ->
+          %{
+            label: sess.title,
+            href: sibling_session_path(current_path, current_query, org_slug, ws_slug, sess.id),
+            active: sess.id == assigns.nav_session.id
+          }
+        end)
+      else
+        []
+      end
+
     assigns =
       assigns
       |> assign(:actions, actions)
       |> assign(:trail, trail)
       |> assign(:workspace_idx, workspace_idx)
-      |> assign(:show_ws_switcher, !is_nil(workspace_idx) and length(siblings) > 1)
+      |> assign(:show_ws_switcher, show_ws_switcher)
+      |> assign(:ws_items, ws_items)
       |> assign(:session_idx, session_idx)
-      |> assign(
-        :show_session_switcher,
-        !is_nil(session_idx) and length(session_siblings) > 1
-      )
+      |> assign(:show_session_switcher, show_session_switcher)
+      |> assign(:session_items, session_items)
 
     ~H"""
     <div class="flex min-h-[68px] w-full items-center justify-between border-b p-4">
@@ -255,139 +288,21 @@ defmodule ControlKeelWeb.OrganizationLayouts do
               <% else %>
                 <span class="font-medium text-foreground">{label}</span>
               <% end %>
-              <div
+              <.breadcrumb_switcher
                 :if={@show_ws_switcher and idx == @workspace_idx}
-                class="relative flex items-center"
-                phx-click-away={
-                  JS.hide(to: "#breadcrumb-ws-switcher-popover")
-                  |> JS.set_attribute({"aria-expanded", "false"},
-                    to: "#breadcrumb-ws-switcher-button"
-                  )
-                }
-              >
-                <button
-                  type="button"
-                  id="breadcrumb-ws-switcher-button"
-                  aria-label="Switch workspace"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  phx-click={
-                    JS.toggle(to: "#breadcrumb-ws-switcher-popover")
-                    |> JS.toggle_attribute({"aria-expanded", "true", "false"})
-                  }
-                  class="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <.icon name="hero-chevron-up-down" class="size-3.5" />
-                </button>
-                <div
-                  id="breadcrumb-ws-switcher-popover"
-                  class="hidden absolute left-0 top-full z-50 mt-1.5 w-56 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
-                >
-                  <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
-                    Workspaces
-                  </div>
-                  <div class="max-h-60 space-y-0.5 overflow-y-auto">
-                    <%= for ws <- @sibling_workspaces do %>
-                      <% active = ws.slug == @nav_workspace.slug %>
-                      <.link
-                        href={
-                          sibling_workspace_path(
-                            @current_path,
-                            @current_query,
-                            @nav_org.slug,
-                            ws.slug
-                          )
-                        }
-                        phx-click={
-                          JS.hide(to: "#breadcrumb-ws-switcher-popover")
-                          |> JS.set_attribute({"aria-expanded", "false"},
-                            to: "#breadcrumb-ws-switcher-button"
-                          )
-                        }
-                        class={[
-                          "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
-                          active && "bg-muted font-medium text-foreground",
-                          !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        ]}
-                      >
-                        <span class="truncate">{ws.name}</span>
-                        <.icon
-                          :if={active}
-                          name="hero-check"
-                          class="size-4 shrink-0 text-primary"
-                        />
-                      </.link>
-                    <% end %>
-                  </div>
-                </div>
-              </div>
-              <div
+                id="breadcrumb-ws-switcher"
+                label="Switch workspace"
+                title="Workspaces"
+                items={@ws_items}
+              />
+              <.breadcrumb_switcher
                 :if={@show_session_switcher and idx == @session_idx}
-                class="relative flex items-center"
-                phx-click-away={
-                  JS.hide(to: "#breadcrumb-session-switcher-popover")
-                  |> JS.set_attribute({"aria-expanded", "false"},
-                    to: "#breadcrumb-session-switcher-button"
-                  )
-                }
-              >
-                <button
-                  type="button"
-                  id="breadcrumb-session-switcher-button"
-                  aria-label="Switch session"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  phx-click={
-                    JS.toggle(to: "#breadcrumb-session-switcher-popover")
-                    |> JS.toggle_attribute({"aria-expanded", "true", "false"})
-                  }
-                  class="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <.icon name="hero-chevron-up-down" class="size-3.5" />
-                </button>
-                <div
-                  id="breadcrumb-session-switcher-popover"
-                  class="hidden absolute left-0 top-full z-50 mt-1.5 w-64 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
-                >
-                  <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
-                    Sessions
-                  </div>
-                  <div class="max-h-60 space-y-0.5 overflow-y-auto">
-                    <%= for sess <- @sibling_sessions do %>
-                      <% active = sess.id == @nav_session.id %>
-                      <.link
-                        href={
-                          sibling_session_path(
-                            @current_path,
-                            @current_query,
-                            @nav_org.slug,
-                            @nav_workspace.slug,
-                            sess.id
-                          )
-                        }
-                        phx-click={
-                          JS.hide(to: "#breadcrumb-session-switcher-popover")
-                          |> JS.set_attribute({"aria-expanded", "false"},
-                            to: "#breadcrumb-session-switcher-button"
-                          )
-                        }
-                        class={[
-                          "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
-                          active && "bg-muted font-medium text-foreground",
-                          !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        ]}
-                      >
-                        <span class="truncate">{sess.title}</span>
-                        <.icon
-                          :if={active}
-                          name="hero-check"
-                          class="size-4 shrink-0 text-primary"
-                        />
-                      </.link>
-                    <% end %>
-                  </div>
-                </div>
-              </div>
+                id="breadcrumb-session-switcher"
+                label="Switch session"
+                title="Sessions"
+                items={@session_items}
+                popover_width="w-64"
+              />
             </li>
           <% end %>
         </ol>
@@ -420,6 +335,70 @@ defmodule ControlKeelWeb.OrganizationLayouts do
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>
         <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true, doc: "base id; button/popover derive from it"
+  attr :label, :string, required: true, doc: "aria-label for the toggle button"
+  attr :title, :string, required: true, doc: "popover heading"
+  attr :items, :list, required: true, doc: "prebuilt [%{label, href, active}] entries"
+  attr :popover_width, :string, default: "w-56"
+
+  defp breadcrumb_switcher(assigns) do
+    ~H"""
+    <div
+      class="relative flex items-center"
+      phx-click-away={
+        JS.hide(to: "##{@id}-popover")
+        |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id}-button")
+      }
+    >
+      <button
+        type="button"
+        id={"#{@id}-button"}
+        aria-label={@label}
+        aria-haspopup="menu"
+        aria-expanded="false"
+        phx-click={
+          JS.toggle(to: "##{@id}-popover")
+          |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+        }
+        class="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <.icon name="hero-chevron-up-down" class="size-3.5" />
+      </button>
+      <div
+        id={"#{@id}-popover"}
+        class={"hidden absolute left-0 top-full z-50 mt-1.5 #{@popover_width} rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"}
+      >
+        <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
+          {@title}
+        </div>
+        <div class="max-h-60 space-y-0.5 overflow-y-auto">
+          <%= for item <- @items do %>
+            <.link
+              href={item.href}
+              phx-click={
+                JS.hide(to: "##{@id}-popover")
+                |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id}-button")
+              }
+              class={[
+                "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
+                item.active && "bg-muted font-medium text-foreground",
+                !item.active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ]}
+            >
+              <span class="truncate">{item.label}</span>
+              <.icon
+                :if={item.active}
+                name="hero-check"
+                class="size-4 shrink-0 text-primary"
+              />
+            </.link>
+          <% end %>
+        </div>
       </div>
     </div>
     """

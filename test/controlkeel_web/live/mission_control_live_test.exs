@@ -11,10 +11,6 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
   alias ControlKeel.Mission
   alias ControlKeel.Repo
 
-  defp session_path(org, ws, session) do
-    "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}"
-  end
-
   test "mission control shows task dependencies and checklist when graph edges exist", %{
     conn: conn
   } do
@@ -47,7 +43,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
         title: "Release verify"
       })
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Task dependencies"
     assert html =~ "Architecture lock"
@@ -76,7 +72,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
                }
              })
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Inversion:"
     assert html =~ "Evidence check:"
@@ -95,7 +91,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
                "session_id" => session.id
              })
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Build the first governed workflow"
     assert html =~ "Sql injection"
@@ -123,7 +119,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
     task_fixture(%{session: session})
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Production boundary"
     assert html =~ "Local-first deploy"
@@ -148,7 +144,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       status: "open"
     })
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "mission-observability-panel"
     assert html =~ "Session run observability"
@@ -162,11 +158,11 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     {org, ws, session} = org_bound_session_fixture()
     review_fixture(%{session: session, submitted_by: "opencode"})
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "1 total review gates"
     assert html =~ "1 pending"
-    assert html =~ session_path(org, ws, session) <> "/reviews"
+    assert html =~ org_session_path(org, ws, session, "/reviews")
     assert html =~ "View all"
   end
 
@@ -181,7 +177,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     {org, ws, session} = org_bound_session_fixture(%{spent_cents: 600, budget_cents: 5_000})
     task_fixture(%{session: session})
 
-    {:ok, view, html} = live(conn, session_path(org, ws, session))
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session))
     assert html =~ "6.0 / 50.0"
 
     assert {:ok, _} =
@@ -228,7 +224,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
         metadata: %{"path" => "assets/js/app.js", "matched_text_redacted" => "inner...HTML"}
       })
 
-    {:ok, view, _html} = live(conn, session_path(org, ws, session))
+    {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
 
     detail_html =
       render_click(
@@ -249,7 +245,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     {org, ws, session} = org_bound_session_fixture()
     task = task_fixture(%{session: session, status: "in_progress"})
 
-    {:ok, view, html} = live(conn, session_path(org, ws, session))
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Workspace context"
     assert html =~ "Recent transcript"
@@ -286,7 +282,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
         title: "Done task"
       })
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Verified task"
     assert html =~ "verified"
@@ -301,7 +297,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     finding_fixture(%{session: session, status: "blocked", title: "Blocked ship finding"})
     {:ok, _proof} = Mission.generate_proof_bundle(task.id)
 
-    {:ok, _view, html} = live(conn, session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Ship readiness"
     # Blocked finding forces a Blocked verdict.
@@ -362,7 +358,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       {org, ws, session} = org_bound_session_fixture()
       approved_done_task_with_proof(session)
 
-      {:ok, _view, html} = live(conn, session_path(org, ws, session))
+      {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
       assert html =~ "mission-release-readiness"
       assert html =~ "release-readiness-status"
@@ -378,7 +374,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       {org, ws, session} = org_bound_session_fixture()
       %{proof: proof} = approved_done_task_with_proof(session)
 
-      {:ok, view, html} = live(conn, session_path(org, ws, session))
+      {:ok, view, html} = live(conn, org_session_path(org, ws, session))
       assert html =~ "needs review"
 
       updated_html =
@@ -413,7 +409,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
         status: "open"
       })
 
-      {:ok, view, _html} = live(conn, session_path(org, ws, session))
+      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
 
       updated_html =
         view
@@ -438,7 +434,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       {org, ws, session} = org_bound_session_fixture()
       approved_done_task_with_proof(session)
 
-      {:ok, view, _html} = live(conn, session_path(org, ws, session))
+      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
       assert release_readiness_event_count(session.id) == 0
 
       send(view.pid, :refresh)
@@ -460,7 +456,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       {org, ws, session} = org_bound_session_fixture()
       approved_done_task_with_proof(session)
 
-      {:ok, view, html} = live(conn, session_path(org, ws, session))
+      {:ok, view, html} = live(conn, org_session_path(org, ws, session))
       assert html =~ "needs review"
 
       finding_fixture(%{
@@ -496,7 +492,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       {org, ws, session} = org_bound_session_fixture()
       task_fixture(%{session: session, status: "in_progress"})
 
-      {:ok, _view, html} = live(conn, session_path(org, ws, session))
+      {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
       assert html =~ "No proof bundle is available for release review yet."
       assert html =~ "needs review"
@@ -510,7 +506,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
       task = task_fixture(%{session: session, status: "in_progress", title: "Do the work"})
 
-      {:ok, view, _html} = live(conn, session_path(org, ws, session))
+      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
       assert has_element?(view, "#task-complete-#{task.id}")
       assert has_element?(view, "#current-task-complete-#{task.id}")
 
@@ -535,7 +531,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
       finding_fixture(%{session: session, status: "open", title: "Blocking finding"})
 
-      {:ok, view, _html} = live(conn, session_path(org, ws, session))
+      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
 
       updated_html =
         view
@@ -552,7 +548,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
       task = task_fixture(%{session: session, status: "in_progress"})
 
-      {:ok, view, _html} = live(conn, session_path(org, ws, session))
+      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
 
       updated_html =
         view
@@ -567,7 +563,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       {org, ws, session} = org_bound_session_fixture()
       done_task = task_fixture(%{session: session, status: "done", title: "Already done"})
 
-      {:ok, view, _html} = live(conn, session_path(org, ws, session))
+      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
 
       refute has_element?(view, "#task-complete-#{done_task.id}")
     end
