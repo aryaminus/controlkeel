@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.4.18 — 2026-09-18
+
+### What's changed
+
+- Merge pull request #177 from aryaminus/refactor/current-org-url
+- refactor/current-org-url: update workspace switcher links to use full page loads for fresh mounts
+- refactor/current-org-url: enhance workspace navigation and breadcrumb handling; add current_query attribute
+- refactor/current-org-url: update Org and Membership modules to include type specifications; modify OrgAccess to return membership details
+- refactor/current-org-url: enhance workspace listing and breadcrumb handling; add org access tests
+- refactor/current-org-url: add recent-first workspace listing and improve breadcrumb handling in organization layouts
+- refactor/current-org-url: format code for consistency in safe_return_to function
+- refactor/current-org-url: enhance session management in tests; assign current_org_id and validate membership in LoadCurrentUser
+- refactor/current-org-url: update error messages for organization access in workspace tests
+- refactor/current-org-url: clear current_org_id session on logout; improve membership retrieval in OrganizationDetailLive
+- refactor/current-org-url: replace OrgAuth with OrgAccess for organization access control; update mount logic in LiveViews
+- refactor/current-org-url: implement workspace switcher in breadcrumbs; add sibling workspaces handling and tests
+- refactor/current-org-url: quarantine cross-org read tests for R2 follow-up
+- refactor/current-org-url: update logout test for URL-only org
+- refactor/current-org-url: format + update plug test for URL-only org
+- refactor/current-org-url: centralize per-URL org auth in OrgAuth helper
+- refactor/current-org-url: remove current_org_id from session management, update URL handling for org context in LiveViews
+
 ## v0.4.17 — 2026-09-17
 
 ### What's changed
