@@ -6,8 +6,12 @@ defmodule ControlKeelWeb.ReviewLiveTest do
 
   alias ControlKeel.Mission
 
+  defp review_path(org, ws, session_id, review_id) do
+    "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session_id}/reviews/#{review_id}"
+  end
+
   test "review live renders alignment context from plan refinement", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
     task =
       task_fixture(%{session: session, status: "queued", title: "Collaborative review packet"})
@@ -34,7 +38,8 @@ defmodule ControlKeelWeb.ReviewLiveTest do
                "validation_plan" => ["mix test test/controlkeel_web/live/review_live_test.exs"]
              })
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{review.session_id}/reviews/#{review.id}")
+    {:ok, _view, html} =
+      live(conn, review_path(org, ws, review.session_id, review.id))
 
     assert html =~ "Human context gathered before execution"
     assert html =~ "PM confirmed the rollout should stay behind approval gates."
@@ -45,7 +50,8 @@ defmodule ControlKeelWeb.ReviewLiveTest do
   end
 
   test "review live renders semantic boundary fields from plan refinement", %{conn: conn} do
-    task = task_fixture(%{status: "queued", title: "Semantic boundary review"})
+    {org, ws, session} = org_bound_session_fixture()
+    task = task_fixture(%{session: session, status: "queued", title: "Semantic boundary review"})
 
     assert {:ok, review} =
              Mission.submit_review(%{
@@ -66,7 +72,8 @@ defmodule ControlKeelWeb.ReviewLiveTest do
                "harness_quality_checks" => ["Proof metadata is preserved"]
              })
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{review.session_id}/reviews/#{review.id}")
+    {:ok, _view, html} =
+      live(conn, review_path(org, ws, review.session_id, review.id))
 
     assert html =~ "Agent execution guardrails"
     assert html =~ "Allowed semantic changes"
@@ -84,7 +91,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
   test "review live renders respond header controls, textareas, and audit trail timeline", %{
     conn: conn
   } do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
     task = task_fixture(%{session: session, status: "queued", title: "Respond UI test"})
 
     assert {:ok, review} =
@@ -94,7 +101,8 @@ defmodule ControlKeelWeb.ReviewLiveTest do
                "submission_body" => "Plan submission for UI test"
              })
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{review.session_id}/reviews/#{review.id}")
+    {:ok, _view, html} =
+      live(conn, review_path(org, ws, review.session_id, review.id))
 
     assert html =~ "Respond"
     assert html =~ "Pending"
@@ -125,7 +133,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
   end
 
   test "review live renders later resubmissions as revisions", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
     task = task_fixture(%{session: session, status: "queued", title: "Revision rendering"})
 
     assert {:ok, parent} =
@@ -145,7 +153,8 @@ defmodule ControlKeelWeb.ReviewLiveTest do
                "previous_review_id" => parent.id
              })
 
-    {:ok, view, html} = live(conn, ~p"/sessions/#{parent.session_id}/reviews/#{parent.id}")
+    {:ok, view, html} =
+      live(conn, review_path(org, ws, parent.session_id, parent.id))
 
     assert html =~ "Revisions"
     assert html =~ "Later resubmissions of this review"
@@ -209,10 +218,11 @@ defmodule ControlKeelWeb.ReviewLiveTest do
       conn
       |> Plug.Test.init_test_session(%{current_user_id: user.id, current_org_id: my_org.id})
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{other_session.id}/reviews/#{review.id}")
-
-    assert html =~ "Review not found"
-    refute html =~ "Should be invisible cross-org"
+    {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Review not found."}}}} =
+      live(
+        conn,
+        "/#{other_org.slug}/workspaces/#{other_workspace.slug}/sessions/#{other_session.id}/reviews/#{review.id}"
+      )
   end
 
   test "review live denies cross-org access with a user-only session (issue #141, R5)", %{
@@ -271,9 +281,29 @@ defmodule ControlKeelWeb.ReviewLiveTest do
 
     conn = conn |> Plug.Test.init_test_session(%{current_user_id: user.id})
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{other_session.id}/reviews/#{review.id}")
+    {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Review not found."}}}} =
+      live(
+        conn,
+        "/#{other_org.slug}/workspaces/#{other_workspace.slug}/sessions/#{other_session.id}/reviews/#{review.id}"
+      )
+  end
 
-    assert html =~ "Review not found"
-    refute html =~ "Should be invisible without seeded org"
+  test "review detail renders the session sidebar with Reviews active", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+    task = task_fixture(%{session: session, status: "queued", title: "Sidebar nav check"})
+
+    assert {:ok, review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "submission_body" => "Plan submission for sidebar check"
+             })
+
+    {:ok, _view, html} =
+      live(conn, review_path(org, ws, review.session_id, review.id))
+
+    assert html =~ "sidebar-org-nav"
+    assert html =~ "Deploy review"
+    refute html =~ "Service accounts"
   end
 end

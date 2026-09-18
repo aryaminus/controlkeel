@@ -15,10 +15,15 @@ defmodule ControlKeelWeb.ReviewLive do
   end
 
   # Cross-session ownership is enforced by matching review.session_id against
-  # the sid path segment; org-level access is enforced via the shared
-  # Accounts.session_accessible?/2 gate (issue #83).
+  # the id path segment; org-level access is enforced via the shared
+  # Accounts.session_accessible?/2 gate (issue #83), plus a URL slug
+  # agreement check so the org/workspace segments can't be swapped.
   @impl true
-  def handle_params(%{"rid" => rid, "sid" => sid}, _uri, socket) do
+  def handle_params(
+        %{"id" => sid, "rid" => rid, "org_slug" => org_slug, "ws_slug" => ws_slug},
+        _uri,
+        socket
+      ) do
     with {:ok, review_id} <- parse_integer(rid),
          {:ok, session_id} <- parse_integer(sid) do
       case Mission.get_review_with_context(review_id) do
@@ -26,10 +31,17 @@ defmodule ControlKeelWeb.ReviewLive do
           {:noreply, review_not_found(socket)}
 
         %{session_id: ^session_id} = review ->
-          if Accounts.session_accessible?(review.session, socket.assigns[:current_user]) do
-            {:noreply, assign_review(socket, review)}
-          else
-            {:noreply, review_not_found(socket)}
+          session = review.session
+
+          cond do
+            not Accounts.session_accessible?(session, socket.assigns[:current_user]) ->
+              {:noreply, review_not_found(socket)}
+
+            check_session_scope(session, org_slug, ws_slug) != :ok ->
+              {:noreply, review_not_found(socket)}
+
+            true ->
+              {:noreply, assign_review(socket, review)}
           end
 
         _review ->
@@ -37,7 +49,10 @@ defmodule ControlKeelWeb.ReviewLive do
       end
     else
       :error ->
-        {:noreply, put_flash(socket, :error, "Invalid review id.")}
+        {:noreply,
+         socket
+         |> put_flash(:error, "Invalid review id.")
+         |> push_navigate(to: ~p"/")}
     end
   end
 
@@ -235,7 +250,7 @@ defmodule ControlKeelWeb.ReviewLive do
                   <div>
                     <.link
                       navigate={
-                        ~p"/sessions/#{revision.session_id || @review.session_id}/reviews/#{revision.id}"
+                        ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{revision.session_id || @review.session_id}/reviews/#{revision.id}"
                       }
                       class="font-medium text-sm hover:text-primary"
                     >
@@ -363,18 +378,47 @@ defmodule ControlKeelWeb.ReviewLive do
   end
 
   defp assign_review(socket, review) do
+    session = review.session
+    workspace = session.workspace
+    org = workspace.org
+
     socket
+    |> assign(:nav_org, org)
+    |> assign(:nav_workspace, workspace)
+    |> assign(:nav_session, %{id: session.id, title: session.title})
+    |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
+    |> assign(:breadcrumbs, [
+      %{label: org.name, to: "/#{org.slug}"},
+      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+      %{
+        label: session.title,
+        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+      },
+      %{label: "Reviews", to: nil}
+    ])
     |> assign(:review, review)
     |> assign(:page_title, review.title)
     |> assign(:diff_chunks, diff_chunks(review))
     |> assign(:response_form, response_form(review))
   end
 
+  defp check_session_scope(session, org_slug, ws_slug) do
+    workspace = session.workspace
+    org = workspace && workspace.org
+
+    cond do
+      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
+      is_nil(org) or org.slug != org_slug -> {:error, :org}
+      true -> :ok
+    end
+  end
+
+  # No nav context without a loaded session — redirect instead of rendering
+  # the layout with nil assigns (which would crash the sidebar).
   defp review_not_found(socket) do
     socket
     |> put_flash(:error, "Review not found.")
-    |> assign(:review, nil)
-    |> assign(:diff_chunks, [])
+    |> push_navigate(to: ~p"/")
   end
 
   defp response_form(review \\ nil) do

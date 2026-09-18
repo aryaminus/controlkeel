@@ -31,34 +31,37 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
   end
 
   defp deploy_session(tmp_dir) do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
     {:ok, session} = Mission.attach_session_runtime_context(session, %{"project_root" => tmp_dir})
-    session
+    {org, ws, session}
   end
 
   defp session_with_no_local_project_binding do
     _binding_id_guard = session_fixture()
-    session_fixture()
+    org_bound_session_fixture()
   end
+
+  defp deploy_path(org, ws, session),
+    do: "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/deploy-review"
 
   test "redirects when the session does not exist", %{conn: conn} do
     assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, ~p"/sessions/999999/deploy-review")
+             live(conn, "/acme/workspaces/core/sessions/999999/deploy-review")
   end
 
   test "shows unavailable notice when the project root cannot be resolved", %{conn: conn} do
-    session = session_with_no_local_project_binding()
+    {org, ws, session} = session_with_no_local_project_binding()
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, _view, html} = live(conn, deploy_path(org, ws, session))
 
     assert html =~ "not available on this machine"
     assert html =~ "controlkeel deploy analyze"
   end
 
   test "renders stack overview for a resolvable project", %{conn: conn, tmp_dir: tmp_dir} do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, _view, html} = live(conn, deploy_path(org, ws, session))
 
     assert html =~ "Detected stack"
     assert html =~ "Phoenix"
@@ -70,9 +73,9 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
     conn: conn,
     tmp_dir: tmp_dir
   } do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, view, _html} = live(conn, deploy_path(org, ws, session))
 
     costs_html =
       render_click(element(view, "button[phx-click=\"set_tab\"][phx-value-tab=\"costs\"]"))
@@ -83,9 +86,9 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
   end
 
   test "estimate costs renders per-platform monthly totals", %{conn: conn, tmp_dir: tmp_dir} do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, view, _html} = live(conn, deploy_path(org, ws, session))
 
     render_click(element(view, "button[phx-click=\"set_tab\"][phx-value-tab=\"costs\"]"))
 
@@ -98,9 +101,9 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
   end
 
   test "rejects unknown tier and db tier values", %{conn: conn, tmp_dir: tmp_dir} do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, view, _html} = live(conn, deploy_path(org, ws, session))
 
     render_click(element(view, "button[phx-click=\"set_tab\"][phx-value-tab=\"costs\"]"))
 
@@ -121,9 +124,9 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
     conn: conn,
     tmp_dir: tmp_dir
   } do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, view, _html} = live(conn, deploy_path(org, ws, session))
 
     render_click(element(view, "button[phx-click=\"set_tab\"][phx-value-tab=\"files\"]"))
 
@@ -144,9 +147,9 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
   end
 
   test "second write skips existing files with an accurate label", %{conn: conn, tmp_dir: tmp_dir} do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, view, _html} = live(conn, deploy_path(org, ws, session))
 
     render_click(element(view, "button[phx-click=\"set_tab\"][phx-value-tab=\"files\"]"))
     render_click(element(view, "button[phx-click=\"preview_files\"]"))
@@ -166,10 +169,10 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
     conn: conn,
     tmp_dir: tmp_dir
   } do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
     File.write!(Path.join(tmp_dir, ".github"), "not a directory")
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, view, _html} = live(conn, deploy_path(org, ws, session))
 
     render_click(element(view, "button[phx-click=\"set_tab\"][phx-value-tab=\"files\"]"))
     render_click(element(view, "button[phx-click=\"preview_files\"]"))
@@ -184,9 +187,9 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
   end
 
   test "guides tab renders DNS, migration, and scaling guides", %{conn: conn, tmp_dir: tmp_dir} do
-    session = deploy_session(tmp_dir)
+    {org, ws, session} = deploy_session(tmp_dir)
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/#{session.id}/deploy-review")
+    {:ok, view, _html} = live(conn, deploy_path(org, ws, session))
 
     guides_html =
       render_click(element(view, "button[phx-click=\"set_tab\"][phx-value-tab=\"guides\"]"))

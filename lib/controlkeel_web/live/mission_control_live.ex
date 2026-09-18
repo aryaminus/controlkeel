@@ -16,7 +16,11 @@ defmodule ControlKeelWeb.MissionControlLive do
   @refresh_interval_ms 2_000
 
   @impl true
-  def mount(%{"id" => id} = params, _session, socket) do
+  def mount(
+        %{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug} = params,
+        _session,
+        socket
+      ) do
     current_user = socket.assigns[:current_user]
 
     case Mission.get_session_context(id) do
@@ -27,26 +31,65 @@ defmodule ControlKeelWeb.MissionControlLive do
          |> push_navigate(to: ~p"/")}
 
       session when not is_nil(session) ->
-        if ControlKeel.Accounts.session_accessible?(session, current_user) do
-          if connected?(socket), do: schedule_refresh()
-          project_root = socket.endpoint.config(:project_root) || File.cwd!()
+        cond do
+          not ControlKeel.Accounts.session_accessible?(session, current_user) ->
+            {:ok,
+             socket
+             |> put_flash(:error, "Session not found.")
+             |> push_navigate(to: ~p"/")}
 
-          {:ok,
-           socket
-           |> assign(:page_title, session.title)
-           |> assign(:project_root, project_root)
-           |> assign(:launched, Map.get(params, "launched") == "1")
-           |> assign(:selected_finding, nil)
-           |> assign(:selected_fix, nil)
-           |> safe_assign_session(session)
-           |> assign_release_readiness(release_form_defaults(), false)}
-        else
-          {:ok,
-           socket
-           |> put_flash(:error, "Session not found.")
-           |> push_navigate(to: ~p"/")}
+          (scope_error = check_session_scope(session, org_slug, ws_slug)) != :ok ->
+            {:ok,
+             socket
+             |> put_flash(:error, scope_error)
+             |> push_navigate(to: ~p"/")}
+
+          true ->
+            if connected?(socket), do: schedule_refresh()
+            project_root = socket.endpoint.config(:project_root) || File.cwd!()
+
+            {:ok,
+             socket
+             |> assign(:page_title, session.title)
+             |> assign(:project_root, project_root)
+             |> assign(:launched, Map.get(params, "launched") == "1")
+             |> assign(:selected_finding, nil)
+             |> assign(:selected_fix, nil)
+             |> safe_assign_session(session)
+             |> assign_release_readiness(release_form_defaults(), false)}
         end
     end
+  end
+
+  defp check_session_scope(session, org_slug, ws_slug) do
+    workspace = session.workspace
+    org = workspace && workspace.org
+
+    cond do
+      is_nil(workspace) or workspace.slug != ws_slug ->
+        "Session does not belong to this workspace."
+
+      is_nil(org) or org.slug != org_slug ->
+        "Session does not belong to this organization."
+
+      true ->
+        :ok
+    end
+  end
+
+  defp assign_session_nav(socket, session) do
+    workspace = session.workspace
+    org = workspace.org
+
+    socket
+    |> assign(:nav_org, org)
+    |> assign(:nav_workspace, workspace)
+    |> assign(:nav_session, %{id: session.id, title: session.title})
+    |> assign(:breadcrumbs, [
+      %{label: org.name, to: "/#{org.slug}"},
+      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+      %{label: session.title, to: nil}
+    ])
   end
 
   @impl true
@@ -305,12 +348,6 @@ defmodule ControlKeelWeb.MissionControlLive do
             Last export ({@latest_audit_export.format}):
             <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
           </p>
-          <.link
-            navigate={~p"/sessions/#{@session.id}/deploy-review"}
-            class="inline-flex shrink-0 items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
-          >
-            <.icon name="hero-cloud-arrow-up" class="size-4" /> Deployment Advisor
-          </.link>
         </div>
       </div>
 
@@ -439,7 +476,9 @@ defmodule ControlKeelWeb.MissionControlLive do
               {@observability.gates.total_reviews} total review gates
             </p>
             <.link
-              navigate={~p"/sessions/#{@session.id}/reviews"}
+              navigate={
+                ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/reviews"
+              }
               class="inline-flex items-center gap-1 mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary transition cursor-pointer"
             >
               View all <.icon name="hero-arrow-right" class="size-3" />
@@ -1133,7 +1172,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   defp safe_assign_session(socket, session) do
-    assign_session(socket, session)
+    socket
+    |> assign_session(session)
+    |> assign(:sibling_sessions, Mission.list_sibling_sessions(session.workspace.id))
   rescue
     e ->
       require Logger
@@ -1142,6 +1183,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       socket
       |> assign(:session, session)
       |> assign(:workspace, session.workspace)
+      |> assign_session_nav(session)
       |> assign(:page_title, session.title)
       |> assign(
         :active_findings,
@@ -1172,7 +1214,9 @@ defmodule ControlKeelWeb.MissionControlLive do
      ship_agent_outcomes} =
       safe_ship_profile(session)
 
-    assign(socket,
+    socket
+    |> assign_session_nav(session)
+    |> assign(
       session: session,
       workspace: session.workspace,
       session_metrics:
