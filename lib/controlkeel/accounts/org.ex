@@ -23,6 +23,8 @@ defmodule ControlKeel.Accounts.Org do
     timestamps(type: :utc_datetime)
   end
 
+  @type t :: %__MODULE__{}
+
   @valid_statuses ~w(active disabled)
   @slug_regex ~r/^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$/
 

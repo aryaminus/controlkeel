@@ -253,4 +253,57 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert msg =~ "Workspace belongs to a different organization."
     end
   end
+
+  describe "breadcrumb workspace switcher" do
+    test "overview lists sibling workspaces as overview links" do
+      {:ok, org} = Accounts.create_org(%{name: "Sworg", slug: "sworg"})
+      ws_a = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
+      ws_b = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws_a.slug}")
+
+      assert html =~ ~s(aria-label="Switch workspace")
+      assert html =~ "Beta"
+      assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws_b.slug}")
+    end
+
+    test "hides the switcher when the org has a single workspace" do
+      {:ok, org} = Accounts.create_org(%{name: "Swone", slug: "swone"})
+      ws = create_workspace(%{name: "Solo", slug: "solo", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+
+      refute html =~ ~s(aria-label="Switch workspace")
+    end
+
+    test "subpages keep the subpage when switching workspaces" do
+      {:ok, org} = Accounts.create_org(%{name: "Swsub", slug: "swsub"})
+      ws_a = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
+      ws_b = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws_a.slug}/repos")
+
+      assert html =~ ~s(aria-label="Switch workspace")
+      assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws_b.slug}/repos")
+    end
+
+    test "switcher links are full page loads so the new workspace remounts" do
+      {:ok, org} = Accounts.create_org(%{name: "Swrel", slug: "swrel"})
+      ws_a = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
+      _ws_b = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
+
+      {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws_a.slug}/repos")
+
+      # Workspace LiveViews load in mount/3 and define no handle_params, so a
+      # live-navigation link (data-phx-link) would change the URL while leaving
+      # stale content. A plain href forces a full load and a fresh mount.
+      html =
+        view
+        |> element("#breadcrumb-ws-switcher-popover a", "Beta")
+        |> render()
+
+      assert html =~ ~s(href="/#{org.slug}/workspaces/beta/repos")
+      refute html =~ "data-phx-link"
+    end
+  end
 end

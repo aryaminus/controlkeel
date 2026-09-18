@@ -190,6 +190,11 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     or have no route.
     """
 
+  attr :nav_org, :any, default: nil
+  attr :nav_workspace, :any, default: nil
+  attr :sibling_workspaces, :list, default: []
+  attr :current_query, :any, default: nil
+
   def breadcrumbs_header(assigns) do
     actions =
       cond do
@@ -198,18 +203,34 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         true -> [assigns.page_action]
       end
 
+    trail = breadcrumb_items(assigns)
+    workspace_root = workspace_root_path(assigns[:nav_org], assigns[:nav_workspace])
+    workspace_idx = workspace_crumb_index(trail, workspace_root, assigns[:current_path])
+    siblings = assigns[:sibling_workspaces] || []
+
     assigns =
       assigns
       |> assign(:actions, actions)
-      |> assign(:trail, breadcrumb_items(assigns))
+      |> assign(:trail, trail)
+      |> assign(:workspace_idx, workspace_idx)
+      |> assign(:show_ws_switcher, !is_nil(workspace_idx) and length(siblings) > 1)
 
     ~H"""
-    <div class="flex w-full items-center justify-between border-b p-4">
+    <div class="flex min-h-[68px] w-full items-center justify-between border-b p-4">
       <nav :if={@current_path && @current_path != "/"} aria-label="Breadcrumb">
         <ol class="flex items-center gap-1.5 text-sm">
+          <li>
+            <.link
+              href={~p"/"}
+              aria-label="Home"
+              class="flex items-center gap-1 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+            >
+              <.icon name="hero-home" class="size-3.5" />
+            </.link>
+          </li>
           <%= for {{label, path}, idx} <- Enum.with_index(@trail) do %>
             <li class="flex items-center gap-1.5">
-              <.icon :if={idx > 0} name="hero-chevron-right" class="size-3 text-muted-foreground" />
+              <.icon name="hero-chevron-right" class="size-3 text-muted-foreground" />
               <%= if path do %>
                 <.link
                   navigate={path}
@@ -218,8 +239,74 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                   {label}
                 </.link>
               <% else %>
-                <span class="font-medium text-muted-foreground">{label}</span>
+                <span class="font-medium text-foreground">{label}</span>
               <% end %>
+              <div
+                :if={@show_ws_switcher and idx == @workspace_idx}
+                class="relative flex items-center"
+                phx-click-away={
+                  JS.hide(to: "#breadcrumb-ws-switcher-popover")
+                  |> JS.set_attribute({"aria-expanded", "false"},
+                    to: "#breadcrumb-ws-switcher-button"
+                  )
+                }
+              >
+                <button
+                  type="button"
+                  id="breadcrumb-ws-switcher-button"
+                  aria-label="Switch workspace"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  phx-click={
+                    JS.toggle(to: "#breadcrumb-ws-switcher-popover")
+                    |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+                  }
+                  class="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <.icon name="hero-chevron-up-down" class="size-3.5" />
+                </button>
+                <div
+                  id="breadcrumb-ws-switcher-popover"
+                  class="hidden absolute left-0 top-full z-50 mt-1.5 w-56 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
+                >
+                  <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
+                    Workspaces
+                  </div>
+                  <div class="max-h-60 space-y-0.5 overflow-y-auto">
+                    <%= for ws <- @sibling_workspaces do %>
+                      <% active = ws.slug == @nav_workspace.slug %>
+                      <.link
+                        href={
+                          sibling_workspace_path(
+                            @current_path,
+                            @current_query,
+                            @nav_org.slug,
+                            ws.slug
+                          )
+                        }
+                        phx-click={
+                          JS.hide(to: "#breadcrumb-ws-switcher-popover")
+                          |> JS.set_attribute({"aria-expanded", "false"},
+                            to: "#breadcrumb-ws-switcher-button"
+                          )
+                        }
+                        class={[
+                          "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
+                          active && "bg-muted font-medium text-foreground",
+                          !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ]}
+                      >
+                        <span class="truncate">{ws.name}</span>
+                        <.icon
+                          :if={active}
+                          name="hero-check"
+                          class="size-4 shrink-0 text-primary"
+                        />
+                      </.link>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
             </li>
           <% end %>
         </ol>
@@ -293,6 +380,55 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       {label, _path, true} -> {label, nil}
       {label, path, false} -> {label, path}
     end)
+  end
+
+  defp workspace_root_path(%{slug: org_slug}, %{slug: ws_slug}),
+    do: "/#{org_slug}/workspaces/#{ws_slug}"
+
+  defp workspace_root_path(_, _), do: nil
+
+  # The workspace crumb is the linked workspace root on subpages. On the
+  # workspace overview page the trail ends with the workspace name as
+  # plain text, so fall back to the final crumb — but only while standing
+  # on the workspace root. A trailing plain-text crumb on any other path
+  # is a subpage label and must never capture the switcher.
+  defp workspace_crumb_index(_trail, nil, _current_path), do: nil
+
+  defp workspace_crumb_index(trail, root, current_path) do
+    Enum.find_index(trail, fn {_label, path} -> path == root end) ||
+      overview_index(trail, root, current_path)
+  end
+
+  defp overview_index(trail, root, root) do
+    case List.last(trail) do
+      {_label, nil} -> length(trail) - 1
+      _ -> nil
+    end
+  end
+
+  defp overview_index(_trail, _root, _current_path), do: nil
+
+  # Workspace URL replacer: swaps the workspace slug segment, keeping the
+  # subpage and query string, so e.g. repos stays on repos. Falls back to
+  # the workspace overview when the current path is outside
+  # `:org_slug/workspaces/:ws_slug/*`. Subpage shapes are dynamic, so this
+  # builds a plain string (no `~p` verification); only the ws segment is
+  # ever rewritten.
+  defp sibling_workspace_path(current_path, current_query, org_slug, ws_slug) do
+    base =
+      case String.split(current_path || "", "/", trim: true) do
+        [^org_slug, "workspaces", _current_ws | rest] ->
+          "/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/")
+
+        _ ->
+          "/#{org_slug}/workspaces/#{ws_slug}"
+      end
+
+    if current_query && current_query != "" do
+      base <> "?" <> current_query
+    else
+      base
+    end
   end
 
   defp breadcrumb_trail(nil), do: []

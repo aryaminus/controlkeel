@@ -106,6 +106,17 @@ defmodule ControlKeel.Mission do
   def list_workspaces_for_org(org_id),
     do: Repo.all(from w in Workspace, where: w.org_id == ^org_id)
 
+  # Breadcrumb workspace switcher: most-recent-first, ordered in the query
+  # so callers don't re-sort in Elixir on every navigation. `inserted_at`
+  # is second-precision, so `id` breaks ties deterministically.
+  def list_workspaces_for_org_recent_first(org_id),
+    do:
+      Repo.all(
+        from w in Workspace,
+          where: w.org_id == ^org_id,
+          order_by: [desc: w.inserted_at, desc: w.id]
+      )
+
   def list_workspaces_for_orgs(org_ids) when is_list(org_ids),
     do: Repo.all(from w in Workspace, where: w.org_id in ^org_ids, order_by: w.name)
 

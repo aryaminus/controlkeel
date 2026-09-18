@@ -2,7 +2,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   @moduledoc """
   Member management for an org at `/:org_slug`.
 
-  Admin+owner only. Allows:
+  Any active member (viewer+) may view. Allows:
     - List active and pending memberships (preloaded with the user)
     - Invite a new member by email + role (creates pending Membership;
       raw invitation token is displayed once for copy-paste, since the
@@ -10,12 +10,14 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     - Revoke a membership (last-owner protected)
     - Change a role (last-owner protected)
 
+  Invite/revoke/role change are admin+ only, gated by `can_manage`.
+
   ## Access
 
-  Resolved per-URL via `Accounts.get_active_membership(user.id, org.id)`
-  (NOT the session's pinned `current_membership`). Local mode has no
-  membership table and is unrestricted. Cloud/self_hosted requires the
-  signed-in user to hold an active admin+ membership for this specific
+  Resolved per-URL via `ControlKeelWeb.OrgAccess.check(org, user)`
+  (default `"viewer"` role; NOT the session's pinned `current_membership`).
+  Local mode has no membership table and is unrestricted. Cloud/self_hosted
+  requires the signed-in user to hold an active membership for this specific
   org; others are redirected to `/organizations`.
   """
 
@@ -25,6 +27,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   alias ControlKeel.Mission
   alias ControlKeel.Repo
   alias ControlKeel.Runtime.Mode
+  alias ControlKeelWeb.OrgAccess
 
   @valid_roles ~w(owner admin member viewer)
 
@@ -35,14 +38,11 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
         {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
 
       org ->
-        mode = Mode.current()
-        user = socket.assigns[:current_user]
+        case OrgAccess.check(org, socket.assigns[:current_user]) do
+          {:ok, membership} ->
+            mount_ok(socket, org, membership)
 
-        cond do
-          mode == :local ->
-            mount_ok(socket, org)
-
-          is_nil(user) ->
+          {:error, :forbidden} ->
             {:ok,
              redirect_with_flash(
                socket,
@@ -51,25 +51,14 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
                ~p"/auth/login"
              )}
 
-          true ->
-            case Accounts.get_active_membership(user.id, org.id) do
-              nil ->
-                {:ok,
-                 redirect_with_flash(
-                   socket,
-                   :error,
-                   "You're not a member of that organization.",
-                   ~p"/organizations"
-                 )}
-
-              membership ->
-                mount_ok(socket, org, membership)
-            end
+          {:error, :needs_admin} ->
+            {:ok,
+             redirect_with_flash(socket, :error, "You don't have permission.", ~p"/organizations")}
         end
     end
   end
 
-  defp mount_ok(socket, org, membership \\ nil) do
+  defp mount_ok(socket, org, membership) do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
     member_count = Accounts.count_memberships_for_org(org.id)
@@ -485,7 +474,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <%= for ws <- @workspaces do %>
               <.link
-                 href={~p"/#{@org.slug}/workspaces/#{ws.slug}"}
+                href={~p"/#{@org.slug}/workspaces/#{ws.slug}"}
                 class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
               >
                 <div class="flex items-start justify-between gap-3">
@@ -943,7 +932,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   defp maybe_add_action(actions, action), do: actions ++ [action]
 
   defp invite_page_action(local_mode, can_manage) do
-    if local_mode || not can_manage do
+    if local_mode || !can_manage do
       nil
     else
       %{label: "Invite member", event: "open_invite", icon: "hero-plus"}
@@ -1030,6 +1019,12 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     Enum.count(memberships, &(&1.role == "owner" and &1.status == "active"))
   end
 
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> put_flash(kind, msg)
+    |> push_navigate(to: path)
+  end
+
   defp tab_class(active?) do
     base = "text-sm font-medium transition-colors px-3 py-1.5 rounded-t-lg border-b-2"
 
@@ -1109,12 +1104,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     do: target.role in ["member", "viewer"] and target.user_id != uid
 
   defp can_revoke?(_, _, _), do: false
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
-  end
 
   defp validate_email(""), do: {:error, "Email is required"}
 
