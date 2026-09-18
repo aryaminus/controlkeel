@@ -722,7 +722,7 @@ defmodule ControlKeel.Mission do
     Session
     |> ControlKeel.Cloud.Scope.scope_workspace(workspace_id)
     |> order_by(desc: :inserted_at)
-    |> preload([:workspace, :tasks, :findings])
+    |> preload([:tasks, :findings, workspace: :org])
     |> Repo.all()
   end
 

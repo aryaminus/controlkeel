@@ -170,6 +170,13 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "View all"
   end
 
+  test "mission control denies mismatched slugs with a generic not-found", %{conn: conn} do
+    {org, _ws, session} = org_bound_session_fixture()
+
+    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
+             live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}")
+  end
+
   test "mission control refreshes when new findings and spend data appear", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture(%{spent_cents: 600, budget_cents: 5_000})
     task_fixture(%{session: session})

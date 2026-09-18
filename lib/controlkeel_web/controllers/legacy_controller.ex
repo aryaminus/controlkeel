@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.LegacyController do
 
   use ControlKeelWeb, :controller
 
+  alias ControlKeel.Bootstrap.LocalDefaults
   alias ControlKeel.Mission.Session
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Repo
@@ -44,23 +45,52 @@ defmodule ControlKeelWeb.LegacyController do
   end
 
   def session(conn, %{"id" => id} = params) do
-    with %Session{} = session <- fetch_session_record(id),
-         %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} <-
-           Repo.preload(session, workspace: :org) do
-      query =
-        case conn.query_string do
-          "" -> ""
-          query -> "?#{query}"
-        end
+    case fetch_session_record(id) do
+      nil ->
+        FallbackController.not_found(conn, params)
 
-      redirect(
+      %Session{} = session ->
+        case Repo.preload(session, workspace: :org) do
+          %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} ->
+            redirect_session(conn, params, org_slug, ws_slug, session.id)
+
+          _ ->
+            default_nesting_redirect(conn, params, session.id)
+        end
+    end
+  end
+
+  # Invariant: every session belongs to a workspace that belongs to an org
+  # (local boot seeds the defaults; LocalMigration consolidates orphans).
+  # If that ever doesn't hold, local mode degrades to the default nesting
+  # instead of a dead 404 — the URL starts working once reconciliation binds
+  # things. Cloud keeps the 404: no synthetic defaults there.
+  defp default_nesting_redirect(conn, params, session_id) do
+    if ControlKeel.Runtime.local?() do
+      redirect_session(
         conn,
-        to:
-          "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}#{session_subpath(params, conn)}#{query}"
+        params,
+        LocalDefaults.default_org_slug(),
+        LocalDefaults.default_workspace_slug(),
+        session_id
       )
     else
-      _ -> FallbackController.not_found(conn, params)
+      FallbackController.not_found(conn, params)
     end
+  end
+
+  defp redirect_session(conn, params, org_slug, ws_slug, session_id) do
+    query =
+      case conn.query_string do
+        "" -> ""
+        query -> "?#{query}"
+      end
+
+    redirect(
+      conn,
+      to:
+        "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}#{session_subpath(params, conn)}#{query}"
+    )
   end
 
   # The route is explicit per subpage (`/reviews`, `/deploy-review`,

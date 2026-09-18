@@ -38,10 +38,10 @@ defmodule ControlKeelWeb.MissionControlLive do
              |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
-          (scope_error = check_session_scope(session, org_slug, ws_slug)) != :ok ->
+          check_session_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
-             |> put_flash(:error, scope_error)
+             |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
           true ->
@@ -66,14 +66,9 @@ defmodule ControlKeelWeb.MissionControlLive do
     org = workspace && workspace.org
 
     cond do
-      is_nil(workspace) or workspace.slug != ws_slug ->
-        "Session does not belong to this workspace."
-
-      is_nil(org) or org.slug != org_slug ->
-        "Session does not belong to this organization."
-
-      true ->
-        :ok
+      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
+      is_nil(org) or org.slug != org_slug -> {:error, :org}
+      true -> :ok
     end
   end
 
