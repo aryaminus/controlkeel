@@ -514,21 +514,23 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   # Subpage shapes are dynamic, so this builds a plain string (no `~p`
   # verification); only the ws segment is ever rewritten.
   defp sibling_workspace_path(current_path, current_query, org_slug, ws_slug) do
-    base =
+    {base, from_session?} =
       case String.split(current_path || "", "/", trim: true) do
         [^org_slug, "workspaces", _current_ws | rest] ->
           if "sessions" in rest do
-            "/#{org_slug}/workspaces/#{ws_slug}"
+            {"/#{org_slug}/workspaces/#{ws_slug}", true}
           else
-            "/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/")
+            {"/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/"), false}
           end
 
         _ ->
-          "/#{org_slug}/workspaces/#{ws_slug}"
+          {"/#{org_slug}/workspaces/#{ws_slug}", false}
       end
 
-    if current_query && current_query != "" do
-      base <> "?" <> current_query
+    query = if from_session?, do: strip_launched(current_query), else: current_query
+
+    if query && query != "" do
+      base <> "?" <> query
     else
       base
     end
@@ -541,25 +543,37 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   # counterpart this builds a plain string (no `~p` verification); only the
   # id segment is ever rewritten.
   defp sibling_session_path(current_path, current_query, org_slug, ws_slug, session_id) do
-    base =
+    {base, switching?} =
       case String.split(current_path || "", "/", trim: true) do
-        [^org_slug, "workspaces", ^ws_slug, "sessions", _current_id | rest] ->
-          "/" <>
-            Enum.join(
-              [org_slug, "workspaces", ws_slug, "sessions", to_string(session_id) | rest],
-              "/"
-            )
+        [^org_slug, "workspaces", ^ws_slug, "sessions", current_id | rest] ->
+          {"/" <>
+             Enum.join(
+               [org_slug, "workspaces", ws_slug, "sessions", to_string(session_id) | rest],
+               "/"
+             ), to_string(session_id) != current_id}
 
         _ ->
-          "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}"
+          {"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}", true}
       end
 
-    if current_query && current_query != "" do
-      base <> "?" <> current_query
+    # `?launched=1` celebrates a fresh launch — it must not follow the user
+    # across to a different session.
+    query = if switching?, do: strip_launched(current_query), else: current_query
+
+    if query && query != "" do
+      base <> "?" <> query
     else
       base
     end
   end
+
+  defp strip_launched(query) when is_binary(query) and query != "" do
+    query |> URI.decode_query() |> Map.delete("launched") |> URI.encode_query()
+  rescue
+    _ -> query
+  end
+
+  defp strip_launched(query), do: query
 
   defp breadcrumb_trail(nil), do: []
 

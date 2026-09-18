@@ -402,6 +402,9 @@ defmodule ControlKeelWeb.ReviewLive do
     |> assign(:response_form, response_form(review))
   end
 
+  # URL slug agreement only — must run after the session_accessible? gate,
+  # which is what guarantees a loaded workspace/org (a nil session never
+  # reaches here).
   defp check_session_scope(session, org_slug, ws_slug) do
     workspace = session.workspace
     org = workspace && workspace.org

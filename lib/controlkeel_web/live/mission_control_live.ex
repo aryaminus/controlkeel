@@ -61,6 +61,9 @@ defmodule ControlKeelWeb.MissionControlLive do
     end
   end
 
+  # URL slug agreement only — must run after the session_accessible? gate,
+  # which is what guarantees a loaded workspace/org (a nil session never
+  # reaches here).
   defp check_session_scope(session, org_slug, ws_slug) do
     workspace = session.workspace
     org = workspace && workspace.org
@@ -74,17 +77,24 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   defp assign_session_nav(socket, session) do
     workspace = session.workspace
-    org = workspace.org
+    org = workspace && workspace.org
+
+    crumbs =
+      if org && workspace do
+        [
+          %{label: org.name, to: "/#{org.slug}"},
+          %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+          %{label: session.title, to: nil}
+        ]
+      else
+        []
+      end
 
     socket
     |> assign(:nav_org, org)
     |> assign(:nav_workspace, workspace)
     |> assign(:nav_session, %{id: session.id, title: session.title})
-    |> assign(:breadcrumbs, [
-      %{label: org.name, to: "/#{org.slug}"},
-      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
-      %{label: session.title, to: nil}
-    ])
+    |> assign(:breadcrumbs, crumbs)
   end
 
   @impl true

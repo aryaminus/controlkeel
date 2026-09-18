@@ -167,6 +167,25 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     refute html =~ "/acme/workspaces/edge/sessions/42"
   end
 
+  test "switching sessions drops the launched flag but keeps other params" do
+    siblings = [%{id: 42, title: "Session A"}, %{id: 43, title: "Session B"}]
+
+    assigns =
+      header_assigns(
+        "/acme/workspaces/core/sessions/42",
+        session_crumbs(42, "Session A", nil),
+        siblings
+      )
+      |> Map.put(:current_query, "launched=1&foo=bar")
+
+    html = render_component(&OrganizationLayouts.breadcrumbs_header/1, assigns)
+
+    # The other session keeps remaining params but loses the launch banner.
+    assert html =~ "/acme/workspaces/core/sessions/43?foo=bar"
+    refute html =~ "/acme/workspaces/core/sessions/43?launched=1"
+    refute html =~ "/acme/workspaces/core/sessions/43?foo=bar&amp;launched=1"
+  end
+
   defp anchor_for(html, href) do
     case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>.*?</a>|s, html) do
       nil -> ""
