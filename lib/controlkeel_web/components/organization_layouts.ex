@@ -508,14 +508,20 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   # Workspace URL replacer: swaps the workspace slug segment, keeping the
   # subpage and query string, so e.g. repos stays on repos. Falls back to
   # the workspace overview when the current path is outside
-  # `:org_slug/workspaces/:ws_slug/*`. Subpage shapes are dynamic, so this
-  # builds a plain string (no `~p` verification); only the ws segment is
-  # ever rewritten.
+  # `:org_slug/workspaces/:ws_slug/*`. Session ids are workspace-scoped, so
+  # a session path never carries over: switching workspace from a session
+  # page lands on the target workspace overview instead of a dead id.
+  # Subpage shapes are dynamic, so this builds a plain string (no `~p`
+  # verification); only the ws segment is ever rewritten.
   defp sibling_workspace_path(current_path, current_query, org_slug, ws_slug) do
     base =
       case String.split(current_path || "", "/", trim: true) do
         [^org_slug, "workspaces", _current_ws | rest] ->
-          "/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/")
+          if "sessions" in rest do
+            "/#{org_slug}/workspaces/#{ws_slug}"
+          else
+            "/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/")
+          end
 
         _ ->
           "/#{org_slug}/workspaces/#{ws_slug}"

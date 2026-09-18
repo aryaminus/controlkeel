@@ -145,6 +145,28 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     refute html =~ "breadcrumb-session-switcher-button"
   end
 
+  test "workspace switcher from a session page lands on the workspace overview" do
+    # Session ids are workspace-scoped: carrying the id over would link a
+    # session that does not exist in the target workspace.
+    html =
+      render_component(
+        &OrganizationLayouts.breadcrumbs_header/1,
+        header_assigns(
+          "/acme/workspaces/core/sessions/42/reviews",
+          session_crumbs(42, "Session A", "Reviews"),
+          [%{id: 42, title: "Session A"}]
+        )
+        |> Map.put(:sibling_workspaces, [
+          %{slug: "core", name: "Core"},
+          %{slug: "edge", name: "Edge"}
+        ])
+      )
+
+    assert html =~ "breadcrumb-ws-switcher-button"
+    assert html =~ "/acme/workspaces/edge"
+    refute html =~ "/acme/workspaces/edge/sessions/42"
+  end
+
   defp anchor_for(html, href) do
     case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>.*?</a>|s, html) do
       nil -> ""
