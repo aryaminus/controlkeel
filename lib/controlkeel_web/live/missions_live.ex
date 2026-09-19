@@ -85,7 +85,7 @@ defmodule ControlKeelWeb.MissionsLive do
                   </td>
                   <td class="px-4 text-right whitespace-nowrap w-px">
                     <.link
-                      navigate={~p"/sessions/#{session.id}"}
+                      navigate={session_path(session)}
                       class="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
                     >
                       Inspect <.icon name="hero-arrow-right" class="size-3" />
@@ -100,4 +100,12 @@ defmodule ControlKeelWeb.MissionsLive do
     </section>
     """
   end
+
+  # Direct org-scoped link. Unbound rows (no org — see the nesting invariant
+  # in LegacyController) keep the legacy path so the local-default fallback
+  # or 404 chain handles them instead of crashing the index.
+  defp session_path(%{id: id, workspace: %{org: %{slug: org_slug}, slug: ws_slug}}),
+    do: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{id}"
+
+  defp session_path(%{id: id}), do: "/sessions/#{id}"
 end

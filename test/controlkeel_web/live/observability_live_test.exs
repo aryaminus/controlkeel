@@ -87,10 +87,11 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
   end
 
   test "mission control links to dedicated observability page", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session})
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}")
+    {:ok, _view, html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}")
 
     assert html =~ "mission-observability-open"
     assert html =~ "Open run observability"
@@ -123,9 +124,10 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
   test "mission control header shows audit log export controls and latest checksum", %{
     conn: conn
   } do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, view, html} = live(conn, ~p"/sessions/#{session.id}")
+    {:ok, view, html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}")
 
     assert has_element?(view, "#mission-audit-export-json")
     assert has_element?(view, "#mission-audit-export-csv")
@@ -135,7 +137,8 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
 
     assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "csv")
 
-    {:ok, _view, html} = live(conn, ~p"/sessions/#{session.id}")
+    {:ok, _view, html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}")
 
     assert html =~ "Last export (csv)"
     assert html =~ export.checksum

@@ -4,6 +4,8 @@ defmodule ControlKeelWeb.LegacyControllerTest do
   alias ControlKeel.Accounts
   alias ControlKeel.Mission
 
+  import ControlKeel.MissionFixtures
+
   defp create_workspace(org, name, slug) do
     {:ok, workspace} =
       Mission.create_workspace(%{
@@ -78,6 +80,48 @@ defmodule ControlKeelWeb.LegacyControllerTest do
 
     test "unknown subpaths 404", %{conn: conn, workspace: ws} do
       assert get(conn, "/workspaces/#{ws.id}/nope").status == 404
+    end
+  end
+
+  describe "legacy /sessions/:id shapes" do
+    test "session redirects to the org-scoped URL", %{conn: conn} do
+      {org, ws, session} = org_bound_session_fixture()
+
+      conn = get(conn, "/sessions/#{session.id}")
+
+      assert redirected_to(conn, 302) ==
+               "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}"
+    end
+
+    test "session subpages preserve their suffix", %{conn: conn} do
+      {org, ws, session} = org_bound_session_fixture()
+
+      conn = get(conn, "/sessions/#{session.id}/reviews")
+
+      assert redirected_to(conn, 302) ==
+               "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/reviews"
+    end
+
+    test "unknown session ids 404", %{conn: conn} do
+      assert get(conn, "/sessions/999999").status == 404
+    end
+
+    test "uncastable session ids 404 instead of raising", %{conn: conn} do
+      assert get(conn, "/sessions/abc").status == 404
+    end
+
+    test "session without org binding falls back to default nesting in local mode", %{
+      conn: conn
+    } do
+      alias ControlKeel.Bootstrap.LocalDefaults
+
+      ws = workspace_fixture()
+      session = session_fixture(%{workspace: ws})
+
+      conn = get(conn, "/sessions/#{session.id}/reviews")
+
+      assert redirected_to(conn, 302) ==
+               "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/reviews"
     end
   end
 end

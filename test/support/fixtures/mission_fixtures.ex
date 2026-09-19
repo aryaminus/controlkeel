@@ -21,6 +21,37 @@ defmodule ControlKeel.MissionFixtures do
     workspace
   end
 
+  @doc """
+  Returns `{org, workspace, session}` with the workspace bound to the org,
+  for org-scoped session routes (`/:org_slug/workspaces/:ws_slug/sessions/:id*`).
+  """
+  def org_bound_session_fixture(attrs \\ %{}) do
+    attrs = Map.new(attrs)
+    suffix = System.unique_integer([:positive])
+
+    {:ok, user} =
+      ControlKeel.Accounts.create_user(%{email: "session-owner-#{suffix}@example.com"})
+
+    {:ok, org} =
+      ControlKeel.Accounts.create_org_with_owner(user.id, %{
+        name: "SessionCo #{suffix}",
+        slug: "sessionco-#{suffix}"
+      })
+
+    workspace = workspace_fixture(Map.merge(%{org_id: org.id}, Map.get(attrs, :workspace, %{})))
+    session = session_fixture(Map.merge(%{workspace: workspace}, Map.delete(attrs, :workspace)))
+
+    {org, workspace, session}
+  end
+
+  @doc """
+  Org-scoped session path (`/:org_slug/workspaces/:ws_slug/sessions/:id`
+  plus optional suffix such as `"/reviews"`).
+  """
+  def org_session_path(org, ws, session, extra \\ "") do
+    "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}#{extra}"
+  end
+
   def session_fixture(attrs \\ %{}) do
     attrs = Map.new(attrs)
     workspace = Map.get_lazy(attrs, :workspace, fn -> workspace_fixture() end)

@@ -286,7 +286,9 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
                   <tr class="transition hover:bg-muted/30">
                     <td class="max-w-sm px-5 py-4">
                       <.link
-                        navigate={~p"/sessions/#{session.id}"}
+                        navigate={
+                          ~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/sessions/#{session.id}"
+                        }
                         class="font-medium text-foreground hover:underline"
                       >
                         {session.title}

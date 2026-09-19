@@ -16,4 +16,12 @@ defmodule ControlKeelWeb.MissionsLiveTest do
     assert html =~ "Session 7"
     assert html =~ "Session 1"
   end
+
+  test "missions index links straight to org-scoped session pages", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, _view, html} = live(conn, ~p"/sessions")
+
+    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}"
+  end
 end

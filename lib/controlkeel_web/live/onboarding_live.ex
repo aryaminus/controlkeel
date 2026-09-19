@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.OnboardingLive do
   alias ControlKeel.Accounts
   alias ControlKeel.Intent
   alias ControlKeel.Mission
+  alias ControlKeel.Repo
   alias ControlKeel.Runtime.Mode
 
   @impl true
@@ -160,9 +161,23 @@ defmodule ControlKeelWeb.OnboardingLive do
 
     case Mission.create_launch_from_brief(attrs, socket.assigns.compiled_brief) do
       {:ok, session} ->
-        {:noreply,
-         socket
-         |> push_navigate(to: ~p"/sessions/#{session.id}?launched=1")}
+        case Repo.preload(session, workspace: :org) do
+          %{workspace: %{org: %{slug: org_slug}, slug: ws_slug}} = session ->
+            {:noreply,
+             socket
+             |> push_navigate(
+               to: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}?launched=1"
+             )}
+
+          _ ->
+            {:noreply,
+             socket
+             |> put_flash(
+               :error,
+               "Session created but its workspace is not bound to an organization."
+             )
+             |> assign(:step, 4)}
+        end
 
       {:error, :workspace_not_found} ->
         {:noreply,

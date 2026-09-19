@@ -335,7 +335,7 @@ defmodule ControlKeel.Mission do
         nil
 
       review ->
-        Repo.preload(review, [:previous_review, :revisions, task: [], session: :workspace])
+        Repo.preload(review, [:previous_review, :revisions, task: [], session: [workspace: :org]])
     end
   end
 
@@ -722,7 +722,19 @@ defmodule ControlKeel.Mission do
     Session
     |> ControlKeel.Cloud.Scope.scope_workspace(workspace_id)
     |> order_by(desc: :inserted_at)
-    |> preload([:workspace, :tasks, :findings])
+    |> preload([:tasks, :findings, workspace: :org])
+    |> Repo.all()
+  end
+
+  @doc """
+  Lightweight id/title list of the sessions in a workspace, newest first.
+  Used for the session switcher (no task/finding preloads).
+  """
+  def list_sibling_sessions(workspace_id) do
+    Session
+    |> where([s], s.workspace_id == ^workspace_id)
+    |> order_by(desc: :inserted_at)
+    |> select([s], %{id: s.id, title: s.title})
     |> Repo.all()
   end
 
@@ -744,14 +756,14 @@ defmodule ControlKeel.Mission do
         nil
 
       session ->
-        Repo.preload(session, [
-          :workspace,
+        Repo.preload(session,
+          workspace: :org,
           tasks: from(t in Task, order_by: t.position),
           task_edges: from(edge in ControlKeel.Platform.TaskEdge, order_by: edge.id),
           findings: from(f in Finding, order_by: [desc: f.inserted_at]),
           invocations: from(i in Invocation, order_by: [desc: i.inserted_at]),
           reviews: from(r in Review, order_by: [desc: r.inserted_at, desc: r.id])
-        ])
+        )
     end
   end
 
@@ -768,14 +780,14 @@ defmodule ControlKeel.Mission do
         invocations_limit = Keyword.get(opts, :invocations_limit, :all)
         reviews_limit = Keyword.get(opts, :reviews_limit, :all)
 
-        Repo.preload(session, [
-          :workspace,
+        Repo.preload(session,
+          workspace: :org,
           tasks: build_limited_query(Task, :position, tasks_limit),
           task_edges: from(edge in ControlKeel.Platform.TaskEdge, order_by: edge.id),
           findings: build_limited_query(Finding, :inserted_at, findings_limit, :desc),
           invocations: build_limited_query(Invocation, :inserted_at, invocations_limit, :desc),
           reviews: build_reviews_limited_query(reviews_limit)
-        ])
+        )
     end
   end
 

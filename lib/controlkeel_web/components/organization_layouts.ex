@@ -14,6 +14,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :current_query, :string, default: nil
   attr :nav_org, :map, required: true
   attr :nav_workspace, :any, default: nil
+  attr :nav_session, :any, default: nil
 
   def organization_sidebar(assigns) do
     mode = ControlKeel.Runtime.Mode.current()
@@ -192,7 +193,9 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   attr :nav_org, :any, default: nil
   attr :nav_workspace, :any, default: nil
+  attr :nav_session, :any, default: nil
   attr :sibling_workspaces, :list, default: []
+  attr :sibling_sessions, :list, default: []
   attr :current_query, :any, default: nil
 
   def breadcrumbs_header(assigns) do
@@ -208,12 +211,56 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     workspace_idx = workspace_crumb_index(trail, workspace_root, assigns[:current_path])
     siblings = assigns[:sibling_workspaces] || []
 
+    session_root =
+      session_root_path(assigns[:nav_org], assigns[:nav_workspace], assigns[:nav_session])
+
+    session_idx = session_crumb_index(trail, session_root, assigns[:current_path])
+    session_siblings = assigns[:sibling_sessions] || []
+
+    show_ws_switcher = !is_nil(workspace_idx) and length(siblings) > 1
+    show_session_switcher = !is_nil(session_idx) and length(session_siblings) > 1
+
+    current_path = assigns[:current_path]
+    current_query = assigns[:current_query]
+    org_slug = assigns[:nav_org] && assigns.nav_org.slug
+    ws_slug = assigns[:nav_workspace] && assigns.nav_workspace.slug
+
+    ws_items =
+      if show_ws_switcher do
+        Enum.map(siblings, fn ws ->
+          %{
+            label: ws.name,
+            href: sibling_workspace_path(current_path, current_query, org_slug, ws.slug),
+            active: ws.slug == ws_slug
+          }
+        end)
+      else
+        []
+      end
+
+    session_items =
+      if show_session_switcher do
+        Enum.map(session_siblings, fn sess ->
+          %{
+            label: sess.title,
+            href: sibling_session_path(current_path, current_query, org_slug, ws_slug, sess.id),
+            active: sess.id == assigns.nav_session.id
+          }
+        end)
+      else
+        []
+      end
+
     assigns =
       assigns
       |> assign(:actions, actions)
       |> assign(:trail, trail)
       |> assign(:workspace_idx, workspace_idx)
-      |> assign(:show_ws_switcher, !is_nil(workspace_idx) and length(siblings) > 1)
+      |> assign(:show_ws_switcher, show_ws_switcher)
+      |> assign(:ws_items, ws_items)
+      |> assign(:session_idx, session_idx)
+      |> assign(:show_session_switcher, show_session_switcher)
+      |> assign(:session_items, session_items)
 
     ~H"""
     <div class="flex min-h-[68px] w-full items-center justify-between border-b p-4">
@@ -241,72 +288,21 @@ defmodule ControlKeelWeb.OrganizationLayouts do
               <% else %>
                 <span class="font-medium text-foreground">{label}</span>
               <% end %>
-              <div
+              <.breadcrumb_switcher
                 :if={@show_ws_switcher and idx == @workspace_idx}
-                class="relative flex items-center"
-                phx-click-away={
-                  JS.hide(to: "#breadcrumb-ws-switcher-popover")
-                  |> JS.set_attribute({"aria-expanded", "false"},
-                    to: "#breadcrumb-ws-switcher-button"
-                  )
-                }
-              >
-                <button
-                  type="button"
-                  id="breadcrumb-ws-switcher-button"
-                  aria-label="Switch workspace"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  phx-click={
-                    JS.toggle(to: "#breadcrumb-ws-switcher-popover")
-                    |> JS.toggle_attribute({"aria-expanded", "true", "false"})
-                  }
-                  class="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <.icon name="hero-chevron-up-down" class="size-3.5" />
-                </button>
-                <div
-                  id="breadcrumb-ws-switcher-popover"
-                  class="hidden absolute left-0 top-full z-50 mt-1.5 w-56 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
-                >
-                  <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
-                    Workspaces
-                  </div>
-                  <div class="max-h-60 space-y-0.5 overflow-y-auto">
-                    <%= for ws <- @sibling_workspaces do %>
-                      <% active = ws.slug == @nav_workspace.slug %>
-                      <.link
-                        href={
-                          sibling_workspace_path(
-                            @current_path,
-                            @current_query,
-                            @nav_org.slug,
-                            ws.slug
-                          )
-                        }
-                        phx-click={
-                          JS.hide(to: "#breadcrumb-ws-switcher-popover")
-                          |> JS.set_attribute({"aria-expanded", "false"},
-                            to: "#breadcrumb-ws-switcher-button"
-                          )
-                        }
-                        class={[
-                          "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
-                          active && "bg-muted font-medium text-foreground",
-                          !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        ]}
-                      >
-                        <span class="truncate">{ws.name}</span>
-                        <.icon
-                          :if={active}
-                          name="hero-check"
-                          class="size-4 shrink-0 text-primary"
-                        />
-                      </.link>
-                    <% end %>
-                  </div>
-                </div>
-              </div>
+                id="breadcrumb-ws-switcher"
+                label="Switch workspace"
+                title="Workspaces"
+                items={@ws_items}
+              />
+              <.breadcrumb_switcher
+                :if={@show_session_switcher and idx == @session_idx}
+                id="breadcrumb-session-switcher"
+                label="Switch session"
+                title="Sessions"
+                items={@session_items}
+                popover_width="w-64"
+              />
             </li>
           <% end %>
         </ol>
@@ -339,6 +335,70 @@ defmodule ControlKeelWeb.OrganizationLayouts do
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>
         <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true, doc: "base id; button/popover derive from it"
+  attr :label, :string, required: true, doc: "aria-label for the toggle button"
+  attr :title, :string, required: true, doc: "popover heading"
+  attr :items, :list, required: true, doc: "prebuilt [%{label, href, active}] entries"
+  attr :popover_width, :string, default: "w-56"
+
+  defp breadcrumb_switcher(assigns) do
+    ~H"""
+    <div
+      class="relative flex items-center"
+      phx-click-away={
+        JS.hide(to: "##{@id}-popover")
+        |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id}-button")
+      }
+    >
+      <button
+        type="button"
+        id={"#{@id}-button"}
+        aria-label={@label}
+        aria-haspopup="menu"
+        aria-expanded="false"
+        phx-click={
+          JS.toggle(to: "##{@id}-popover")
+          |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+        }
+        class="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <.icon name="hero-chevron-up-down" class="size-3.5" />
+      </button>
+      <div
+        id={"#{@id}-popover"}
+        class={"hidden absolute left-0 top-full z-50 mt-1.5 #{@popover_width} rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"}
+      >
+        <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
+          {@title}
+        </div>
+        <div class="max-h-60 space-y-0.5 overflow-y-auto">
+          <%= for item <- @items do %>
+            <.link
+              href={item.href}
+              phx-click={
+                JS.hide(to: "##{@id}-popover")
+                |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id}-button")
+              }
+              class={[
+                "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
+                item.active && "bg-muted font-medium text-foreground",
+                !item.active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ]}
+            >
+              <span class="truncate">{item.label}</span>
+              <.icon
+                :if={item.active}
+                name="hero-check"
+                class="size-4 shrink-0 text-primary"
+              />
+            </.link>
+          <% end %>
+        </div>
       </div>
     </div>
     """
@@ -399,6 +459,22 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       overview_index(trail, root, current_path)
   end
 
+  defp session_root_path(%{slug: org_slug}, %{slug: ws_slug}, %{id: session_id}),
+    do: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}"
+
+  defp session_root_path(_, _, _), do: nil
+
+  # Same shape as the workspace crumb: the linked session root on subpages
+  # (reviews, deploy-review, review detail), falling back to the final
+  # plain-text crumb on the session overview page. Reuses `overview_index/3`
+  # so a trailing subpage label never captures the switcher.
+  defp session_crumb_index(_trail, nil, _current_path), do: nil
+
+  defp session_crumb_index(trail, root, current_path) do
+    Enum.find_index(trail, fn {_label, path} -> path == root end) ||
+      overview_index(trail, root, current_path)
+  end
+
   defp overview_index(trail, root, root) do
     case List.last(trail) do
       {_label, nil} -> length(trail) - 1
@@ -411,25 +487,72 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   # Workspace URL replacer: swaps the workspace slug segment, keeping the
   # subpage and query string, so e.g. repos stays on repos. Falls back to
   # the workspace overview when the current path is outside
-  # `:org_slug/workspaces/:ws_slug/*`. Subpage shapes are dynamic, so this
-  # builds a plain string (no `~p` verification); only the ws segment is
-  # ever rewritten.
+  # `:org_slug/workspaces/:ws_slug/*`. Session ids are workspace-scoped, so
+  # a session path never carries over: switching workspace from a session
+  # page lands on the target workspace overview instead of a dead id.
+  # Subpage shapes are dynamic, so this builds a plain string (no `~p`
+  # verification); only the ws segment is ever rewritten.
   defp sibling_workspace_path(current_path, current_query, org_slug, ws_slug) do
-    base =
+    {base, from_session?} =
       case String.split(current_path || "", "/", trim: true) do
         [^org_slug, "workspaces", _current_ws | rest] ->
-          "/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/")
+          if "sessions" in rest do
+            {"/#{org_slug}/workspaces/#{ws_slug}", true}
+          else
+            {"/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/"), false}
+          end
 
         _ ->
-          "/#{org_slug}/workspaces/#{ws_slug}"
+          {"/#{org_slug}/workspaces/#{ws_slug}", false}
       end
 
-    if current_query && current_query != "" do
-      base <> "?" <> current_query
+    query = if from_session?, do: strip_launched(current_query), else: current_query
+
+    if query && query != "" do
+      base <> "?" <> query
     else
       base
     end
   end
+
+  # Session URL replacer: swaps the session id segment, keeping the
+  # subpage and query string, so e.g. reviews stays on reviews. Falls back
+  # to the session overview when the current path is outside
+  # `:org_slug/workspaces/:ws_slug/sessions/:id/*`. Like its workspace
+  # counterpart this builds a plain string (no `~p` verification); only the
+  # id segment is ever rewritten.
+  defp sibling_session_path(current_path, current_query, org_slug, ws_slug, session_id) do
+    {base, switching?} =
+      case String.split(current_path || "", "/", trim: true) do
+        [^org_slug, "workspaces", ^ws_slug, "sessions", current_id | rest] ->
+          {"/" <>
+             Enum.join(
+               [org_slug, "workspaces", ws_slug, "sessions", to_string(session_id) | rest],
+               "/"
+             ), to_string(session_id) != current_id}
+
+        _ ->
+          {"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}", true}
+      end
+
+    # `?launched=1` celebrates a fresh launch — it must not follow the user
+    # across to a different session.
+    query = if switching?, do: strip_launched(current_query), else: current_query
+
+    if query && query != "" do
+      base <> "?" <> query
+    else
+      base
+    end
+  end
+
+  defp strip_launched(query) when is_binary(query) and query != "" do
+    query |> URI.decode_query() |> Map.delete("launched") |> URI.encode_query()
+  rescue
+    _ -> query
+  end
+
+  defp strip_launched(query), do: query
 
   defp breadcrumb_trail(nil), do: []
 
@@ -476,6 +599,14 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     ]
   end
 
+  defp sidebar_nav_items(%{nav_session: %{id: _id}} = assigns),
+    do:
+      session_nav_items(
+        assigns.nav_org.slug,
+        assigns.nav_workspace.slug,
+        assigns.nav_session.id
+      )
+
   defp sidebar_nav_items(%{nav_workspace: nil} = assigns),
     do: organization_nav_items(assigns.nav_org)
 
@@ -521,6 +652,38 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-shield-check"
       }
     ]
+  end
+
+  defp session_nav_items(org_slug, ws_slug, session_id) do
+    [
+      %{
+        label: "Overview",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}",
+        scope: :session_overview,
+        icon: "hero-squares-2x2"
+      },
+      %{
+        label: "Reviews",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/reviews",
+        scope: :session_section,
+        icon: "hero-document-check"
+      },
+      %{
+        label: "Deploy review",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/deploy-review",
+        scope: :session_section,
+        icon: "hero-cloud-arrow-up"
+      }
+    ]
+  end
+
+  defp sidebar_item_active?(current_path, _current_query, %{scope: :session_overview} = item) do
+    is_binary(current_path) && current_path == item.href
+  end
+
+  defp sidebar_item_active?(current_path, _current_query, %{scope: :session_section} = item) do
+    is_binary(current_path) &&
+      (current_path == item.href or String.starts_with?(current_path, item.href <> "/"))
   end
 
   defp sidebar_item_active?(current_path, _current_query, %{scope: :workspace} = item) do

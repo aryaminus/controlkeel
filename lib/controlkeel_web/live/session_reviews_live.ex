@@ -7,7 +7,7 @@ defmodule ControlKeelWeb.SessionReviewsLive do
   @refresh_interval_ms 2_000
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
 
     case Mission.get_session_context(id) do
@@ -18,14 +18,36 @@ defmodule ControlKeelWeb.SessionReviewsLive do
          |> push_navigate(to: ~p"/")}
 
       session when not is_nil(session) ->
-        if Accounts.session_accessible?(session, current_user) do
-          {:ok, mount_session(socket, session)}
-        else
-          {:ok,
-           socket
-           |> put_flash(:error, "Session not found.")
-           |> push_navigate(to: ~p"/")}
+        cond do
+          not Accounts.session_accessible?(session, current_user) ->
+            {:ok,
+             socket
+             |> put_flash(:error, "Session not found.")
+             |> push_navigate(to: ~p"/")}
+
+          check_session_scope(session, org_slug, ws_slug) != :ok ->
+            {:ok,
+             socket
+             |> put_flash(:error, "Session not found.")
+             |> push_navigate(to: ~p"/")}
+
+          true ->
+            {:ok, mount_session(socket, session)}
         end
+    end
+  end
+
+  # URL slug agreement only — must run after the session_accessible? gate,
+  # which is what guarantees a loaded workspace/org (a nil session never
+  # reaches here).
+  defp check_session_scope(session, org_slug, ws_slug) do
+    workspace = session.workspace
+    org = workspace && workspace.org
+
+    cond do
+      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
+      is_nil(org) or org.slug != org_slug -> {:error, :org}
+      true -> :ok
     end
   end
 
@@ -66,7 +88,9 @@ defmodule ControlKeelWeb.SessionReviewsLive do
               <tr class="transition hover:bg-muted/30">
                 <td class="px-5 py-4">
                   <.link
-                    navigate={~p"/sessions/#{@session.id}/reviews/#{review.id}"}
+                    navigate={
+                      ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/reviews/#{review.id}"
+                    }
                     class="font-medium text-foreground hover:text-primary"
                   >
                     {review.title}
@@ -105,7 +129,23 @@ defmodule ControlKeelWeb.SessionReviewsLive do
   defp mount_session(socket, session) do
     if connected?(socket), do: schedule_refresh()
 
+    workspace = session.workspace
+    org = workspace.org
+
     socket
+    |> assign(:nav_org, org)
+    |> assign(:nav_workspace, workspace)
+    |> assign(:nav_session, %{id: session.id, title: session.title})
+    |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
+    |> assign(:breadcrumbs, [
+      %{label: org.name, to: "/#{org.slug}"},
+      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+      %{
+        label: session.title,
+        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+      },
+      %{label: "Reviews", to: nil}
+    ])
     |> assign(:page_title, "#{session.title} — Reviews")
     |> assign(:session, session)
     |> assign_reviews()

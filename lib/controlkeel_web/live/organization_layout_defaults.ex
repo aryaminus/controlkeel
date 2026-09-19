@@ -20,9 +20,11 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
       |> assign(:current_query, nil)
       |> assign_new(:nav_org, fn -> nil end)
       |> assign_new(:nav_workspace, fn -> nil end)
+      |> assign_new(:nav_session, fn -> nil end)
       |> assign_new(:page_action, fn -> nil end)
       |> assign_new(:breadcrumbs, fn -> nil end)
       |> assign_new(:sibling_workspaces, fn -> [] end)
+      |> assign_new(:sibling_sessions, fn -> [] end)
       |> assign_new(:sibling_workspaces_org_id, fn -> nil end)
       |> attach_hook(:__organization_current_path__, :handle_params, fn _params, uri, socket ->
         parsed = URI.parse(uri)
