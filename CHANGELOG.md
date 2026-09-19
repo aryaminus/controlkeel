@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.19 — 2026-09-19
+
+### What's changed
+
+- Merge pull request #180 from aryaminus/feat/session-navbar
+- feat/session-navbar: refactor session path handling to use org_session_path for consistency across tests
+- feat/session-navbar: enhance session path handling and add tests for query parameter management
+- feat/session-navbar: update session handling and routing for org-scoped URLs in legacy controller and live views
+- Merge branch 'main' of github.com:aryaminus/controlkeel into feat/session-navbar
+- feat/session-navbar: fall back to workspace overview when switching workspace from a session page
+- feat/session-navbar: session-scoped sidebar, breadcrumb switcher and org-bound session guards
+- feat/session-navbar: implement session management and routing updates for workspace sessions
+
 ## v0.4.18 — 2026-09-18
 
 ### What's changed
