@@ -3163,10 +3163,10 @@ defmodule ControlKeel.Mission do
   end
 
   defp cluster_summary(rows) do
+    # Optimized: Use frequencies_by/2 to avoid intermediate list allocations and reduce GC pressure
     rows
-    |> Enum.map(& &1["summary"])
-    |> Enum.reject(&is_nil/1)
-    |> Enum.frequencies()
+    |> Enum.frequencies_by(& &1["summary"])
+    |> Map.delete(nil)
     |> Enum.max_by(fn {_summary, count} -> count end, fn -> {nil, 0} end)
     |> elem(0)
   end
@@ -3758,9 +3758,9 @@ defmodule ControlKeel.Mission do
   end
 
   defp proof_strength_counts(check_results) do
+    # Optimized: Use frequencies_by/2 to avoid intermediate list allocations and reduce GC pressure
     check_results
-    |> Enum.map(&task_check_proof_strength/1)
-    |> Enum.frequencies()
+    |> Enum.frequencies_by(&task_check_proof_strength/1)
   end
 
   defp strongest_proof_strength(check_results) do
