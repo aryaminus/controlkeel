@@ -120,7 +120,6 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/dashboard", DashboardLive, :index
       live "/sessions", MissionsLive, :index
-      live "/sessions/start", OnboardingLive, :new
       live "/findings", FindingsLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
@@ -133,6 +132,18 @@ defmodule ControlKeelWeb.Router do
 
       live "/policies", PolicyStudioLive, :index
       live "/skills", SkillsLive, :index
+    end
+
+    # Session start uses a standalone Vercel-type onboarding layout
+    # (own SessionStartLayouts module — no sidebar/breadcrumb):
+    # top bar + centered wizard column.
+    live_session :onboarding,
+      layout: {ControlKeelWeb.SessionStartLayouts, :session_start},
+      on_mount: [
+        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
+        ControlKeelWeb.LayoutDefaults
+      ] do
+      live "/sessions/start", OnboardingLive, :new
     end
 
     # Observability section routes use the shared :dashboard framework layout;
