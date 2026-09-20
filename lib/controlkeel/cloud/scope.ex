@@ -47,9 +47,12 @@ defmodule ControlKeel.Cloud.Scope do
 
   @doc """
   Add a `WHERE workspace_id IN (?)` clause for batch queries.
+
+  An empty id list yields no rows — "no accessible workspaces" must not
+  degrade into an unscoped fetch (issue #183).
   """
   @spec scope_workspaces(Ecto.Queryable.t(), [integer()]) :: Ecto.Queryable.t()
-  def scope_workspaces(query, []), do: query
+  def scope_workspaces(query, []), do: where(query, [x], false)
 
   def scope_workspaces(query, workspace_ids) when is_list(workspace_ids) do
     where(query, [x], x.workspace_id in ^workspace_ids)

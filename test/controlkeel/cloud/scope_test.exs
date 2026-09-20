@@ -5,6 +5,8 @@ defmodule ControlKeel.Cloud.ScopeTest do
 
   alias ControlKeel.Cloud.RunPackage
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Session
+  alias ControlKeel.Repo
 
   describe "scope_workspace/2" do
     test "pass-through when workspace_id is nil" do
@@ -22,9 +24,16 @@ defmodule ControlKeel.Cloud.ScopeTest do
   end
 
   describe "scope_workspaces/2" do
-    test "pass-through when list is empty" do
-      query = from(p in RunPackage, select: p.id)
-      assert scope_workspaces(query, []) == query
+    test "empty list yields no rows, not a pass-through" do
+      # "No accessible workspaces" must never degrade into an unscoped
+      # fetch (issue #183).
+      session =
+        ControlKeel.MissionFixtures.session_fixture(%{title: "Scoped session"})
+
+      assert Repo.all(scope_workspaces(Session, [])) == []
+
+      assert Repo.all(scope_workspaces(Session, [session.workspace_id]))
+             |> Enum.map(& &1.id) == [session.id]
     end
 
     test "adds IN clause for workspace ids" do
