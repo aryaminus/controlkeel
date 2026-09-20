@@ -99,7 +99,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
      |> assign(:show_invite_modal, false)
      |> assign(:show_revoke_modal, false)
      |> assign(:revoke_target, nil)
-     |> assign(:page_action, page_actions(local_mode, can_manage))
      |> assign(:current_user, socket.assigns[:current_user])}
   end
 
@@ -453,13 +452,13 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
           <p class="text-sm text-muted-foreground">
             Workspaces group sessions, findings, and budgets under this organization.
           </p>
-          <button
-            type="button"
+          <.button
+            variant="outline"
             phx-click="new_workspace"
-            class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+            class="shrink-0 rounded-full px-4 py-2 text-sm font-medium"
           >
             <.icon name="hero-plus" class="size-4" /> New Workspace
-          </button>
+          </.button>
         </div>
 
         <%= if @workspaces == [] do %>
@@ -525,6 +524,20 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
             </p>
           </section>
         <% else %>
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <p class="text-sm text-muted-foreground">
+              Manage organization members and their roles.
+            </p>
+            <.button
+              :if={@can_manage}
+              id="invite-member-button"
+              variant="outline"
+              phx-click="open_invite"
+              class="shrink-0 rounded-full px-4 py-2 text-sm font-medium"
+            >
+              <.icon name="hero-plus" class="size-4" /> Invite member
+            </.button>
+          </div>
           <section class="rounded-2xl border bg-card shadow-card overflow-clip">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-border text-left text-sm">
@@ -922,23 +935,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   # ── Private ─────────────────────────────────────────────────────────
 
-  defp page_actions(local_mode, can_manage) do
-    actions = maybe_add_action([], invite_page_action(local_mode, can_manage))
-
-    if actions == [], do: nil, else: actions
-  end
-
-  defp maybe_add_action(actions, nil), do: actions
-  defp maybe_add_action(actions, action), do: actions ++ [action]
-
-  defp invite_page_action(local_mode, can_manage) do
-    if local_mode || !can_manage do
-      nil
-    else
-      %{label: "Invite member", event: "open_invite", icon: "hero-plus"}
-    end
-  end
-
   defp load_memberships(org_id) do
     Accounts.list_memberships_for_org(org_id)
     |> Repo.preload(:user)
@@ -1012,7 +1008,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     |> assign(:active_owner_count, count_active_owners(memberships))
     |> assign(:current_role, viewer_role)
     |> assign(:can_manage, can_manage)
-    |> assign(:page_action, page_actions(socket.assigns[:local_mode], can_manage))
   end
 
   defp count_active_owners(memberships) do

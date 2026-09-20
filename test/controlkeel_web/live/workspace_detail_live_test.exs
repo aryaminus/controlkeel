@@ -67,6 +67,20 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert html =~ "Second session"
     end
 
+    test "org switcher stays cloud-only in local mode" do
+      {:ok, org} = Accounts.create_org(%{name: "Local Switch", slug: "local-switch"})
+      ws = create_workspace(%{name: "LS", slug: "ls", industry: "web", org_id: org.id})
+
+      {:ok, view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+
+      # Main behavior: the org home link renders, but the switcher toggle,
+      # popover, and any creation entry stay cloud-only.
+      assert html =~ org.name
+      refute has_element?(view, "#org-switcher-button")
+      refute html =~ "Organizations"
+      refute html =~ "Create organization"
+    end
+
     test "resolves the workspace slug case-insensitively" do
       {:ok, org} = Accounts.create_org(%{name: "Wscase", slug: "wscase"})
       _ws = create_workspace(%{name: "Core", slug: "core", industry: "web", org_id: org.id})
@@ -228,6 +242,58 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, _view, html} = live(conn, ~p"/viewco/workspaces/#{ws.slug}")
 
       assert html =~ "Viewable"
+    end
+
+    test "header New Session carries org and workspace slugs for an org owner" do
+      owner = create_user!("ws-cta-owner@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "CtaCo", slug: "ctaco"})
+      ws = create_workspace(%{name: "CtaWs", slug: "ctaws", industry: "web", org_id: org.id})
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{
+          "current_user_id" => owner.id,
+          "current_org_id" => org.id
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/ctaco/workspaces/#{ws.slug}")
+
+      assert html =~ "New Session"
+      assert html =~ ~s(href="/sessions/start?org_slug=ctaco&amp;ws_slug=ctaws")
+      # The old inline duplicate is gone; only the parametrized header
+      # action links to the launcher.
+      refute html =~ ~s(href="/sessions/start")
+    end
+
+    test "header New Session is bare for a non-admin member" do
+      owner = create_user!("ws-cta-view-owner@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "CtaView", slug: "ctaview"})
+
+      ws =
+        create_workspace(%{name: "CtaViewWs", slug: "ctaviewws", industry: "web", org_id: org.id})
+
+      viewer = create_user!("ws-cta-viewer@example.com")
+
+      %Membership{}
+      |> Membership.changeset(%{
+        user_id: viewer.id,
+        org_id: org.id,
+        role: "viewer",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{
+          "current_user_id" => viewer.id,
+          "current_org_id" => org.id
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/ctaview/workspaces/#{ws.slug}")
+
+      assert html =~ ~s(href="/sessions/start")
+      refute html =~ "org_slug=ctaview"
     end
 
     test "a user outside the org is refused access" do

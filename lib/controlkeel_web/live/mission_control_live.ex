@@ -302,9 +302,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <section class="mx-auto max-w-[1180px] w-full px-4 pt-8 pb-16">
+    <section class="w-full space-y-6">
       <%= if @launched do %>
-        <div class="p-6 rounded-3xl border bg-[var(--ck-success)] text-muted-foreground border-l-4 border-l-[var(--ck-success)] mb-6">
+        <div class="p-6 rounded-3xl border bg-[var(--ck-success)] text-muted-foreground border-l-4 border-l-[var(--ck-success)]">
           <div class="flex items-start gap-4">
             <span class="text-2xl leading-none">✓</span>
             <div>
@@ -326,37 +326,13 @@ defmodule ControlKeelWeb.MissionControlLive do
           </div>
         </div>
       <% end %>
-      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
-        <div class="space-y-1 min-w-0">
-          <h2 class="text-2xl font-semibold text-primary leading-6 tracking-wide uppercase">
-            {@session.title}
-          </h2>
-          <p class="text-muted-foreground">
-            {@session.objective}
-          </p>
-        </div>
-        <div class="flex flex-col sm:items-end gap-2 shrink-0">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Audit log
-            </span>
-            <.link
-              :for={format <- ~w(json csv pdf)}
-              id={"mission-audit-export-#{format}"}
-              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
-              class="rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-            >
-              {String.upcase(format)}
-            </.link>
-          </div>
-          <p :if={@latest_audit_export} class="text-xs text-muted-foreground">
-            Last export ({@latest_audit_export.format}):
-            <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
-          </p>
-        </div>
-      </div>
+      <.page_title
+        title={@session.title}
+        subtitle={@session.objective}
+        class="min-w-0 max-w-3xl"
+      />
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="p-5 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-lg">
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
             Primary agent
@@ -425,7 +401,7 @@ defmodule ControlKeelWeb.MissionControlLive do
               Compact local-first view of health, events, findings, gates, memory, proofs, and cost.
             </p>
           </div>
-          <div class="flex flex-wrap gap-2 items-center">
+          <div class="flex flex-wrap items-center justify-end gap-3">
             <span
               id="mission-observability-health"
               class={obs_health_pill_class(@observability.health.status)}
@@ -514,6 +490,31 @@ defmodule ControlKeelWeb.MissionControlLive do
           </ul>
         </div>
       </div>
+
+      <section class="rounded-2xl border bg-card p-5 shadow-card">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <.section_title>Audit log</.section_title>
+            <p class="mt-1 text-sm text-muted-foreground">
+              Export a record of this session's governed activity.
+            </p>
+            <p :if={@latest_audit_export} class="mt-2 text-xs text-muted-foreground">
+              Last export ({@latest_audit_export.format}):
+              <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2" aria-label="Audit log exports">
+            <.link
+              :for={format <- ~w(json csv pdf)}
+              id={"mission-audit-export-#{format}"}
+              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
+              class="rounded-lg border border-border bg-transparent px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              {String.upcase(format)}
+            </.link>
+          </div>
+        </div>
+      </section>
 
       <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
