@@ -663,7 +663,7 @@ defmodule ControlKeelWeb.CoreComponents do
             <button
               type="button"
               phx-click={@on_close}
-              class="rounded-md text-muted-foreground transition hover:text-foreground"
+              class="rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label="Close"
             >
               <.icon name="hero-x-mark" class="size-5" />
