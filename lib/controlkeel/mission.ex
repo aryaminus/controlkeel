@@ -720,12 +720,13 @@ defmodule ControlKeel.Mission do
 
   @doc """
   Recent sessions visible to the viewer: cloud mode scopes to their
-  accessible workspaces (issue #183); local mode (nil user included)
-  stays unscoped.
+  accessible workspaces (issue #183); local mode stays unscoped.
   """
   def list_recent_sessions_for_user(user, limit \\ 6)
 
-  def list_recent_sessions_for_user(nil, limit), do: list_recent_sessions(limit)
+  def list_recent_sessions_for_user(nil, limit) do
+    if ControlKeel.Runtime.Mode.current() == :local, do: list_recent_sessions(limit), else: []
+  end
 
   def list_recent_sessions_for_user(user, limit) do
     if ControlKeel.Runtime.Mode.current() == :local do
@@ -773,9 +774,11 @@ defmodule ControlKeel.Mission do
 
   @doc """
   Sessions visible to the viewer: cloud mode scopes to their accessible
-  workspaces; local mode (nil user) stays unscoped.
+  workspaces; local mode stays unscoped.
   """
-  def list_all_sessions_for_user(nil), do: list_all_sessions()
+  def list_all_sessions_for_user(nil) do
+    if ControlKeel.Runtime.Mode.current() == :local, do: list_all_sessions(), else: []
+  end
 
   def list_all_sessions_for_user(user) do
     if ControlKeel.Runtime.Mode.current() == :local do

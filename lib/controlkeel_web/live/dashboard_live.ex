@@ -18,7 +18,7 @@ defmodule ControlKeelWeb.DashboardLive do
      |> assign(
        benchmark_summary: Benchmark.benchmark_summary(),
        provider_status: ProviderBroker.status(project_root),
-       recent_sessions: Mission.list_recent_sessions_for_user(socket.assigns[:current_user]),
+       recent_sessions: Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 4),
        registry_status: ACPRegistry.status(),
        ship_summary: Analytics.funnel_summary(),
        runtime_mode: Mode.current()

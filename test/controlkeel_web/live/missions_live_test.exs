@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.MissionsLiveTest do
   import ControlKeel.MissionFixtures
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Mission
 
   test "missions index shows the full session history", %{conn: conn} do
     workspace = workspace_fixture(%{name: "History Workspace"})
@@ -87,6 +88,14 @@ defmodule ControlKeelWeb.MissionsLiveTest do
 
       assert html =~ "No sessions yet."
       refute html =~ "Someone Else Session"
+    end
+
+    test "nil user never receives an unscoped session listing" do
+      workspace = workspace_fixture(%{name: "Private Workspace"})
+      session_fixture(%{workspace: workspace, title: "Private Session"})
+
+      assert Mission.list_recent_sessions_for_user(nil) == []
+      assert Mission.list_all_sessions_for_user(nil) == []
     end
   end
 end
