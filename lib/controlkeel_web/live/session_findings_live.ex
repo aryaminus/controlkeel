@@ -197,15 +197,15 @@ defmodule ControlKeelWeb.SessionFindingsLive do
       <.page_title title="Findings" />
 
       <div class="bg-card border rounded-2xl shadow-card overflow-visible">
-        <table class="min-w-full divide-y divide-border text-left text-sm">
-          <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+        <table class="min-w-full divide-y divide-border text-left text-sm border-separate border-spacing-0">
+          <thead class="text-xs uppercase tracking-[0.14em] text-muted-foreground sticky top-0 z-10">
             <tr>
-              <th class="px-5 py-3 font-semibold">Finding</th>
-              <th class="px-5 py-3 font-semibold">Severity</th>
-              <th class="px-5 py-3 font-semibold">Status</th>
-              <th class="px-5 py-3 font-semibold">Category</th>
-              <th class="px-5 py-3 font-semibold w-px whitespace-nowrap">Updated</th>
-              <th class="px-5 py-3 font-semibold w-px whitespace-nowrap text-right">Actions</th>
+              <th class="bg-muted px-5 py-3 font-semibold first:rounded-tl-2xl">Finding</th>
+              <th class="bg-muted px-5 py-3 font-semibold">Severity</th>
+              <th class="bg-muted px-5 py-3 font-semibold">Status</th>
+              <th class="bg-muted px-5 py-3 font-semibold">Category</th>
+              <th class="bg-muted px-5 py-3 font-semibold">Updated</th>
+              <th class="bg-muted px-5 py-3 font-semibold w-px whitespace-nowrap last:rounded-tr-2xl"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
@@ -238,8 +238,8 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                 <td class="px-5 py-4 text-muted-foreground whitespace-nowrap w-px font-mono tabular-nums tracking-tight text-xs">
                   {event_timestamp(finding.inserted_at)}
                 </td>
-                <td class="px-5 py-4 text-right whitespace-nowrap w-px">
-                  <div class="relative inline-flex">
+                <td class="px-4 text-right whitespace-nowrap w-px">
+                  <div id={"finding-actions-wrapper-#{finding.id}"} class="relative inline-flex">
                     <button
                       id={"finding-actions-#{finding.id}"}
                       type="button"
@@ -249,6 +249,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                       phx-click={
                         JS.toggle(to: "#finding-menu-#{finding.id}")
                         |> JS.toggle_attribute({"aria-expanded", "true", "false"})
+                        |> JS.toggle_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
                       }
                       class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
@@ -256,14 +257,23 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                     </button>
                     <div
                       id={"finding-menu-#{finding.id}"}
-                      class="hidden absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/20"
-                      phx-click-away={JS.hide(to: "#finding-menu-#{finding.id}")}
+                      class={[
+                        "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/20",
+                        if finding == List.last(@session.findings) do "bottom-full mb-1" else "top-full mt-1" end
+                      ]}
+                      phx-click-away={
+                        JS.hide(to: "#finding-menu-#{finding.id}")
+                        |> JS.remove_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
+                        |> JS.set_attribute({"aria-expanded", "false"}, to: "#finding-actions-#{finding.id}")
+                      }
                     >
                       <button
                         type="button"
                         class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
                         phx-click={
                           JS.hide(to: "#finding-menu-#{finding.id}")
+                          |> JS.remove_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
+                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#finding-actions-#{finding.id}")
                           |> JS.push("view_fix", value: %{id: finding.id})
                         }
                       >
