@@ -232,6 +232,7 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
       live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
       live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show

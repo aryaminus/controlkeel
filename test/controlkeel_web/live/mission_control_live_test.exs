@@ -94,13 +94,17 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Build the first governed workflow"
-    assert html =~ "Sql injection"
-    assert html =~ "blocked"
     assert html =~ "/proxy/openai/"
     assert html =~ "/v1/completions"
     assert html =~ "/v1/embeddings"
     assert html =~ "/v1/models"
-    assert html =~ "View fix"
+
+    # Findings feed has moved to session findings page
+    refute html =~ "Findings feed"
+    {:ok, _fview, fhtml} = live(conn, org_session_path(org, ws, session, "/findings"))
+    assert fhtml =~ "Sql injection"
+    assert fhtml =~ "blocked"
+    assert fhtml =~ "View fix"
   end
 
   test "mission control shows the derived production boundary summary", %{conn: conn} do
@@ -227,7 +231,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert refreshed_html =~ "Current funnel stage"
   end
 
-  test "mission control renders and copies a guided fix for supported findings", %{conn: conn} do
+  test "session findings renders and copies a guided fix for supported findings", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
     finding =
@@ -240,7 +244,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
         metadata: %{"path" => "assets/js/app.js", "matched_text_redacted" => "inner...HTML"}
       })
 
-    {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
+    {:ok, view, _html} = live(conn, org_session_path(org, ws, session, "/findings"))
 
     detail_html =
       render_click(

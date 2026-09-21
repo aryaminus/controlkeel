@@ -85,8 +85,8 @@ defmodule ControlKeelWeb.AuthController do
     if String.starts_with?(path, "/") and
          not String.starts_with?(path, "//") and
          not String.contains?(path, "\\"),
-      do: path,
-      else: "/organizations"
+       do: path,
+       else: "/organizations"
   end
 
   defp safe_return_to(_), do: "/organizations"

@@ -655,6 +655,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-squares-2x2"
       },
       %{
+        label: "Findings",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/findings",
+        scope: :session_section,
+        icon: "hero-exclamation-triangle"
+      },
+      %{
         label: "Reviews",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/reviews",
         scope: :session_section,
