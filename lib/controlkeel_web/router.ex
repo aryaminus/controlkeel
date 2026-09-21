@@ -124,7 +124,6 @@ defmodule ControlKeelWeb.Router do
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
       live "/proofs", ProofBrowserLive, :index
-      live "/proofs/:id", ProofBrowserLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
@@ -213,6 +212,11 @@ defmodule ControlKeelWeb.Router do
     get "/sessions/:id/deploy-review", LegacyController, :session
     get "/sessions/:id/reviews/:rid", LegacyController, :session
 
+    # Legacy proof detail URL: `/proofs/:id` now lives under the session
+    # scope (`.../sessions/:id/proofs/:proof_id`); two-segment, so the
+    # single-segment ":org_slug" live block below does not swallow it.
+    get "/proofs/:id", LegacyController, :proof
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
@@ -235,6 +239,7 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs", SessionProofsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id", SessionProofLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show

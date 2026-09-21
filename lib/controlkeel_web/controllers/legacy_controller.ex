@@ -15,6 +15,7 @@ defmodule ControlKeelWeb.LegacyController do
   alias ControlKeel.Bootstrap.LocalDefaults
   alias ControlKeel.Mission.Session
   alias ControlKeel.Mission.Workspace
+  alias ControlKeel.Mission.ProofBundle
   alias ControlKeel.Repo
   alias ControlKeelWeb.FallbackController
 
@@ -60,26 +61,56 @@ defmodule ControlKeelWeb.LegacyController do
     end
   end
 
+  @doc """
+  Legacy proof URL redirect: `/proofs/:id` now lives at
+  `/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id`, so
+  resolve the proof (preloading session → workspace → org) and redirect.
+  Unknown ids 404; unbound sessions follow the same local-mode default
+  nesting fallback as `session/2`.
+  """
+  def proof(conn, %{"id" => id} = params) do
+    case fetch_proof(id) do
+      nil ->
+        FallbackController.not_found(conn, params)
+
+      %ProofBundle{} = proof ->
+        case Repo.preload(proof, session: [workspace: :org]) do
+          %{session: %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}}} =
+              proof ->
+            session = proof.session
+
+            redirect(
+              conn,
+              to: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/proofs/#{proof.id}"
+            )
+
+          _ ->
+            default_nesting_redirect(conn, params, proof.session_id, proof.id)
+        end
+    end
+  end
+
   # Invariant: every session belongs to a workspace that belongs to an org
   # (local boot seeds the defaults; LocalMigration consolidates orphans).
   # If that ever doesn't hold, local mode degrades to the default nesting
   # instead of a dead 404 — the URL starts working once reconciliation binds
   # things. Cloud keeps the 404: no synthetic defaults there.
-  defp default_nesting_redirect(conn, params, session_id) do
+  defp default_nesting_redirect(conn, params, session_id, proof_id \\ nil) do
     if ControlKeel.Runtime.local?() do
       redirect_session(
         conn,
         params,
         LocalDefaults.default_org_slug(),
         LocalDefaults.default_workspace_slug(),
-        session_id
+        session_id,
+        proof_id
       )
     else
       FallbackController.not_found(conn, params)
     end
   end
 
-  defp redirect_session(conn, params, org_slug, ws_slug, session_id) do
+  defp redirect_session(conn, params, org_slug, ws_slug, session_id, proof_id \\ nil) do
     query =
       case conn.query_string do
         "" -> ""
@@ -89,7 +120,7 @@ defmodule ControlKeelWeb.LegacyController do
     redirect(
       conn,
       to:
-        "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}#{session_subpath(params, conn)}#{query}"
+        "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}#{if(proof_id, do: "/proofs/#{proof_id}", else: session_subpath(params, conn))}#{query}"
     )
   end
 
@@ -116,6 +147,12 @@ defmodule ControlKeelWeb.LegacyController do
 
   defp fetch_session_record(id) do
     Repo.get(Session, id)
+  rescue
+    Ecto.Query.CastError -> nil
+  end
+
+  defp fetch_proof(id) do
+    Repo.get(ProofBundle, id)
   rescue
     Ecto.Query.CastError -> nil
   end

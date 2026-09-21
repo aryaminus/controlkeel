@@ -75,6 +75,7 @@ defmodule ControlKeelWeb.SessionProofsLive do
   @impl true
   def handle_info(:refresh, socket) do
     if connected?(socket), do: schedule_refresh()
+
     case Mission.get_session_context(socket.assigns.session.id) do
       nil -> {:noreply, socket}
       session -> {:noreply, assign_session(socket, session)}
@@ -104,7 +105,9 @@ defmodule ControlKeelWeb.SessionProofsLive do
               <tr id={"proof-row-#{proof.id}"} class="transition hover:bg-muted/30">
                 <td class="px-5 py-4">
                   <.link
-                    navigate={~p"/proofs/#{proof.id}"}
+                    navigate={
+                      ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/proofs/#{proof.id}"
+                    }
                     class="font-medium text-foreground hover:text-primary"
                   >
                     {proof.task.title}
@@ -112,7 +115,8 @@ defmodule ControlKeelWeb.SessionProofsLive do
                   <span class={[
                     "mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
                     proof.status == "generated" && "bg-success/10 text-success ring-success/20",
-                    proof.status == "failed" && "bg-destructive/10 text-destructive ring-destructive/20",
+                    proof.status == "failed" &&
+                      "bg-destructive/10 text-destructive ring-destructive/20",
                     proof.status not in ["generated", "failed"] &&
                       "bg-muted text-muted-foreground ring-border"
                   ]}>

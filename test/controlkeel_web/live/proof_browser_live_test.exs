@@ -8,7 +8,8 @@ defmodule ControlKeelWeb.ProofBrowserLiveTest do
   alias ControlKeel.Accounts.Org
 
   test "proof browser filters and paginates proof bundles", %{conn: conn} do
-    session = session_fixture(%{title: "Proof mission"})
+    {org, ws, session} = org_bound_session_fixture(%{title: "Proof mission"})
+
     task = task_fixture(%{session: session, status: "done", title: "Ship proof"})
     proof = proof_bundle_fixture(%{task: task})
 
@@ -16,24 +17,31 @@ defmodule ControlKeelWeb.ProofBrowserLiveTest do
 
     assert html =~ "Proof browser"
     assert html =~ "Ship proof"
-    assert has_element?(view, "a[href=\"/proofs/#{proof.id}\"]", "View")
+
+    assert has_element?(
+             view,
+             "a[href=\"/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/proofs/#{proof.id}\"]",
+             "View"
+           )
   end
 
-  test "proof browser detail renders immutable proof content and related memory", %{conn: conn} do
-    session = session_fixture()
+  test "proof detail renders under the session scope with task page title", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
     task = task_fixture(%{session: session, status: "done", title: "Detailed proof"})
     proof = proof_bundle_fixture(%{task: task})
     _memory = memory_record_fixture(%{session: session, task_id: task.id, title: "Proof memory"})
 
-    {:ok, _view, html} = live(conn, ~p"/proofs/#{proof.id}")
+    path = "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/proofs/#{proof.id}"
+    {:ok, _view, html} = live(conn, path)
 
-    assert html =~ "Immutable proof snapshot"
     assert html =~ "Detailed proof"
     assert html =~ "Rollback instructions"
     assert html =~ "Related memory"
   end
 
-  test "detail view enforces org workspace boundary", %{conn: conn} do
+  test "session proof detail enforces session boundary and rejects cross-session ids", %{
+    conn: conn
+  } do
     {:ok, org_a} =
       %Org{}
       |> Org.changeset(%{name: "Proof Org A", slug: "proof-org-a", status: "active"})
@@ -56,23 +64,22 @@ defmodule ControlKeelWeb.ProofBrowserLiveTest do
     proof_a = proof_bundle_fixture(%{task: task_a})
     proof_b = proof_bundle_fixture(%{task: task_b})
 
-    conn_a = Plug.Test.init_test_session(conn, %{"current_org_id" => org_a.id})
-
-    {:ok, _view, html} = live(conn_a, ~p"/proofs/#{proof_a.id}")
-    assert html =~ "Immutable proof snapshot"
+    path_a = "/#{org_a.slug}/workspaces/#{workspace_a.slug}/sessions/#{session_a.id}"
+    {:ok, _view, html} = live(conn, "#{path_a}/proofs/#{proof_a.id}")
     assert html =~ "Org A Task"
     refute html =~ "Org B Task"
 
-    {:ok, _view, html_unauth} = live(conn_a, ~p"/proofs/#{proof_b.id}")
-    assert html_unauth =~ "Proof not found"
-    assert html_unauth =~ "No proof bundle exists with this identifier."
-    refute html_unauth =~ "Immutable proof snapshot"
-    refute html_unauth =~ "Org B Task"
+    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
+             live(conn, "#{path_a}/proofs/#{proof_b.id}")
   end
 
-  test "malformed proof id shows not-found inline", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/proofs/not-an-id")
-    assert html =~ "Proof not found"
-    assert html =~ "No proof bundle exists with this identifier."
+  test "malformed proof id under session scope is rejected generically", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
+             live(
+               conn,
+               "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/proofs/not-an-id"
+             )
   end
 end

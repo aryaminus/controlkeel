@@ -436,7 +436,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
                       </button>
                       <.link
                         :if={Map.get(@latest_proofs, task.id)}
-                        navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"}
+                        navigate={
+                          ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"
+                        }
                         class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
                         phx-click={
                           JS.hide(to: "#task-menu-#{task.id}")
