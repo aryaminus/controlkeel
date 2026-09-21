@@ -4,7 +4,6 @@ defmodule ControlKeelWeb.ProofBrowserLive do
   alias ControlKeel.Intent
   alias ControlKeel.Memory
   alias ControlKeel.Mission
-  alias ControlKeel.Repo
 
   @risk_tiers ~w(low moderate high critical)
 
@@ -19,6 +18,48 @@ defmodule ControlKeelWeb.ProofBrowserLive do
      |> assign(:risk_tiers, @risk_tiers)
      |> assign(:session_options, Mission.list_recent_sessions(30, nil))
      |> assign(:form, to_form(%{}, as: :filters))}
+  end
+
+  @impl true
+  def handle_params(%{"id" => id}, _uri, socket) do
+    case parse_int(id) do
+      nil ->
+        {:noreply,
+         socket
+         |> assign(:page_title, "Proof not found")
+         |> assign(:proof, nil)
+         |> assign(:memory_hits, [])}
+
+      parsed_id ->
+        case Mission.get_proof_bundle_with_context(parsed_id) do
+          nil ->
+            {:noreply,
+             socket
+             |> assign(:page_title, "Proof not found")
+             |> assign(:proof, nil)
+             |> assign(:memory_hits, [])}
+
+          proof ->
+            current_org_id = socket.assigns[:current_org_id]
+            workspace_ids = org_workspace_ids(current_org_id)
+
+            if current_org_id && proof.session.workspace_id not in workspace_ids do
+              {:noreply,
+               socket
+               |> assign(:page_title, "Proof not found")
+               |> assign(:proof, nil)
+               |> assign(:memory_hits, [])}
+            else
+              memory_hits = related_memory_hits(proof)
+
+              {:noreply,
+               socket
+               |> assign(:page_title, "Proof #{proof.id}")
+               |> assign(:proof, proof)
+               |> assign(:memory_hits, memory_hits)}
+            end
+        end
+    end
   end
 
   def handle_params(params, _uri, socket) do
@@ -43,6 +84,444 @@ defmodule ControlKeelWeb.ProofBrowserLive do
   @impl true
   def handle_event("filter", %{"filters" => filters}, socket) do
     {:noreply, push_patch(socket, to: ~p"/proofs?#{filter_params(filters)}")}
+  end
+
+  @impl true
+  def render(%{live_action: :show} = assigns) do
+    ~H"""
+    <section class="mx-auto w-[min(1180px,calc(100%-2rem))]">
+      <div :if={@proof} class="space-y-8 mb-12">
+        <.link
+          navigate={~p"/proofs"}
+          class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
+        >
+          <.icon name="hero-arrow-left" class="w-3 h-3" /> Back to proofs
+        </.link>
+
+        <div class="flex items-center justify-between gap-4">
+          <div class="space-y-1">
+            <h2 class="text-2xl font-semibold text-primary leading-6 tracking-wide uppercase">
+              Immutable proof snapshot
+            </h2>
+            <p class="text-muted-foreground">
+              Every proof bundle is a frozen audit artifact for a single task version.
+            </p>
+          </div>
+
+          <.link
+            navigate={~p"/sessions/#{@proof.session_id}"}
+            class="text-xs font-semibold uppercase tracking-[0.14em] text-primary border-muted-foreground border rounded-md px-3 py-2 hover:bg-primary/10"
+          >
+            Open session
+          </.link>
+        </div>
+      </div>
+
+      <div :if={!@proof} class="flex flex-col mt-28 items-center gap-4 text-center">
+        <div>
+          <h1 class="text-[clamp(2rem,4vw,3.4rem)] leading-tight font-semibold">
+            Proof not found
+          </h1>
+        </div>
+
+        <p class="text-lg text-muted-foreground">
+          No proof bundle exists with this identifier.
+        </p>
+        <.link
+          navigate={~p"/proofs"}
+          class="rounded-md border border-input bg-background px-5 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-primary transition hover:border-primary inline-flex items-center gap-2"
+        >
+          <.icon name="hero-arrow-left" class="w-4 h-4" /> Browse proofs
+        </.link>
+      </div>
+
+      <div :if={@proof} class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
+        <div class="rounded-2xl border  p-6 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-[18px]">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Task
+          </p>
+          <strong>{@proof.task.title}</strong>
+        </div>
+        <div class="rounded-2xl border  p-6 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-[18px]">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Version
+          </p>
+          <strong>v{@proof.version}</strong>
+        </div>
+        <div class="rounded-2xl border  p-6 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-[18px]">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Risk score
+          </p>
+          <strong>{@proof.risk_score}</strong>
+        </div>
+        <div class="rounded-2xl border  p-6 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-[18px]">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Deploy ready
+          </p>
+          <strong>{if @proof.deploy_ready, do: "Yes", else: "No"}</strong>
+        </div>
+      </div>
+
+      <div
+        :if={@proof}
+        class="mt-6"
+      >
+        <div class="rounded-2xl border p-6 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-[18px]">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-2">
+            Snapshot
+          </p>
+          <div class="grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
+            <div>
+              <h3>Session</h3>
+              <p class="text-muted-foreground">{@proof.session.title}</p>
+            </div>
+            <div>
+              <h3>Generated</h3>
+              <p class="text-muted-foreground">
+                {format_datetime(@proof.generated_at, "Not recorded")}
+              </p>
+            </div>
+            <div>
+              <h3>Open findings</h3>
+              <p class="text-muted-foreground">{@proof.open_findings_count}</p>
+            </div>
+            <div>
+              <h3>Blocked findings</h3>
+              <p class="text-muted-foreground">{@proof.blocked_findings_count}</p>
+            </div>
+            <div>
+              <h3>Domain pack</h3>
+              <p class="text-muted-foreground">
+                {format_domain_pack(get_in(@proof.session.execution_brief || %{}, ["domain_pack"]))}
+              </p>
+            </div>
+          </div>
+
+          <p class="mt-6 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Compliance attestations
+          </p>
+          <ul class="m-0 grid gap-4 p-0 list-none">
+            <%= for attestation <- List.wrap(@proof.bundle["compliance_attestations"]) do %>
+              <li>
+                {format_domain_pack(attestation["pack"])}: {attestation["status"]} ({attestation[
+                  "blocked_count"
+                ]} blocked)
+              </li>
+            <% end %>
+          </ul>
+
+          <div class="mt-6 space-y-2">
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+              Rollback instructions
+            </p>
+
+            <pre class="m-0 rounded-2xl border bg-[rgba(255,255,255,0.03)] w-fit p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words">{@proof.bundle["rollback_instructions"]}</pre>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 mt-6 gap-4">
+            <div class="space-y-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                Related memory
+              </p>
+
+              <div class="rounded-2xl border p-4">
+                <%= if @memory_hits == [] do %>
+                  <p class="text-muted-foreground">
+                    No related memory hits for this task yet.
+                  </p>
+                <% else %>
+                  <ul class="m-0 grid gap-4 p-0 list-none">
+                    <%= for hit <- @memory_hits do %>
+                      <li>
+                        <strong>{hit.title}</strong>
+                        <p class="text-muted-foreground">{hit.summary}</p>
+                      </li>
+                    <% end %>
+                  </ul>
+                <% end %>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                Finding resolution summary
+              </p>
+
+              <div class="rounded-2xl border p-6 grid grid-cols-2 gap-4">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                    Approved
+                  </p>
+                  <strong>
+                    {get_in(@proof.bundle, ["finding_resolution_summary", "approved"]) || 0}
+                  </strong>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                    Resolved
+                  </p>
+                  <strong>
+                    {get_in(@proof.bundle, ["finding_resolution_summary", "resolved"]) || 0}
+                  </strong>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                    Open
+                  </p>
+                  <strong>
+                    {get_in(@proof.bundle, ["finding_resolution_summary", "open"]) || 0}
+                  </strong>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                    Blocked
+                  </p>
+                  <strong>
+                    {get_in(@proof.bundle, ["finding_resolution_summary", "blocked"]) || 0}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="mt-6 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            Assessment summary
+          </p>
+          <div class="mt-4 grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
+            <div class="rounded-xl border p-5">
+              <div class="flex items-center justify-between mb-4">
+                <p class="text-xs font-semibold uppercase tracking-[0.14em]">
+                  Surface verification
+                </p>
+                <% ver_status = bundle_get(@proof, ["verification_assessment", "status"]) %>
+                <span
+                  :if={ver_status}
+                  class={[
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider",
+                    verification_status_color(ver_status)
+                  ]}
+                >
+                  {ver_status}
+                </span>
+              </div>
+              <div class="flex items-baseline gap-2 mb-4">
+                <% ver_score = bundle_get(@proof, ["verification_assessment", "score"]) %>
+                <span class={[
+                  "text-3xl font-bold tabular-nums",
+                  verification_score_color(ver_score)
+                ]}>
+                  {ver_score || "—"}
+                </span>
+                <span :if={ver_score} class="text-sm text-muted-foreground">/ 100</span>
+                <span
+                  :if={bundle_get(@proof, ["verification_assessment", "verification_ready"]) == true}
+                  class="ml-auto inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+                >
+                  <.icon name="hero-check-circle" class="w-3.5 h-3.5" /> Ready
+                </span>
+              </div>
+              <% ver_evidence = bundle_get(@proof, ["verification_assessment", "evidence"], %{}) %>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <span class="text-muted-foreground">Passed checks</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {ver_evidence["passed_checks"] || 0}
+                </span>
+                <span class="text-muted-foreground">Task checks (strong)</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {ver_evidence["passed_task_checks"] || 0} / {ver_evidence[
+                    "passed_strong_task_checks"
+                  ] || 0}
+                </span>
+                <span class="text-muted-foreground">Failed checks</span>
+                <span class="text-right font-medium tabular-nums text-destructive">
+                  {ver_evidence["failed_task_checks"] || 0}
+                </span>
+                <span class="text-muted-foreground">External regressions</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {ver_evidence["external_regressions"] || 0}
+                </span>
+              </div>
+            </div>
+
+            <div class="rounded-xl border p-5">
+              <p class="text-xs font-semibold uppercase tracking-[0.14em] mb-4">
+                Task check counts
+              </p>
+              <% task_checks = bundle_get(@proof, ["task_checks"], %{}) %>
+              <% ch_total = task_checks["total"] || 0 %>
+              <% ch_passed = task_checks["passed"] || 0 %>
+              <% ch_failed = task_checks["failed"] || 0 %>
+              <% ch_warn = task_checks["warn"] || 0 %>
+              <div class="flex items-baseline gap-2 mb-4">
+                <span class="text-3xl font-bold tabular-nums text-foreground">{ch_total}</span>
+                <span class="text-sm text-muted-foreground">total</span>
+                <span class="ml-auto flex gap-3 text-sm tabular-nums">
+                  <span class="text-primary">{ch_passed} passed</span>
+                  <span class="text-destructive">{ch_failed} failed</span>
+                  <span class="text-[var(--ck-warning)]">{ch_warn} warn</span>
+                </span>
+              </div>
+              <% passed_pct = if ch_total > 0, do: round(ch_passed / ch_total * 100), else: 0 %>
+              <% failed_pct = if ch_total > 0, do: round(ch_failed / ch_total * 100), else: 0 %>
+              <div class="h-2 rounded-full bg-card overflow-hidden mb-4">
+                <div class="h-full flex">
+                  <div
+                    style={"width: #{passed_pct}%"}
+                    class="bg-primary transition-all rounded-l-full"
+                  >
+                  </div>
+                  <div style={"width: #{failed_pct}%"} class="bg-destructive transition-all"></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <span class="text-muted-foreground">Passed strong</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {task_checks["passed_strong"] || 0}
+                </span>
+                <span class="text-muted-foreground">Strongest proof</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {task_checks["strongest_proof_strength"] || "—"}
+                </span>
+                <span class="text-muted-foreground">Hashed outputs</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {task_checks["hashed_outputs"] || 0}
+                </span>
+                <span class="text-muted-foreground">Git refs</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {length(task_checks["git_shas"] || [])}
+                </span>
+              </div>
+            </div>
+
+            <div class="rounded-xl border p-5">
+              <div class="flex items-center justify-between mb-4">
+                <p class="text-xs font-semibold uppercase tracking-[0.14em]">
+                  Context integrity
+                </p>
+                <% ctx = bundle_get(@proof, ["runtime_context_integrity"], %{}) %>
+                <span class={[
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider",
+                  context_status_color(ctx["status"])
+                ]}>
+                  <.icon
+                    name={
+                      if ctx["status"] == "clean",
+                        do: "hero-check-circle",
+                        else: "hero-exclamation-triangle"
+                    }
+                    class="w-3.5 h-3.5"
+                  />
+                  {ctx["status"] || "Unknown"}
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <span class="text-muted-foreground">Partial reads</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {ctx["partial_read_count"] || 0}
+                </span>
+                <span class="text-muted-foreground">Compactions</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {ctx["compaction_count"] || 0}
+                </span>
+                <span :if={ctx["compaction_source"]} class="text-muted-foreground">
+                  Compaction source
+                </span>
+                <span
+                  :if={ctx["compaction_source"]}
+                  class="text-right font-medium tabular-nums text-foreground"
+                >
+                  {ctx["compaction_source"]}
+                </span>
+              </div>
+              <div :if={ctx["latest_compaction_reason"]} class="mt-3 rounded-lg bg-card/50 p-3">
+                <p class="text-xs text-muted-foreground mb-1">Latest compaction</p>
+                <p class="text-sm text-muted-foreground">{ctx["latest_compaction_reason"]}</p>
+              </div>
+            </div>
+
+            <div class="rounded-xl border p-5">
+              <div class="flex items-center justify-between mb-4">
+                <p class="text-xs font-semibold uppercase tracking-[0.14em]">
+                  Deploy readiness
+                </p>
+                <span class={[
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider",
+                  deploy_badge_class(@proof.deploy_ready)
+                ]}>
+                  <.icon
+                    name={if @proof.deploy_ready, do: "hero-check-circle", else: "hero-x-circle"}
+                    class="w-3.5 h-3.5"
+                  />
+                  {if @proof.deploy_ready, do: "Ready", else: "Not ready"}
+                </span>
+              </div>
+              <div class="flex items-center gap-3 mb-4">
+                <div class="flex-1">
+                  <div class="flex justify-between text-sm mb-1">
+                    <span class="text-muted-foreground">Risk score</span>
+                    <span class="font-medium tabular-nums">{@proof.risk_score}</span>
+                  </div>
+                  <div class="h-2 rounded-full bg-card overflow-hidden">
+                    <div
+                      style={"width: #{risk_bar_width(@proof.risk_score)}%"}
+                      class={[
+                        "h-full rounded-full transition-all",
+                        @proof.risk_score <= 0.3 && "bg-primary",
+                        @proof.risk_score > 0.3 && @proof.risk_score <= 0.6 &&
+                          "bg-[var(--ck-warning)]",
+                        @proof.risk_score > 0.6 && "bg-destructive"
+                      ]}
+                    >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <span class="text-muted-foreground">Validation gate</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {@proof.bundle["validation_gate"] || "—"}
+                </span>
+                <span class="text-muted-foreground">Open findings</span>
+                <span class="text-right font-medium tabular-nums text-[var(--ck-warning)]">
+                  {@proof.open_findings_count}
+                </span>
+                <span class="text-muted-foreground">Blocked findings</span>
+                <span class="text-right font-medium tabular-nums text-destructive">
+                  {@proof.blocked_findings_count}
+                </span>
+                <span class="text-muted-foreground">Compliance packs</span>
+                <span class="text-right font-medium tabular-nums text-foreground">
+                  {length(List.wrap(@proof.bundle["compliance_attestations"]))}
+                </span>
+              </div>
+              <div
+                :if={gate = bundle_get(@proof, ["security_workflow", "release_gate_decision"])}
+                class="mt-3"
+              >
+                <span class={[
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider",
+                  gate == "ready" && "border-primary/40 bg-primary/10 text-primary",
+                  gate == "blocked" && "border-destructive/40 bg-destructive/10 text-destructive"
+                ]}>
+                  Release gate: {gate}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <details class="mt-6 group">
+            <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary cursor-pointer hover:text-primary transition-colors list-none flex items-center gap-2">
+              <.icon
+                name="hero-chevron-right"
+                class="w-3.5 h-3.5 group-open:rotate-90 transition-transform"
+              /> Raw proof payload
+            </summary>
+            <pre class="m-0 mt-3 rounded-2xl border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words overflow-auto h-100">{Jason.encode!(@proof.bundle, pretty: true)}</pre>
+          </details>
+        </div>
+      </div>
+    </section>
+    """
   end
 
   def render(assigns) do
@@ -322,7 +801,7 @@ defmodule ControlKeelWeb.ProofBrowserLive do
                         </.link>
 
                         <.link
-                          navigate={proof_path(proof)}
+                          navigate={~p"/proofs/#{proof.id}"}
                           class="text-primary transition hover:text-primary border px-2 py-1 rounded-md"
                         >
                           View
@@ -468,19 +947,6 @@ defmodule ControlKeelWeb.ProofBrowserLive do
   defp risk_bar_width(nil), do: 0
   defp risk_bar_width(score) when is_float(score), do: min(round(score * 100), 100)
   defp risk_bar_width(_), do: 0
-
-  # Org-bound proofs deep-link into the session-scoped detail; unbound
-  # (local/orphan) rows fall back to the legacy session redirect, which
-  # resolves the nesting or 404s.
-  defp proof_path(proof) do
-    with %{session_id: session_id} when is_integer(session_id) <- proof,
-         %{workspace: %{slug: ws_slug, org: %{slug: org_slug}}} <-
-           Repo.preload(proof, session: [workspace: :org]) |> Map.get(:session) do
-      "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/proofs/#{proof.id}"
-    else
-      _ -> "/sessions/#{proof.session_id}"
-    end
-  end
 
   defp org_workspace_ids(nil), do: []
 

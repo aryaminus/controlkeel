@@ -663,8 +663,6 @@ defmodule ControlKeelWeb.MissionControlLive do
             </div>
           </div>
         </div>
-
-
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

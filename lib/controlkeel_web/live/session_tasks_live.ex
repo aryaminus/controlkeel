@@ -215,7 +215,10 @@ defmodule ControlKeelWeb.SessionTasksLive do
                   No dependency edges are recorded yet. When tasks include architecture, feature, and release tracks, edges appear here grouped by source.
                 </p>
               <% else %>
-                <div class="divide-y divide-border overflow-hidden rounded-xl border" id="mission-task-edges">
+                <div
+                  class="divide-y divide-border overflow-hidden rounded-xl border"
+                  id="mission-task-edges"
+                >
                   <%= for {from_id, edges} <- @task_graph.edges |> Enum.group_by(& &1.from_task_id) |> Enum.sort_by(fn {id, _} -> id end) do %>
                     <div class="bg-muted/[0.03] p-3">
                       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -267,7 +270,8 @@ defmodule ControlKeelWeb.SessionTasksLive do
               <th class="bg-muted px-5 py-3 font-semibold">Confidence</th>
               <th class="bg-muted px-5 py-3 font-semibold">Ready</th>
               <th class="bg-muted px-5 py-3 font-semibold">Validation gate</th>
-              <th class="bg-muted px-5 py-3 font-semibold w-px whitespace-nowrap last:rounded-tr-2xl"></th>
+              <th class="bg-muted px-5 py-3 font-semibold w-px whitespace-nowrap last:rounded-tr-2xl">
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
@@ -276,7 +280,8 @@ defmodule ControlKeelWeb.SessionTasksLive do
                 id={"task-row-#{task.id}"}
                 class={[
                   "transition hover:bg-muted/30",
-                  @current_task && @current_task.id == task.id && "bg-primary/5 ring-1 ring-primary/20"
+                  @current_task && @current_task.id == task.id &&
+                    "bg-primary/5 ring-1 ring-primary/20"
                 ]}
               >
                 <td class="max-w-sm px-5 py-4">
@@ -375,12 +380,18 @@ defmodule ControlKeelWeb.SessionTasksLive do
                       id={"task-menu-#{task.id}"}
                       class={[
                         "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/20",
-                        if task == List.last(@session.tasks) do "bottom-full mb-1" else "top-full mt-1" end
+                        if task == List.last(@session.tasks) do
+                          "bottom-full mb-1"
+                        else
+                          "top-full mt-1"
+                        end
                       ]}
                       phx-click-away={
                         JS.hide(to: "#task-menu-#{task.id}")
                         |> JS.remove_class("z-50", to: "#task-actions-wrapper-#{task.id}")
-                        |> JS.set_attribute({"aria-expanded", "false"}, to: "#task-actions-#{task.id}")
+                        |> JS.set_attribute({"aria-expanded", "false"},
+                          to: "#task-actions-#{task.id}"
+                        )
                       }
                     >
                       <button
@@ -390,7 +401,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
                         phx-click={
                           JS.hide(to: "#task-menu-#{task.id}")
                           |> JS.remove_class("z-50", to: "#task-actions-wrapper-#{task.id}")
-                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#task-actions-#{task.id}")
+                          |> JS.set_attribute({"aria-expanded", "false"},
+                            to: "#task-actions-#{task.id}"
+                          )
                           |> JS.push("complete_task", value: %{id: task.id})
                         }
                       >
@@ -402,7 +415,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
                         phx-click={
                           JS.hide(to: "#task-menu-#{task.id}")
                           |> JS.remove_class("z-50", to: "#task-actions-wrapper-#{task.id}")
-                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#task-actions-#{task.id}")
+                          |> JS.set_attribute({"aria-expanded", "false"},
+                            to: "#task-actions-#{task.id}"
+                          )
                           |> JS.push("generate_proof", value: %{id: task.id})
                         }
                       >
@@ -415,7 +430,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
                         phx-click={
                           JS.hide(to: "#task-menu-#{task.id}")
                           |> JS.remove_class("z-50", to: "#task-actions-wrapper-#{task.id}")
-                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#task-actions-#{task.id}")
+                          |> JS.set_attribute({"aria-expanded", "false"},
+                            to: "#task-actions-#{task.id}"
+                          )
                           |> JS.push("pause_task", value: %{id: task.id})
                         }
                       >
@@ -428,7 +445,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
                         phx-click={
                           JS.hide(to: "#task-menu-#{task.id}")
                           |> JS.remove_class("z-50", to: "#task-actions-wrapper-#{task.id}")
-                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#task-actions-#{task.id}")
+                          |> JS.set_attribute({"aria-expanded", "false"},
+                            to: "#task-actions-#{task.id}"
+                          )
                           |> JS.push("resume_task", value: %{id: task.id})
                         }
                       >
@@ -436,14 +455,14 @@ defmodule ControlKeelWeb.SessionTasksLive do
                       </button>
                       <.link
                         :if={Map.get(@latest_proofs, task.id)}
-                        navigate={
-                          ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"
-                        }
+                        navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"}
                         class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
                         phx-click={
                           JS.hide(to: "#task-menu-#{task.id}")
                           |> JS.remove_class("z-50", to: "#task-actions-wrapper-#{task.id}")
-                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#task-actions-#{task.id}")
+                          |> JS.set_attribute({"aria-expanded", "false"},
+                            to: "#task-actions-#{task.id}"
+                          )
                         }
                       >
                         View proof

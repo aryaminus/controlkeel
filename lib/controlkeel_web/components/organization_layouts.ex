@@ -667,12 +667,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-exclamation-triangle"
       },
       %{
-        label: "Proofs",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/proofs",
-        scope: :session_section,
-        icon: "hero-shield-check"
-      },
-      %{
         label: "Reviews",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/reviews",
         scope: :session_section,
