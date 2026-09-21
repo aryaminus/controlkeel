@@ -726,13 +726,21 @@ defmodule ControlKeelWeb.MissionControlLive do
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
             Recent transcript
           </p>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
               {@current_transcript_summary["total_events"] || 0} events
             </span>
             <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
               {length(@current_recent_events)} recent
             </span>
+            <.link
+              navigate={
+                ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/transcript"
+              }
+              class="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary transition cursor-pointer"
+            >
+              View transcript <.icon name="hero-arrow-right" class="size-3" />
+            </.link>
           </div>
         </div>
         <%= if @current_recent_events == [] do %>

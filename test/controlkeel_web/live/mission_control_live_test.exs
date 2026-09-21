@@ -588,4 +588,15 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
       refute has_element?(view, "#task-complete-#{done_task.id}")
     end
   end
+
+  test "mission control links the recent transcript section to the session transcript page", %{
+    conn: conn
+  } do
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
+
+    assert html =~ "Recent transcript"
+    assert html =~ org_session_path(org, ws, session, "/transcript")
+  end
 end

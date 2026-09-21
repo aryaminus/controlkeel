@@ -242,6 +242,7 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id", SessionProofLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/transcript", SessionTranscriptLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
     end
   end

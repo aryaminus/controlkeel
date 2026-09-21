@@ -683,6 +683,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/deploy-review",
         scope: :session_section,
         icon: "hero-cloud-arrow-up"
+      },
+      %{
+        label: "Transcript",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/transcript",
+        scope: :session_section,
+        icon: "hero-clock"
       }
     ]
   end
