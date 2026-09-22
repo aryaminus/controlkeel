@@ -315,26 +315,6 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "done, unverified"
   end
 
-  test "ship readiness section surfaces session-specific posture and a verdict", %{conn: conn} do
-    {org, ws, session} = org_bound_session_fixture(%{title: "Ship verdict session"})
-    task = task_fixture(%{session: session, status: "done"})
-
-    finding_fixture(%{session: session, status: "blocked", title: "Blocked ship finding"})
-    {:ok, _proof} = Mission.generate_proof_bundle(task.id)
-
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
-
-    assert html =~ "Ship readiness"
-    # Blocked finding forces a Blocked verdict.
-    assert html =~ "Blocked"
-    # Session-specific posture metrics migrated from /ship.
-    assert html =~ "Proof-backed tasks"
-    assert html =~ "Deploy-ready rate"
-    assert html =~ "Autonomy posture"
-    assert html =~ "Outcome alignment"
-    assert html =~ "Ship verdict session"
-  end
-
   describe "complete task" do
     test "completes an eligible task and surfaces the new proof", %{conn: conn} do
       {org, ws, session} =

@@ -701,6 +701,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/release",
         scope: :session_section,
         icon: "hero-rocket-launch"
+      },
+      %{
+        label: "Ship",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/ship",
+        scope: :session_section,
+        icon: "hero-check-badge"
       }
     ]
   end
