@@ -649,7 +649,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   defp session_nav_items(org_slug, ws_slug, session_id) do
     # Ordered by operator priority: daily work surfaces first (tasks,
     # findings, reviews), then health and shipping (ship, release), then
-    # history and continuity (transcript, resume packet), then occasional
+    # history and continuity (activity, resume packet), then occasional
     # reference (deploy review, connect), with interim external bridges last.
     [
       %{
@@ -689,8 +689,8 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-rocket-launch"
       },
       %{
-        label: "Transcript",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/transcript",
+        label: "Activity",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/activity",
         scope: :session_section,
         icon: "hero-clock"
       },

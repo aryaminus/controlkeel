@@ -1,7 +1,8 @@
-defmodule ControlKeelWeb.SessionTranscriptLive do
+defmodule ControlKeelWeb.SessionActivityLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Mission
+  alias ControlKeel.Platform
 
   @refresh_interval_ms 2_000
   @initial_event_limit 50
@@ -71,9 +72,9 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
         label: session.title,
         to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
       },
-      %{label: "Transcript", to: nil}
+      %{label: "Activity", to: nil}
     ])
-    |> assign(:page_title, "#{session.title} — Transcript")
+    |> assign(:page_title, "#{session.title} — Activity")
     |> assign(:session, session)
     |> assign_transcript()
   end
@@ -85,6 +86,10 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
     socket
     |> assign(:transcript_summary, Mission.transcript_summary(session_id))
     |> assign(:recent_events, Mission.list_session_events(session_id, limit))
+    |> assign(
+      :latest_audit_export,
+      Platform.list_audit_exports(session_id, 1) |> List.first()
+    )
   end
 
   @impl true
@@ -124,8 +129,8 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
     ~H"""
     <div class="space-y-6">
       <.page_title
-        title="Transcript"
-        subtitle="Every recorded event for this governed run, newest first."
+        title="Activity"
+        subtitle="Event feed and audit exports for this governed run."
       />
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -283,6 +288,31 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
             </button>
           </div>
         <% end %>
+      </section>
+
+      <section class="rounded-2xl border bg-card p-5 shadow-card">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <.section_title>Audit exports</.section_title>
+            <p class="mt-1 text-sm text-muted-foreground">
+              Export a checksummed record of this session's governed activity.
+            </p>
+            <p :if={@latest_audit_export} class="mt-2 text-xs text-muted-foreground">
+              Last export ({@latest_audit_export.format}):
+              <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2" aria-label="Audit log exports">
+            <.link
+              :for={format <- ~w(json csv pdf)}
+              id={"activity-audit-export-#{format}"}
+              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
+              class="rounded-lg border border-border bg-transparent px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              {String.upcase(format)}
+            </.link>
+          </div>
+        </div>
       </section>
     </div>
     """

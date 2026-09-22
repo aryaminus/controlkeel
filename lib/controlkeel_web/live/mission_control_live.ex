@@ -4,7 +4,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Analytics
   alias ControlKeel.Intent
   alias ControlKeel.Mission
-  alias ControlKeel.Platform
   alias ControlKeelWeb.FindingComponents
 
   @refresh_interval_ms 2_000
@@ -359,31 +358,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         </div>
       </div>
 
-      <section class="rounded-2xl border bg-card p-5 shadow-card">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <.section_title>Audit log</.section_title>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Export a record of this session's governed activity.
-            </p>
-            <p :if={@latest_audit_export} class="mt-2 text-xs text-muted-foreground">
-              Last export ({@latest_audit_export.format}):
-              <code class="font-mono break-all">{@latest_audit_export.checksum}</code>
-            </p>
-          </div>
-          <div class="flex flex-wrap items-center gap-2" aria-label="Audit log exports">
-            <.link
-              :for={format <- ~w(json csv pdf)}
-              id={"mission-audit-export-#{format}"}
-              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
-              class="rounded-lg border border-border bg-transparent px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            >
-              {String.upcase(format)}
-            </.link>
-          </div>
-        </div>
-      </section>
-
       <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
           Session metrics
@@ -581,7 +555,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         :active_tasks,
         Enum.count(session.tasks || [], &(&1.status in ["queued", "in_progress"]))
       )
-      |> assign(:latest_audit_export, nil)
       |> assign(:task_graph, %{tasks: session.tasks || [], edges: []})
   end
 
@@ -615,7 +588,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
       compliance_score: compliance_score(session.findings),
       latest_proofs: Mission.latest_proof_bundles_for_session(session.id),
-      latest_audit_export: Platform.list_audit_exports(session.id, 1) |> List.first(),
       current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
       current_workspace_context: Mission.workspace_context(session),
       task_graph: task_graph,

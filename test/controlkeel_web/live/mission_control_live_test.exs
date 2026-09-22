@@ -385,7 +385,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     end
   end
 
-  test "mission control reaches the session transcript through the session sidebar", %{
+  test "mission control reaches session activity through the session sidebar", %{
     conn: conn
   } do
     {org, ws, session} = org_bound_session_fixture()
@@ -393,6 +393,6 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     refute html =~ "Recent transcript"
-    assert html =~ org_session_path(org, ws, session, "/transcript")
+    assert html =~ org_session_path(org, ws, session, "/activity")
   end
 end

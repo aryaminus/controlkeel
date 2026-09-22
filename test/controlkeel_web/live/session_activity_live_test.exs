@@ -1,4 +1,4 @@
-defmodule ControlKeelWeb.SessionTranscriptLiveTest do
+defmodule ControlKeelWeb.SessionActivityLiveTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
@@ -6,11 +6,11 @@ defmodule ControlKeelWeb.SessionTranscriptLiveTest do
 
   alias ControlKeel.Mission
 
-  test "session transcript toggles event details by clicking the event card", %{conn: conn} do
+  test "session activity toggles event details by clicking the event card", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session, title: "Toggle task"})
 
-    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
 
     refute html =~ "View event details"
     # The task event body ("Brief approved") stays hidden until the card is expanded.
@@ -30,13 +30,13 @@ defmodule ControlKeelWeb.SessionTranscriptLiveTest do
     refute collapsed_html =~ "Brief approved"
   end
 
-  test "session transcript lists events newest first with types and actors", %{conn: conn} do
+  test "session activity lists events newest first with types and actors", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session, title: "Wire the timeline"})
 
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
 
-    assert html =~ "Transcript"
+    assert html =~ "Activity"
     assert html =~ "Session created: ControlKeel Session"
     assert html =~ "Task created: Wire the timeline"
     assert html =~ "task.created"
@@ -47,43 +47,43 @@ defmodule ControlKeelWeb.SessionTranscriptLiveTest do
     refute after_session =~ "Task created: Wire the timeline"
   end
 
-  test "session transcript links events to session-scoped task and finding pages", %{conn: conn} do
+  test "session activity links events to session-scoped task and finding pages", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session, title: "Linked task"})
     finding_fixture(%{session: session, title: "Linked finding"})
 
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
 
     assert html =~ org_session_path(org, ws, session, "/tasks")
     assert html =~ org_session_path(org, ws, session, "/findings")
     assert html =~ "Finding created: Linked finding"
   end
 
-  test "session transcript links to the run observability timeline", %{conn: conn} do
+  test "session activity links to the run observability timeline", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
 
     assert html =~ ~p"/observability/sessions/#{session.id}/timeline"
   end
 
-  test "session transcript renders the session sidebar with Transcript active", %{conn: conn} do
+  test "session activity renders the session sidebar with Transcript active", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
 
     assert html =~ "sidebar-org-nav"
-    assert html =~ "Transcript"
+    assert html =~ "Activity"
     refute html =~ "Service accounts"
 
-    transcript_href = org_session_path(org, ws, session, "/transcript")
+    transcript_href = org_session_path(org, ws, session, "/activity")
     assert html =~ ~s(href="#{transcript_href}")
   end
 
-  test "session transcript refreshes as new events are recorded", %{conn: conn} do
+  test "session activity refreshes as new events are recorded", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
     refute html =~ "Task created: Refresh task"
 
     task_fixture(%{session: session, title: "Refresh task"})
@@ -92,30 +92,42 @@ defmodule ControlKeelWeb.SessionTranscriptLiveTest do
     assert render(view) =~ "Task created: Refresh task"
   end
 
-  test "session transcript keeps the recorded-event count in view", %{conn: conn} do
+  test "session activity keeps the recorded-event count in view", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session})
 
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
 
     assert html =~ "Showing 2 of 2 recorded events."
     assert html =~ "session · 1"
     assert html =~ "task · 1"
   end
 
-  test "session transcript redirects when the session does not exist", %{conn: conn} do
+  test "session activity exposes audit export downloads", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
+
+    assert html =~ "Audit exports"
+    assert html =~ ~s(id="activity-audit-export-json")
+    assert html =~ ~s(id="activity-audit-export-csv")
+    assert html =~ ~s(id="activity-audit-export-pdf")
+    assert html =~ "/observability/sessions/#{session.id}/audit-log/json"
+  end
+
+  test "session activity redirects when the session does not exist", %{conn: conn} do
     assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
              live(conn, "/acme/workspaces/core/sessions/999999/transcript")
   end
 
-  test "session transcript redirects when the workspace slug disagrees", %{conn: conn} do
+  test "session activity redirects when the workspace slug disagrees", %{conn: conn} do
     {org, _ws, session} = org_bound_session_fixture()
 
     assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => _}}}} =
              live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/transcript")
   end
 
-  test "session transcript redirects when the org slug disagrees", %{conn: conn} do
+  test "session activity redirects when the org slug disagrees", %{conn: conn} do
     {_org, ws, session} = org_bound_session_fixture()
 
     assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => _}}}} =
