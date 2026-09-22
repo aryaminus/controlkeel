@@ -3,13 +3,11 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   alias ControlKeel.Analytics
   alias ControlKeel.Agent.AutonomyLoop
-  alias ControlKeel.Governance
   alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeel.Observability
   alias ControlKeel.Platform
   alias ControlKeelWeb.FindingComponents
-  alias ControlKeelWeb.ReleaseReadiness
   alias ControlKeelWeb.ShipReadiness
 
   @refresh_interval_ms 2_000
@@ -54,8 +52,7 @@ defmodule ControlKeelWeb.MissionControlLive do
              |> assign(:launched, Map.get(params, "launched") == "1")
              |> assign(:selected_finding, nil)
              |> assign(:selected_fix, nil)
-             |> safe_assign_session(session)
-             |> assign_release_readiness(release_form_defaults(), false)}
+             |> safe_assign_session(session)}
         end
     end
   end
@@ -161,8 +158,7 @@ defmodule ControlKeelWeb.MissionControlLive do
           {:noreply,
            socket
            |> put_flash(:info, "Finding approved.")
-           |> safe_assign_session(session)
-           |> refresh_release_readiness()}
+           |> safe_assign_session(session)}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
@@ -188,8 +184,7 @@ defmodule ControlKeelWeb.MissionControlLive do
           {:noreply,
            socket
            |> put_flash(:info, "Finding rejected.")
-           |> safe_assign_session(session)
-           |> refresh_release_readiness()}
+           |> safe_assign_session(session)}
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
@@ -205,27 +200,10 @@ defmodule ControlKeelWeb.MissionControlLive do
       {:noreply,
        socket
        |> put_flash(:info, "Proof bundle generated.")
-       |> safe_assign_session(session)
-       |> refresh_release_readiness()}
+       |> safe_assign_session(session)}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
     end
-  end
-
-  @impl true
-  def handle_event("check_release_readiness", %{"release" => params}, socket) do
-    form_params = Map.merge(release_form_defaults(), params)
-
-    socket =
-      socket
-      |> assign(:release_form_params, form_params)
-      |> assign_release_readiness(form_params, true)
-
-    {:noreply,
-     case socket.assigns.release_readiness do
-       nil -> socket
-       _readiness -> put_flash(socket, :info, "Release readiness checked.")
-     end}
   end
 
   @impl true
@@ -265,8 +243,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       {:noreply,
        socket
        |> put_flash(:info, "Task paused.")
-       |> safe_assign_session(session)
-       |> refresh_release_readiness()}
+       |> safe_assign_session(session)}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
     end
@@ -281,8 +258,7 @@ defmodule ControlKeelWeb.MissionControlLive do
       {:noreply,
        socket
        |> put_flash(:info, "Task resumed.")
-       |> safe_assign_session(session)
-       |> refresh_release_readiness()}
+       |> safe_assign_session(session)}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
     end
@@ -294,7 +270,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         socket
 
       session ->
-        socket |> safe_assign_session(session) |> refresh_release_readiness()
+        socket |> safe_assign_session(session)
     end
   end
 
@@ -554,12 +530,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         autonomy_profile={@autonomy_profile}
         outcome_profile={@outcome_profile}
         agent_outcomes={@ship_agent_outcomes}
-      />
-
-      <ReleaseReadiness.release_readiness
-        readiness={@release_readiness}
-        form={@release_form}
-        session_id={@session.id}
       />
 
       <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
@@ -824,75 +794,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
-
-  defp release_form_defaults do
-    %{
-      "smoke_status" => "",
-      "smoke_run" => "",
-      "artifact_source" => "",
-      "sha" => "",
-      "provenance_verified" => "false"
-    }
-  end
-
-  # Release readiness is isolated (like safe_assign_session) so a gate failure
-  # can never take down the periodic refresh loop. Mutation-triggered refreshes
-  # pass `record_telemetry: false`; only explicit operator checks record telemetry.
-  defp assign_release_readiness(socket, form_params, record_telemetry) do
-    readiness =
-      socket.assigns.session.id
-      |> release_readiness_opts(form_params)
-      |> Map.put(:record_telemetry, record_telemetry)
-      |> Governance.release_readiness()
-      |> case do
-        {:ok, readiness} -> readiness
-        {:error, _reason} -> nil
-      end
-
-    socket
-    |> assign(:release_readiness, readiness)
-    |> assign(:release_form, to_form(form_params, as: :release))
-  rescue
-    e ->
-      require Logger
-      Logger.warning("MissionControlLive release readiness rescued: #{inspect(e)}")
-
-      socket
-      |> assign(:release_readiness, nil)
-      |> assign(:release_form, to_form(form_params, as: :release))
-  end
-
-  defp refresh_release_readiness(socket) do
-    assign_release_readiness(
-      socket,
-      socket.assigns[:release_form_params] || release_form_defaults(),
-      false
-    )
-  end
-
-  defp release_readiness_opts(session_id, params) do
-    %{
-      session_id: session_id,
-      sha: blank_to_nil(params["sha"]),
-      smoke: %{
-        "status" => blank_to_nil(params["smoke_status"]),
-        "run_id" => blank_to_nil(params["smoke_run"])
-      },
-      provenance: %{
-        "verified" => params["provenance_verified"] in [true, "true"],
-        "artifact_source" => blank_to_nil(params["artifact_source"])
-      }
-    }
-  end
-
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp blank_to_nil(_value), do: nil
 
   defp current_task(tasks) do
     Enum.find(tasks, &(&1.status == "in_progress")) ||

@@ -695,6 +695,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/connect",
         scope: :session_section,
         icon: "hero-link"
+      },
+      %{
+        label: "Release",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/release",
+        scope: :session_section,
+        icon: "hero-rocket-launch"
       }
     ]
   end
