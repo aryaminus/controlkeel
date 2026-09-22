@@ -562,11 +562,10 @@ defmodule ControlKeelWeb.MissionControlLive do
         session_id={@session.id}
       />
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Execution brief
-          </p>
+      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
+          Execution brief
+        </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
             <div>
               <h3 class="text-sm font-semibold text-muted-foreground mb-1">Domain pack</h3>
@@ -603,7 +602,7 @@ defmodule ControlKeelWeb.MissionControlLive do
           </div>
         </div>
 
-        <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20">
+        <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
             Production boundary
           </p>
@@ -662,60 +661,37 @@ defmodule ControlKeelWeb.MissionControlLive do
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Workspace context
-          </p>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <span>{workspace_status_label(@current_workspace_context)}</span>
-            <span>{get_in(@current_workspace_context, ["git", "branch"]) || "no-branch"}</span>
-            <span>
-              {String.slice(
-                get_in(@current_workspace_context, ["git", "head_sha"]) || "unknown",
-                0,
-                7
-              )}
-            </span>
-          </div>
-          <p class="text-sm text-muted-foreground mt-3">
-            {@current_workspace_context["summary_text"]}
-          </p>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <span>
-              {length(@current_workspace_context["instruction_files"] || [])} instructions
-            </span>
-            <span>{length(@current_workspace_context["key_files"] || [])} key files</span>
-          </div>
-          <details class="mt-4">
-            <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary cursor-pointer select-none">
-              View raw workspace JSON
-            </summary>
-            <pre class="p-4 max-h-96 overflow-auto border rounded-2xl bg-muted/[0.03] text-sm text-[#f2e6c9] font-mono whitespace-pre-wrap break-all leading-relaxed mt-4">{Jason.encode!(@current_workspace_context, pretty: true)}</pre>
-          </details>
+      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
+          Workspace context
+        </p>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <span>{workspace_status_label(@current_workspace_context)}</span>
+          <span>{get_in(@current_workspace_context, ["git", "branch"]) || "no-branch"}</span>
+          <span>
+            {String.slice(
+              get_in(@current_workspace_context, ["git", "head_sha"]) || "unknown",
+              0,
+              7
+            )}
+          </span>
         </div>
-
-        <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Relevant memory
-          </p>
-          <%= if @current_memory_hits == [] do %>
-            <p class="text-sm text-muted-foreground mt-3">
-              No matching memory has been captured for this task yet.
-            </p>
-          <% else %>
-            <ul class="space-y-3 list-none p-0 m-0 mt-3">
-              <%= for hit <- @current_memory_hits do %>
-                <li>
-                  <strong>{hit.title}</strong>
-                  <p class="text-sm text-muted-foreground">{hit.summary}</p>
-                </li>
-              <% end %>
-            </ul>
-          <% end %>
+        <p class="text-sm text-muted-foreground mt-3">
+          {@current_workspace_context["summary_text"]}
+        </p>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <span>
+            {length(@current_workspace_context["instruction_files"] || [])} instructions
+          </span>
+          <span>{length(@current_workspace_context["key_files"] || [])} key files</span>
         </div>
+        <details class="mt-4">
+          <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary cursor-pointer select-none">
+            View raw workspace JSON
+          </summary>
+          <pre class="p-4 max-h-96 overflow-auto border rounded-2xl bg-muted/[0.03] text-sm text-[#f2e6c9] font-mono whitespace-pre-wrap break-all leading-relaxed mt-4">{Jason.encode!(@current_workspace_context, pretty: true)}</pre>
+        </details>
       </div>
 
       <FindingComponents.autofix_panel
@@ -792,7 +768,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       latest_audit_export: Platform.list_audit_exports(session.id, 1) |> List.first(),
       observability: Observability.session_run(session),
       current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
-      current_memory_hits: current_memory_hits(session),
       current_workspace_context: Mission.workspace_context(session),
       task_graph: task_graph,
       task_title_by_id: task_title_by_id,
@@ -924,18 +899,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       Enum.find(tasks, &(&1.status == "paused")) ||
       Enum.find(tasks, &(&1.status == "blocked")) ||
       Enum.find(tasks, &(&1.status == "queued"))
-  end
-
-  defp current_memory_hits(session) do
-    case current_task(session.tasks) do
-      nil ->
-        []
-
-      task ->
-        session
-        |> ControlKeel.Memory.retrieve_for_task(task, findings: session.findings, top_k: 5)
-        |> Map.get(:entries, [])
-    end
   end
 
   # Ship-readiness verdict, derived from the session's improvement loop signals.
