@@ -38,6 +38,7 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
             {:ok,
              socket
              |> assign(:event_limit, @initial_event_limit)
+             |> assign(:expanded_events, MapSet.new())
              |> assign_session(session)}
         end
     end
@@ -94,6 +95,20 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
       nil -> {:noreply, socket}
       session -> {:noreply, assign_session(socket, session)}
     end
+  end
+
+  @impl true
+  def handle_event("toggle_event", %{"id" => id}, socket) do
+    event_id = to_string(id)
+
+    expanded_events =
+      if MapSet.member?(socket.assigns.expanded_events, event_id) do
+        MapSet.delete(socket.assigns.expanded_events, event_id)
+      else
+        MapSet.put(socket.assigns.expanded_events, event_id)
+      end
+
+    {:noreply, assign(socket, :expanded_events, expanded_events)}
   end
 
   @impl true
@@ -168,16 +183,36 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
         <%= if @recent_events == [] do %>
           <p class="mt-6 text-sm text-muted-foreground">No transcript events recorded yet.</p>
         <% else %>
-          <ul class="mt-5 space-y-2 list-none p-0 m-0">
+          <ul class="mt-5 divide-y divide-border list-none p-0 m-0 border-y">
             <%= for event <- @recent_events do %>
               <li
                 id={"transcript-event-#{event["id"]}"}
-                class="rounded-xl border bg-card px-4 py-3 transition hover:bg-muted/30"
+                phx-click={event_details?(event) && "toggle_event"}
+                phx-value-id={event["id"]}
+                phx-keydown={event_details?(event) && "toggle_event"}
+                phx-key="Enter"
+                role={event_details?(event) && "button"}
+                tabindex={event_details?(event) && "0"}
+                aria-expanded={event_details?(event) && to_string(expanded?(@expanded_events, event))}
+                class={[
+                  "px-4 py-3 transition hover:bg-muted/30",
+                  event_details?(event) && "cursor-pointer"
+                ]}
               >
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <strong class="text-sm font-medium text-foreground">{event["summary"]}</strong>
-                  <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2 py-0.5 text-[0.65rem] text-muted-foreground">
-                    {event["event_type"]}
+                  <span class="flex items-center gap-1.5">
+                    <.icon
+                      :if={event_details?(event)}
+                      name="hero-chevron-down"
+                      class={[
+                        "size-4 text-muted-foreground transition-transform",
+                        expanded?(@expanded_events, event) && "rotate-180"
+                      ]}
+                    />
+                    <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2 py-0.5 text-[0.65rem] text-muted-foreground">
+                      {event["event_type"]}
+                    </span>
                   </span>
                 </div>
                 <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -215,19 +250,20 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
                     Review #{event["review_id"]}
                   </.link>
                 </div>
-                <details :if={event_details?(event)} class="mt-3">
-                  <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary cursor-pointer select-none">
-                    View event details
-                  </summary>
+                <div
+                  :if={expanded?(@expanded_events, event) and event_details?(event)}
+                  id={"transcript-event-details-#{event["id"]}"}
+                  class="mt-3 space-y-3"
+                >
                   <pre
                     :if={is_binary(event["body"]) and event["body"] != ""}
-                    class="mt-3 p-3 border rounded-lg bg-muted/[0.03] text-xs text-muted-foreground whitespace-pre-wrap break-words"
+                    class="p-3 border rounded-lg bg-muted/[0.03] text-xs text-muted-foreground whitespace-pre-wrap break-words"
                   >{event["body"]}</pre>
                   <pre
                     :if={map_size(event["payload"] || %{}) > 0}
-                    class="mt-3 p-3 max-h-72 overflow-auto border rounded-lg bg-muted/[0.03] text-xs font-mono whitespace-pre-wrap break-all"
+                    class="p-3 max-h-72 overflow-auto border rounded-lg bg-muted/[0.03] text-xs font-mono whitespace-pre-wrap break-all"
                   >{Jason.encode!(event["payload"], pretty: true)}</pre>
-                </details>
+                </div>
               </li>
             <% end %>
           </ul>
@@ -268,6 +304,9 @@ defmodule ControlKeelWeb.SessionTranscriptLive do
     (is_binary(event["body"]) and event["body"] != "") or
       map_size(event["payload"] || %{}) > 0
   end
+
+  defp expanded?(expanded_events, event),
+    do: MapSet.member?(expanded_events, to_string(event["id"]))
 
   defp event_timestamp(nil), do: "unknown"
 

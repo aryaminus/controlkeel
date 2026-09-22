@@ -4,6 +4,32 @@ defmodule ControlKeelWeb.SessionTranscriptLiveTest do
   import Phoenix.LiveViewTest
   import ControlKeel.MissionFixtures
 
+  alias ControlKeel.Mission
+
+  test "session transcript toggles event details by clicking the event card", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+    task_fixture(%{session: session, title: "Toggle task"})
+
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/transcript"))
+
+    refute html =~ "View event details"
+    # The task event body ("Brief approved") stays hidden until the card is expanded.
+    refute html =~ "Brief approved"
+
+    [event] =
+      session.id
+      |> Mission.list_session_events()
+      |> Enum.filter(&(&1["event_type"] == "task.created"))
+
+    expanded_html = render_click(element(view, "#transcript-event-#{event["id"]}"))
+
+    assert expanded_html =~ "Brief approved"
+    assert expanded_html =~ "transcript-event-details-#{event["id"]}"
+
+    collapsed_html = render_click(element(view, "#transcript-event-#{event["id"]}"))
+    refute collapsed_html =~ "Brief approved"
+  end
+
   test "session transcript lists events newest first with types and actors", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session, title: "Wire the timeline"})
