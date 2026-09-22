@@ -278,7 +278,7 @@ defmodule ControlKeelWeb.Layouts do
         aria-expanded="false"
         aria-label="User menu"
         class={[
-          "transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded",
+          "transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded",
           if(@compact,
             do:
               "flex items-center gap-2 rounded-full px-1 py-1 text-sm font-semibold text-muted-foreground hover:text-foreground",
