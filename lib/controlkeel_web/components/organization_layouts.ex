@@ -683,6 +683,18 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/transcript",
         scope: :session_section,
         icon: "hero-clock"
+      },
+      %{
+        label: "Resume packet",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/resume-packet",
+        scope: :session_section,
+        icon: "hero-play"
+      },
+      %{
+        label: "Connect",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/connect",
+        scope: :session_section,
+        icon: "hero-link"
       }
     ]
   end

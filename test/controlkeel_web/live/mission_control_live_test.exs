@@ -94,10 +94,14 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Build the first governed workflow"
-    assert html =~ "/proxy/openai/"
-    assert html =~ "/v1/completions"
-    assert html =~ "/v1/embeddings"
-    assert html =~ "/v1/models"
+
+    # Proxy endpoints have moved to the session connect page
+    refute html =~ "/proxy/openai/"
+    {:ok, _cview, chtml} = live(conn, org_session_path(org, ws, session, "/connect"))
+    assert chtml =~ "/proxy/openai/"
+    assert chtml =~ "/v1/completions"
+    assert chtml =~ "/v1/embeddings"
+    assert chtml =~ "/v1/models"
 
     # Findings feed has moved to session findings page
     refute html =~ "Findings feed"
@@ -276,7 +280,10 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
     render_click(element(view, "#current-task-pause-#{task.id}"))
     assert Mission.get_task!(task.id).status == "paused"
-    assert render(view) =~ "Resume packet"
+
+    {:ok, _rview, rhtml} = live(conn, org_session_path(org, ws, session, "/resume-packet"))
+    assert rhtml =~ "Resume packet"
+    assert rhtml =~ task.title
 
     render_click(element(view, "#current-task-resume-#{task.id}"))
     assert Mission.get_task!(task.id).status == "in_progress"

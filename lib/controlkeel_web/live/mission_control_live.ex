@@ -8,7 +8,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Mission
   alias ControlKeel.Observability
   alias ControlKeel.Platform
-  alias ControlKeel.Proxy
   alias ControlKeelWeb.FindingComponents
   alias ControlKeelWeb.ReleaseReadiness
   alias ControlKeelWeb.ShipReadiness
@@ -719,77 +718,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         </div>
       </div>
 
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-          Resume packet
-        </p>
-        <%= if @current_resume_packet do %>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <span>{length(@current_resume_packet["unresolved_findings"])} unresolved</span>
-            <span>{length(@current_resume_packet["latest_invocations"])} recent runs</span>
-            <span>{length(@current_resume_packet["memory_hits"])} memory hits</span>
-          </div>
-          <details class="mt-4">
-            <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary cursor-pointer select-none">
-              View resume packet JSON
-            </summary>
-            <pre class="p-4 max-h-96 overflow-auto border rounded-2xl bg-muted/[0.03] text-sm text-[#f2e6c9] font-mono whitespace-pre-wrap break-all leading-relaxed mt-4">{Jason.encode!(@current_resume_packet, pretty: true)}</pre>
-          </details>
-        <% else %>
-          <p class="text-sm text-muted-foreground mt-3">
-            Pause a task to capture a durable resume packet.
-          </p>
-        <% end %>
-
-        <p class="mt-6 pt-6 border-t text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-          Proxy endpoints
-        </p>
-        <div class="grid grid-cols-2 gap-3 mt-3">
-          <a
-            href={@proxy_urls.openai_responses}
-            class="block rounded-xl border bg-muted/[0.03] px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            OpenAI responses
-          </a>
-          <a
-            href={@proxy_urls.openai_chat}
-            class="block rounded-xl border bg-muted/[0.03] px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            OpenAI chat
-          </a>
-          <a
-            href={@proxy_urls.openai_completions}
-            class="block rounded-xl border bg-muted/[0.03] px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            OpenAI completions
-          </a>
-          <a
-            href={@proxy_urls.openai_embeddings}
-            class="block rounded-xl border bg-muted/[0.03] px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            OpenAI embeddings
-          </a>
-          <a
-            href={@proxy_urls.openai_models}
-            class="block rounded-xl border bg-muted/[0.03] px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            OpenAI models
-          </a>
-          <a
-            href={@proxy_urls.openai_realtime}
-            class="block rounded-xl border bg-muted/[0.03] px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            OpenAI realtime
-          </a>
-          <a
-            href={@proxy_urls.anthropic_messages}
-            class="block rounded-xl border bg-muted/[0.03] px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            Anthropic messages
-          </a>
-        </div>
-      </div>
-
       <FindingComponents.autofix_panel
         :if={@selected_finding && @selected_fix}
         finding={@selected_finding}
@@ -866,12 +794,10 @@ defmodule ControlKeelWeb.MissionControlLive do
       current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
       current_memory_hits: current_memory_hits(session),
       current_workspace_context: Mission.workspace_context(session),
-      current_resume_packet: current_resume_packet(session),
       task_graph: task_graph,
       task_title_by_id: task_title_by_id,
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent")),
-      proxy_urls: Proxy.endpoint_urls(session),
       autonomy_profile: autonomy_profile,
       outcome_profile: outcome_profile,
       improvement_loop: improvement_loop,
@@ -1009,19 +935,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         session
         |> ControlKeel.Memory.retrieve_for_task(task, findings: session.findings, top_k: 5)
         |> Map.get(:entries, [])
-    end
-  end
-
-  defp current_resume_packet(session) do
-    case current_task(session.tasks) do
-      nil ->
-        nil
-
-      task ->
-        case Mission.resume_packet(task.id) do
-          {:ok, packet} -> packet
-          _error -> nil
-        end
     end
   end
 
