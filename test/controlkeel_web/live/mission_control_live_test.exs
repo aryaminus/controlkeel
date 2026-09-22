@@ -268,7 +268,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     {:ok, view, html} = live(conn, org_session_path(org, ws, session))
 
     assert html =~ "Workspace context"
-    assert html =~ "Recent transcript"
+    refute html =~ "Recent transcript"
 
     render_click(element(view, "#current-task-generate-proof-#{task.id}"))
     assert render(view) =~ "Proof bundle generated."
@@ -589,14 +589,14 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     end
   end
 
-  test "mission control links the recent transcript section to the session transcript page", %{
+  test "mission control reaches the session transcript through the session sidebar", %{
     conn: conn
   } do
     {org, ws, session} = org_bound_session_fixture()
 
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
-    assert html =~ "Recent transcript"
+    refute html =~ "Recent transcript"
     assert html =~ org_session_path(org, ws, session, "/transcript")
   end
 end
