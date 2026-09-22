@@ -86,16 +86,16 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert %{"error" => "session not found"} = json_response(conn, 404)
   end
 
-  test "mission control links to dedicated observability page", %{conn: conn} do
+  test "mission control session nav bridges to the dedicated observability page", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session})
 
     {:ok, _view, html} =
       live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}")
 
-    assert html =~ "mission-observability-open"
-    assert html =~ "Open run observability"
-    assert html =~ "/observability/sessions/#{session.id}"
+    assert html =~ "sidebar-org-nav"
+    assert html =~ "Observability"
+    assert html =~ ~s(href="/observability/sessions/#{session.id}")
   end
 
   test "observability page renders audit log export controls and checksums", %{conn: conn} do

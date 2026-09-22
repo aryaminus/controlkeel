@@ -4,7 +4,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Analytics
   alias ControlKeel.Intent
   alias ControlKeel.Mission
-  alias ControlKeel.Observability
   alias ControlKeel.Platform
   alias ControlKeelWeb.FindingComponents
 
@@ -360,110 +359,6 @@ defmodule ControlKeelWeb.MissionControlLive do
         </div>
       </div>
 
-      <div
-        id="mission-observability-panel"
-        class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6"
-      >
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6 mb-4">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Session run observability
-            </p>
-            <h2 class="m-0 text-xl font-bold text-foreground">{@observability.health.label}</h2>
-            <p class="text-sm text-muted-foreground mt-1.5">
-              Compact local-first view of health, events, findings, gates, memory, proofs, and cost.
-            </p>
-          </div>
-          <div class="flex flex-wrap items-center justify-end gap-3">
-            <span
-              id="mission-observability-health"
-              class={obs_health_pill_class(@observability.health.status)}
-            >
-              {@observability.health.status}
-            </span>
-            <.link
-              id="mission-observability-open"
-              navigate={~p"/observability/sessions/#{@session.id}"}
-              class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary transition bg-transparent border-0 p-0 cursor-pointer"
-            >
-              Open run observability
-            </.link>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
-          <div
-            id="mission-observability-budget"
-            class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg"
-          >
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Budget health
-            </p>
-            <strong>{@observability.budget["decision"] || "unknown"}</strong>
-            <p class="text-xs text-muted-foreground mt-1">
-              {format_currency(@observability.budget["spent_cents"] || 0)} / {format_currency(
-                @observability.budget["session_budget_cents"] || 0
-              )} used
-            </p>
-          </div>
-          <div
-            id="mission-observability-findings"
-            class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg"
-          >
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Findings
-            </p>
-            <strong>{@observability.findings.active} active</strong>
-            <p class="text-xs text-muted-foreground mt-1">
-              {@observability.findings.critical} critical · {@observability.findings.high} high · {@observability.findings.blocked} blocked
-            </p>
-          </div>
-          <div
-            id="mission-observability-gates"
-            class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg"
-          >
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Gates
-            </p>
-            <strong>{@observability.gates.pending_reviews} pending</strong>
-            <p class="text-xs text-muted-foreground mt-1">
-              {@observability.gates.total_reviews} total review gates
-            </p>
-            <.link
-              navigate={
-                ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/reviews"
-              }
-              class="inline-flex items-center gap-1 mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary transition cursor-pointer"
-            >
-              View all <.icon name="hero-arrow-right" class="size-3" />
-            </.link>
-          </div>
-          <div
-            id="mission-observability-timeline"
-            class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg"
-          >
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Timeline
-            </p>
-            <strong>{@observability.timeline.count} events</strong>
-            <p class="text-xs text-muted-foreground mt-1">
-              {@observability.memory.records} memory · {@observability.proofs.count} proofs · {@observability.hosts_models_tools.invocations} calls
-            </p>
-          </div>
-        </div>
-
-        <div class="mt-4">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Recommendations
-          </p>
-          <ul id="mission-observability-recommendations" class="space-y-2 list-none p-0 m-0">
-            <%= for recommendation <- Enum.take(@observability.recommendations, 3) do %>
-              <li>{recommendation}</li>
-            <% end %>
-          </ul>
-        </div>
-      </div>
-
       <section class="rounded-2xl border bg-card p-5 shadow-card">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -721,7 +616,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       compliance_score: compliance_score(session.findings),
       latest_proofs: Mission.latest_proof_bundles_for_session(session.id),
       latest_audit_export: Platform.list_audit_exports(session.id, 1) |> List.first(),
-      observability: Observability.session_run(session),
       current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
       current_workspace_context: Mission.workspace_context(session),
       task_graph: task_graph,
@@ -765,18 +659,6 @@ defmodule ControlKeelWeb.MissionControlLive do
       "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(255,207,107,0.12)] text-[#fff0bf]"
 
   defp task_status_pill_class(_status),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
-
-  defp obs_health_pill_class("red"),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(255,143,107,0.12)] text-[#ffd6cb]"
-
-  defp obs_health_pill_class("yellow"),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(255,207,107,0.12)] text-[#fff0bf]"
-
-  defp obs_health_pill_class(_status),
     do:
       "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
 

@@ -133,7 +133,9 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "$40/month to start"
   end
 
-  test "mission control renders compact observability panel", %{conn: conn} do
+  test "mission control drops the observability panel and bridges to the run page", %{
+    conn: conn
+  } do
     {org, ws, session} =
       org_bound_session_fixture(%{
         budget_cents: 2_000,
@@ -152,24 +154,22 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
-    assert html =~ "mission-observability-panel"
-    assert html =~ "Session run observability"
-    assert html =~ "mission-observability-health"
-    assert html =~ "mission-observability-budget"
-    assert html =~ "mission-observability-findings"
-    assert html =~ "mission-observability-recommendations"
+    refute html =~ "mission-observability-panel"
+    refute html =~ "Session run observability"
+    assert html =~ "Observability"
+    assert html =~ ~s(href="/observability/sessions/#{session.id}")
+  end
   end
 
   test "mission control links to the session review queue page", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     review_fixture(%{session: session, submitted_by: "opencode"})
 
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/reviews"))
 
-    assert html =~ "1 total review gates"
+    assert html =~ "1 total"
     assert html =~ "1 pending"
     assert html =~ org_session_path(org, ws, session, "/reviews")
-    assert html =~ "View all"
   end
 
   test "mission control denies mismatched slugs with a generic not-found", %{conn: conn} do
