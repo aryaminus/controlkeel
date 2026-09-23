@@ -6,6 +6,10 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
   @refresh_interval_ms 2_000
 
+  # Collections skipped on refetch: tasks page reads tasks + findings only.
+  # Uses `LIMIT 0` (valid Ecto, returns []) instead of loading them.
+  @refresh_opts [invocations_limit: 0, reviews_limit: 0]
+
   @impl true
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
@@ -62,7 +66,6 @@ defmodule ControlKeelWeb.SessionTasksLive do
     |> assign(:page_title, "#{session.title} — Tasks")
     |> assign(:session, session)
     |> assign(:current_task, current)
-    |> assign(:current_proof_summary, current |> Mission.proof_summary_for_task())
     |> assign(:latest_proofs, Mission.latest_proof_bundles_for_session(session.id))
     |> assign(:task_graph, task_graph)
     |> assign(:task_title_by_id, task_title_by_id)
@@ -74,9 +77,7 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    opts = [invocations_limit: 0, reviews_limit: 0]
-
-    case Mission.get_session_context(socket.assigns.session.id, opts) do
+    case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
@@ -127,11 +128,17 @@ defmodule ControlKeelWeb.SessionTasksLive do
          %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
          {:ok, _proof} <- Mission.generate_proof_bundle(task.id),
          session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Proof bundle generated.")
-       |> assign_session(session)}
+           Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
+      case SessionScope.reauthorize(socket, session) do
+        {:ok, session} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Proof bundle generated.")
+           |> assign_session(session)}
+
+        {:error, :not_found} ->
+          {:noreply, SessionScope.session_not_found(socket)}
+      end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
     end
@@ -141,13 +148,19 @@ defmodule ControlKeelWeb.SessionTasksLive do
   def handle_event("pause_task", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
          %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
-         {:ok, _result} <- Mission.pause_task(task.id, "mission_control"),
+         {:ok, _result} <- Mission.pause_task(task.id, "session_tasks"),
          session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task paused.")
-       |> assign_session(session)}
+           Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
+      case SessionScope.reauthorize(socket, session) do
+        {:ok, session} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Task paused.")
+           |> assign_session(session)}
+
+        {:error, :not_found} ->
+          {:noreply, SessionScope.session_not_found(socket)}
+      end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
     end
@@ -157,22 +170,34 @@ defmodule ControlKeelWeb.SessionTasksLive do
   def handle_event("resume_task", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
          %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
-         {:ok, _result} <- Mission.resume_task(task.id, "mission_control"),
+         {:ok, _result} <- Mission.resume_task(task.id, "session_tasks"),
          session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task resumed.")
-       |> assign_session(session)}
+           Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
+      case SessionScope.reauthorize(socket, session) do
+        {:ok, session} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Task resumed.")
+           |> assign_session(session)}
+
+        {:error, :not_found} ->
+          {:noreply, SessionScope.session_not_found(socket)}
+      end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
     end
   end
 
   defp refresh_session_after_mutation(socket) do
-    case Mission.get_session_context(socket.assigns.session.id) do
-      nil -> socket
-      session -> assign_session(socket, session)
+    case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
+      nil ->
+        SessionScope.session_not_found(socket)
+
+      session ->
+        case SessionScope.reauthorize(socket, session) do
+          {:ok, session} -> assign_session(socket, session)
+          {:error, :not_found} -> SessionScope.session_not_found(socket)
+        end
     end
   end
 
@@ -210,7 +235,7 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
           <div
             id="task-dependencies-popover"
-            class="hidden absolute right-0 top-full z-30 mt-2 w-full max-w-2xl rounded-2xl border bg-card shadow-2xl shadow-black/20"
+            class="hidden absolute right-0 top-full z-30 mt-2 w-full max-w-2xl rounded-2xl border bg-card shadow-card"
             style="width: min(72rem, 98vw)"
           >
             <div class="max-h-[60vh] overflow-y-auto pr-1">
@@ -383,7 +408,7 @@ defmodule ControlKeelWeb.SessionTasksLive do
                     <div
                       id={"task-menu-#{task.id}"}
                       class={[
-                        "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/20",
+                        "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-card",
                         if task == List.last(@session.tasks) do
                           "bottom-full mb-1"
                         else
@@ -552,10 +577,14 @@ defmodule ControlKeelWeb.SessionTasksLive do
   defp task_verification_label(task, _proof_summary),
     do: if(done_unverified?(task), do: "unverified", else: "verification pending")
 
-  defp parse_id(value) do
-    case Integer.parse(to_string(value)) do
+  defp parse_id(value) when is_integer(value), do: {:ok, value}
+
+  defp parse_id(value) when is_binary(value) do
+    case Integer.parse(value) do
       {parsed, ""} -> {:ok, parsed}
       _ -> {:error, :invalid_id}
     end
   end
+
+  defp parse_id(_value), do: {:error, :invalid_id}
 end

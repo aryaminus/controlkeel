@@ -89,7 +89,6 @@ defmodule ControlKeelWeb.SessionReleaseLive do
 
     socket =
       socket
-      |> assign(:release_form_params, form_params)
       |> assign_release_readiness(form_params, true)
 
     {:noreply,
@@ -114,6 +113,17 @@ defmodule ControlKeelWeb.SessionReleaseLive do
             Release readiness could not be evaluated for this session yet. Submit the evidence below to run the gate.
           </p>
         <% else %>
+          <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Gate verdict
+            </p>
+            <span
+              id="release-readiness-status"
+              class={status_badge_class(@release_readiness["status"])}
+            >
+              {status_label(@release_readiness["status"])}
+            </span>
+          </div>
           <div class="w-full flex flex-col gap-6 mt-6 lg:flex-row">
             <div class="flex-1">
               <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
@@ -126,29 +136,12 @@ defmodule ControlKeelWeb.SessionReleaseLive do
                 phx-submit="check_release_readiness"
                 class="flex flex-col gap-3 "
               >
-                <div>
-                  <label
-                    for="release-smoke-status"
-                    class="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground/90"
-                  >
-                    Smoke status
-                  </label>
-                  <select
-                    id="release-smoke-status"
-                    name="release[smoke_status]"
-                    class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
-                  >
-                    <option value="" selected={@release_form[:smoke_status].value in [nil, ""]}>
-                      Not run yet
-                    </option>
-                    <option value="success" selected={@release_form[:smoke_status].value == "success"}>
-                      Passed
-                    </option>
-                    <option value="failed" selected={@release_form[:smoke_status].value == "failed"}>
-                      Failed
-                    </option>
-                  </select>
-                </div>
+                <.input
+                  field={@release_form[:smoke_status]}
+                  type="select"
+                  label="Smoke status"
+                  options={["Not run yet": "", Passed: "success", Failed: "failed"]}
+                />
                 <.input_component
                   field={@release_form[:smoke_run]}
                   label="Smoke run URL or note"
@@ -346,6 +339,22 @@ defmodule ControlKeelWeb.SessionReleaseLive do
       }
     }
   end
+
+  defp status_badge_class("ready"),
+    do:
+      "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] bg-success/15 text-success border-success/30"
+
+  defp status_badge_class("blocked"),
+    do:
+      "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] bg-destructive/15 text-destructive border-destructive/30"
+
+  defp status_badge_class(_status),
+    do:
+      "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] bg-warning/15 text-warning border-warning/30"
+
+  defp status_label("needs-review"), do: "needs review"
+  defp status_label(status) when is_binary(status), do: status
+  defp status_label(nil), do: "not checked"
 
   defp blank_to_nil(value) when is_binary(value) do
     case String.trim(value) do

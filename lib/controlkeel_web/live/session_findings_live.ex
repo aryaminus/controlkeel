@@ -7,6 +7,10 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
   @refresh_interval_ms 2_000
 
+  # Collections skipped on refetch: findings page reads findings only.
+  # Uses `LIMIT 0` (valid Ecto, returns []) instead of loading them.
+  @refresh_opts [tasks_limit: 0, invocations_limit: 0, reviews_limit: 0]
+
   @impl true
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
@@ -54,6 +58,13 @@ defmodule ControlKeelWeb.SessionFindingsLive do
         _ -> nil
       end
 
+    # Preserve the open modal's fix across ticks instead of recomputing it.
+    selected_fix =
+      case {selected_finding, socket.assigns[:selected_fix]} do
+        {%{}, fix} when is_map(fix) -> fix
+        {finding, _} -> maybe_regenerate_fix(finding)
+      end
+
     socket
     |> assign(:nav_org, org)
     |> assign(:nav_workspace, workspace)
@@ -71,14 +82,12 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     |> assign(:page_title, "#{session.title} — Findings")
     |> assign(:session, session)
     |> assign(:selected_finding, selected_finding)
-    |> assign(:selected_fix, maybe_regenerate_fix(selected_finding))
+    |> assign(:selected_fix, selected_fix)
   end
 
   @impl true
   def handle_info(:refresh, socket) do
-    opts = [tasks_limit: 0, invocations_limit: 0, reviews_limit: 0]
-
-    case Mission.get_session_context(socket.assigns.session.id, opts) do
+    case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
@@ -138,12 +147,19 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.approve_finding(finding, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
+      case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
         nil ->
-          {:noreply, socket}
+          {:noreply, SessionScope.session_not_found(socket)}
 
         session ->
-          {:noreply, socket |> put_flash(:info, "Finding approved.") |> assign_session(session)}
+          case SessionScope.reauthorize(socket, session) do
+            {:ok, session} ->
+              {:noreply,
+               socket |> put_flash(:info, "Finding approved.") |> assign_session(session)}
+
+            {:error, :not_found} ->
+              {:noreply, SessionScope.session_not_found(socket)}
+          end
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
@@ -161,12 +177,19 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.reject_finding(finding, reason, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
+      case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
         nil ->
-          {:noreply, socket}
+          {:noreply, SessionScope.session_not_found(socket)}
 
         session ->
-          {:noreply, socket |> put_flash(:info, "Finding rejected.") |> assign_session(session)}
+          case SessionScope.reauthorize(socket, session) do
+            {:ok, session} ->
+              {:noreply,
+               socket |> put_flash(:info, "Finding rejected.") |> assign_session(session)}
+
+            {:error, :not_found} ->
+              {:noreply, SessionScope.session_not_found(socket)}
+          end
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
@@ -178,12 +201,19 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.escalate_finding(finding, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
+      case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
         nil ->
-          {:noreply, socket}
+          {:noreply, SessionScope.session_not_found(socket)}
 
         session ->
-          {:noreply, socket |> put_flash(:info, "Finding escalated.") |> assign_session(session)}
+          case SessionScope.reauthorize(socket, session) do
+            {:ok, session} ->
+              {:noreply,
+               socket |> put_flash(:info, "Finding escalated.") |> assign_session(session)}
+
+            {:error, :not_found} ->
+              {:noreply, SessionScope.session_not_found(socket)}
+          end
       end
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not escalate finding.")}
@@ -259,7 +289,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                     <div
                       id={"finding-menu-#{finding.id}"}
                       class={[
-                        "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/20",
+                        "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-card",
                         if finding == List.last(@session.findings) do
                           "bottom-full mb-1"
                         else
@@ -379,12 +409,16 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     )
   end
 
-  defp parse_id(value) do
-    case Integer.parse(to_string(value)) do
+  defp parse_id(value) when is_integer(value), do: {:ok, value}
+
+  defp parse_id(value) when is_binary(value) do
+    case Integer.parse(value) do
       {parsed, ""} -> {:ok, parsed}
       _ -> {:error, :invalid_id}
     end
   end
+
+  defp parse_id(_value), do: {:error, :invalid_id}
 
   defp actor_opts(socket) do
     case socket.assigns[:current_user] do

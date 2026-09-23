@@ -62,7 +62,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
       end
 
     workspace = session.workspace
-    org = workspace.org
+    org = workspace && workspace.org
 
     socket
     |> assign(:nav_org, org)

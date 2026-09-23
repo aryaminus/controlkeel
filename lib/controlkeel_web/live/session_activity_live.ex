@@ -101,7 +101,8 @@ defmodule ControlKeelWeb.SessionActivityLive do
   end
 
   @impl true
-  def handle_event("toggle_event", %{"id" => id}, socket) do
+  def handle_event("toggle_event", %{"id" => id}, socket)
+      when is_binary(id) or is_integer(id) or is_atom(id) do
     event_id = to_string(id)
 
     expanded_events =
@@ -112,6 +113,10 @@ defmodule ControlKeelWeb.SessionActivityLive do
       end
 
     {:noreply, assign(socket, :expanded_events, expanded_events)}
+  end
+
+  def handle_event("toggle_event", _params, socket) do
+    {:noreply, socket}
   end
 
   @impl true

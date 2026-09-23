@@ -85,7 +85,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         case SessionScope.reauthorize(socket, session) do
           {:ok, session} ->
             if connected?(socket), do: schedule_refresh()
-            {:noreply, socket |> assign_session(session)}
+            {:noreply, tick_assign(socket, session)}
 
           {:error, :not_found} ->
             {:noreply, SessionScope.session_not_found(socket)}
@@ -513,20 +513,37 @@ defmodule ControlKeelWeb.MissionControlLive do
       require Logger
       Logger.warning("MissionControlLive assign_session rescued: #{inspect(e)}")
 
+      # Degraded but renderable: every assign the template reads gets a default
+      # so a partial failure can't turn into a certain KeyError on render.
+      findings = if is_list(session.findings), do: session.findings, else: []
+
       socket
       |> assign(:session, session)
       |> assign(:workspace, session.workspace)
       |> assign_session_nav(session)
       |> assign(:page_title, session.title)
+      |> assign(:sibling_sessions, [])
+      |> assign(:agent_label, "Not specified")
       |> assign(
         :active_findings,
-        Enum.count(session.findings || [], &(&1.status in ["open", "blocked"]))
+        Enum.count(findings, &(&1.status in ["open", "blocked"]))
       )
-      |> assign(
-        :active_tasks,
-        Enum.count(session.tasks || [], &(&1.status in ["queued", "in_progress"]))
-      )
-      |> assign(:task_graph, %{tasks: session.tasks || [], edges: []})
+      |> assign(:compliance_score, compliance_score(findings))
+      |> assign(:session_metrics, default_session_metrics(session.id))
+      |> assign(:brief, %{})
+      |> assign(:compiler, %{})
+      |> assign(:boundary_summary, Intent.boundary_summary(%{}))
+      |> assign(:latest_proofs, %{})
+      |> assign(:current_workspace_context, %{"available" => false})
+  end
+
+  defp tick_assign(socket, session) do
+    assign_session(socket, session)
+  rescue
+    e ->
+      require Logger
+      Logger.warning("MissionControlLive tick assign rescued: #{inspect(e)}")
+      socket
   end
 
   defp assign_session(socket, session) do

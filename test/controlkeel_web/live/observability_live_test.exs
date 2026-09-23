@@ -121,24 +121,24 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     refute html =~ "unknown time"
   end
 
-  test "mission control header shows audit log export controls and latest checksum", %{
+  test "session activity page shows audit log export controls and latest checksum", %{
     conn: conn
   } do
     {org, ws, session} = org_bound_session_fixture()
 
     {:ok, view, html} =
-      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}")
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/activity")
 
-    assert has_element?(view, "#mission-audit-export-json")
-    assert has_element?(view, "#mission-audit-export-csv")
-    assert has_element?(view, "#mission-audit-export-pdf")
+    assert has_element?(view, "#activity-audit-export-json")
+    assert has_element?(view, "#activity-audit-export-csv")
+    assert has_element?(view, "#activity-audit-export-pdf")
     assert html =~ "/observability/sessions/#{session.id}/audit-log/csv"
     refute html =~ "Last export"
 
     assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "csv")
 
     {:ok, _view, html} =
-      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}")
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/activity")
 
     assert html =~ "Last export (csv)"
     assert html =~ export.checksum

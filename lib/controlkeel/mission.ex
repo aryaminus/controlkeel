@@ -843,6 +843,20 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  @doc """
+  Loads a session with only its workspace/org preloaded — no task, finding,
+  invocation, review, or edge collections. For refresh paths that read
+  collections through dedicated by-id queries (or not at all).
+  """
+  def get_session_nav(id) do
+    Session
+    |> Repo.get(id)
+    |> case do
+      nil -> nil
+      session -> Repo.preload(session, workspace: :org)
+    end
+  end
+
   def get_session_context(id, opts) when is_list(opts) do
     Session
     |> Repo.get(id)
@@ -864,21 +878,6 @@ defmodule ControlKeel.Mission do
           invocations: build_limited_query(Invocation, :inserted_at, invocations_limit, :desc),
           reviews: build_reviews_limited_query(reviews_limit)
         )
-    end
-  end
-
-  @doc """
-  Loads a session with only its workspace/org preloaded — no tasks, findings,
-  invocations, reviews, or edges. For LiveViews whose tick reads collections
-  through dedicated by-id queries (or not at all) instead of the preloaded
-  associations, so the 2s refresh stays at two small queries.
-  """
-  def get_session_nav(id) do
-    Session
-    |> Repo.get(id)
-    |> case do
-      nil -> nil
-      session -> Repo.preload(session, workspace: :org)
     end
   end
 

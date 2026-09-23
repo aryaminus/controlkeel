@@ -120,7 +120,7 @@ defmodule ControlKeelWeb.SessionReleaseLiveTest do
       })
 
     assert updated_html =~ "1 blocking finding(s) remain unresolved."
-    assert updated_html =~ "findings?session_id=#{session.id}&amp;status=open"
+    assert updated_html =~ org_session_path(org, ws, session, "/findings")
   end
 
   test "records telemetry only for explicit checks, not mount or auto-refresh", %{conn: conn} do

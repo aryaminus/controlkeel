@@ -34,7 +34,7 @@ defmodule ControlKeelWeb.SessionConnectLiveTest do
 
     {:ok, view, _html} = live(conn, org_session_path(org, ws, session, "/connect"))
 
-    render_click(element(view, "button[phx-click=\"copy_endpoint\"]"))
+    render_click(element(view, "#copy-endpoint-openai-0"))
 
     assert_push_event(view, "copy-to-clipboard", %{text: text})
     assert text =~ "/proxy/openai/"

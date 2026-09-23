@@ -124,16 +124,19 @@ defmodule ControlKeelWeb.SessionConnectLive do
         subtitle="Copy a session-scoped endpoint into any OpenAI-compatible client. Paste one as the base URL and the client runs through this session's governance: policy checks, budget metering, and a full audit trail. Treat these URLs like passwords — the token in each one grants access to this session."
       />
 
+      <.section_title>Proxy endpoints</.section_title>
+
       <%= for {provider, items} <- @endpoints do %>
         <section class="rounded-2xl border bg-card p-5 shadow-card">
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             {provider}
           </p>
           <ul class="mt-3 divide-y divide-border border-y list-none p-0 m-0">
-            <%= for {label, href} <- items do %>
+            <%= for {{label, href}, index} <- Enum.with_index(items) do %>
               <li>
                 <button
                   type="button"
+                  id={endpoint_button_id(provider, index)}
                   phx-click="copy_endpoint"
                   phx-value-url={href}
                   aria-label={"Copy #{provider} #{label} endpoint"}
@@ -154,6 +157,16 @@ defmodule ControlKeelWeb.SessionConnectLive do
       <% end %>
     </div>
     """
+  end
+
+  defp endpoint_button_id(provider, index) do
+    slug =
+      provider
+      |> String.downcase()
+      |> String.replace(~r/[^a-z0-9]+/, "-")
+      |> String.trim("-")
+
+    "copy-endpoint-#{slug}-#{index}"
   end
 
   defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)

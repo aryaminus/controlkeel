@@ -263,6 +263,12 @@ defmodule ControlKeelWeb.SessionShipLive do
   defp verdict_badge_class("progress"),
     do: "bg-info/15 text-info border-info/30"
 
+  defp verdict_badge_class(tone) when tone in ["review", "budget"],
+    do: "bg-warning/15 text-warning border-warning/30"
+
+  defp verdict_badge_class("proof"),
+    do: "bg-info/15 text-info border-info/30"
+
   defp verdict_badge_class(_),
     do: "bg-warning/15 text-warning border-warning/30"
 
