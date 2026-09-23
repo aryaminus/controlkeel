@@ -40,7 +40,7 @@ defmodule ControlKeelWeb.SessionObservabilityOverview do
         </div>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 gap-4">
         <div
           id="observability-health-card"
           class="rounded-xl p-4 border bg-[rgba(255,255,255,0.015)] space-y-2"
@@ -71,40 +71,6 @@ defmodule ControlKeelWeb.SessionObservabilityOverview do
             Rolling 24h: {format_currency(@run.budget["rolling_24h_spend_cents"] || 0)} / {format_currency(
               @run.budget["daily_budget_cents"] || 0
             )}
-          </p>
-        </div>
-
-        <div
-          id="observability-findings"
-          class="rounded-xl p-4 border bg-[rgba(255,255,255,0.015)] space-y-1"
-        >
-          <p class="text-muted-foreground uppercase tracking-[0.1em] text-[10px]">
-            Findings
-          </p>
-          <p class="text-2xl font-semibold">
-            {@run.findings.active} active / {@run.findings.total} total
-          </p>
-          <p class="text-muted-foreground text-xs">
-            {@run.findings.critical} critical · {@run.findings.high} high · {@run.findings.blocked} blocked
-          </p>
-          <.link
-            navigate={~p"/findings"}
-            class="text-sm text-primary font-semibold hover:opacity-80 transition-opacity"
-          >
-            Open findings →
-          </.link>
-        </div>
-
-        <div
-          id="observability-gates"
-          class="rounded-xl p-4 border bg-[rgba(255,255,255,0.015)] space-y-1"
-        >
-          <p class="text-muted-foreground uppercase tracking-[0.1em] text-[10px]">Gates</p>
-          <p class="text-2xl font-semibold">
-            {@run.gates.pending_reviews} pending
-          </p>
-          <p class="text-muted-foreground text-xs">
-            {@run.gates.total_reviews} total review gates
           </p>
         </div>
       </div>
@@ -275,29 +241,6 @@ defmodule ControlKeelWeb.SessionObservabilityOverview do
               </li>
             <% end %>
           </ul>
-        <% end %>
-      </div>
-
-      <div
-        id="observability-recent-findings"
-        class="rounded-xl p-4 border bg-[rgba(255,255,255,0.015)] space-y-2"
-      >
-        <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-          Recent findings
-        </p>
-        <%= if @run.findings.recent == [] do %>
-          <p class="text-muted-foreground text-sm">No findings recorded yet.</p>
-        <% else %>
-          <div class="space-y-2">
-            <%= for finding <- @run.findings.recent do %>
-              <div class="rounded-lg px-3 py-2 border bg-[rgba(255,255,255,0.02)]">
-                <p class="text-sm font-medium">{finding.title}</p>
-                <p class="text-muted-foreground text-xs">
-                  {finding.severity} / {finding.status} · {finding.rule_id}
-                </p>
-              </div>
-            <% end %>
-          </div>
         <% end %>
       </div>
     </section>

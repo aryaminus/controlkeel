@@ -39,19 +39,17 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert has_element?(view, "#observability-health-card")
     assert has_element?(view, "#session-observability-timeline")
     assert has_element?(view, "#session-observability-memory")
-    assert has_element?(view, "#observability-findings")
-    assert has_element?(view, "#observability-gates")
+    refute has_element?(view, "#observability-findings")
+    refute has_element?(view, "#observability-gates")
     assert has_element?(view, "#observability-costs")
     assert has_element?(view, "#observability-tools")
     assert has_element?(view, "#observability-recommendations")
     assert has_element?(view, "#observability-telemetry-export")
-    assert has_element?(view, "#observability-recent-findings")
+    refute has_element?(view, "#observability-recent-findings")
     refute has_element?(view, "#observability-timeline")
     assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/export.json"
     assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
-    assert html =~ ~s(href="#session-observability-timeline")
     assert html =~ ~s(href="#session-observability-memory")
-    assert html =~ "Observable finding"
   end
 
   test "observability page links the proofs card pre-filtered to the session", %{conn: conn} do
