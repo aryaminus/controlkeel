@@ -10,7 +10,7 @@ defmodule ControlKeelWeb.SessionTasksLive do
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    case Mission.get_session_context(id) do
+    case SessionScope.fetch_session(id) do
       nil ->
         {:ok,
          socket
@@ -77,15 +77,22 @@ defmodule ControlKeelWeb.SessionTasksLive do
     if connected?(socket), do: schedule_refresh()
 
     case Mission.get_session_context(socket.assigns.session.id) do
-      nil -> {:noreply, socket}
-      session -> {:noreply, assign_session(socket, session)}
+      nil ->
+        {:noreply, SessionScope.session_not_found(socket)}
+
+      session ->
+        case SessionScope.reauthorize(socket, session) do
+          {:ok, session} -> {:noreply, assign_session(socket, session)}
+          {:error, :not_found} -> {:noreply, SessionScope.session_not_found(socket)}
+        end
     end
   end
 
   @impl true
   def handle_event("complete_task", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
-         {:ok, task} <- Mission.complete_task(task_id) do
+         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
+         {:ok, task} <- Mission.complete_task(task.id) do
       {:noreply,
        socket
        |> put_flash(:info, "Task completed: #{task.title}.")
@@ -113,7 +120,8 @@ defmodule ControlKeelWeb.SessionTasksLive do
   @impl true
   def handle_event("generate_proof", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
-         {:ok, _proof} <- Mission.generate_proof_bundle(task_id),
+         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
+         {:ok, _proof} <- Mission.generate_proof_bundle(task.id),
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
       {:noreply,
@@ -128,7 +136,8 @@ defmodule ControlKeelWeb.SessionTasksLive do
   @impl true
   def handle_event("pause_task", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
-         {:ok, _result} <- Mission.pause_task(task_id, "mission_control"),
+         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
+         {:ok, _result} <- Mission.pause_task(task.id, "mission_control"),
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
       {:noreply,
@@ -143,7 +152,8 @@ defmodule ControlKeelWeb.SessionTasksLive do
   @impl true
   def handle_event("resume_task", %{"id" => id}, socket) do
     with {:ok, task_id} <- parse_id(id),
-         {:ok, _result} <- Mission.resume_task(task_id, "mission_control"),
+         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
+         {:ok, _result} <- Mission.resume_task(task.id, "mission_control"),
          session when not is_nil(session) <-
            Mission.get_session_context(socket.assigns.session.id) do
       {:noreply,
@@ -537,13 +547,6 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
   defp task_verification_label(task, _proof_summary),
     do: if(done_unverified?(task), do: "unverified", else: "verification pending")
-
-  defp task_decision_prompts(task) do
-    task
-    |> Mission.review_gate_status()
-    |> Map.get("decision_prompts", [])
-    |> Enum.take(2)
-  end
 
   defp parse_id(value) do
     case Integer.parse(to_string(value)) do

@@ -24,7 +24,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    case Mission.get_session_context(id) do
+    case SessionScope.fetch_session(id) do
       nil ->
         {:ok,
          socket

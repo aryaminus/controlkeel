@@ -11,7 +11,7 @@ defmodule ControlKeelWeb.SessionReviewsLive do
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    case Mission.get_session_context(id) do
+    case SessionScope.fetch_session(id) do
       nil ->
         {:ok,
          socket
@@ -41,7 +41,20 @@ defmodule ControlKeelWeb.SessionReviewsLive do
   @impl true
   def handle_info(:refresh, socket) do
     if connected?(socket), do: schedule_refresh()
-    {:noreply, assign_reviews(socket)}
+
+    case Mission.get_session_context(socket.assigns.session.id) do
+      nil ->
+        {:noreply, SessionScope.session_not_found(socket)}
+
+      session ->
+        case SessionScope.reauthorize(socket, session) do
+          {:ok, session} ->
+            {:noreply, socket |> assign(:session, session) |> assign_reviews()}
+
+          {:error, :not_found} ->
+            {:noreply, SessionScope.session_not_found(socket)}
+        end
+    end
   end
 
   @impl true

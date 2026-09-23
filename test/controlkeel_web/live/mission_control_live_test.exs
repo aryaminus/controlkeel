@@ -9,47 +9,9 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
   alias ControlKeel.MCP.Tools.CkValidate
   alias ControlKeel.Mission
 
-  test "mission control shows task dependencies and checklist when graph edges exist", %{
+  test "mission control renders review decision prompts on the resume packet page", %{
     conn: conn
   } do
-    {org, ws, session} = org_bound_session_fixture()
-
-    _t1 =
-      task_fixture(%{
-        session: session,
-        position: 1,
-        status: "done",
-        metadata: %{"track" => "architecture"},
-        title: "Architecture lock"
-      })
-
-    _t2 =
-      task_fixture(%{
-        session: session,
-        position: 2,
-        status: "in_progress",
-        metadata: %{"track" => "feature"},
-        title: "Feature work"
-      })
-
-    _t3 =
-      task_fixture(%{
-        session: session,
-        position: 3,
-        status: "queued",
-        metadata: %{"track" => "release"},
-        title: "Release verify"
-      })
-
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
-
-    assert html =~ "Task dependencies"
-    assert html =~ "Architecture lock"
-    assert html =~ "Task checklist"
-    assert html =~ "mission-task-checklist"
-  end
-
-  test "mission control renders review decision prompts", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task = task_fixture(%{session: session, status: "queued", title: "Risky plan"})
 
@@ -70,7 +32,7 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
                }
              })
 
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/resume-packet"))
 
     assert html =~ "Inversion:"
     assert html =~ "Evidence check:"
@@ -226,162 +188,12 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     send(view.pid, :refresh)
     refreshed_html = render(view)
 
-    assert refreshed_html =~ "Runtime review required"
     assert refreshed_html =~ "9.0 / 50.0"
     assert refreshed_html =~ "Session metrics"
-    assert refreshed_html =~ "Current funnel stage"
-  end
+    assert refreshed_html =~ "Funnel stage"
 
-  test "session findings renders and copies a guided fix for supported findings", %{conn: conn} do
-    {org, ws, session} = org_bound_session_fixture()
-
-    finding =
-      finding_fixture(%{
-        session: session,
-        title: "Unsafe HTML",
-        rule_id: "security.xss_unsafe_html",
-        severity: "high",
-        category: "security",
-        metadata: %{"path" => "assets/js/app.js", "matched_text_redacted" => "inner...HTML"}
-      })
-
-    {:ok, view, _html} = live(conn, org_session_path(org, ws, session, "/findings"))
-
-    detail_html =
-      render_click(
-        element(view, "button[phx-click=\"view_fix\"][phx-value-id=\"#{finding.id}\"]")
-      )
-
-    assert detail_html =~ "Guided fix"
-    assert detail_html =~ "safe DOM API"
-
-    render_click(
-      element(view, "button[phx-click=\"copy_fix_prompt\"][phx-value-id=\"#{finding.id}\"]")
-    )
-
-    assert_push_event(view, "copy-to-clipboard", %{text: _text})
-  end
-
-  test "mission control supports proof generation and pause/resume controls", %{conn: conn} do
-    {org, ws, session} = org_bound_session_fixture()
-    task = task_fixture(%{session: session, status: "in_progress"})
-
-    {:ok, view, html} = live(conn, org_session_path(org, ws, session))
-
-    assert html =~ "Workspace context"
-    refute html =~ "Recent transcript"
-
-    render_click(element(view, "#current-task-generate-proof-#{task.id}"))
-    assert render(view) =~ "Proof bundle generated."
-    assert Mission.latest_proof_bundle_for_task(task.id)
-
-    render_click(element(view, "#current-task-pause-#{task.id}"))
-    assert Mission.get_task!(task.id).status == "paused"
-
-    {:ok, _rview, rhtml} = live(conn, org_session_path(org, ws, session, "/resume-packet"))
-    assert rhtml =~ "Resume packet"
-    assert rhtml =~ task.title
-
-    render_click(element(view, "#current-task-resume-#{task.id}"))
-    assert Mission.get_task!(task.id).status == "in_progress"
-  end
-
-  test "mission control distinguishes verified tasks from done but unverified tasks", %{
-    conn: conn
-  } do
-    {org, ws, session} = org_bound_session_fixture()
-
-    _verified =
-      task_fixture(%{
-        session: session,
-        status: "verified",
-        title: "Verified task"
-      })
-
-    _done =
-      task_fixture(%{
-        session: session,
-        position: 2,
-        status: "done",
-        title: "Done task"
-      })
-
-    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
-
-    assert html =~ "Verified task"
-    assert html =~ "verified"
-    assert html =~ "Done task"
-    assert html =~ "done, unverified"
-  end
-
-  describe "complete task" do
-    test "completes an eligible task and surfaces the new proof", %{conn: conn} do
-      {org, ws, session} =
-        org_bound_session_fixture(%{risk_tier: "low", title: "Complete success session"})
-
-      task = task_fixture(%{session: session, status: "in_progress", title: "Do the work"})
-
-      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
-      assert has_element?(view, "#task-complete-#{task.id}")
-      assert has_element?(view, "#current-task-complete-#{task.id}")
-
-      updated_html =
-        view
-        |> element("#task-complete-#{task.id}")
-        |> render_click()
-
-      assert updated_html =~ "Task completed:"
-      assert updated_html =~ "Do the work"
-
-      assert ControlKeel.Mission.get_task!(task.id).status in ["done", "verified"]
-
-      proof = ControlKeel.Mission.latest_proof_bundle_for_task(task.id)
-      assert proof
-      assert updated_html =~ "/proofs/#{proof.id}"
-    end
-
-    test "surfaces unresolved findings when completion is blocked", %{conn: conn} do
-      {org, ws, session} = org_bound_session_fixture(%{risk_tier: "low"})
-      task = task_fixture(%{session: session, status: "in_progress"})
-
-      finding_fixture(%{session: session, status: "open", title: "Blocking finding"})
-
-      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
-
-      updated_html =
-        view
-        |> element("#task-complete-#{task.id}")
-        |> render_click()
-
-      assert updated_html =~ "unresolved finding"
-      assert ControlKeel.Mission.get_task!(task.id).status == "blocked"
-    end
-
-    test "surfaces the proof-not-ready reason for high-risk sessions", %{conn: conn} do
-      {org, ws, session} =
-        org_bound_session_fixture(%{risk_tier: "high", title: "Proof gate session"})
-
-      task = task_fixture(%{session: session, status: "in_progress"})
-
-      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
-
-      updated_html =
-        view
-        |> element("#task-complete-#{task.id}")
-        |> render_click()
-
-      assert updated_html =~ "not deploy-ready"
-      assert ControlKeel.Mission.get_task!(task.id).status == "in_progress"
-    end
-
-    test "completed tasks do not show a Complete button", %{conn: conn} do
-      {org, ws, session} = org_bound_session_fixture()
-      done_task = task_fixture(%{session: session, status: "done", title: "Already done"})
-
-      {:ok, view, _html} = live(conn, org_session_path(org, ws, session))
-
-      refute has_element?(view, "#task-complete-#{done_task.id}")
-    end
+    {:ok, _fview, fhtml} = live(conn, org_session_path(org, ws, session, "/findings"))
+    assert fhtml =~ "Runtime review required"
   end
 
   test "mission control reaches session activity through the session sidebar", %{

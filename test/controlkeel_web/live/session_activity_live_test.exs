@@ -117,20 +117,20 @@ defmodule ControlKeelWeb.SessionActivityLiveTest do
 
   test "session activity redirects when the session does not exist", %{conn: conn} do
     assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/acme/workspaces/core/sessions/999999/transcript")
+             live(conn, "/acme/workspaces/core/sessions/999999/activity")
   end
 
   test "session activity redirects when the workspace slug disagrees", %{conn: conn} do
     {org, _ws, session} = org_bound_session_fixture()
 
     assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => _}}}} =
-             live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/transcript")
+             live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/activity")
   end
 
   test "session activity redirects when the org slug disagrees", %{conn: conn} do
     {_org, ws, session} = org_bound_session_fixture()
 
     assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => _}}}} =
-             live(conn, "/other-org/workspaces/#{ws.slug}/sessions/#{session.id}/transcript")
+             live(conn, "/other-org/workspaces/#{ws.slug}/sessions/#{session.id}/activity")
   end
 end
