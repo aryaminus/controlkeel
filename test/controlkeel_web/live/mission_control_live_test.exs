@@ -159,7 +159,6 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ "Observability"
     assert html =~ ~s(href="/observability/sessions/#{session.id}")
   end
-  end
 
   test "mission control links to the session review queue page", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()

@@ -271,256 +271,409 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   @impl true
+  @spec render(any()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-6">
       <%= if @launched do %>
-        <div class="p-6 rounded-3xl border bg-[var(--ck-success)] text-muted-foreground border-l-4 border-l-[var(--ck-success)]">
-          <div class="flex items-start gap-4">
-            <span class="text-2xl leading-none">✓</span>
-            <div>
-              <strong class="block mb-1">
+        <div class="rounded-2xl border bg-card p-5 shadow-card">
+          <div class="flex items-start gap-3">
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
+              <.icon name="hero-check-circle" class="size-4" />
+            </span>
+            <div class="min-w-0 space-y-2">
+              <p class="text-base font-semibold text-foreground">
                 You're set — ControlKeel is governing this session
-              </strong>
-              <p class="text-sm text-muted-foreground mb-3">
+              </p>
+              <p class="text-sm leading-6 text-muted-foreground">
                 Attach your preferred client to start intercepting agent actions. OpenCode is the fastest MCP-plus-instructions path:
-                <code class="font-mono bg-[var(--ck-success)] px-1.5 py-0.5 rounded text-sm">
+                <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
                   controlkeel attach opencode
                 </code>
               </p>
-              <p class="text-sm text-muted-foreground">
+              <p class="text-sm leading-6 text-muted-foreground">
                 Or validate content directly via the
-                <a href="/policies" class="underline hover:text-[var(--ck-success)]">Policy Studio</a>
-                or REST API at <code class="font-mono bg-[var(--ck-success)] px-1.5 py-0.5 rounded text-sm">POST /api/v1/validate</code>.
+                <.link
+                  navigate={~p"/policies"}
+                  class="font-medium text-primary underline-offset-4 transition hover:underline"
+                >
+                  Policy Studio
+                </.link>
+                or REST API at <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">POST /api/v1/validate</code>.
               </p>
             </div>
           </div>
         </div>
       <% end %>
-      <.page_title
-        title={@session.title}
-        subtitle={@session.objective}
-        class="min-w-0 max-w-3xl"
-      />
+      <.page_title title={@session.title} subtitle={@session.objective} />
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div class="p-5 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-lg">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Primary agent
+      <div class="grid grid-cols-1 gap-4 rounded-2xl border bg-card p-5 shadow-card sm:grid-cols-2 lg:grid-cols-5 lg:gap-0">
+        <article class="p-5 lg:border-r lg:border-border">
+          <p class="text-sm font-medium text-muted-foreground">Primary agent</p>
+          <p class="mt-2 truncate text-xl font-semibold text-foreground/90">{@agent_label}</p>
+        </article>
+
+        <article class="p-5 lg:border-r lg:border-border">
+          <p class="text-sm font-medium text-muted-foreground">Needs review</p>
+          <p class="mt-2 text-xl font-semibold text-foreground/90">
+            {@active_findings} finding{if @active_findings != 1, do: "s"}
           </p>
-          <strong>{@agent_label}</strong>
-        </div>
-        <div class="p-5 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-lg">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Needs review
-          </p>
-          <strong>{@active_findings} finding{if @active_findings != 1, do: "s"}</strong>
-        </div>
-        <div class="p-5 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-lg">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Compliance score
-          </p>
-          <div class="flex items-center gap-3">
-            <svg
-              viewBox="0 0 36 36"
-              width="48"
-              height="48"
-              class="shrink-0 -rotate-90"
-            >
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" stroke-width="3.8" />
-              <circle
-                cx="18"
-                cy="18"
-                r="15.9"
-                fill="none"
-                stroke={donut_color(@compliance_score)}
-                stroke-width="3.8"
-                stroke-dasharray={"#{@compliance_score} #{100 - @compliance_score}"}
-                stroke-linecap="round"
-              />
-            </svg>
-            <strong>{@compliance_score}%</strong>
+          <p class="mt-3 text-xs text-muted-foreground">Open or blocked</p>
+        </article>
+
+        <article class="p-5 lg:border-r lg:border-border">
+          <p class="text-sm font-medium text-muted-foreground">Compliance score</p>
+          <p class="mt-2 text-xl font-semibold text-foreground/90">{@compliance_score}%</p>
+          <div class="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              class={["h-full rounded-full", compliance_bar_class(@compliance_score)]}
+              style={"width: #{@compliance_score}%"}
+            />
           </div>
-        </div>
-        <div class="p-5 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-lg">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Budget spent
-          </p>
-          <strong>
+          <p class="mt-3 text-xs text-muted-foreground">Findings approved or rejected</p>
+        </article>
+
+        <% budget_pct = budget_percent(@session.spent_cents, @session.budget_cents) %>
+
+        <article class="p-5 lg:border-r lg:border-border">
+          <p class="text-sm font-medium text-muted-foreground">Budget spent</p>
+          <p class="mt-2 text-xl font-semibold text-foreground/90">
             {format_currency(@session.spent_cents)} / {format_currency(@session.budget_cents)}
-          </strong>
-        </div>
-        <div class="p-5 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-lg">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Proof bundles
           </p>
-          <strong>{map_size(@latest_proofs)}</strong>
-        </div>
+          <div class="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              :if={budget_pct}
+              class={["h-full rounded-full", budget_bar_class(budget_pct)]}
+              style={"width: #{budget_pct}%"}
+            />
+          </div>
+          <p class="mt-3 text-xs text-muted-foreground">Session budget utilization</p>
+        </article>
+
+        <article class="p-5">
+          <p class="text-sm font-medium text-muted-foreground">Proof bundles</p>
+          <p class="mt-2 text-xl font-semibold text-foreground/90">{map_size(@latest_proofs)}</p>
+          <p class="mt-3 text-xs text-muted-foreground">Latest bundle per task</p>
+        </article>
       </div>
 
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-          Session metrics
-        </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
-          <div class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg">
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Current funnel stage
-            </p>
-            <strong>{Analytics.stage_label(@session_metrics.funnel_stage)}</strong>
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <section class="rounded-2xl border bg-card p-5 shadow-card lg:col-span-2">
+          <div class="flex items-center justify-between gap-3">
+            <.section_title>Session metrics</.section_title>
+            <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs text-muted-foreground">
+              <span class="size-1.5 animate-pulse rounded-full bg-success" /> Live
+            </span>
           </div>
-          <div class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg">
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              First finding time
-            </p>
-            <strong>{format_duration(@session_metrics.time_to_first_finding_seconds)}</strong>
-          </div>
-          <div class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg">
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Total findings
-            </p>
-            <strong>{@session_metrics.total_findings}</strong>
-          </div>
-          <div class="p-5 rounded-3xl border bg-muted/[0.03] shadow-lg">
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-              Blocked findings
-            </p>
-            <strong>{@session_metrics.blocked_findings_total}</strong>
-          </div>
-        </div>
-      </div>
+          <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="rounded-xl bg-muted/[0.03] p-4">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-medium text-muted-foreground">Funnel stage</p>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-info/10 text-info">
+                  <.icon name="hero-signal" class="size-4" />
+                </span>
+              </div>
+              <p class="mt-2 text-lg font-semibold text-foreground/90">
+                {Analytics.stage_label(@session_metrics.funnel_stage)}
+              </p>
+              <p class="mt-3 text-xs text-muted-foreground">Latest analytics snapshot</p>
+            </div>
 
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-          Execution brief
-        </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Domain pack</h3>
-              <p class="text-sm text-muted-foreground">
-                {format_domain_pack(brief_value(@brief, "domain_pack"))}
+            <div class="rounded-xl bg-muted/[0.03] p-4">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-medium text-muted-foreground">First finding</p>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <.icon name="hero-clock" class="size-4" />
+                </span>
+              </div>
+              <p class="mt-2 text-lg font-semibold text-foreground/90">
+                {format_duration(@session_metrics.time_to_first_finding_seconds)}
+              </p>
+              <p class="mt-3 text-xs text-muted-foreground">Time from session start</p>
+            </div>
+
+            <div class="rounded-xl bg-muted/[0.03] p-4">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-medium text-muted-foreground">Total findings</p>
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <.icon name="hero-exclamation-triangle" class="size-4" />
+                </span>
+              </div>
+              <p class="mt-2 text-lg font-semibold text-foreground/90">
+                {@session_metrics.total_findings}
+              </p>
+              <p class="mt-3 text-xs text-muted-foreground">Raised during the session</p>
+            </div>
+
+            <% blocked_pct =
+              blocked_ratio_percent(
+                @session_metrics.blocked_findings_total,
+                @session_metrics.total_findings
+              ) %>
+
+            <div class="rounded-xl bg-muted/[0.03] p-4">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-medium text-muted-foreground">Blocked findings</p>
+                <span class={[
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                  @session_metrics.blocked_findings_total > 0 && "bg-destructive/10 text-destructive",
+                  @session_metrics.blocked_findings_total == 0 && "bg-success/10 text-success"
+                ]}>
+                  <.icon name="hero-shield-exclamation" class="size-4" />
+                </span>
+              </div>
+              <p class={[
+                "mt-2 text-lg font-semibold",
+                @session_metrics.blocked_findings_total > 0 && "text-destructive",
+                @session_metrics.blocked_findings_total == 0 && "text-foreground/90"
+              ]}>
+                {@session_metrics.blocked_findings_total}
+              </p>
+              <div class="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  :if={blocked_pct}
+                  class="h-full rounded-full bg-destructive"
+                  style={"width: #{blocked_pct}%"}
+                />
+              </div>
+              <p class="mt-3 text-xs text-muted-foreground">
+                {if is_nil(blocked_pct),
+                  do: "No findings yet",
+                  else: "#{blocked_pct}% of all findings"}
               </p>
             </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Occupation</h3>
-              <p class="text-sm text-muted-foreground">{brief_value(@brief, "occupation")}</p>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Recommended stack</h3>
-              <p class="text-sm text-muted-foreground">{brief_value(@brief, "recommended_stack")}</p>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Next step</h3>
-              <p class="text-sm text-muted-foreground">{brief_value(@brief, "next_step")}</p>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Acceptance criteria</h3>
-              <ul class="space-y-1 text-sm text-muted-foreground list-none p-0 m-0">
+          </div>
+        </section>
+
+        <section class="rounded-2xl border bg-card p-5 shadow-card">
+          <.section_title>Session context</.section_title>
+
+          <ul class="mt-4 space-y-3">
+            <%= for {label, value, icon_name} <- session_context_items(@session, @nav_org, @nav_workspace) do %>
+              <li class="flex items-center gap-3 w-full">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <.icon name={icon_name} class="size-4" />
+                </span>
+                <p class="w-28 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {label}
+                </p>
+                <p class="min-w-0 flex-1 truncate text-right text-sm font-medium text-foreground">
+                  {value || "Not specified"}
+                </p>
+              </li>
+            <% end %>
+          </ul>
+        </section>
+      </div>
+
+      <details class="group rounded-2xl border bg-card p-5 shadow-card">
+        <summary class="flex cursor-pointer select-none list-none items-center gap-2">
+          <.section_title>Execution brief</.section_title>
+          <.icon
+            name="hero-chevron-right"
+            class="size-3.5 transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Domain pack
+            </dt>
+            <dd class="mt-1 text-sm font-medium text-foreground">
+              {format_domain_pack(brief_value(@brief, "domain_pack"))}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Occupation
+            </dt>
+            <dd class="mt-1 text-sm font-medium text-foreground">
+              {brief_value(@brief, "occupation")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Recommended stack
+            </dt>
+            <dd class="mt-1 text-sm font-medium text-foreground">
+              {brief_value(@brief, "recommended_stack")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Compiler
+            </dt>
+            <dd class="mt-1 text-sm font-medium text-foreground">
+              {brief_value(@compiler, "provider")} / {brief_value(@compiler, "model")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Next step
+            </dt>
+            <dd class="mt-1 text-sm leading-6 text-muted-foreground">
+              {brief_value(@brief, "next_step")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Acceptance criteria
+            </dt>
+            <dd class="mt-1.5">
+              <ul class="ml-5 list-disc space-y-1 text-sm leading-6 text-muted-foreground">
                 <%= for item <- brief_list(@brief, "acceptance_criteria") do %>
                   <li>{item}</li>
                 <% end %>
               </ul>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Compiler</h3>
-              <p class="text-sm text-muted-foreground">
-                {brief_value(@compiler, "provider")} / {brief_value(@compiler, "model")}
-              </p>
-            </div>
+            </dd>
           </div>
-        </div>
+        </dl>
+      </details>
 
-        <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-            Production boundary
-          </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Risk tier</h3>
-              <p class="text-sm text-muted-foreground">
-                {boundary_value(@boundary_summary, "risk_tier")}
-              </p>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Budget note</h3>
-              <p class="text-sm text-muted-foreground">
-                {boundary_value(@boundary_summary, "budget_note")}
-              </p>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Launch window</h3>
-              <p class="text-sm text-muted-foreground">
-                {boundary_value(@boundary_summary, "launch_window")}
-              </p>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Data summary</h3>
-              <p class="text-sm text-muted-foreground">
-                {boundary_value(@boundary_summary, "data_summary")}
-              </p>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Constraints</h3>
-              <ul class="space-y-1 text-sm text-muted-foreground list-none p-0 m-0">
+      <% risk_tier = boundary_value(@boundary_summary, "risk_tier") %>
+
+      <details class="group rounded-2xl border bg-card p-5 shadow-card">
+        <summary class="flex cursor-pointer select-none list-none items-center gap-2">
+          <.section_title>Production boundary</.section_title>
+          <.icon
+            name="hero-chevron-right"
+            class="size-3.5 transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Risk tier
+            </dt>
+            <dd class="mt-1">
+              <span
+                :if={risk_tier_class(risk_tier)}
+                class={[
+                  "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+                  risk_tier_class(risk_tier)
+                ]}
+              >
+                {risk_tier}
+              </span>
+              <span
+                :if={is_nil(risk_tier_class(risk_tier))}
+                class="text-sm font-medium text-foreground"
+              >
+                {risk_tier}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Budget note
+            </dt>
+            <dd class="mt-1 text-sm leading-6 text-muted-foreground">
+              {boundary_value(@boundary_summary, "budget_note")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Launch window
+            </dt>
+            <dd class="mt-1 text-sm font-medium text-foreground">
+              {boundary_value(@boundary_summary, "launch_window")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Data summary
+            </dt>
+            <dd class="mt-1 text-sm leading-6 text-muted-foreground">
+              {boundary_value(@boundary_summary, "data_summary")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Constraints
+            </dt>
+            <dd class="mt-1.5">
+              <ul class="ml-5 list-disc space-y-1 text-sm leading-6 text-muted-foreground">
                 <%= for item <- boundary_list(@boundary_summary, "constraints") do %>
                   <li>{item}</li>
                 <% end %>
               </ul>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Compliance</h3>
-              <ul class="flex flex-wrap gap-1.5 mt-1">
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Compliance
+            </dt>
+            <dd class="mt-1.5">
+              <ul class="flex flex-wrap gap-1.5">
                 <%= for item <- boundary_list(@boundary_summary, "compliance") do %>
-                  <li>
-                    <span class="inline-flex items-center rounded-full border bg-muted/[0.05] px-2.5 py-1 text-xs text-muted-foreground">
-                      {item}
-                    </span>
+                  <li class="inline-flex items-center rounded-full bg-info/10 px-2.5 py-1 text-xs font-medium text-info ring-1 ring-info/20">
+                    {item}
                   </li>
                 <% end %>
               </ul>
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold text-muted-foreground mb-1">Open questions</h3>
-              <ul class="space-y-1 text-sm text-muted-foreground list-none p-0 m-0">
+            </dd>
+          </div>
+          <div class="sm:col-span-2">
+            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Open questions
+            </dt>
+            <dd class="mt-1.5">
+              <ul class="ml-5 list-disc space-y-1 text-sm leading-6 text-muted-foreground">
                 <%= for item <- boundary_list(@boundary_summary, "open_questions") do %>
                   <li>{item}</li>
                 <% end %>
               </ul>
-            </div>
+            </dd>
           </div>
-        </div>
+        </dl>
+      </details>
 
-      <div class="p-6 rounded-3xl border bg-card/70 backdrop-blur-xl shadow-2xl shadow-black/20 mt-6">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary mb-1">
-          Workspace context
-        </p>
-        <div class="flex flex-wrap gap-2 mt-2">
-          <span>{workspace_status_label(@current_workspace_context)}</span>
-          <span>{get_in(@current_workspace_context, ["git", "branch"]) || "no-branch"}</span>
-          <span>
+      <details class="group rounded-2xl border bg-card p-5 shadow-card">
+        <summary class="flex cursor-pointer select-none list-none items-center gap-2">
+          <.section_title>Workspace context</.section_title>
+          <.icon
+            name="hero-chevron-right"
+            class="size-3.5 transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <span class={[
+            "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1",
+            workspace_status_class(@current_workspace_context)
+          ]}>
+            {workspace_status_label(@current_workspace_context)}
+          </span>
+          <span class="inline-flex items-center rounded-full border px-3 py-1 font-mono text-xs text-muted-foreground">
+            {get_in(@current_workspace_context, ["git", "branch"]) || "no-branch"}
+          </span>
+          <span class="inline-flex items-center rounded-full border px-3 py-1 font-mono text-xs text-muted-foreground">
             {String.slice(
               get_in(@current_workspace_context, ["git", "head_sha"]) || "unknown",
               0,
               7
             )}
           </span>
-        </div>
-        <p class="text-sm text-muted-foreground mt-3">
-          {@current_workspace_context["summary_text"]}
-        </p>
-        <div class="flex flex-wrap gap-2 mt-2">
-          <span>
+          <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs text-muted-foreground">
             {length(@current_workspace_context["instruction_files"] || [])} instructions
           </span>
-          <span>{length(@current_workspace_context["key_files"] || [])} key files</span>
+          <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs text-muted-foreground">
+            {length(@current_workspace_context["key_files"] || [])} key files
+          </span>
         </div>
-        <details class="mt-4">
-          <summary class="text-xs font-semibold uppercase tracking-[0.14em] text-primary hover:text-primary cursor-pointer select-none">
+        <p class="mt-3 text-sm leading-6 text-muted-foreground">
+          {@current_workspace_context["summary_text"]}
+        </p>
+        <details class="group/raw mt-4">
+          <summary class="inline-flex cursor-pointer select-none items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-primary">
             View raw workspace JSON
+            <.icon
+              name="hero-chevron-down"
+              class="size-3.5 transition-transform group-open/raw:rotate-180"
+            />
           </summary>
-          <pre class="p-4 max-h-96 overflow-auto border rounded-2xl bg-muted/[0.03] text-sm text-[#f2e6c9] font-mono whitespace-pre-wrap break-all leading-relaxed mt-4">{Jason.encode!(@current_workspace_context, pretty: true)}</pre>
+          <pre class="mt-4 max-h-96 overflow-auto rounded-xl bg-muted/[0.03] p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-muted-foreground">{Jason.encode!(@current_workspace_context, pretty: true)}</pre>
         </details>
-      </div>
+      </details>
 
       <FindingComponents.autofix_panel
         :if={@selected_finding && @selected_fix}
@@ -614,63 +767,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp workspace_status_label(%{"available" => true}), do: "available"
   defp workspace_status_label(_context), do: "unavailable"
 
-  defp task_status_label(%{status: "verified"}), do: "verified"
-  defp task_status_label(%{status: "done"}), do: "done, unverified"
-
-  defp task_status_label(%{status: status}) when is_binary(status),
-    do: String.replace(status, "_", " ")
-
-  defp task_status_label(_task), do: "unknown"
-
-  defp task_status_pill_class("verified"),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
-
-  defp task_status_pill_class("done"),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(255,207,107,0.12)] text-[#fff0bf]"
-
-  defp task_status_pill_class(_status),
-    do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
-
-  defp done_unverified?(%{status: "done"}), do: true
-  defp done_unverified?(_task), do: false
-
-  defp task_verification_label(_task, %{"verification_status" => "strong"}),
-    do: "verification strong"
-
-  defp task_verification_label(_task, %{"verification_status" => "moderate"}),
-    do: "verification moderate"
-
-  defp task_verification_label(_task, %{"verification_status" => "weak"}), do: "verification weak"
-
-  defp task_verification_label(_task, %{
-         bundle: %{"verification_assessment" => %{"status" => "strong"}}
-       }),
-       do: "verification strong"
-
-  defp task_verification_label(
-         _task,
-         %{bundle: %{"verification_assessment" => %{"status" => "moderate"}}}
-       ),
-       do: "verification moderate"
-
-  defp task_verification_label(_task, %{
-         bundle: %{"verification_assessment" => %{"status" => "weak"}}
-       }),
-       do: "verification weak"
-
-  defp task_verification_label(task, _proof_summary),
-    do: if(done_unverified?(task), do: "unverified", else: "verification pending")
-
-  defp task_decision_prompts(task) do
-    task
-    |> Mission.review_gate_status()
-    |> Map.get("decision_prompts", [])
-    |> Enum.take(2)
-  end
-
   defp format_currency(cents), do: cents |> Kernel./(100) |> Float.round(2)
 
   defp brief_value(map, key), do: Map.get(map, key, "Not specified")
@@ -716,9 +812,75 @@ defmodule ControlKeelWeb.MissionControlLive do
     round(resolved / total * 100)
   end
 
-  defp donut_color(score) when score >= 80, do: "#22c55e"
-  defp donut_color(score) when score >= 50, do: "#f59e0b"
-  defp donut_color(_score), do: "#ef4444"
+  defp compliance_bar_class(score) when score >= 80, do: "bg-success"
+  defp compliance_bar_class(score) when score >= 50, do: "bg-warning"
+  defp compliance_bar_class(_score), do: "bg-destructive"
+
+  defp budget_percent(spent, budget) when is_number(budget) and budget > 0,
+    do: min(round(spent / budget * 100), 100)
+
+  defp budget_percent(_spent, _budget), do: nil
+
+  defp blocked_ratio_percent(blocked, total) when is_number(total) and total > 0,
+    do: min(round(blocked / total * 100), 100)
+
+  defp blocked_ratio_percent(_blocked, _total), do: nil
+
+  defp budget_bar_class(pct) when pct >= 100, do: "bg-destructive"
+  defp budget_bar_class(pct) when pct >= 80, do: "bg-warning"
+  defp budget_bar_class(_pct), do: "bg-primary"
+
+  defp risk_tier_class(tier) when tier in ["low"],
+    do: "bg-success/10 text-success ring-success/20"
+
+  defp risk_tier_class(tier) when tier in ["medium", "moderate"],
+    do: "bg-warning/10 text-warning ring-warning/20"
+
+  defp risk_tier_class(tier) when tier in ["high", "critical"],
+    do: "bg-destructive/10 text-destructive ring-destructive/20"
+
+  defp risk_tier_class(_tier), do: nil
+
+  defp workspace_status_class(%{"available" => true}),
+    do: "bg-success/10 text-success ring-success/20"
+
+  defp workspace_status_class(_context), do: "bg-muted text-muted-foreground ring-border"
+
+  defp session_context_items(session, org, workspace) do
+    [
+      {"Organization", org && org.name, "hero-building-office-2"},
+      {"Workspace", workspace && workspace.name, "hero-squares-2x2"},
+      {"Session", session.title, "hero-bolt"},
+      {"Created", format_created_date(session.inserted_at), "hero-clock"}
+    ]
+  end
+
+  defp format_created_date(nil), do: nil
+  defp format_created_date(""), do: nil
+  defp format_created_date(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d")
+  defp format_created_date(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d")
+  defp format_created_date(%Date{} = d), do: Calendar.strftime(d, "%Y-%m-%d")
+
+  defp format_created_date(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, dt, _offset} ->
+        Calendar.strftime(dt, "%Y-%m-%d")
+
+      _ ->
+        case NaiveDateTime.from_iso8601(value) do
+          {:ok, ndt} ->
+            Calendar.strftime(ndt, "%Y-%m-%d")
+
+          _ ->
+            case Date.from_iso8601(String.slice(value, 0, 10)) do
+              {:ok, d} -> Calendar.strftime(d, "%Y-%m-%d")
+              _ -> String.slice(value, 0, 10)
+            end
+        end
+    end
+  end
+
+  defp format_created_date(value), do: to_string(value)
 
   defp parse_id(value) do
     case Integer.parse(to_string(value)) do
