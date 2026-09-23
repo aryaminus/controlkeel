@@ -3588,10 +3588,10 @@ defmodule ControlKeel.Observability do
   defp session_context_counts(session_id), do: Mission.session_context_counts(session_id)
 
   defp frequencies(items, fun) do
+    # Bolt: Replaced Enum.map |> Enum.reject |> Enum.frequencies with Enum.frequencies_by |> Map.delete(nil) to avoid intermediate list allocations
     items
-    |> Enum.map(fun)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.frequencies()
+    |> Enum.frequencies_by(fun)
+    |> Map.delete(nil)
   end
 
   defp persist_perf_snapshot(snapshot, opts) do
