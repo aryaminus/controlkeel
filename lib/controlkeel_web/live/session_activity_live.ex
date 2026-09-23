@@ -160,7 +160,7 @@ defmodule ControlKeelWeb.SessionActivityLive do
         <article class="rounded-2xl border bg-card p-5 shadow-card">
           <p class="text-sm font-medium text-muted-foreground">Full timeline</p>
           <.link
-            navigate={~p"/observability/sessions/#{@session.id}/timeline"}
+            navigate={~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/observability#session-observability-timeline"}
             class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:text-primary transition cursor-pointer"
           >
             Open run timeline <.icon name="hero-arrow-right" class="size-3.5" />
@@ -309,7 +309,9 @@ defmodule ControlKeelWeb.SessionActivityLive do
             <.link
               :for={format <- ~w(json csv pdf)}
               id={"activity-audit-export-#{format}"}
-              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
+              href={
+                ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/observability/audit-log/#{format}"
+              }
               class="rounded-lg border border-border bg-transparent px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               {String.upcase(format)}

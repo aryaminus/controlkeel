@@ -97,4 +97,51 @@ defmodule ControlKeelWeb.PageController do
 
     redirect(conn, to: target)
   end
+
+  # Legacy session observability URLs (pre-org-scope nesting): the
+  # overview/timeline/memory tabs now live stacked at
+  # `/:org_slug/workspaces/:ws_slug/sessions/:id/observability`.
+  # Resolves the numeric id to its org/workspace slugs and redirects;
+  # timeline/memory preserve an anchor so the stacked page scrolls there.
+  def observability_session_redirect(conn, %{"id" => id} = params) do
+    alias ControlKeel.Bootstrap.LocalDefaults
+    alias ControlKeel.Mission.Session
+    alias ControlKeel.Mission.Workspace
+    alias ControlKeel.Repo
+    alias ControlKeelWeb.FallbackController
+
+    anchor =
+      cond do
+        String.ends_with?(conn.request_path, "/timeline") -> "#session-observability-timeline"
+        String.ends_with?(conn.request_path, "/memory") -> "#session-observability-memory"
+        true -> ""
+      end
+
+    case Repo.get(Session, id) do
+      nil ->
+        FallbackController.not_found(conn, params)
+
+      %Session{} = session ->
+        case Repo.preload(session, workspace: :org) do
+          %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} ->
+            redirect(
+              conn,
+              to: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
+            )
+
+          _ ->
+            if ControlKeel.Runtime.local?() do
+              redirect(
+                conn,
+                to:
+                  "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/observability#{anchor}"
+              )
+            else
+              FallbackController.not_found(conn, params)
+            end
+        end
+    end
+  rescue
+    Ecto.Query.CastError -> ControlKeelWeb.FallbackController.not_found(conn, params)
+  end
 end

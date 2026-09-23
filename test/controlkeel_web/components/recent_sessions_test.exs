@@ -22,7 +22,9 @@ defmodule ControlKeelWeb.RecentSessionsTest do
         budget_spent_cents: 1250,
         budget_limit_cents: 10_000,
         memory_records: 7,
-        proof_bundles: 3
+        proof_bundles: 3,
+        org_slug: "acme",
+        workspace_slug: "main"
       },
       %{
         id: 2,
@@ -40,7 +42,7 @@ defmodule ControlKeelWeb.RecentSessionsTest do
     html = render_component(&RecentSessions.session_observability_section/1, runs: runs)
     assert html =~ "Session A"
     assert html =~ "Session B"
-    assert html =~ "/observability/sessions/1"
+    assert html =~ "/acme/workspaces/main/sessions/1/observability"
     assert html =~ "/observability/sessions/2"
     assert html =~ "3 active"
     assert html =~ "1 blocked"

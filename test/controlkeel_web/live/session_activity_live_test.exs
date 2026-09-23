@@ -64,7 +64,8 @@ defmodule ControlKeelWeb.SessionActivityLiveTest do
 
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))
 
-    assert html =~ ~p"/observability/sessions/#{session.id}/timeline"
+    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability"
+    assert html =~ "#session-observability-timeline"
   end
 
   test "session activity renders the session sidebar with Transcript active", %{conn: conn} do
@@ -112,7 +113,7 @@ defmodule ControlKeelWeb.SessionActivityLiveTest do
     assert html =~ ~s(id="activity-audit-export-json")
     assert html =~ ~s(id="activity-audit-export-csv")
     assert html =~ ~s(id="activity-audit-export-pdf")
-    assert html =~ "/observability/sessions/#{session.id}/audit-log/json"
+    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
   end
 
   test "session activity redirects when the session does not exist", %{conn: conn} do

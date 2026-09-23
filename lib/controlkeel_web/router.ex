@@ -172,19 +172,14 @@ defmodule ControlKeelWeb.Router do
       live "/observability/promotions", ObservabilityPromotionsLive, :index
     end
 
-    # Session-scoped observability routes use the :observability_session
-    # framework layout (sidebar + session tabs). LayoutDefaults sets shared
-    # layout assigns (@current_path, @page_action) for tab highlighting.
-    live_session :observability_session,
-      layout: {ControlKeelWeb.Layouts, :observability_session},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.LayoutDefaults
-      ] do
-      live "/observability/sessions/:id/memory", ObservabilityMemoryLive, :show
-      live "/observability/sessions/:id/timeline", ObservabilityTimelineLive, :show
-      live "/observability/sessions/:id", ObservabilityLive, :show
-    end
+    # Legacy session observability URLs (pre-org-scope nesting): the
+    # overview/timeline/memory tabs now live stacked at
+    # `/:org_slug/workspaces/:ws_slug/sessions/:id/observability`.
+    # Export/audit-log downloads keep their legacy paths functional (dual
+    # routes) plus redirect helpers for the page URLs.
+    get "/observability/sessions/:id", PageController, :observability_session_redirect
+    get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
+    get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
 
     # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
     # shape is the most-shared URL in docs/Slack/CI, so keep it as a redirect
@@ -246,6 +241,9 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/release", SessionReleaseLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/ship", SessionShipLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/observability",
+           SessionObservabilityLive,
+           :show
     end
   end
 
@@ -253,12 +251,21 @@ defmodule ControlKeelWeb.Router do
   scope "/", ControlKeelWeb do
     pipe_through [:browser, :require_session_auth]
 
-    # Session export is auth-gated via Plugs.RequireSessionAuth (mirrors
-    # LiveAuth.require_cloud_auth plus org ownership of the session).
+    # Legacy export paths (dual-route for backwards compat): keep functional
+    # so existing `controlkeel obs export` downloads and old bookmarks still
+    # work, alongside the new org-scoped paths below.
     get "/observability/sessions/:id/export.json", ObservabilityController, :export_session
 
-    # Audit-log artifact of record (json/csv/pdf), same auth gate as above.
     get "/observability/sessions/:id/audit-log/:format",
+        ObservabilityController,
+        :export_audit_log
+
+    # New org-scoped export paths for the stacked observability page.
+    get "/:org_slug/workspaces/:ws_slug/sessions/:id/observability/export.json",
+        ObservabilityController,
+        :export_session
+
+    get "/:org_slug/workspaces/:ws_slug/sessions/:id/observability/audit-log/:format",
         ObservabilityController,
         :export_audit_log
   end

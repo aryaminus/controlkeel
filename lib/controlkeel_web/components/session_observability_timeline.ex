@@ -1,42 +1,31 @@
-defmodule ControlKeelWeb.ObservabilityTimelineLive do
-  use ControlKeelWeb, :live_view
+defmodule ControlKeelWeb.SessionObservabilityTimeline do
+  @moduledoc """
+  Timeline stage of the session observability page
+  (`/:org_slug/workspaces/:ws_slug/sessions/:id/observability`).
+  Migrated verbatim from the former `ObservabilityTimelineLive` page.
+  Presentational only.
+  """
 
-  alias ControlKeel.Observability
-  alias ControlKeelWeb.CommandPill
+  use Phoenix.Component
 
-  on_mount ControlKeelWeb.CommandPill
+  import ControlKeelWeb.FormatHelpers, only: [format_datetime: 2]
 
-  @impl true
-  def mount(%{"id" => id}, _session, socket) do
-    socket = socket |> assign(:session_id, nil) |> assign(:session_title, nil)
+  use Phoenix.VerifiedRoutes,
+    endpoint: ControlKeelWeb.Endpoint,
+    router: ControlKeelWeb.Router,
+    statics: ControlKeelWeb.static_paths()
 
-    case Observability.timeline(id, limit: 50) do
-      {:ok, timeline} ->
-        {:ok,
-         socket
-         |> assign(:page_title, "Observability Timeline")
-         |> assign(:timeline, timeline)
-         |> assign(:session_id, timeline.session.id)
-         |> assign(:session_title, timeline.session.title)}
+  attr :timeline, :map, required: true
 
-      {:error, _reason} ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Session timeline not found.")
-         |> push_navigate(to: ~p"/observability")}
-    end
-  end
-
-  @impl true
-  def render(assigns) do
+  def timeline_panel(assigns) do
     ~H"""
     <section
-      id="observability-timeline-page"
-      class="border rounded-[1.5rem] backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 space-y-5"
+      id="session-observability-timeline"
+      class="border rounded-[1.5rem] backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 space-y-5 scroll-mt-6"
     >
       <div class="flex items-start justify-between gap-4">
         <div>
-          <h1 class="text-xl font-semibold text-primary">Timeline</h1>
+          <h2 class="text-xl font-semibold text-primary">Timeline</h2>
           <p class="text-muted-foreground text-sm mt-1">
             Recent governed events for {@timeline.session.title}.
           </p>
@@ -47,8 +36,6 @@ defmodule ControlKeelWeb.ObservabilityTimelineLive do
           </span>
         </div>
       </div>
-
-      <CommandPill.command_pill command={"controlkeel obs timeline #{@timeline.session.id}"} />
 
       <div id="observability-timeline-summary" class="grid grid-cols-3 gap-4">
         <div class="rounded-xl p-4 border bg-[rgba(255,255,255,0.015)] space-y-1">
@@ -120,6 +107,10 @@ defmodule ControlKeelWeb.ObservabilityTimelineLive do
       </div>
     </section>
     """
+  end
+
+  defp neutral_pill_class do
+    "inline-flex items-center border rounded-full px-3 py-1.5 text-sm bg-muted text-muted-foreground"
   end
 
   defp format_frequency(map) when map == %{}, do: "none"
