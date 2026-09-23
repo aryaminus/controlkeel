@@ -867,6 +867,21 @@ defmodule ControlKeel.Mission do
     end
   end
 
+  @doc """
+  Loads a session with only its workspace/org preloaded — no tasks, findings,
+  invocations, reviews, or edges. For LiveViews whose tick reads collections
+  through dedicated by-id queries (or not at all) instead of the preloaded
+  associations, so the 2s refresh stays at two small queries.
+  """
+  def get_session_nav(id) do
+    Session
+    |> Repo.get(id)
+    |> case do
+      nil -> nil
+      session -> Repo.preload(session, workspace: :org)
+    end
+  end
+
   defp build_reviews_limited_query(:all) do
     from(r in Review, order_by: [desc: r.inserted_at, desc: r.id])
   end

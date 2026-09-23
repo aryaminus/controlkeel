@@ -76,16 +76,20 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    if connected?(socket), do: schedule_refresh()
+    opts = [tasks_limit: 0, invocations_limit: 0, reviews_limit: 0]
 
-    case Mission.get_session_context(socket.assigns.session.id) do
+    case Mission.get_session_context(socket.assigns.session.id, opts) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
       session ->
         case SessionScope.reauthorize(socket, session) do
-          {:ok, session} -> {:noreply, assign_session(socket, session)}
-          {:error, :not_found} -> {:noreply, SessionScope.session_not_found(socket)}
+          {:ok, session} ->
+            if connected?(socket), do: schedule_refresh()
+            {:noreply, assign_session(socket, session)}
+
+          {:error, :not_found} ->
+            {:noreply, SessionScope.session_not_found(socket)}
         end
     end
   end
@@ -217,9 +221,9 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                     finding.severity in ["critical", "high"] &&
                       "bg-destructive/10 text-destructive ring-destructive/20",
                     finding.severity in ["medium", "moderate"] &&
-                      "bg-[var(--ck-warning)]/10 text-[var(--ck-warning)] ring-[var(--ck-warning)]/20",
+                      "bg-warning/10 text-warning ring-warning/20",
                     finding.severity in ["low"] &&
-                      "bg-[var(--ck-success)]/10 text-[var(--ck-success)] ring-[var(--ck-success)]/20",
+                      "bg-success/10 text-success ring-success/20",
                     finding.severity not in ["critical", "high", "medium", "moderate", "low"] &&
                       "bg-muted text-muted-foreground ring-border"
                   ]}>

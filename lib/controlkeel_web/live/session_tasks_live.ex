@@ -74,16 +74,20 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    if connected?(socket), do: schedule_refresh()
+    opts = [invocations_limit: 0, reviews_limit: 0]
 
-    case Mission.get_session_context(socket.assigns.session.id) do
+    case Mission.get_session_context(socket.assigns.session.id, opts) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
       session ->
         case SessionScope.reauthorize(socket, session) do
-          {:ok, session} -> {:noreply, assign_session(socket, session)}
-          {:error, :not_found} -> {:noreply, SessionScope.session_not_found(socket)}
+          {:ok, session} ->
+            if connected?(socket), do: schedule_refresh()
+            {:noreply, assign_session(socket, session)}
+
+          {:error, :not_found} ->
+            {:noreply, SessionScope.session_not_found(socket)}
         end
     end
   end
@@ -288,9 +292,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
                   <div class="flex items-center gap-2">
                     <span class={[
                       "size-3 rounded-full inline-block shrink-0 ring-1 ring-border shadow-sm",
-                      task.status in ["done", "verified"] && "bg-[var(--ck-success)]",
+                      task.status in ["done", "verified"] && "bg-success",
                       task.status == "in_progress" && "bg-primary",
-                      task.status == "queued" && "bg-[var(--ck-warning)]",
+                      task.status == "queued" && "bg-warning",
                       task.status == "paused" && "bg-info",
                       task.status == "blocked" && "bg-destructive"
                     ]}>
@@ -323,7 +327,7 @@ defmodule ControlKeelWeb.SessionTasksLive do
                     </p>
                   <% end %>
                   <%= if task.status == "in_progress" and @active_findings > 0 do %>
-                    <p class="mt-1 text-xs text-[var(--ck-warning)]">
+                    <p class="mt-1 text-xs text-warning">
                       {@active_findings} unresolved finding{if @active_findings != 1, do: "s"}
                     </p>
                   <% end %>
@@ -508,15 +512,15 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
   defp task_status_pill_class("verified"),
     do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-success/10 text-success ring-success/20"
 
   defp task_status_pill_class("done"),
     do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(255,207,107,0.12)] text-[#fff0bf]"
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-warning/10 text-warning ring-warning/20"
 
   defp task_status_pill_class(_status),
     do:
-      "border bg-muted rounded-full px-[0.8rem] py-[0.45rem] text-[0.8rem] bg-[rgba(125,226,174,0.1)] text-[#d2ffe7]"
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-muted text-muted-foreground ring-border"
 
   defp done_unverified?(%{status: "done"}), do: true
   defp done_unverified?(_task), do: false

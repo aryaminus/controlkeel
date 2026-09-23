@@ -4,7 +4,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Analytics
   alias ControlKeel.Intent
   alias ControlKeel.Mission
-  alias ControlKeelWeb.FindingComponents
   alias ControlKeelWeb.SessionScope
 
   @refresh_interval_ms 2_000
@@ -47,8 +46,6 @@ defmodule ControlKeelWeb.MissionControlLive do
              |> assign(:page_title, session.title)
              |> assign(:project_root, project_root)
              |> assign(:launched, Map.get(params, "launched") == "1")
-             |> assign(:selected_finding, nil)
-             |> assign(:selected_fix, nil)
              |> safe_assign_session(session)}
         end
     end
@@ -78,189 +75,21 @@ defmodule ControlKeelWeb.MissionControlLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    if connected?(socket), do: schedule_refresh()
+    opts = [tasks_limit: 0, invocations_limit: 0, reviews_limit: 0]
 
-    case Mission.get_session_context(socket.assigns.session.id) do
+    case Mission.get_session_context(socket.assigns.session.id, opts) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
       session ->
         case SessionScope.reauthorize(socket, session) do
-          {:ok, session} -> {:noreply, socket |> assign_session(session)}
-          {:error, :not_found} -> {:noreply, SessionScope.session_not_found(socket)}
+          {:ok, session} ->
+            if connected?(socket), do: schedule_refresh()
+            {:noreply, socket |> assign_session(session)}
+
+          {:error, :not_found} ->
+            {:noreply, SessionScope.session_not_found(socket)}
         end
-    end
-  end
-
-  @impl true
-  def handle_event("view_fix", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <-
-           Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
-      fix = Mission.auto_fix_for_finding(finding)
-      emit_autofix_event(:viewed, finding, fix)
-
-      {:noreply,
-       socket
-       |> assign(:selected_finding, finding)
-       |> assign(:selected_fix, fix)}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "ControlKeel could not load that fix.")}
-    end
-  end
-
-  @impl true
-  def handle_event("copy_fix_prompt", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <- socket.assigns.selected_finding,
-         %{"agent_prompt" => prompt} = fix <- socket.assigns.selected_fix,
-         true <- is_binary(prompt) and prompt != "" do
-      emit_autofix_event(:copied, finding, fix)
-
-      {:noreply,
-       socket
-       |> push_event("copy-to-clipboard", %{text: prompt})
-       |> put_flash(:info, "Fix prompt copied to the clipboard.")}
-    else
-      _error -> {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("close_fix", _params, socket) do
-    {:noreply, socket |> assign(:selected_finding, nil) |> assign(:selected_fix, nil)}
-  end
-
-  @impl true
-  def handle_event("approve_finding", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
-         {:ok, _updated} <- Mission.approve_finding(finding, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
-        nil ->
-          {:noreply, socket}
-
-        session ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Finding approved.")
-           |> safe_assign_session(session)}
-      end
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
-    end
-  end
-
-  @impl true
-  def handle_event("reject_finding", params, socket) do
-    id = params["id"]
-
-    reason =
-      params["reason"]
-      |> then(&if is_binary(&1) and String.trim(&1) != "", do: String.trim(&1), else: nil)
-
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
-         {:ok, _updated} <- Mission.reject_finding(finding, reason, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id) do
-        nil ->
-          {:noreply, socket}
-
-        session ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Finding rejected.")
-           |> safe_assign_session(session)}
-      end
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
-    end
-  end
-
-  @impl true
-  def handle_event("generate_proof", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
-         {:ok, _proof} <- Mission.generate_proof_bundle(task.id),
-         session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Proof bundle generated.")
-       |> safe_assign_session(session)}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
-    end
-  end
-
-  @impl true
-  def handle_event("complete_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
-         {:ok, task} <- Mission.complete_task(task.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task completed: #{task.title}.")
-       |> refresh_session_after_mutation()}
-    else
-      {:error, :unresolved_findings, findings} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "#{length(findings)} unresolved finding(s) must be approved or resolved before marking this task done."
-         )}
-
-      {:error, :proof_not_ready, reason} when is_binary(reason) ->
-        {:noreply, put_flash(socket, :error, reason)}
-
-      {:error, :invalid_id} ->
-        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
-
-      _error ->
-        {:noreply, put_flash(socket, :error, "ControlKeel could not complete that task.")}
-    end
-  end
-
-  @impl true
-  def handle_event("pause_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
-         {:ok, _result} <- Mission.pause_task(task.id, "mission_control"),
-         session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task paused.")
-       |> safe_assign_session(session)}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
-    end
-  end
-
-  @impl true
-  def handle_event("resume_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
-         %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
-         {:ok, _result} <- Mission.resume_task(task.id, "mission_control"),
-         session when not is_nil(session) <-
-           Mission.get_session_context(socket.assigns.session.id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Task resumed.")
-       |> safe_assign_session(session)}
-    else
-      _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
-    end
-  end
-
-  defp refresh_session_after_mutation(socket) do
-    case Mission.get_session_context(socket.assigns.session.id) do
-      nil ->
-        socket
-
-      session ->
-        socket |> safe_assign_session(session)
     end
   end
 
@@ -668,14 +497,6 @@ defmodule ControlKeelWeb.MissionControlLive do
           <pre class="mt-4 max-h-96 overflow-auto rounded-xl bg-muted/[0.03] p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-muted-foreground">{Jason.encode!(@current_workspace_context, pretty: true)}</pre>
         </details>
       </details>
-
-      <FindingComponents.autofix_panel
-        :if={@selected_finding && @selected_fix}
-        finding={@selected_finding}
-        fix={@selected_fix}
-        copy_event="copy_fix_prompt"
-        close_event="close_fix"
-      />
     </section>
     """
   end
@@ -683,6 +504,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp safe_assign_session(socket, session) do
     socket
     |> assign_session(session)
+    # Filesystem + git inspection (several subprocesses): compute once at mount,
+    # not on every 2s tick. Remount to pick up branch/sha changes.
+    |> assign(:current_workspace_context, Mission.workspace_context(session))
     |> assign(:sibling_sessions, Mission.list_sibling_sessions(session.workspace.id))
   rescue
     e ->
@@ -709,15 +533,6 @@ defmodule ControlKeelWeb.MissionControlLive do
     brief = stringify_keys(session.execution_brief || %{})
     compiler = stringify_keys(Map.get(brief, "compiler", %{}))
 
-    selected_finding =
-      case socket.assigns[:selected_finding] do
-        %{id: id} -> Enum.find(session.findings, &(&1.id == id))
-        _ -> nil
-      end
-
-    task_graph = Mission.session_task_graph(session.id)
-    task_title_by_id = Map.new(task_graph.tasks, &{&1.id, &1.title})
-
     socket
     |> assign_session_nav(session)
     |> assign(
@@ -728,30 +543,15 @@ defmodule ControlKeelWeb.MissionControlLive do
       brief: brief,
       boundary_summary: Intent.boundary_summary(brief),
       compiler: compiler,
-      current_task: current_task(session.tasks),
-      selected_finding: selected_finding,
-      selected_fix: maybe_regenerate_fix(selected_finding),
       active_findings: Enum.count(session.findings, &(&1.status in ["open", "blocked"])),
-      active_tasks: Enum.count(session.tasks, &(&1.status in ["queued", "in_progress"])),
       compliance_score: compliance_score(session.findings),
       latest_proofs: Mission.latest_proof_bundles_for_session(session.id),
-      current_proof_summary: current_task(session.tasks) |> Mission.proof_summary_for_task(),
-      current_workspace_context: Mission.workspace_context(session),
-      task_graph: task_graph,
-      task_title_by_id: task_title_by_id,
       agent_label:
         Map.get(Mission.agent_labels(), session.workspace.agent, brief_value(brief, "agent"))
     )
   end
 
   defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
-
-  defp current_task(tasks) do
-    Enum.find(tasks, &(&1.status == "in_progress")) ||
-      Enum.find(tasks, &(&1.status == "paused")) ||
-      Enum.find(tasks, &(&1.status == "blocked")) ||
-      Enum.find(tasks, &(&1.status == "queued"))
-  end
 
   defp format_duration(nil), do: "Not recorded"
   defp format_duration(seconds) when seconds < 60, do: "#{seconds}s"
@@ -777,25 +577,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   defp format_domain_pack("Not specified"), do: "Not specified"
   defp format_domain_pack(nil), do: "Not specified"
   defp format_domain_pack(domain_pack), do: Intent.pack_label(domain_pack)
-  defp maybe_regenerate_fix(nil), do: nil
-  defp maybe_regenerate_fix(finding), do: Mission.auto_fix_for_finding(finding)
 
   defp stringify_keys(map) when is_map(map) do
     Enum.into(map, %{}, fn {key, value} -> {to_string(key), value} end)
-  end
-
-  defp emit_autofix_event(action, finding, fix) do
-    :telemetry.execute(
-      [:controlkeel, :autofix, action],
-      %{count: 1},
-      %{
-        finding_id: finding.id,
-        session_id: finding.session_id,
-        rule_id: finding.rule_id,
-        supported: fix["supported"],
-        fix_kind: fix["fix_kind"]
-      }
-    )
   end
 
   defp compliance_score([]), do: 100
@@ -875,20 +659,6 @@ defmodule ControlKeelWeb.MissionControlLive do
   end
 
   defp format_created_date(value), do: to_string(value)
-
-  defp parse_id(value) do
-    case Integer.parse(to_string(value)) do
-      {parsed, ""} -> {:ok, parsed}
-      _ -> {:error, :invalid_id}
-    end
-  end
-
-  defp actor_opts(socket) do
-    case socket.assigns[:current_user] do
-      nil -> [actor_source: "web", actor_identifier: "web"]
-      user -> [actor_source: "web", actor_user_id: user.id, actor_identifier: user.email]
-    end
-  end
 
   defp default_session_metrics(session_id) do
     %{

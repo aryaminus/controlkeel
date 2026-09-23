@@ -67,16 +67,18 @@ defmodule ControlKeelWeb.SessionReleaseLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    if connected?(socket), do: schedule_refresh()
-
-    case Mission.get_session_context(socket.assigns.session.id) do
+    case Mission.get_session_nav(socket.assigns.session.id) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
       session ->
         case SessionScope.reauthorize(socket, session) do
-          {:ok, session} -> {:noreply, assign_session(socket, session)}
-          {:error, :not_found} -> {:noreply, SessionScope.session_not_found(socket)}
+          {:ok, session} ->
+            if connected?(socket), do: schedule_refresh()
+            {:noreply, assign_session(socket, session)}
+
+          {:error, :not_found} ->
+            {:noreply, SessionScope.session_not_found(socket)}
         end
     end
   end

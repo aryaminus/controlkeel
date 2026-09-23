@@ -40,15 +40,14 @@ defmodule ControlKeelWeb.SessionReviewsLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    if connected?(socket), do: schedule_refresh()
-
-    case Mission.get_session_context(socket.assigns.session.id) do
+    case Mission.get_session_nav(socket.assigns.session.id) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
       session ->
         case SessionScope.reauthorize(socket, session) do
           {:ok, session} ->
+            if connected?(socket), do: schedule_refresh()
             {:noreply, socket |> assign(:session, session) |> assign_reviews()}
 
           {:error, :not_found} ->

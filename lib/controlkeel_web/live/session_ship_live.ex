@@ -115,16 +115,21 @@ defmodule ControlKeelWeb.SessionShipLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    if connected?(socket), do: schedule_refresh()
+    # AutonomyLoop profiles read session.tasks/findings off the struct.
+    opts = [invocations_limit: 0, reviews_limit: 0]
 
-    case Mission.get_session_context(socket.assigns.session.id) do
+    case Mission.get_session_context(socket.assigns.session.id, opts) do
       nil ->
         {:noreply, SessionScope.session_not_found(socket)}
 
       session ->
         case SessionScope.reauthorize(socket, session) do
-          {:ok, session} -> {:noreply, assign_session(socket, session)}
-          {:error, :not_found} -> {:noreply, SessionScope.session_not_found(socket)}
+          {:ok, session} ->
+            if connected?(socket), do: schedule_refresh()
+            {:noreply, assign_session(socket, session)}
+
+          {:error, :not_found} ->
+            {:noreply, SessionScope.session_not_found(socket)}
         end
     end
   end
