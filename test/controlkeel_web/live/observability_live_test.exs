@@ -36,7 +36,7 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
 
     assert html =~ "Session observability"
     assert has_element?(view, "#observability-run-page")
-    assert has_element?(view, "#observability-health-card")
+    refute has_element?(view, "#observability-health-card")
     assert has_element?(view, "#session-observability-timeline")
     assert has_element?(view, "#session-observability-memory")
     refute has_element?(view, "#observability-findings")
