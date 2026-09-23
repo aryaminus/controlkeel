@@ -241,6 +241,7 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/release", SessionReleaseLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/ship", SessionShipLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
+
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/observability",
            SessionObservabilityLive,
            :show

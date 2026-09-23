@@ -160,7 +160,9 @@ defmodule ControlKeelWeb.SessionActivityLive do
         <article class="rounded-2xl border bg-card p-5 shadow-card">
           <p class="text-sm font-medium text-muted-foreground">Full timeline</p>
           <.link
-            navigate={~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/observability#session-observability-timeline"}
+            navigate={
+              ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/observability#session-observability-timeline"
+            }
             class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:text-primary transition cursor-pointer"
           >
             Open run timeline <.icon name="hero-arrow-right" class="size-3.5" />

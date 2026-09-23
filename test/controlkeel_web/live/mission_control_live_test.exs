@@ -119,7 +119,9 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     refute html =~ "mission-observability-panel"
     refute html =~ "Session run observability"
     assert html =~ "Observability"
-    assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability")
+
+    assert html =~
+             ~s(href="/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability")
   end
 
   test "mission control links to the session review queue page", %{conn: conn} do

@@ -113,7 +113,9 @@ defmodule ControlKeelWeb.SessionActivityLiveTest do
     assert html =~ ~s(id="activity-audit-export-json")
     assert html =~ ~s(id="activity-audit-export-csv")
     assert html =~ ~s(id="activity-audit-export-pdf")
-    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
+
+    assert html =~
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
   end
 
   test "session activity redirects when the session does not exist", %{conn: conn} do

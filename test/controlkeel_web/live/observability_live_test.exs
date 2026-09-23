@@ -7,11 +7,16 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
   alias ControlKeel.Mission
   alias ControlKeel.Platform
 
-  defp observability_path(org, ws, session), do: "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability"
+  defp observability_path(org, ws, session),
+    do: "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability"
 
   test "stacked observability page renders session run details", %{conn: conn} do
     {org, ws, session} =
-      org_bound_session_fixture(%{budget_cents: 2_000, daily_budget_cents: 2_000, spent_cents: 300})
+      org_bound_session_fixture(%{
+        budget_cents: 2_000,
+        daily_budget_cents: 2_000,
+        spent_cents: 300
+      })
 
     task = task_fixture(%{session: session, status: "in_progress", title: "Observe task"})
 
@@ -47,8 +52,13 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert has_element?(view, "#observability-telemetry-export")
     refute has_element?(view, "#observability-recent-findings")
     refute has_element?(view, "#observability-timeline")
-    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/export.json"
-    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
+
+    assert html =~
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/export.json"
+
+    assert html =~
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
+
     assert html =~ ~s(href="#session-observability-memory")
   end
 
@@ -71,7 +81,11 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
   test "observability export route returns local telemetry envelope via new path", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    conn = get(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/export.json")
+    conn =
+      get(
+        conn,
+        "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/export.json"
+      )
 
     assert %{
              "schema_version" => "controlkeel.observability.v1",
@@ -94,7 +108,9 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
 
   test "observability export route returns not found for missing sessions", %{conn: conn} do
     {org, ws, _} = org_bound_session_fixture()
-    conn = get(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/999999/observability/export.json")
+
+    conn =
+      get(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/999999/observability/export.json")
 
     assert %{"error" => "session not found"} = json_response(conn, 404)
   end
@@ -108,7 +124,9 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
 
     assert html =~ "sidebar-org-nav"
     assert html =~ "Observability"
-    assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability")
+
+    assert html =~
+             ~s(href="/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability")
   end
 
   test "observability page renders audit log export controls and checksums", %{conn: conn} do
@@ -121,7 +139,10 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert has_element?(view, "#observability-audit-export-json")
     assert has_element?(view, "#observability-audit-export-csv")
     assert has_element?(view, "#observability-audit-export-pdf")
-    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
+
+    assert html =~
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
+
     assert html =~ "No audit exports recorded yet"
 
     assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "json")
@@ -145,7 +166,10 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert has_element?(view, "#activity-audit-export-json")
     assert has_element?(view, "#activity-audit-export-csv")
     assert has_element?(view, "#activity-audit-export-pdf")
-    assert html =~ "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/csv"
+
+    assert html =~
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/csv"
+
     refute html =~ "Last export"
 
     assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "csv")
@@ -170,13 +194,15 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     {org, ws, session} = org_bound_session_fixture()
     conn = get(conn, ~p"/observability/sessions/#{session.id}/timeline")
 
-    assert redirected_to(conn, 302) == "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability#session-observability-timeline"
+    assert redirected_to(conn, 302) ==
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability#session-observability-timeline"
   end
 
   test "legacy memory path redirects with anchor", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     conn = get(conn, ~p"/observability/sessions/#{session.id}/memory")
 
-    assert redirected_to(conn, 302) == "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability#session-observability-memory"
+    assert redirected_to(conn, 302) ==
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability#session-observability-memory"
   end
 end

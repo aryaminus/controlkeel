@@ -62,7 +62,10 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
         [
           %{label: org.name, to: "/#{org.slug}"},
           %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
-          %{label: session.title, to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"},
+          %{
+            label: session.title,
+            to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+          },
           %{label: "Observability", to: nil}
         ]
       else

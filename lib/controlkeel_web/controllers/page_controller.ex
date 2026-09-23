@@ -126,7 +126,8 @@ defmodule ControlKeelWeb.PageController do
           %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} ->
             redirect(
               conn,
-              to: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
+              to:
+                "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
             )
 
           _ ->
