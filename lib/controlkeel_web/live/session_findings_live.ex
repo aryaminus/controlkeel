@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Mission
+  alias ControlKeelWeb.SessionScope
   alias ControlKeelWeb.FindingComponents
 
   @refresh_interval_ms 2_000
@@ -25,7 +26,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
              |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
-          check_session_scope(session, org_slug, ws_slug) != :ok ->
+          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
@@ -40,17 +41,6 @@ defmodule ControlKeelWeb.SessionFindingsLive do
              |> assign(:selected_fix, nil)
              |> assign_session(session)}
         end
-    end
-  end
-
-  defp check_session_scope(session, org_slug, ws_slug) do
-    workspace = session.workspace
-    org = workspace && workspace.org
-
-    cond do
-      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
-      is_nil(org) or org.slug != org_slug -> {:error, :org}
-      true -> :ok
     end
   end
 
@@ -205,7 +195,8 @@ defmodule ControlKeelWeb.SessionFindingsLive do
               <th class="bg-muted px-5 py-3 font-semibold">Status</th>
               <th class="bg-muted px-5 py-3 font-semibold">Category</th>
               <th class="bg-muted px-5 py-3 font-semibold">Updated</th>
-              <th class="bg-muted px-5 py-3 font-semibold w-px whitespace-nowrap last:rounded-tr-2xl"></th>
+              <th class="bg-muted px-5 py-3 font-semibold w-px whitespace-nowrap last:rounded-tr-2xl">
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-border">
@@ -259,12 +250,18 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                       id={"finding-menu-#{finding.id}"}
                       class={[
                         "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/20",
-                        if finding == List.last(@session.findings) do "bottom-full mb-1" else "top-full mt-1" end
+                        if finding == List.last(@session.findings) do
+                          "bottom-full mb-1"
+                        else
+                          "top-full mt-1"
+                        end
                       ]}
                       phx-click-away={
                         JS.hide(to: "#finding-menu-#{finding.id}")
                         |> JS.remove_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
-                        |> JS.set_attribute({"aria-expanded", "false"}, to: "#finding-actions-#{finding.id}")
+                        |> JS.set_attribute({"aria-expanded", "false"},
+                          to: "#finding-actions-#{finding.id}"
+                        )
                       }
                     >
                       <button
@@ -273,7 +270,9 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                         phx-click={
                           JS.hide(to: "#finding-menu-#{finding.id}")
                           |> JS.remove_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
-                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#finding-actions-#{finding.id}")
+                          |> JS.set_attribute({"aria-expanded", "false"},
+                            to: "#finding-actions-#{finding.id}"
+                          )
                           |> JS.push("view_fix", value: %{id: finding.id})
                         }
                       >

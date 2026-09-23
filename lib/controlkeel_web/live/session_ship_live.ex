@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.SessionShipLive do
   alias ControlKeel.Agent.AutonomyLoop
   alias ControlKeel.Analytics
   alias ControlKeel.Mission
+  alias ControlKeelWeb.SessionScope
 
   @refresh_interval_ms 2_000
 
@@ -26,7 +27,7 @@ defmodule ControlKeelWeb.SessionShipLive do
              |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
-          check_session_scope(session, org_slug, ws_slug) != :ok ->
+          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
@@ -36,17 +37,6 @@ defmodule ControlKeelWeb.SessionShipLive do
             if connected?(socket), do: schedule_refresh()
             {:ok, assign_session(socket, session)}
         end
-    end
-  end
-
-  defp check_session_scope(session, org_slug, ws_slug) do
-    workspace = session.workspace
-    org = workspace && workspace.org
-
-    cond do
-      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
-      is_nil(org) or org.slug != org_slug -> {:error, :org}
-      true -> :ok
     end
   end
 

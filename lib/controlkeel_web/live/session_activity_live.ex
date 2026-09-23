@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.SessionActivityLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Mission
+  alias ControlKeelWeb.SessionScope
   alias ControlKeel.Platform
 
   @refresh_interval_ms 2_000
@@ -27,7 +28,7 @@ defmodule ControlKeelWeb.SessionActivityLive do
              |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
-          check_session_scope(session, org_slug, ws_slug) != :ok ->
+          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
@@ -42,17 +43,6 @@ defmodule ControlKeelWeb.SessionActivityLive do
              |> assign(:expanded_events, MapSet.new())
              |> assign_session(session)}
         end
-    end
-  end
-
-  defp check_session_scope(session, org_slug, ws_slug) do
-    workspace = session.workspace
-    org = workspace && workspace.org
-
-    cond do
-      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
-      is_nil(org) or org.slug != org_slug -> {:error, :org}
-      true -> :ok
     end
   end
 

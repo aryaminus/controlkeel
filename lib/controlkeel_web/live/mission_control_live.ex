@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Intent
   alias ControlKeel.Mission
   alias ControlKeelWeb.FindingComponents
+  alias ControlKeelWeb.SessionScope
 
   @refresh_interval_ms 2_000
 
@@ -31,7 +32,7 @@ defmodule ControlKeelWeb.MissionControlLive do
              |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
-          check_session_scope(session, org_slug, ws_slug) != :ok ->
+          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
@@ -50,20 +51,6 @@ defmodule ControlKeelWeb.MissionControlLive do
              |> assign(:selected_fix, nil)
              |> safe_assign_session(session)}
         end
-    end
-  end
-
-  # URL slug agreement only — must run after the session_accessible? gate,
-  # which is what guarantees a loaded workspace/org (a nil session never
-  # reaches here).
-  defp check_session_scope(session, org_slug, ws_slug) do
-    workspace = session.workspace
-    org = workspace && workspace.org
-
-    cond do
-      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
-      is_nil(org) or org.slug != org_slug -> {:error, :org}
-      true -> :ok
     end
   end
 

@@ -3,6 +3,7 @@ defmodule ControlKeelWeb.ReviewLive do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Mission
+  alias ControlKeelWeb.SessionScope
 
   @impl true
   def mount(_params, _session, socket) do
@@ -37,7 +38,7 @@ defmodule ControlKeelWeb.ReviewLive do
             not Accounts.session_accessible?(session, socket.assigns[:current_user]) ->
               {:noreply, review_not_found(socket)}
 
-            check_session_scope(session, org_slug, ws_slug) != :ok ->
+            SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
               {:noreply, review_not_found(socket)}
 
             true ->
@@ -400,20 +401,6 @@ defmodule ControlKeelWeb.ReviewLive do
     |> assign(:page_title, review.title)
     |> assign(:diff_chunks, diff_chunks(review))
     |> assign(:response_form, response_form(review))
-  end
-
-  # URL slug agreement only — must run after the session_accessible? gate,
-  # which is what guarantees a loaded workspace/org (a nil session never
-  # reaches here).
-  defp check_session_scope(session, org_slug, ws_slug) do
-    workspace = session.workspace
-    org = workspace && workspace.org
-
-    cond do
-      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
-      is_nil(org) or org.slug != org_slug -> {:error, :org}
-      true -> :ok
-    end
   end
 
   # No nav context without a loaded session — redirect instead of rendering
