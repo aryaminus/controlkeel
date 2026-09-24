@@ -20,6 +20,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Mission
   alias ControlKeel.Observability
   alias ControlKeelWeb.SessionScope
 
@@ -84,6 +85,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
     |> assign(:nav_org, org)
     |> assign(:nav_workspace, workspace)
     |> assign(:nav_session, %{id: session.id, title: session.title})
+    |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
     |> assign(:breadcrumbs, crumbs)
   end
 
@@ -108,7 +110,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
             }
             target="_blank"
             rel="noopener"
-            class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+            class="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-5 py-2.5 text-sm font-semibold text-muted-foreground transition hover:bg-muted/80 hover:text-foreground"
           >
             Download JSON envelope
           </.link>
