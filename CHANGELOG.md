@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.20 — 2026-09-24
+
+### What's changed
+
+- a11y(web): keyboard focus rings on modal close, icon, and autofix buttons (#201)
+- perf(elixir): frequencies_by in remaining count helpers (#200)
+- a11y(web): keyboard focus rings on modal close, icon, and autofix buttons
+- perf(elixir): replace map+reject+frequencies with frequencies_by in remaining helpers
+
 ## v0.4.19 — 2026-09-19
 
 ### What's changed
