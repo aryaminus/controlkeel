@@ -4,8 +4,13 @@ defmodule ControlKeelWeb.PageController do
   alias ControlKeel.Accounts
   alias ControlKeel.Bootstrap.LocalDefaults
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Session
+  alias ControlKeel.Mission.Workspace
+  alias ControlKeel.Repo
+  alias ControlKeel.Runtime
   alias ControlKeel.Runtime.Mode
   alias ControlKeel.Skills
+  alias ControlKeelWeb.FallbackController
 
   # Public marketing pages render inside the `:public` framework layout
   # (ControlKeelWeb.Layouts). The layout reads @current_user/@flash directly,
@@ -105,12 +110,6 @@ defmodule ControlKeelWeb.PageController do
   # to its org/workspace slugs and redirects; memory preserves an anchor
   # so the stacked page scrolls there.
   def observability_session_redirect(conn, %{"id" => id} = params) do
-    alias ControlKeel.Bootstrap.LocalDefaults
-    alias ControlKeel.Mission.Session
-    alias ControlKeel.Mission.Workspace
-    alias ControlKeel.Repo
-    alias ControlKeelWeb.FallbackController
-
     timeline? = String.ends_with?(conn.request_path, "/timeline")
 
     anchor =
@@ -141,7 +140,7 @@ defmodule ControlKeelWeb.PageController do
             end
 
           _ ->
-            if ControlKeel.Runtime.local?() do
+            if Runtime.local?() do
               if timeline? do
                 redirect(
                   conn,

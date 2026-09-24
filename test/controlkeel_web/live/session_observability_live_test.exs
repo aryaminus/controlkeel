@@ -1,4 +1,4 @@
-defmodule ControlKeelWeb.ObservabilityLiveTest do
+defmodule ControlKeelWeb.SessionObservabilityLiveTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import ControlKeel.MissionFixtures

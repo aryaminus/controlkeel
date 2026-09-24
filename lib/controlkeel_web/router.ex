@@ -172,15 +172,6 @@ defmodule ControlKeelWeb.Router do
       live "/observability/promotions", ObservabilityPromotionsLive, :index
     end
 
-    # Legacy session observability page URLs (pre-org-scope nesting).
-    # The page redirects themselves live in the `:require_session_auth`
-    # scope below, next to the dual-routed exports: gating them the same
-    # way keeps anonymous callers from probing session-id validity
-    # (302 vs 404) and leaking org/workspace slugs in cloud mode.
-    # Overview/memory now live stacked at
-    # `/:org_slug/workspaces/:ws_slug/sessions/:id/observability`
-    # (timeline lives canonically in `.../activity`).
-
     # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
     # shape is the most-shared URL in docs/Slack/CI, so keep it as a redirect
     # rather than a 404. Two-segment, so the single-segment ":org_slug" live
