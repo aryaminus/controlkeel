@@ -3164,9 +3164,9 @@ defmodule ControlKeel.Mission do
 
   defp cluster_summary(rows) do
     rows
-    |> Enum.map(& &1["summary"])
-    |> Enum.reject(&is_nil/1)
-    |> Enum.frequencies()
+    # Bolt: Avoid intermediate list allocations and reduce GC pressure with Enum.frequencies_by/2
+    |> Enum.frequencies_by(& &1["summary"])
+    |> Map.delete(nil)
     |> Enum.max_by(fn {_summary, count} -> count end, fn -> {nil, 0} end)
     |> elem(0)
   end
