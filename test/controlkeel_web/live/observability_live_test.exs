@@ -42,7 +42,7 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert html =~ "Session observability"
     assert has_element?(view, "#observability-run-page")
     refute has_element?(view, "#observability-health-card")
-    assert has_element?(view, "#session-observability-timeline")
+    refute has_element?(view, "#session-observability-timeline")
     assert has_element?(view, "#session-observability-memory")
     refute has_element?(view, "#observability-findings")
     refute has_element?(view, "#observability-gates")
@@ -56,19 +56,22 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert html =~
              "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/export.json"
 
-    assert html =~
+    refute html =~
              "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
-
-    assert html =~ ~s(href="#session-observability-memory")
   end
 
-  test "observability page links the proofs card pre-filtered to the session", %{conn: conn} do
+  test "observability page no longer links proofs from overview (moved to dedicated tab)", %{
+    conn: conn
+  } do
     {org, ws, session} = org_bound_session_fixture()
     task_fixture(%{session: session})
 
-    {:ok, _view, html} = live(conn, observability_path(org, ws, session))
+    {:ok, view, _html} = live(conn, observability_path(org, ws, session))
 
-    assert html =~ "/proofs?session_id=#{session.id}"
+    # Overview memory-proof card no longer has Jump/Open links; proofs lives in sidebar nav
+    refute has_element?(view, "#observability-memory-proof a[href=\"#session-observability-memory\"]")
+    refute has_element?(view, "#observability-memory-proof a[href*=\"/proofs?session_id=\"]")
+    assert has_element?(view, "#observability-memory-proof")
   end
 
   test "stacked observability page redirects missing sessions", %{conn: conn} do
@@ -129,30 +132,14 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
              ~s(href="/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability")
   end
 
-  test "observability page renders audit log export controls and checksums", %{conn: conn} do
+  test "observability page no longer renders audit log export (moved to activity)", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     _finding = finding_fixture(%{session: session})
 
-    {:ok, view, html} = live(conn, observability_path(org, ws, session))
+    {:ok, view, _html} = live(conn, observability_path(org, ws, session))
 
-    assert has_element?(view, "#observability-audit-log-export")
-    assert has_element?(view, "#observability-audit-export-json")
-    assert has_element?(view, "#observability-audit-export-csv")
-    assert has_element?(view, "#observability-audit-export-pdf")
-
-    assert html =~
-             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability/audit-log/json"
-
-    assert html =~ "No audit exports recorded yet"
-
-    assert {:ok, %{export: export}} = Platform.export_audit_log(session.id, "json")
-
-    {:ok, _view, html} = live(conn, observability_path(org, ws, session))
-
-    assert html =~ export.checksum
-    assert html =~ export.format
-    assert html =~ Calendar.strftime(export.generated_at, "%Y-%m-%d %H:%M:%S UTC")
-    refute html =~ "unknown time"
+    refute has_element?(view, "#observability-audit-log-export")
+    refute has_element?(view, "#observability-audit-export-json")
   end
 
   test "session activity page shows audit log export controls and latest checksum", %{
@@ -190,12 +177,12 @@ defmodule ControlKeelWeb.ObservabilityLiveTest do
     assert redirected_to(conn, 302) =~ "/sessions/#{session.id}/observability"
   end
 
-  test "legacy timeline path redirects with anchor", %{conn: conn} do
+  test "legacy timeline path redirects to activity (canonical feed)", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     conn = get(conn, ~p"/observability/sessions/#{session.id}/timeline")
 
     assert redirected_to(conn, 302) ==
-             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability#session-observability-timeline"
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/activity"
   end
 
   test "legacy memory path redirects with anchor", %{conn: conn} do

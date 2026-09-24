@@ -1,20 +1,19 @@
 defmodule ControlKeelWeb.SessionObservabilityLive do
   @moduledoc """
   Session observability page under the organization layout: one route
-  stacking the run overview, timeline, and memory stages
+  stacking the run overview and memory stages
   (`/:org_slug/workspaces/:ws_slug/sessions/:id/observability`).
   Replaces the former tabbed `/observability/sessions/:id/*` family
   (docs/issues/observability-route-consolidation.md).
+  Timeline lives canonically in `SessionActivityLive` (`.../activity`).
   """
 
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
   alias ControlKeel.Observability
-  alias ControlKeel.Platform
   alias ControlKeelWeb.SessionObservabilityMemory
   alias ControlKeelWeb.SessionObservabilityOverview
-  alias ControlKeelWeb.SessionObservabilityTimeline
   alias ControlKeelWeb.SessionScope
 
   @impl true
@@ -35,7 +34,6 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
 
       true ->
         with {:ok, run} <- Observability.session_run(id),
-             {:ok, timeline} <- Observability.timeline(id, limit: 50),
              {:ok, memory_context} <- Observability.memory_context(id, limit: 20) do
           {:ok,
            socket
@@ -43,9 +41,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
            |> assign(:org_slug, org_slug)
            |> assign(:ws_slug, ws_slug)
            |> assign(:run, run)
-           |> assign(:timeline, timeline)
            |> assign(:memory_context, memory_context)
-           |> assign(:audit_exports, Platform.list_audit_exports(session.id))
            |> assign_session_nav(session)}
         else
           _ -> {:ok, SessionScope.session_not_found(socket)}
@@ -88,18 +84,11 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
           Session observability
         </h1>
         <p class="text-sm text-muted-foreground">
-          Run overview, governed event timeline, and memory context for this session, stacked on one page.
+          Run overview and memory context for this session, stacked on one page.
         </p>
       </div>
 
-      <SessionObservabilityOverview.overview_panel
-        run={@run}
-        audit_exports={@audit_exports}
-        org_slug={@org_slug}
-        ws_slug={@ws_slug}
-      />
-
-      <SessionObservabilityTimeline.timeline_panel timeline={@timeline} />
+      <SessionObservabilityOverview.overview_panel run={@run} org_slug={@org_slug} ws_slug={@ws_slug} />
 
       <SessionObservabilityMemory.memory_panel memory_context={@memory_context} />
     </section>

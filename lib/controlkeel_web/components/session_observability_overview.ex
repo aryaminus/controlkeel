@@ -15,7 +15,6 @@ defmodule ControlKeelWeb.SessionObservabilityOverview do
     statics: ControlKeelWeb.static_paths()
 
   attr :run, :map, required: true
-  attr :audit_exports, :list, required: true
   attr :org_slug, :string, required: true
   attr :ws_slug, :string, required: true
 
@@ -107,18 +106,6 @@ defmodule ControlKeelWeb.SessionObservabilityOverview do
           <span class="text-muted-foreground">
             {@run.proofs.count} proof(s) · {@run.tasks.active}/{@run.tasks.total} tasks · {@run.memory.records} memory record(s)
           </span>
-          <a
-            href="#session-observability-memory"
-            class="text-xs text-primary font-semibold hover:opacity-80 transition-opacity"
-          >
-            Jump to memory →
-          </a>
-          <.link
-            navigate={~p"/proofs?#{%{"session_id" => @run.session.id}}"}
-            class="text-xs text-primary font-semibold hover:opacity-80 transition-opacity"
-          >
-            Open proofs →
-          </.link>
         </div>
       </div>
 
@@ -135,81 +122,25 @@ defmodule ControlKeelWeb.SessionObservabilityOverview do
         </div>
       <% end %>
 
-      <div
-        id="observability-telemetry-export"
-        class="rounded-xl px-4 py-3 border bg-[rgba(255,255,255,0.015)] space-y-2"
-      >
-        <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-          Trace/proof export
-        </p>
-        <p class="text-muted-foreground text-sm leading-relaxed">
-          Download the local observability envelope for this run, then preview it locally with <code class="text-primary font-semibold ml-2 text-xs">
-              controlkeel obs import &lt;file&gt; --dry-run
-            </code>.
-        </p>
+      <div id="observability-telemetry-export" class="flex justify-end">
         <.link
           href={
             ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@run.session.id}/observability/export.json"
           }
-          class="text-sm text-primary font-semibold hover:opacity-80 transition-opacity"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
         >
-          Download JSON envelope →
+          Download JSON envelope
         </.link>
       </div>
 
-      <div
-        id="observability-audit-log-export"
-        class="rounded-xl px-4 py-3 border bg-[rgba(255,255,255,0.015)] space-y-2"
-      >
-        <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-          Audit log export
-        </p>
-        <p class="text-muted-foreground text-sm leading-relaxed">
-          Checksummed audit artifact of record for this session, proofs embedded. The same export
-          behind <code class="text-primary font-semibold ml-1 text-xs">controlkeel audit-log</code>.
-        </p>
-        <div class="flex flex-wrap items-center gap-2">
-          <.link
-            :for={format <- ~w(json csv pdf)}
-            id={"observability-audit-export-#{format}"}
-            href={
-              ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@run.session.id}/observability/audit-log/#{format}"
-            }
-            class="rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] border bg-muted/[0.03] text-muted-foreground hover:bg-muted/[0.08] hover:text-foreground transition"
-          >
-            {String.upcase(format)}
-          </.link>
-        </div>
-        <%= if @audit_exports == [] do %>
-          <p class="text-muted-foreground text-xs">
-            No audit exports recorded yet — download one above, then reload to see its checksum here.
-          </p>
-        <% else %>
-          <ul class="space-y-1 list-none p-0 m-0">
-            <%= for export <- @audit_exports do %>
-              <li class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span class="font-semibold uppercase">{export.format}</span>
-                <code class="font-mono break-all">{export.checksum}</code>
-                <span>{format_exported_at(export.generated_at)}</span>
-              </li>
-            <% end %>
-          </ul>
-        <% end %>
-      </div>
     </section>
     """
   end
 
   defp format_currency(cents) when is_integer(cents), do: (cents / 100) |> Float.round(2)
   defp format_currency(_cents), do: 0.0
-
-  defp format_exported_at(nil), do: "unknown time"
-
-  defp format_exported_at(%DateTime{} = at),
-    do: Calendar.strftime(at, "%Y-%m-%d %H:%M:%S UTC")
-
-  defp format_exported_at(%NaiveDateTime{} = at),
-    do: Calendar.strftime(at, "%Y-%m-%d %H:%M:%S UTC")
 
   defp format_frequency(map) when map == %{}, do: "none"
 

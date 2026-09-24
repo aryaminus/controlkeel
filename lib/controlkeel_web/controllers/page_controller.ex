@@ -99,10 +99,11 @@ defmodule ControlKeelWeb.PageController do
   end
 
   # Legacy session observability URLs (pre-org-scope nesting): the
-  # overview/timeline/memory tabs now live stacked at
+  # overview/memory tabs now live stacked at
   # `/:org_slug/workspaces/:ws_slug/sessions/:id/observability`.
-  # Resolves the numeric id to its org/workspace slugs and redirects;
-  # timeline/memory preserve an anchor so the stacked page scrolls there.
+  # Timeline lives canonically in `.../activity`. Resolves the numeric id
+  # to its org/workspace slugs and redirects; memory preserves an anchor
+  # so the stacked page scrolls there.
   def observability_session_redirect(conn, %{"id" => id} = params) do
     alias ControlKeel.Bootstrap.LocalDefaults
     alias ControlKeel.Mission.Session
@@ -110,9 +111,11 @@ defmodule ControlKeelWeb.PageController do
     alias ControlKeel.Repo
     alias ControlKeelWeb.FallbackController
 
+    timeline? = String.ends_with?(conn.request_path, "/timeline")
+
     anchor =
       cond do
-        String.ends_with?(conn.request_path, "/timeline") -> "#session-observability-timeline"
+        timeline? -> ""
         String.ends_with?(conn.request_path, "/memory") -> "#session-observability-memory"
         true -> ""
       end
@@ -124,19 +127,34 @@ defmodule ControlKeelWeb.PageController do
       %Session{} = session ->
         case Repo.preload(session, workspace: :org) do
           %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} ->
-            redirect(
-              conn,
-              to:
-                "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
-            )
-
-          _ ->
-            if ControlKeel.Runtime.local?() do
+            if timeline? do
+              redirect(
+                conn,
+                to: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/activity"
+              )
+            else
               redirect(
                 conn,
                 to:
-                  "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/observability#{anchor}"
+                  "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
               )
+            end
+
+          _ ->
+            if ControlKeel.Runtime.local?() do
+              if timeline? do
+                redirect(
+                  conn,
+                  to:
+                    "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/activity"
+                )
+              else
+                redirect(
+                  conn,
+                  to:
+                    "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/observability#{anchor}"
+                )
+              end
             else
               FallbackController.not_found(conn, params)
             end
