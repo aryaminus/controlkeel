@@ -13,7 +13,7 @@ defmodule ControlKeelWeb.CommandPill do
         type="button"
         phx-click="copy_command"
         phx-value-command={@command}
-        class="cursor-pointer hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+        class="cursor-pointer hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
         aria-label="Copy command"
         title="Copy command"
       >
