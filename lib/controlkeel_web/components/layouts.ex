@@ -556,22 +556,4 @@ defmodule ControlKeelWeb.Layouts do
     |> Enum.map(&String.capitalize/1)
     |> Enum.join(" ")
   end
-
-  # Tab styling for the observability session layout (Overview / Timeline /
-  # Memory / Export JSON).
-  defp tab_class(path, current_path) do
-    if path == current_path do
-      "#{tab_base_class()} text-primary bg-[rgba(190,242,100,0.1)] border-primary"
-    else
-      tab_inactive_class()
-    end
-  end
-
-  defp tab_inactive_class do
-    "#{tab_base_class()} hover:text-primary bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.06)]"
-  end
-
-  defp tab_base_class do
-    "text-sm font-medium transition-colors px-3 py-1.5 rounded-lg border"
-  end
 end

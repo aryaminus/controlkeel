@@ -172,14 +172,14 @@ defmodule ControlKeelWeb.Router do
       live "/observability/promotions", ObservabilityPromotionsLive, :index
     end
 
-    # Legacy session observability URLs (pre-org-scope nesting): the
-    # overview/timeline/memory tabs now live stacked at
-    # `/:org_slug/workspaces/:ws_slug/sessions/:id/observability`.
-    # Export/audit-log downloads keep their legacy paths functional (dual
-    # routes) plus redirect helpers for the page URLs.
-    get "/observability/sessions/:id", PageController, :observability_session_redirect
-    get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
-    get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
+    # Legacy session observability page URLs (pre-org-scope nesting).
+    # The page redirects themselves live in the `:require_session_auth`
+    # scope below, next to the dual-routed exports: gating them the same
+    # way keeps anonymous callers from probing session-id validity
+    # (302 vs 404) and leaking org/workspace slugs in cloud mode.
+    # Overview/memory now live stacked at
+    # `/:org_slug/workspaces/:ws_slug/sessions/:id/observability`
+    # (timeline lives canonically in `.../activity`).
 
     # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
     # shape is the most-shared URL in docs/Slack/CI, so keep it as a redirect
@@ -251,6 +251,14 @@ defmodule ControlKeelWeb.Router do
   # Session export is authenticated in cloud/self_hosted (passthrough in local mode).
   scope "/", ControlKeelWeb do
     pipe_through [:browser, :require_session_auth]
+
+    # Legacy session observability page URLs (pre-org-scope nesting):
+    # same gate as the exports so anonymous callers cannot probe
+    # session-id validity (302 vs 404) in cloud mode. Local mode passes
+    # through, preserving old bookmarks and `controlkeel obs` flows.
+    get "/observability/sessions/:id", PageController, :observability_session_redirect
+    get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
+    get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
 
     # Legacy export paths (dual-route for backwards compat): keep functional
     # so existing `controlkeel obs export` downloads and old bookmarks still

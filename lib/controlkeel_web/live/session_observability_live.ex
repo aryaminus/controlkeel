@@ -3,7 +3,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
   Session observability page under the organization layout: one route
   (`/:org_slug/workspaces/:ws_slug/sessions/:id/observability`).
   Replaces the former tabbed `/observability/sessions/:id/*` family
-  (docs/issues/observability-route-consolidation.md).
+  (see `docs/issues/session-observability-stacked-organization-route.md`).
   Timeline lives canonically in `SessionActivityLive` (`.../activity`).
   Renders inline `~H` (no separate stage components).
 
@@ -40,21 +40,24 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
         {:ok, SessionScope.session_not_found(socket)}
 
       true ->
-        with {:ok, run} <- Observability.session_run(id),
-             {:ok, timeline} <- Observability.timeline(id, limit: 50),
-             {:ok, memory_context} <- Observability.memory_context(id, limit: 20) do
-          {:ok,
-           socket
-           |> assign(:page_title, "Observability — #{run.session.title}")
-           |> assign(:org_slug, org_slug)
-           |> assign(:ws_slug, ws_slug)
-           |> assign(:run, run)
-           |> assign(:timeline, timeline)
-           |> assign(:memory_context, memory_context)
-           |> assign_session_nav(session)}
-        else
-          _ -> {:ok, SessionScope.session_not_found(socket)}
-        end
+        # Reuse the already-fetched session struct: the `%Session{}`
+        # overloads skip their own `get_session_context` reloads
+        # (`ensure_preloaded`/`ensure_workspace_preloaded` passthrough),
+        # so mount costs one full session load plus the aggregate/count
+        # queries instead of four session loads.
+        run = Observability.session_run(session)
+        timeline = Observability.timeline(session, limit: 50)
+        memory_context = Observability.memory_context(session, limit: 20)
+
+        {:ok,
+         socket
+         |> assign(:page_title, "Observability — #{run.session.title}")
+         |> assign(:org_slug, org_slug)
+         |> assign(:ws_slug, ws_slug)
+         |> assign(:run, run)
+         |> assign(:timeline, timeline)
+         |> assign(:memory_context, memory_context)
+         |> assign_session_nav(session)}
     end
   end
 
