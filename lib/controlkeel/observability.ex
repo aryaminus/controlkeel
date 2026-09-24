@@ -3589,9 +3589,8 @@ defmodule ControlKeel.Observability do
 
   defp frequencies(items, fun) do
     items
-    |> Enum.map(fun)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.frequencies()
+    |> Enum.frequencies_by(fun)
+    |> Map.delete(nil)
   end
 
   defp persist_perf_snapshot(snapshot, opts) do
