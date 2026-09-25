@@ -169,16 +169,10 @@ defmodule ControlKeelWeb.Layouts do
           %{label: "Evals", href: ~p"/observability/evals", icon: "hero-chart-pie"},
           %{group: "Benchmarks"},
           %{
-            label: "Drafts",
-            href: ~p"/observability/benchmarks/drafts",
-            icon: "hero-pencil-square"
-          },
-          %{
-            label: "Scenarios",
-            href: ~p"/observability/benchmarks/scenarios",
+            label: "Benchmark",
+            href: ~p"/observability/benchmark",
             icon: "hero-beaker"
           },
-          %{label: "History", href: ~p"/observability/benchmarks/history", icon: "hero-clock"},
           %{
             label: "Regressions",
             href: ~p"/observability/regressions",
