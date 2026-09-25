@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.4.21 — 2026-09-25
+
+### What's changed
+
+- Merge pull request #199 from aryaminus/feat/session-observability-nesting
+- Merge pull request #192 from aryaminus/feat/session-scoped-navigation
+- Merge pull request #190 from aryaminus/feat/session-onboarding-183
+- refactor: add sibling sessions assignment and update download button styling
+- refactor: remove legacy session observability components and implement new org-scoped routing
+- refactor: consolidate session observability into a single stacked page and remove legacy tab components
+- refactor: remove legacy session observability components and update live view structure
+- refactor: consolidate session observability components and update legacy redirects
+- style: format
+- fix: lean observability overview - remove redundant header/health/jump
+- refactor: remove findings/gates summary from observability overview
+- feat/session-observability-nesting: Refactor session observability routes to support org/workspace nesting
+- feat/session-scoped-navigation: delete session-scoped navigation plan document
+- feat(session-scoped-navigation): enhance session navigation and improve LiveView handling
+- feat/session-scoped-navigation: add session navigation loading function and refactor LiveViews for improved session context handling
+- feat/session-scoped-navigation: Refactor session context handling across LiveViews
+- feat/session-scoped-navigation: refactor session scope checks and centralize authorization logic
+- feat/session-scoped-navigation: update mission control live view and remove observability panel from tests
+- feat/session-scoped-navigation: rename transcript to activity in session navigation and add session activity page
+- feat/session-scoped-navigation: update session navigation items and remove observability panel
+- feat/session-scoped-navigation: add session ship readiness page and related functionality
+- feat/session-scoped-navigation: add release readiness functionality and UI
+- feat/session-scoped-navigation: streamline layout and remove unused memory hits logic in mission control
+- feat/session-scoped-navigation: add session connect and resume packet pages with functionality for endpoint management and task resumption
+- feat/session-scoped-navigation: implement event detail toggle functionality in session transcript
+
 ## v0.4.20 — 2026-09-24
 
 ### What's changed
