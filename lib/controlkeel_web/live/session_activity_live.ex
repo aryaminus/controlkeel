@@ -136,7 +136,7 @@ defmodule ControlKeelWeb.SessionActivityLive do
         subtitle="Event feed and audit exports for this governed run."
       />
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <article class="rounded-2xl border bg-card p-5 shadow-card">
           <p class="text-sm font-medium text-muted-foreground">Total events</p>
           <p class="mt-2 text-xl font-semibold text-foreground/90">
@@ -154,19 +154,6 @@ defmodule ControlKeelWeb.SessionActivityLive do
           </p>
           <p class="mt-1 text-xs text-muted-foreground">
             {latest_actor(@recent_events) || "No recorded actor"}
-          </p>
-        </article>
-
-        <article class="rounded-2xl border bg-card p-5 shadow-card">
-          <p class="text-sm font-medium text-muted-foreground">Full timeline</p>
-          <.link
-            navigate={~p"/observability/sessions/#{@session.id}/timeline"}
-            class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:text-primary transition cursor-pointer"
-          >
-            Open run timeline <.icon name="hero-arrow-right" class="size-3.5" />
-          </.link>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Health, events, memory, and cost for this run.
           </p>
         </article>
       </div>
@@ -309,7 +296,9 @@ defmodule ControlKeelWeb.SessionActivityLive do
             <.link
               :for={format <- ~w(json csv pdf)}
               id={"activity-audit-export-#{format}"}
-              href={~p"/observability/sessions/#{@session.id}/audit-log/#{format}"}
+              href={
+                ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/sessions/#{@session.id}/observability/audit-log/#{format}"
+              }
               class="rounded-lg border border-border bg-transparent px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               {String.upcase(format)}

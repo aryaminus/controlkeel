@@ -712,13 +712,9 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         scope: :session_section,
         icon: "hero-link"
       },
-      # TODO: interim bridge to the legacy observability route family. Move to
-      # a nested session route (e.g. `.../sessions/:id/observability`) under
-      # the organization layout instead of linking out to the standalone
-      # `/observability/sessions/:id` layout.
       %{
         label: "Observability",
-        href: ~p"/observability/sessions/#{session_id}",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/observability",
         scope: :session_section,
         icon: "hero-chart-bar-square"
       },

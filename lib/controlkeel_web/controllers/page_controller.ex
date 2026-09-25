@@ -4,8 +4,13 @@ defmodule ControlKeelWeb.PageController do
   alias ControlKeel.Accounts
   alias ControlKeel.Bootstrap.LocalDefaults
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Session
+  alias ControlKeel.Mission.Workspace
+  alias ControlKeel.Repo
+  alias ControlKeel.Runtime
   alias ControlKeel.Runtime.Mode
   alias ControlKeel.Skills
+  alias ControlKeelWeb.FallbackController
 
   # Public marketing pages render inside the `:public` framework layout
   # (ControlKeelWeb.Layouts). The layout reads @current_user/@flash directly,
@@ -96,5 +101,65 @@ defmodule ControlKeelWeb.PageController do
         else: "/#{slug}"
 
     redirect(conn, to: target)
+  end
+
+  # Legacy session observability URLs (pre-org-scope nesting): the
+  # overview/memory tabs now live stacked at
+  # `/:org_slug/workspaces/:ws_slug/sessions/:id/observability`.
+  # Timeline lives canonically in `.../activity`. Resolves the numeric id
+  # to its org/workspace slugs and redirects; memory preserves an anchor
+  # so the stacked page scrolls there.
+  def observability_session_redirect(conn, %{"id" => id} = params) do
+    timeline? = String.ends_with?(conn.request_path, "/timeline")
+
+    anchor =
+      cond do
+        timeline? -> ""
+        String.ends_with?(conn.request_path, "/memory") -> "#session-observability-memory"
+        true -> ""
+      end
+
+    case Repo.get(Session, id) do
+      nil ->
+        FallbackController.not_found(conn, params)
+
+      %Session{} = session ->
+        case Repo.preload(session, workspace: :org) do
+          %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} ->
+            if timeline? do
+              redirect(
+                conn,
+                to: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/activity"
+              )
+            else
+              redirect(
+                conn,
+                to:
+                  "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
+              )
+            end
+
+          _ ->
+            if Runtime.local?() do
+              if timeline? do
+                redirect(
+                  conn,
+                  to:
+                    "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/activity"
+                )
+              else
+                redirect(
+                  conn,
+                  to:
+                    "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/observability#{anchor}"
+                )
+              end
+            else
+              FallbackController.not_found(conn, params)
+            end
+        end
+    end
+  rescue
+    Ecto.Query.CastError -> ControlKeelWeb.FallbackController.not_found(conn, params)
   end
 end

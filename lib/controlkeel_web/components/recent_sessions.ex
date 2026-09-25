@@ -21,7 +21,12 @@ defmodule ControlKeelWeb.RecentSessions do
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <%= for run <- @runs do %>
             <.link
-              navigate={~p"/observability/sessions/#{run.id}"}
+              navigate={
+                if run[:org_slug] && run[:workspace_slug],
+                  do:
+                    ~p"/#{run.org_slug}/workspaces/#{run.workspace_slug}/sessions/#{run.id}/observability",
+                  else: ~p"/observability/sessions/#{run.id}"
+              }
               class="group rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:bg-muted/30"
             >
               <div class="flex items-start justify-between gap-3">

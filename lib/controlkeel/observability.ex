@@ -1448,6 +1448,8 @@ defmodule ControlKeel.Observability do
       objective: run.session.objective,
       workspace_id: run.session.workspace_id,
       workspace_name: run.session.workspace_name,
+      org_slug: Map.get(run.session, :org_slug),
+      workspace_slug: Map.get(run.session, :workspace_slug),
       health: run.health.status,
       health_label: run.health.label,
       active_findings: run.findings.active,
@@ -3230,6 +3232,21 @@ defmodule ControlKeel.Observability do
   end
 
   defp session_summary(session) do
+    workspace = Map.get(session, :workspace)
+
+    {workspace_slug, org_slug} =
+      case workspace do
+        %{slug: ws_slug, org: %{slug: org_slug}}
+        when is_binary(ws_slug) and is_binary(org_slug) ->
+          {ws_slug, org_slug}
+
+        %{slug: ws_slug} when is_binary(ws_slug) ->
+          {ws_slug, nil}
+
+        _ ->
+          {nil, nil}
+      end
+
     %{
       id: session.id,
       title: session.title,
@@ -3237,7 +3254,9 @@ defmodule ControlKeel.Observability do
       risk_tier: session.risk_tier,
       status: session.status,
       workspace_id: session.workspace_id,
-      workspace_name: session.workspace && session.workspace.name
+      workspace_name: workspace && Map.get(workspace, :name),
+      workspace_slug: workspace_slug,
+      org_slug: org_slug
     }
   end
 
