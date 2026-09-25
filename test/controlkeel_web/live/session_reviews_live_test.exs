@@ -5,6 +5,18 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
   import ControlKeel.MissionFixtures
 
   alias ControlKeel.Mission
+  alias ControlKeel.Repo
+
+  test "session reviews redirects when the session disappears on refresh", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, view, _html} = live(conn, org_session_path(org, ws, session, "/reviews"))
+
+    Repo.delete!(session)
+    send(view.pid, :refresh)
+
+    assert_redirect(view, "/")
+  end
 
   test "session reviews lists the reviews for the session", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()

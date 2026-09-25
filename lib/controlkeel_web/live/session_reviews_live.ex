@@ -3,6 +3,7 @@ defmodule ControlKeelWeb.SessionReviewsLive do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Mission
+  alias ControlKeelWeb.SessionScope
 
   @refresh_interval_ms 2_000
 
@@ -10,7 +11,7 @@ defmodule ControlKeelWeb.SessionReviewsLive do
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    case Mission.get_session_context(id) do
+    case SessionScope.fetch_session(id) do
       nil ->
         {:ok,
          socket
@@ -25,7 +26,7 @@ defmodule ControlKeelWeb.SessionReviewsLive do
              |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
-          check_session_scope(session, org_slug, ws_slug) != :ok ->
+          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
@@ -37,24 +38,22 @@ defmodule ControlKeelWeb.SessionReviewsLive do
     end
   end
 
-  # URL slug agreement only — must run after the session_accessible? gate,
-  # which is what guarantees a loaded workspace/org (a nil session never
-  # reaches here).
-  defp check_session_scope(session, org_slug, ws_slug) do
-    workspace = session.workspace
-    org = workspace && workspace.org
-
-    cond do
-      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
-      is_nil(org) or org.slug != org_slug -> {:error, :org}
-      true -> :ok
-    end
-  end
-
   @impl true
   def handle_info(:refresh, socket) do
-    if connected?(socket), do: schedule_refresh()
-    {:noreply, assign_reviews(socket)}
+    case Mission.get_session_nav(socket.assigns.session.id) do
+      nil ->
+        {:noreply, SessionScope.session_not_found(socket)}
+
+      session ->
+        case SessionScope.reauthorize(socket, session) do
+          {:ok, session} ->
+            if connected?(socket), do: schedule_refresh()
+            {:noreply, socket |> assign(:session, session) |> assign_reviews()}
+
+          {:error, :not_found} ->
+            {:noreply, SessionScope.session_not_found(socket)}
+        end
+    end
   end
 
   @impl true

@@ -647,6 +647,10 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   defp session_nav_items(org_slug, ws_slug, session_id) do
+    # Ordered by operator priority: daily work surfaces first (tasks,
+    # findings, reviews), then health and shipping (ship, release), then
+    # history and continuity (activity, resume packet), then occasional
+    # reference (deploy review, connect), with interim external bridges last.
     [
       %{
         label: "Overview",
@@ -655,16 +659,78 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-squares-2x2"
       },
       %{
+        label: "Tasks",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/tasks",
+        scope: :session_section,
+        icon: "hero-list-bullet"
+      },
+      %{
+        label: "Findings",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/findings",
+        scope: :session_section,
+        icon: "hero-exclamation-triangle"
+      },
+      %{
         label: "Reviews",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/reviews",
         scope: :session_section,
         icon: "hero-document-check"
       },
       %{
+        label: "Ship",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/ship",
+        scope: :session_section,
+        icon: "hero-check-badge"
+      },
+      %{
+        label: "Release",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/release",
+        scope: :session_section,
+        icon: "hero-rocket-launch"
+      },
+      %{
+        label: "Activity",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/activity",
+        scope: :session_section,
+        icon: "hero-clock"
+      },
+      %{
+        label: "Resume packet",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/resume-packet",
+        scope: :session_section,
+        icon: "hero-play"
+      },
+      %{
         label: "Deploy review",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/deploy-review",
         scope: :session_section,
         icon: "hero-cloud-arrow-up"
+      },
+      %{
+        label: "Connect",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/connect",
+        scope: :session_section,
+        icon: "hero-link"
+      },
+      # TODO: interim bridge to the legacy observability route family. Move to
+      # a nested session route (e.g. `.../sessions/:id/observability`) under
+      # the organization layout instead of linking out to the standalone
+      # `/observability/sessions/:id` layout.
+      %{
+        label: "Observability",
+        href: ~p"/observability/sessions/#{session_id}",
+        scope: :session_section,
+        icon: "hero-chart-bar-square"
+      },
+      # TODO: interim bridge to the global proof browser, pre-filtered to this
+      # session. Move to nested session routes (e.g. `.../sessions/:id/proofs`
+      # and `.../sessions/:id/proofs/:proof_id`) under the organization layout
+      # instead of linking out to the standalone `/proofs` layout.
+      %{
+        label: "Proofs",
+        href: ~p"/proofs?#{%{"session_id" => session_id}}",
+        scope: :session_section,
+        icon: "hero-shield-check"
       }
     ]
   end

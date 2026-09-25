@@ -7,6 +7,16 @@ defmodule ControlKeelWeb.ProofBrowserLiveTest do
   alias ControlKeel.Repo
   alias ControlKeel.Accounts.Org
 
+  test "session nav bridges to the session-filtered proof browser", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
+
+    assert html =~ "sidebar-org-nav"
+    assert html =~ "Proofs"
+    assert html =~ ~s(href="/proofs?session_id=#{session.id}")
+  end
+
   test "proof browser filters and paginates proof bundles", %{conn: conn} do
     session = session_fixture(%{title: "Proof mission"})
     task = task_fixture(%{session: session, status: "done", title: "Ship proof"})

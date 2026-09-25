@@ -13,6 +13,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
   alias ControlKeel.Ops.HostingCost
   alias ControlKeel.Project.WorkspaceContext
   alias ControlKeelWeb.DeploymentComponents
+  alias ControlKeelWeb.SessionScope
 
   @tabs ~w(overview costs files guides)
 
@@ -23,7 +24,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    case Mission.get_session_context(id) do
+    case SessionScope.fetch_session(id) do
       nil ->
         {:ok,
          socket
@@ -38,7 +39,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
              |> put_flash(:error, "Session not found.")
              |> push_navigate(to: ~p"/")}
 
-          check_session_scope(session, org_slug, ws_slug) != :ok ->
+          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
@@ -47,20 +48,6 @@ defmodule ControlKeelWeb.DeployReviewLive do
           true ->
             {:ok, mount_session(socket, session)}
         end
-    end
-  end
-
-  # URL slug agreement only — must run after the session_accessible? gate,
-  # which is what guarantees a loaded workspace/org (a nil session never
-  # reaches here).
-  defp check_session_scope(session, org_slug, ws_slug) do
-    workspace = session.workspace
-    org = workspace && workspace.org
-
-    cond do
-      is_nil(workspace) or workspace.slug != ws_slug -> {:error, :workspace}
-      is_nil(org) or org.slug != org_slug -> {:error, :org}
-      true -> :ok
     end
   end
 
@@ -75,7 +62,7 @@ defmodule ControlKeelWeb.DeployReviewLive do
       end
 
     workspace = session.workspace
-    org = workspace.org
+    org = workspace && workspace.org
 
     socket
     |> assign(:nav_org, org)
