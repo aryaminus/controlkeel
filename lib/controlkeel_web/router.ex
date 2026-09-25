@@ -158,9 +158,6 @@ defmodule ControlKeelWeb.Router do
       live "/observability", ObservabilityOverviewLive, :index
       live "/observability/loop", ObservabilityLoopLive, :index
       live "/observability/benchmark", ObservabilityBenchmarkLive, :index
-      live "/observability/benchmarks/drafts", ObservabilityBenchmarkDraftsLive, :index
-      live "/observability/benchmarks/scenarios", ObservabilityBenchmarkScenariosLive, :index
-      live "/observability/benchmarks/history", ObservabilityBenchmarkHistoryLive, :index
       live "/observability/compare", ObservabilityCompareLive, :index
       live "/observability/costs", ObservabilityCostsLive, :index
       live "/observability/evals", ObservabilityEvalsLive, :index
@@ -251,6 +248,13 @@ defmodule ControlKeelWeb.Router do
     get "/observability/sessions/:id", PageController, :observability_session_redirect
     get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
     get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
+
+    # Legacy observability benchmark sub-routes (consolidated into the stacked
+    # `/observability/benchmark` page): redirect bookmarks to the matching
+    # section anchor, preserving the query string.
+    get "/observability/benchmarks/drafts", PageController, :observability_benchmarks_redirect
+    get "/observability/benchmarks/scenarios", PageController, :observability_benchmarks_redirect
+    get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
 
     # Legacy export paths (dual-route for backwards compat): keep functional
     # so existing `controlkeel obs export` downloads and old bookmarks still

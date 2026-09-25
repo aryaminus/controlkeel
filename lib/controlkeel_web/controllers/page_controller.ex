@@ -162,4 +162,25 @@ defmodule ControlKeelWeb.PageController do
   rescue
     Ecto.Query.CastError -> ControlKeelWeb.FallbackController.not_found(conn, params)
   end
+
+  # Legacy observability benchmark sub-routes (pre-consolidation): the drafts,
+  # scenarios, and history pages now live stacked at `/observability/benchmark`.
+  # Redirects preserve the query string and land on the matching section anchor.
+  def observability_benchmarks_redirect(conn, _params) do
+    anchor =
+      cond do
+        String.ends_with?(conn.request_path, "/drafts") -> "#benchmarks-drafts"
+        String.ends_with?(conn.request_path, "/scenarios") -> "#benchmarks-scenarios"
+        String.ends_with?(conn.request_path, "/history") -> "#benchmarks-history"
+        true -> ""
+      end
+
+    query =
+      case conn.query_string do
+        "" -> ""
+        query -> "?#{query}"
+      end
+
+    redirect(conn, to: "/observability/benchmark#{anchor}#{query}")
+  end
 end
