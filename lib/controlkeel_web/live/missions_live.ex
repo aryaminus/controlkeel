@@ -12,7 +12,10 @@ defmodule ControlKeelWeb.MissionsLive do
        :page_action,
        %{label: "New Session", to: ~p"/sessions/start", icon: "hero-plus"}
      )
-     |> assign(:recent_sessions, Mission.list_all_sessions())}
+     |> assign(
+       :recent_sessions,
+       Mission.list_all_sessions_for_user(socket.assigns[:current_user])
+     )}
   end
 
   @impl true

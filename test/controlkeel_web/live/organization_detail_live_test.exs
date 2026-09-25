@@ -39,6 +39,46 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
   defp conn_for(user),
     do: build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
 
+  describe "layout-level creation entry points" do
+    setup do
+      owner = create_user!("cta-owner@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "CtaOrg", slug: "ctaorg"})
+
+      member = create_user!("cta-member@example.com")
+      add_active_membership(member.id, org.id, "member")
+
+      {:ok, org: org, owner: owner, member: member}
+    end
+
+    test "owner header keeps scoped New Session and org creation lives in the switcher dialog",
+         %{org: org, owner: owner} do
+      {:ok, view, html} = live(conn_for(owner), ~p"/#{org.slug}")
+
+      assert html =~ "New Session"
+      assert html =~ ~s(href="/sessions/start?org_slug=#{org.slug}")
+      refute has_element?(view, "#organization-page-action", "Invite")
+    end
+
+    test "member header New Session is bare (no slug params)", %{org: org, member: member} do
+      {:ok, _view, html} = live(conn_for(member), ~p"/#{org.slug}")
+
+      assert html =~ ~s(href="/sessions/start")
+      refute html =~ "org_slug=ctaorg"
+    end
+
+    test "owner can open Invite member from the Members tab", %{org: org, owner: owner} do
+      {:ok, view, _html} = live(conn_for(owner), ~p"/#{org.slug}?tab=members")
+
+      assert has_element?(view, "#invite-member-button")
+
+      view
+      |> element("#invite-member-button")
+      |> render_click()
+
+      assert has_element?(view, "#invite-member-modal")
+    end
+  end
+
   describe "admin viewer role controls" do
     setup do
       owner = create_user!("owner@example.com")
@@ -202,7 +242,6 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       # Sanity: management controls present before the change.
       html_before = render(view)
       assert html_before =~ ~s(id="role-form-#{owner_m.id}")
-      assert html_before =~ "open_invite"
       assert html_before =~ "confirm_revoke"
 
       view
@@ -212,10 +251,9 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       html_after = render(view)
       assert html_after =~ "Role updated."
 
-      # Demoted to member -> no longer admin+: role selects, invite and revoke
-      # controls all disappear from the same LiveView (no reload).
+      # Demoted to member -> no longer admin+: role selects and revoke
+      # controls disappear from the same LiveView (no reload).
       refute html_after =~ "role-form-"
-      refute html_after =~ "open_invite"
       refute html_after =~ "confirm_revoke"
 
       # Persisted.

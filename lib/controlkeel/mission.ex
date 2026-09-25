@@ -718,9 +718,85 @@ defmodule ControlKeel.Mission do
     |> Repo.all()
   end
 
+  @doc """
+  Recent sessions visible to the viewer: cloud mode scopes to their
+  accessible workspaces (issue #183); local mode stays unscoped.
+  """
+  def list_recent_sessions_for_user(user, limit \\ 6)
+
+  def list_recent_sessions_for_user(nil, limit) do
+    if ControlKeel.Runtime.Mode.current() == :local, do: list_recent_sessions(limit), else: []
+  end
+
+  def list_recent_sessions_for_user(user, limit) do
+    if ControlKeel.Runtime.Mode.current() == :local do
+      list_recent_sessions(limit)
+    else
+      user.id
+      |> accessible_workspace_ids()
+      |> list_recent_sessions_in_workspaces(limit)
+    end
+  end
+
+  @doc """
+  Recent sessions across the given workspaces, newest first. An empty id
+  list yields no rows (Scope) — "no accessible workspaces" must not degrade
+  into an unscoped fetch.
+  """
+  def list_recent_sessions_in_workspaces(workspace_ids, limit) do
+    Session
+    |> ControlKeel.Cloud.Scope.scope_workspaces(workspace_ids)
+    |> order_by(desc: :inserted_at)
+    |> preload([:workspace, :tasks, :findings])
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
   def list_all_sessions(workspace_id \\ nil) do
     Session
     |> ControlKeel.Cloud.Scope.scope_workspace(workspace_id)
+    |> order_by(desc: :inserted_at)
+    |> preload([:tasks, :findings, workspace: :org])
+    |> Repo.all()
+  end
+
+  @doc """
+  Workspace ids of every org where `user_id` holds an active membership
+  (any role). Cloud session listings scope to these (issue #183).
+  """
+  def accessible_workspace_ids(user_id) do
+    user_id
+    |> Accounts.list_orgs_for_user()
+    |> Enum.map(& &1.org.id)
+    |> list_workspaces_for_orgs()
+    |> Enum.map(& &1.id)
+  end
+
+  @doc """
+  Sessions visible to the viewer: cloud mode scopes to their accessible
+  workspaces; local mode stays unscoped.
+  """
+  def list_all_sessions_for_user(nil) do
+    if ControlKeel.Runtime.Mode.current() == :local, do: list_all_sessions(), else: []
+  end
+
+  def list_all_sessions_for_user(user) do
+    if ControlKeel.Runtime.Mode.current() == :local do
+      list_all_sessions()
+    else
+      user.id
+      |> accessible_workspace_ids()
+      |> list_all_sessions_in_workspaces()
+    end
+  end
+
+  @doc """
+  All sessions in the given workspaces, newest first, same preloads as
+  `list_all_sessions/1`. An empty id list yields no rows (Scope).
+  """
+  def list_all_sessions_in_workspaces(workspace_ids) do
+    Session
+    |> ControlKeel.Cloud.Scope.scope_workspaces(workspace_ids)
     |> order_by(desc: :inserted_at)
     |> preload([:tasks, :findings, workspace: :org])
     |> Repo.all()

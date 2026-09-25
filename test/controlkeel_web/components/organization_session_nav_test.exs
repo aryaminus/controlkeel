@@ -21,7 +21,6 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
       current_user: nil,
       current_path: current_path,
       current_query: nil,
-      page_action: nil,
       breadcrumbs: breadcrumbs,
       nav_org: %{id: 1, slug: "acme", name: "Acme"},
       nav_workspace: %{id: 2, slug: "core", name: "Core"},
@@ -58,6 +57,20 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     refute html =~ "Service accounts"
     refute html =~ "Tool policy"
     refute html =~ "Repositories"
+  end
+
+  test "local mode hides the org switcher and creation controls" do
+    html =
+      render_component(
+        &OrganizationLayouts.organization_sidebar/1,
+        nav_assigns("/acme")
+      )
+
+    # Element-id assertions: the switcher wrapper's phx-click-away JSON also
+    # mentions the ids, so a bare =~ would false-positive.
+    refute html =~ ~s(id="org-switcher-button")
+    refute html =~ ~s(id="sidebar-org-switcher-popover")
+    refute html =~ "Create organization"
   end
 
   test "session overview is active on the session page" do

@@ -173,6 +173,22 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
              live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}")
   end
 
+  test "session page shows the attach banner only after a fresh launch (issue #183)", %{
+    conn: conn
+  } do
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, _view, html} =
+      live(conn, org_session_path(org, ws, session, "?launched=1"))
+
+    assert html =~ "ControlKeel is governing this session"
+    assert html =~ "controlkeel attach opencode"
+
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
+
+    refute html =~ "ControlKeel is governing this session"
+  end
+
   test "mission control refreshes when new findings and spend data appear", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture(%{spent_cents: 600, budget_cents: 5_000})
     task_fixture(%{session: session})

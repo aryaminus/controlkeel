@@ -181,7 +181,14 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   attr :current_path, :string, default: nil
-  attr :page_action, :any, default: nil
+
+  attr :nav_org_admin?, :boolean,
+    default: false,
+    doc: """
+    Whether the viewer is admin/owner of nav_org (memoized by
+    OrganizationLayoutDefaults). Gates org/workspace slug params on the
+    layout-level "New Session" action (issue #183).
+    """
 
   attr :breadcrumbs, :list,
     default: nil,
@@ -199,13 +206,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :current_query, :any, default: nil
 
   def breadcrumbs_header(assigns) do
-    actions =
-      cond do
-        is_nil(assigns.page_action) -> []
-        is_list(assigns.page_action) -> assigns.page_action
-        true -> [assigns.page_action]
-      end
-
     trail = breadcrumb_items(assigns)
     workspace_root = workspace_root_path(assigns[:nav_org], assigns[:nav_workspace])
     workspace_idx = workspace_crumb_index(trail, workspace_root, assigns[:current_path])
@@ -253,7 +253,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
     assigns =
       assigns
-      |> assign(:actions, actions)
       |> assign(:trail, trail)
       |> assign(:workspace_idx, workspace_idx)
       |> assign(:show_ws_switcher, show_ws_switcher)
@@ -307,38 +306,31 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           <% end %>
         </ol>
       </nav>
-      <div :if={@actions != []} class="flex items-center gap-2" id="organization-page-action">
-        <%= for action <- @actions do %>
-          <a
-            :if={action[:to]}
-            href={action.to}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
-          >
-            <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
-          </a>
-
-          <button
-            :if={action[:form]}
-            type="submit"
-            form={action.form}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
-          >
-            <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
-          </button>
-
-          <button
-            :if={action[:event]}
-            type="button"
-            phx-click={action.event}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
-          >
-            <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
-          </button>
-        <% end %>
+      <div class="flex items-center gap-2" id="organization-page-action">
+        <.link
+          href={new_session_path(assigns)}
+          class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+        >
+          <.icon name="hero-plus" class="size-4" /> New Session
+        </.link>
       </div>
     </div>
     """
   end
+
+  # Slug params are attached only when the viewer is admin/owner of nav_org
+  # (issue #183); OnboardingLive re-validates anything it receives. Local
+  # mode and lower roles get the bare launcher URL.
+  defp new_session_path(
+         %{nav_org: %{slug: org_slug}, nav_workspace: %{slug: ws_slug}, nav_org_admin?: true} =
+           _assigns
+       ),
+       do: ~p"/sessions/start?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
+
+  defp new_session_path(%{nav_org: %{slug: org_slug}, nav_org_admin?: true} = _assigns),
+    do: ~p"/sessions/start?#{%{org_slug: org_slug}}"
+
+  defp new_session_path(_assigns), do: ~p"/sessions/start"
 
   attr :id, :string, required: true, doc: "base id; button/popover derive from it"
   attr :label, :string, required: true, doc: "aria-label for the toggle button"

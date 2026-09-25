@@ -32,9 +32,21 @@ defmodule ControlKeelWeb.OnboardingLive do
      |> assign(:compiled_brief, nil)
      |> assign(:compiled_boundary_summary, Intent.boundary_summary(nil))
      |> assign(:started?, false)
-     |> assign(:recent_sessions, Mission.list_recent_sessions())
+     |> assign(
+       :recent_sessions,
+       Mission.list_recent_sessions_for_user(socket.assigns[:current_user])
+     )
      |> assign_org_context(cloud_mode)
      |> assign_form()}
+  end
+
+  # URL-driven scope selection (issue #183): `?org_slug`/`?ws_slug` are the
+  # source of truth for the picker. Mount seeds defaults (first admin/owner
+  # org + first workspace); handle_params then applies the URL on top, so
+  # re-renders and back/forward never lose the selection.
+  @impl true
+  def handle_params(params, _uri, socket) do
+    {:noreply, apply_scope_params(socket, params)}
   end
 
   @impl true
@@ -52,28 +64,40 @@ defmodule ControlKeelWeb.OnboardingLive do
 
   @impl true
   def handle_event("select_org", %{"org_id" => org_id}, socket) do
-    selected_org_id = parse_org_id(org_id, socket.assigns.org_options)
-    workspaces = load_workspaces(selected_org_id)
+    case parse_org_id(org_id, socket.assigns.org_options) do
+      nil ->
+        # Unknown/mangled option id: keep the previous valid selection and
+        # surface why, instead of blanking the picker (issue #183).
+        {:noreply, put_scope_notice(socket, "That organization is not available.")}
 
-    {:noreply,
-     socket
-     |> assign(:selected_org_id, selected_org_id)
-     |> assign(:workspace_options, Enum.map(workspaces, &{&1.id, &1.name}))
-     |> assign(
-       :selected_workspace_id,
-       default_workspace_id(workspaces, socket.assigns[:current_membership])
-     )
-     |> recompute_onboarding_state()}
+      org_id ->
+        # Keep the current workspace when it is still valid for the target
+        # org; otherwise fall back to the org's first workspace. The URL is
+        # the selection state — patch it and let handle_params re-apply.
+        workspaces = load_workspaces(org_id)
+        org_slug = org_slug_for_id(socket.assigns.org_options, org_id)
+        ws_slug = workspace_slug_for_id(workspaces, socket.assigns.selected_workspace_id)
+
+        {:noreply,
+         socket
+         |> push_patch(to: scope_path(org_slug, ws_slug))}
+    end
   end
 
   @impl true
   def handle_event("select_workspace", %{"workspace_id" => workspace_id}, socket) do
-    selected_workspace_id = parse_workspace_id(workspace_id, socket.assigns.workspace_options)
+    case parse_workspace_id(workspace_id, socket.assigns.workspace_options) do
+      nil ->
+        {:noreply, put_scope_notice(socket, "That workspace is not available.")}
 
-    {:noreply,
-     socket
-     |> assign(:selected_workspace_id, selected_workspace_id)
-     |> recompute_onboarding_state()}
+      workspace_id ->
+        org_slug = org_slug_for_id(socket.assigns.org_options, socket.assigns.selected_org_id)
+        ws_slug = option_workspace_slug(socket.assigns.workspace_options, workspace_id)
+
+        {:noreply,
+         socket
+         |> push_patch(to: scope_path(org_slug, ws_slug))}
+    end
   end
 
   @impl true
@@ -161,10 +185,16 @@ defmodule ControlKeelWeb.OnboardingLive do
 
     case Mission.create_launch_from_brief(attrs, socket.assigns.compiled_brief) do
       {:ok, session} ->
+        # Flash = creation confirmation; `?launched=1` keeps the
+        # attach-instructions banner on the session page (issue #183).
         case Repo.preload(session, workspace: :org) do
           %{workspace: %{org: %{slug: org_slug}, slug: ws_slug}} = session ->
             {:noreply,
              socket
+             |> put_flash(
+               :info,
+               "Session \"#{session.title}\" created in #{session.workspace.name}."
+             )
              |> push_navigate(
                to: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}?launched=1"
              )}
@@ -208,30 +238,32 @@ defmodule ControlKeelWeb.OnboardingLive do
         {:noreply, socket}
 
       id ->
-        case Mission.get_session(String.to_integer(id)) do
-          nil ->
-            {:noreply,
-             socket
-             |> put_flash(:error, "Selected session not found.")}
+        # Client-supplied ids are untrusted: parse safely and enforce the
+        # same access gate as the session pages before reading the brief
+        # (issue #183 — the picker must never leak another user's session).
+        with {id, ""} <- Integer.parse(to_string(id)),
+             session when not is_nil(session) <- Mission.get_session(id),
+             true <- Accounts.session_accessible?(session, socket.assigns[:current_user]) do
+          brief = session.execution_brief || %{}
+          interview_answers = get_in(brief, ["compiler", "interview_answers"]) || %{}
+          idea = Map.get(brief, "idea", session.objective)
 
-          session ->
-            brief = session.execution_brief || %{}
-            interview_answers = get_in(brief, ["compiler", "interview_answers"]) || %{}
-            idea = Map.get(brief, "idea", session.objective)
+          attrs =
+            socket.assigns.attrs
+            |> Map.merge(%{
+              "project_name" => session.title,
+              "idea" => idea,
+              "interview_answers" => interview_answers
+            })
 
-            attrs =
-              socket.assigns.attrs
-              |> Map.merge(%{
-                "project_name" => session.title,
-                "idea" => idea,
-                "interview_answers" => interview_answers
-              })
-
-            {:noreply,
-             socket
-             |> assign(:attrs, attrs)
-             |> assign(:interview_questions, Intent.interview_questions(attrs["occupation"]))
-             |> assign_form()}
+          {:noreply,
+           socket
+           |> assign(:attrs, attrs)
+           |> assign(:interview_questions, Intent.interview_questions(attrs["occupation"]))
+           |> assign_form()}
+        else
+          _ ->
+            {:noreply, put_flash(socket, :error, "Selected session not found.")}
         end
     end
   end
@@ -239,85 +271,104 @@ defmodule ControlKeelWeb.OnboardingLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <section class="max-w-7xl mx-auto px-4 py-6">
-      <div class="mb-8">
-        <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
-          Session onboarding
-        </p>
+    <div class="w-full space-y-6">
+      <div class="space-y-4 text-center sm:text-left">
+        <.page_title
+          title="Start a session"
+          subtitle="Scope it, describe the product, answer the interview, then review the compiled brief."
+        />
+        <ControlKeelWeb.SessionStartLayouts.steps step={@step} cloud_mode={@cloud_mode} />
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        <div class="lg:col-span-2 rounded-2xl border bg-card/30 p-6 md:p-8 backdrop-blur-xl">
-          <%= if @cloud_mode do %>
-            <div class="mb-8 space-y-4">
-              <div>
-                <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
-                  Organization and workspace
-                </p>
-                <p class="text-sm text-muted-foreground mt-1">
-                  Choose where this session will be created.
-                </p>
-              </div>
+      <%= if @cloud_mode do %>
+        <section class="rounded-2xl border bg-card p-5 shadow-card" aria-label="Scope">
+          <div class="flex items-center justify-between gap-3">
+            <.section_title>Organization and workspace</.section_title>
+            <span class="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+              Step 0 · Scope
+            </span>
+          </div>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Choose where this session will be created.
+          </p>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div class="space-y-1.5">
-                  <label
-                    for="onboarding-org-select"
-                    class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
-                  >
-                    Organization
-                  </label>
-                  <select
-                    id="onboarding-org-select"
-                    name="org_id"
-                    phx-change="select_org"
-                    class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                  >
-                    <%= for {id, name, _slug} <- @org_options do %>
-                      <option value={id} selected={@selected_org_id == id}>{name}</option>
-                    <% end %>
-                  </select>
-                </div>
-
-                <div class="space-y-1.5">
-                  <label
-                    for="onboarding-workspace-select"
-                    class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
-                  >
-                    Workspace
-                  </label>
-                  <select
-                    id="onboarding-workspace-select"
-                    name="workspace_id"
-                    phx-change="select_workspace"
-                    class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                  >
-                    <%= for {id, name} <- @workspace_options do %>
-                      <option value={id} selected={@selected_workspace_id == id}>{name}</option>
-                    <% end %>
-                  </select>
-                </div>
-              </div>
-
-              <%= if @onboarding_notice do %>
-                <div class="flex flex-col gap-2 rounded-xl border border-[var(--ck-warning)]/20 bg-[var(--ck-warning)]/5 p-4">
-                  <p class="text-sm text-[var(--ck-warning)] font-medium">
-                    {@onboarding_notice.text}
-                  </p>
-                  <%= if @onboarding_notice.link do %>
-                    <.link
-                      navigate={@onboarding_notice.link}
-                      class="text-xs font-semibold text-primary hover:text-primary/80 underline underline-offset-4"
-                    >
-                      {@onboarding_notice.link_text}
-                    </.link>
+          <%!-- LV 1.x only fires phx-change on inputs inside a form; input-level
+             bindings are preserved and the client serializes only the bound
+             input name/value. --%>
+          <form id="onboarding-scope-form">
+            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div class="space-y-1.5">
+                <label
+                  for="onboarding-org-select"
+                  class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
+                >
+                  Organization
+                </label>
+                <select
+                  id="onboarding-org-select"
+                  name="org_id"
+                  phx-change="select_org"
+                  class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                >
+                  <%= for {id, name, _slug} <- @org_options do %>
+                    <option value={id} selected={@selected_org_id == id}>{name}</option>
                   <% end %>
-                </div>
-              <% end %>
+                </select>
+              </div>
+
+              <div class="space-y-1.5">
+                <label
+                  for="onboarding-workspace-select"
+                  class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
+                >
+                  Workspace
+                </label>
+                <select
+                  id="onboarding-workspace-select"
+                  name="workspace_id"
+                  phx-change="select_workspace"
+                  class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                >
+                  <%= for {id, name, _slug} <- @workspace_options do %>
+                    <option value={id} selected={@selected_workspace_id == id}>{name}</option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+          </form>
+
+          <%= if @scope_notice do %>
+            <div class="mt-4 flex flex-col gap-2 rounded-xl border border-warning/20 bg-warning/10 p-4">
+              <p class="text-sm text-warning font-medium">
+                {@scope_notice}
+              </p>
             </div>
           <% end %>
 
-          <.form for={@form} phx-change="validate" phx-submit="next">
+          <%= if @onboarding_notice do %>
+            <div class="mt-4 flex flex-col gap-2 rounded-xl border border-warning/20 bg-warning/10 p-4">
+              <p class="text-sm text-warning font-medium">
+                {@onboarding_notice.text}
+              </p>
+              <%= if @onboarding_notice.link do %>
+                <.link
+                  navigate={@onboarding_notice.link}
+                  class="text-xs font-semibold text-primary hover:text-primary/80 underline underline-offset-4"
+                >
+                  {@onboarding_notice.link_text}
+                </.link>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
+      <% end %>
+
+      <div class="grid grid-cols-1 items-start gap-6">
+        <section
+          class="rounded-2xl border bg-card p-5 shadow-card"
+          aria-label="Setup wizard"
+        >
+          <.form for={@form} phx-change="validate" phx-submit="next" id="onboarding-wizard-form">
             <%= case @step do %>
               <% 1 -> %>
                 <div class="space-y-6">
@@ -347,6 +398,12 @@ defmodule ControlKeelWeb.OnboardingLive do
                     <%= if error = field_error(@errors, "occupation") do %>
                       <p class="text-xs text-destructive font-medium mt-1">{error}</p>
                     <% end %>
+                    <p class="text-xs text-muted-foreground leading-relaxed">
+                      {@preflight.occupation.description}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      Domain pack: {@preflight.occupation.domain_pack} · preliminary risk: {@preflight.preliminary_risk_tier}
+                    </p>
                   </div>
 
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t">
@@ -438,6 +495,7 @@ defmodule ControlKeelWeb.OnboardingLive do
                           Or continue from an existing session
                         </label>
                         <select
+                          id="onboarding-recent-session-select"
                           name="recent_mission_id"
                           class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
                           phx-change="select_mission"
@@ -599,6 +657,23 @@ defmodule ControlKeelWeb.OnboardingLive do
 
                       <div class="rounded-xl border bg-card/20 p-4 md:col-span-2">
                         <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
+                          Governance that will apply
+                        </h4>
+                        <p class="text-xs text-muted-foreground leading-relaxed">
+                          This session will be governed under the {@preflight.occupation.domain_pack} domain pack
+                          at preliminary risk {@preflight.preliminary_risk_tier}. {@preflight.validation_language} High-risk and destructive actions route to human review.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mt-2">
+                          <%= for item <- @preflight.compliance do %>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+                              {item}
+                            </span>
+                          <% end %>
+                        </div>
+                      </div>
+
+                      <div class="rounded-xl border bg-card/20 p-4 md:col-span-2">
+                        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
                           Open Questions
                         </h4>
                         <ul class="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
@@ -662,77 +737,9 @@ defmodule ControlKeelWeb.OnboardingLive do
               </div>
             </div>
           </.form>
-        </div>
-
-        <div class="lg:col-span-1 space-y-6">
-          <div class="rounded-2xl border bg-card/30 p-6 backdrop-blur-xl">
-            <p class="text-[10px] font-semibold tracking-wider text-primary uppercase font-mono mb-3">
-              Domain pack preview
-            </p>
-            <div class="space-y-4">
-              <div>
-                <h4 class="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">
-                  Occupation
-                </h4>
-                <p class="text-foreground text-sm mt-0.5">{@preflight.occupation.label}</p>
-              </div>
-
-              <div>
-                <h4 class="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">
-                  Description
-                </h4>
-                <p class="text-foreground text-sm mt-0.5">{@preflight.occupation.description}</p>
-              </div>
-
-              <div class="flex gap-2 justify-between">
-                <div>
-                  <h4 class="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">
-                    Domain
-                  </h4>
-                  <p class="text-foreground text-sm mt-0.5">{@preflight.occupation.domain_pack}</p>
-                </div>
-
-                <div>
-                  <h4 class="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">
-                    preliminary risk
-                  </h4>
-                  <p class="text-foreground text-sm mt-0.5">{@preflight.preliminary_risk_tier}</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 class="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">
-                  Validation emphasis
-                </h4>
-                <p class="text-foreground text-sm mt-0.5 leading-relaxed">
-                  {@preflight.validation_language}
-                </p>
-              </div>
-              <div>
-                <h4 class="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider mb-1.5">
-                  Compliance
-                </h4>
-                <div class="flex flex-wrap gap-1">
-                  <%= for item <- @preflight.compliance do %>
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-card text-muted-foreground border">
-                      {item}
-                    </span>
-                  <% end %>
-                </div>
-              </div>
-              <div>
-                <h4 class="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">
-                  Stack guidance
-                </h4>
-                <p class="text-foreground text-xs mt-0.5 leading-relaxed">
-                  {@preflight.stack_guidance}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
-    </section>
+    </div>
     """
   end
 
@@ -774,8 +781,11 @@ defmodule ControlKeelWeb.OnboardingLive do
     |> assign(:selected_workspace_id, nil)
     |> assign(:can_onboard, true)
     |> assign(:onboarding_notice, nil)
+    |> assign(:scope_notice, nil)
   end
 
+  # Defaults: first admin/owner org + its first workspace (issue #183 — the
+  # URL params applied later by handle_params take precedence over these).
   defp assign_org_context(socket, true) do
     case socket.assigns[:current_user] do
       nil ->
@@ -784,24 +794,111 @@ defmodule ControlKeelWeb.OnboardingLive do
         |> assign(:workspace_options, [])
         |> assign(:selected_org_id, nil)
         |> assign(:selected_workspace_id, nil)
+        |> assign(:scope_notice, nil)
         |> recompute_onboarding_state()
 
       user ->
         org_rows = Accounts.list_orgs_for_user(user.id, "admin")
         org_options = Enum.map(org_rows, &{&1.org.id, &1.org.name, &1.org.slug})
-        selected_org_id = default_org_id(org_rows, socket.assigns[:current_membership])
+        selected_org_id = default_org_id(org_rows)
         workspaces = load_workspaces(selected_org_id)
 
         socket
         |> assign(:org_options, org_options)
-        |> assign(:workspace_options, Enum.map(workspaces, &{&1.id, &1.name}))
+        |> assign(:workspace_options, Enum.map(workspaces, &{&1.id, &1.name, &1.slug}))
         |> assign(:selected_org_id, selected_org_id)
-        |> assign(
-          :selected_workspace_id,
-          default_workspace_id(workspaces, socket.assigns[:current_membership])
-        )
+        |> assign(:selected_workspace_id, default_workspace_id(workspaces))
+        |> assign(:scope_notice, nil)
         |> recompute_onboarding_state()
     end
+  end
+
+  # Applies `?org_slug`/`?ws_slug` on top of the mount defaults. Only
+  # admin/owner orgs are in org_options, so a slug match against them IS the
+  # authorization — params for anything else are ignored server-side with an
+  # inline notice (issue #183).
+  defp apply_scope_params(socket, params) do
+    if socket.assigns.cloud_mode and socket.assigns[:current_user] != nil do
+      apply_org_slug(socket, params["org_slug"], params["ws_slug"])
+    else
+      socket
+    end
+  end
+
+  defp apply_org_slug(socket, org_slug, _ws_slug) when not is_binary(org_slug),
+    do: socket
+
+  defp apply_org_slug(socket, org_slug, _ws_slug) when byte_size(org_slug) == 0,
+    do: socket
+
+  defp apply_org_slug(socket, org_slug, ws_slug) do
+    case Enum.find(socket.assigns.org_options, fn {_id, _name, slug} -> slug == org_slug end) do
+      nil ->
+        put_scope_notice(
+          socket,
+          "Organization \"#{org_slug}\" is not available to you — keeping your default selection."
+        )
+
+      {org_id, _name, _slug} ->
+        apply_ws_slug(socket, org_id, ws_slug)
+    end
+  end
+
+  defp apply_ws_slug(socket, org_id, ws_slug) when is_binary(ws_slug) and ws_slug != "" do
+    workspaces = load_workspaces(org_id)
+
+    case Enum.find(workspaces, &(&1.slug == ws_slug)) do
+      nil ->
+        put_scope_notice(
+          socket,
+          "Workspace \"#{ws_slug}\" does not belong to that organization — keeping your default selection."
+        )
+
+      workspace ->
+        assign_scope_selection(socket, org_id, workspaces, workspace.id)
+    end
+  end
+
+  # Org-only params (org-scope header buttons): pre-select the org and its
+  # first workspace.
+  defp apply_ws_slug(socket, org_id, _ws_slug) do
+    workspaces = load_workspaces(org_id)
+    assign_scope_selection(socket, org_id, workspaces, default_workspace_id(workspaces))
+  end
+
+  defp assign_scope_selection(socket, org_id, workspaces, workspace_id) do
+    socket
+    |> assign(:selected_org_id, org_id)
+    |> assign(:workspace_options, Enum.map(workspaces, &{&1.id, &1.name, &1.slug}))
+    |> assign(:selected_workspace_id, workspace_id)
+    |> assign(:scope_notice, nil)
+    |> recompute_onboarding_state()
+  end
+
+  # The URL is the selection state: picker events patch these params and
+  # handle_params re-applies them.
+  defp scope_path(org_slug, nil) when is_binary(org_slug),
+    do: ~p"/sessions/start?#{%{org_slug: org_slug}}"
+
+  defp scope_path(org_slug, ws_slug) when is_binary(org_slug) and is_binary(ws_slug),
+    do: ~p"/sessions/start?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
+
+  defp org_slug_for_id(org_options, org_id) do
+    Enum.find_value(org_options, fn {id, _name, slug} -> if id == org_id, do: slug end)
+  end
+
+  defp workspace_slug_for_id(workspaces, workspace_id) do
+    Enum.find_value(workspaces, fn ws -> if ws.id == workspace_id, do: ws.slug end)
+  end
+
+  defp option_workspace_slug(workspace_options, workspace_id) do
+    Enum.find_value(workspace_options, fn {id, _name, slug} ->
+      if id == workspace_id, do: slug
+    end)
+  end
+
+  defp put_scope_notice(socket, text) do
+    assign(socket, :scope_notice, text)
   end
 
   defp recompute_onboarding_state(socket) do
@@ -819,31 +916,18 @@ defmodule ControlKeelWeb.OnboardingLive do
 
   defp load_workspaces(_org_id), do: []
 
-  defp default_org_id(org_rows, %{org_id: org_id}) when is_integer(org_id) do
-    if Enum.any?(org_rows, &(&1.org.id == org_id)),
-      do: org_id,
-      else: default_org_id(org_rows, nil)
-  end
+  defp default_org_id([]), do: nil
+  defp default_org_id([%{org: org} | _]), do: org.id
 
-  defp default_org_id([], _membership), do: nil
-  defp default_org_id([%{org: org} | _], _membership), do: org.id
-
-  defp default_workspace_id(workspaces, %{mission_workspace_id: workspace_id})
-       when is_integer(workspace_id) do
-    if Enum.any?(workspaces, &(&1.id == workspace_id)),
-      do: workspace_id,
-      else: default_workspace_id(workspaces, nil)
-  end
-
-  defp default_workspace_id([], _membership), do: nil
-  defp default_workspace_id([workspace | _], _membership), do: workspace.id
+  defp default_workspace_id([]), do: nil
+  defp default_workspace_id([workspace | _]), do: workspace.id
 
   defp parse_org_id(org_id, options) do
     parse_option_id(org_id, options, fn {id, _name, _slug} -> id end)
   end
 
   defp parse_workspace_id(workspace_id, options) do
-    parse_option_id(workspace_id, options, fn {id, _name} -> id end)
+    parse_option_id(workspace_id, options, fn {id, _name, _slug} -> id end)
   end
 
   defp parse_option_id(value, options, id_of) do
