@@ -540,6 +540,116 @@ defmodule ControlKeel.Observability do
     }
   end
 
+  @doc """
+  Single-pass loader for the stacked `/observability/benchmark` page.
+
+  Returns the exact maps built by `benchmark_drafts/1`,
+  `observability_benchmark_scenarios/1`, `observability_benchmark_run_preview/1`,
+  and `observability_benchmark_history/1`, but fetches the overlapping records
+  once: scenario ordering is deterministic (`desc inserted_at, desc id`), so the
+  first N of the 500-record fetch are identical to the standalone limit-N
+  fetches, and the history coverage reuses the already-fetched drafts count.
+  The standalone functions are unchanged (CLI parity).
+  """
+  def observability_benchmark_page(opts \\ []) do
+    scenario_limit = Keyword.get(opts, :limit, 50)
+    history_limit = Keyword.get(opts, :limit, 12)
+    workspace_id = Keyword.get(opts, :workspace_id)
+    suite_slug = Keyword.get(opts, :suite)
+    scenario_slugs = normalize_observability_scenario_slugs(Keyword.get(opts, :scenario_slugs))
+    subjects = Keyword.get(opts, :subjects)
+
+    drafts = benchmark_drafts(opts)
+
+    all_scenarios =
+      observability_scenario_records([workspace_id: workspace_id, limit: 500], 500)
+
+    scenarios = Enum.take(all_scenarios, scenario_limit)
+
+    scenario_count =
+      if length(all_scenarios) < 500,
+        do: length(all_scenarios),
+        else: observability_scenario_count(opts)
+
+    scenarios_map = %{
+      count: scenario_count,
+      limit: scenario_limit,
+      scenarios: Enum.map(scenarios, &observability_scenario_summary/1),
+      by_suite: frequencies(scenarios, &observability_scenario_suite_slug/1),
+      recommendations: observability_scenario_recommendations(scenarios)
+    }
+
+    filtered =
+      scenarios
+      |> maybe_filter_observability_scenarios_by_suite(suite_slug)
+      |> maybe_filter_observability_scenarios_by_slugs(scenario_slugs)
+
+    suites =
+      filtered
+      |> Enum.map(&observability_scenario_suite_slug/1)
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    selected_suite = suite_slug || single_suite(suites)
+
+    selected_scenarios =
+      if selected_suite do
+        Enum.filter(filtered, &(observability_scenario_suite_slug(&1) == selected_suite))
+      else
+        filtered
+      end
+
+    run_preview = %{
+      suite: selected_suite,
+      suites: suites,
+      scenario_slugs: Enum.map(selected_scenarios, & &1.slug),
+      scenarios: Enum.map(selected_scenarios, &observability_scenario_summary/1),
+      subjects: subjects,
+      executable:
+        selected_suite != nil and subjects_present?(subjects) and selected_scenarios != [],
+      dry_run: true,
+      benchmark_execution: false,
+      command: observability_benchmark_run_command(selected_suite, selected_scenarios, subjects),
+      recommendations:
+        observability_run_recommendations(selected_suite, suites, selected_scenarios, subjects)
+    }
+
+    runs = observability_benchmark_run_records(all_scenarios, history_limit)
+
+    covered_ids =
+      runs
+      |> Enum.flat_map(&(&1.results || []))
+      |> Enum.map(& &1.scenario_id)
+      |> Enum.uniq()
+
+    saved = saved_eval_candidates(workspace_id: workspace_id)
+    approved_drafts = benchmark_draft_count(workspace_id: workspace_id, status: "approved")
+    latest = List.first(runs)
+    scenario_ids = Enum.map(all_scenarios, & &1.id)
+
+    coverage = %{
+      saved_eval_candidates: saved.count,
+      benchmark_drafts: drafts.count,
+      approved_drafts: approved_drafts,
+      materialized_scenarios: length(scenario_ids),
+      # Bolt: Using Enum.count/2 avoids intermediate list allocation
+      covered_scenarios: Enum.count(scenario_ids, &(&1 in covered_ids)),
+      benchmark_runs: length(runs)
+    }
+
+    history = %{
+      limit: history_limit,
+      readiness: observability_benchmark_readiness(latest, coverage),
+      coverage: coverage,
+      latest_run: if(latest, do: observability_benchmark_history_run_summary(latest), else: nil),
+      runs: Enum.map(runs, &observability_benchmark_history_run_summary/1),
+      missed: observability_benchmark_missed_summaries(runs),
+      recommendations: observability_benchmark_history_recommendations(latest, coverage)
+    }
+
+    %{drafts: drafts, scenarios: scenarios_map, run_preview: run_preview, history: history}
+  end
+
   def promotion_candidates(opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
     workspace_id = Keyword.get(opts, :workspace_id)

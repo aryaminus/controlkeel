@@ -11,19 +11,23 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   def mount(_params, _session, socket) do
     recent_session = Mission.list_recent_sessions(1) |> List.first()
     opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
-    drafts = Observability.benchmark_drafts(opts)
-    scenarios = Observability.observability_benchmark_scenarios(opts)
-    run_preview = Observability.observability_benchmark_run_preview(opts)
-    history = Observability.observability_benchmark_history(opts)
 
     {:ok,
      socket
      |> assign(:page_title, "Benchmark")
      |> assign(:opts, opts)
-     |> assign(:drafts, drafts)
-     |> assign(:scenarios, scenarios)
-     |> assign(:run_preview, run_preview)
-     |> assign(:history, history)}
+     |> assign_benchmark_page(Observability.observability_benchmark_page(opts))}
+  end
+
+  # Single-pass refresh: draft mutations can materialize scenarios and shift
+  # history coverage, so every event re-derives all four assigns together
+  # instead of refreshing :drafts alone.
+  defp assign_benchmark_page(socket, page) do
+    socket
+    |> assign(:drafts, page.drafts)
+    |> assign(:scenarios, page.scenarios)
+    |> assign(:run_preview, page.run_preview)
+    |> assign(:history, page.history)
   end
 
   # Currently approve/reject/archive are fully reversible, so devs and users can
@@ -45,7 +49,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
         {:noreply,
          socket
-         |> assign(:drafts, Observability.benchmark_drafts(socket.assigns.opts))
+         |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
          |> put_flash(:info, approve_materialize_message(materialize))}
 
       {:error, reason} ->
@@ -62,7 +66,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
       {:ok, result} ->
         {:noreply,
          socket
-         |> assign(:drafts, Observability.benchmark_drafts(socket.assigns.opts))
+         |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
          |> put_flash(:info, status_flash_message(result))}
 
       {:error, reason} ->
@@ -79,7 +83,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
       {:ok, result} ->
         {:noreply,
          socket
-         |> assign(:drafts, Observability.benchmark_drafts(socket.assigns.opts))
+         |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
          |> put_flash(:info, status_flash_message(result))}
 
       {:error, reason} ->
@@ -94,7 +98,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
     {:noreply,
      socket
-     |> assign(:drafts, Observability.benchmark_drafts(socket.assigns.opts))
+     |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
      |> put_flash(:info, generate_drafts_message(result))}
   end
 
