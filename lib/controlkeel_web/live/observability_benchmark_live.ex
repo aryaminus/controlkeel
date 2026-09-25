@@ -30,6 +30,40 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
     |> assign(:history, page.history)
   end
 
+  # Shared section header for the three stacked sections: title + subtitle
+  # left, caller-supplied actions (count pills, buttons) right. Keeps every
+  # section on one <h2> level under the page <h1>.
+  defp benchmark_section_header(assigns) do
+    ~H"""
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div class="space-y-2">
+        <.section_title>{@title}</.section_title>
+        <p class="text-sm text-muted-foreground">{@subtitle}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 shrink-0 justify-end">
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  # Shared recommendations card: identical chrome, only the DOM id and items
+  # differ. Renders nothing when empty.
+  defp benchmark_recommendations(assigns) do
+    ~H"""
+    <section
+      :if={@recommendations != []}
+      id={@id}
+      class="rounded-2xl border bg-card p-5 shadow-card space-y-3"
+    >
+      <.section_title>Recommendations</.section_title>
+      <%= for recommendation <- @recommendations do %>
+        <p class="text-sm leading-relaxed text-muted-foreground">{recommendation}</p>
+      <% end %>
+    </section>
+    """
+  end
+
   # Currently approve/reject/archive are fully reversible, so devs and users can
   # test the actions back and forth.
   #
@@ -106,31 +140,27 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   def render(assigns) do
     ~H"""
     <section id="observability-benchmark-page" class="w-full space-y-6">
-      <div id="benchmarks-drafts" class="scroll-mt-6">
-        <section id="observability-benchmark-drafts-page" class="w-full space-y-5">
-          <div class="flex items-start justify-between gap-4 flex-wrap">
-            <div class="space-y-2">
-              <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-                Benchmark drafts
-              </h1>
-              <p class="text-sm text-muted-foreground">
-                Human-gated local benchmark draft scenarios generated from saved eval candidates.
-              </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3 shrink-0 justify-end">
-              <span id="observability-benchmark-drafts-count" class={neutral_pill_class()}>
-                {@drafts.count} draft(s)
-              </span>
-              <.button
-                id="observability-benchmark-drafts-generate"
-                type="button"
-                variant="outline"
-                phx-click="generate-drafts"
-              >
-                Generate drafts
-              </.button>
-            </div>
-          </div>
+      <.page_title
+        title="Benchmark"
+        subtitle="Draft, review, and run history for locally generated observability benchmarks."
+      />
+      <section id="benchmarks-drafts" class="w-full space-y-5 scroll-mt-6">
+        <.benchmark_section_header
+          title="Benchmark drafts"
+          subtitle="Human-gated local benchmark draft scenarios generated from saved eval candidates."
+        >
+          <span id="observability-benchmark-drafts-count" class={neutral_pill_class()}>
+            {@drafts.count} draft(s)
+          </span>
+          <.button
+            id="observability-benchmark-drafts-generate"
+            type="button"
+            variant="outline"
+            phx-click="generate-drafts"
+          >
+            Generate drafts
+          </.button>
+        </.benchmark_section_header>
 
           <div class="flex flex-wrap items-center gap-3">
             <CommandPill.command_pill command="controlkeel obs benchmarks drafts" />
@@ -157,17 +187,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
             </article>
           </div>
 
-          <%= if @drafts.recommendations != [] do %>
-            <section
-              id="observability-benchmark-drafts-recommendations"
-              class="rounded-2xl border bg-card p-5 shadow-card space-y-3"
-            >
-              <.section_title>Recommendations</.section_title>
-              <%= for recommendation <- @drafts.recommendations do %>
-                <p class="text-sm leading-relaxed text-muted-foreground">{recommendation}</p>
-              <% end %>
-            </section>
-          <% end %>
+        <.benchmark_recommendations
+            id="observability-benchmark-drafts-recommendations"
+            recommendations={@drafts.recommendations}
+          />
 
           <section
             id="observability-benchmark-drafts-list"
@@ -239,42 +262,26 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
               </div>
             <% end %>
           </section>
-        </section>
-      </div>
+      </section>
 
-      <div id="benchmarks-scenarios" class="scroll-mt-6">
-        <section id="observability-benchmark-scenarios-page" class="w-full space-y-5">
-          <div class="flex items-start justify-between gap-4 flex-wrap">
-            <div class="space-y-2">
-              <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-                Materialized benchmark scenarios
-              </h1>
-              <p class="text-sm text-muted-foreground">
-                Local Benchmark.Scenario records generated from approved observability drafts.
-              </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3 shrink-0 justify-end">
-              <span id="observability-benchmark-scenarios-count" class={neutral_pill_class()}>
-                {@scenarios.count} scenario(s)
-              </span>
-            </div>
-          </div>
+      <section id="benchmarks-scenarios" class="w-full space-y-5 scroll-mt-6">
+        <.benchmark_section_header
+          title="Materialized benchmark scenarios"
+          subtitle="Local Benchmark.Scenario records generated from approved observability drafts."
+        >
+          <span id="observability-benchmark-scenarios-count" class={neutral_pill_class()}>
+            {@scenarios.count} scenario(s)
+          </span>
+        </.benchmark_section_header>
 
           <div class="flex flex-wrap items-center gap-3">
             <CommandPill.command_pill command="controlkeel obs benchmarks scenarios" />
           </div>
 
-          <%= if @scenarios.recommendations != [] do %>
-            <section
-              id="observability-benchmark-scenarios-summary"
-              class="rounded-2xl border bg-card p-5 shadow-card space-y-3"
-            >
-              <.section_title>Recommendations</.section_title>
-              <%= for recommendation <- @scenarios.recommendations do %>
-                <p class="text-sm leading-relaxed text-muted-foreground">{recommendation}</p>
-              <% end %>
-            </section>
-          <% end %>
+          <.benchmark_recommendations
+            id="observability-benchmark-scenarios-summary"
+            recommendations={@scenarios.recommendations}
+          />
 
           <section
             id="observability-benchmark-run-guidance"
@@ -324,29 +331,20 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
               </div>
             <% end %>
           </section>
-        </section>
-      </div>
+      </section>
 
-      <div id="benchmarks-history" class="scroll-mt-6">
-        <section id="observability-benchmark-history-page" class="w-full space-y-5">
-          <div class="flex items-start justify-between gap-4 flex-wrap">
-            <div class="space-y-2">
-              <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-                Benchmark history
-              </h1>
-              <p class="text-sm text-muted-foreground">
-                Read-only readiness and run evidence for generated observability benchmark scenarios.
-              </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3 shrink-0 justify-end">
-              <span
-                id="observability-benchmark-history-readiness"
-                class={health_pill_class(@history.readiness.status)}
-              >
-                {@history.readiness.status}
-              </span>
-            </div>
-          </div>
+      <section id="benchmarks-history" class="w-full space-y-5 scroll-mt-6">
+        <.benchmark_section_header
+          title="Benchmark history"
+          subtitle="Read-only readiness and run evidence for generated observability benchmark scenarios."
+        >
+          <span
+            id="observability-benchmark-history-readiness"
+            class={health_pill_class(@history.readiness.status)}
+          >
+            {@history.readiness.status}
+          </span>
+        </.benchmark_section_header>
 
           <div class="flex flex-wrap items-center gap-3">
             <CommandPill.command_pill command="controlkeel obs benchmarks history" />
@@ -388,17 +386,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
             </div>
           </section>
 
-          <%= if @history.recommendations != [] do %>
-            <section
-              id="observability-benchmark-history-recommendations"
-              class="rounded-2xl border bg-card p-5 shadow-card space-y-3"
-            >
-              <.section_title>Recommendations</.section_title>
-              <%= for recommendation <- @history.recommendations do %>
-                <p class="text-sm leading-relaxed text-muted-foreground">{recommendation}</p>
-              <% end %>
-            </section>
-          <% end %>
+          <.benchmark_recommendations
+            id="observability-benchmark-history-recommendations"
+            recommendations={@history.recommendations}
+          />
 
           <section
             id="observability-benchmark-history-runs"
@@ -433,8 +424,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
               </div>
             <% end %>
           </section>
-        </section>
-      </div>
+      </section>
     </section>
     """
   end
@@ -443,11 +433,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
     do:
       "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-success/10 text-success ring-success/20"
 
-  defp status_pill_class("rejected"),
-    do:
-      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-destructive/10 text-destructive ring-destructive/20"
-
-  defp status_pill_class("failed"),
+  defp status_pill_class(status) when status in ["rejected", "failed"],
     do:
       "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-destructive/10 text-destructive ring-destructive/20"
 
