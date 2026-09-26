@@ -200,85 +200,85 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           </.button>
         </.benchmark_section_header>
 
-          <div class="flex flex-wrap items-center gap-3">
-            <CommandPill.command_pill command="controlkeel obs benchmarks drafts" />
-          </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <CommandPill.command_pill command="controlkeel obs benchmarks drafts" />
+        </div>
 
         <.benchmark_recommendations
-            id="observability-benchmark-drafts-recommendations"
-            recommendations={@drafts.recommendations}
-          />
+          id="observability-benchmark-drafts-recommendations"
+          recommendations={@drafts.recommendations}
+        />
 
-          <section
-            id="observability-benchmark-drafts-list"
-            class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
-          >
-            <.section_title>Draft scenarios</.section_title>
-            <%= if @drafts.drafts == [] do %>
-              <p class="text-sm text-muted-foreground">No benchmark drafts yet.</p>
-            <% else %>
-              <div class="divide-y divide-border">
-                <%= for draft <- @drafts.drafts do %>
-                  <div
-                    id={"observability-benchmark-draft-#{draft.id}"}
-                    class="space-y-2 py-3 first:pt-0 last:pb-0"
-                  >
-                    <div class="flex items-center justify-between gap-4">
-                      <div class="min-w-0 space-y-1">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          {draft.suite_slug}
-                        </p>
-                        <p class="text-sm font-medium text-foreground">{draft.title}</p>
-                      </div>
-                      <span class={status_pill_class(draft.status)}>{draft.status}</span>
+        <section
+          id="observability-benchmark-drafts-list"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
+        >
+          <.section_title>Draft scenarios</.section_title>
+          <%= if @drafts.drafts == [] do %>
+            <p class="text-sm text-muted-foreground">No benchmark drafts yet.</p>
+          <% else %>
+            <div class="divide-y divide-border">
+              <%= for draft <- @drafts.drafts do %>
+                <div
+                  id={"observability-benchmark-draft-#{draft.id}"}
+                  class="space-y-2 py-3 first:pt-0 last:pb-0"
+                >
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0 space-y-1">
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        {draft.suite_slug}
+                      </p>
+                      <p class="text-sm font-medium text-foreground">{draft.title}</p>
                     </div>
-                    <p class="text-sm leading-relaxed text-foreground">{draft.scenario_prompt}</p>
-                    <p class="text-xs text-muted-foreground">
-                      Expected: {draft.expected_behavior}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      Human gate required: {draft.human_gate_required}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      Scenario: {materialized_scenario(draft)}
-                    </p>
-                    <div class="flex items-center gap-3 pt-1">
+                    <span class={status_pill_class(draft.status)}>{draft.status}</span>
+                  </div>
+                  <p class="text-sm leading-relaxed text-foreground">{draft.scenario_prompt}</p>
+                  <p class="text-xs text-muted-foreground">
+                    Expected: {draft.expected_behavior}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Human gate required: {draft.human_gate_required}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Scenario: {materialized_scenario(draft)}
+                  </p>
+                  <div class="flex items-center gap-3 pt-1">
+                    <.button
+                      id={"observability-benchmark-draft-approve-#{draft.id}"}
+                      type="button"
+                      phx-click="approve-draft"
+                      phx-value-id={draft.id}
+                      disabled={draft.status == "approved"}
+                    >
+                      Approve
+                    </.button>
+                    <.button
+                      id={"observability-benchmark-draft-reject-#{draft.id}"}
+                      type="button"
+                      variant="outline"
+                      phx-click="reject-draft"
+                      phx-value-id={draft.id}
+                      disabled={draft.status == "rejected"}
+                    >
+                      Reject
+                    </.button>
+                    <%= if draft.status != "archived" do %>
                       <.button
-                        id={"observability-benchmark-draft-approve-#{draft.id}"}
-                        type="button"
-                        phx-click="approve-draft"
-                        phx-value-id={draft.id}
-                        disabled={draft.status == "approved"}
-                      >
-                        Approve
-                      </.button>
-                      <.button
-                        id={"observability-benchmark-draft-reject-#{draft.id}"}
+                        id={"observability-benchmark-draft-archive-#{draft.id}"}
                         type="button"
                         variant="outline"
-                        phx-click="reject-draft"
+                        phx-click="archive-draft"
                         phx-value-id={draft.id}
-                        disabled={draft.status == "rejected"}
                       >
-                        Reject
+                        Archive
                       </.button>
-                      <%= if draft.status != "archived" do %>
-                        <.button
-                          id={"observability-benchmark-draft-archive-#{draft.id}"}
-                          type="button"
-                          variant="outline"
-                          phx-click="archive-draft"
-                          phx-value-id={draft.id}
-                        >
-                          Archive
-                        </.button>
-                      <% end %>
-                    </div>
+                    <% end %>
                   </div>
-                <% end %>
-              </div>
-            <% end %>
-          </section>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
       </section>
 
       <section id="benchmarks-scenarios" class="w-full space-y-5 scroll-mt-6">
@@ -291,63 +291,63 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           </span>
         </.benchmark_section_header>
 
-          <div class="flex flex-wrap items-center gap-3">
-            <CommandPill.command_pill command="controlkeel obs benchmarks scenarios" />
-          </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <CommandPill.command_pill command="controlkeel obs benchmarks scenarios" />
+        </div>
 
-          <.benchmark_recommendations
-            id="observability-benchmark-scenarios-summary"
-            recommendations={@scenarios.recommendations}
-          />
+        <.benchmark_recommendations
+          id="observability-benchmark-scenarios-summary"
+          recommendations={@scenarios.recommendations}
+        />
 
-          <section
-            id="observability-benchmark-run-guidance"
-            class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
-          >
-            <.section_title>Human-gated execution</.section_title>
-            <p class="text-sm leading-relaxed text-muted-foreground">
-              Benchmark execution is CLI-only. Review generated scenarios first, then run an explicit command.
+        <section
+          id="observability-benchmark-run-guidance"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
+        >
+          <.section_title>Human-gated execution</.section_title>
+          <p class="text-sm leading-relaxed text-muted-foreground">
+            Benchmark execution is CLI-only. Review generated scenarios first, then run an explicit command.
+          </p>
+          <code class="block rounded-lg border bg-muted px-3 py-2 text-xs text-muted-foreground overflow-x-auto">
+            {@run_preview.command || "controlkeel obs benchmarks run --dry-run"}
+          </code>
+          <%= if @run_preview.recommendations != [] do %>
+            <div class="space-y-2">
+              <%= for recommendation <- @run_preview.recommendations do %>
+                <p class="text-sm leading-relaxed text-muted-foreground">{recommendation}</p>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
+
+        <section
+          id="observability-benchmark-scenarios-list"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
+        >
+          <.section_title>Scenarios</.section_title>
+          <%= if @scenarios.scenarios == [] do %>
+            <p class="text-sm text-muted-foreground">
+              No materialized observability scenarios yet.
             </p>
-            <code class="block rounded-lg border bg-muted px-3 py-2 text-xs text-muted-foreground overflow-x-auto">
-              {@run_preview.command || "controlkeel obs benchmarks run --dry-run"}
-            </code>
-            <%= if @run_preview.recommendations != [] do %>
-              <div class="space-y-2">
-                <%= for recommendation <- @run_preview.recommendations do %>
-                  <p class="text-sm leading-relaxed text-muted-foreground">{recommendation}</p>
-                <% end %>
-              </div>
-            <% end %>
-          </section>
-
-          <section
-            id="observability-benchmark-scenarios-list"
-            class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
-          >
-            <.section_title>Scenarios</.section_title>
-            <%= if @scenarios.scenarios == [] do %>
-              <p class="text-sm text-muted-foreground">
-                No materialized observability scenarios yet.
-              </p>
-            <% else %>
-              <div class="divide-y divide-border">
-                <%= for scenario <- @scenarios.scenarios do %>
-                  <div
-                    id={"observability-benchmark-scenario-#{scenario.id}"}
-                    class="space-y-1 py-3 first:pt-0 last:pb-0"
-                  >
-                    <p class="text-sm font-medium text-foreground">{scenario.name}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {scenario.suite_slug} · {scenario.slug} · {scenario.split}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      Expected rules: {Enum.join(scenario.expected_rules, ", ")}
-                    </p>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
-          </section>
+          <% else %>
+            <div class="divide-y divide-border">
+              <%= for scenario <- @scenarios.scenarios do %>
+                <div
+                  id={"observability-benchmark-scenario-#{scenario.id}"}
+                  class="space-y-1 py-3 first:pt-0 last:pb-0"
+                >
+                  <p class="text-sm font-medium text-foreground">{scenario.name}</p>
+                  <p class="text-xs text-muted-foreground">
+                    {scenario.suite_slug} · {scenario.slug} · {scenario.split}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Expected rules: {Enum.join(scenario.expected_rules, ", ")}
+                  </p>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
       </section>
 
       <section id="benchmarks-history" class="w-full space-y-5 scroll-mt-6">
@@ -363,84 +363,84 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           </span>
         </.benchmark_section_header>
 
-          <div class="flex flex-wrap items-center gap-3">
-            <CommandPill.command_pill command="controlkeel obs benchmarks history" />
+        <div class="flex flex-wrap items-center gap-3">
+          <CommandPill.command_pill command="controlkeel obs benchmarks history" />
+        </div>
+
+        <section
+          id="observability-benchmark-history-summary"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
+        >
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-muted-foreground">Readiness</p>
+            <p class="text-base font-semibold text-foreground/90">{@history.readiness.reason}</p>
           </div>
-
-          <section
-            id="observability-benchmark-history-summary"
-            class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
-          >
-            <div class="space-y-1">
-              <p class="text-sm font-medium text-muted-foreground">Readiness</p>
-              <p class="text-base font-semibold text-foreground/90">{@history.readiness.reason}</p>
+          <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
+              <p class="text-xs text-muted-foreground">Saved evals</p>
+              <p class="text-xl font-semibold text-foreground/90">
+                {@history.coverage.saved_eval_candidates}
+              </p>
             </div>
-            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
-                <p class="text-xs text-muted-foreground">Saved evals</p>
-                <p class="text-xl font-semibold text-foreground/90">
-                  {@history.coverage.saved_eval_candidates}
-                </p>
-              </div>
-              <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
-                <p class="text-xs text-muted-foreground">Drafts</p>
-                <p class="text-xl font-semibold text-foreground/90">
-                  {@history.coverage.benchmark_drafts}
-                </p>
-              </div>
-              <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
-                <p class="text-xs text-muted-foreground">Materialized</p>
-                <p class="text-xl font-semibold text-foreground/90">
-                  {@history.coverage.materialized_scenarios}
-                </p>
-              </div>
-              <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
-                <p class="text-xs text-muted-foreground">Covered</p>
-                <p class="text-xl font-semibold text-foreground/90">
-                  {@history.coverage.covered_scenarios}
-                </p>
-              </div>
+            <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
+              <p class="text-xs text-muted-foreground">Drafts</p>
+              <p class="text-xl font-semibold text-foreground/90">
+                {@history.coverage.benchmark_drafts}
+              </p>
             </div>
-          </section>
+            <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
+              <p class="text-xs text-muted-foreground">Materialized</p>
+              <p class="text-xl font-semibold text-foreground/90">
+                {@history.coverage.materialized_scenarios}
+              </p>
+            </div>
+            <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
+              <p class="text-xs text-muted-foreground">Covered</p>
+              <p class="text-xl font-semibold text-foreground/90">
+                {@history.coverage.covered_scenarios}
+              </p>
+            </div>
+          </div>
+        </section>
 
-          <.benchmark_recommendations
-            id="observability-benchmark-history-recommendations"
-            recommendations={@history.recommendations}
-          />
+        <.benchmark_recommendations
+          id="observability-benchmark-history-recommendations"
+          recommendations={@history.recommendations}
+        />
 
-          <section
-            id="observability-benchmark-history-runs"
-            class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
-          >
-            <.section_title>Recent generated-suite runs</.section_title>
-            <%= if @history.runs == [] do %>
-              <p class="text-sm text-muted-foreground">No observability benchmark runs yet.</p>
-            <% else %>
-              <div class="divide-y divide-border">
-                <%= for run <- @history.runs do %>
-                  <div
-                    id={"observability-benchmark-history-run-#{run.id}"}
-                    class="space-y-1 py-3 first:pt-0 last:pb-0"
-                  >
-                    <div class="flex items-center justify-between gap-4">
-                      <div class="min-w-0">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          {run.suite}
-                        </p>
-                        <p class="text-sm font-medium text-foreground">
-                          Run #{run.id}: {run.status}
-                        </p>
-                      </div>
-                      <span class={status_pill_class(run.status)}>{run.status}</span>
+        <section
+          id="observability-benchmark-history-runs"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
+        >
+          <.section_title>Recent generated-suite runs</.section_title>
+          <%= if @history.runs == [] do %>
+            <p class="text-sm text-muted-foreground">No observability benchmark runs yet.</p>
+          <% else %>
+            <div class="divide-y divide-border">
+              <%= for run <- @history.runs do %>
+                <div
+                  id={"observability-benchmark-history-run-#{run.id}"}
+                  class="space-y-1 py-3 first:pt-0 last:pb-0"
+                >
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0">
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        {run.suite}
+                      </p>
+                      <p class="text-sm font-medium text-foreground">
+                        Run #{run.id}: {run.status}
+                      </p>
                     </div>
-                    <p class="text-xs text-muted-foreground">
-                      catch {run.catch_rate}% · rule-hit {run.expected_rule_hit_rate}%
-                    </p>
+                    <span class={status_pill_class(run.status)}>{run.status}</span>
                   </div>
-                <% end %>
-              </div>
-            <% end %>
-          </section>
+                  <p class="text-xs text-muted-foreground">
+                    catch {run.catch_rate}% · rule-hit {run.expected_rule_hit_rate}%
+                  </p>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
       </section>
 
       <section id="benchmarks-regressions" class="w-full space-y-5 scroll-mt-6">

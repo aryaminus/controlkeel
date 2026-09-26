@@ -88,8 +88,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     {org, _ws, _session} = org_bound_session_fixture()
 
     assert {:error,
-            {:live_redirect,
-             %{to: "/organizations", flash: %{"error" => "Workspace not found."}}}} =
+            {:live_redirect, %{to: "/organizations", flash: %{"error" => "Workspace not found."}}}} =
              live(conn, "/#{org.slug}/workspaces/no-such-ws/benchmark")
   end
 
