@@ -184,9 +184,9 @@ defmodule ControlKeelWeb.PageController do
   end
 
   # Legacy observability benchmark sub-routes (pre-consolidation): the drafts,
-  # scenarios, and history pages now live stacked in the workspace benchmark
-  # page. Redirects preserve the query string and land on the matching section
-  # anchor.
+  # scenarios, history, and regressions pages now live stacked in the workspace
+  # benchmark page. Redirects preserve the query string and land on the matching
+  # section anchor.
   def observability_benchmarks_redirect(conn, _params) do
     anchor =
       cond do

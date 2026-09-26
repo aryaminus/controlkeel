@@ -3,8 +3,8 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   Workspace benchmark page at `/:org_slug/workspaces/:ws_slug/benchmark`.
 
   One stacked page for the workspace's benchmark loop: draft review, approved
-  test inventory with the run command, and run history. All data resolves from
-  the URL workspace — no recent-session heuristic.
+  test inventory with the run command, run history, and regression posture.
+  All data resolves from the URL workspace — no recent-session heuristic.
   """
 
   use ControlKeelWeb, :live_view
@@ -71,7 +71,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
     |> assign(:regressions, Observability.regressions(opts))
   end
 
-  # Shared section header for the three stacked sections: title + subtitle
+  # Shared section header for the four stacked sections: title + subtitle
   # left, caller-supplied actions (count pills, buttons) right. Keeps every
   # section on one <h2> level under the page <h1>.
   defp benchmark_section_header(assigns) do
