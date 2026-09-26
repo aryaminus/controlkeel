@@ -4,7 +4,9 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   import ControlKeel.MissionFixtures
   import Phoenix.LiveViewTest
 
+  alias ControlKeel.Accounts
   alias ControlKeel.Observability
+  alias ControlKeel.Repo
 
   defp benchmark_path(org, ws), do: "/#{org.slug}/workspaces/#{ws.slug}/benchmark"
 
@@ -122,6 +124,104 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
         ] do
       conn = get(conn, path)
       assert redirected_to(conn, 302) == "#{base}#{anchor}"
+    end
+  end
+
+  describe "benchmark access and resolvers (cloud mode)" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      :ok
+    end
+
+    setup %{conn: conn} do
+      suffix = System.unique_integer([:positive])
+
+      {:ok, org} =
+        Accounts.create_org(%{name: "BenchCo #{suffix}", slug: "benchco-#{suffix}"})
+
+      {:ok, admin} =
+        Accounts.create_user(%{email: "bench-admin-#{suffix}@example.com"})
+
+      %Accounts.Membership{}
+      |> Accounts.Membership.changeset(%{
+        user_id: admin.id,
+        org_id: org.id,
+        role: "admin",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      {:ok, viewer} =
+        Accounts.create_user(%{email: "bench-viewer-#{suffix}@example.com"})
+
+      %Accounts.Membership{}
+      |> Accounts.Membership.changeset(%{
+        user_id: viewer.id,
+        org_id: org.id,
+        role: "viewer",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      workspace = workspace_fixture(%{org_id: org.id})
+
+      {:ok, conn: conn, org: org, workspace: workspace, admin: admin, viewer: viewer}
+    end
+
+    test "resolvers fall back to the workspace picker without sessions", %{
+      conn: conn,
+      org: org,
+      admin: admin
+    } do
+      conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
+
+      for path <- [
+            "/observability/benchmark",
+            "/observability/benchmarks/drafts",
+            "/observability/regressions"
+          ] do
+        conn = get(conn, path)
+        assert redirected_to(conn, 302) == "/organizations"
+      end
+    end
+
+    test "viewers are redirected from the benchmark page", %{
+      conn: conn,
+      org: org,
+      workspace: ws,
+      viewer: viewer
+    } do
+      conn = init_test_session(conn, %{current_user_id: viewer.id, current_org_id: org.id})
+
+      assert {:error,
+              {:live_redirect,
+               %{
+                 to: "/organizations",
+                 flash: %{"error" => "Admin or owner role required."}
+               }}} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/benchmark")
+    end
+
+    test "admins can view the benchmark page", %{
+      conn: conn,
+      org: org,
+      workspace: ws,
+      admin: admin
+    } do
+      conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
+
+      {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/benchmark")
+
+      assert has_element?(view, "#observability-benchmark-page")
     end
   end
 end

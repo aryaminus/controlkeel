@@ -627,11 +627,12 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
   defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
 
-  # Read + draft-review surface: org-bound workspace + active membership at
-  # any role, resolved from (user, resource) via the shared gate. Matches the
-  # previous global page, which sat behind member auth without an admin gate.
+  # Admin surface: org-bound workspace + active admin/owner membership,
+  # resolved from (user, resource) via the shared gate. Draft review mutates
+  # workspace-wide exam state, so viewing and reviewing both require admin.
+  # Local mode skips the check (single-user deployment).
   defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
+    case WorkspaceAccess.check(workspace, assigns[:current_user], "admin") do
       :ok -> :ok
       {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
       {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
