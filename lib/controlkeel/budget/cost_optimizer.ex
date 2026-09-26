@@ -235,10 +235,10 @@ defmodule ControlKeel.Budget.CostOptimizer do
   defp estimate_repeat_rate(spending) do
     tools =
       spending
-      |> Enum.map(fn s ->
+      # Bolt: Use Enum.frequencies_by to avoid intermediate list allocations
+      |> Enum.frequencies_by(fn s ->
         Map.get(s, "tool", Map.get(s, "metadata", %{}) |> Map.get("tool", "unknown"))
       end)
-      |> Enum.frequencies()
 
     total = Enum.count(spending)
 
