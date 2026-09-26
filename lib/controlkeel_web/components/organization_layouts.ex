@@ -642,6 +642,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/tool-policy",
         scope: :workspace,
         icon: "hero-shield-check"
+      },
+      %{
+        label: "Benchmark",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/benchmark",
+        scope: :workspace,
+        icon: "hero-beaker"
       }
     ]
   end
