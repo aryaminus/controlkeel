@@ -68,7 +68,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
     |> assign(:scenarios, page.scenarios)
     |> assign(:run_preview, page.run_preview)
     |> assign(:history, page.history)
-    |> assign(:regressions, Observability.regressions(opts))
+    |> assign(:regressions, page.regressions)
   end
 
   # Shared section header for the four stacked sections: title + subtitle
@@ -283,8 +283,8 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
       <section id="benchmarks-scenarios" class="w-full space-y-5 scroll-mt-6">
         <.benchmark_section_header
-          title="Materialized benchmark scenarios"
-          subtitle="Local Benchmark.Scenario records generated from approved observability drafts."
+          title="Benchmark tests"
+          subtitle="Tests created from your approved drafts — this is the exam."
         >
           <span id="observability-benchmark-scenarios-count" class={neutral_pill_class()}>
             {@scenarios.count} scenario(s)
@@ -324,10 +324,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           id="observability-benchmark-scenarios-list"
           class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
         >
-          <.section_title>Scenarios</.section_title>
+          <.section_title>Tests</.section_title>
           <%= if @scenarios.scenarios == [] do %>
             <p class="text-sm text-muted-foreground">
-              No materialized observability scenarios yet.
+              No benchmark tests yet.
             </p>
           <% else %>
             <div class="divide-y divide-border">
@@ -353,7 +353,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
       <section id="benchmarks-history" class="w-full space-y-5 scroll-mt-6">
         <.benchmark_section_header
           title="Benchmark history"
-          subtitle="Read-only readiness and run evidence for generated observability benchmark scenarios."
+          subtitle="Read-only readiness and run evidence for your benchmark tests."
         >
           <span
             id="observability-benchmark-history-readiness"
@@ -389,7 +389,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
               </p>
             </div>
             <div class="rounded-xl border bg-muted/40 p-4 space-y-1">
-              <p class="text-xs text-muted-foreground">Materialized</p>
+              <p class="text-xs text-muted-foreground">Tests</p>
               <p class="text-xl font-semibold text-foreground/90">
                 {@history.coverage.materialized_scenarios}
               </p>
@@ -574,7 +574,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
       "inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold capitalize ring-1 bg-success/10 text-success ring-success/20"
 
   defp approve_materialize_message(%{materialized: materialized, existing: existing}) do
-    count_part = "Approved and materialized #{materialized} draft(s)"
+    count_part = "Approved and created #{materialized} test(s)"
     existing_part = if existing > 0, do: " · #{existing} already existed", else: ""
     count_part <> existing_part <> "."
   end
@@ -596,7 +596,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   defp materialized_scenario(draft) do
     case get_in(draft.metadata || %{}, ["materialized_scenario_id"]) do
       id when is_integer(id) -> "##{id}"
-      _ -> "not materialized"
+      _ -> "not yet a test"
     end
   end
 

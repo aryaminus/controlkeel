@@ -648,7 +648,18 @@ defmodule ControlKeel.Observability do
       recommendations: observability_benchmark_history_recommendations(latest, coverage)
     }
 
-    %{drafts: drafts, scenarios: scenarios_map, run_preview: run_preview, history: history}
+    regression_days = Keyword.get(opts, :days) || 30
+    regression_runs = benchmark_run_records(regression_days, history_limit)
+
+    regressions = build_regressions(regression_runs, drafts, saved, regression_days)
+
+    %{
+      drafts: drafts,
+      scenarios: scenarios_map,
+      run_preview: run_preview,
+      history: history,
+      regressions: regressions
+    }
   end
 
   def promotion_candidates(opts \\ []) do
@@ -696,6 +707,10 @@ defmodule ControlKeel.Observability do
     drafts = benchmark_drafts(workspace_id: workspace_id)
     saved = saved_eval_candidates(workspace_id: workspace_id)
 
+    build_regressions(runs, drafts, saved, days)
+  end
+
+  defp build_regressions(runs, drafts, saved, days) do
     %{
       days: days,
       health: regression_health(runs, drafts, saved),
@@ -2273,12 +2288,12 @@ defmodule ControlKeel.Observability do
 
   defp observability_scenario_recommendations([]),
     do: [
-      "No materialized observability benchmark scenarios yet; approve drafts and materialize them before execution."
+      "No benchmark tests yet; approve drafts to create tests before execution."
     ]
 
   defp observability_scenario_recommendations(scenarios) do
     [
-      "Review #{length(scenarios)} materialized scenario(s) before running benchmark suites.",
+      "Review #{length(scenarios)} benchmark test(s) before running benchmark suites.",
       "Benchmark execution remains separate and should stay human-gated."
     ]
   end
@@ -2345,12 +2360,11 @@ defmodule ControlKeel.Observability do
        when materialized > 0,
        do: %{
          status: "yellow",
-         reason:
-           "Materialized observability scenarios exist, but none have benchmark run evidence yet."
+         reason: "Benchmark tests exist, but none have run evidence yet."
        }
 
   defp observability_benchmark_readiness(nil, _coverage),
-    do: %{status: "red", reason: "No materialized observability benchmark scenarios exist yet."}
+    do: %{status: "red", reason: "No benchmark tests exist yet."}
 
   defp observability_benchmark_readiness(run, coverage) do
     cond do

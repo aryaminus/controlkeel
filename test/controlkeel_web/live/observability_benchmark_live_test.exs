@@ -52,7 +52,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     assert html =~ "controlkeel obs regressions"
 
     assert html =~ "No benchmark drafts yet."
-    assert html =~ "No materialized observability scenarios yet."
+    assert html =~ "No benchmark tests yet."
     assert html =~ "No observability benchmark runs yet."
   end
 
@@ -69,8 +69,29 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
       |> element("#observability-benchmark-draft-approve-#{draft_id}")
       |> render_click()
 
-    assert html =~ "Approved and materialized"
+    assert html =~ "Approved and created"
     assert html =~ "approved"
+  end
+
+  test "draft reject and archive events update status with flashes", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+    draft_id = draft_fixture(ws, session)
+
+    {:ok, view, _html} = live(conn, benchmark_path(org, ws))
+
+    reject_html =
+      view
+      |> element("#observability-benchmark-draft-reject-#{draft_id}")
+      |> render_click()
+
+    assert reject_html =~ "Rejected draft"
+
+    archive_html =
+      view
+      |> element("#observability-benchmark-draft-archive-#{draft_id}")
+      |> render_click()
+
+    assert archive_html =~ "Archived draft"
   end
 
   test "generate-drafts event reports when no candidates exist", %{conn: conn} do

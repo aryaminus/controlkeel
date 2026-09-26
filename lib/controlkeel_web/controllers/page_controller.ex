@@ -168,15 +168,9 @@ defmodule ControlKeelWeb.PageController do
   # workspace and redirect; without a resolvable workspace fall back to the
   # workspace picker instead of a dead 404.
   def observability_benchmark_resolve(conn, _params) do
-    query =
-      case conn.query_string do
-        "" -> ""
-        query -> "?#{query}"
-      end
-
     case benchmark_workspace(conn.assigns[:current_user]) do
       {org_slug, ws_slug} ->
-        redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{query}")
+        redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{query_suffix(conn)}")
 
       nil ->
         redirect(conn, to: ~p"/organizations")
@@ -197,18 +191,22 @@ defmodule ControlKeelWeb.PageController do
         true -> ""
       end
 
-    query =
-      case conn.query_string do
-        "" -> ""
-        query -> "?#{query}"
-      end
-
     case benchmark_workspace(conn.assigns[:current_user]) do
       {org_slug, ws_slug} ->
-        redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{anchor}#{query}")
+        redirect(
+          conn,
+          to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{anchor}#{query_suffix(conn)}"
+        )
 
       nil ->
         redirect(conn, to: ~p"/organizations")
+    end
+  end
+
+  defp query_suffix(conn) do
+    case conn.query_string do
+      "" -> ""
+      query -> "?#{query}"
     end
   end
 
