@@ -1,33 +1,74 @@
 defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
+  @moduledoc """
+  Workspace benchmark page at `/:org_slug/workspaces/:ws_slug/benchmark`.
+
+  One stacked page for the workspace's benchmark loop: draft review, approved
+  test inventory with the run command, and run history. All data resolves from
+  the URL workspace — no recent-session heuristic.
+  """
+
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.Accounts
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
+  alias ControlKeel.Repo
   alias ControlKeelWeb.CommandPill
+  alias ControlKeelWeb.WorkspaceAccess
 
   on_mount ControlKeelWeb.CommandPill
 
   @impl true
-  def mount(_params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
-    opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
+         :ok <- check_org_slug(workspace, %{slug: slug}),
+         :ok <- check_workspace_access(workspace, socket.assigns) do
+      opts = [workspace_id: workspace.id]
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Benchmark")
-     |> assign(:opts, opts)
-     |> assign_benchmark_page(Observability.observability_benchmark_page(opts))}
+      {:ok,
+       socket
+       |> assign(:page_title, "Benchmark — #{workspace.name}")
+       |> assign(:opts, opts)
+       |> assign(:workspace, workspace)
+       |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
+       |> assign(
+         :breadcrumbs,
+         [
+           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+           %{
+             label: workspace.name,
+             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+           },
+           %{label: "Benchmark", to: nil}
+         ]
+       )
+       |> assign_benchmark_page()}
+    else
+      nil ->
+        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+
+      {:error, reason} ->
+        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+    end
   end
 
   # Single-pass refresh: draft mutations can materialize scenarios and shift
-  # history coverage, so every event re-derives all four assigns together
-  # instead of refreshing :drafts alone.
-  defp assign_benchmark_page(socket, page) do
+  # history and regression coverage, so every event re-derives all assigns
+  # together instead of refreshing :drafts alone.
+  defp assign_benchmark_page(socket) do
+    opts = socket.assigns.opts
+    page = Observability.observability_benchmark_page(opts)
+
     socket
     |> assign(:drafts, page.drafts)
     |> assign(:scenarios, page.scenarios)
     |> assign(:run_preview, page.run_preview)
     |> assign(:history, page.history)
+    |> assign(:regressions, Observability.regressions(opts))
   end
 
   # Shared section header for the three stacked sections: title + subtitle
@@ -83,7 +124,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
         {:noreply,
          socket
-         |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
+         |> assign_benchmark_page()
          |> put_flash(:info, approve_materialize_message(materialize))}
 
       {:error, reason} ->
@@ -100,7 +141,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
       {:ok, result} ->
         {:noreply,
          socket
-         |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
+         |> assign_benchmark_page()
          |> put_flash(:info, status_flash_message(result))}
 
       {:error, reason} ->
@@ -117,7 +158,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
       {:ok, result} ->
         {:noreply,
          socket
-         |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
+         |> assign_benchmark_page()
          |> put_flash(:info, status_flash_message(result))}
 
       {:error, reason} ->
@@ -132,7 +173,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
     {:noreply,
      socket
-     |> assign_benchmark_page(Observability.observability_benchmark_page(socket.assigns.opts))
+     |> assign_benchmark_page()
      |> put_flash(:info, generate_drafts_message(result))}
   end
 
@@ -149,9 +190,6 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           title="Benchmark drafts"
           subtitle="Human-gated local benchmark draft scenarios generated from saved eval candidates."
         >
-          <span id="observability-benchmark-drafts-count" class={neutral_pill_class()}>
-            {@drafts.count} draft(s)
-          </span>
           <.button
             id="observability-benchmark-drafts-generate"
             type="button"
@@ -161,31 +199,6 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
             Generate drafts
           </.button>
         </.benchmark_section_header>
-
-          <div class="flex flex-wrap items-center gap-3">
-            <CommandPill.command_pill command="controlkeel obs benchmarks drafts" />
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <article
-              id="observability-benchmark-drafts-status"
-              class="rounded-2xl border bg-card p-5 shadow-card"
-            >
-              <p class="text-sm font-medium text-muted-foreground">Status</p>
-              <p class="mt-2 text-lg font-semibold text-foreground/90">
-                {format_frequency(@drafts.by_status)}
-              </p>
-            </article>
-            <article
-              id="observability-benchmark-drafts-suites"
-              class="rounded-2xl border bg-card p-5 shadow-card"
-            >
-              <p class="text-sm font-medium text-muted-foreground">Suites</p>
-              <p class="mt-2 text-lg font-semibold text-foreground/90">
-                {format_frequency(@drafts.by_suite)}
-              </p>
-            </article>
-          </div>
 
         <.benchmark_recommendations
             id="observability-benchmark-drafts-recommendations"
@@ -425,6 +438,105 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
             <% end %>
           </section>
       </section>
+
+      <section id="benchmarks-regressions" class="w-full space-y-5 scroll-mt-6">
+        <.benchmark_section_header
+          title="Regression tracking"
+          subtitle="Read-only benchmark run posture connected to saved eval candidates and benchmark drafts."
+        >
+          <span class={health_pill_class(@regressions.health.status)}>
+            {@regressions.health.status}
+          </span>
+        </.benchmark_section_header>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <CommandPill.command_pill command="controlkeel obs regressions" />
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <section
+            id="observability-regressions-runs"
+            class="rounded-2xl border bg-card p-5 shadow-card space-y-1"
+          >
+            <p class="text-sm font-medium text-muted-foreground">Benchmark runs</p>
+            <p class="text-2xl font-semibold text-foreground/90">
+              {@regressions.benchmark_runs.count}
+            </p>
+            <p class="text-xs text-muted-foreground">Window: {@regressions.days} day(s)</p>
+          </section>
+          <section
+            id="observability-regressions-catch-rate"
+            class="rounded-2xl border bg-card p-5 shadow-card space-y-1"
+          >
+            <p class="text-sm font-medium text-muted-foreground">Average catch rate</p>
+            <p class="text-2xl font-semibold text-foreground/90">
+              {format_rate(@regressions.benchmark_runs.average_catch_rate)}
+            </p>
+            <p class="text-xs text-muted-foreground">
+              {format_frequency(@regressions.benchmark_runs.by_status)}
+            </p>
+          </section>
+          <section
+            id="observability-regressions-draft-coverage"
+            class="rounded-2xl border bg-card p-5 shadow-card space-y-1"
+          >
+            <p class="text-sm font-medium text-muted-foreground">Draft coverage</p>
+            <p class="text-2xl font-semibold text-foreground/90">
+              {@regressions.draft_coverage.benchmark_drafts} draft(s)
+            </p>
+            <p class="text-xs text-muted-foreground">
+              {@regressions.draft_coverage.saved_eval_candidates} saved eval(s)
+            </p>
+          </section>
+        </div>
+
+        <.benchmark_recommendations
+          id="observability-regressions-recommendations"
+          recommendations={@regressions.recommendations}
+        />
+
+        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
+          <.section_title>Recent benchmark runs</.section_title>
+          <%= if @regressions.benchmark_runs.recent == [] do %>
+            <p class="text-sm text-muted-foreground">
+              No benchmark runs in the selected window.
+            </p>
+          <% else %>
+            <div class="divide-y divide-border">
+              <%= for run <- @regressions.benchmark_runs.recent do %>
+                <div
+                  id={"observability-regression-run-#{run.id}"}
+                  class="space-y-2 py-3 first:pt-0 last:pb-0"
+                >
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0 space-y-1">
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        {run.suite}
+                      </p>
+                      <p class="text-sm font-medium text-foreground">Run #{run.id}</p>
+                    </div>
+                    <span class={health_pill_class(run.status)}>{run.status}</span>
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    Catch rate {format_rate(run.catch_rate)} · {run.caught_count}/{run.total_scenarios} scenario(s) · {run.result_count} result(s)
+                  </p>
+                  <div class="flex items-center gap-4 text-xs">
+                    <p class="text-muted-foreground">
+                      {format_datetime(run.inserted_at, "unknown")}
+                    </p>
+                    <.link
+                      navigate={~p"/benchmarks/runs/#{run.id}"}
+                      class="text-sm font-medium text-primary transition hover:text-primary"
+                    >
+                      Open run →
+                    </.link>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
+      </section>
     </section>
     """
   end
@@ -493,11 +605,39 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
   defp format_frequency(map) when map == %{}, do: "none"
 
-  defp format_frequency(map) when is_map(map) do
+  defp format_frequency(map) do
     map
-    |> Enum.sort_by(fn {_key, count} -> count end, :desc)
-    |> Enum.take(4)
-    |> Enum.map(fn {key, count} -> "#{key}: #{count}" end)
-    |> Enum.join(", ")
+    |> Enum.sort_by(fn {key, _count} -> key end)
+    |> Enum.map_join(", ", fn {key, count} -> "#{key}: #{count}" end)
+  end
+
+  defp format_rate(nil), do: "0.0%"
+  defp format_rate(rate), do: "#{Float.round(rate * 100, 1)}%"
+
+  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
+    case Accounts.get_org_by_slug(slug) do
+      %Org{id: ^org_id} -> :ok
+      _ -> {:error, "Workspace does not belong to this organization."}
+    end
+  end
+
+  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
+
+  # Read + draft-review surface: org-bound workspace + active membership at
+  # any role, resolved from (user, resource) via the shared gate. Matches the
+  # previous global page, which sat behind member auth without an admin gate.
+  defp check_workspace_access(workspace, assigns) do
+    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
+      :ok -> :ok
+      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
+      {:error, :needs_admin} -> {:error, "Admin or owner role required."}
+    end
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> Phoenix.LiveView.put_flash(kind, msg)
+    |> Phoenix.LiveView.push_navigate(to: path)
   end
 end

@@ -163,15 +163,37 @@ defmodule ControlKeelWeb.PageController do
     Ecto.Query.CastError -> ControlKeelWeb.FallbackController.not_found(conn, params)
   end
 
+  # Global benchmark entry point (pre-workspace-scope): the benchmark page now
+  # lives at `/:org_slug/workspaces/:ws_slug/benchmark`. Resolve the visitor's
+  # workspace and redirect; without a resolvable workspace fall back to the
+  # workspace picker instead of a dead 404.
+  def observability_benchmark_resolve(conn, _params) do
+    query =
+      case conn.query_string do
+        "" -> ""
+        query -> "?#{query}"
+      end
+
+    case benchmark_workspace(conn.assigns[:current_user]) do
+      {org_slug, ws_slug} ->
+        redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{query}")
+
+      nil ->
+        redirect(conn, to: ~p"/organizations")
+    end
+  end
+
   # Legacy observability benchmark sub-routes (pre-consolidation): the drafts,
-  # scenarios, and history pages now live stacked at `/observability/benchmark`.
-  # Redirects preserve the query string and land on the matching section anchor.
+  # scenarios, and history pages now live stacked in the workspace benchmark
+  # page. Redirects preserve the query string and land on the matching section
+  # anchor.
   def observability_benchmarks_redirect(conn, _params) do
     anchor =
       cond do
         String.ends_with?(conn.request_path, "/drafts") -> "#benchmarks-drafts"
         String.ends_with?(conn.request_path, "/scenarios") -> "#benchmarks-scenarios"
         String.ends_with?(conn.request_path, "/history") -> "#benchmarks-history"
+        String.ends_with?(conn.request_path, "/regressions") -> "#benchmarks-regressions"
         true -> ""
       end
 
@@ -181,6 +203,39 @@ defmodule ControlKeelWeb.PageController do
         query -> "?#{query}"
       end
 
-    redirect(conn, to: "/observability/benchmark#{anchor}#{query}")
+    case benchmark_workspace(conn.assigns[:current_user]) do
+      {org_slug, ws_slug} ->
+        redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{anchor}#{query}")
+
+      nil ->
+        redirect(conn, to: ~p"/organizations")
+    end
+  end
+
+  # Workspace resolution for the benchmark redirects: local mode uses the
+  # seeded defaults; cloud/self_hosted uses the visitor's most recent
+  # workspace (same heuristic the benchmark page previously mounted with).
+  defp benchmark_workspace(user) do
+    if Runtime.local?() do
+      {LocalDefaults.default_org_slug(), LocalDefaults.default_workspace_slug()}
+    else
+      cloud_benchmark_workspace(user)
+    end
+  end
+
+  defp cloud_benchmark_workspace(user) do
+    case Mission.list_recent_sessions_for_user(user, 1) do
+      [%{workspace: %{slug: ws_slug} = workspace} | _] ->
+        case Repo.preload(workspace, :org) do
+          %{org: %{slug: org_slug}} -> {org_slug, ws_slug}
+          _ -> nil
+        end
+
+      [_ | _] ->
+        nil
+
+      _ ->
+        nil
+    end
   end
 end
