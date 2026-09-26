@@ -30,9 +30,11 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     assert html =~ "/observability/memory-quality"
     assert html =~ "/observability/trends"
     assert html =~ "/observability/evals"
-    assert html =~ "/observability/benchmarks/drafts"
-    assert html =~ "/observability/benchmarks/scenarios"
-    assert html =~ "/observability/benchmarks/history"
+    # Benchmark depth pages consolidated into the workspace benchmark page
+    refute html =~ "/observability/benchmarks/drafts"
+    refute html =~ "/observability/benchmarks/scenarios"
+    refute html =~ "/observability/benchmarks/history"
+    refute html =~ "/observability/regressions"
   end
 
   test "overview page scopes recent runs to the latest workspace", %{conn: conn} do

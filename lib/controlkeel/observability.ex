@@ -541,7 +541,8 @@ defmodule ControlKeel.Observability do
   end
 
   @doc """
-  Single-pass loader for the stacked `/observability/benchmark` page.
+  Single-pass loader for the workspace benchmark page
+  (`/:org_slug/workspaces/:ws_slug/benchmark`).
 
   Returns the exact maps built by `benchmark_drafts/1`,
   `observability_benchmark_scenarios/1`, `observability_benchmark_run_preview/1`,

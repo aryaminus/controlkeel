@@ -212,27 +212,39 @@ defmodule ControlKeelWeb.PageController do
     end
   end
 
-  # Workspace resolution for the benchmark redirects: local mode uses the
-  # seeded defaults; cloud/self_hosted uses the visitor's most recent
-  # workspace (same heuristic the benchmark page previously mounted with).
+  # Workspace resolution for the benchmark redirects: the visitor's most
+  # recent workspace in every mode (the same heuristic the benchmark page
+  # previously mounted with). Local mode falls back to the seeded defaults
+  # when no sessions exist yet; cloud/self_hosted falls back to nil and the
+  # callers send the visitor to the workspace picker.
   defp benchmark_workspace(user) do
-    if Runtime.local?() do
-      {LocalDefaults.default_org_slug(), LocalDefaults.default_workspace_slug()}
-    else
-      cloud_benchmark_workspace(user)
+    case recent_workspace_slugs(user) do
+      {_, _} = slugs ->
+        slugs
+
+      nil ->
+        if Runtime.local?() do
+          {LocalDefaults.default_org_slug(), LocalDefaults.default_workspace_slug()}
+        else
+          nil
+        end
     end
   end
 
-  defp cloud_benchmark_workspace(user) do
-    case Mission.list_recent_sessions_for_user(user, 1) do
+  defp recent_workspace_slugs(user) do
+    sessions =
+      if Runtime.local?() do
+        Mission.list_recent_sessions(1)
+      else
+        Mission.list_recent_sessions_for_user(user, 1)
+      end
+
+    case sessions do
       [%{workspace: %{slug: ws_slug} = workspace} | _] ->
         case Repo.preload(workspace, :org) do
           %{org: %{slug: org_slug}} -> {org_slug, ws_slug}
           _ -> nil
         end
-
-      [_ | _] ->
-        nil
 
       _ ->
         nil

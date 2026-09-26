@@ -35,10 +35,10 @@ defmodule ControlKeelWeb.LayoutsTest do
   end
 
   test "sidebar highlights the matching child on deep observability paths" do
-    html = render_component(&Layouts.sidebar/1, current_path: "/observability/benchmarks/history")
+    html = render_component(&Layouts.sidebar/1, current_path: "/observability/evals")
 
     assert html =~ "aria-expanded=\"true\""
-    assert anchor_for(html, "/observability/benchmarks/history") =~ "aria-current=\"page\""
+    assert anchor_for(html, "/observability/evals") =~ "aria-current=\"page\""
     refute anchor_for(html, "/observability") =~ "aria-current=\"page\""
   end
 

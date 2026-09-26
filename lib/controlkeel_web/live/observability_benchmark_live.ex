@@ -200,6 +200,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           </.button>
         </.benchmark_section_header>
 
+          <div class="flex flex-wrap items-center gap-3">
+            <CommandPill.command_pill command="controlkeel obs benchmarks drafts" />
+          </div>
+
         <.benchmark_recommendations
             id="observability-benchmark-drafts-recommendations"
             recommendations={@drafts.recommendations}
