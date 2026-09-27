@@ -146,28 +146,6 @@ defmodule ControlKeelWeb.Router do
       live "/sessions/start", OnboardingLive, :new
     end
 
-    # Observability section routes use the shared :dashboard framework layout;
-    # each page renders its own heading. LayoutDefaults sets shared layout
-    # assigns (@current_path, @page_action) for active-link highlighting.
-    live_session :observability,
-      layout: {ControlKeelWeb.Layouts, :dashboard},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.LayoutDefaults
-      ] do
-      live "/observability", ObservabilityOverviewLive, :index
-      live "/observability/loop", ObservabilityLoopLive, :index
-      live "/observability/compare", ObservabilityCompareLive, :index
-      live "/observability/costs", ObservabilityCostsLive, :index
-      live "/observability/evals", ObservabilityEvalsLive, :index
-      live "/observability/imports", ObservabilityImportsLive, :index
-      live "/observability/memory-quality", ObservabilityMemoryQualityLive, :index
-      live "/observability/recommendations", ObservabilityRecommendationsLive, :index
-      live "/observability/trends", ObservabilityTrendsLive, :index
-      live "/observability/problems", ObservabilityProblemsLive, :index
-      live "/observability/promotions", ObservabilityPromotionsLive, :index
-    end
-
     # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
     # shape is the most-shared URL in docs/Slack/CI, so keep it as a redirect
     # rather than a 404. Two-segment, so the single-segment ":org_slug" live
@@ -278,6 +256,21 @@ defmodule ControlKeelWeb.Router do
     get "/observability/benchmarks/scenarios", PageController, :observability_benchmarks_redirect
     get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
     get "/observability/regressions", PageController, :observability_benchmarks_redirect
+
+    # Removed observability section pages (now at
+    # `/:org_slug/workspaces/:ws_slug/observability/*`): resolve the
+    # visitor's workspace and redirect, preserving the query string.
+    get "/observability", PageController, :observability_page_redirect
+    get "/observability/loop", PageController, :observability_page_redirect
+    get "/observability/compare", PageController, :observability_page_redirect
+    get "/observability/costs", PageController, :observability_page_redirect
+    get "/observability/evals", PageController, :observability_page_redirect
+    get "/observability/imports", PageController, :observability_page_redirect
+    get "/observability/memory-quality", PageController, :observability_page_redirect
+    get "/observability/recommendations", PageController, :observability_page_redirect
+    get "/observability/trends", PageController, :observability_page_redirect
+    get "/observability/problems", PageController, :observability_page_redirect
+    get "/observability/promotions", PageController, :observability_page_redirect
 
     # Legacy export paths (dual-route for backwards compat): keep functional
     # so existing `controlkeel obs export` downloads and old bookmarks still
