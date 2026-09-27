@@ -72,6 +72,15 @@ defmodule ControlKeelWeb.Router do
     delete "/mcp", ProtocolController, :mcp_delete
   end
 
+  # Single-segment legacy redirect: must precede the browser scope because the
+  # ":org_slug" live route below matches any one-segment path and would
+  # otherwise swallow it (same rule as the protocol GETs above).
+  scope "/", ControlKeelWeb do
+    pipe_through [:browser, :require_session_auth]
+
+    get "/observability", PageController, :observability_page_redirect
+  end
+
   scope "/", ControlKeelWeb do
     pipe_through :browser
 
@@ -257,11 +266,11 @@ defmodule ControlKeelWeb.Router do
     get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
     get "/observability/regressions", PageController, :observability_benchmarks_redirect
 
-    # Removed observability section pages (overview at
+    # Removed observability section subpages (overview at
     # `/:org_slug/workspaces/:ws_slug/observability`, subpages directly under
     # the workspace): resolve the visitor's workspace and redirect, preserving
-    # the query string.
-    get "/observability", PageController, :observability_page_redirect
+    # the query string. The bare `/observability` path lives in an earlier
+    # scope (single-segment paths would otherwise match `/:org_slug`).
     get "/observability/loop", PageController, :observability_page_redirect
     get "/observability/compare", PageController, :observability_page_redirect
     get "/observability/costs", PageController, :observability_page_redirect
