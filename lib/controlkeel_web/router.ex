@@ -196,20 +196,20 @@ defmodule ControlKeelWeb.Router do
       # modules untouched — mounts still use the recent-session heuristic
       # until the mount migration slice lands).
       live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/loop", ObservabilityLoopLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/compare", ObservabilityCompareLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/costs", ObservabilityCostsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/evals", ObservabilityEvalsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/imports", ObservabilityImportsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/memory-quality",
+      live "/:org_slug/workspaces/:ws_slug/loop", ObservabilityLoopLive, :index
+      live "/:org_slug/workspaces/:ws_slug/compare", ObservabilityCompareLive, :index
+      live "/:org_slug/workspaces/:ws_slug/costs", ObservabilityCostsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/evals", ObservabilityEvalsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/imports", ObservabilityImportsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/memory-quality",
            ObservabilityMemoryQualityLive,
            :index
-      live "/:org_slug/workspaces/:ws_slug/observability/recommendations",
+      live "/:org_slug/workspaces/:ws_slug/recommendations",
            ObservabilityRecommendationsLive,
            :index
-      live "/:org_slug/workspaces/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/problems", ObservabilityProblemsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/promotions", ObservabilityPromotionsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/trends", ObservabilityTrendsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/problems", ObservabilityProblemsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/promotions", ObservabilityPromotionsLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
@@ -257,9 +257,10 @@ defmodule ControlKeelWeb.Router do
     get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
     get "/observability/regressions", PageController, :observability_benchmarks_redirect
 
-    # Removed observability section pages (now at
-    # `/:org_slug/workspaces/:ws_slug/observability/*`): resolve the
-    # visitor's workspace and redirect, preserving the query string.
+    # Removed observability section pages (overview at
+    # `/:org_slug/workspaces/:ws_slug/observability`, subpages directly under
+    # the workspace): resolve the visitor's workspace and redirect, preserving
+    # the query string.
     get "/observability", PageController, :observability_page_redirect
     get "/observability/loop", PageController, :observability_page_redirect
     get "/observability/compare", PageController, :observability_page_redirect

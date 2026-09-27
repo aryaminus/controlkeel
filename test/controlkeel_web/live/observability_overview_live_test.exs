@@ -24,13 +24,13 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     assert html =~ "Observability"
     assert has_element?(view, "#observability-overview-page")
     assert has_element?(view, "#observability-overview-run-list")
-    assert html =~ "/observability/problems"
-    assert html =~ "/observability/promotions"
-    assert html =~ "/observability/compare"
-    assert html =~ "/observability/imports"
-    assert html =~ "/observability/memory-quality"
-    assert html =~ "/observability/trends"
-    assert html =~ "/observability/evals"
+    assert html =~ "/#{ws.slug}/problems"
+    assert html =~ "/#{ws.slug}/promotions"
+    assert html =~ "/#{ws.slug}/compare"
+    assert html =~ "/#{ws.slug}/imports"
+    assert html =~ "/#{ws.slug}/memory-quality"
+    assert html =~ "/#{ws.slug}/trends"
+    assert html =~ "/#{ws.slug}/evals"
     # Benchmark depth pages consolidated into the workspace benchmark page
     refute html =~ "/observability/benchmarks/drafts"
     refute html =~ "/observability/benchmarks/scenarios"

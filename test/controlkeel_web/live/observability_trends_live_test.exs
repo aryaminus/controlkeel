@@ -16,7 +16,7 @@ defmodule ControlKeelWeb.ObservabilityTrendsLiveTest do
       rule_id: "security.trends"
     })
 
-    {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/trends")
+    {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/trends")
 
     assert html =~ "Trends"
     assert html =~ "controlkeel obs trends"
@@ -30,6 +30,6 @@ defmodule ControlKeelWeb.ObservabilityTrendsLiveTest do
     |> form("#trends-days", %{days: "30"})
     |> render_change()
 
-    assert_patch(view, "/#{org.slug}/workspaces/#{ws.slug}/observability/trends?days=30")
+    assert_patch(view, "/#{org.slug}/workspaces/#{ws.slug}/trends?days=30")
   end
 end

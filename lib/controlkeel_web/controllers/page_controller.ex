@@ -203,23 +203,24 @@ defmodule ControlKeelWeb.PageController do
     end
   end
 
-  # Removed observability section pages (pre-workspace-scope): each now lives
-  # at `/:org_slug/workspaces/:ws_slug/observability/<page>`. Resolve the
-  # visitor's workspace and redirect, preserving the query string; without a
-  # resolvable workspace fall back to the workspace picker.
+  # Removed observability section pages (pre-workspace-scope): the overview
+  # now lives at `/:org_slug/workspaces/:ws_slug/observability` and each
+  # subpage directly under the workspace (`/:org_slug/workspaces/:ws_slug/<page>`).
+  # Resolve the visitor's workspace and redirect, preserving the query string;
+  # without a resolvable workspace fall back to the workspace picker.
   def observability_page_redirect(conn, _params) do
     suffix =
       case conn.request_path do
-        "/observability" -> ""
+        "/observability" -> "/observability"
         "/observability/" <> rest -> "/#{rest}"
-        _ -> ""
+        _ -> "/observability"
       end
 
     case benchmark_workspace(conn.assigns[:current_user]) do
       {org_slug, ws_slug} ->
         redirect(
           conn,
-          to: "/#{org_slug}/workspaces/#{ws_slug}/observability#{suffix}#{query_suffix(conn)}"
+          to: "/#{org_slug}/workspaces/#{ws_slug}#{suffix}#{query_suffix(conn)}"
         )
 
       nil ->

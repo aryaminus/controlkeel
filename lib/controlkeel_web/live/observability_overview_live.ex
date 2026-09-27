@@ -114,7 +114,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
             {@overview.problems.total_findings} active finding(s)
           </p>
           <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/observability/problems"}
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/problems"}
             class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
           >
             Review groups <.icon name="hero-arrow-up-right" class="size-3" />
@@ -137,7 +137,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
             )} estimated
           </p>
           <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/observability/costs"}
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/costs"}
             class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
           >
             Review costs <.icon name="hero-arrow-up-right" class="size-3" />
@@ -159,7 +159,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
             {@overview.telemetry.persisted_imports} persisted import(s)
           </p>
           <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/observability/imports"}
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/imports"}
             class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
           >
             Review imports <.icon name="hero-arrow-up-right" class="size-3" />
@@ -179,7 +179,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           </ul>
         <% end %>
         <.link
-          navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/observability/recommendations"}
+          navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/recommendations"}
           class="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
         >
           Open recommendations <.icon name="hero-arrow-up-right" class="size-3" />

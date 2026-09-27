@@ -81,7 +81,7 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
     {:noreply,
      push_patch(socket,
        to:
-         ~p"/#{socket.assigns.org_slug}/workspaces/#{socket.assigns.ws_slug}/observability/trends?#{[
+         ~p"/#{socket.assigns.org_slug}/workspaces/#{socket.assigns.ws_slug}/trends?#{[
            days: parse_days(days)
          ]}"
      )}

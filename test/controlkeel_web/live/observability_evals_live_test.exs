@@ -16,7 +16,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLiveTest do
       rule_id: "security.evals"
     })
 
-    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/evals")
+    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/evals")
 
     view
     |> element("#observability-evals-save")
@@ -37,7 +37,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLiveTest do
       rule_id: "security.evals"
     })
 
-    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/evals")
+    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/evals")
 
     view
     |> element("#observability-evals-save")

@@ -334,7 +334,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
           <div class="flex items-center justify-between gap-4">
             <.section_title>Recent notes</.section_title>
             <.link
-              navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/observability/memory-quality"}
+              navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/memory-quality"}
               class="text-sm font-medium text-primary transition hover:underline"
             >
               Memory quality →

@@ -657,61 +657,61 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       },
       %{
         label: "Learning loop",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/loop",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/loop",
         scope: :workspace,
         icon: "hero-arrow-path"
       },
       %{
         label: "Memory quality",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/memory-quality",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/memory-quality",
         scope: :workspace,
         icon: "hero-cpu-chip"
       },
       %{
         label: "Trends",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/trends",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/trends",
         scope: :workspace,
         icon: "hero-arrow-trending-up"
       },
       %{
         label: "Problems",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/problems",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/problems",
         scope: :workspace,
         icon: "hero-exclamation-triangle"
       },
       %{
         label: "Recommendations",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/recommendations",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/recommendations",
         scope: :workspace,
         icon: "hero-light-bulb"
       },
       %{
         label: "Evals",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/evals",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/evals",
         scope: :workspace,
         icon: "hero-chart-pie"
       },
       %{
         label: "Costs",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/costs",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/costs",
         scope: :workspace,
         icon: "hero-currency-dollar"
       },
       %{
         label: "Imports",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/imports",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/imports",
         scope: :workspace,
         icon: "hero-arrow-down-tray"
       },
       %{
         label: "Compare",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/compare",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/compare",
         scope: :workspace,
         icon: "hero-scale"
       },
       %{
         label: "Promotions",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/promotions",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/promotions",
         scope: :workspace,
         icon: "hero-trophy"
       }
