@@ -1,25 +1,78 @@
 defmodule ControlKeelWeb.ObservabilityEvalsLive do
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.Accounts
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
+  alias ControlKeel.Repo
   alias ControlKeelWeb.CommandPill
+  alias ControlKeelWeb.WorkspaceAccess
 
   on_mount ControlKeelWeb.CommandPill
 
   @impl true
-  def mount(_params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
-    opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
-    eval_candidates = Observability.eval_candidates(opts)
-    saved = Observability.saved_eval_candidates(opts)
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
+         :ok <- check_org_slug(workspace, %{slug: slug}),
+         :ok <- check_workspace_access(workspace, socket.assigns) do
+      opts = [workspace_id: workspace.id]
+      eval_candidates = Observability.eval_candidates(opts)
+      saved = Observability.saved_eval_candidates(opts)
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Observability Eval Candidates")
-     |> assign(:opts, opts)
-     |> assign(:eval_candidates, eval_candidates)
-     |> assign(:saved, saved)}
+      {:ok,
+       socket
+       |> assign(:page_title, "Observability Eval Candidates")
+       |> assign(:workspace, workspace)
+       |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
+       |> assign(
+         :breadcrumbs,
+         [
+           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+           %{
+             label: workspace.name,
+             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+           },
+           %{label: "Evals", to: nil}
+         ]
+       )
+       |> assign(:opts, opts)
+       |> assign(:eval_candidates, eval_candidates)
+       |> assign(:saved, saved)}
+    else
+      nil ->
+        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+
+      {:error, reason} ->
+        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+    end
+  end
+
+  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
+    case Accounts.get_org_by_slug(slug) do
+      %Org{id: ^org_id} -> :ok
+      _ -> {:error, "Workspace does not belong to this organization."}
+    end
+  end
+
+  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
+
+  defp check_workspace_access(workspace, assigns) do
+    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
+      :ok -> :ok
+      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
+      {:error, :needs_admin} -> {:error, "Viewer role or higher required."}
+    end
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> Phoenix.LiveView.put_flash(kind, msg)
+    |> Phoenix.LiveView.push_navigate(to: path)
   end
 
   @impl true
