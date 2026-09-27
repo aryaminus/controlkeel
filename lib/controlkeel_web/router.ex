@@ -214,6 +214,24 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
       live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
       live "/:org_slug/workspaces/:ws_slug/benchmark", ObservabilityBenchmarkLive, :index
+      # Workspace-scoped observability pages (slice 1: routes only, existing
+      # modules untouched — mounts still use the recent-session heuristic
+      # until the mount migration slice lands).
+      live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/loop", ObservabilityLoopLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/compare", ObservabilityCompareLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/costs", ObservabilityCostsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/evals", ObservabilityEvalsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/imports", ObservabilityImportsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/memory-quality",
+           ObservabilityMemoryQualityLive,
+           :index
+      live "/:org_slug/workspaces/:ws_slug/observability/recommendations",
+           ObservabilityRecommendationsLive,
+           :index
+      live "/:org_slug/workspaces/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/problems", ObservabilityProblemsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/promotions", ObservabilityPromotionsLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
