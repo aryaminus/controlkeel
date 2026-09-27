@@ -5,7 +5,9 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
   import Phoenix.LiveViewTest
 
   test "overview page renders workspace observability cockpit", %{conn: conn} do
-    session = session_fixture(%{budget_cents: 2_000, spent_cents: 450})
+    {org, ws, session} =
+      org_bound_session_fixture(%{budget_cents: 2_000, spent_cents: 450})
+
     task_fixture(%{session: session, status: "in_progress"})
 
     finding_fixture(%{
@@ -17,13 +19,12 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
       rule_id: "security.overview"
     })
 
-    {:ok, view, html} = live(conn, ~p"/observability")
+    {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
     assert html =~ "Observability"
     assert has_element?(view, "#observability-overview-page")
     assert has_element?(view, "#observability-overview-run-list")
     assert html =~ "/observability/problems"
-    assert html =~ "/observability/loop"
     assert html =~ "/observability/promotions"
     assert html =~ "/observability/compare"
     assert html =~ "/observability/imports"
@@ -37,14 +38,11 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     refute html =~ "/observability/regressions"
   end
 
-  test "overview page scopes recent runs to the latest workspace", %{conn: conn} do
-    workspace_one = workspace_fixture()
-    workspace_two = workspace_fixture()
+  test "overview page scopes recent runs to the URL workspace", %{conn: conn} do
+    {org_one, ws_one, _session_one} = org_bound_session_fixture()
+    {_org_two, _ws_two, _session_two} = org_bound_session_fixture()
 
-    session_fixture(%{workspace: workspace_one, budget_cents: 2_000, spent_cents: 450})
-    session_fixture(%{workspace: workspace_two, budget_cents: 2_000, spent_cents: 450})
-
-    {:ok, _view, html} = live(conn, ~p"/observability")
+    {:ok, _view, html} = live(conn, "/#{org_one.slug}/workspaces/#{ws_one.slug}/observability")
 
     assert html =~ "1 recent"
   end

@@ -9,7 +9,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
   alias ControlKeel.Repo
 
   test "loop page renders read-only learning loop status", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
     finding_fixture(%{
       session: session,
@@ -20,7 +20,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
       rule_id: "security.loop_page"
     })
 
-    {:ok, _view, html} = live(conn, ~p"/observability/loop")
+    {:ok, _view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/loop")
 
     assert html =~ "Learning loop"
     assert html =~ "Safety boundary"
@@ -30,7 +30,8 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
   end
 
   test "loop page renders loop diagnostics section with no detected runs", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/observability/loop")
+    {org, ws, _session} = org_bound_session_fixture()
+    {:ok, _view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/loop")
 
     assert html =~ "Loop diagnostics"
     assert html =~ "Repeated tool events"
@@ -40,9 +41,9 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
   end
 
   test "capture performance snapshot persists a memory record and renders results", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, view, html} = live(conn, ~p"/observability/loop")
+    {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/loop")
 
     assert html =~ "No performance snapshot captured yet."
 

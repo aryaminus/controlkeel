@@ -5,7 +5,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLiveTest do
   import Phoenix.LiveViewTest
 
   test "save button flashes a summary after saving candidates", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
     finding_fixture(%{
       session: session,
@@ -16,7 +16,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLiveTest do
       rule_id: "security.evals"
     })
 
-    {:ok, view, _html} = live(conn, ~p"/observability/evals")
+    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/evals")
 
     view
     |> element("#observability-evals-save")
@@ -26,7 +26,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLiveTest do
   end
 
   test "repeat save flashes a nothing-new message", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
     finding_fixture(%{
       session: session,
@@ -37,7 +37,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLiveTest do
       rule_id: "security.evals"
     })
 
-    {:ok, view, _html} = live(conn, ~p"/observability/evals")
+    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/evals")
 
     view
     |> element("#observability-evals-save")

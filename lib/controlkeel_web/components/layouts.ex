@@ -141,39 +141,7 @@ defmodule ControlKeelWeb.Layouts do
       %{label: "Proofs", href: ~p"/proofs", icon: "hero-shield-check"},
       %{label: "Policy Studio", href: ~p"/policies", icon: "hero-adjustments-horizontal"},
       %{label: "Benchmarks", href: ~p"/benchmarks", icon: "hero-chart-bar-square"},
-      %{label: "Findings", href: ~p"/findings", icon: "hero-exclamation-triangle"},
-      %{
-        label: "Observability",
-        href: ~p"/observability",
-        icon: "hero-signal",
-        children: [
-          %{group: "Workspace signals"},
-          %{label: "Overview", href: ~p"/observability", icon: "hero-signal"},
-          %{label: "Learning loop", href: ~p"/observability/loop", icon: "hero-arrow-path"},
-          %{
-            label: "Memory quality",
-            href: ~p"/observability/memory-quality",
-            icon: "hero-cpu-chip"
-          },
-          %{label: "Trends", href: ~p"/observability/trends", icon: "hero-arrow-trending-up"},
-          %{
-            label: "Problems",
-            href: ~p"/observability/problems",
-            icon: "hero-exclamation-triangle"
-          },
-          %{
-            label: "Recommendations",
-            href: ~p"/observability/recommendations",
-            icon: "hero-light-bulb"
-          },
-          %{label: "Evals", href: ~p"/observability/evals", icon: "hero-chart-pie"},
-          %{group: "Delivery & data"},
-          %{label: "Costs", href: ~p"/observability/costs", icon: "hero-currency-dollar"},
-          %{label: "Imports", href: ~p"/observability/imports", icon: "hero-arrow-down-tray"},
-          %{label: "Compare", href: ~p"/observability/compare", icon: "hero-scale"},
-          %{label: "Promotions", href: ~p"/observability/promotions", icon: "hero-trophy"}
-        ]
-      }
+      %{label: "Findings", href: ~p"/findings", icon: "hero-exclamation-triangle"}
     ]
   end
 

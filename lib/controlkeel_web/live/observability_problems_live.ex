@@ -225,7 +225,7 @@ defmodule ControlKeelWeb.ObservabilityProblemsLive do
                             </p>
                           </div>
                           <.link
-                            navigate={~p"/observability/sessions/#{example.session_id}"}
+                            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/sessions/#{example.session_id}/observability"}
                             class="shrink-0 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
                           >
                             Open run <.icon name="hero-arrow-up-right" class="size-3" />

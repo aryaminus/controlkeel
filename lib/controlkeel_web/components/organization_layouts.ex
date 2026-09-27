@@ -134,7 +134,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         </div>
       </div>
 
-      <nav id="sidebar-org-nav" class="mt-4 flex flex-1 flex-col gap-1 px-3 text-sm">
+      <nav id="sidebar-org-nav" class="mt-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 text-sm">
         <%= for item <- @nav_items do %>
           <% active = sidebar_item_active?(@current_path, @current_query, item) %>
           <.link
