@@ -72,18 +72,18 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
   end
 
   @impl true
-  def handle_params(params, _url, socket) do
+  def handle_params(params, _url, %{assigns: %{opts: _}} = socket) do
     {:noreply, load_trends(socket, parse_days(params["days"]))}
   end
+
+  def handle_params(_params, _url, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("select_days", %{"days" => days}, socket) do
     {:noreply,
      push_patch(socket,
        to:
-         ~p"/#{socket.assigns.org_slug}/workspaces/#{socket.assigns.ws_slug}/trends?#{[
-           days: parse_days(days)
-         ]}"
+         ~p"/#{socket.assigns.org_slug}/workspaces/#{socket.assigns.ws_slug}/trends?#{[days: parse_days(days)]}"
      )}
   end
 

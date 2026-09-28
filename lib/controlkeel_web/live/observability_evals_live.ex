@@ -77,15 +77,20 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
 
   @impl true
   def handle_event("save-candidates", _params, socket) do
-    opts = socket.assigns.opts
-    result = Observability.save_eval_candidates(opts)
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      opts = socket.assigns.opts
+      result = Observability.save_eval_candidates(opts)
 
-    socket =
-      socket
-      |> assign(:eval_candidates, Observability.eval_candidates(opts))
-      |> assign(:saved, Observability.saved_eval_candidates(opts))
+      socket =
+        socket
+        |> assign(:eval_candidates, Observability.eval_candidates(opts))
+        |> assign(:saved, Observability.saved_eval_candidates(opts))
 
-    {:noreply, put_flash(socket, :info, save_summary_message(result))}
+      {:noreply, put_flash(socket, :info, save_summary_message(result))}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Admin or owner role required.")}
+    end
   end
 
   @impl true

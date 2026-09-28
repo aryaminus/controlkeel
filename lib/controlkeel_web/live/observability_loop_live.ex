@@ -80,17 +80,22 @@ defmodule ControlKeelWeb.ObservabilityLoopLive do
 
   @impl true
   def handle_event("capture-perf-snapshot", _params, socket) do
-    opts =
-      socket.assigns.opts
-      |> maybe_put_session(socket.assigns.session_id)
-      |> Keyword.put(:persist, true)
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      opts =
+        socket.assigns.opts
+        |> maybe_put_session(socket.assigns.session_id)
+        |> Keyword.put(:persist, true)
 
-    snapshot = Observability.perf_snapshot(opts)
+      snapshot = Observability.perf_snapshot(opts)
 
-    {:noreply,
-     socket
-     |> assign(:snapshot, snapshot)
-     |> put_flash(:info, perf_flash_message(snapshot))}
+      {:noreply,
+       socket
+       |> assign(:snapshot, snapshot)
+       |> put_flash(:info, perf_flash_message(snapshot))}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Admin or owner role required.")}
+    end
   end
 
   @impl true
