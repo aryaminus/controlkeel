@@ -32,4 +32,12 @@ defmodule ControlKeelWeb.ObservabilityTrendsLiveTest do
 
     assert_patch(view, "/#{org.slug}/workspaces/#{ws.slug}/trends?days=30")
   end
+
+  test "unknown workspace slug redirects instead of crashing", %{conn: conn} do
+    {org, _ws, _session} = org_bound_session_fixture()
+
+    assert {:error,
+            {:live_redirect, %{to: "/organizations", flash: %{"error" => "Workspace not found."}}}} =
+             live(conn, "/#{org.slug}/workspaces/no-such-ws/trends")
+  end
 end

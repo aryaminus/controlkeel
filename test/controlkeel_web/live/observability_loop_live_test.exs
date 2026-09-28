@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
   import Ecto.Query
   import Phoenix.LiveViewTest
 
+  alias ControlKeel.Accounts
   alias ControlKeel.Memory.Record
   alias ControlKeel.Repo
 
@@ -68,5 +69,101 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
     assert persisted.title == "Performance Snapshot"
     assert persisted.workspace_id == session.workspace_id
     assert persisted.metadata["total_wall_ms"] >= 0
+  end
+
+  test "unknown workspace slug redirects instead of crashing", %{conn: conn} do
+    {org, _ws, _session} = org_bound_session_fixture()
+
+    assert {:error,
+            {:live_redirect, %{to: "/organizations", flash: %{"error" => "Workspace not found."}}}} =
+             live(conn, "/#{org.slug}/workspaces/no-such-ws/loop")
+  end
+
+  describe "cloud mode role gates" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      :ok
+    end
+
+    defp cloud_loop_setup(suffix) do
+      {:ok, org} = Accounts.create_org(%{name: "LoopCo #{suffix}", slug: "loopco-#{suffix}"})
+
+      {:ok, admin} = Accounts.create_user(%{email: "loop-admin-#{suffix}@example.com"})
+
+      %Accounts.Membership{}
+      |> Accounts.Membership.changeset(%{
+        user_id: admin.id,
+        org_id: org.id,
+        role: "admin",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      {:ok, viewer} = Accounts.create_user(%{email: "loop-viewer-#{suffix}@example.com"})
+
+      %Accounts.Membership{}
+      |> Accounts.Membership.changeset(%{
+        user_id: viewer.id,
+        org_id: org.id,
+        role: "viewer",
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      ws = workspace_fixture(%{org_id: org.id})
+      session = session_fixture(%{workspace: ws})
+
+      %{org: org, workspace: ws, session: session, admin: admin, viewer: viewer}
+    end
+
+    defp session_conn(conn, user, org) do
+      Plug.Test.init_test_session(conn, %{
+        "current_user_id" => user.id,
+        "current_org_id" => org.id
+      })
+    end
+
+    defp persisted_snapshot?(workspace_id) do
+      from(r in Record,
+        where: r.workspace_id == ^workspace_id and r.source_type == "observability",
+        limit: 1
+      )
+      |> Repo.one()
+    end
+
+    test "viewers keep read access to the loop page", %{conn: conn} do
+      %{org: org, workspace: ws, viewer: viewer} =
+        cloud_loop_setup(System.unique_integer([:positive]))
+
+      {:ok, _view, html} =
+        live(session_conn(conn, viewer, org), "/#{org.slug}/workspaces/#{ws.slug}/loop")
+
+      assert html =~ "Learning loop"
+    end
+
+    test "viewers cannot capture performance snapshots", %{conn: conn} do
+      %{org: org, workspace: ws, viewer: viewer} =
+        cloud_loop_setup(System.unique_integer([:positive]))
+
+      {:ok, view, _html} =
+        live(session_conn(conn, viewer, org), "/#{org.slug}/workspaces/#{ws.slug}/loop")
+
+      view
+      |> element("#observability-perf-capture")
+      |> render_click()
+
+      assert render(view) =~ "Admin or owner role required."
+      refute persisted_snapshot?(ws.id)
+    end
   end
 end
