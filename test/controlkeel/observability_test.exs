@@ -966,7 +966,6 @@ defmodule ControlKeel.ObservabilityTest do
 
   test "regressions/1 summarizes benchmark runs and draft coverage" do
     session = session_fixture()
-    _run = benchmark_run_fixture()
 
     finding_fixture(%{
       session: session,
@@ -979,8 +978,27 @@ defmodule ControlKeel.ObservabilityTest do
 
     assert %{stored: 1} = Observability.save_eval_candidates(workspace_id: session.workspace_id)
 
-    assert %{stored: 1} =
+    assert %{stored: 1, drafts: [%{id: draft_id}]} =
              Observability.generate_benchmark_drafts(workspace_id: session.workspace_id)
+
+    assert {:ok, _result} =
+             Observability.update_benchmark_draft_status(draft_id, "approved",
+               reviewed_by: "test"
+             )
+
+    assert %{materialized: 1} =
+             Observability.materialize_benchmark_drafts(workspace_id: session.workspace_id)
+
+    assert {:ok, %{benchmark_execution: true}} =
+             Observability.run_observability_benchmark(
+               [
+                 workspace_id: session.workspace_id,
+                 subjects: "controlkeel_validate",
+                 dry_run: false,
+                 execute: true
+               ],
+               File.cwd!()
+             )
 
     regressions = Observability.regressions(workspace_id: session.workspace_id)
 
@@ -991,6 +1009,36 @@ defmodule ControlKeel.ObservabilityTest do
     assert regressions.draft_coverage.benchmark_drafts == 1
     assert regressions.health.status in ["green", "yellow", "red"]
     assert regressions.recommendations != []
+  end
+
+  test "regressions/1 scopes benchmark runs to the current workspace" do
+    session = session_fixture()
+    _unrelated_run = benchmark_run_fixture()
+
+    finding_fixture(%{
+      session: session,
+      title: "Scoped regression candidate",
+      severity: "high",
+      status: "open",
+      category: "security",
+      rule_id: "security.scoped_regression_candidate"
+    })
+
+    assert %{stored: 1} = Observability.save_eval_candidates(workspace_id: session.workspace_id)
+
+    assert %{stored: 1} =
+             Observability.generate_benchmark_drafts(workspace_id: session.workspace_id)
+
+    # No materialized scenarios in this workspace, so the unrelated seed-suite
+    # run must not leak into the workspace-scoped regression section.
+    regressions = Observability.regressions(workspace_id: session.workspace_id)
+
+    assert regressions.benchmark_runs.count == 0
+    assert regressions.health.status == "yellow"
+
+    # The unscoped contract still reports the global run.
+    unscoped = Observability.regressions(days: 30)
+    assert unscoped.benchmark_runs.count >= 1
   end
 
   test "update_benchmark_draft_status/3 changes only local draft review state" do

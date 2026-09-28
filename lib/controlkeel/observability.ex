@@ -649,7 +649,13 @@ defmodule ControlKeel.Observability do
     }
 
     regression_days = Keyword.get(opts, :days) || 30
-    regression_runs = benchmark_run_records(regression_days, history_limit)
+
+    regression_runs =
+      if workspace_id do
+        observability_benchmark_run_records(all_scenarios, history_limit, regression_days)
+      else
+        benchmark_run_records(regression_days, history_limit)
+      end
 
     regressions = build_regressions(regression_runs, drafts, saved, regression_days)
 
@@ -703,7 +709,7 @@ defmodule ControlKeel.Observability do
     days = Keyword.get(opts, :days) || 30
     limit = Keyword.get(opts, :limit) || 12
     workspace_id = Keyword.get(opts, :workspace_id)
-    runs = benchmark_run_records(days, limit)
+    runs = regression_run_records(workspace_id, days, limit)
     drafts = benchmark_drafts(workspace_id: workspace_id)
     saved = saved_eval_candidates(workspace_id: workspace_id)
 
@@ -1967,7 +1973,7 @@ defmodule ControlKeel.Observability do
   defp parse_id(_id), do: {:error, :invalid_id}
 
   defp benchmark_run_records(days, limit) do
-    since = DateTime.add(DateTime.utc_now(), -max(days, 1) * 86_400, :second)
+    since = regression_since(days)
 
     BenchmarkRun
     |> where([run], run.inserted_at >= ^since)
@@ -1975,6 +1981,23 @@ defmodule ControlKeel.Observability do
     |> limit(^limit)
     |> preload([:suite, results: []])
     |> Repo.all()
+  end
+
+  defp regression_since(days) do
+    DateTime.add(DateTime.utc_now(), -max(days, 1) * 86_400, :second)
+  end
+
+  # Workspace-scoped regression runs. Benchmark runs carry only a suite
+  # association, so workspace ownership is derived from the workspace's
+  # materialized observability scenarios (via their draft linkage). A nil
+  # workspace preserves the unscoped contract used by global callers.
+  defp regression_run_records(nil, days, limit), do: benchmark_run_records(days, limit)
+
+  defp regression_run_records(workspace_id, days, limit) do
+    scenarios =
+      observability_scenario_records([workspace_id: workspace_id, limit: 500], 500)
+
+    observability_benchmark_run_records(scenarios, limit, days)
   end
 
   defp benchmark_run_summary(%BenchmarkRun{} = run) do
@@ -2298,14 +2321,18 @@ defmodule ControlKeel.Observability do
     ]
   end
 
-  defp observability_benchmark_run_records([], _limit), do: []
+  defp observability_benchmark_run_records(scenarios, limit),
+    do: observability_benchmark_run_records(scenarios, limit, nil)
 
-  defp observability_benchmark_run_records(scenarios, limit) do
+  defp observability_benchmark_run_records([], _limit, _days), do: []
+
+  defp observability_benchmark_run_records(scenarios, limit, days) do
     suite_ids = scenarios |> Enum.map(& &1.suite_id) |> Enum.uniq()
     scenario_ids = scenarios |> Enum.map(& &1.id) |> MapSet.new()
 
     BenchmarkRun
     |> where([run], run.suite_id in ^suite_ids)
+    |> maybe_filter_run_since(days)
     |> order_by([run], desc: run.inserted_at, desc: run.id)
     |> limit(^limit)
     |> preload([:suite, results: [:scenario]])
@@ -2315,6 +2342,13 @@ defmodule ControlKeel.Observability do
       %{run | results: results}
     end)
     |> Enum.reject(&(&1.results == []))
+  end
+
+  defp maybe_filter_run_since(query, nil), do: query
+
+  defp maybe_filter_run_since(query, days) do
+    since = regression_since(days)
+    where(query, [run], run.inserted_at >= ^since)
   end
 
   defp observability_benchmark_history_run_summary(%BenchmarkRun{} = run) do
