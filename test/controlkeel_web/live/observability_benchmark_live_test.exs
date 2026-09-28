@@ -146,6 +146,9 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
       conn = get(conn, path)
       assert redirected_to(conn, 302) == "#{base}#{anchor}"
     end
+
+    conn = get(conn, "/observability/benchmarks/drafts?suite=x")
+    assert redirected_to(conn, 302) == "#{base}?suite=x#benchmarks-drafts"
   end
 
   describe "benchmark access and resolvers (cloud mode)" do

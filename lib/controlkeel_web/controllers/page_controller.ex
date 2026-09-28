@@ -195,7 +195,7 @@ defmodule ControlKeelWeb.PageController do
       {org_slug, ws_slug} ->
         redirect(
           conn,
-          to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{anchor}#{query_suffix(conn)}"
+          to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#{query_suffix(conn)}#{anchor}"
         )
 
       nil ->
