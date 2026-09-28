@@ -1481,13 +1481,22 @@ defmodule ControlKeel.Observability do
         true -> "green"
       end
 
+    # Bolt: Single-pass Enum.reduce/3 to accumulate multiple health counts simultaneously, avoiding intermediate list traversals.
+    {red, yellow, green} =
+      Enum.reduce(runs, {0, 0, 0}, fn
+        %{health: "red"}, {r, y, g} -> {r + 1, y, g}
+        %{health: "yellow"}, {r, y, g} -> {r, y + 1, g}
+        %{health: "green"}, {r, y, g} -> {r, y, g + 1}
+        _, acc -> acc
+      end)
+
     %{
       status: status,
       label: health_label(status),
       run_count: length(runs),
-      red_runs: Enum.count(runs, &(&1.health == "red")),
-      yellow_runs: Enum.count(runs, &(&1.health == "yellow")),
-      green_runs: Enum.count(runs, &(&1.health == "green"))
+      red_runs: red,
+      yellow_runs: yellow,
+      green_runs: green
     }
   end
 
