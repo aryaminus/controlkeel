@@ -89,10 +89,20 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
 
       snapshot = Observability.perf_snapshot(opts)
 
-      {:noreply,
-       socket
-       |> assign(:snapshot, snapshot)
-       |> put_flash(:info, perf_flash_message(snapshot))}
+      if snapshot.persist_requested and not snapshot.persisted do
+        {:noreply,
+         socket
+         |> assign(:snapshot, snapshot)
+         |> put_flash(
+           :error,
+           "Performance snapshot captured but failed to persist. Snapshot is shown but was not saved."
+         )}
+      else
+        {:noreply,
+         socket
+         |> assign(:snapshot, snapshot)
+         |> put_flash(:info, perf_flash_message(snapshot))}
+      end
     else
       _ -> {:noreply, put_flash(socket, :error, "Admin or owner role required.")}
     end

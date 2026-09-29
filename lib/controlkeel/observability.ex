@@ -841,11 +841,20 @@ defmodule ControlKeel.Observability do
       summary: perf_summary(items)
     }
 
-    if persist do
-      persist_perf_snapshot(snapshot, opts)
-    end
+    {persisted, persist_error} =
+      if persist do
+        case persist_perf_snapshot(snapshot, opts) do
+          :ok -> {true, nil}
+          {:error, reason} -> {false, inspect(reason)}
+        end
+      else
+        {false, nil}
+      end
 
     snapshot
+    |> Map.put(:persisted, persisted)
+    |> Map.put(:persist_error, persist_error)
+    |> Map.put(:persist_requested, persist)
   end
 
   def eval_candidates(opts \\ []) do
