@@ -647,12 +647,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-shield-check"
       },
       %{
-        label: "Benchmark",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/benchmark",
-        scope: :workspace,
-        icon: "hero-beaker"
-      },
-      %{
         label: "Observability",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability",
         scope: :workspace,
@@ -693,6 +687,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/evals",
         scope: :workspace,
         icon: "hero-chart-pie"
+      },
+      %{
+        label: "Benchmark",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/benchmark",
+        scope: :workspace,
+        icon: "hero-beaker"
       },
       %{
         label: "Costs",
