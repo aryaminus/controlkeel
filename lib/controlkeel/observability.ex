@@ -732,12 +732,22 @@ defmodule ControlKeel.Observability do
   end
 
   def loop_status(opts \\ []) do
-    overview_opts = opts |> Keyword.delete(:overview) |> Keyword.delete(:recommendations_report)
+    overview_opts =
+      opts
+      |> Keyword.delete(:overview)
+      |> Keyword.delete(:problems_report)
+      |> Keyword.delete(:evals_report)
+      |> Keyword.delete(:recommendations_report)
+
     overview = Keyword.get(opts, :overview) || workspace_overview(overview_opts)
     workspace_id = Keyword.get(opts, :workspace_id) || overview.workspace.id
     scoped_opts = if workspace_id, do: [workspace_id: workspace_id], else: []
-    problems_report = problems(Keyword.put(scoped_opts, :limit, 5))
-    evals = eval_candidates(Keyword.put(scoped_opts, :limit, 5))
+    problems_report = Keyword.get(opts, :problems_report) || problems(Keyword.put(scoped_opts, :limit, 5))
+
+    evals =
+      Keyword.get(opts, :evals_report) ||
+        eval_candidates(Keyword.put(scoped_opts, :limit, 5) ++ [problems_report: problems_report])
+
     saved = saved_eval_candidates(Keyword.put(scoped_opts, :limit, 10))
     drafts = benchmark_drafts(Keyword.put(scoped_opts, :limit, 10))
     scenarios = observability_benchmark_scenarios(Keyword.put(scoped_opts, :limit, 10))
@@ -745,10 +755,11 @@ defmodule ControlKeel.Observability do
     promotions = promotion_candidates(Keyword.put(scoped_opts, :limit, 10))
 
     recommendations_report =
-      Keyword.get(opts, :recommendations_report) ||
-        recommendations(
-          scoped_opts ++ [overview: overview] ++ Keyword.take(opts, [:project_root])
-        )
+      cond do
+        Keyword.get(opts, :skip_recommendations) -> %{actions: []}
+        report = Keyword.get(opts, :recommendations_report) -> report
+        true -> recommendations(scoped_opts ++ [overview: overview, problems_report: problems_report] ++ Keyword.take(opts, [:project_root]))
+      end
 
     blockers = loop_status_blockers(overview, problems_report, drafts, history, promotions)
 
@@ -793,8 +804,8 @@ defmodule ControlKeel.Observability do
     overview = Keyword.get(opts, :overview) || workspace_overview(Keyword.delete(opts, :overview))
     workspace_id = overview.workspace.id
     scoped_opts = if workspace_id, do: [workspace_id: workspace_id], else: []
-    problems = problems(Keyword.put(scoped_opts, :limit, 5))
-    costs = costs(scoped_opts)
+    problems = Keyword.get(opts, :problems_report) || problems(Keyword.put(scoped_opts, :limit, 5))
+    costs = Keyword.get(opts, :costs_report) || costs(scoped_opts)
     project_root = Keyword.get(opts, :project_root, File.cwd!())
 
     actions =
@@ -858,7 +869,7 @@ defmodule ControlKeel.Observability do
   end
 
   def eval_candidates(opts \\ []) do
-    problem_summary = problems(opts)
+    problem_summary = Keyword.get(opts, :problems_report) || problems(opts)
 
     candidates =
       problem_summary.problems

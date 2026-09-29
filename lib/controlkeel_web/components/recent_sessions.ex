@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.RecentSessions do
   use Phoenix.Component
 
+  import ControlKeelWeb.ObservabilityHelpers
   import ControlKeelWeb.Typography
 
   use Phoenix.VerifiedRoutes,
@@ -47,7 +48,7 @@ defmodule ControlKeelWeb.RecentSessions do
                     </.link>
                   </td>
                   <td class="px-5 py-4 whitespace-nowrap">
-                    <span class={health_pill_class(run.health)}>{run.health}</span>
+                    <span class={health_pill_class(run.health, :sm)}>{run.health}</span>
                   </td>
                   <td class="px-5 py-4 whitespace-nowrap text-foreground">
                     {run.active_findings} active
@@ -79,19 +80,4 @@ defmodule ControlKeelWeb.RecentSessions do
     </section>
     """
   end
-
-  defp health_pill_class("red") do
-    "inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold capitalize ring-1 bg-destructive/10 text-destructive ring-destructive/20"
-  end
-
-  defp health_pill_class("yellow") do
-    "inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold capitalize ring-1 bg-warning/10 text-warning ring-warning/20"
-  end
-
-  defp health_pill_class(_) do
-    "inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold capitalize ring-1 bg-success/10 text-success ring-success/20"
-  end
-
-  defp format_currency(cents) when is_integer(cents), do: cents |> Kernel./(100) |> Float.round(2)
-  defp format_currency(_cents), do: 0.0
 end

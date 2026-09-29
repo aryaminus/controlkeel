@@ -10,6 +10,8 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
   alias ControlKeelWeb.RecentSessions
   alias ControlKeelWeb.WorkspaceAccess
 
+  import ControlKeelWeb.ObservabilityHelpers
+
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
     with %Workspace{} = workspace <-
@@ -18,7 +20,10 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
          :ok <- check_workspace_access(workspace, socket.assigns) do
       opts = [workspace_id: workspace.id]
       overview = Observability.workspace_overview([limit: 6] ++ opts)
-      loop = Observability.loop_status(opts ++ [overview: overview])
+      # Folded loop sections render blockers/diagnostics only — next_actions
+      # is never shown, so skip the recommendations build (problems + costs
+      # + project scan) on page load.
+      loop = Observability.loop_status(opts ++ [overview: overview, skip_recommendations: true])
       diagnostics = Observability.loop_diagnostics(opts)
       recent_session = Mission.list_recent_sessions(1, workspace.id) |> List.first()
 
@@ -448,52 +453,10 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
     """
   end
 
-  defp format_currency(cents) when is_integer(cents), do: cents |> Kernel./(100) |> Float.round(2)
-  defp format_currency(_cents), do: 0.0
-
-  defp humanize_blocker_id(id) when is_binary(id) do
-    id |> String.replace("_", " ") |> String.capitalize()
-  end
-
-  defp humanize_blocker_id(id), do: inspect(id)
-
-  defp health_pill_class("red"),
-    do:
-      "inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold capitalize ring-1 bg-destructive/10 text-destructive ring-destructive/20"
-
-  defp health_pill_class("yellow"),
-    do:
-      "inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold capitalize ring-1 bg-warning/10 text-warning ring-warning/20"
-
-  defp health_pill_class(_),
-    do:
-      "inline-flex items-center rounded-full px-3 py-1.5 text-sm font-semibold capitalize ring-1 bg-success/10 text-success ring-success/20"
-
-  defp format_frequency(map) when map == %{}, do: "none"
-
-  defp format_frequency(map) when is_map(map) do
-    map
-    |> Enum.sort_by(fn {_key, count} -> count end, :desc)
-    |> Enum.map(fn {key, count} -> "#{key}: #{count}" end)
-    |> Enum.join(", ")
-  end
-
   defp perf_flash_message(%{summary: summary}) do
     "Performance snapshot captured and persisted: #{summary.item_count} item(s), #{summary.total_wall_ms} ms total."
   end
 
   defp maybe_put_session(opts, nil), do: opts
   defp maybe_put_session(opts, session_id), do: Keyword.put(opts, :session_id, session_id)
-
-  defp format_dt(nil), do: "—"
-  defp format_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-  defp format_dt(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-  defp format_dt(_), do: "—"
-
-  defp format_ms(value) when is_number(value), do: "#{value} ms"
-  defp format_ms(_), do: "—"
-
-  defp format_bytes(nil), do: "—"
-  defp format_bytes(bytes) when is_integer(bytes), do: "#{bytes} B"
-  defp format_bytes(_), do: "—"
 end
