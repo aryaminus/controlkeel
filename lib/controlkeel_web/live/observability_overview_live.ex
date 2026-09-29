@@ -99,6 +99,11 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
   end
 
   @impl true
+  def handle_event("close-perf-snapshot", _params, socket) do
+    {:noreply, assign(socket, :snapshot, nil)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <section id="observability-overview-page" class="w-full space-y-5">
@@ -296,16 +301,11 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       <RecentSessions.session_observability_section runs={@overview.runs.recent} />
 
       <section id="observability-loop-diagnostics" class="space-y-4">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="space-y-1">
-            <.section_title>Loop diagnostics</.section_title>
-            <p class="text-xs text-muted-foreground">
-              Repeated identical tool-event and invocation runs detected in the sampled window.
-            </p>
-          </div>
-          <span class={neutral_pill_class()}>
-            {@diagnostics.totals.event_runs} event run(s) · {@diagnostics.totals.invocation_runs} invocation run(s)
-          </span>
+        <div class="space-y-1">
+          <.section_title>Loop diagnostics</.section_title>
+          <p class="text-xs text-muted-foreground">
+            Repeated identical tool-event and invocation runs detected in the sampled window.
+          </p>
         </div>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -417,58 +417,64 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           </.button>
         </div>
 
-        <%= if @snapshot do %>
-          <p class="text-xs text-muted-foreground">
-            Generated at {format_dt(@snapshot.generated_at)}
-          </p>
-
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <article class="rounded-2xl border bg-card p-4">
-              <p class="text-sm font-medium text-muted-foreground">Items</p>
-              <p class="mt-2 text-xl font-semibold text-foreground/90">
-                {@snapshot.summary.item_count}
-              </p>
-            </article>
-            <article class="rounded-2xl border bg-card p-4">
-              <p class="text-sm font-medium text-muted-foreground">Total wall time</p>
-              <p class="mt-2 text-xl font-semibold text-foreground/90">
-                {format_ms(@snapshot.summary.total_wall_ms)}
-              </p>
-            </article>
-            <article class="rounded-2xl border bg-card p-4">
-              <p class="text-sm font-medium text-muted-foreground">Ecto queries</p>
-              <p class="mt-2 text-xl font-semibold text-foreground/90">
-                {@snapshot.summary.total_ecto_queries}
-              </p>
-            </article>
-            <article class="rounded-2xl border bg-card p-4">
-              <p class="text-sm font-medium text-muted-foreground">Payload</p>
-              <p class="mt-2 text-xl font-semibold text-foreground/90">
-                {format_bytes(@snapshot.summary.total_payload_bytes)}
-              </p>
-            </article>
-          </div>
-
-          <div id="observability-perf-items" class="divide-y divide-border">
-            <%= for item <- @snapshot.items do %>
-              <div class="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium text-foreground leading-snug">{item.label}</p>
-                </div>
-                <p class="shrink-0 text-xs text-muted-foreground">
-                  {format_ms(item.wall_ms)} · {item.ecto_query_count} query(s) · {format_bytes(
-                    item.payload_bytes
-                  )}
-                </p>
-              </div>
-            <% end %>
-          </div>
-        <% else %>
-          <p class="text-sm text-muted-foreground">
-            No performance snapshot captured yet. Capture one to persist a durable perf memory record.
-          </p>
-        <% end %>
+        <p class="text-sm text-muted-foreground">
+          No performance snapshot captured yet. Capture one to persist a durable perf memory record.
+        </p>
       </section>
+
+      <.modal
+        :if={@snapshot}
+        id="observability-perf-modal"
+        title="Performance snapshot"
+        on_close="close-perf-snapshot"
+        width="max-w-3xl"
+      >
+        <p class="text-xs text-muted-foreground">
+          Generated at {format_dt(@snapshot.generated_at)}
+        </p>
+
+        <div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <article class="rounded-2xl border bg-card p-4">
+            <p class="text-sm font-medium text-muted-foreground">Items</p>
+            <p class="mt-2 text-xl font-semibold text-foreground/90">
+              {@snapshot.summary.item_count}
+            </p>
+          </article>
+          <article class="rounded-2xl border bg-card p-4">
+            <p class="text-sm font-medium text-muted-foreground">Total wall time</p>
+            <p class="mt-2 text-xl font-semibold text-foreground/90">
+              {format_ms(@snapshot.summary.total_wall_ms)}
+            </p>
+          </article>
+          <article class="rounded-2xl border bg-card p-4">
+            <p class="text-sm font-medium text-muted-foreground">Ecto queries</p>
+            <p class="mt-2 text-xl font-semibold text-foreground/90">
+              {@snapshot.summary.total_ecto_queries}
+            </p>
+          </article>
+          <article class="rounded-2xl border bg-card p-4">
+            <p class="text-sm font-medium text-muted-foreground">Payload</p>
+            <p class="mt-2 text-xl font-semibold text-foreground/90">
+              {format_bytes(@snapshot.summary.total_payload_bytes)}
+            </p>
+          </article>
+        </div>
+
+        <div id="observability-perf-items" class="mt-4 divide-y divide-border">
+          <%= for item <- @snapshot.items do %>
+            <div class="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-foreground leading-snug">{item.label}</p>
+              </div>
+              <p class="shrink-0 text-xs text-muted-foreground">
+                {format_ms(item.wall_ms)} · {item.ecto_query_count} query(s) · {format_bytes(
+                  item.payload_bytes
+                )}
+              </p>
+            </div>
+          <% end %>
+        </div>
+      </.modal>
     </section>
     """
   end
