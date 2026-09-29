@@ -205,7 +205,6 @@ defmodule ControlKeelWeb.Router do
       # modules untouched — mounts still use the recent-session heuristic
       # until the mount migration slice lands).
       live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
-      live "/:org_slug/workspaces/:ws_slug/loop", ObservabilityLoopLive, :index
       live "/:org_slug/workspaces/:ws_slug/compare", ObservabilityCompareLive, :index
       live "/:org_slug/workspaces/:ws_slug/costs", ObservabilityCostsLive, :index
       live "/:org_slug/workspaces/:ws_slug/evals", ObservabilityEvalsLive, :index
@@ -272,6 +271,7 @@ defmodule ControlKeelWeb.Router do
     # the query string. The bare `/observability` path lives in an earlier
     # scope (single-segment paths would otherwise match `/:org_slug`).
     get "/observability/loop", PageController, :observability_page_redirect
+    get "/:org_slug/workspaces/:ws_slug/loop", PageController, :workspace_loop_redirect
     get "/observability/compare", PageController, :observability_page_redirect
     get "/observability/costs", PageController, :observability_page_redirect
     get "/observability/evals", PageController, :observability_page_redirect

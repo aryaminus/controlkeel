@@ -18,7 +18,7 @@ defmodule ControlKeelWeb.CommandPillTest do
 
   test "copy button triggers copy_command event through a LiveView", %{conn: conn} do
     {org, ws, _session} = org_bound_session_fixture()
-    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
+    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/costs")
     assert has_element?(view, "button[phx-click=\"copy_command\"]")
   end
 end

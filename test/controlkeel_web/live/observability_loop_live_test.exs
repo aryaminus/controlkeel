@@ -9,7 +9,23 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
   alias ControlKeel.Memory.Record
   alias ControlKeel.Repo
 
-  test "loop page renders read-only learning loop status", %{conn: conn} do
+  test "workspace loop path 302s to observability with query preserved", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    conn = get(conn, "/#{org.slug}/workspaces/#{ws.slug}/loop?filter=red")
+
+    assert redirected_to(conn, 302) ==
+             "/#{org.slug}/workspaces/#{ws.slug}/observability?filter=red"
+  end
+
+  test "legacy global loop path still resolves to workspace observability", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    conn = get(conn, "/observability/loop")
+    assert redirected_to(conn, 302) == "/#{org.slug}/workspaces/#{ws.slug}/observability"
+  end
+
+  test "folded overview renders read-only learning loop status", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
     finding_fixture(%{
@@ -21,18 +37,17 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
       rule_id: "security.loop_page"
     })
 
-    {:ok, _view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/loop")
+    {:ok, _view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
-    assert html =~ "Learning loop"
     assert html =~ "Safety boundary"
     assert html =~ "Automatic benchmark execution: false"
     assert html =~ "Automatic promotion: false"
-    assert html =~ "controlkeel obs loop"
+    refute html =~ "controlkeel obs loop"
   end
 
-  test "loop page renders loop diagnostics section with no detected runs", %{conn: conn} do
+  test "folded overview renders loop diagnostics section with no detected runs", %{conn: conn} do
     {org, ws, _session} = org_bound_session_fixture()
-    {:ok, _view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/loop")
+    {:ok, _view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
     assert html =~ "Loop diagnostics"
     assert html =~ "Repeated tool events"
@@ -44,7 +59,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
   test "capture performance snapshot persists a memory record and renders results", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/loop")
+    {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
     assert html =~ "No performance snapshot captured yet."
 
@@ -76,7 +91,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
 
     assert {:error,
             {:live_redirect, %{to: "/organizations", flash: %{"error" => "Workspace not found."}}}} =
-             live(conn, "/#{org.slug}/workspaces/no-such-ws/loop")
+             live(conn, "/#{org.slug}/workspaces/no-such-ws/observability")
   end
 
   describe "cloud mode role gates" do
@@ -141,14 +156,14 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
       |> Repo.one()
     end
 
-    test "viewers keep read access to the loop page", %{conn: conn} do
+    test "viewers keep read access to the folded observability page", %{conn: conn} do
       %{org: org, workspace: ws, viewer: viewer} =
         cloud_loop_setup(System.unique_integer([:positive]))
 
       {:ok, _view, html} =
-        live(session_conn(conn, viewer, org), "/#{org.slug}/workspaces/#{ws.slug}/loop")
+        live(session_conn(conn, viewer, org), "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
-      assert html =~ "Learning loop"
+      assert html =~ "Safety boundary"
     end
 
     test "viewers cannot capture performance snapshots", %{conn: conn} do
@@ -156,7 +171,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
         cloud_loop_setup(System.unique_integer([:positive]))
 
       {:ok, view, _html} =
-        live(session_conn(conn, viewer, org), "/#{org.slug}/workspaces/#{ws.slug}/loop")
+        live(session_conn(conn, viewer, org), "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
       view
       |> element("#observability-perf-capture")

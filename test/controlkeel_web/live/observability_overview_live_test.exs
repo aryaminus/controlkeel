@@ -38,6 +38,22 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     refute html =~ "/observability/regressions"
   end
 
+  test "overview page renders folded learning-loop sections", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
+
+    assert html =~ "Safety boundary"
+    assert html =~ "Blockers"
+    assert html =~ "Next actions"
+    assert html =~ "Loop diagnostics"
+    assert html =~ "Performance snapshot"
+    refute html =~ "controlkeel obs"
+    assert has_element?(view, "#observability-loop-diagnostics")
+    assert has_element?(view, "#observability-perf-snapshot")
+    assert has_element?(view, "#observability-perf-capture")
+  end
+
   test "overview page scopes recent runs to the URL workspace", %{conn: conn} do
     {org_one, ws_one, _session_one} = org_bound_session_fixture()
     {_org_two, _ws_two, _session_two} = org_bound_session_fixture()

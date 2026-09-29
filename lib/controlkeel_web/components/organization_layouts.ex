@@ -653,12 +653,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-signal"
       },
       %{
-        label: "Learning loop",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/loop",
-        scope: :workspace,
-        icon: "hero-arrow-path"
-      },
-      %{
         label: "Memory quality",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/memory-quality",
         scope: :workspace,
