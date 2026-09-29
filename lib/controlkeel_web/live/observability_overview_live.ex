@@ -137,12 +137,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             {@overview.problems.total_findings} active finding(s)
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/problems"}
-            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-          >
-            Review groups <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
         </article>
 
         <article
@@ -160,12 +154,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
               @overview.costs.estimated_invocation_cents
             )} estimated
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/costs"}
-            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-          >
-            Review costs <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
         </article>
 
         <article
@@ -182,12 +170,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             {@overview.telemetry.persisted_imports} persisted import(s)
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/imports"}
-            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-          >
-            Review imports <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
         </article>
 
         <article class="rounded-2xl border bg-card p-5 shadow-card">
@@ -198,12 +180,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             Saved status: {format_frequency(@loop.evals.saved_by_status)}
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/evals"}
-            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-          >
-            Review evals <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
         </article>
 
         <article class="rounded-2xl border bg-card p-5 shadow-card">
@@ -214,12 +190,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             {@loop.benchmarks.drafts} draft(s), readiness {@loop.benchmarks.history_readiness.status}
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/benchmark"}
-            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-          >
-            Review benchmarks <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
         </article>
 
         <article class="rounded-2xl border bg-card p-5 shadow-card">
@@ -230,12 +200,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             Readiness: {format_frequency(@loop.promotions.by_readiness)}
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/promotions"}
-            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-          >
-            Review promotions <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
         </article>
       </div>
 
@@ -301,12 +265,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       <RecentSessions.session_observability_section runs={@overview.runs.recent} />
 
       <section id="observability-loop-diagnostics" class="space-y-4">
-        <div class="space-y-1">
-          <.section_title>Loop diagnostics</.section_title>
-          <p class="text-xs text-muted-foreground">
-            Repeated identical tool-event and invocation runs detected in the sampled window.
-          </p>
-        </div>
+        <.section_title>Loop diagnostics</.section_title>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <section
