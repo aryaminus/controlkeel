@@ -54,11 +54,15 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
   end
 
   test "overview page scopes recent runs to the URL workspace", %{conn: conn} do
-    {org_one, ws_one, _session_one} = org_bound_session_fixture()
-    {_org_two, _ws_two, _session_two} = org_bound_session_fixture()
+    {org_one, ws_one, session_one} = org_bound_session_fixture()
+    {_org_two, ws_two, session_two} = org_bound_session_fixture()
 
     {:ok, _view, html} = live(conn, "/#{org_one.slug}/workspaces/#{ws_one.slug}/observability")
 
-    assert html =~ "1 recent"
+    assert html =~
+             "/#{org_one.slug}/workspaces/#{ws_one.slug}/sessions/#{session_one.id}/observability"
+
+    refute html =~
+             "/#{ws_two.slug}/sessions/#{session_two.id}/observability"
   end
 end

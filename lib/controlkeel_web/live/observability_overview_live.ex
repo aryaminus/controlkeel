@@ -120,20 +120,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <article
-          id="observability-overview-runs"
-          class="rounded-2xl border bg-card p-5 shadow-card"
-        >
-          <p class="text-sm font-medium text-muted-foreground">Runs</p>
-          <p class="mt-2 text-xl font-semibold text-foreground/90">
-            {@overview.runs.count} recent
-          </p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {@overview.health.red_runs} red · {@overview.health.yellow_runs} yellow · {@overview.health.green_runs} green
-          </p>
-        </article>
-
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <article
           id="observability-overview-problems"
           class="rounded-2xl border bg-card p-5 shadow-card"
@@ -197,45 +184,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
             Review imports <.icon name="hero-arrow-up-right" class="size-3" />
           </.link>
         </article>
-      </div>
 
-      <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <.section_title>Top problems</.section_title>
-        <%= if @overview.problems.top == [] do %>
-          <p class="text-sm text-muted-foreground">No active problems detected.</p>
-        <% else %>
-          <div class="space-y-2">
-            <%= for problem <- @overview.problems.top do %>
-              <div class="flex items-start justify-between gap-3 rounded-lg px-3 py-2 bg-muted/30">
-                <p class="text-sm font-medium text-foreground">{problem.rule_id}</p>
-                <p class="shrink-0 text-xs text-muted-foreground">
-                  {problem.health} · {problem.count} finding(s) · {problem.affected_session_count} session(s)
-                </p>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-      </section>
-
-      <RecentSessions.session_observability_section runs={@overview.runs.recent} />
-
-      <section
-        id="observability-loop-fold"
-        class="rounded-2xl border bg-card p-5 shadow-card space-y-3"
-      >
-        <.section_title>Safety boundary</.section_title>
-        <p class="text-sm font-medium text-foreground">
-          Read-only: {@loop.read_only} · Mutation: {@loop.mutation}
-        </p>
-        <p class="text-xs text-muted-foreground">
-          Automatic benchmark execution: {@loop.learning_loop.automatic_benchmark_execution} · Automatic promotion: {@loop.learning_loop.automatic_promotion}
-        </p>
-        <p class="text-xs text-muted-foreground">
-          Generated benchmarks are {@loop.learning_loop.generated_benchmarks}.
-        </p>
-      </section>
-
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <article class="rounded-2xl border bg-card p-5 shadow-card">
           <p class="text-sm font-medium text-muted-foreground">Evals</p>
           <p class="mt-2 text-xl font-semibold text-foreground/90">
@@ -244,6 +193,12 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             Saved status: {format_frequency(@loop.evals.saved_by_status)}
           </p>
+          <.link
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/evals"}
+            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
+          >
+            Review evals <.icon name="hero-arrow-up-right" class="size-3" />
+          </.link>
         </article>
 
         <article class="rounded-2xl border bg-card p-5 shadow-card">
@@ -254,6 +209,12 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             {@loop.benchmarks.drafts} draft(s), readiness {@loop.benchmarks.history_readiness.status}
           </p>
+          <.link
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/benchmark"}
+            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
+          >
+            Review benchmarks <.icon name="hero-arrow-up-right" class="size-3" />
+          </.link>
         </article>
 
         <article class="rounded-2xl border bg-card p-5 shadow-card">
@@ -264,24 +225,75 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             Readiness: {format_frequency(@loop.promotions.by_readiness)}
           </p>
+          <.link
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/promotions"}
+            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
+          >
+            Review promotions <.icon name="hero-arrow-up-right" class="size-3" />
+          </.link>
         </article>
       </div>
 
-      <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <.section_title>Blockers</.section_title>
-        <%= if @loop.blockers == [] do %>
-          <p class="text-sm text-muted-foreground">No learning-loop blockers detected.</p>
-        <% else %>
-          <div class="space-y-2">
-            <%= for blocker <- @loop.blockers do %>
-              <div class="flex items-start justify-between gap-3 rounded-lg px-3 py-2 bg-destructive/10">
-                <p class="text-sm font-medium text-foreground">{blocker.id}</p>
-                <p class="shrink-0 text-xs text-muted-foreground">{blocker.reason}</p>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-      </section>
+      <div class="w-full flex gap-4">
+        <section
+          id="observability-loop-fold"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-3 w-full"
+        >
+          <.section_title>Safety boundary</.section_title>
+          <p class="text-sm font-medium text-foreground">
+            Read-only: <span class="text-muted-foreground">{@loop.read_only}</span>
+          </p>
+          <p class="text-sm font-medium text-foreground">
+            Mutation: <span class="text-muted-foreground">{@loop.mutation}</span>
+          </p>
+
+          <p class="text-sm font-medium text-foreground">
+            Automatic benchmark execution:
+            <span class="text-muted-foreground">
+              {@loop.learning_loop.automatic_benchmark_execution}
+            </span>
+          </p>
+          <p class="text-sm font-medium text-foreground">
+            Automatic promotion:
+            <span class="text-muted-foreground">{@loop.learning_loop.automatic_promotion}</span>
+          </p>
+
+          <p class="text-sm font-medium text-foreground">
+            Generated benchmarks are <span class="text-foreground">{@loop.learning_loop.generated_benchmarks}</span>.
+          </p>
+        </section>
+
+        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4 w-full">
+          <.section_title>Blockers</.section_title>
+          <%= if @loop.blockers == [] do %>
+            <div class="flex items-center gap-2.5 rounded-lg bg-success/10 px-3 py-2.5 ring-1 ring-success/20">
+              <.icon name="hero-check-circle" class="size-4 shrink-0 text-success" />
+              <p class="text-sm text-muted-foreground">Loop is flowing — nothing stuck.</p>
+            </div>
+          <% else %>
+            <ul class="space-y-4">
+              <%= for blocker <- @loop.blockers do %>
+                <li class="flex items-start gap-2.5 rounded-lg bg-destructive/10 px-3 py-2.5 ring-1 ring-destructive/20">
+                  <.icon
+                    name="hero-exclamation-circle"
+                    class="size-4 shrink-0 mt-0.5 text-destructive"
+                  />
+                  <div class="min-w-0 space-y-0.5">
+                    <p class="text-sm font-medium text-foreground">
+                      {humanize_blocker_id(blocker.id)}
+                    </p>
+                    <p class="text-xs leading-relaxed text-muted-foreground">
+                      {blocker.reason}
+                    </p>
+                  </div>
+                </li>
+              <% end %>
+            </ul>
+          <% end %>
+        </section>
+      </div>
+
+      <RecentSessions.session_observability_section runs={@overview.runs.recent} />
 
       <section id="observability-loop-diagnostics" class="space-y-4">
         <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -463,6 +475,12 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
 
   defp format_currency(cents) when is_integer(cents), do: cents |> Kernel./(100) |> Float.round(2)
   defp format_currency(_cents), do: 0.0
+
+  defp humanize_blocker_id(id) when is_binary(id) do
+    id |> String.replace("_", " ") |> String.capitalize()
+  end
+
+  defp humanize_blocker_id(id), do: inspect(id)
 
   defp health_pill_class("red"),
     do:

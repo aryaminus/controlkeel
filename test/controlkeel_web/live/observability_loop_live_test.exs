@@ -40,8 +40,8 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
     {:ok, _view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
     assert html =~ "Safety boundary"
-    assert html =~ "Automatic benchmark execution: false"
-    assert html =~ "Automatic promotion: false"
+    assert html =~ "Automatic benchmark execution"
+    assert html =~ "Automatic promotion"
     refute html =~ "controlkeel obs loop"
   end
 
