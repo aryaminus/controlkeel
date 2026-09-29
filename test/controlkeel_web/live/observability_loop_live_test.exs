@@ -49,8 +49,10 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
     assert html =~ "No repeated identical invocation runs detected."
   end
 
-  test "capture performance snapshot persists a memory record and renders results", %{conn: conn} do
-    {org, ws, session} = org_bound_session_fixture()
+  test "perf snapshot capture renders results without persisting", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    initial_count = Repo.aggregate(Record, :count, :id)
 
     {:ok, view, html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
@@ -63,20 +65,10 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
     assert rendered =~ "Performance snapshot"
     assert rendered =~ "Total wall time"
     assert rendered =~ "Ecto queries"
-    assert rendered =~ "Payload"
+    assert rendered =~ "Nothing persisted"
 
-    persisted =
-      from(r in Record,
-        where: r.source_type == "observability" and r.session_id == ^session.id,
-        order_by: [desc: :id],
-        limit: 1
-      )
-      |> Repo.one()
-
-    assert persisted
-    assert persisted.title == "Performance Snapshot"
-    assert persisted.workspace_id == session.workspace_id
-    assert persisted.metadata["total_wall_ms"] >= 0
+    assert Repo.aggregate(Record, :count, :id) == initial_count
+    refute persisted_snapshot?(ws.id)
   end
 
   test "unknown workspace slug redirects instead of crashing", %{conn: conn} do
@@ -149,8 +141,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
       |> Repo.one()
     end
 
-    test "viewers keep read access to the folded observability page", %{conn: conn} do
-      %{org: org, workspace: ws, viewer: viewer} =
+    test "viewers keep read access to the folded observability page", %{conn: conn} do      %{org: org, workspace: ws, viewer: viewer} =
         cloud_loop_setup(System.unique_integer([:positive]))
 
       {:ok, _view, html} =
@@ -159,18 +150,16 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
       assert html =~ "Safety boundary"
     end
 
-    test "viewers cannot capture performance snapshots", %{conn: conn} do
+    test "viewers can capture the display-only readout (no persist, no gate)", %{conn: conn} do
       %{org: org, workspace: ws, viewer: viewer} =
         cloud_loop_setup(System.unique_integer([:positive]))
 
       {:ok, view, _html} =
         live(session_conn(conn, viewer, org), "/#{org.slug}/workspaces/#{ws.slug}/observability")
 
-      view
-      |> element("#observability-perf-capture")
-      |> render_click()
+      view |> element("#observability-perf-capture") |> render_click()
 
-      assert render(view) =~ "Admin or owner role required."
+      assert render(view) =~ "Nothing persisted"
       refute persisted_snapshot?(ws.id)
     end
   end

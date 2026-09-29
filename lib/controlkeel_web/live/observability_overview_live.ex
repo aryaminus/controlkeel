@@ -25,7 +25,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       # + project scan) on page load.
       loop = Observability.loop_status(opts ++ [overview: overview, skip_recommendations: true])
       diagnostics = Observability.loop_diagnostics(opts)
-      recent_session = Mission.list_recent_sessions(1, workspace.id) |> List.first()
 
       {:ok,
        socket
@@ -44,8 +43,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
            %{label: "Observability", to: nil}
          ]
        )
-       |> assign(:opts, opts)
-       |> assign(:session_id, recent_session && recent_session.id)
        |> assign(:overview, overview)
        |> assign(:loop, loop)
        |> assign(:diagnostics, diagnostics)
@@ -85,32 +82,22 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
 
   @impl true
   def handle_event("capture-perf-snapshot", _params, socket) do
-    with %Workspace{} = workspace <- socket.assigns[:workspace],
-         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
-      opts =
-        socket.assigns.opts
-        |> maybe_put_session(socket.assigns.session_id)
-        |> Keyword.put(:persist, true)
+    # Non-persisting readout: measures read-path timing for display only.
+    # Never writes a memory record — durable snapshots live in the obs CLI.
+    # Session scoping is resolved here (not on mount) so page load stays lean.
+    workspace = socket.assigns.workspace
+    session_id = recent_session_id(workspace.id)
 
-      snapshot = Observability.perf_snapshot(opts)
+    opts =
+      [workspace_id: workspace.id]
+      |> maybe_put_session(session_id)
 
-      if snapshot.persist_requested and not snapshot.persisted do
-        {:noreply,
-         socket
-         |> assign(:snapshot, snapshot)
-         |> put_flash(
-           :error,
-           "Performance snapshot captured but failed to persist. Snapshot is shown but was not saved."
-         )}
-      else
-        {:noreply,
-         socket
-         |> assign(:snapshot, snapshot)
-         |> put_flash(:info, perf_flash_message(snapshot))}
-      end
-    else
-      _ -> {:noreply, put_flash(socket, :error, "Admin or owner role required.")}
-    end
+    snapshot = Observability.perf_snapshot(opts)
+
+    {:noreply,
+     socket
+     |> assign(:snapshot, snapshot)
+     |> put_flash(:info, perf_flash_message(snapshot))}
   end
 
   @impl true
@@ -378,7 +365,8 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <div class="space-y-1">
             <.section_title>Performance snapshot</.section_title>
             <p class="text-xs text-muted-foreground">
-              Measures observability read-path timing; capturing persists a durable memory record.
+              Measures observability read-path timing for display only — nothing is persisted.
+              Durable snapshots live in the obs CLI.
             </p>
           </div>
           <.button
@@ -392,7 +380,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
         </div>
 
         <p class="text-sm text-muted-foreground">
-          No performance snapshot captured yet. Capture one to persist a durable perf memory record.
+          No performance snapshot captured yet.
         </p>
       </section>
 
@@ -454,7 +442,14 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
   end
 
   defp perf_flash_message(%{summary: summary}) do
-    "Performance snapshot captured and persisted: #{summary.item_count} item(s), #{summary.total_wall_ms} ms total."
+    "Performance snapshot captured: #{summary.item_count} item(s), #{summary.total_wall_ms} ms total. Nothing persisted."
+  end
+
+  defp recent_session_id(workspace_id) do
+    case Mission.list_recent_sessions(1, workspace_id) do
+      [%{id: id} | _] -> id
+      _ -> nil
+    end
   end
 
   defp maybe_put_session(opts, nil), do: opts
