@@ -9,20 +9,13 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
   alias ControlKeel.Memory.Record
   alias ControlKeel.Repo
 
-  test "workspace loop path 302s to observability with query preserved", %{conn: conn} do
-    {org, ws, _session} = org_bound_session_fixture()
-
-    conn = get(conn, "/#{org.slug}/workspaces/#{ws.slug}/loop?filter=red")
-
-    assert redirected_to(conn, 302) ==
-             "/#{org.slug}/workspaces/#{ws.slug}/observability?filter=red"
-  end
-
   test "legacy global loop path still resolves to workspace observability", %{conn: conn} do
     {org, ws, _session} = org_bound_session_fixture()
 
-    conn = get(conn, "/observability/loop")
-    assert redirected_to(conn, 302) == "/#{org.slug}/workspaces/#{ws.slug}/observability"
+    conn = get(conn, "/observability/loop?filter=red")
+
+    assert redirected_to(conn, 302) ==
+             "/#{org.slug}/workspaces/#{ws.slug}/observability?filter=red"
   end
 
   test "folded overview renders read-only learning loop status", %{conn: conn} do

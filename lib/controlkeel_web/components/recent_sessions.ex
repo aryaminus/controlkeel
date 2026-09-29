@@ -19,7 +19,7 @@ defmodule ControlKeelWeb.RecentSessions do
       <%= if @runs == [] do %>
         <p class="text-sm text-muted-foreground">No sessions available yet.</p>
       <% else %>
-        <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+        <div class="bg-card border rounded-2xl shadow-card overflow-x-auto">
           <table class="min-w-full divide-y divide-border text-left text-sm">
             <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
               <tr>

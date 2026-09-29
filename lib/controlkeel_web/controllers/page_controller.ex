@@ -229,13 +229,6 @@ defmodule ControlKeelWeb.PageController do
     end
   end
 
-  # Consolidation: the workspace learning-loop page now lives folded into
-  # `/:org_slug/workspaces/:ws_slug/observability`. Redirect bookmarks,
-  # preserving the query string — never 404.
-  def workspace_loop_redirect(conn, %{"org_slug" => org_slug, "ws_slug" => ws_slug}) do
-    redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}/observability#{query_suffix(conn)}")
-  end
-
   defp query_suffix(conn) do
     case conn.query_string do
       "" -> ""

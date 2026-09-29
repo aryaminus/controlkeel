@@ -271,7 +271,6 @@ defmodule ControlKeelWeb.Router do
     # the query string. The bare `/observability` path lives in an earlier
     # scope (single-segment paths would otherwise match `/:org_slug`).
     get "/observability/loop", PageController, :observability_page_redirect
-    get "/:org_slug/workspaces/:ws_slug/loop", PageController, :workspace_loop_redirect
     get "/observability/compare", PageController, :observability_page_redirect
     get "/observability/costs", PageController, :observability_page_redirect
     get "/observability/evals", PageController, :observability_page_redirect

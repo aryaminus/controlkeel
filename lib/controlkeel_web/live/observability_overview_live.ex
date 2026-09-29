@@ -218,10 +218,10 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
         </article>
       </div>
 
-      <div class="w-full flex gap-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section
           id="observability-loop-fold"
-          class="rounded-2xl border bg-card p-5 shadow-card space-y-3 w-full"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-3"
         >
           <.section_title>Safety boundary</.section_title>
           <p class="text-sm font-medium text-foreground">
@@ -247,7 +247,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           </p>
         </section>
 
-        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4 w-full">
+        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
           <.section_title>Blockers</.section_title>
           <%= if @loop.blockers == [] do %>
             <div class="flex items-center gap-2.5 rounded-lg bg-success/10 px-3 py-2.5 ring-1 ring-success/20">
