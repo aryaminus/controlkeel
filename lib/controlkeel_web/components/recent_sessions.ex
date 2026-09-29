@@ -18,58 +18,62 @@ defmodule ControlKeelWeb.RecentSessions do
       <%= if @runs == [] do %>
         <p class="text-sm text-muted-foreground">No sessions available yet.</p>
       <% else %>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <%= for run <- @runs do %>
-            <.link
-              navigate={
-                if run[:org_slug] && run[:workspace_slug],
-                  do:
-                    ~p"/#{run.org_slug}/workspaces/#{run.workspace_slug}/sessions/#{run.id}/observability",
-                  else: ~p"/observability/sessions/#{run.id}"
-              }
-              class="group rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:bg-muted/30"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <p class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                  <span class="group-hover:underline">{run.title}</span>
-                </p>
-                <span class={health_pill_class(run.health)}>{run.health}</span>
-              </div>
-              <dl class="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-3 text-xs">
-                <div>
-                  <dt class="text-muted-foreground">Findings</dt>
-                  <dd class="mt-0.5 font-medium text-foreground">
+        <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+          <table class="min-w-full divide-y divide-border text-left text-sm">
+            <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              <tr>
+                <th class="px-5 py-3 font-semibold">Session</th>
+                <th class="px-5 py-3 font-semibold">Health</th>
+                <th class="px-5 py-3 font-semibold">Findings</th>
+                <th class="px-5 py-3 font-semibold">Proofs</th>
+                <th class="px-5 py-3 font-semibold">Budget</th>
+                <th class="px-5 py-3 font-semibold">Memory</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              <%= for run <- @runs do %>
+                <tr class="transition hover:bg-muted/30">
+                  <td class="px-5 py-4">
+                    <.link
+                      navigate={
+                        if run[:org_slug] && run[:workspace_slug],
+                          do:
+                            ~p"/#{run.org_slug}/workspaces/#{run.workspace_slug}/sessions/#{run.id}/observability",
+                          else: ~p"/observability/sessions/#{run.id}"
+                      }
+                      class="font-medium text-foreground underline-offset-4 transition hover:text-primary hover:underline"
+                    >
+                      {run.title}
+                    </.link>
+                  </td>
+                  <td class="px-5 py-4 whitespace-nowrap">
+                    <span class={health_pill_class(run.health)}>{run.health}</span>
+                  </td>
+                  <td class="px-5 py-4 whitespace-nowrap text-foreground">
                     {run.active_findings} active
                     <span :if={run.blocked_findings > 0}>
                       · {run.blocked_findings} blocked
                     </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-muted-foreground">Proofs</dt>
-                  <dd class="mt-0.5 font-medium text-foreground">
+                  </td>
+                  <td class="px-5 py-4 whitespace-nowrap text-foreground">
                     <%= if (Map.get(run, :proof_bundles) || 0) > 0 do %>
                       {run.proof_bundles} bundles
                     <% else %>
                       <span class="font-normal text-muted-foreground">No proofs yet</span>
                     <% end %>
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-muted-foreground">Budget</dt>
-                  <dd class="mt-0.5 font-medium text-foreground">
+                  </td>
+                  <td class="px-5 py-4 whitespace-nowrap text-foreground">
                     {format_currency(run.budget_spent_cents)} / {format_currency(
                       run.budget_limit_cents
                     )}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-muted-foreground">Memory</dt>
-                  <dd class="mt-0.5 font-medium text-foreground">{run.memory_records} records</dd>
-                </div>
-              </dl>
-            </.link>
-          <% end %>
+                  </td>
+                  <td class="px-5 py-4 whitespace-nowrap text-foreground">
+                    {run.memory_records} records
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
         </div>
       <% end %>
     </section>

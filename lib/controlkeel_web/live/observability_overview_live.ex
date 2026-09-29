@@ -200,25 +200,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       </div>
 
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <.section_title>Recommended next actions</.section_title>
-        <%= if @overview.recommendations == [] do %>
-          <p class="text-sm text-muted-foreground">No recommendations available.</p>
-        <% else %>
-          <ul class="space-y-2 text-sm text-muted-foreground list-disc ml-5">
-            <%= for recommendation <- @overview.recommendations do %>
-              <li class="leading-relaxed">{recommendation}</li>
-            <% end %>
-          </ul>
-        <% end %>
-        <.link
-          navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/recommendations"}
-          class="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-        >
-          Open recommendations <.icon name="hero-arrow-up-right" class="size-3" />
-        </.link>
-      </section>
-
-      <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
         <.section_title>Top problems</.section_title>
         <%= if @overview.problems.top == [] do %>
           <p class="text-sm text-muted-foreground">No active problems detected.</p>
@@ -254,17 +235,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
         </p>
       </section>
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article class="rounded-2xl border bg-card p-5 shadow-card">
-          <p class="text-sm font-medium text-muted-foreground">Problems</p>
-          <p class="mt-2 text-xl font-semibold text-foreground/90">
-            {@loop.active_problems.count} group(s)
-          </p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            {@loop.active_problems.total_findings} active finding(s)
-          </p>
-        </article>
-
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <article class="rounded-2xl border bg-card p-5 shadow-card">
           <p class="text-sm font-medium text-muted-foreground">Evals</p>
           <p class="mt-2 text-xl font-semibold text-foreground/90">
@@ -306,24 +277,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
               <div class="flex items-start justify-between gap-3 rounded-lg px-3 py-2 bg-destructive/10">
                 <p class="text-sm font-medium text-foreground">{blocker.id}</p>
                 <p class="shrink-0 text-xs text-muted-foreground">{blocker.reason}</p>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-      </section>
-
-      <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <.section_title>Next actions</.section_title>
-        <%= if @loop.next_actions == [] do %>
-          <p class="text-sm text-muted-foreground">No next actions.</p>
-        <% else %>
-          <div class="space-y-2">
-            <%= for action <- @loop.next_actions do %>
-              <div class="rounded-lg px-3 py-2 bg-muted/30 space-y-1">
-                <p class="text-sm font-medium text-foreground">
-                  [{action.priority}] {action.title}
-                </p>
-                <p class="text-xs text-muted-foreground">{action.suggested_action}</p>
               </div>
             <% end %>
           </div>

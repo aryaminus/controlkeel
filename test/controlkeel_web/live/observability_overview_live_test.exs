@@ -45,7 +45,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
 
     assert html =~ "Safety boundary"
     assert html =~ "Blockers"
-    assert html =~ "Next actions"
     assert html =~ "Loop diagnostics"
     assert html =~ "Performance snapshot"
     refute html =~ "controlkeel obs"
