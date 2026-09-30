@@ -732,7 +732,7 @@ defmodule ControlKeel.Observability do
   end
 
   def loop_status(opts \\ []) do
-    overview = workspace_overview(opts)
+    overview = Keyword.get(opts, :overview) || workspace_overview(opts)
     workspace_id = Keyword.get(opts, :workspace_id) || overview.workspace.id
     scoped_opts = if workspace_id, do: [workspace_id: workspace_id], else: []
     problems_report = problems(Keyword.put(scoped_opts, :limit, 5))
@@ -742,7 +742,7 @@ defmodule ControlKeel.Observability do
     scenarios = observability_benchmark_scenarios(Keyword.put(scoped_opts, :limit, 10))
     history = observability_benchmark_history(Keyword.put(scoped_opts, :limit, 10))
     promotions = promotion_candidates(Keyword.put(scoped_opts, :limit, 10))
-    recommendations_report = recommendations(scoped_opts)
+    recommendations_report = recommendations(Keyword.put(scoped_opts, :overview, overview))
 
     blockers = loop_status_blockers(overview, problems_report, drafts, history, promotions)
 
@@ -784,7 +784,7 @@ defmodule ControlKeel.Observability do
   end
 
   def recommendations(opts \\ []) do
-    overview = workspace_overview(opts)
+    overview = Keyword.get(opts, :overview) || workspace_overview(opts)
     workspace_id = overview.workspace.id
     scoped_opts = if workspace_id, do: [workspace_id: workspace_id], else: []
     problems = problems(Keyword.put(scoped_opts, :limit, 5))

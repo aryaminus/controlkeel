@@ -182,6 +182,13 @@ defmodule ControlKeelWeb.Router do
     get "/sessions/:id/deploy-review", LegacyController, :session
     get "/sessions/:id/reviews/:rid", LegacyController, :session
 
+    # Folded Learning loop page (observability consolidation): the loop now
+    # lives as the `#learning-loop` section of the workspace overview.
+    # Redirect (preserving the query string) instead of 404 so bookmarks keep
+    # working. Defined ahead of the `:org_slug` live block so the GET wins
+    # over the LiveView route it replaces.
+    get "/:org_slug/workspaces/:ws_slug/loop", PageController, :observability_loop_redirect
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
@@ -205,7 +212,6 @@ defmodule ControlKeelWeb.Router do
       # modules untouched — mounts still use the recent-session heuristic
       # until the mount migration slice lands).
       live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
-      live "/:org_slug/workspaces/:ws_slug/loop", ObservabilityLoopLive, :index
       live "/:org_slug/workspaces/:ws_slug/compare", ObservabilityCompareLive, :index
       live "/:org_slug/workspaces/:ws_slug/costs", ObservabilityCostsLive, :index
       live "/:org_slug/workspaces/:ws_slug/evals", ObservabilityEvalsLive, :index

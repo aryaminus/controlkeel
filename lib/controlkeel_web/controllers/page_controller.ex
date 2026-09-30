@@ -208,11 +208,14 @@ defmodule ControlKeelWeb.PageController do
   # subpage directly under the workspace (`/:org_slug/workspaces/:ws_slug/<page>`).
   # Resolve the visitor's workspace and redirect, preserving the query string;
   # without a resolvable workspace fall back to the workspace picker.
+  # The folded Learning loop page redirects straight to the overview
+  # `#learning-loop` section instead of the removed `/loop` path.
   def observability_page_redirect(conn, _params) do
     suffix =
       case conn.request_path do
         "/observability" -> "/observability"
-        "/observability/" <> rest -> "/#{rest}"
+        "/observability/loop" -> "/observability#learning-loop"
+        "/observability/" <> rest -> "/#{map_folded_suffix(rest)}"
         _ -> "/observability"
       end
 
@@ -234,6 +237,19 @@ defmodule ControlKeelWeb.PageController do
       query -> "?#{query}"
     end
   end
+
+  # Folded Learning loop page (workspace scope): the loop now lives as the
+  # `#learning-loop` section of the overview. Redirect bookmarks here,
+  # preserving the query string (anchor-then-query matches the existing
+  # benchmark redirect style).
+  def observability_loop_redirect(conn, %{"org_slug" => org_slug, "ws_slug" => ws_slug}) do
+    redirect(conn,
+      to: "/#{org_slug}/workspaces/#{ws_slug}/observability#learning-loop#{query_suffix(conn)}"
+    )
+  end
+
+  defp map_folded_suffix("loop"), do: "observability#learning-loop"
+  defp map_folded_suffix(rest), do: rest
 
   # Workspace resolution for the benchmark redirects: the visitor's most
   # recent workspace in every mode (the same heuristic the benchmark page
