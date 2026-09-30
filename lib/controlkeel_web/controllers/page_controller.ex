@@ -256,8 +256,18 @@ defmodule ControlKeelWeb.PageController do
     )
   end
 
+  # Folded Evals page (workspace scope): eval candidates now live as the
+  # `#evals` section of the benchmark page, the draft pipeline they feed.
+  # Same redirect pattern as above.
+  def observability_evals_redirect(conn, %{"org_slug" => org_slug, "ws_slug" => ws_slug}) do
+    redirect(conn,
+      to: "/#{org_slug}/workspaces/#{ws_slug}/benchmark#evals#{query_suffix(conn)}"
+    )
+  end
+
   defp map_folded_suffix("loop"), do: "observability#learning-loop"
   defp map_folded_suffix("compare"), do: "costs#compare"
+  defp map_folded_suffix("evals"), do: "benchmark#evals"
   defp map_folded_suffix(rest), do: rest
 
   # Workspace resolution for the benchmark redirects: the visitor's most

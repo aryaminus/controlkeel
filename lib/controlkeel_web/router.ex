@@ -194,6 +194,11 @@ defmodule ControlKeelWeb.Router do
     # grouping control. Same redirect pattern as the folded loop page above.
     get "/:org_slug/workspaces/:ws_slug/compare", PageController, :observability_compare_redirect
 
+    # Folded Evals page (observability consolidation): eval candidates now
+    # live as the `#evals` section of the workspace problems page, their
+    # derivation source. Same redirect pattern as above.
+    get "/:org_slug/workspaces/:ws_slug/evals", PageController, :observability_evals_redirect
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
@@ -218,7 +223,6 @@ defmodule ControlKeelWeb.Router do
       # until the mount migration slice lands).
       live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
       live "/:org_slug/workspaces/:ws_slug/costs", ObservabilityCostsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/evals", ObservabilityEvalsLive, :index
       live "/:org_slug/workspaces/:ws_slug/imports", ObservabilityImportsLive, :index
       live "/:org_slug/workspaces/:ws_slug/memory-quality",
            ObservabilityMemoryQualityLive,

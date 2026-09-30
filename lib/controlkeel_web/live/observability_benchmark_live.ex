@@ -69,6 +69,8 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
     |> assign(:run_preview, page.run_preview)
     |> assign(:history, page.history)
     |> assign(:regressions, page.regressions)
+    |> assign(:eval_candidates, Observability.eval_candidates(opts))
+    |> assign(:saved, Observability.saved_eval_candidates(opts))
   end
 
   # Shared section header for the four stacked sections: title + subtitle
@@ -177,6 +179,20 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
      |> put_flash(:info, generate_drafts_message(result))}
   end
 
+  def handle_event("save-candidates", _params, socket) do
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      result = Observability.save_eval_candidates(socket.assigns.opts)
+
+      {:noreply,
+       socket
+       |> assign_benchmark_page()
+       |> put_flash(:info, save_summary_message(result))}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Admin or owner role required.")}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -185,6 +201,164 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
         title="Benchmark"
         subtitle="Draft, review, and run history for locally generated observability benchmarks."
       />
+      <section id="evals" class="w-full space-y-5 scroll-mt-6">
+        <.benchmark_section_header
+          title="Eval candidates"
+          subtitle="Advisory regression candidates derived from grouped problems — review and save them here, then generate benchmark drafts below."
+        >
+          <span id="observability-evals-health" class={health_pill_class(@eval_candidates.health)}>
+            {@eval_candidates.health}
+          </span>
+          <span class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+            {@eval_candidates.count} candidate(s)
+          </span>
+          <.button
+            id="observability-evals-save"
+            type="button"
+            phx-click="save-candidates"
+          >
+            Review &amp; save candidates
+          </.button>
+        </.benchmark_section_header>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <CommandPill.command_pill command="controlkeel obs evals" />
+          <p class="text-xs text-muted-foreground">
+            Save persists the current advisory candidates locally for human-gated review.
+          </p>
+          <.link
+            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/problems"}
+            class="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
+          >
+            View grouped problems <.icon name="hero-arrow-up-right" class="size-3" />
+          </.link>
+        </div>
+
+        <%= if @eval_candidates.recommendations != [] do %>
+          <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
+            <.section_title>Recommended next actions</.section_title>
+            <ul class="space-y-2 text-sm leading-relaxed text-muted-foreground list-disc ml-5">
+              <%= for recommendation <- @eval_candidates.recommendations do %>
+                <li>{recommendation}</li>
+              <% end %>
+            </ul>
+          </section>
+        <% end %>
+
+        <section
+          id="observability-evals-list"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
+        >
+          <.section_title>Active candidates</.section_title>
+          <%= if @eval_candidates.candidates == [] do %>
+            <p class="text-sm text-muted-foreground">
+              No eval candidates are currently active.
+            </p>
+          <% else %>
+            <div class="divide-y divide-border">
+              <%= for candidate <- @eval_candidates.candidates do %>
+                <div
+                  id={"observability-eval-#{candidate.id}"}
+                  class="space-y-2 py-3 first:pt-0 last:pb-0"
+                >
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0 space-y-1">
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        {candidate.category}
+                      </p>
+                      <p class="text-sm font-medium text-foreground">{candidate.title}</p>
+                    </div>
+                    <span class={priority_pill_class(candidate.priority)}>{candidate.priority}</span>
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    {candidate.rule_id} · {candidate.finding_count} finding(s) · {candidate.affected_session_count} session(s)
+                  </p>
+                  <p class="text-sm leading-relaxed text-foreground">
+                    {candidate.evidence_summary}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Benchmark hint: {candidate.benchmark_hint}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Human gate required: {candidate.human_gate_required}
+                  </p>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <article
+            id="observability-persisted-evals-status"
+            class="rounded-2xl border bg-card p-5 shadow-card"
+          >
+            <p class="text-sm font-medium text-muted-foreground">Saved status</p>
+            <p class="mt-2 text-lg font-semibold text-foreground/90">
+              {if @saved.by_status == %{}, do: "none", else: format_frequency(@saved.by_status)}
+            </p>
+          </article>
+
+          <article
+            id="observability-persisted-evals-priority"
+            class="rounded-2xl border bg-card p-5 shadow-card"
+          >
+            <p class="text-sm font-medium text-muted-foreground">Saved priority</p>
+            <p class="mt-2 text-lg font-semibold text-foreground/90">
+              {if @saved.by_priority == %{},
+                do: "none",
+                else: format_frequency(@saved.by_priority)}
+            </p>
+          </article>
+        </div>
+
+        <section
+          id="observability-persisted-evals-list"
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-4"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <.section_title>Saved eval candidates</.section_title>
+            <span class="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+              {@saved.count} saved
+            </span>
+          </div>
+          <%= if @saved.candidates == [] do %>
+            <p class="text-sm text-muted-foreground">No saved eval candidates yet.</p>
+          <% else %>
+            <div class="divide-y divide-border">
+              <%= for candidate <- @saved.candidates do %>
+                <div
+                  id={"observability-persisted-eval-#{candidate.id}"}
+                  class="space-y-2 py-3 first:pt-0 last:pb-0"
+                >
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0 space-y-1">
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        {candidate.category || "uncategorized"}
+                      </p>
+                      <p class="text-sm font-medium text-foreground">{candidate.title}</p>
+                    </div>
+                    <span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                      {candidate.status}
+                    </span>
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    {candidate.rule_id} · {candidate.priority} · human gate {candidate.human_gate_required}
+                  </p>
+                  <p class="text-sm leading-relaxed text-foreground">
+                    {candidate.evidence_summary}
+                  </p>
+                  <p class="text-xs text-muted-foreground">Next: {candidate.suggested_action}</p>
+                  <p class="text-xs text-muted-foreground">
+                    Benchmark hint: {candidate.benchmark_hint || "none"}
+                  </p>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
+      </section>
+
       <section id="benchmarks-drafts" class="w-full space-y-5 scroll-mt-6">
         <.benchmark_section_header
           title="Benchmark drafts"
@@ -202,6 +376,12 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
         <div class="flex flex-wrap items-center gap-3">
           <CommandPill.command_pill command="controlkeel obs benchmarks drafts" />
+          <a
+            href="#evals"
+            class="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
+          >
+            View eval candidates <.icon name="hero-arrow-up-right" class="size-3" />
+          </a>
         </div>
 
         <.benchmark_recommendations
@@ -589,6 +769,32 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
   defp generate_drafts_message(%{stored: stored, existing: existing}) do
     count_part = "Generated #{stored} draft(s)"
+    existing_part = if existing > 0, do: " · #{existing} already existed", else: ""
+    count_part <> existing_part <> "."
+  end
+
+  defp priority_pill_class("critical"),
+    do:
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-destructive/10 text-destructive ring-destructive/20"
+
+  defp priority_pill_class("high"),
+    do:
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-warning/10 text-warning ring-warning/20"
+
+  defp priority_pill_class(_),
+    do:
+      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 bg-muted text-foreground ring-border"
+
+  defp save_summary_message(%{stored: 0, existing: _existing, source_count: 0}) do
+    "No active eval candidates to save."
+  end
+
+  defp save_summary_message(%{stored: 0, existing: existing}) when existing > 0 do
+    "Nothing new to save — #{existing} candidate(s) already saved."
+  end
+
+  defp save_summary_message(%{stored: stored, existing: existing}) do
+    count_part = "Saved #{stored} candidate(s)"
     existing_part = if existing > 0, do: " · #{existing} already existed", else: ""
     count_part <> existing_part <> "."
   end

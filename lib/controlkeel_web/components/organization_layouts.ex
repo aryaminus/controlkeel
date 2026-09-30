@@ -677,12 +677,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-light-bulb"
       },
       %{
-        label: "Evals",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/evals",
-        scope: :workspace,
-        icon: "hero-chart-pie"
-      },
-      %{
         label: "Benchmark",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/benchmark",
         scope: :workspace,
