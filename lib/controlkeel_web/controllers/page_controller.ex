@@ -248,7 +248,16 @@ defmodule ControlKeelWeb.PageController do
     )
   end
 
+  # Folded Compare page (workspace scope): invocation comparison now lives as
+  # the `#compare` section of the costs page. Same redirect pattern as loop.
+  def observability_compare_redirect(conn, %{"org_slug" => org_slug, "ws_slug" => ws_slug}) do
+    redirect(conn,
+      to: "/#{org_slug}/workspaces/#{ws_slug}/costs#compare#{query_suffix(conn)}"
+    )
+  end
+
   defp map_folded_suffix("loop"), do: "observability#learning-loop"
+  defp map_folded_suffix("compare"), do: "costs#compare"
   defp map_folded_suffix(rest), do: rest
 
   # Workspace resolution for the benchmark redirects: the visitor's most

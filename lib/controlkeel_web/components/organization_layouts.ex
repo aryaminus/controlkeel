@@ -701,12 +701,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-arrow-down-tray"
       },
       %{
-        label: "Compare",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/compare",
-        scope: :workspace,
-        icon: "hero-scale"
-      },
-      %{
         label: "Promotions",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/promotions",
         scope: :workspace,

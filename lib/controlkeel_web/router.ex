@@ -189,6 +189,11 @@ defmodule ControlKeelWeb.Router do
     # over the LiveView route it replaces.
     get "/:org_slug/workspaces/:ws_slug/loop", PageController, :observability_loop_redirect
 
+    # Folded Compare page (observability consolidation): invocation comparison
+    # now lives as the `#compare` section of the workspace costs page, with a
+    # grouping control. Same redirect pattern as the folded loop page above.
+    get "/:org_slug/workspaces/:ws_slug/compare", PageController, :observability_compare_redirect
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
@@ -212,7 +217,6 @@ defmodule ControlKeelWeb.Router do
       # modules untouched — mounts still use the recent-session heuristic
       # until the mount migration slice lands).
       live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
-      live "/:org_slug/workspaces/:ws_slug/compare", ObservabilityCompareLive, :index
       live "/:org_slug/workspaces/:ws_slug/costs", ObservabilityCostsLive, :index
       live "/:org_slug/workspaces/:ws_slug/evals", ObservabilityEvalsLive, :index
       live "/:org_slug/workspaces/:ws_slug/imports", ObservabilityImportsLive, :index

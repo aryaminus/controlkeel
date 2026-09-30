@@ -181,6 +181,44 @@ defmodule ControlKeel.Observability do
     }
   end
 
+  # Merged cost + invocation-comparison report for the consolidated Costs
+  # page. Fetches the workspace invocations once and derives every grouping
+  # in memory, replacing the 4 separate `costs/1` queries the old Costs page
+  # ran (and the 4 `comparison/1` queries the old Compare page ran).
+  def costs_comparison(opts \\ []) do
+    by = normalize_cost_group(Keyword.get(opts, :by, "model"))
+    groupings = Keyword.get(opts, :groupings, @cost_group_fields)
+    invocations = cost_invocations(opts)
+    totals = cost_totals(invocations)
+
+    grouped = Map.new(groupings, fn group -> {group, cost_groups(invocations, group)} end)
+    primary_groups = Map.get(grouped, by, cost_groups(invocations, by))
+    compare_groups = comparison_groups(invocations, by)
+
+    %{
+      by: by,
+      totals: totals,
+      costs: %{
+        by: by,
+        totals: totals,
+        groups: primary_groups,
+        recommendations: cost_recommendations(totals, primary_groups, by),
+        available_groupings: @cost_group_fields
+      },
+      comparison: %{
+        by: by,
+        totals: totals,
+        groups: compare_groups,
+        available_groupings: @cost_group_fields,
+        recommendations: comparison_recommendations(compare_groups, by)
+      },
+      grouped_costs:
+        Enum.map(groupings, fn group ->
+          {group, %{by: group, totals: totals, groups: Map.fetch!(grouped, group)}}
+        end)
+    }
+  end
+
   def saved_eval_candidates(opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
     candidates = saved_eval_candidate_records(opts, limit)

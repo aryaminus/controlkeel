@@ -26,7 +26,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     assert has_element?(view, "#observability-overview-run-list")
     assert html =~ "/#{ws.slug}/problems"
     assert html =~ "/#{ws.slug}/promotions"
-    assert html =~ "/#{ws.slug}/compare"
+    assert html =~ "/#{ws.slug}/costs"
     assert html =~ "/#{ws.slug}/imports"
     assert html =~ "/#{ws.slug}/memory-quality"
     assert html =~ "/#{ws.slug}/trends"
