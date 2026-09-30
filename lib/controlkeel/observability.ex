@@ -1481,13 +1481,24 @@ defmodule ControlKeel.Observability do
         true -> "green"
       end
 
+    # Bolt: Single-pass Enum.reduce avoids multiple iterations
+    counts =
+      Enum.reduce(runs, %{red: 0, yellow: 0, green: 0}, fn run, acc ->
+        case run.health do
+          "red" -> %{acc | red: acc.red + 1}
+          "yellow" -> %{acc | yellow: acc.yellow + 1}
+          "green" -> %{acc | green: acc.green + 1}
+          _ -> acc
+        end
+      end)
+
     %{
       status: status,
       label: health_label(status),
       run_count: length(runs),
-      red_runs: Enum.count(runs, &(&1.health == "red")),
-      yellow_runs: Enum.count(runs, &(&1.health == "yellow")),
-      green_runs: Enum.count(runs, &(&1.health == "green"))
+      red_runs: counts.red,
+      yellow_runs: counts.yellow,
+      green_runs: counts.green
     }
   end
 
@@ -3261,25 +3272,37 @@ defmodule ControlKeel.Observability do
   end
 
   defp health(findings, tasks, reviews, budget) do
-    active_findings = Enum.filter(findings, &(&1.status in @active_finding_statuses))
-    critical = Enum.count(active_findings, &(&1.severity == "critical"))
-    high = Enum.count(active_findings, &(&1.severity == "high"))
-    blocked = Enum.count(active_findings, &(&1.status == "blocked"))
+    # Bolt: Single-pass Enum.reduce avoids intermediate list allocations and multiple iterations
+    counts =
+      Enum.reduce(findings, %{active: 0, critical: 0, high: 0, blocked: 0}, fn f, acc ->
+        if f.status in @active_finding_statuses do
+          %{
+            acc
+            | active: acc.active + 1,
+              critical: acc.critical + if(f.severity == "critical", do: 1, else: 0),
+              high: acc.high + if(f.severity == "high", do: 1, else: 0),
+              blocked: acc.blocked + if(f.status == "blocked", do: 1, else: 0)
+          }
+        else
+          acc
+        end
+      end)
+
     pending_reviews = Enum.count(reviews, &(&1.status == "pending"))
     active_tasks = Enum.count(tasks, &(&1.status in @active_task_statuses))
 
     status =
       cond do
-        Map.get(budget, "decision") == "block" or critical > 0 or blocked > 0 -> "red"
-        Map.get(budget, "decision") == "warn" or high > 0 or pending_reviews > 0 -> "yellow"
-        active_findings != [] or active_tasks > 0 -> "yellow"
+        Map.get(budget, "decision") == "block" or counts.critical > 0 or counts.blocked > 0 -> "red"
+        Map.get(budget, "decision") == "warn" or counts.high > 0 or pending_reviews > 0 -> "yellow"
+        counts.active > 0 or active_tasks > 0 -> "yellow"
         true -> "green"
       end
 
     %{
       status: status,
       label: health_label(status),
-      reasons: health_reasons(status, critical, high, blocked, pending_reviews, budget)
+      reasons: health_reasons(status, counts.critical, counts.high, counts.blocked, pending_reviews, budget)
     }
   end
 
