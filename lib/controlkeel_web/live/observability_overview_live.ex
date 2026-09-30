@@ -25,6 +25,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       overview = Observability.workspace_overview([limit: 6] ++ opts)
       loop = Observability.loop_status(Keyword.put(opts, :overview, overview))
       diagnostics = Observability.loop_diagnostics(opts)
+      imports = Observability.imports(opts)
       recent_session = Mission.list_recent_sessions(1, workspace.id) |> List.first()
 
       {:ok,
@@ -49,6 +50,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
        |> assign(:overview, overview)
        |> assign(:loop, loop)
        |> assign(:diagnostics, diagnostics)
+       |> assign(:imports, imports)
        |> assign(:snapshot, nil)}
     else
       nil ->
@@ -188,12 +190,12 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           <p class="mt-1 text-xs text-muted-foreground">
             {@overview.telemetry.persisted_imports} persisted import(s)
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/imports"}
+          <a
+            href="#imports"
             class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
           >
             Review imports <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
+          </a>
         </article>
       </div>
 
@@ -235,6 +237,146 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       </section>
 
       <RecentSessions.session_observability_section runs={@overview.runs.recent} />
+
+      <section id="imports" class="w-full space-y-5 pt-2">
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div class="space-y-2">
+            <h2 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+              Imported snapshots
+            </h2>
+            <p class="text-sm text-muted-foreground">
+              Local persisted observability envelopes, listed as summary-only evidence snapshots.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 shrink-0 justify-end">
+            <span id="observability-imports-count" class={neutral_pill_class()}>
+              {@imports.count} persisted
+            </span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <CommandPill.command_pill command="controlkeel obs imports" />
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <article
+            id="observability-imports-integrity"
+            class="rounded-2xl border bg-card p-5 shadow-card"
+          >
+            <p class="text-sm font-medium text-muted-foreground">Integrity</p>
+            <p class="mt-2 text-lg font-semibold text-foreground/90">
+              {format_frequency(@imports.by_integrity)}
+            </p>
+          </article>
+          <article
+            id="observability-imports-health"
+            class="rounded-2xl border bg-card p-5 shadow-card"
+          >
+            <p class="text-sm font-medium text-muted-foreground">Health</p>
+            <p class="mt-2 text-lg font-semibold text-foreground/90">
+              {format_frequency(@imports.by_health)}
+            </p>
+          </article>
+        </div>
+
+        <%= if @imports.recommendations != [] do %>
+          <section class="rounded-2xl border bg-card p-5 shadow-card space-y-3">
+            <.section_title>Recommendations</.section_title>
+            <%= for recommendation <- @imports.recommendations do %>
+              <p class="text-sm leading-relaxed text-muted-foreground">{recommendation}</p>
+            <% end %>
+          </section>
+        <% end %>
+
+        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
+          <.section_title>Recent imports</.section_title>
+          <%= if @imports.recent == [] do %>
+            <p class="text-sm text-muted-foreground">
+              No persisted observability imports yet.
+            </p>
+          <% else %>
+            <div class="divide-y divide-border">
+              <%= for imported <- @imports.recent do %>
+                <div
+                  id={"observability-import-#{imported.id}"}
+                  class="space-y-3 py-4 first:pt-0 last:pb-0"
+                >
+                  <p class="text-sm font-medium text-foreground">
+                    {imported.original_session_title || "Unknown session"}
+                  </p>
+                  <dl class="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
+                    <div>
+                      <dt class="text-muted-foreground">Imported</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">
+                        {imported.imported_at || "unknown time"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Exported</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">
+                        {imported.exported_at || "unknown time"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Session</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">
+                        #{imported.original_session_id || "unknown"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Health</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">{imported.health}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Problem groups</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">{imported.problem_groups}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Findings</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">
+                        {imported.total_problem_findings}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Integrity</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">
+                        {imported.integrity_status}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Mutation</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">{imported.mutation}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Schema</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">{imported.schema_version}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Source</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">
+                        {source_label(imported.source)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">Redaction</dt>
+                      <dd class="mt-0.5 font-medium text-foreground">
+                        {imported.redaction_policy || "unknown"}
+                      </dd>
+                    </div>
+                    <div class="col-span-2 md:col-span-4">
+                      <dt class="text-muted-foreground">Fingerprint</dt>
+                      <dd class="mt-0.5 truncate font-mono text-[10px] text-foreground">
+                        {imported.payload_fingerprint || "unknown"}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </section>
+      </section>
 
       <section id="learning-loop" class="w-full space-y-5 pt-2">
         <div id="observability-loop" class="flex items-start justify-between gap-4 flex-wrap">
@@ -578,4 +720,16 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
   defp format_bytes(nil), do: "—"
   defp format_bytes(bytes) when is_integer(bytes), do: "#{bytes} B"
   defp format_bytes(_), do: "—"
+
+  defp source_label(source) when is_map(source) do
+    [source["product"], source["surface"], source["mode"]]
+    |> Enum.reject(&(&1 in [nil, ""]))
+    |> Enum.join(" / ")
+    |> case do
+      "" -> "unknown"
+      label -> label
+    end
+  end
+
+  defp source_label(_source), do: "unknown"
 end

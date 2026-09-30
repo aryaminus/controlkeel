@@ -689,12 +689,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-currency-dollar"
       },
       %{
-        label: "Imports",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/imports",
-        scope: :workspace,
-        icon: "hero-arrow-down-tray"
-      },
-      %{
         label: "Promotions",
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/promotions",
         scope: :workspace,

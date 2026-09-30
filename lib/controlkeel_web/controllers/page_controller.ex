@@ -265,9 +265,18 @@ defmodule ControlKeelWeb.PageController do
     )
   end
 
+  # Folded Imports page (workspace scope): imports now live as the
+  # `#imports` section of the overview. Same redirect pattern as above.
+  def observability_imports_redirect(conn, %{"org_slug" => org_slug, "ws_slug" => ws_slug}) do
+    redirect(conn,
+      to: "/#{org_slug}/workspaces/#{ws_slug}/observability#imports#{query_suffix(conn)}"
+    )
+  end
+
   defp map_folded_suffix("loop"), do: "observability#learning-loop"
   defp map_folded_suffix("compare"), do: "costs#compare"
   defp map_folded_suffix("evals"), do: "benchmark#evals"
+  defp map_folded_suffix("imports"), do: "observability#imports"
   defp map_folded_suffix(rest), do: rest
 
   # Workspace resolution for the benchmark redirects: the visitor's most
