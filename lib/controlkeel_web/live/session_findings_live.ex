@@ -6,6 +6,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   alias ControlKeelWeb.FindingComponents
 
   @refresh_interval_ms 2_000
+  @filters ~w(all blocked open resolved)
 
   # Collections skipped on refetch: findings page reads findings only.
   # Uses `LIMIT 0` (valid Ecto, returns []) instead of loading them.
@@ -41,8 +42,11 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
             {:ok,
              socket
-             |> assign(:selected_finding, nil)
-             |> assign(:selected_fix, nil)
+             |> assign(:open_ids, MapSet.new())
+             |> assign(:fixes, %{})
+             |> assign(:reject_id, nil)
+             |> assign(:reject_reason, "")
+             |> assign(:filter, "all")
              |> assign_session(session)}
         end
     end
@@ -51,19 +55,6 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   defp assign_session(socket, session) do
     workspace = session.workspace
     org = workspace && workspace.org
-
-    selected_finding =
-      case socket.assigns[:selected_finding] do
-        %{id: id} -> Enum.find(session.findings || [], &(&1.id == id))
-        _ -> nil
-      end
-
-    # Preserve the open modal's fix across ticks instead of recomputing it.
-    selected_fix =
-      case {selected_finding, socket.assigns[:selected_fix]} do
-        {%{}, fix} when is_map(fix) -> fix
-        {finding, _} -> maybe_regenerate_fix(finding)
-      end
 
     socket
     |> assign(:nav_org, org)
@@ -81,8 +72,22 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     ])
     |> assign(:page_title, "#{session.title} — Findings")
     |> assign(:session, session)
-    |> assign(:selected_finding, selected_finding)
-    |> assign(:selected_fix, selected_fix)
+    |> assign_view()
+  end
+
+  # Derives the filtered + sorted list and the chip counts from the session.
+  # Called after every session refresh and every filter change.
+  defp assign_view(socket) do
+    findings = socket.assigns.session.findings || []
+
+    view =
+      findings
+      |> Enum.filter(&matches_filter?(&1, socket.assigns.filter))
+      |> sort_findings()
+
+    socket
+    |> assign(:counts, counts(findings))
+    |> assign(:findings_view, view)
   end
 
   @impl true
@@ -104,27 +109,43 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   end
 
   @impl true
-  def handle_event("view_fix", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <-
-           Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
-      fix = Mission.auto_fix_for_finding(finding)
-      emit_autofix_event(:viewed, finding, fix)
+  def handle_event("set_filter", %{"filter" => filter}, socket) when filter in @filters do
+    {:noreply, socket |> assign(:filter, filter) |> assign_view()}
+  end
 
-      {:noreply,
-       socket
-       |> assign(:selected_finding, finding)
-       |> assign(:selected_fix, fix)}
+  def handle_event("set_filter", _params, socket), do: {:noreply, socket}
+
+  # Accordion toggle. Open state lives in assigns so the 2s poll re-render
+  # never collapses an expanded row; the guided fix is computed lazily on
+  # first open and cached under the finding id.
+  @impl true
+  def handle_event("toggle_finding", %{"id" => id}, socket) do
+    with {:ok, finding_id} <- parse_id(id),
+         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
+      if MapSet.member?(socket.assigns.open_ids, finding_id) do
+        {:noreply,
+         socket
+         |> assign(:open_ids, MapSet.delete(socket.assigns.open_ids, finding_id))
+         |> maybe_clear_reject(finding_id)}
+      else
+        fix = Map.get(socket.assigns.fixes, finding_id) || Mission.auto_fix_for_finding(finding)
+        emit_autofix_event(:viewed, finding, fix)
+
+        {:noreply,
+         socket
+         |> assign(:open_ids, MapSet.put(socket.assigns.open_ids, finding_id))
+         |> assign(:fixes, Map.put(socket.assigns.fixes, finding_id, fix))}
+      end
     else
-      _error -> {:noreply, put_flash(socket, :error, "ControlKeel could not load that fix.")}
+      _error -> {:noreply, socket}
     end
   end
 
   @impl true
   def handle_event("copy_fix_prompt", %{"id" => id}, socket) do
     with {:ok, finding_id} <- parse_id(id),
-         %{id: ^finding_id} = finding <- socket.assigns.selected_finding,
-         %{"agent_prompt" => prompt} = fix <- socket.assigns.selected_fix,
+         %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
+         %{"agent_prompt" => prompt} = fix <- Map.get(socket.assigns.fixes, finding_id),
          true <- is_binary(prompt) and prompt != "" do
       emit_autofix_event(:copied, finding, fix)
 
@@ -138,59 +159,59 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   end
 
   @impl true
-  def handle_event("close_fix", _params, socket) do
-    {:noreply, socket |> assign(:selected_finding, nil) |> assign(:selected_fix, nil)}
-  end
-
-  @impl true
   def handle_event("approve_finding", %{"id" => id}, socket) do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.approve_finding(finding, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
-        nil ->
-          {:noreply, SessionScope.session_not_found(socket)}
-
-        session ->
-          case SessionScope.reauthorize(socket, session) do
-            {:ok, session} ->
-              {:noreply,
-               socket |> put_flash(:info, "Finding approved.") |> assign_session(session)}
-
-            {:error, :not_found} ->
-              {:noreply, SessionScope.session_not_found(socket)}
-          end
-      end
+      {:noreply,
+       socket
+       |> put_flash(:info, "Finding approved.")
+       |> refresh_session()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
     end
   end
 
+  # Reject is two-step: the first click reveals the inline reason form,
+  # `set_reject_reason` tracks the input, `confirm_reject_finding` executes.
   @impl true
-  def handle_event("reject_finding", params, socket) do
-    id = params["id"]
-
-    reason =
-      params["reason"]
-      |> then(&if is_binary(&1) and String.trim(&1) != "", do: String.trim(&1), else: nil)
-
+  def handle_event("reject_finding", %{"id" => id}, socket) do
     with {:ok, finding_id} <- parse_id(id),
+         %{} = _finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
+      {:noreply,
+       socket
+       |> assign(:reject_id, finding_id)
+       |> assign(:reject_reason, "")}
+    else
+      _error -> {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("set_reject_reason", %{"reject_reason" => reason}, socket) do
+    {:noreply, assign(socket, :reject_reason, reason)}
+  end
+
+  @impl true
+  def handle_event("cancel_reject", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:reject_id, nil)
+     |> assign(:reject_reason, "")}
+  end
+
+  @impl true
+  def handle_event("confirm_reject_finding", _params, socket) do
+    with finding_id when not is_nil(finding_id) <- socket.assigns.reject_id,
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
-         {:ok, _updated} <- Mission.reject_finding(finding, reason, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
-        nil ->
-          {:noreply, SessionScope.session_not_found(socket)}
-
-        session ->
-          case SessionScope.reauthorize(socket, session) do
-            {:ok, session} ->
-              {:noreply,
-               socket |> put_flash(:info, "Finding rejected.") |> assign_session(session)}
-
-            {:error, :not_found} ->
-              {:noreply, SessionScope.session_not_found(socket)}
-          end
-      end
+         {:ok, _updated} <-
+           Mission.reject_finding(finding, reject_reason(socket), actor_opts(socket)) do
+      {:noreply,
+       socket
+       |> put_flash(:info, "Finding rejected.")
+       |> assign(:reject_id, nil)
+       |> assign(:reject_reason, "")
+       |> refresh_session()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
     end
@@ -201,202 +222,411 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.escalate_finding(finding, actor_opts(socket)) do
-      case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
-        nil ->
-          {:noreply, SessionScope.session_not_found(socket)}
-
-        session ->
-          case SessionScope.reauthorize(socket, session) do
-            {:ok, session} ->
-              {:noreply,
-               socket |> put_flash(:info, "Finding escalated.") |> assign_session(session)}
-
-            {:error, :not_found} ->
-              {:noreply, SessionScope.session_not_found(socket)}
-          end
-      end
+      {:noreply,
+       socket
+       |> put_flash(:info, "Finding escalated.")
+       |> refresh_session()}
     else
       _error -> {:noreply, put_flash(socket, :error, "Could not escalate finding.")}
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Render
+  # ---------------------------------------------------------------------------
+
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="space-y-6">
+    <div class="space-y-5">
       <.page_title title="Findings" />
 
-      <div class="bg-card border rounded-2xl shadow-card overflow-visible">
-        <table class="min-w-full divide-y divide-border text-left text-sm border-separate border-spacing-0">
-          <thead class="text-xs uppercase tracking-[0.14em] text-muted-foreground sticky top-0 z-10">
-            <tr>
-              <th class="bg-muted px-5 py-3 font-semibold first:rounded-tl-2xl">Finding</th>
-              <th class="bg-muted px-5 py-3 font-semibold">Severity</th>
-              <th class="bg-muted px-5 py-3 font-semibold">Status</th>
-              <th class="bg-muted px-5 py-3 font-semibold">Category</th>
-              <th class="bg-muted px-5 py-3 font-semibold">Updated</th>
-              <th class="bg-muted px-5 py-3 font-semibold w-px whitespace-nowrap last:rounded-tr-2xl">
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border">
-            <%= for finding <- @session.findings do %>
-              <tr id={"finding-row-#{finding.id}"} class="transition hover:bg-muted/30">
-                <td class="px-5 py-4">
-                  <div class="font-medium text-foreground">{finding.title}</div>
-                  <div :if={finding.rule_id} class="mt-0.5 font-mono text-xs text-muted-foreground">
-                    {finding.rule_id}
-                  </div>
-                </td>
-                <td class="px-5 py-4 whitespace-nowrap">
-                  <span class={[
-                    "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                    finding.severity in ["critical", "high"] &&
-                      "bg-destructive/10 text-destructive ring-destructive/20",
-                    finding.severity in ["medium", "moderate"] &&
-                      "bg-warning/10 text-warning ring-warning/20",
-                    finding.severity in ["low"] &&
-                      "bg-success/10 text-success ring-success/20",
-                    finding.severity not in ["critical", "high", "medium", "moderate", "low"] &&
-                      "bg-muted text-muted-foreground ring-border"
-                  ]}>
-                    {finding.severity}
-                  </span>
-                </td>
-                <td class="px-5 py-4 whitespace-nowrap">
-                  <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 bg-muted text-muted-foreground ring-border">
-                    {finding.status}
-                  </span>
-                </td>
-                <td class="px-5 py-4 text-muted-foreground whitespace-nowrap">{finding.category}</td>
-                <td class="px-5 py-4 text-muted-foreground whitespace-nowrap w-px font-mono tabular-nums tracking-tight text-xs">
-                  {event_timestamp(finding.inserted_at)}
-                </td>
-                <td class="px-4 text-right whitespace-nowrap w-px">
-                  <div id={"finding-actions-wrapper-#{finding.id}"} class="relative inline-flex">
-                    <button
-                      id={"finding-actions-#{finding.id}"}
-                      type="button"
-                      aria-label={"Actions for #{finding.title}"}
-                      aria-haspopup="menu"
-                      aria-expanded="false"
-                      phx-click={
-                        JS.toggle(to: "#finding-menu-#{finding.id}")
-                        |> JS.toggle_attribute({"aria-expanded", "true", "false"})
-                        |> JS.toggle_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
-                      }
-                      class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <.icon name="hero-ellipsis-horizontal" class="size-5 shrink-0" />
-                    </button>
-                    <div
-                      id={"finding-menu-#{finding.id}"}
-                      class={[
-                        "hidden absolute right-0 z-50 w-48 rounded-xl border bg-card p-1.5 shadow-card",
-                        if finding == List.last(@session.findings) do
-                          "bottom-full mb-1"
-                        else
-                          "top-full mt-1"
-                        end
-                      ]}
-                      phx-click-away={
-                        JS.hide(to: "#finding-menu-#{finding.id}")
-                        |> JS.remove_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
-                        |> JS.set_attribute({"aria-expanded", "false"},
-                          to: "#finding-actions-#{finding.id}"
-                        )
-                      }
-                    >
-                      <button
-                        type="button"
-                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
-                        phx-click={
-                          JS.hide(to: "#finding-menu-#{finding.id}")
-                          |> JS.remove_class("z-50", to: "#finding-actions-wrapper-#{finding.id}")
-                          |> JS.set_attribute({"aria-expanded", "false"},
-                            to: "#finding-actions-#{finding.id}"
-                          )
-                          |> JS.push("view_fix", value: %{id: finding.id})
-                        }
-                      >
-                        View fix
-                      </button>
-                      <%= if finding.status in ["open", "blocked"] do %>
-                        <button
-                          type="button"
-                          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
-                          phx-click={
-                            JS.hide(to: "#finding-menu-#{finding.id}")
-                            |> JS.push("approve_finding", value: %{id: finding.id})
-                          }
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
-                          phx-click={
-                            JS.hide(to: "#finding-menu-#{finding.id}")
-                            |> JS.push("reject_finding", value: %{id: finding.id})
-                          }
-                        >
-                          Reject
-                        </button>
-                        <button
-                          type="button"
-                          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
-                          phx-click={
-                            JS.hide(to: "#finding-menu-#{finding.id}")
-                            |> JS.push("escalate_finding", value: %{id: finding.id})
-                          }
-                        >
-                          Escalate
-                        </button>
-                      <% end %>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            <% end %>
-            <%= if @session.findings == [] do %>
-              <tr>
-                <td colspan="6" class="px-5 py-12 text-center">
-                  <p class="text-base font-medium text-foreground">No findings yet.</p>
-                  <p class="mt-1 text-sm text-muted-foreground">
-                    ControlKeel is monitoring every agent action.
-                  </p>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
+      <%= if @session.findings == [] do %>
+        <div class="rounded-2xl border bg-card px-5 py-12 text-center">
+          <p class="text-base font-medium text-foreground">No findings yet.</p>
+          <p class="mt-1 text-sm text-muted-foreground">
+            ControlKeel is monitoring every agent action.
+          </p>
+        </div>
+      <% else %>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <p class="text-sm text-muted-foreground">
+            {@counts.all} {if @counts.all == 1, do: "finding", else: "findings"}
+          </p>
 
-      <.modal
-        :if={@selected_finding && @selected_fix}
-        id="finding-fix-modal"
-        title={"Guided fix: #{@selected_finding.title}"}
-        on_close="close_fix"
-      >
-        <FindingComponents.autofix_panel
-          finding={@selected_finding}
-          fix={@selected_fix}
-          copy_event="copy_fix_prompt"
-          close_event="close_fix"
-        />
-      </.modal>
+          <div role="group" aria-label="Filter findings" class="flex flex-wrap items-center gap-2">
+            <button
+              :for={{key, label, count_key} <- filter_options()}
+              type="button"
+              id={"filter-#{key}"}
+              phx-click="set_filter"
+              phx-value-filter={key}
+              aria-pressed={@filter == key}
+              class={[
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                if(@filter == key,
+                  do: "bg-primary text-primary-foreground",
+                  else: "bg-muted text-muted-foreground hover:text-foreground"
+                )
+              ]}
+            >
+              <.icon :if={key != "all"} name={filter_icon(key)} class="size-3.5" />
+              {label}
+              <span class="tabular-nums">{Map.fetch!(@counts, count_key)}</span>
+            </button>
+          </div>
+        </div>
+
+        <%= if @findings_view == [] do %>
+          <div class="rounded-2xl border bg-card px-5 py-10 text-center">
+            <p class="text-base font-medium text-foreground">No findings match this filter.</p>
+            <div class="mt-3">
+              <.button variant="outline" phx-click="set_filter" phx-value-filter="all">
+                Show all findings
+              </.button>
+            </div>
+          </div>
+        <% else %>
+          <ul id="session-findings-list" class="space-y-3">
+            <.finding_card
+              :for={finding <- @findings_view}
+              finding={finding}
+              open?={MapSet.member?(@open_ids, finding.id)}
+              fix={Map.get(@fixes, finding.id)}
+              reject_id={@reject_id}
+              reject_reason={@reject_reason}
+            />
+          </ul>
+        <% end %>
+      <% end %>
     </div>
     """
   end
 
-  defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
+  attr :finding, :map, required: true
+  attr :open?, :boolean, required: true
+  attr :fix, :map, default: nil
+  attr :reject_id, :integer, default: nil
+  attr :reject_reason, :string, default: ""
+
+  defp finding_card(assigns) do
+    ~H"""
+    <li
+      id={"finding-#{@finding.id}"}
+      class="relative overflow-hidden rounded-xl border bg-card shadow-card"
+    >
+      <button
+        type="button"
+        id={"finding-toggle-#{@finding.id}"}
+        phx-click="toggle_finding"
+        phx-value-id={@finding.id}
+        aria-expanded={@open?}
+        aria-controls={"finding-detail-#{@finding.id}"}
+        class="relative flex w-full cursor-pointer items-center gap-4 py-4 pr-5 pl-6 text-left transition hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50"
+      >
+        <span
+          aria-hidden="true"
+          style="position:absolute;top:0;bottom:0;left:0;width:4px;"
+          class={severity_bar(@finding)}
+        >
+        </span>
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <.icon name={category_icon(@finding.category)} class="size-5" />
+        </span>
+
+        <span class="min-w-0 flex-1">
+          <span class={[
+            "block font-medium",
+            if(resolved?(@finding), do: "text-muted-foreground", else: "text-foreground")
+          ]}>
+            <.finding_title title={@finding.title} />
+          </span>
+          <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span :if={meta_value(@finding, "path")} class="max-w-[20rem] truncate font-mono">
+              {meta_value(@finding, "path")}
+            </span>
+            <span :if={@finding.rule_id} class="font-mono">{@finding.rule_id}</span>
+            <span class="capitalize">{@finding.category}</span>
+            <time
+              datetime={iso8601(@finding.inserted_at)}
+              title={event_timestamp(@finding.inserted_at)}
+              class="tabular-nums"
+            >
+              {relative_time(@finding.inserted_at)}
+            </time>
+          </span>
+        </span>
+
+        <span class="flex shrink-0 items-center gap-2">
+          <span class={[
+            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+            severity_pill(@finding.severity)
+          ]}>
+            {@finding.severity}
+          </span>
+          <span class="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold capitalize text-muted-foreground ring-1 ring-border">
+            {@finding.status}
+          </span>
+          <.icon
+            name="hero-chevron-down"
+            class={["size-4 text-muted-foreground transition-transform", @open? && "rotate-180"]}
+          />
+        </span>
+      </button>
+
+      <div
+        :if={@open?}
+        id={"finding-detail-#{@finding.id}"}
+        class="space-y-5 border-t py-5 pr-5 pl-6"
+      >
+        <div
+          :if={meta_value(@finding, "path") || meta_value(@finding, "matched_text_redacted")}
+          class="space-y-1"
+        >
+          <p :if={meta_value(@finding, "path")} class="text-xs text-muted-foreground">
+            <span class="font-medium text-foreground">Path:</span>
+            <span class="font-mono">{meta_value(@finding, "path")}</span>
+          </p>
+          <p
+            :if={meta_value(@finding, "matched_text_redacted")}
+            class="text-xs text-muted-foreground"
+          >
+            <span class="font-medium text-foreground">Matched:</span>
+            <span class="font-mono">{meta_value(@finding, "matched_text_redacted")}</span>
+          </p>
+        </div>
+
+        <div :if={@fix} class="rounded-xl border bg-muted/[0.03] p-4">
+          <FindingComponents.finding_fix_detail
+            finding={@finding}
+            fix={@fix}
+            copy_event="copy_fix_prompt"
+          />
+        </div>
+
+        <div
+          :if={@finding.status in ["open", "blocked"]}
+          class="flex flex-wrap items-center gap-2"
+        >
+          <.button phx-click="approve_finding" phx-value-id={@finding.id}>
+            Approve
+          </.button>
+          <.button variant="outline" phx-click="escalate_finding" phx-value-id={@finding.id}>
+            Escalate
+          </.button>
+          <.button
+            :if={@reject_id != @finding.id}
+            variant="destructive"
+            phx-click="reject_finding"
+            phx-value-id={@finding.id}
+          >
+            Reject
+          </.button>
+
+          <form
+            :if={@reject_id == @finding.id}
+            id={"reject-reason-#{@finding.id}"}
+            class="flex flex-wrap items-center gap-2"
+            phx-change="set_reject_reason"
+            phx-submit="confirm_reject_finding"
+          >
+            <.input
+              type="text"
+              name="reject_reason"
+              value={@reject_reason}
+              placeholder="Reason (optional)"
+              class="w-64"
+            />
+            <.button variant="destructive" type="submit">Confirm reject</.button>
+            <.button variant="secondary" type="button" phx-click="cancel_reject">
+              Cancel
+            </.button>
+          </form>
+        </div>
+      </div>
+    </li>
+    """
+  end
+
+  # Renders `code` segments inline when backticks are balanced; strips stray
+  # backticks otherwise so a title never shows a dangling "`".
+  attr :title, :string, default: ""
+
+  defp finding_title(assigns) do
+    assigns = assign(assigns, :parts, title_parts(assigns.title))
+
+    ~H"""
+    <span
+      :for={{kind, text} <- @parts}
+      class={
+        if kind == :code,
+          do: "rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]",
+          else: nil
+      }
+    >
+      {text}
+    </span>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # View helpers
+  # ---------------------------------------------------------------------------
+
+  defp filter_options do
+    [
+      {"all", "All", :all},
+      {"blocked", "Blocked", :blocked},
+      {"open", "Open", :open},
+      {"resolved", "Resolved", :resolved}
+    ]
+  end
+
+  defp filter_icon("blocked"), do: "hero-lock-closed"
+  defp filter_icon("open"), do: "hero-clock"
+  defp filter_icon("resolved"), do: "hero-check-circle"
+  defp filter_icon(_), do: "hero-funnel"
+
+  # Category says what kind of problem it is; severity is carried by the
+  # left bar and the pill, so the icon deliberately does not repeat it.
+  defp category_icon("security"), do: "hero-shield-exclamation"
+  defp category_icon("correctness"), do: "hero-bug-ant"
+  defp category_icon("cost"), do: "hero-banknotes"
+  defp category_icon(_), do: "hero-flag"
+
+  defp severity_bar(finding) do
+    if resolved?(finding) do
+      "bg-border"
+    else
+      severity_bar_color(finding.severity)
+    end
+  end
+
+  defp severity_bar_color(severity) when severity in ["critical", "high"], do: "bg-destructive"
+  defp severity_bar_color(severity) when severity in ["medium", "moderate"], do: "bg-warning"
+  defp severity_bar_color("low"), do: "bg-success"
+  defp severity_bar_color(_), do: "bg-muted"
+
+  defp severity_pill(severity) when severity in ["critical", "high"],
+    do: "bg-destructive/10 text-destructive ring-destructive/20"
+
+  defp severity_pill(severity) when severity in ["medium", "moderate"],
+    do: "bg-warning/10 text-warning ring-warning/20"
+
+  defp severity_pill("low"), do: "bg-success/10 text-success ring-success/20"
+  defp severity_pill(_), do: "bg-muted text-muted-foreground ring-border"
+
+  defp resolved?(finding), do: finding.status not in ["open", "blocked"]
+
+  defp meta_value(%{metadata: %{} = metadata}, key), do: metadata[key]
+  defp meta_value(_finding, _key), do: nil
+
+  defp title_parts(title) do
+    title = title || ""
+    segments = String.split(title, "`")
+
+    if rem(length(segments), 2) == 1 do
+      segments
+      |> Enum.with_index()
+      |> Enum.reject(fn {text, _index} -> text == "" end)
+      |> Enum.map(fn {text, index} -> {if(rem(index, 2) == 1, do: :code, else: :text), text} end)
+    else
+      [{:text, String.replace(title, "`", "")}]
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Filtering, sorting, counting
+  # ---------------------------------------------------------------------------
+
+  defp matches_filter?(_finding, "all"), do: true
+  defp matches_filter?(finding, "blocked"), do: finding.status == "blocked"
+  defp matches_filter?(finding, "open"), do: finding.status == "open"
+  defp matches_filter?(finding, "resolved"), do: resolved?(finding)
+  defp matches_filter?(_finding, _other), do: true
+
+  defp counts(findings) do
+    %{
+      all: length(findings),
+      blocked: Enum.count(findings, &(&1.status == "blocked")),
+      open: Enum.count(findings, &(&1.status == "open")),
+      resolved: Enum.count(findings, &resolved?/1)
+    }
+  end
+
+  # Newest first, then a stable sort by (resolved?, severity) so unresolved
+  # high-severity work is always on top and resolved items sink to the bottom.
+  defp sort_findings(findings) do
+    findings
+    |> Enum.sort_by(&unix(&1.inserted_at), :desc)
+    |> Enum.sort_by(fn finding ->
+      {if(resolved?(finding), do: 1, else: 0), severity_rank(finding.severity)}
+    end)
+  end
+
+  defp severity_rank("critical"), do: 0
+  defp severity_rank("high"), do: 1
+  defp severity_rank(s) when s in ["medium", "moderate"], do: 2
+  defp severity_rank("low"), do: 3
+  defp severity_rank(_), do: 4
+
+  defp unix(%DateTime{} = timestamp), do: DateTime.to_unix(timestamp)
+  defp unix(_), do: 0
+
+  # ---------------------------------------------------------------------------
+  # Time
+  # ---------------------------------------------------------------------------
 
   defp event_timestamp(nil), do: "unknown"
-
   defp event_timestamp(%DateTime{} = timestamp), do: Calendar.strftime(timestamp, "%Y-%m-%d")
 
-  defp maybe_regenerate_fix(nil), do: nil
-  defp maybe_regenerate_fix(finding), do: Mission.auto_fix_for_finding(finding)
+  defp iso8601(%DateTime{} = timestamp), do: DateTime.to_iso8601(timestamp)
+  defp iso8601(_), do: nil
+
+  defp relative_time(nil), do: "unknown"
+
+  defp relative_time(%DateTime{} = timestamp) do
+    diff = DateTime.diff(DateTime.utc_now(), timestamp, :second)
+
+    cond do
+      diff < 60 -> "just now"
+      diff < 3_600 -> "#{div(diff, 60)}m ago"
+      diff < 86_400 -> "#{div(diff, 3_600)}h ago"
+      diff < 7 * 86_400 -> "#{div(diff, 86_400)}d ago"
+      true -> Calendar.strftime(timestamp, "%b %d, %Y")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Internals
+  # ---------------------------------------------------------------------------
+
+  defp schedule_refresh, do: Process.send_after(self(), :refresh, @refresh_interval_ms)
+
+  defp refresh_session(socket) do
+    case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
+      nil -> SessionScope.session_not_found(socket)
+      session -> assign_session(socket, session)
+    end
+  end
+
+  defp maybe_clear_reject(socket, finding_id) do
+    if socket.assigns.reject_id == finding_id do
+      socket
+      |> assign(:reject_id, nil)
+      |> assign(:reject_reason, "")
+    else
+      socket
+    end
+  end
+
+  defp reject_reason(socket) do
+    case String.trim(socket.assigns.reject_reason) do
+      "" -> nil
+      reason -> reason
+    end
+  end
 
   defp emit_autofix_event(action, finding, fix) do
     :telemetry.execute(

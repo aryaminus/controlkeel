@@ -81,4 +81,75 @@ defmodule ControlKeelWeb.FindingComponents do
     </div>
     """
   end
+
+  @doc """
+  Inline (non-modal) guided-fix detail for the session findings accordion.
+  Same fix payload as `autofix_panel`, lighter chrome: no modal surface,
+  tone tokens only, action buttons stay in the host page.
+  """
+  attr :finding, :map, required: true
+  attr :fix, :map, required: true
+  attr :copy_event, :string, default: nil
+
+  def finding_fix_detail(assigns) do
+    ~H"""
+    <div class="space-y-4">
+      <div class="flex items-center justify-between gap-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+          Guided fix
+        </p>
+        <span class={[
+          "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+          @fix["supported"] && "bg-success/10 text-success ring-success/20",
+          !@fix["supported"] && "bg-warning/10 text-warning ring-warning/20"
+        ]}>
+          {if @fix["supported"], do: "supported", else: "manual review"}
+        </span>
+      </div>
+
+      <p class="text-sm leading-relaxed text-muted-foreground">{@fix["summary"]}</p>
+
+      <div class="grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
+        <div>
+          <p class="text-sm font-semibold text-foreground">Why</p>
+          <p class="mt-1 text-sm text-muted-foreground">{@fix["why"]}</p>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-foreground">Requires human</p>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {if @fix["requires_human"], do: "Yes", else: "No"}
+          </p>
+        </div>
+      </div>
+
+      <div :if={@fix["steps"] != [] && @fix["steps"]}>
+        <p class="text-sm font-semibold text-foreground">Steps</p>
+        <ol class="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
+          <%= for step <- @fix["steps"] || [] do %>
+            <li class="leading-relaxed">{step}</li>
+          <% end %>
+        </ol>
+      </div>
+
+      <div :if={@fix["example"]}>
+        <p class="text-sm font-semibold text-foreground">Example</p>
+        <pre class="mt-2 m-0 p-4 border rounded-xl bg-muted/[0.03] whitespace-pre-wrap break-words font-mono text-[0.9rem] leading-[1.6]"><code>{@fix["example"]}</code></pre>
+      </div>
+
+      <div :if={@fix["agent_prompt"]}>
+        <p class="text-sm font-semibold text-foreground">Agent prompt</p>
+        <pre class="mt-2 m-0 p-4 border rounded-xl bg-muted/[0.03] whitespace-pre-wrap break-words font-mono text-[0.9rem] leading-[1.6]"><code>{@fix["agent_prompt"]}</code></pre>
+        <button
+          :if={@copy_event}
+          type="button"
+          class="mt-3 inline-flex items-center gap-2 rounded-lg border border-border bg-transparent px-4 py-1.5 text-xs font-semibold text-foreground transition cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          phx-click={@copy_event}
+          phx-value-id={@finding.id}
+        >
+          Copy fix prompt
+        </button>
+      </div>
+    </div>
+    """
+  end
 end

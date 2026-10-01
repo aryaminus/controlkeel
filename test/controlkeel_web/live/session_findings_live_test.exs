@@ -26,10 +26,13 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
     assert html =~ "Unsafe HTML"
     assert html =~ "security.xss_unsafe_html"
 
-    detail_html = render_click(view, "view_fix", %{"id" => finding.id})
+    # Accordion: details and actions reveal on toggle, fix computed lazily.
+    detail_html = render_click(view, "toggle_finding", %{"id" => finding.id})
 
     assert detail_html =~ "Guided fix"
     assert detail_html =~ "safe DOM API"
+    assert detail_html =~ "Approve"
+    assert detail_html =~ "Reject"
 
     render_click(view, "copy_fix_prompt", %{"id" => finding.id})
 
@@ -57,10 +60,12 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
     assert Mission.get_finding!(approve_target.id).status == "approved"
 
     rejected_html =
-      render_click(view, "reject_finding", %{
-        "id" => reject_target.id,
-        "reason" => "false positive"
-      })
+      view
+      |> render_click("reject_finding", %{"id" => reject_target.id})
+      |> then(fn _ ->
+        render_click(view, "set_reject_reason", %{"reject_reason" => "false positive"})
+      end)
+      |> then(fn _ -> render_click(view, "confirm_reject_finding") end)
 
     assert rejected_html =~ "Finding rejected."
     assert Mission.get_finding!(reject_target.id).status == "rejected"
