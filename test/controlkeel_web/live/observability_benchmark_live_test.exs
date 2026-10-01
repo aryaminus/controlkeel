@@ -8,7 +8,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   alias ControlKeel.Observability
   alias ControlKeel.Repo
 
-  defp benchmark_path(org, ws), do: "/#{org.slug}/workspaces/#{ws.slug}/benchmark"
+  defp benchmark_path, do: "/observability/benchmark"
 
   defp draft_fixture(workspace, session) do
     finding_fixture(%{
@@ -28,12 +28,12 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     draft_id
   end
 
-  test "workspace benchmark page stacks drafts, scenarios, history, and regressions", %{
+  test "global benchmark page stacks drafts, scenarios, history, and regressions", %{
     conn: conn
   } do
-    {org, ws, _session} = org_bound_session_fixture()
+    {_org, _ws, _session} = org_bound_session_fixture()
 
-    {:ok, view, html} = live(conn, benchmark_path(org, ws))
+    {:ok, view, html} = live(conn, benchmark_path())
 
     assert html =~ "Benchmark"
     assert has_element?(view, "#observability-benchmark-page")
@@ -57,10 +57,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   end
 
   test "draft approve event refreshes all sections with one flash", %{conn: conn} do
-    {org, ws, session} = org_bound_session_fixture()
+    {_org, ws, session} = org_bound_session_fixture()
     draft_id = draft_fixture(ws, session)
 
-    {:ok, view, _html} = live(conn, benchmark_path(org, ws))
+    {:ok, view, _html} = live(conn, benchmark_path())
 
     assert has_element?(view, "#observability-benchmark-draft-#{draft_id}")
 
@@ -74,10 +74,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   end
 
   test "draft reject and archive events update status with flashes", %{conn: conn} do
-    {org, ws, session} = org_bound_session_fixture()
+    {_org, ws, session} = org_bound_session_fixture()
     draft_id = draft_fixture(ws, session)
 
-    {:ok, view, _html} = live(conn, benchmark_path(org, ws))
+    {:ok, view, _html} = live(conn, benchmark_path())
 
     reject_html =
       view
@@ -95,9 +95,9 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   end
 
   test "generate-drafts event reports when no candidates exist", %{conn: conn} do
-    {org, ws, _session} = org_bound_session_fixture()
+    {_org, _ws, _session} = org_bound_session_fixture()
 
-    {:ok, view, _html} = live(conn, benchmark_path(org, ws))
+    {:ok, view, _html} = live(conn, benchmark_path())
 
     html =
       view
@@ -107,35 +107,8 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     assert html =~ "No open saved eval candidates"
   end
 
-  test "benchmark page redirects unknown workspaces", %{conn: conn} do
-    {org, _ws, _session} = org_bound_session_fixture()
-
-    assert {:error,
-            {:live_redirect, %{to: "/organizations", flash: %{"error" => "Workspace not found."}}}} =
-             live(conn, "/#{org.slug}/workspaces/no-such-ws/benchmark")
-  end
-
-  test "benchmark page redirects scope-mismatched slugs", %{conn: conn} do
-    {org, ws, _session} = org_bound_session_fixture()
-
-    assert {:error, {:live_redirect, %{to: "/organizations"}}} =
-             live(conn, "/#{org.slug}/workspaces/other-ws/benchmark")
-
-    assert {:error, {:live_redirect, %{to: "/organizations"}}} =
-             live(conn, "/other-org/workspaces/#{ws.slug}/benchmark")
-  end
-
-  test "global benchmark path resolves to the workspace page", %{conn: conn} do
-    {org, ws, _session} = org_bound_session_fixture()
-
-    conn = get(conn, "/observability/benchmark")
-
-    assert redirected_to(conn, 302) == benchmark_path(org, ws)
-  end
-
-  test "legacy benchmark sub-routes redirect to anchored workspace sections", %{conn: conn} do
-    {org, ws, _session} = org_bound_session_fixture()
-    base = benchmark_path(org, ws)
+  test "legacy benchmark sub-routes redirect to anchored global sections", %{conn: conn} do
+    base = benchmark_path()
 
     for {path, anchor} <- [
           {"/observability/benchmarks/drafts", "#benchmarks-drafts"},
@@ -202,7 +175,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
       {:ok, conn: conn, org: org, workspace: workspace, admin: admin, viewer: viewer}
     end
 
-    test "resolvers fall back to the workspace picker without sessions", %{
+    test "legacy sub-routes redirect to global benchmark anchors", %{
       conn: conn,
       org: org,
       admin: admin
@@ -210,40 +183,34 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
       conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
 
       for path <- [
-            "/observability/benchmark",
             "/observability/benchmarks/drafts",
             "/observability/regressions"
           ] do
         conn = get(conn, path)
-        assert redirected_to(conn, 302) == "/organizations"
+        assert redirected_to(conn, 302) =~ "/observability/benchmark#"
       end
     end
 
-    test "viewers are redirected from the benchmark page", %{
+    test "viewers can view the benchmark page", %{
       conn: conn,
       org: org,
-      workspace: ws,
       viewer: viewer
     } do
       conn = init_test_session(conn, %{current_user_id: viewer.id, current_org_id: org.id})
 
-      assert {:error,
-              {:live_redirect,
-               %{
-                 to: "/organizations",
-                 flash: %{"error" => "Admin or owner role required."}
-               }}} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/benchmark")
+      {:ok, view, _html} = live(conn, "/observability/benchmark")
+
+      assert has_element?(view, "#observability-benchmark-page")
     end
 
     test "admins can view the benchmark page", %{
       conn: conn,
       org: org,
-      workspace: ws,
       admin: admin
     } do
       conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
 
-      {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/benchmark")
+      {:ok, view, _html} = live(conn, "/observability/benchmark")
 
       assert has_element?(view, "#observability-benchmark-page")
     end

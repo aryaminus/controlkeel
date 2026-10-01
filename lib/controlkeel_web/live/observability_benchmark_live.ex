@@ -1,59 +1,31 @@
 defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   @moduledoc """
-  Workspace benchmark page at `/:org_slug/workspaces/:ws_slug/benchmark`.
+  Global benchmark page at `/observability/benchmark`.
 
-  One stacked page for the workspace's benchmark loop: draft review, approved
+  One stacked page for the benchmark loop: draft review, approved
   test inventory with the run command, run history, and regression posture.
-  All data resolves from the URL workspace — no recent-session heuristic.
+  Data resolves from the most recent session's workspace (the same heuristic
+  as the other global observability pages).
   """
 
   use ControlKeelWeb, :live_view
 
-  alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Org
   alias ControlKeel.Mission
-  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
-  alias ControlKeel.Repo
   alias ControlKeelWeb.CommandPill
-  alias ControlKeelWeb.WorkspaceAccess
 
   on_mount ControlKeelWeb.CommandPill
 
   @impl true
-  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
-    with %Workspace{} = workspace <-
-           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
-         :ok <- check_org_slug(workspace, %{slug: slug}),
-         :ok <- check_workspace_access(workspace, socket.assigns) do
-      opts = [workspace_id: workspace.id]
+  def mount(_params, _session, socket) do
+    recent_session = Mission.list_recent_sessions(1) |> List.first()
+    opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
 
-      {:ok,
-       socket
-       |> assign(:page_title, "Benchmark — #{workspace.name}")
-       |> assign(:opts, opts)
-       |> assign(:workspace, workspace)
-       |> assign(:nav_org, workspace.org)
-       |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{
-             label: workspace.name,
-             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
-           },
-           %{label: "Benchmark", to: nil}
-         ]
-       )
-       |> assign_benchmark_page()}
-    else
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
-
-      {:error, reason} ->
-        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
-    end
+    {:ok,
+     socket
+     |> assign(:page_title, "Benchmark")
+     |> assign(:opts, opts)
+     |> assign_benchmark_page()}
   end
 
   # Single-pass refresh: draft mutations can materialize scenarios and shift
@@ -617,32 +589,4 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
   defp format_rate(nil), do: "0.0%"
   defp format_rate(rate), do: "#{Float.round(rate * 100, 1)}%"
-
-  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
-    case Accounts.get_org_by_slug(slug) do
-      %Org{id: ^org_id} -> :ok
-      _ -> {:error, "Workspace does not belong to this organization."}
-    end
-  end
-
-  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
-
-  # Admin surface: org-bound workspace + active admin/owner membership,
-  # resolved from (user, resource) via the shared gate. Draft review mutates
-  # workspace-wide exam state, so viewing and reviewing both require admin.
-  # Local mode skips the check (single-user deployment).
-  defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check(workspace, assigns[:current_user], "admin") do
-      :ok -> :ok
-      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
-      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
-      {:error, :needs_admin} -> {:error, "Admin or owner role required."}
-    end
-  end
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
-  end
 end

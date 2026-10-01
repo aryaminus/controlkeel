@@ -157,6 +157,7 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/observability", ObservabilityOverviewLive, :index
       live "/observability/loop", ObservabilityLoopLive, :index
+      live "/observability/benchmark", ObservabilityBenchmarkLive, :index
       live "/observability/compare", ObservabilityCompareLive, :index
       live "/observability/costs", ObservabilityCostsLive, :index
       live "/observability/evals", ObservabilityEvalsLive, :index
@@ -213,7 +214,6 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
       live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
       live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
-      live "/:org_slug/workspaces/:ws_slug/benchmark", ObservabilityBenchmarkLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
@@ -248,14 +248,9 @@ defmodule ControlKeelWeb.Router do
     get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
     get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
 
-    # Benchmark page now lives at the workspace scope
-    # (`/:org_slug/workspaces/:ws_slug/benchmark`): the global path resolves
-    # the visitor's workspace and redirects, so old bookmarks keep working.
-    get "/observability/benchmark", PageController, :observability_benchmark_resolve
-
     # Legacy observability benchmark sub-routes (consolidated into the stacked
-    # benchmark page): redirect bookmarks to the matching section anchor,
-    # preserving the query string.
+    # `/observability/benchmark` page): redirect bookmarks to the matching
+    # section anchor, preserving the query string.
     get "/observability/benchmarks/drafts", PageController, :observability_benchmarks_redirect
     get "/observability/benchmarks/scenarios", PageController, :observability_benchmarks_redirect
     get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
