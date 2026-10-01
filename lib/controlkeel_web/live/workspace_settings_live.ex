@@ -441,7 +441,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
                   disabled={@live_mode == "inherit" || nil}
                   aria-label={"Remove #{tool}"}
                   class={[
-                    "transition",
+                    "transition rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     @live_mode == "inherit" &&
                       "cursor-not-allowed opacity-60 hover:text-current",
                     @live_mode != "inherit" && "cursor-pointer hover:text-destructive"
