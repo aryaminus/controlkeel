@@ -1,42 +1,101 @@
 defmodule ControlKeelWeb.ObservabilityLoopLive do
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.Accounts
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
+  alias ControlKeel.Repo
   alias ControlKeelWeb.CommandPill
+  alias ControlKeelWeb.WorkspaceAccess
 
   on_mount ControlKeelWeb.CommandPill
 
   @impl true
-  def mount(_params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
-    opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
-    loop = Observability.loop_status(opts)
-    diagnostics = Observability.loop_diagnostics(opts)
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
+         :ok <- check_org_slug(workspace, %{slug: slug}),
+         :ok <- check_workspace_access(workspace, socket.assigns) do
+      opts = [workspace_id: workspace.id]
+      loop = Observability.loop_status(opts)
+      diagnostics = Observability.loop_diagnostics(opts)
+      recent_session = Mission.list_recent_sessions(1, workspace.id) |> List.first()
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Observability Learning Loop")
-     |> assign(:opts, opts)
-     |> assign(:session_id, recent_session && recent_session.id)
-     |> assign(:loop, loop)
-     |> assign(:diagnostics, diagnostics)
-     |> assign(:snapshot, nil)}
+      {:ok,
+       socket
+       |> assign(:page_title, "Observability Learning Loop")
+       |> assign(:workspace, workspace)
+       |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
+       |> assign(
+         :breadcrumbs,
+         [
+           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+           %{
+             label: workspace.name,
+             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+           },
+           %{label: "Learning loop", to: nil}
+         ]
+       )
+       |> assign(:opts, opts)
+       |> assign(:session_id, recent_session && recent_session.id)
+       |> assign(:loop, loop)
+       |> assign(:diagnostics, diagnostics)
+       |> assign(:snapshot, nil)}
+    else
+      nil ->
+        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+
+      {:error, reason} ->
+        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+    end
+  end
+
+  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
+    case Accounts.get_org_by_slug(slug) do
+      %Org{id: ^org_id} -> :ok
+      _ -> {:error, "Workspace does not belong to this organization."}
+    end
+  end
+
+  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
+
+  defp check_workspace_access(workspace, assigns) do
+    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
+      :ok -> :ok
+      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
+      {:error, :needs_admin} -> {:error, "Viewer role or higher required."}
+    end
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> Phoenix.LiveView.put_flash(kind, msg)
+    |> Phoenix.LiveView.push_navigate(to: path)
   end
 
   @impl true
   def handle_event("capture-perf-snapshot", _params, socket) do
-    opts =
-      socket.assigns.opts
-      |> maybe_put_session(socket.assigns.session_id)
-      |> Keyword.put(:persist, true)
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      opts =
+        socket.assigns.opts
+        |> maybe_put_session(socket.assigns.session_id)
+        |> Keyword.put(:persist, true)
 
-    snapshot = Observability.perf_snapshot(opts)
+      snapshot = Observability.perf_snapshot(opts)
 
-    {:noreply,
-     socket
-     |> assign(:snapshot, snapshot)
-     |> put_flash(:info, perf_flash_message(snapshot))}
+      {:noreply,
+       socket
+       |> assign(:snapshot, snapshot)
+       |> put_flash(:info, perf_flash_message(snapshot))}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Admin or owner role required.")}
+    end
   end
 
   @impl true
