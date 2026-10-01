@@ -173,6 +173,29 @@ defmodule ControlKeelWeb.Router do
     get "/sessions/:id/deploy-review", LegacyController, :session
     get "/sessions/:id/reviews/:rid", LegacyController, :session
 
+    # Global observability page URLs (pre-workspace-scope nesting): kept as
+    # auth-aware resolvers that 302 to the visitor's workspace URL, preserving
+    # the query string. Defined before the ":org_slug" live block below so the
+    # single-segment match does not swallow them.
+    get "/observability", PageController, :observability_workspace_redirect
+    get "/observability/loop", PageController, :observability_workspace_redirect
+    get "/observability/benchmark", PageController, :observability_workspace_redirect
+    get "/observability/compare", PageController, :observability_workspace_redirect
+    get "/observability/costs", PageController, :observability_workspace_redirect
+    get "/observability/evals", PageController, :observability_workspace_redirect
+    get "/observability/imports", PageController, :observability_workspace_redirect
+    get "/observability/memory-quality", PageController, :observability_workspace_redirect
+    get "/observability/recommendations", PageController, :observability_workspace_redirect
+    get "/observability/trends", PageController, :observability_workspace_redirect
+    get "/observability/problems", PageController, :observability_workspace_redirect
+    get "/observability/promotions", PageController, :observability_workspace_redirect
+    # Pre-consolidation benchmark aliases (never real pages): same resolver,
+    # landing on the workspace benchmark page.
+    get "/observability/benchmarks/drafts", PageController, :observability_workspace_redirect
+    get "/observability/benchmarks/scenarios", PageController, :observability_workspace_redirect
+    get "/observability/benchmarks/history", PageController, :observability_workspace_redirect
+    get "/observability/regressions", PageController, :observability_workspace_redirect
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
@@ -265,14 +288,6 @@ defmodule ControlKeelWeb.Router do
     get "/observability/sessions/:id", PageController, :observability_session_redirect
     get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
     get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
-
-    # Legacy observability benchmark sub-routes (consolidated into the stacked
-    # `/observability/benchmark` page): redirect bookmarks there, preserving
-    # the query string.
-    get "/observability/benchmarks/drafts", PageController, :observability_benchmarks_redirect
-    get "/observability/benchmarks/scenarios", PageController, :observability_benchmarks_redirect
-    get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
-    get "/observability/regressions", PageController, :observability_benchmarks_redirect
 
     # Legacy export paths (dual-route for backwards compat): keep functional
     # so existing `controlkeel obs export` downloads and old bookmarks still

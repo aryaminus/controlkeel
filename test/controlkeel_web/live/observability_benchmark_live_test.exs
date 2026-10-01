@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Bootstrap.LocalDefaults
   alias ControlKeel.Observability
   alias ControlKeel.Repo
 
@@ -28,7 +29,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     draft_id
   end
 
-  test "global benchmark page stacks drafts, scenarios, history, and regressions", %{
+  test "workspace benchmark page stacks drafts, scenarios, history, and regressions", %{
     conn: conn
   } do
     {org, ws, _session} = org_bound_session_fixture()
@@ -107,8 +108,9 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     assert html =~ "No open saved eval candidates"
   end
 
-  test "legacy benchmark sub-routes redirect to the global benchmark page", %{conn: conn} do
-    base = "/observability/benchmark"
+  test "legacy benchmark sub-routes redirect to the workspace benchmark page", %{conn: conn} do
+    base =
+      "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/observability/benchmark"
 
     for path <- [
           "/observability/benchmarks/drafts",
@@ -175,19 +177,23 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
       {:ok, conn: conn, org: org, workspace: workspace, admin: admin, viewer: viewer}
     end
 
-    test "legacy sub-routes redirect to global benchmark anchors", %{
+    test "legacy sub-routes redirect to the workspace benchmark page", %{
       conn: conn,
       org: org,
+      workspace: workspace,
       admin: admin
     } do
       conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
+      session_fixture(%{workspace: workspace})
+
+      base = "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark"
 
       for path <- [
             "/observability/benchmarks/drafts",
             "/observability/regressions"
           ] do
         conn = get(conn, path)
-        assert redirected_to(conn, 302) == "/observability/benchmark"
+        assert redirected_to(conn, 302) == base
       end
     end
 
