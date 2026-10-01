@@ -123,10 +123,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     with {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
       if MapSet.member?(socket.assigns.open_ids, finding_id) do
-        {:noreply,
-         socket
-         |> assign(:open_ids, MapSet.delete(socket.assigns.open_ids, finding_id))
-         |> maybe_clear_reject(finding_id)}
+        {:noreply, assign(socket, :open_ids, MapSet.delete(socket.assigns.open_ids, finding_id))}
       else
         fix = Map.get(socket.assigns.fixes, finding_id) || Mission.auto_fix_for_finding(finding)
         emit_autofix_event(:viewed, finding, fix)
@@ -172,8 +169,9 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     end
   end
 
-  # Reject is two-step: the first click reveals the inline reason form,
-  # `set_reject_reason` tracks the input, `confirm_reject_finding` executes.
+  # Reject opens the reason dialog; `set_reject_reason` tracks the input,
+  # `confirm_reject_finding` executes, `cancel_reject` closes the dialog
+  # (also wired as the modal's on_close for backdrop/X/Escape).
   @impl true
   def handle_event("reject_finding", %{"id" => id}, socket) do
     with {:ok, finding_id} <- parse_id(id),
@@ -271,7 +269,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                 )
               ]}
             >
-              <.icon :if={key != "all"} name={filter_icon(key)} class="size-3.5" />
+              <.icon name={filter_icon(key)} class="size-3.5" />
               {label}
               <span class="tabular-nums">{Map.fetch!(@counts, count_key)}</span>
             </button>
@@ -279,7 +277,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
         </div>
 
         <%= if @findings_view == [] do %>
-          <div class="rounded-2xl border bg-card px-5 py-10 text-center">
+          <div class="rounded-2xl border bg-card px-5 h-72 text-center flex items-center flex-col justify-center gap-3">
             <p class="text-base font-medium text-foreground">No findings match this filter.</p>
             <div class="mt-3">
               <.button variant="outline" phx-click="set_filter" phx-value-filter="all">
@@ -288,16 +286,55 @@ defmodule ControlKeelWeb.SessionFindingsLive do
             </div>
           </div>
         <% else %>
-          <ul id="session-findings-list" class="space-y-3">
+          <ul id="session-findings-list" class="space-y-6">
             <.finding_card
               :for={finding <- @findings_view}
               finding={finding}
               open?={MapSet.member?(@open_ids, finding.id)}
               fix={Map.get(@fixes, finding.id)}
-              reject_id={@reject_id}
-              reject_reason={@reject_reason}
             />
           </ul>
+
+          <.modal
+            :if={reject_target(@reject_id, @session.findings)}
+            id="reject-finding-modal"
+            title="Reject finding"
+            on_close="cancel_reject"
+            width="max-w-lg"
+          >
+            <form
+              id="reject-reason-form"
+              class="space-y-4"
+              phx-change="set_reject_reason"
+              phx-submit="confirm_reject_finding"
+            >
+              <p class="text-sm text-muted-foreground">
+                <span class="font-medium text-foreground">
+                  {reject_target(@reject_id, @session.findings).title}
+                </span>
+                <span
+                  :if={reject_target(@reject_id, @session.findings).rule_id}
+                  class="font-mono text-xs"
+                >
+                  · {reject_target(@reject_id, @session.findings).rule_id}
+                </span>
+              </p>
+              <.input
+                type="text"
+                name="reject_reason"
+                label="Reason"
+                value={@reject_reason}
+                placeholder="False positive, duplicate, out of scope…"
+                class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm transition placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <div class="flex items-center justify-end gap-2">
+                <.button variant="secondary" type="button" phx-click="cancel_reject">
+                  Cancel
+                </.button>
+                <.button variant="destructive" type="submit">Confirm reject</.button>
+              </div>
+            </form>
+          </.modal>
         <% end %>
       <% end %>
     </div>
@@ -307,8 +344,6 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   attr :finding, :map, required: true
   attr :open?, :boolean, required: true
   attr :fix, :map, default: nil
-  attr :reject_id, :integer, default: nil
-  attr :reject_reason, :string, default: ""
 
   defp finding_card(assigns) do
     ~H"""
@@ -331,54 +366,76 @@ defmodule ControlKeelWeb.SessionFindingsLive do
           class={severity_bar(@finding)}
         >
         </span>
-        <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-          <.icon name={category_icon(@finding.category)} class="size-5" />
-        </span>
 
-        <span class="min-w-0 flex-1">
-          <span class={[
-            "block font-medium",
-            if(resolved?(@finding), do: "text-muted-foreground", else: "text-foreground")
-          ]}>
-            <.finding_title title={@finding.title} />
+        <div class="flex w-full items-center gap-4 px-4">
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+            <.icon
+              name={category_icon(@finding.category)}
+              class={["size-5", category_icon_tone(@finding.severity)]}
+            />
           </span>
-          <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span :if={meta_value(@finding, "path")} class="max-w-[20rem] truncate font-mono">
-              {meta_value(@finding, "path")}
+
+          <span class="min-w-0 flex-1">
+            <span class={[
+              "block font-medium",
+              if(resolved?(@finding), do: "text-muted-foreground", else: "text-foreground")
+            ]}>
+              <.finding_title title={@finding.title} />
             </span>
-            <span :if={@finding.rule_id} class="font-mono">{@finding.rule_id}</span>
-            <span class="capitalize">{@finding.category}</span>
-            <time
-              datetime={iso8601(@finding.inserted_at)}
-              title={event_timestamp(@finding.inserted_at)}
-              class="tabular-nums"
-            >
-              {relative_time(@finding.inserted_at)}
-            </time>
+            <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <%= for {{kind, value}, index} <- Enum.with_index(meta_items(@finding)) do %>
+                <span
+                  :if={index > 0}
+                  aria-hidden="true"
+                  class="opacity-50 text-foreground font-medium"
+                >
+                  -
+                </span>
+                <span
+                  :if={kind == :path}
+                  title={value}
+                  class="max-w-[20rem] truncate font-mono"
+                >
+                  {value}
+                </span>
+                <span :if={kind == :rule} class="font-mono">
+                  {value}
+                </span>
+                <span :if={kind == :category} class="capitalize">{value}</span>
+                <time
+                  :if={kind == :time}
+                  datetime={iso8601(@finding.inserted_at)}
+                  title={event_timestamp(@finding.inserted_at)}
+                  class="tabular-nums"
+                >
+                  {relative_time(@finding.inserted_at)}
+                </time>
+              <% end %>
+            </span>
           </span>
-        </span>
 
-        <span class="flex shrink-0 items-center gap-2">
-          <span class={[
-            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-            severity_pill(@finding.severity)
-          ]}>
-            {@finding.severity}
+          <span class="flex shrink-0 items-center gap-2">
+            <span class={[
+              "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+              severity_pill(@finding.severity)
+            ]}>
+              {@finding.severity}
+            </span>
+            <span class="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold capitalize text-muted-foreground ring-1 ring-border">
+              {@finding.status}
+            </span>
+            <.icon
+              name="hero-chevron-down"
+              class={["size-4 text-muted-foreground transition-transform", @open? && "rotate-180"]}
+            />
           </span>
-          <span class="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold capitalize text-muted-foreground ring-1 ring-border">
-            {@finding.status}
-          </span>
-          <.icon
-            name="hero-chevron-down"
-            class={["size-4 text-muted-foreground transition-transform", @open? && "rotate-180"]}
-          />
-        </span>
+        </div>
       </button>
 
       <div
         :if={@open?}
         id={"finding-detail-#{@finding.id}"}
-        class="space-y-5 border-t py-5 pr-5 pl-6"
+        class="border-t p-4 space-y-6"
       >
         <div
           :if={meta_value(@finding, "path") || meta_value(@finding, "matched_text_redacted")}
@@ -397,52 +454,25 @@ defmodule ControlKeelWeb.SessionFindingsLive do
           </p>
         </div>
 
-        <div :if={@fix} class="rounded-xl border bg-muted/[0.03] p-4">
-          <FindingComponents.finding_fix_detail
-            finding={@finding}
-            fix={@fix}
-            copy_event="copy_fix_prompt"
-          />
-        </div>
+        <FindingComponents.finding_fix_detail
+          finding={@finding}
+          fix={@fix}
+          copy_event="copy_fix_prompt"
+        />
 
         <div
           :if={@finding.status in ["open", "blocked"]}
           class="flex flex-wrap items-center gap-2"
         >
           <.button phx-click="approve_finding" phx-value-id={@finding.id}>
-            Approve
+            <.icon name="hero-check" class="size-3.5" /> Approve
           </.button>
           <.button variant="outline" phx-click="escalate_finding" phx-value-id={@finding.id}>
-            Escalate
+            <.icon name="hero-arrow-up" class="size-3.5" /> Escalate
           </.button>
-          <.button
-            :if={@reject_id != @finding.id}
-            variant="destructive"
-            phx-click="reject_finding"
-            phx-value-id={@finding.id}
-          >
-            Reject
+          <.button variant="destructive" phx-click="reject_finding" phx-value-id={@finding.id}>
+            <.icon name="hero-x-mark" class="size-3.5" /> Reject
           </.button>
-
-          <form
-            :if={@reject_id == @finding.id}
-            id={"reject-reason-#{@finding.id}"}
-            class="flex flex-wrap items-center gap-2"
-            phx-change="set_reject_reason"
-            phx-submit="confirm_reject_finding"
-          >
-            <.input
-              type="text"
-              name="reject_reason"
-              value={@reject_reason}
-              placeholder="Reason (optional)"
-              class="w-64"
-            />
-            <.button variant="destructive" type="submit">Confirm reject</.button>
-            <.button variant="secondary" type="button" phx-click="cancel_reject">
-              Cancel
-            </.button>
-          </form>
         </div>
       </div>
     </li>
@@ -483,21 +513,55 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     ]
   end
 
+  defp filter_icon("all"), do: "hero-squares-2x2"
   defp filter_icon("blocked"), do: "hero-lock-closed"
   defp filter_icon("open"), do: "hero-clock"
   defp filter_icon("resolved"), do: "hero-check-circle"
-  defp filter_icon(_), do: "hero-funnel"
+  defp filter_icon(_), do: "hero-list-bullet"
 
   # Category says what kind of problem it is; severity is carried by the
   # left bar and the pill, so the icon deliberately does not repeat it.
+  # NOTE: icon names must already exist in the compiled app.css — the
+  # heroicons Tailwind plugin only emits icons seen at build time, so any
+  # newly introduced name stays invisible until `mix assets.build` runs.
+  # Every name below was verified present in priv/static/assets/css/app-*.css.
   defp category_icon("security"), do: "hero-shield-exclamation"
-  defp category_icon("correctness"), do: "hero-bug-ant"
-  defp category_icon("cost"), do: "hero-banknotes"
-  defp category_icon(_), do: "hero-flag"
+  defp category_icon("secret"), do: "hero-key"
+  defp category_icon("privacy"), do: "hero-lock-closed"
+  defp category_icon("compliance"), do: "hero-scale"
+  defp category_icon("governance"), do: "hero-document-check"
+  defp category_icon("cost"), do: "hero-currency-dollar"
+  defp category_icon("token"), do: "hero-cpu-chip"
+  defp category_icon("review"), do: "hero-document-text"
+
+  defp category_icon(category) when category in ["quality", "code_quality"],
+    do: "hero-check-badge"
+
+  defp category_icon("correctness"), do: "hero-puzzle-piece"
+  defp category_icon("completeness"), do: "hero-list-bullet"
+  defp category_icon("dependencies"), do: "hero-link"
+  defp category_icon("destructive_operation"), do: "hero-no-symbol"
+  defp category_icon("ops"), do: "hero-server"
+  defp category_icon("health"), do: "hero-chart-bar"
+  defp category_icon("proof"), do: "hero-shield-check"
+  defp category_icon("problem"), do: "hero-exclamation-triangle"
+  defp category_icon("research"), do: "hero-beaker"
+  defp category_icon("unverified"), do: "hero-information-circle"
+  defp category_icon(_), do: "hero-bolt"
+
+  # Severity tone for the category glyph (currentColor). Tinted chip
+  # backgrounds (bg-*/10) are absent from the current CSS bundle, so the
+  # chip stays neutral bg-muted and only the glyph takes the tone.
+  defp category_icon_tone(severity) when severity in ["critical", "high"], do: "text-destructive"
+  defp category_icon_tone(severity) when severity in ["medium", "moderate"], do: "text-warning"
+  defp category_icon_tone("low"), do: "text-success"
+  defp category_icon_tone(_), do: "text-muted-foreground"
 
   defp severity_bar(finding) do
     if resolved?(finding) do
-      "bg-border"
+      # NOTE: bg-border is absent from the compiled CSS bundle; bg-muted
+      # keeps the strip visible (dimmed) instead of transparent.
+      "bg-muted"
     else
       severity_bar_color(finding.severity)
     end
@@ -521,6 +585,19 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
   defp meta_value(%{metadata: %{} = metadata}, key), do: metadata[key]
   defp meta_value(_finding, _key), do: nil
+
+  # Present meta segments in display order. Separators render between
+  # segments, so missing values (no path, no rule_id) leave no dangling
+  # dashes. The timestamp always renders ("unknown" fallback).
+  defp meta_items(finding) do
+    [
+      {:path, meta_value(finding, "path")},
+      {:rule, finding.rule_id},
+      {:category, finding.category},
+      {:time, true}
+    ]
+    |> Enum.reject(fn {_kind, value} -> value in [nil, ""] end)
+  end
 
   defp title_parts(title) do
     title = title || ""
@@ -555,21 +632,15 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     }
   end
 
-  # Newest first, then a stable sort by (resolved?, severity) so unresolved
-  # high-severity work is always on top and resolved items sink to the bottom.
+  # Newest first, and nothing else. Deliberately no status/severity
+  # bucketing: re-sorting on disposition would relocate the row from under
+  # the user's cursor (and the 2s poll would keep moving rows), so positions
+  # stay stable while triaging. The status filter chips and the resolved
+  # dimming separate done from todo instead.
   defp sort_findings(findings) do
-    findings
-    |> Enum.sort_by(&unix(&1.inserted_at), :desc)
-    |> Enum.sort_by(fn finding ->
-      {if(resolved?(finding), do: 1, else: 0), severity_rank(finding.severity)}
-    end)
+    # id breaks same-second ties (inserted_at has second precision).
+    Enum.sort_by(findings, &{unix(&1.inserted_at), &1.id}, :desc)
   end
-
-  defp severity_rank("critical"), do: 0
-  defp severity_rank("high"), do: 1
-  defp severity_rank(s) when s in ["medium", "moderate"], do: 2
-  defp severity_rank("low"), do: 3
-  defp severity_rank(_), do: 4
 
   defp unix(%DateTime{} = timestamp), do: DateTime.to_unix(timestamp)
   defp unix(_), do: 0
@@ -611,15 +682,9 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     end
   end
 
-  defp maybe_clear_reject(socket, finding_id) do
-    if socket.assigns.reject_id == finding_id do
-      socket
-      |> assign(:reject_id, nil)
-      |> assign(:reject_reason, "")
-    else
-      socket
-    end
-  end
+  defp reject_target(nil, _findings), do: nil
+  defp reject_target(_id, nil), do: nil
+  defp reject_target(id, findings), do: Enum.find(findings, &(&1.id == id))
 
   defp reject_reason(socket) do
     case String.trim(socket.assigns.reject_reason) do

@@ -25,6 +25,8 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
     # (keyed by rule_id) can be correlated with session findings.
     assert html =~ "Unsafe HTML"
     assert html =~ "security.xss_unsafe_html"
+    # Category glyph renders tone-matched (high severity → destructive).
+    assert html =~ "hero-shield-exclamation"
 
     # Accordion: details and actions reveal on toggle, fix computed lazily.
     detail_html = render_click(view, "toggle_finding", %{"id" => finding.id})
@@ -33,6 +35,10 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
     assert detail_html =~ "safe DOM API"
     assert detail_html =~ "Approve"
     assert detail_html =~ "Reject"
+    # Disposition buttons and the All filter carry icons.
+    assert detail_html =~ "hero-check"
+    assert detail_html =~ "hero-arrow-up"
+    assert detail_html =~ "hero-x-mark"
 
     render_click(view, "copy_fix_prompt", %{"id" => finding.id})
 
@@ -59,16 +65,48 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
     assert approved_html =~ "Finding approved."
     assert Mission.get_finding!(approve_target.id).status == "approved"
 
+    # Acting on a finding must not relocate its row: newest-first order
+    # ("Reject me" is newer) holds before and after disposition.
+    {reject_pos, _} = :binary.match(approved_html, "Reject me")
+    {approve_pos, _} = :binary.match(approved_html, "Approve me")
+    assert reject_pos < approve_pos
+
     rejected_html =
       view
       |> render_click("reject_finding", %{"id" => reject_target.id})
-      |> then(fn _ ->
+      |> then(fn dialog_html ->
+        # Reject opens a dialog with the finding context and a reason input.
+        assert dialog_html =~ "Reject finding"
+        assert dialog_html =~ "Reject me"
+        assert dialog_html =~ "reject-reason-form"
+
         render_click(view, "set_reject_reason", %{"reject_reason" => "false positive"})
       end)
       |> then(fn _ -> render_click(view, "confirm_reject_finding") end)
 
     assert rejected_html =~ "Finding rejected."
     assert Mission.get_finding!(reject_target.id).status == "rejected"
+  end
+
+  test "session findings meta row separates only present values", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    # Fixture default metadata has no path: rule · category · time.
+    finding_fixture(%{session: session, status: "open", title: "No path finding"})
+
+    finding_fixture(%{
+      session: session,
+      status: "open",
+      title: "Pathed finding",
+      metadata: %{"path" => "lib/foo.ex"}
+    })
+
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/findings"))
+
+    # 2 separators + 3 separators, and no text-dash separators remain.
+    assert length(:binary.matches(html, "size-1 shrink-0 rounded-full bg-secondary")) == 5
+    refute html =~ ">-</span>"
+    refute html =~ ">·</span>"
   end
 
   test "session findings rejects a finding id from another session", %{conn: conn} do
