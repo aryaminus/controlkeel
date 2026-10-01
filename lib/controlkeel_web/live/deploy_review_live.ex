@@ -200,9 +200,14 @@ defmodule ControlKeelWeb.DeployReviewLive do
   def handle_event("confirm_write_files", _params, socket) do
     {:ok, results} = generate(socket, dry_run: false)
 
-    written = Enum.count(results, &match?({:ok, _name, _path, _content, :written}, &1))
-    skipped = Enum.count(results, &match?({:ok, _name, _path, _content, :skipped}, &1))
-    failed = Enum.count(results, &match?({:error, _name, _path, _reason}, &1))
+    # Bolt: Optimizes multiple list passes into a single reduction
+    %{written: written, skipped: skipped, failed: failed} =
+      Enum.reduce(results, %{written: 0, skipped: 0, failed: 0}, fn
+        {:ok, _name, _path, _content, :written}, acc -> %{acc | written: acc.written + 1}
+        {:ok, _name, _path, _content, :skipped}, acc -> %{acc | skipped: acc.skipped + 1}
+        {:error, _name, _path, _reason}, acc -> %{acc | failed: acc.failed + 1}
+        _, acc -> acc
+      end)
 
     message =
       if failed > 0 do
