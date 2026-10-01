@@ -41,7 +41,8 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
        )
        |> assign(:opts, opts)
        |> assign(:eval_candidates, eval_candidates)
-       |> assign(:saved, saved)}
+       |> assign(:saved, saved)
+       |> assign(:can_mutate, can_mutate?(workspace, socket.assigns))}
     else
       nil ->
         {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
@@ -73,6 +74,12 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
     socket
     |> Phoenix.LiveView.put_flash(kind, msg)
     |> Phoenix.LiveView.push_navigate(to: path)
+  end
+
+  # Mutation gate (viewer reads stay open): the save button renders and the
+  # event runs only for admin/owner. Local mode always passes.
+  defp can_mutate?(workspace, assigns) do
+    WorkspaceAccess.check(workspace, assigns[:current_user], "admin") == :ok
   end
 
   @impl true
@@ -114,6 +121,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
             {@eval_candidates.count} candidate(s)
           </span>
           <button
+            :if={@can_mutate}
             id="observability-evals-save"
             type="button"
             phx-click="save-candidates"

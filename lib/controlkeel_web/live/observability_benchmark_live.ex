@@ -46,6 +46,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
          ]
        )
        |> assign(:opts, opts)
+       |> assign(:can_mutate, can_mutate?(workspace, socket.assigns))
        |> assign_benchmark_page()}
     else
       nil ->
@@ -78,6 +79,21 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
     socket
     |> Phoenix.LiveView.put_flash(kind, msg)
     |> Phoenix.LiveView.push_navigate(to: path)
+  end
+
+  # Mutation gate (viewer reads stay open): draft buttons render and draft
+  # events run only for admin/owner. Local mode always passes.
+  defp can_mutate?(workspace, assigns) do
+    WorkspaceAccess.check(workspace, assigns[:current_user], "admin") == :ok
+  end
+
+  defp require_admin(socket) do
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      {:ok, socket}
+    else
+      _ -> {:error, put_flash(socket, :error, "Admin or owner role required.")}
+    end
   end
 
   # Single-pass refresh: draft mutations can materialize scenarios and shift
@@ -140,65 +156,81 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   # accordingly.
   @impl true
   def handle_event("approve-draft", %{"id" => id}, socket) do
-    opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
+    with {:ok, socket} <- require_admin(socket) do
+      opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
 
-    case Observability.update_benchmark_draft_status(id, "approved", opts) do
-      {:ok, _result} ->
-        materialize = Observability.materialize_benchmark_drafts(socket.assigns.opts)
+      case Observability.update_benchmark_draft_status(id, "approved", opts) do
+        {:ok, _result} ->
+          materialize = Observability.materialize_benchmark_drafts(socket.assigns.opts)
 
-        {:noreply,
-         socket
-         |> assign_benchmark_page()
-         |> put_flash(:info, approve_materialize_message(materialize))}
+          {:noreply,
+           socket
+           |> assign_benchmark_page()
+           |> put_flash(:info, approve_materialize_message(materialize))}
 
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, flash_for_status_error(reason))}
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, flash_for_status_error(reason))}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
   def handle_event("reject-draft", %{"id" => id}, socket) do
-    opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
+    with {:ok, socket} <- require_admin(socket) do
+      opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
 
-    case Observability.update_benchmark_draft_status(id, "rejected", opts) do
-      {:ok, result} ->
-        {:noreply,
-         socket
-         |> assign_benchmark_page()
-         |> put_flash(:info, status_flash_message(result))}
+      case Observability.update_benchmark_draft_status(id, "rejected", opts) do
+        {:ok, result} ->
+          {:noreply,
+           socket
+           |> assign_benchmark_page()
+           |> put_flash(:info, status_flash_message(result))}
 
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, flash_for_status_error(reason))}
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, flash_for_status_error(reason))}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
   def handle_event("archive-draft", %{"id" => id}, socket) do
-    opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
+    with {:ok, socket} <- require_admin(socket) do
+      opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
 
-    case Observability.update_benchmark_draft_status(id, "archived", opts) do
-      {:ok, result} ->
-        {:noreply,
-         socket
-         |> assign_benchmark_page()
-         |> put_flash(:info, status_flash_message(result))}
+      case Observability.update_benchmark_draft_status(id, "archived", opts) do
+        {:ok, result} ->
+          {:noreply,
+           socket
+           |> assign_benchmark_page()
+           |> put_flash(:info, status_flash_message(result))}
 
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, flash_for_status_error(reason))}
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, flash_for_status_error(reason))}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
   def handle_event("generate-drafts", _params, socket) do
-    result = Observability.generate_benchmark_drafts(socket.assigns.opts)
+    with {:ok, socket} <- require_admin(socket) do
+      result = Observability.generate_benchmark_drafts(socket.assigns.opts)
 
-    {:noreply,
-     socket
-     |> assign_benchmark_page()
-     |> put_flash(:info, generate_drafts_message(result))}
+      {:noreply,
+       socket
+       |> assign_benchmark_page()
+       |> put_flash(:info, generate_drafts_message(result))}
+    else
+      {:error, socket} -> {:noreply, socket}
+    end
   end
 
   @impl true
@@ -215,6 +247,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           subtitle="Human-gated local benchmark draft scenarios generated from saved eval candidates."
         >
           <.button
+            :if={@can_mutate}
             id="observability-benchmark-drafts-generate"
             type="button"
             variant="outline"
@@ -266,7 +299,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
                   <p class="text-xs text-muted-foreground">
                     Scenario: {materialized_scenario(draft)}
                   </p>
-                  <div class="flex items-center gap-3 pt-1">
+                  <div :if={@can_mutate} class="flex items-center gap-3 pt-1">
                     <.button
                       id={"observability-benchmark-draft-approve-#{draft.id}"}
                       type="button"

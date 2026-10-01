@@ -44,7 +44,8 @@ defmodule ControlKeelWeb.ObservabilityLoopLive do
        |> assign(:session_id, recent_session && recent_session.id)
        |> assign(:loop, loop)
        |> assign(:diagnostics, diagnostics)
-       |> assign(:snapshot, nil)}
+       |> assign(:snapshot, nil)
+       |> assign(:can_mutate, can_mutate?(workspace, socket.assigns))}
     else
       nil ->
         {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
@@ -76,6 +77,13 @@ defmodule ControlKeelWeb.ObservabilityLoopLive do
     socket
     |> Phoenix.LiveView.put_flash(kind, msg)
     |> Phoenix.LiveView.push_navigate(to: path)
+  end
+
+  # Mutation gate (viewer reads stay open): the snapshot button renders only
+  # for admin/owner (the event itself already requires admin). Local mode
+  # always passes.
+  defp can_mutate?(workspace, assigns) do
+    WorkspaceAccess.check(workspace, assigns[:current_user], "admin") == :ok
   end
 
   @impl true
@@ -335,6 +343,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLive do
             </p>
           </div>
           <.button
+            :if={@can_mutate}
             id="observability-perf-capture"
             type="button"
             variant="outline"
