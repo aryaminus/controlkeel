@@ -157,16 +157,13 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/observability", ObservabilityOverviewLive, :index
       live "/observability/loop", ObservabilityLoopLive, :index
-      live "/observability/benchmarks/drafts", ObservabilityBenchmarkDraftsLive, :index
-      live "/observability/benchmarks/scenarios", ObservabilityBenchmarkScenariosLive, :index
-      live "/observability/benchmarks/history", ObservabilityBenchmarkHistoryLive, :index
+      live "/observability/benchmark", ObservabilityBenchmarkLive, :index
       live "/observability/compare", ObservabilityCompareLive, :index
       live "/observability/costs", ObservabilityCostsLive, :index
       live "/observability/evals", ObservabilityEvalsLive, :index
       live "/observability/imports", ObservabilityImportsLive, :index
       live "/observability/memory-quality", ObservabilityMemoryQualityLive, :index
       live "/observability/recommendations", ObservabilityRecommendationsLive, :index
-      live "/observability/regressions", ObservabilityRegressionsLive, :index
       live "/observability/trends", ObservabilityTrendsLive, :index
       live "/observability/problems", ObservabilityProblemsLive, :index
       live "/observability/promotions", ObservabilityPromotionsLive, :index
@@ -250,6 +247,14 @@ defmodule ControlKeelWeb.Router do
     get "/observability/sessions/:id", PageController, :observability_session_redirect
     get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
     get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
+
+    # Legacy observability benchmark sub-routes (consolidated into the stacked
+    # `/observability/benchmark` page): redirect bookmarks there, preserving
+    # the query string.
+    get "/observability/benchmarks/drafts", PageController, :observability_benchmarks_redirect
+    get "/observability/benchmarks/scenarios", PageController, :observability_benchmarks_redirect
+    get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
+    get "/observability/regressions", PageController, :observability_benchmarks_redirect
 
     # Legacy export paths (dual-route for backwards compat): keep functional
     # so existing `controlkeel obs export` downloads and old bookmarks still

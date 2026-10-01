@@ -540,6 +540,134 @@ defmodule ControlKeel.Observability do
     }
   end
 
+  @doc """
+  Single-pass loader for the global benchmark page
+  (`/observability/benchmark`).
+
+  Returns the exact maps built by `benchmark_drafts/1`,
+  `observability_benchmark_scenarios/1`, `observability_benchmark_run_preview/1`,
+  and `observability_benchmark_history/1`, but fetches the overlapping records
+  once: scenario ordering is deterministic (`desc inserted_at, desc id`), so the
+  first N of the 500-record fetch are identical to the standalone limit-N
+  fetches, and the history coverage reuses the already-fetched drafts count.
+  The standalone functions are unchanged (CLI parity).
+  """
+  def observability_benchmark_page(opts \\ []) do
+    scenario_limit = Keyword.get(opts, :limit, 50)
+    history_limit = Keyword.get(opts, :limit, 12)
+    workspace_id = Keyword.get(opts, :workspace_id)
+    suite_slug = Keyword.get(opts, :suite)
+    scenario_slugs = normalize_observability_scenario_slugs(Keyword.get(opts, :scenario_slugs))
+    subjects = Keyword.get(opts, :subjects)
+
+    drafts = benchmark_drafts(opts)
+
+    all_scenarios =
+      observability_scenario_records([workspace_id: workspace_id, limit: 500], 500)
+
+    scenarios = Enum.take(all_scenarios, scenario_limit)
+
+    scenario_count =
+      if length(all_scenarios) < 500,
+        do: length(all_scenarios),
+        else: observability_scenario_count(opts)
+
+    scenarios_map = %{
+      count: scenario_count,
+      limit: scenario_limit,
+      scenarios: Enum.map(scenarios, &observability_scenario_summary/1),
+      by_suite: frequencies(scenarios, &observability_scenario_suite_slug/1),
+      recommendations: observability_scenario_recommendations(scenarios)
+    }
+
+    filtered =
+      scenarios
+      |> maybe_filter_observability_scenarios_by_suite(suite_slug)
+      |> maybe_filter_observability_scenarios_by_slugs(scenario_slugs)
+
+    suites =
+      filtered
+      |> Enum.map(&observability_scenario_suite_slug/1)
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    selected_suite = suite_slug || single_suite(suites)
+
+    selected_scenarios =
+      if selected_suite do
+        Enum.filter(filtered, &(observability_scenario_suite_slug(&1) == selected_suite))
+      else
+        filtered
+      end
+
+    run_preview = %{
+      suite: selected_suite,
+      suites: suites,
+      scenario_slugs: Enum.map(selected_scenarios, & &1.slug),
+      scenarios: Enum.map(selected_scenarios, &observability_scenario_summary/1),
+      subjects: subjects,
+      executable:
+        selected_suite != nil and subjects_present?(subjects) and selected_scenarios != [],
+      dry_run: true,
+      benchmark_execution: false,
+      command: observability_benchmark_run_command(selected_suite, selected_scenarios, subjects),
+      recommendations:
+        observability_run_recommendations(selected_suite, suites, selected_scenarios, subjects)
+    }
+
+    runs = observability_benchmark_run_records(all_scenarios, history_limit)
+
+    covered_ids =
+      runs
+      |> Enum.flat_map(&(&1.results || []))
+      |> Enum.map(& &1.scenario_id)
+      |> Enum.uniq()
+
+    saved = saved_eval_candidates(workspace_id: workspace_id)
+    approved_drafts = benchmark_draft_count(workspace_id: workspace_id, status: "approved")
+    latest = List.first(runs)
+    scenario_ids = Enum.map(all_scenarios, & &1.id)
+
+    coverage = %{
+      saved_eval_candidates: saved.count,
+      benchmark_drafts: drafts.count,
+      approved_drafts: approved_drafts,
+      materialized_scenarios: length(scenario_ids),
+      # Bolt: Using Enum.count/2 avoids intermediate list allocation
+      covered_scenarios: Enum.count(scenario_ids, &(&1 in covered_ids)),
+      benchmark_runs: length(runs)
+    }
+
+    history = %{
+      limit: history_limit,
+      readiness: observability_benchmark_readiness(latest, coverage),
+      coverage: coverage,
+      latest_run: if(latest, do: observability_benchmark_history_run_summary(latest), else: nil),
+      runs: Enum.map(runs, &observability_benchmark_history_run_summary/1),
+      missed: observability_benchmark_missed_summaries(runs),
+      recommendations: observability_benchmark_history_recommendations(latest, coverage)
+    }
+
+    regression_days = Keyword.get(opts, :days) || 30
+
+    regression_runs =
+      if workspace_id do
+        observability_benchmark_run_records(all_scenarios, history_limit, regression_days)
+      else
+        benchmark_run_records(regression_days, history_limit)
+      end
+
+    regressions = build_regressions(regression_runs, drafts, saved, regression_days)
+
+    %{
+      drafts: drafts,
+      scenarios: scenarios_map,
+      run_preview: run_preview,
+      history: history,
+      regressions: regressions
+    }
+  end
+
   def promotion_candidates(opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
     workspace_id = Keyword.get(opts, :workspace_id)
@@ -581,10 +709,14 @@ defmodule ControlKeel.Observability do
     days = Keyword.get(opts, :days) || 30
     limit = Keyword.get(opts, :limit) || 12
     workspace_id = Keyword.get(opts, :workspace_id)
-    runs = benchmark_run_records(days, limit)
+    runs = regression_run_records(workspace_id, days, limit)
     drafts = benchmark_drafts(workspace_id: workspace_id)
     saved = saved_eval_candidates(workspace_id: workspace_id)
 
+    build_regressions(runs, drafts, saved, days)
+  end
+
+  defp build_regressions(runs, drafts, saved, days) do
     %{
       days: days,
       health: regression_health(runs, drafts, saved),
@@ -1841,7 +1973,7 @@ defmodule ControlKeel.Observability do
   defp parse_id(_id), do: {:error, :invalid_id}
 
   defp benchmark_run_records(days, limit) do
-    since = DateTime.add(DateTime.utc_now(), -max(days, 1) * 86_400, :second)
+    since = regression_since(days)
 
     BenchmarkRun
     |> where([run], run.inserted_at >= ^since)
@@ -1849,6 +1981,23 @@ defmodule ControlKeel.Observability do
     |> limit(^limit)
     |> preload([:suite, results: []])
     |> Repo.all()
+  end
+
+  defp regression_since(days) do
+    DateTime.add(DateTime.utc_now(), -max(days, 1) * 86_400, :second)
+  end
+
+  # Workspace-scoped regression runs. Benchmark runs carry only a suite
+  # association, so workspace ownership is derived from the workspace's
+  # materialized observability scenarios (via their draft linkage). A nil
+  # workspace preserves the unscoped contract used by global callers.
+  defp regression_run_records(nil, days, limit), do: benchmark_run_records(days, limit)
+
+  defp regression_run_records(workspace_id, days, limit) do
+    scenarios =
+      observability_scenario_records([workspace_id: workspace_id, limit: 500], 500)
+
+    observability_benchmark_run_records(scenarios, limit, days)
   end
 
   defp benchmark_run_summary(%BenchmarkRun{} = run) do
@@ -2162,24 +2311,28 @@ defmodule ControlKeel.Observability do
 
   defp observability_scenario_recommendations([]),
     do: [
-      "No materialized observability benchmark scenarios yet; approve drafts and materialize them before execution."
+      "No benchmark tests yet; approve drafts to create tests before execution."
     ]
 
   defp observability_scenario_recommendations(scenarios) do
     [
-      "Review #{length(scenarios)} materialized scenario(s) before running benchmark suites.",
+      "Review #{length(scenarios)} benchmark test(s) before running benchmark suites.",
       "Benchmark execution remains separate and should stay human-gated."
     ]
   end
 
-  defp observability_benchmark_run_records([], _limit), do: []
+  defp observability_benchmark_run_records(scenarios, limit),
+    do: observability_benchmark_run_records(scenarios, limit, nil)
 
-  defp observability_benchmark_run_records(scenarios, limit) do
+  defp observability_benchmark_run_records([], _limit, _days), do: []
+
+  defp observability_benchmark_run_records(scenarios, limit, days) do
     suite_ids = scenarios |> Enum.map(& &1.suite_id) |> Enum.uniq()
     scenario_ids = scenarios |> Enum.map(& &1.id) |> MapSet.new()
 
     BenchmarkRun
     |> where([run], run.suite_id in ^suite_ids)
+    |> maybe_filter_run_since(days)
     |> order_by([run], desc: run.inserted_at, desc: run.id)
     |> limit(^limit)
     |> preload([:suite, results: [:scenario]])
@@ -2189,6 +2342,13 @@ defmodule ControlKeel.Observability do
       %{run | results: results}
     end)
     |> Enum.reject(&(&1.results == []))
+  end
+
+  defp maybe_filter_run_since(query, nil), do: query
+
+  defp maybe_filter_run_since(query, days) do
+    since = regression_since(days)
+    where(query, [run], run.inserted_at >= ^since)
   end
 
   defp observability_benchmark_history_run_summary(%BenchmarkRun{} = run) do
@@ -2234,12 +2394,11 @@ defmodule ControlKeel.Observability do
        when materialized > 0,
        do: %{
          status: "yellow",
-         reason:
-           "Materialized observability scenarios exist, but none have benchmark run evidence yet."
+         reason: "Benchmark tests exist, but none have run evidence yet."
        }
 
   defp observability_benchmark_readiness(nil, _coverage),
-    do: %{status: "red", reason: "No materialized observability benchmark scenarios exist yet."}
+    do: %{status: "red", reason: "No benchmark tests exist yet."}
 
   defp observability_benchmark_readiness(run, coverage) do
     cond do
