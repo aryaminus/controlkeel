@@ -134,16 +134,57 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         </div>
       </div>
 
-      <nav id="sidebar-org-nav" class="mt-4 flex flex-1 flex-col gap-1 px-3 text-sm">
+      <nav
+        id="sidebar-org-nav"
+        phx-hook="SidebarNav"
+        class="mt-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 overscroll-contain text-sm"
+      >
         <%= for item <- @nav_items do %>
           <% active = sidebar_item_active?(@current_path, @current_query, item) %>
-          <.link
-            navigate={item.href}
-            aria-current={active && "page"}
-            class={organization_nav_link_class(active)}
-          >
-            <.icon name={item.icon} class={organization_nav_icon_class(active)} /> {item.label}
-          </.link>
+          <% label_id = Phoenix.Naming.underscore(item.label) %>
+          <%= if item[:children] do %>
+            <% opened = active %>
+            <% collapse_id = "sidebar-collapse-#{label_id}" %>
+            <% chevron_id = "sidebar-chevron-#{label_id}" %>
+            <div class="flex flex-col gap-1">
+              <button
+                type="button"
+                id={"sidebar-toggle-#{label_id}"}
+                data-sidebar-toggle
+                aria-expanded={(opened && "true") || "false"}
+                aria-controls={collapse_id}
+                aria-label={"Toggle #{item.label} menu"}
+                class={["w-full text-left cursor-pointer", organization_nav_link_class(active)]}
+              >
+                <.icon name={item.icon} class={organization_nav_icon_class(active)} />
+                <span class="flex-1">{item.label}</span>
+                <span
+                  id={chevron_id}
+                  class={[
+                    "inline-flex shrink-0 transition-transform duration-200 text-muted-foreground",
+                    opened && "rotate-90"
+                  ]}
+                >
+                  <.icon name="hero-chevron-right" class="size-4 shrink-0" />
+                </span>
+              </button>
+              <div id={collapse_id} class={unless opened, do: "hidden"}>
+                <.organization_sidebar_children
+                  children={item.children}
+                  current_path={@current_path}
+                  parent_href={item.href}
+                />
+              </div>
+            </div>
+          <% else %>
+            <.link
+              navigate={item.href}
+              aria-current={active && "page"}
+              class={organization_nav_link_class(active)}
+            >
+              <.icon name={item.icon} class={organization_nav_icon_class(active)} /> {item.label}
+            </.link>
+          <% end %>
         <% end %>
       </nav>
 
@@ -606,6 +647,8 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     do: workspace_nav_items(assigns.nav_org.slug, workspace.slug)
 
   defp workspace_nav_items(org_slug, ws_slug) do
+    observability_href = ~p"/#{org_slug}/workspaces/#{ws_slug}/observability"
+
     [
       %{
         label: "Overview",
@@ -642,6 +685,73 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org_slug}/workspaces/#{ws_slug}/tool-policy",
         scope: :workspace,
         icon: "hero-shield-check"
+      },
+      %{
+        label: "Observability",
+        href: observability_href,
+        scope: :workspace,
+        icon: "hero-signal",
+        children: [
+          %{group: "Workspace signals"},
+          %{label: "Overview", href: observability_href, icon: "hero-signal"},
+          %{
+            label: "Learning loop",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/loop",
+            icon: "hero-arrow-path"
+          },
+          %{
+            label: "Memory quality",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/memory-quality",
+            icon: "hero-cpu-chip"
+          },
+          %{
+            label: "Trends",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/trends",
+            icon: "hero-arrow-trending-up"
+          },
+          %{
+            label: "Problems",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/problems",
+            icon: "hero-exclamation-triangle"
+          },
+          %{
+            label: "Recommendations",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/recommendations",
+            icon: "hero-light-bulb"
+          },
+          %{
+            label: "Evals",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/evals",
+            icon: "hero-chart-pie"
+          },
+          %{group: "Benchmarks"},
+          %{
+            label: "Benchmark",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/benchmark",
+            icon: "hero-beaker"
+          },
+          %{group: "Delivery & data"},
+          %{
+            label: "Costs",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/costs",
+            icon: "hero-currency-dollar"
+          },
+          %{
+            label: "Imports",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/imports",
+            icon: "hero-arrow-down-tray"
+          },
+          %{
+            label: "Compare",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/compare",
+            icon: "hero-scale"
+          },
+          %{
+            label: "Promotions",
+            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/promotions",
+            icon: "hero-trophy"
+          }
+        ]
       }
     ]
   end
@@ -731,6 +841,15 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     ]
   end
 
+  # Parent of a collapsible group (e.g. Observability): active when the
+  # current path is the parent href or anything beneath it. Must precede the
+  # scope clauses below so group parents never fall through to the tab-based
+  # organization matcher (group maps carry no `tab` key).
+  defp sidebar_item_active?(current_path, _current_query, %{children: [_ | _]} = item) do
+    is_binary(current_path) && is_binary(item.href) &&
+      (current_path == item.href or String.starts_with?(current_path, item.href <> "/"))
+  end
+
   defp sidebar_item_active?(current_path, _current_query, %{scope: :session_overview} = item) do
     is_binary(current_path) && current_path == item.href
   end
@@ -775,6 +894,57 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   defp organization_nav_icon_class(false),
     do: "size-4 text-muted-foreground group-hover:text-primary"
+
+  attr :children, :list, required: true
+  attr :current_path, :string, default: nil
+  attr :parent_href, :string, required: true
+
+  def organization_sidebar_children(assigns) do
+    ~H"""
+    <div data-sidebar-subnav class="mt-1 flex flex-col gap-0.5 pl-4 border-l border-border ml-4">
+      <%= for child <- @children do %>
+        <%= if child[:group] do %>
+          <p class="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            {child.group}
+          </p>
+        <% else %>
+          <% active = organization_subnav_active?(@current_path, child, @parent_href) %>
+          <.link
+            navigate={child.href}
+            aria-current={active && "page"}
+            class={organization_subnav_link_class(active)}
+          >
+            <.icon name={child.icon} class={organization_subnav_icon_class(active)} /> {child.label}
+          </.link>
+        <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  # The duplicate Overview child shares the parent href, so it matches exactly;
+  # every other child matches its href or anything beneath it.
+  defp organization_subnav_active?(current_path, child, parent_href) do
+    is_binary(current_path) &&
+      if child.href == parent_href do
+        current_path == child.href
+      else
+        current_path == child.href or String.starts_with?(current_path, child.href <> "/")
+      end
+  end
+
+  defp organization_subnav_link_class(true) do
+    "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted"
+  end
+
+  defp organization_subnav_link_class(false) do
+    "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+  end
+
+  defp organization_subnav_icon_class(true), do: "size-3.5 shrink-0 text-primary"
+
+  defp organization_subnav_icon_class(false),
+    do: "size-3.5 shrink-0 text-muted-foreground/70 group-hover:text-primary"
 
   # NOTE: `user_menu/1` and `flash_group/1` are intentionally duplicated here
   # (forked from `ControlKeelWeb.Layouts` on 2026-09-11) so organization pages

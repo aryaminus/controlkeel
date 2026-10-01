@@ -146,29 +146,6 @@ defmodule ControlKeelWeb.Router do
       live "/sessions/start", OnboardingLive, :new
     end
 
-    # Observability section routes use the shared :dashboard framework layout;
-    # each page renders its own heading. LayoutDefaults sets shared layout
-    # assigns (@current_path, @page_action) for active-link highlighting.
-    live_session :observability,
-      layout: {ControlKeelWeb.Layouts, :dashboard},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.LayoutDefaults
-      ] do
-      live "/observability", ObservabilityOverviewLive, :index
-      live "/observability/loop", ObservabilityLoopLive, :index
-      live "/observability/benchmark", ObservabilityBenchmarkLive, :index
-      live "/observability/compare", ObservabilityCompareLive, :index
-      live "/observability/costs", ObservabilityCostsLive, :index
-      live "/observability/evals", ObservabilityEvalsLive, :index
-      live "/observability/imports", ObservabilityImportsLive, :index
-      live "/observability/memory-quality", ObservabilityMemoryQualityLive, :index
-      live "/observability/recommendations", ObservabilityRecommendationsLive, :index
-      live "/observability/trends", ObservabilityTrendsLive, :index
-      live "/observability/problems", ObservabilityProblemsLive, :index
-      live "/observability/promotions", ObservabilityPromotionsLive, :index
-    end
-
     # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
     # shape is the most-shared URL in docs/Slack/CI, so keep it as a redirect
     # rather than a 404. Two-segment, so the single-segment ":org_slug" live
@@ -214,6 +191,47 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
       live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
       live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
+
+      # Workspace-scoped observability (issue: observability-workspace-scope):
+      # same LiveViews as the former global `/observability/*` pages, mounted
+      # from the URL workspace (`ws_slug` + `org_slug`) instead of the
+      # most-recent-session heuristic.
+      live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/loop", ObservabilityLoopLive, :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/compare",
+           ObservabilityCompareLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/costs", ObservabilityCostsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/evals", ObservabilityEvalsLive, :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/imports",
+           ObservabilityImportsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/memory-quality",
+           ObservabilityMemoryQualityLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/recommendations",
+           ObservabilityRecommendationsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/problems",
+           ObservabilityProblemsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/promotions",
+           ObservabilityPromotionsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/benchmark",
+           ObservabilityBenchmarkLive,
+           :index
+
       live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
