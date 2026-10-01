@@ -244,6 +244,9 @@ defmodule ControlKeelWeb.SessionFindingsLive do
               <tr id={"finding-row-#{finding.id}"} class="transition hover:bg-muted/30">
                 <td class="px-5 py-4">
                   <div class="font-medium text-foreground">{finding.title}</div>
+                  <div :if={finding.rule_id} class="mt-0.5 font-mono text-xs text-muted-foreground">
+                    {finding.rule_id}
+                  </div>
                 </td>
                 <td class="px-5 py-4 whitespace-nowrap">
                   <span class={[

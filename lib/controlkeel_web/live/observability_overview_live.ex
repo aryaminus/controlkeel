@@ -106,19 +106,13 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           id="observability-overview-problems"
           class="rounded-2xl border bg-card p-5 shadow-card"
         >
-          <p class="text-sm font-medium text-muted-foreground">Problems</p>
+          <p class="text-sm font-medium text-muted-foreground">Findings</p>
           <p class="mt-2 text-xl font-semibold text-foreground/90">
             {@overview.problems.count} groups
           </p>
           <p class="mt-1 text-xs text-muted-foreground">
             {@overview.problems.total_findings} active finding(s)
           </p>
-          <.link
-            navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/observability/problems"}
-            class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
-          >
-            Review groups <.icon name="hero-arrow-up-right" class="size-3" />
-          </.link>
         </article>
 
         <article
@@ -179,7 +173,9 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           </ul>
         <% end %>
         <.link
-          navigate={~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/observability/recommendations"}
+          navigate={
+            ~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/observability/recommendations"
+          }
           class="inline-flex items-center gap-2 text-sm font-medium text-primary transition hover:text-primary"
         >
           Open recommendations <.icon name="hero-arrow-up-right" class="size-3" />
@@ -187,17 +183,45 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       </section>
 
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <.section_title>Top problems</.section_title>
+        <div class="flex items-start justify-between gap-3">
+          <div class="space-y-1">
+            <.section_title>Top findings</.section_title>
+            <p class="text-xs text-muted-foreground">
+              Recurring patterns across sessions — open a session to inspect its individual findings.
+            </p>
+          </div>
+          <span class="shrink-0 rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+            {@overview.problems.count} group(s)
+          </span>
+        </div>
         <%= if @overview.problems.top == [] do %>
           <p class="text-sm text-muted-foreground">No active problems detected.</p>
         <% else %>
-          <div class="space-y-2">
+          <div class="divide-y divide-border">
             <%= for problem <- @overview.problems.top do %>
-              <div class="flex items-start justify-between gap-3 rounded-lg px-3 py-2 bg-muted/30">
-                <p class="text-sm font-medium text-foreground">{problem.rule_id}</p>
-                <p class="shrink-0 text-xs text-muted-foreground">
-                  {problem.health} · {problem.count} finding(s) · {problem.affected_session_count} session(s)
-                </p>
+              <div class="py-3 first:pt-0 last:pb-0">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-foreground">{problem.title}</p>
+                    <p class="mt-0.5 font-mono text-xs text-muted-foreground">
+                      {problem.rule_id}
+                    </p>
+                  </div>
+                  <p class="shrink-0 text-xs text-muted-foreground">
+                    {problem.health} · {problem.count} finding(s) · {problem.affected_session_count} session(s)
+                  </p>
+                </div>
+                <%= for example <- problem.examples |> List.first() |> List.wrap() do %>
+                  <.link
+                    navigate={
+                      ~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/sessions/#{example.session_id}/findings"
+                    }
+                    class="mt-1 inline-flex items-center gap-2 text-xs font-medium text-primary transition hover:text-primary"
+                  >
+                    Inspect findings in this session
+                    <.icon name="hero-arrow-up-right" class="size-3" />
+                  </.link>
+                <% end %>
               </div>
             <% end %>
           </div>

@@ -19,7 +19,12 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
         metadata: %{"path" => "assets/js/app.js", "matched_text_redacted" => "inner...HTML"}
       })
 
-    {:ok, view, _html} = live(conn, org_session_path(org, ws, session, "/findings"))
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/findings"))
+
+    # rule_id renders under the title so overview problem groups
+    # (keyed by rule_id) can be correlated with session findings.
+    assert html =~ "Unsafe HTML"
+    assert html =~ "security.xss_unsafe_html"
 
     detail_html = render_click(view, "view_fix", %{"id" => finding.id})
 
