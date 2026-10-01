@@ -165,19 +165,18 @@ defmodule ControlKeelWeb.PageController do
 
   # Legacy observability benchmark sub-routes (pre-consolidation): the drafts,
   # scenarios, history, and regressions pages now live stacked in the global
-  # `/observability/benchmark` page. Redirects preserve the query string and
-  # land on the matching section anchor.
-  def observability_benchmarks_redirect(conn, _params) do
-    anchor =
-      cond do
-        String.ends_with?(conn.request_path, "/drafts") -> "#benchmarks-drafts"
-        String.ends_with?(conn.request_path, "/scenarios") -> "#benchmarks-scenarios"
-        String.ends_with?(conn.request_path, "/history") -> "#benchmarks-history"
-        String.ends_with?(conn.request_path, "/regressions") -> "#benchmarks-regressions"
-        true -> ""
-      end
+  # `/observability/benchmark` page. Direct map of old route to target;
+  # query string is preserved, no section anchors.
+  @legacy_benchmark_redirects %{
+    "/observability/benchmarks/drafts" => "/observability/benchmark",
+    "/observability/benchmarks/scenarios" => "/observability/benchmark",
+    "/observability/benchmarks/history" => "/observability/benchmark",
+    "/observability/regressions" => "/observability/benchmark"
+  }
 
-    redirect(conn, to: "/observability/benchmark#{query_suffix(conn)}#{anchor}")
+  def observability_benchmarks_redirect(conn, _params) do
+    target = Map.get(@legacy_benchmark_redirects, conn.request_path, "/observability/benchmark")
+    redirect(conn, to: "#{target}#{query_suffix(conn)}")
   end
 
   defp query_suffix(conn) do

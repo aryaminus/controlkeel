@@ -107,21 +107,21 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     assert html =~ "No open saved eval candidates"
   end
 
-  test "legacy benchmark sub-routes redirect to anchored global sections", %{conn: conn} do
+  test "legacy benchmark sub-routes redirect to the global benchmark page", %{conn: conn} do
     base = benchmark_path()
 
-    for {path, anchor} <- [
-          {"/observability/benchmarks/drafts", "#benchmarks-drafts"},
-          {"/observability/benchmarks/scenarios", "#benchmarks-scenarios"},
-          {"/observability/benchmarks/history", "#benchmarks-history"},
-          {"/observability/regressions", "#benchmarks-regressions"}
+    for path <- [
+          "/observability/benchmarks/drafts",
+          "/observability/benchmarks/scenarios",
+          "/observability/benchmarks/history",
+          "/observability/regressions"
         ] do
       conn = get(conn, path)
-      assert redirected_to(conn, 302) == "#{base}#{anchor}"
+      assert redirected_to(conn, 302) == base
     end
 
     conn = get(conn, "/observability/benchmarks/drafts?suite=x")
-    assert redirected_to(conn, 302) == "#{base}?suite=x#benchmarks-drafts"
+    assert redirected_to(conn, 302) == "#{base}?suite=x"
   end
 
   describe "benchmark access and resolvers (cloud mode)" do
@@ -187,7 +187,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
             "/observability/regressions"
           ] do
         conn = get(conn, path)
-        assert redirected_to(conn, 302) =~ "/observability/benchmark#"
+        assert redirected_to(conn, 302) == "/observability/benchmark"
       end
     end
 

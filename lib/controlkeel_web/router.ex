@@ -249,8 +249,8 @@ defmodule ControlKeelWeb.Router do
     get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
 
     # Legacy observability benchmark sub-routes (consolidated into the stacked
-    # `/observability/benchmark` page): redirect bookmarks to the matching
-    # section anchor, preserving the query string.
+    # `/observability/benchmark` page): redirect bookmarks there, preserving
+    # the query string.
     get "/observability/benchmarks/drafts", PageController, :observability_benchmarks_redirect
     get "/observability/benchmarks/scenarios", PageController, :observability_benchmarks_redirect
     get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
