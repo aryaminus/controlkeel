@@ -204,7 +204,11 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
         <% end %>
       </section>
 
-      <RecentSessions.session_observability_section runs={@overview.runs.recent} />
+      <RecentSessions.session_observability_section
+        runs={@overview.runs.recent}
+        org_slug={@workspace.org.slug}
+        ws_slug={@workspace.slug}
+      />
     </section>
     """
   end
