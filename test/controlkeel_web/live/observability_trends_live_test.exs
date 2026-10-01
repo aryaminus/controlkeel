@@ -5,7 +5,7 @@ defmodule ControlKeelWeb.ObservabilityTrendsLiveTest do
   import Phoenix.LiveViewTest
 
   test "trends page renders and supports day window selection", %{conn: conn} do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
     finding_fixture(%{
       session: session,
@@ -16,7 +16,8 @@ defmodule ControlKeelWeb.ObservabilityTrendsLiveTest do
       rule_id: "security.trends"
     })
 
-    {:ok, view, html} = live(conn, ~p"/observability/trends")
+    base = "/#{org.slug}/workspaces/#{ws.slug}/observability/trends"
+    {:ok, view, html} = live(conn, base)
 
     assert html =~ "Trends"
     assert html =~ "controlkeel obs trends"
@@ -30,6 +31,6 @@ defmodule ControlKeelWeb.ObservabilityTrendsLiveTest do
     |> form("#trends-days", %{days: "30"})
     |> render_change()
 
-    assert_patch(view, ~p"/observability/trends?#{%{days: 30}}")
+    assert_patch(view, "#{base}?days=30")
   end
 end

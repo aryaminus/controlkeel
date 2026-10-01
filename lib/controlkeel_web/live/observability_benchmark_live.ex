@@ -1,31 +1,99 @@
 defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   @moduledoc """
-  Global benchmark page at `/observability/benchmark`.
+  Workspace benchmark page at `/:org_slug/workspaces/:ws_slug/observability/benchmark`.
 
   One stacked page for the benchmark loop: draft review, approved
   test inventory with the run command, run history, and regression posture.
-  Data resolves from the most recent session's workspace (the same heuristic
-  as the other global observability pages).
+  Data resolves from the URL workspace.
   """
 
   use ControlKeelWeb, :live_view
 
+  alias ControlKeel.Accounts
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
+  alias ControlKeel.Repo
   alias ControlKeelWeb.CommandPill
+  alias ControlKeelWeb.WorkspaceAccess
 
   on_mount ControlKeelWeb.CommandPill
 
   @impl true
-  def mount(_params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
-    opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
+         :ok <- check_org_slug(workspace, %{slug: slug}),
+         :ok <- check_workspace_access(workspace, socket.assigns) do
+      opts = [workspace_id: workspace.id]
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Benchmark")
-     |> assign(:opts, opts)
-     |> assign_benchmark_page()}
+      {:ok,
+       socket
+       |> assign(:page_title, "Benchmark")
+       |> assign(:workspace, workspace)
+       |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
+       |> assign(
+         :breadcrumbs,
+         [
+           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+           %{
+             label: workspace.name,
+             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+           },
+           %{label: "Benchmark", to: nil}
+         ]
+       )
+       |> assign(:opts, opts)
+       |> assign(:can_mutate, can_mutate?(workspace, socket.assigns))
+       |> assign_benchmark_page()}
+    else
+      nil ->
+        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+
+      {:error, reason} ->
+        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+    end
+  end
+
+  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
+    case Accounts.get_org_by_slug(slug) do
+      %Org{id: ^org_id} -> :ok
+      _ -> {:error, "Workspace does not belong to this organization."}
+    end
+  end
+
+  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
+
+  defp check_workspace_access(workspace, assigns) do
+    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
+      :ok -> :ok
+      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
+      {:error, :needs_admin} -> {:error, "Viewer role or higher required."}
+    end
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> Phoenix.LiveView.put_flash(kind, msg)
+    |> Phoenix.LiveView.push_navigate(to: path)
+  end
+
+  # Mutation gate (viewer reads stay open): draft buttons render and draft
+  # events run only for admin/owner. Local mode always passes.
+  defp can_mutate?(workspace, assigns) do
+    WorkspaceAccess.check(workspace, assigns[:current_user], "admin") == :ok
+  end
+
+  defp require_admin(socket) do
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      {:ok, socket}
+    else
+      _ -> {:error, put_flash(socket, :error, "Admin or owner role required.")}
+    end
   end
 
   # Single-pass refresh: draft mutations can materialize scenarios and shift
@@ -88,65 +156,81 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   # accordingly.
   @impl true
   def handle_event("approve-draft", %{"id" => id}, socket) do
-    opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
+    with {:ok, socket} <- require_admin(socket) do
+      opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
 
-    case Observability.update_benchmark_draft_status(id, "approved", opts) do
-      {:ok, _result} ->
-        materialize = Observability.materialize_benchmark_drafts(socket.assigns.opts)
+      case Observability.update_benchmark_draft_status(id, "approved", opts) do
+        {:ok, _result} ->
+          materialize = Observability.materialize_benchmark_drafts(socket.assigns.opts)
 
-        {:noreply,
-         socket
-         |> assign_benchmark_page()
-         |> put_flash(:info, approve_materialize_message(materialize))}
+          {:noreply,
+           socket
+           |> assign_benchmark_page()
+           |> put_flash(:info, approve_materialize_message(materialize))}
 
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, flash_for_status_error(reason))}
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, flash_for_status_error(reason))}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
   def handle_event("reject-draft", %{"id" => id}, socket) do
-    opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
+    with {:ok, socket} <- require_admin(socket) do
+      opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
 
-    case Observability.update_benchmark_draft_status(id, "rejected", opts) do
-      {:ok, result} ->
-        {:noreply,
-         socket
-         |> assign_benchmark_page()
-         |> put_flash(:info, status_flash_message(result))}
+      case Observability.update_benchmark_draft_status(id, "rejected", opts) do
+        {:ok, result} ->
+          {:noreply,
+           socket
+           |> assign_benchmark_page()
+           |> put_flash(:info, status_flash_message(result))}
 
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, flash_for_status_error(reason))}
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, flash_for_status_error(reason))}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
   def handle_event("archive-draft", %{"id" => id}, socket) do
-    opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
+    with {:ok, socket} <- require_admin(socket) do
+      opts = Keyword.merge(socket.assigns.opts, reviewed_by: "web")
 
-    case Observability.update_benchmark_draft_status(id, "archived", opts) do
-      {:ok, result} ->
-        {:noreply,
-         socket
-         |> assign_benchmark_page()
-         |> put_flash(:info, status_flash_message(result))}
+      case Observability.update_benchmark_draft_status(id, "archived", opts) do
+        {:ok, result} ->
+          {:noreply,
+           socket
+           |> assign_benchmark_page()
+           |> put_flash(:info, status_flash_message(result))}
 
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, flash_for_status_error(reason))}
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, flash_for_status_error(reason))}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
   def handle_event("generate-drafts", _params, socket) do
-    result = Observability.generate_benchmark_drafts(socket.assigns.opts)
+    with {:ok, socket} <- require_admin(socket) do
+      result = Observability.generate_benchmark_drafts(socket.assigns.opts)
 
-    {:noreply,
-     socket
-     |> assign_benchmark_page()
-     |> put_flash(:info, generate_drafts_message(result))}
+      {:noreply,
+       socket
+       |> assign_benchmark_page()
+       |> put_flash(:info, generate_drafts_message(result))}
+    else
+      {:error, socket} -> {:noreply, socket}
+    end
   end
 
   @impl true
@@ -163,6 +247,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           subtitle="Human-gated local benchmark draft scenarios generated from saved eval candidates."
         >
           <.button
+            :if={@can_mutate}
             id="observability-benchmark-drafts-generate"
             type="button"
             variant="outline"
@@ -214,7 +299,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
                   <p class="text-xs text-muted-foreground">
                     Scenario: {materialized_scenario(draft)}
                   </p>
-                  <div class="flex items-center gap-3 pt-1">
+                  <div :if={@can_mutate} class="flex items-center gap-3 pt-1">
                     <.button
                       id={"observability-benchmark-draft-approve-#{draft.id}"}
                       type="button"

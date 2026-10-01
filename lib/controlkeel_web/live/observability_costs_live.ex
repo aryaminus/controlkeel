@@ -3,41 +3,94 @@ defmodule ControlKeelWeb.ObservabilityCostsLive do
 
   import Ecto.Query, only: [from: 2]
 
+  alias ControlKeel.Accounts
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Budget.CostOptimizer
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Invocation
+  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
   alias ControlKeelWeb.CommandPill
+  alias ControlKeelWeb.WorkspaceAccess
 
   on_mount ControlKeelWeb.CommandPill
 
   @groupings ~w(model tool source provider)
 
   @impl true
-  def mount(_params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
-    base_opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
+  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
+    with %Workspace{} = workspace <-
+           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
+         :ok <- check_org_slug(workspace, %{slug: slug}),
+         :ok <- check_workspace_access(workspace, socket.assigns) do
+      base_opts = [workspace_id: workspace.id]
 
-    grouped_costs =
-      Enum.map(@groupings, fn group ->
-        {group, Observability.costs(Keyword.put(base_opts, :by, group))}
-      end)
+      grouped_costs =
+        Enum.map(@groupings, fn group ->
+          {group, Observability.costs(Keyword.put(base_opts, :by, group))}
+        end)
 
-    primary_costs = grouped_costs |> List.first() |> elem(1)
+      primary_costs = grouped_costs |> List.first() |> elem(1)
 
-    {:ok, suggestions} = load_suggestions(recent_session)
+      recent_session = Mission.list_recent_sessions(1, workspace.id) |> List.first()
+      {:ok, suggestions} = load_suggestions(recent_session)
 
-    {:ok, comparison} =
-      CostOptimizer.compare_agents("Agent cost comparison", estimated_tokens: 10_000)
+      {:ok, comparison} =
+        CostOptimizer.compare_agents("Agent cost comparison", estimated_tokens: 10_000)
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Observability Costs")
-     |> assign(:costs, primary_costs)
-     |> assign(:grouped_costs, grouped_costs)
-     |> assign(:suggestions, suggestions)
-     |> assign(:comparison, comparison)}
+      {:ok,
+       socket
+       |> assign(:page_title, "Observability Costs")
+       |> assign(:workspace, workspace)
+       |> assign(:nav_org, workspace.org)
+       |> assign(:nav_workspace, workspace)
+       |> assign(
+         :breadcrumbs,
+         [
+           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
+           %{
+             label: workspace.name,
+             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+           },
+           %{label: "Costs", to: nil}
+         ]
+       )
+       |> assign(:costs, primary_costs)
+       |> assign(:grouped_costs, grouped_costs)
+       |> assign(:suggestions, suggestions)
+       |> assign(:comparison, comparison)}
+    else
+      nil ->
+        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+
+      {:error, reason} ->
+        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+    end
+  end
+
+  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
+    case Accounts.get_org_by_slug(slug) do
+      %Org{id: ^org_id} -> :ok
+      _ -> {:error, "Workspace does not belong to this organization."}
+    end
+  end
+
+  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
+
+  defp check_workspace_access(workspace, assigns) do
+    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
+      :ok -> :ok
+      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
+      {:error, :needs_admin} -> {:error, "Viewer role or higher required."}
+    end
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> Phoenix.LiveView.put_flash(kind, msg)
+    |> Phoenix.LiveView.push_navigate(to: path)
   end
 
   @impl true
