@@ -88,6 +88,12 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "Safety and automation"
       assert body =~ "controlkeel obs costs"
       assert body =~ "controlkeel obs benchmarks draft"
+      assert body =~ "controlkeel obs benchmarks drafts"
+      assert body =~ "controlkeel obs benchmarks scenarios"
+      assert body =~ "controlkeel obs benchmarks history"
+      assert body =~ "controlkeel obs regressions"
+      assert body =~ "/observability"
+      refute body =~ "/:org_slug/workspaces/"
       assert body =~ "--execute"
       assert body =~ "ck_observability"
       assert body =~ ~r{href="/docs/observability"[^>]*aria-current="page"}
@@ -105,6 +111,12 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "## The evidence loop"
       assert body =~ "## Proving an improvement"
       assert body =~ "controlkeel obs memory-quality"
+      assert body =~ "controlkeel obs benchmarks drafts"
+      assert body =~ "controlkeel obs benchmarks scenarios"
+      assert body =~ "controlkeel obs benchmarks history"
+      assert body =~ "controlkeel obs regressions"
+      assert body =~ "`/observability`"
+      refute body =~ "/:org_slug/workspaces/"
     end
   end
 

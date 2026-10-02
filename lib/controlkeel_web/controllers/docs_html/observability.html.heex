@@ -54,24 +54,17 @@
   <section class="space-y-3">
     <.section_title>Reading a single session</.section_title>
     <p class="text-sm leading-7 text-muted-foreground">
-      Use the session view when the question is about one run — what happened, what it cost, what it touched. Each session has a stacked observability page at
-      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/:org_slug/workspaces/:ws_slug/sessions/:id/observability</code>
-      covering run state and memory, with the full event timeline at
-      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/activity</code>.
-      The same page exports evidence:
-      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">observability/export.json</code>
-      for the full session payload and
-      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">observability/audit-log/:format</code>
-      for the audit trail.
+      Use the session observability view when the question is about one run — what happened, what it cost, and what it touched. It brings together run state, memory context, the event timeline, and downloadable session and audit evidence.
     </p>
   </section>
 
   <section class="space-y-4">
     <.section_title>Monitoring a workspace</.section_title>
     <p class="text-sm leading-7 text-muted-foreground">
-      Use the workspace pages for ongoing signal across sessions. They live under
-      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/:org_slug/workspaces/:ws_slug/observability</code>,
-      and every page has a terminal parallel for when you are not in a browser:
+      Use <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/observability</code>
+      for ongoing signal across workspace sessions. Each page has a terminal parallel for when
+      you are not in a browser. The benchmark workflow groups drafts, scenarios, history, and
+      regressions on its benchmark page; these sections map to the following commands:
     </p>
     <div class="bg-card border rounded-2xl shadow-card overflow-clip">
       <table class="min-w-full divide-y divide-border text-left text-sm">
@@ -134,9 +127,46 @@
             <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs promotions</code></td>
           </tr>
           <tr class="transition hover:bg-muted/30">
-            <td class="px-5 py-4 font-medium text-foreground">Benchmark</td>
-            <td class="px-5 py-4 text-muted-foreground">Drafts, scenarios, history, regressions</td>
-            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks drafts</code></td>
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — drafts</td>
+            <td class="px-5 py-4 text-muted-foreground">Review generated benchmark drafts.</td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs benchmarks drafts
+              </code>
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — scenarios</td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Inspect the available benchmark scenarios.
+            </td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs benchmarks scenarios
+              </code>
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — history</td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Review previous benchmark runs and outcomes.
+            </td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs benchmarks history
+              </code>
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — regressions</td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Review regression signals from workspace evidence.
+            </td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs regressions
+              </code>
+            </td>
           </tr>
         </tbody>
       </table>

@@ -235,11 +235,11 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     ## Reading a single session
 
-    Use the session view when the question is about one run. Each session has a stacked observability page at `/:org_slug/workspaces/:ws_slug/sessions/:id/observability` covering run state and memory, with the full event timeline at `/activity`. The same page exports evidence: `observability/export.json` for the full session payload and `observability/audit-log/:format` for the audit trail.
+    Use the session observability view when the question is about one run — what happened, what it cost, and what it touched. It brings together run state, memory context, the event timeline, and downloadable session and audit evidence.
 
     ## Monitoring a workspace
 
-    Workspace pages live under `/:org_slug/workspaces/:ws_slug/observability`. Every page has a terminal parallel:
+    Use `/observability` for ongoing signal across workspace sessions. Each page has a terminal parallel. The benchmark workflow groups drafts, scenarios, history, and regressions on its benchmark page; these sections map to the following commands:
 
     | Page | Terminal |
     |---|---|
@@ -253,7 +253,10 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     | Memory quality | `controlkeel obs memory-quality` |
     | Recommendations | `controlkeel obs recommend` |
     | Promotions | `controlkeel obs promotions` |
-    | Benchmark | `controlkeel obs benchmarks drafts` |
+    | Benchmark — drafts | `controlkeel obs benchmarks drafts` |
+    | Benchmark — scenarios | `controlkeel obs benchmarks scenarios` |
+    | Benchmark — history | `controlkeel obs benchmarks history` |
+    | Benchmark — regressions | `controlkeel obs regressions` |
 
     ## Proving an improvement
 
