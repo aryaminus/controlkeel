@@ -1,0 +1,116 @@
+<% nav_items = [
+  %{label: "Docs", to: "/docs"},
+  %{label: "Getting started", to: "/docs/getting-started"},
+  %{label: "How it governs", to: "/docs/governance"},
+  %{label: "Agents", to: "/docs/agents"}
+] %>
+<% current_page = Enum.find(nav_items, &(&1.to == @conn.request_path)) %>
+<div class="h-screen flex overflow-hidden">
+  <aside
+    id="docs-sidebar-wrap"
+    class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
+  >
+    <div class="p-3">
+      <a
+        href={~p"/"}
+        aria-label="Documentation home"
+        class="flex min-w-0 flex-1 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+          <.icon name="hero-bolt-solid" class="size-5" />
+        </span>
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span class="block text-sm font-semibold tracking-wide text-foreground">
+            ControlKeel
+          </span>
+        </div>
+      </a>
+    </div>
+
+    <nav
+      id="docs-sidebar"
+      aria-label="Documentation"
+      class="mt-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 overscroll-contain text-sm"
+    >
+      <%= for item <- nav_items do %>
+        <% active = item.to == @conn.request_path %>
+        <a
+          href={item.to}
+          aria-current={active && "page"}
+          class={sidebar_link_class(active)}
+        >
+          {item.label}
+        </a>
+      <% end %>
+    </nav>
+  </aside>
+
+  <div class="flex flex-1 flex-col overflow-hidden">
+    <div class="flex w-full items-center justify-between gap-4 border-b p-4">
+      <nav aria-label="Breadcrumb" class="min-w-0">
+        <ol class="flex items-center gap-1.5 text-sm">
+          <li class="shrink-0">
+            <%= if @conn.request_path == "/docs" do %>
+              <span aria-current="page" class="font-semibold text-foreground">Docs</span>
+            <% else %>
+              <a href="/docs" class="text-muted-foreground transition hover:text-foreground">
+                Docs
+              </a>
+            <% end %>
+          </li>
+          <%= if current_page && current_page.to != "/docs" do %>
+            <li aria-hidden="true" class="shrink-0 text-muted-foreground">/</li>
+            <li class="min-w-0">
+              <span aria-current="page" class="block truncate font-semibold text-foreground">
+                {current_page.label}
+              </span>
+            </li>
+          <% end %>
+        </ol>
+      </nav>
+      <div class="flex shrink-0 items-center gap-3">
+        <a
+          href="https://github.com/aryaminus/controlkeel"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="ControlKeel on GitHub (opens in a new tab)"
+        >
+          GitHub
+        </a>
+        <%= if ControlKeel.Runtime.Mode.current() == :local do %>
+          <a
+            href={~p"/dashboard"}
+            class="rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            Dashboard
+          </a>
+        <% else %>
+          <%= if @current_user do %>
+            <.user_menu
+              id="docs-user-menu"
+              current_user={@current_user}
+              compact
+              show_dashboard
+            />
+          <% else %>
+            <a
+              href={~p"/auth/login"}
+              class="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+            >
+              Sign in
+            </a>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <main class="flex-1 overflow-y-auto">
+      <div class="px-4 pt-6 pb-12 sm:px-8 lg:px-8 container mx-auto">
+        {@inner_content}
+      </div>
+    </main>
+  </div>
+</div>
+
+<.flash_group flash={@flash} />

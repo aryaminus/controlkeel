@@ -1,0 +1,66 @@
+<.page_title
+  title="How it governs"
+  subtitle="The delivery lifecycle, proof loop, and operating modes behind every governed change."
+/>
+
+<div class="mt-10 space-y-10">
+  <section class="space-y-3">
+    <.section_title>Governed delivery lifecycle</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Every change moves through the same loop, from stated intent to recorded evidence:
+    </p>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>
+        Intent intake and execution briefs at
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">/sessions/start</code>
+      </li>
+      <li>Task graph, validation, and findings during execution</li>
+      <li>Proof bundles, Ship Dashboard, and benchmarks as evidence</li>
+    </ul>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Proof console loop</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Governance state lives outside the chat window, so evidence stays reviewable after the session ends:
+    </p>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>Session Control for active task state, risk, and approvals</li>
+      <li>Findings turn policy violations into reviewable work</li>
+      <li>Proof Browser for immutable evidence and rollback guidance</li>
+      <li>Ship Dashboard and benchmarks for outcome evidence</li>
+    </ul>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Autonomy and findings</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Severity maps to expected human gates; findings stay readable in plain language. LLM advisory is optional and needs a provider. See <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">docs/autonomy-and-findings.md</code>.
+    </p>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Operating modes</.section_title>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>Local mode ships with SQLite, Ollama, or heuristic fallback.</li>
+      <li>Cloud mode connects orgs, projects, users, webhooks, and service accounts as shared governance evidence.</li>
+      <li>Use benchmarks to collect bounded evidence before claiming a workflow is safer, cheaper, or faster.</li>
+    </ul>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Occupation-first onboarding</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Start from what best describes your work. ControlKeel picks the domain pack, interview language, and governance posture behind the scenes, so non-experts don't need to choose a framework first.
+    </p>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Project rescue</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      If another tool already touched the repo, bootstrap it, run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel watch</code>, and use findings, proofs, and
+      <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">ck_validate</code>
+      to recover. Add governed proxy only when the tool points at compatible OpenAI or Anthropic endpoints.
+    </p>
+  </section>
+</div>

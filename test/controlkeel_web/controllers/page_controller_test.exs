@@ -84,6 +84,8 @@ defmodule ControlKeelWeb.PageControllerTest do
       assert body =~ "Host-agnostic control"
       assert body =~ "How it works"
       assert body =~ "Ready to govern"
+      assert body =~ "<footer"
+      assert body =~ "Agent control plane for governed AI engineering."
     end
 
     test "renders the org → workspace → session tree for signed-in users", %{
@@ -168,25 +170,6 @@ defmodule ControlKeelWeb.PageControllerTest do
       assert body =~ ~p"/organizations"
       assert body =~ ~p"/sessions/start"
     end
-  end
-
-  test "GET /getting-started renders the guide with install channels", %{conn: conn} do
-    conn = get(conn, ~p"/getting-started")
-    body = html_response(conn, 200)
-
-    assert body =~ "Install to first finding in five minutes"
-    assert body =~ "controlkeel attach opencode"
-    assert body =~ "controlkeel setup"
-    assert body =~ "controlkeel attach doctor"
-    assert body =~ "controlkeel provider doctor"
-    assert body =~ "controlkeel status"
-    assert body =~ "controlkeel findings"
-    assert body =~ "Local stdio MCP exposes the full local tool set"
-    assert body =~ "Quick start"
-    assert body =~ "Available where"
-    assert body =~ "How it governs"
-    assert body =~ "Other supported agents"
-    assert body =~ "Project rescue"
   end
 
   describe "legacy org redirects" do

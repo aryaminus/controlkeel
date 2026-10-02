@@ -1,0 +1,176 @@
+<.page_title
+  title="How agents use CK"
+  subtitle="Every supported agent host, how it attaches to ControlKeel, and how ControlKeel runs it back."
+/>
+
+<div class="mt-6 space-y-4">
+  <section class="rounded-2xl border bg-card p-5 shadow-card">
+    <div class="flex items-center gap-2">
+      <span class="rounded-full bg-primary/10 w-8 h-8 flex items-center justify-center text-primary">
+        <.icon name="hero-cpu-chip" class="size-4" />
+      </span>
+      <p class="text-base font-semibold">Supported agents</p>
+    </div>
+    <ul class="mt-4 space-y-2 text-sm text-muted-foreground list-disc ml-5">
+      <li>
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach codex-cli</code>
+        installs native Codex skills and the CK operator agent.
+      </li>
+      <li>
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach vscode</code>
+        and
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach copilot</code>
+        prepare repo-native skills plus MCP config.
+      </li>
+      <li>
+        OpenCode is the recommended quick start; Cursor, Windsurf, Kiro, Amp, Gemini CLI, Continue, and Aider use the same portable bundle path.
+      </li>
+    </ul>
+    <a
+      href="https://github.com/aryaminus/controlkeel"
+      class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-primary"
+    >
+      Learn more on GitHub <.icon name="hero-arrow-up-right" class="size-3" />
+    </a>
+  </section>
+
+  <%= for integration <- @agent_integrations do %>
+    <details
+      id={"agent-#{integration.id}"}
+      class="group rounded-2xl border bg-card p-5 shadow-card"
+    >
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-4 select-none [&::-webkit-details-marker]:hidden">
+        <p class="text-base font-semibold">{integration.label}</p>
+        <span class="inline-flex items-center gap-2">
+          <span class="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/20">
+            {human_support_class(integration.support_class)}
+          </span>
+          <span class="text-xs text-muted-foreground transition-transform duration-200 group-open:rotate-180">
+            ▼
+          </span>
+        </span>
+      </summary>
+
+      <div class="mt-4 space-y-6 border-t border-border pt-4">
+        <div class="space-y-1.5">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            How agent uses CK
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Uses CK via: {format_targets(integration.agent_uses_ck_via)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Scope: {format_targets(integration.supported_scopes)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Install: {human_install_experience(integration.install_experience)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Auto-bootstrap: {if integration.auto_bootstrap, do: "yes", else: "no"}
+          </p>
+
+          <%= if integration.attach_command do %>
+            <div class="mt-4 overflow-hidden rounded-2xl border border-border bg-muted/30">
+              <pre class="whitespace-pre-wrap px-4 py-3 text-sm leading-6 text-foreground"><code>{integration.attach_command}</code></pre>
+            </div>
+          <% else %>
+            <code class="text-sm text-foreground">
+              {integration.runtime_export_command || alias_action(integration)}
+            </code>
+          <% end %>
+        </div>
+
+        <div class="space-y-1.5 border-t border-border pt-4">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            How CK runs the agent
+          </p>
+          <p class="text-sm text-muted-foreground">
+            CK runs via: {integration.ck_runs_agent_via || "none"}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Execution: {integration.execution_support || "inbound_only"}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Review: {human_review_experience(integration.review_experience)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Submit / feedback: {integration.submission_mode} / {integration.feedback_mode}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Phase / embed: {human_phase_model(integration.phase_model)} / {human_browser_embed(
+              integration.browser_embed
+            )}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Runtime / review transport: {integration.runtime_transport || "artifact_only"} / {integration.runtime_review_transport ||
+              "artifact_only"}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Subagent visibility: {human_subagent_visibility(integration.subagent_visibility)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Autonomy: {integration.autonomy_mode || "policy_gated"}
+          </p>
+          <p class="text-sm text-muted-foreground">{integration.config_location}</p>
+          <p class="text-sm text-muted-foreground">
+            Required CK tools: {format_targets(integration.required_mcp_tools)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Auth: {integration.auth_mode} / {auth_owner(integration)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Provider bridge: {format_provider_bridge(integration.provider_bridge)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Runtime auth owner: {integration.runtime_auth_owner || "none"}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            MCP / skills: {integration.mcp_mode} / {integration.skills_mode}
+          </p>
+        </div>
+
+        <div class="space-y-1.5 border-t border-border pt-4">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Companion and policy
+          </p>
+          <p class="text-sm text-muted-foreground">{integration.companion_delivery}</p>
+          <p class="text-sm text-muted-foreground">
+            Export targets: {format_targets(integration.export_targets)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Plan phases: {format_targets(integration.plan_phase_support)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Runtime sessions: {format_runtime_session_support(
+              integration.runtime_session_support
+            )}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Files written: {format_paths(integration.artifact_surfaces)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Package outputs: {format_package_outputs(integration.package_outputs)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Direct install: {format_direct_install_methods(integration.direct_install_methods)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Human intervention: {human_intervention_copy(integration)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Confidence: {human_confidence_level(integration.confidence_level)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Upstream: {integration.upstream_slug || "n/a"}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            ACP registry: {registry_label(integration)}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Get CK: {format_install_channels(integration.install_channels)}
+          </p>
+        </div>
+      </div>
+    </details>
+  <% end %>
+</div>

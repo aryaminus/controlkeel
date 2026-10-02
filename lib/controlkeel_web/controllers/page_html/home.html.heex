@@ -12,7 +12,7 @@
   </p>
   <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
     <a
-      href={~p"/getting-started"}
+      href={~p"/docs/getting-started"}
       class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90"
     >
       <.icon name="hero-arrow-down-tray" class="size-4" /> Install ControlKeel
@@ -97,6 +97,33 @@
   </div>
 </section>
 
+<section class="mx-auto max-w-5xl py-12">
+  <h2 class="text-center text-3xl font-bold mb-4">What it is not</h2>
+  <p class="text-center text-sm text-muted-foreground mb-10">
+    Clear scope, on purpose
+  </p>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="rounded-xl border bg-card p-6 text-center">
+      <div class="mb-3 flex justify-center">
+        <.icon name="hero-code-bracket-square" class="size-8 text-primary" />
+      </div>
+      <h3 class="text-lg font-semibold mb-2">Not another IDE or coding model</h3>
+    </div>
+    <div class="rounded-xl border bg-card p-6 text-center">
+      <div class="mb-3 flex justify-center">
+        <.icon name="hero-building-storefront" class="size-8 text-primary" />
+      </div>
+      <h3 class="text-lg font-semibold mb-2">Not a prompt marketplace or generic memory API</h3>
+    </div>
+    <div class="rounded-xl border bg-card p-6 text-center">
+      <div class="mb-3 flex justify-center">
+        <.icon name="hero-eye-slash" class="size-8 text-primary" />
+      </div>
+      <h3 class="text-lg font-semibold mb-2">Not passive monitoring or post-hoc review only</h3>
+    </div>
+  </div>
+</section>
+
 <section class="mx-auto max-w-5xl py-16 text-center">
   <div class="rounded-2xl border bg-muted p-10">
     <h2 class="text-2xl font-bold mb-3">Ready to govern your agents?</h2>
@@ -104,7 +131,7 @@
       Install in under five minutes. No account required for local mode.
     </p>
     <a
-      href={~p"/getting-started"}
+      href={~p"/docs/getting-started"}
       class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:-translate-y-0.5 hover:bg-primary/90"
     >
       Get started <.icon name="hero-arrow-right" class="size-4" />

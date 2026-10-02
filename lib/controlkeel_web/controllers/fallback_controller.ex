@@ -48,7 +48,7 @@ defmodule ControlKeelWeb.FallbackController do
     ## Helpful links
 
     - [Home](https://controlkeel.com/)
-    - [Documentation](https://controlkeel.com/getting-started)
+    - [Documentation](https://controlkeel.com/docs/getting-started)
     - [API Reference](https://controlkeel.com/developers)
     - [OpenAPI Spec](https://controlkeel.com/openapi.json)
     - [llms.txt](https://controlkeel.com/llms.txt)

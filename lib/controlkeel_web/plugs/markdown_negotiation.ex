@@ -9,7 +9,9 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
   @markdown_pages %{
     "/" => :home,
-    "/getting-started" => :getting_started,
+    "/docs/getting-started" => :getting_started,
+    "/docs/agents" => :docs_agents,
+    "/docs/governance" => :docs_governance,
     "/about" => :about,
     "/contact" => :contact,
     "/developers" => :developers
@@ -77,7 +79,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     Install in under five minutes. No account required for local mode.
 
-    - Installation: https://controlkeel.com/getting-started
+    - Installation: https://controlkeel.com/docs/getting-started
     - GitHub: https://github.com/aryaminus/controlkeel
     - API docs: https://controlkeel.com/developers
     - OpenAPI spec: https://controlkeel.com/openapi.json
@@ -139,6 +141,70 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     """
   end
 
+  defp page_to_markdown(:docs_agents) do
+    """
+    # How agents use CK
+
+    Every supported agent host, how it attaches to ControlKeel, and how ControlKeel runs it back.
+
+    ## Supported agents
+
+    - `controlkeel attach codex-cli` installs native Codex skills and the CK operator agent.
+    - `controlkeel attach vscode` and `controlkeel attach copilot` prepare repo-native skills plus MCP config.
+    - OpenCode is the recommended quick start; Cursor, Windsurf, Kiro, Amp, Gemini CLI, Continue, and Aider use the same portable bundle path.
+    - Learn more on GitHub: https://github.com/aryaminus/controlkeel
+
+    ## Host catalog
+
+    Generated from the same integration catalog as the HTML page.
+
+    """ <>
+      Enum.map_join(ControlKeel.Skills.agent_integrations(), "\n", &integration_markdown/1)
+  end
+
+  defp page_to_markdown(:docs_governance) do
+    """
+    # How it governs
+
+    The delivery lifecycle, proof loop, and operating modes behind every governed change.
+
+    ## Governed delivery lifecycle
+
+    Every change moves through the same loop, from stated intent to recorded evidence:
+
+    - Intent intake and execution briefs at `/sessions/start`
+    - Task graph, validation, and findings during execution
+    - Proof bundles, Ship Dashboard, and benchmarks as evidence
+
+    ## Proof console loop
+
+    Governance state lives outside the chat window, so evidence stays reviewable after the session ends:
+
+    - Session Control for active task state, risk, and approvals
+    - Findings turn policy violations into reviewable work
+    - Proof Browser for immutable evidence and rollback guidance
+    - Ship Dashboard and benchmarks for outcome evidence
+
+    ## Autonomy and findings
+
+    Severity maps to expected human gates; findings stay readable in plain language. LLM advisory is optional and needs a provider. See `docs/autonomy-and-findings.md`.
+
+    ## Operating modes
+
+    - Local mode ships with SQLite, Ollama, or heuristic fallback.
+    - Cloud mode connects orgs, projects, users, webhooks, and service accounts as shared governance evidence.
+    - Use benchmarks to collect bounded evidence before claiming a workflow is safer, cheaper, or faster.
+
+    ## Occupation-first onboarding
+
+    Start from what best describes your work. ControlKeel picks the domain pack, interview language, and governance posture behind the scenes, so non-experts don't need to choose a framework first.
+
+    ## Project rescue
+
+    If another tool already touched the repo, bootstrap it, run `controlkeel watch`, and use findings, proofs, and `ck_validate` to recover. Add governed proxy only when the tool points at compatible OpenAI or Anthropic endpoints.
+    """
+  end
+
   defp page_to_markdown(:about) do
     """
     # About ControlKeel
@@ -197,7 +263,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     ## Community
 
     - GitHub: https://github.com/aryaminus/controlkeel
-    - Documentation: https://controlkeel.com/getting-started
+    - Documentation: https://controlkeel.com/docs/getting-started
     - API Reference: https://controlkeel.com/openapi.json
     """
   end
@@ -256,4 +322,29 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     - GitHub: https://github.com/aryaminus/controlkeel
     """
   end
+
+  defp integration_markdown(integration) do
+    """
+    ### #{integration.label} (#{integration.support_class})
+
+    - Attach: `#{attach_hint(integration)}`
+    - Uses CK via: #{markdown_targets(integration.agent_uses_ck_via)}
+    - Scope: #{markdown_targets(integration.supported_scopes)}
+    - Install: #{integration.install_experience}
+    - Auto-bootstrap: #{if integration.auto_bootstrap, do: "yes", else: "no"}
+    - Execution: #{integration.execution_support || "inbound_only"}
+    - Review: #{integration.review_experience}
+    - Required CK tools: #{markdown_targets(integration.required_mcp_tools)}
+    - MCP / skills: #{integration.mcp_mode} / #{integration.skills_mode}
+    - Confidence: #{integration.confidence_level}
+    """
+  end
+
+  defp attach_hint(integration) do
+    integration.attach_command || integration.runtime_export_command || "reference only"
+  end
+
+  defp markdown_targets([]), do: "none"
+  defp markdown_targets(nil), do: "none"
+  defp markdown_targets(values), do: Enum.join(values, ", ")
 end
