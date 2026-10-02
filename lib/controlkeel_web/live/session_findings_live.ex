@@ -387,9 +387,9 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                 <span
                   :if={index > 0}
                   aria-hidden="true"
-                  class="opacity-50 text-foreground font-medium"
+                  class="text-foreground font-medium"
                 >
-                  -
+                  ·
                 </span>
                 <span
                   :if={kind == :path}
@@ -438,6 +438,17 @@ defmodule ControlKeelWeb.SessionFindingsLive do
         class="border-t p-4 space-y-6"
       >
         <div
+          :if={@finding.status == "rejected"}
+          class=""
+        >
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Rejection reason
+          </p>
+          <p class="mt-1 text-sm leading-relaxed text-foreground">
+            {meta_value(@finding, "rejection_reason") || "No reason given."}
+          </p>
+        </div>
+        <div
           :if={meta_value(@finding, "path") || meta_value(@finding, "matched_text_redacted")}
           class="space-y-1"
         >
@@ -465,13 +476,13 @@ defmodule ControlKeelWeb.SessionFindingsLive do
           class="flex flex-wrap items-center gap-2"
         >
           <.button phx-click="approve_finding" phx-value-id={@finding.id}>
-            <.icon name="hero-check" class="size-3.5" /> Approve
+            Approve
           </.button>
           <.button variant="outline" phx-click="escalate_finding" phx-value-id={@finding.id}>
-            <.icon name="hero-arrow-up" class="size-3.5" /> Escalate
+            Escalate
           </.button>
           <.button variant="destructive" phx-click="reject_finding" phx-value-id={@finding.id}>
-            <.icon name="hero-x-mark" class="size-3.5" /> Reject
+            Reject
           </.button>
         </div>
       </div>

@@ -35,10 +35,6 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
     assert detail_html =~ "safe DOM API"
     assert detail_html =~ "Approve"
     assert detail_html =~ "Reject"
-    # Disposition buttons and the All filter carry icons.
-    assert detail_html =~ "hero-check"
-    assert detail_html =~ "hero-arrow-up"
-    assert detail_html =~ "hero-x-mark"
 
     render_click(view, "copy_fix_prompt", %{"id" => finding.id})
 
@@ -86,6 +82,13 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
 
     assert rejected_html =~ "Finding rejected."
     assert Mission.get_finding!(reject_target.id).status == "rejected"
+
+    # The modal reason persists on the finding and renders in its detail.
+    assert Mission.get_finding!(reject_target.id).metadata["rejection_reason"] == "false positive"
+
+    expanded_html = render_click(view, "toggle_finding", %{"id" => reject_target.id})
+    assert expanded_html =~ "Rejection reason"
+    assert expanded_html =~ "false positive"
   end
 
   test "session findings meta row separates only present values", %{conn: conn} do
