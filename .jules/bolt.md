@@ -1,3 +1,3 @@
-## 2026-08-19 - Elixir List Allocation Overhead
-**Learning:** Chaining `Enum.map/2` into `Enum.uniq/1` then `length/1` (or `Enum.filter/2` into `length/1`) forces unnecessary intermediate list allocations in Elixir, adding hidden overhead.
-**Action:** Use `MapSet.new/2 |> MapSet.size()` and `Enum.count/2` to skip intermediate lists and reduce GC pressure.
+## 2024-06-25 - Single-pass Enum.reduce optimization
+**Learning:** Found a sequence of `Enum.filter` followed by three separate `Enum.count` iterations over the same list (`health` calculation in `observability.ex`).
+**Action:** Replaced multiple passes with a single-pass `Enum.reduce` to avoid intermediate list allocations (saving memory) and reduce CPU overhead from multiple passes.
