@@ -387,9 +387,8 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                 <span
                   :if={index > 0}
                   aria-hidden="true"
-                  class="text-foreground font-medium"
+                  class="size-1 shrink-0 rounded-full bg-secondary"
                 >
-                  ·
                 </span>
                 <span
                   :if={kind == :path}
