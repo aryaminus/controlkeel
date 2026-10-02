@@ -135,17 +135,6 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     4. Run `controlkeel attach doctor` and `controlkeel status`
     5. Trigger a controlled validation, then check findings
 
-    ## Observability
-
-    The web pages show data and offer actions; these CLI commands are the terminal equivalent. Benchmark execution is CLI-only and refuses to run without an explicit `--execute` flag.
-
-    - Overview: `controlkeel obs status`, `controlkeel obs recommend`
-    - Spend: `controlkeel obs costs --by provider`, `controlkeel obs compare`, `controlkeel obs trends --days 30` (defaults to 7 days)
-    - Improvement loop: `controlkeel obs evals`, `controlkeel obs evals save`, `controlkeel obs benchmarks drafts`, `controlkeel obs benchmarks approve <id>`, `controlkeel obs benchmarks run --dry-run` (add `--execute --suite <suite>` to run), `controlkeel obs benchmarks history`, `controlkeel obs regressions`, `controlkeel obs promotions`
-    - Memory quality: `controlkeel obs memory-quality`, `controlkeel obs imports`
-
-    Agents should call the structured `ck_observability` MCP tool, not copy these shell commands.
-
     ## API
 
     REST API at `/api/v1`. See https://controlkeel.com/openapi.json for the full specification.
@@ -154,39 +143,65 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
   defp page_to_markdown(:docs_agents) do
     """
-    # Agents
+    # How agents use CK
 
-    Where ControlKeel runs. Attach ControlKeel to the agent host your team already uses. Binding auto-bootstraps on first use; attach defaults to project scope.
+    Every supported agent host, how it attaches to ControlKeel, and how ControlKeel runs it back.
 
-    OpenCode is the recommended quick start. Run `controlkeel attach doctor` to verify the active host.
-    """
+    ## Supported agents
+
+    - `controlkeel attach codex-cli` installs native Codex skills and the CK operator agent.
+    - `controlkeel attach vscode` and `controlkeel attach copilot` prepare repo-native skills plus MCP config.
+    - OpenCode is the recommended quick start; Cursor, Windsurf, Kiro, Amp, Gemini CLI, Continue, and Aider use the same portable bundle path.
+    - Learn more on GitHub: https://github.com/aryaminus/controlkeel
+
+    ## Host catalog
+
+    Generated from the same integration catalog as the HTML page.
+
+    """ <>
+      Enum.map_join(ControlKeel.Skills.agent_integrations(), "\n", &integration_markdown/1)
   end
 
   defp page_to_markdown(:docs_governance) do
     """
-    # How It Governs
+    # How it governs
 
     The delivery lifecycle, proof loop, and operating modes behind every governed change.
 
     ## Governed delivery lifecycle
 
-    Intent intake at `/sessions/start`, task graph and findings during execution, proof bundles and benchmarks as evidence.
+    Every change moves through the same loop, from stated intent to recorded evidence:
+
+    - Intent intake and execution briefs at `/sessions/start`
+    - Task graph, validation, and findings during execution
+    - Proof bundles, Ship Dashboard, and benchmarks as evidence
 
     ## Proof console loop
 
-    Session Control, findings, Proof Browser, Ship Dashboard, and benchmarks.
+    Governance state lives outside the chat window, so evidence stays reviewable after the session ends:
+
+    - Session Control for active task state, risk, and approvals
+    - Findings turn policy violations into reviewable work
+    - Proof Browser for immutable evidence and rollback guidance
+    - Ship Dashboard and benchmarks for outcome evidence
 
     ## Autonomy and findings
 
-    Severity maps to expected human gates; findings stay readable in plain language.
+    Severity maps to expected human gates; findings stay readable in plain language. LLM advisory is optional and needs a provider. See `docs/autonomy-and-findings.md`.
 
     ## Operating modes
 
-    Local mode ships with SQLite, Ollama, or heuristic fallback. Cloud mode connects orgs, projects, users, webhooks, and service accounts.
+    - Local mode ships with SQLite, Ollama, or heuristic fallback.
+    - Cloud mode connects orgs, projects, users, webhooks, and service accounts as shared governance evidence.
+    - Use benchmarks to collect bounded evidence before claiming a workflow is safer, cheaper, or faster.
+
+    ## Occupation-first onboarding
+
+    Start from what best describes your work. ControlKeel picks the domain pack, interview language, and governance posture behind the scenes, so non-experts don't need to choose a framework first.
 
     ## Project rescue
 
-    Bootstrap the repo, run `controlkeel watch`, and use findings, proofs, and validation to recover.
+    If another tool already touched the repo, bootstrap it, run `controlkeel watch`, and use findings, proofs, and `ck_validate` to recover. Add governed proxy only when the tool points at compatible OpenAI or Anthropic endpoints.
     """
   end
 
@@ -307,4 +322,29 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     - GitHub: https://github.com/aryaminus/controlkeel
     """
   end
+
+  defp integration_markdown(integration) do
+    """
+    ### #{integration.label} (#{integration.support_class})
+
+    - Attach: `#{attach_hint(integration)}`
+    - Uses CK via: #{markdown_targets(integration.agent_uses_ck_via)}
+    - Scope: #{markdown_targets(integration.supported_scopes)}
+    - Install: #{integration.install_experience}
+    - Auto-bootstrap: #{if integration.auto_bootstrap, do: "yes", else: "no"}
+    - Execution: #{integration.execution_support || "inbound_only"}
+    - Review: #{integration.review_experience}
+    - Required CK tools: #{markdown_targets(integration.required_mcp_tools)}
+    - MCP / skills: #{integration.mcp_mode} / #{integration.skills_mode}
+    - Confidence: #{integration.confidence_level}
+    """
+  end
+
+  defp attach_hint(integration) do
+    integration.attach_command || integration.runtime_export_command || "reference only"
+  end
+
+  defp markdown_targets([]), do: "none"
+  defp markdown_targets(nil), do: "none"
+  defp markdown_targets(values), do: Enum.join(values, ", ")
 end

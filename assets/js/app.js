@@ -134,6 +134,8 @@ document.addEventListener("click", async event => {
   }
 
   button.dataset.copyState = "copied"
+  button.dataset.originalLabel = button.getAttribute("aria-label") || "Copy command"
+  button.setAttribute("aria-label", "Copied")
   const idle = button.querySelector('[data-copy-icon="idle"]')
   const done = button.querySelector('[data-copy-icon="done"]')
   idle?.classList.add("hidden")
@@ -142,6 +144,7 @@ document.addEventListener("click", async event => {
   setTimeout(() => {
     idle?.classList.remove("hidden")
     done?.classList.add("hidden")
+    button.setAttribute("aria-label", button.dataset.originalLabel)
     delete button.dataset.copyState
   }, 1500)
 })
