@@ -9,7 +9,8 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
   @markdown_pages %{
     "/" => :home,
-    "/getting-started" => :getting_started,
+    "/docs/getting-started" => :getting_started,
+    "/docs/agents" => :docs_agents,
     "/about" => :about,
     "/contact" => :contact,
     "/developers" => :developers
@@ -77,7 +78,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     Install in under five minutes. No account required for local mode.
 
-    - Installation: https://controlkeel.com/getting-started
+    - Installation: https://controlkeel.com/docs/getting-started
     - GitHub: https://github.com/aryaminus/controlkeel
     - API docs: https://controlkeel.com/developers
     - OpenAPI spec: https://controlkeel.com/openapi.json
@@ -133,9 +134,30 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     4. Run `controlkeel attach doctor` and `controlkeel status`
     5. Trigger a controlled validation, then check findings
 
+    ## Observability
+
+    The web pages show data and offer actions; these CLI commands are the terminal equivalent. Benchmark execution is CLI-only and refuses to run without an explicit `--execute` flag.
+
+    - Overview: `controlkeel obs status`, `controlkeel obs recommend`
+    - Spend: `controlkeel obs costs --by provider`, `controlkeel obs compare`, `controlkeel obs trends --days 30` (defaults to 7 days)
+    - Improvement loop: `controlkeel obs evals`, `controlkeel obs evals save`, `controlkeel obs benchmarks drafts`, `controlkeel obs benchmarks approve <id>`, `controlkeel obs benchmarks run --dry-run` (add `--execute --suite <suite>` to run), `controlkeel obs benchmarks history`, `controlkeel obs regressions`, `controlkeel obs promotions`
+    - Memory quality: `controlkeel obs memory-quality`, `controlkeel obs imports`
+
+    Agents should call the structured `ck_observability` MCP tool, not copy these shell commands.
+
     ## API
 
     REST API at `/api/v1`. See https://controlkeel.com/openapi.json for the full specification.
+    """
+  end
+
+  defp page_to_markdown(:docs_agents) do
+    """
+    # Agents
+
+    Where ControlKeel runs. Attach ControlKeel to the agent host your team already uses. Binding auto-bootstraps on first use; attach defaults to project scope.
+
+    OpenCode is the recommended quick start. Run `controlkeel attach doctor` to verify the active host.
     """
   end
 
@@ -197,7 +219,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     ## Community
 
     - GitHub: https://github.com/aryaminus/controlkeel
-    - Documentation: https://controlkeel.com/getting-started
+    - Documentation: https://controlkeel.com/docs/getting-started
     - API Reference: https://controlkeel.com/openapi.json
     """
   end
