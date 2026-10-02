@@ -117,6 +117,35 @@ window.addEventListener("phx:copy-to-clipboard", async ({detail}) => {
   }
 })
 
+// Copy buttons on non-LiveView surfaces (docs and marketing pages render from
+// controllers, so the copy_command LiveView event path never fires). Buttons
+// carry data-copy-command; feedback swaps the idle/done icons for 1.5s.
+document.addEventListener("click", async event => {
+  const button = event.target.closest("[data-copy-command]")
+  if (!button || button.dataset.copyState === "copied") return
+
+  const text = button.dataset.copyCommand
+  if (!text || !navigator.clipboard?.writeText) return
+
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch (_error) {
+    return
+  }
+
+  button.dataset.copyState = "copied"
+  const idle = button.querySelector('[data-copy-icon="idle"]')
+  const done = button.querySelector('[data-copy-icon="done"]')
+  idle?.classList.add("hidden")
+  done?.classList.remove("hidden")
+
+  setTimeout(() => {
+    idle?.classList.remove("hidden")
+    done?.classList.add("hidden")
+    delete button.dataset.copyState
+  }, 1500)
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 
