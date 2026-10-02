@@ -95,6 +95,60 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "/observability"
       refute body =~ "/:org_slug/workspaces/"
       assert body =~ "--execute"
+      assert body =~ "CLI reference"
+
+      for command <- [
+            "obs status",
+            "obs run",
+            "obs loop",
+            "obs problems",
+            "obs costs",
+            "obs imports",
+            "obs trends",
+            "obs regressions",
+            "obs recommend",
+            "obs evals",
+            "obs evals save",
+            "obs evals persisted",
+            "obs benchmarks draft",
+            "obs benchmarks drafts",
+            "obs benchmarks approve",
+            "obs benchmarks reject",
+            "obs benchmarks archive",
+            "obs benchmarks materialize",
+            "obs benchmarks scenarios",
+            "obs benchmarks run",
+            "obs benchmarks history",
+            "obs promotions",
+            "obs compare",
+            "obs timeline",
+            "obs memory",
+            "obs memory-quality",
+            "obs export",
+            "obs import"
+          ] do
+        assert body =~ command
+      end
+
+      for option <- [
+            "--by",
+            "--days",
+            "--format",
+            "--json",
+            "--limit",
+            "--stale-days",
+            "--suite",
+            "--subjects",
+            "--baseline-subject",
+            "--scenario-slugs",
+            "--dry-run",
+            "--execute",
+            "--project-root",
+            "--persist"
+          ] do
+        assert body =~ option
+      end
+
       assert body =~ "ck_observability"
       assert body =~ ~r{href="/docs/observability"[^>]*aria-current="page"}
     end
@@ -117,6 +171,59 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "controlkeel obs regressions"
       assert body =~ "`/observability`"
       refute body =~ "/:org_slug/workspaces/"
+      assert body =~ "## CLI reference"
+
+      for command <- [
+            "controlkeel obs status",
+            "controlkeel obs run",
+            "controlkeel obs loop",
+            "controlkeel obs problems",
+            "controlkeel obs costs",
+            "controlkeel obs imports",
+            "controlkeel obs trends",
+            "controlkeel obs regressions",
+            "controlkeel obs recommend",
+            "controlkeel obs evals",
+            "controlkeel obs evals save",
+            "controlkeel obs evals persisted",
+            "controlkeel obs benchmarks draft",
+            "controlkeel obs benchmarks drafts",
+            "controlkeel obs benchmarks approve",
+            "controlkeel obs benchmarks reject",
+            "controlkeel obs benchmarks archive",
+            "controlkeel obs benchmarks materialize",
+            "controlkeel obs benchmarks scenarios",
+            "controlkeel obs benchmarks run",
+            "controlkeel obs benchmarks history",
+            "controlkeel obs promotions",
+            "controlkeel obs compare",
+            "controlkeel obs timeline",
+            "controlkeel obs memory",
+            "controlkeel obs memory-quality",
+            "controlkeel obs export",
+            "controlkeel obs import"
+          ] do
+        assert body =~ command
+      end
+
+      for option <- [
+            "--by",
+            "--days",
+            "--format",
+            "--json",
+            "--limit",
+            "--stale-days",
+            "--suite",
+            "--subjects",
+            "--baseline-subject",
+            "--scenario-slugs",
+            "--dry-run",
+            "--execute",
+            "--project-root",
+            "--persist"
+          ] do
+        assert body =~ "`#{option}`"
+      end
     end
   end
 

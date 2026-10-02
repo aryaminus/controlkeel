@@ -258,6 +258,43 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     | Benchmark — history | `controlkeel obs benchmarks history` |
     | Benchmark — regressions | `controlkeel obs regressions` |
 
+    ## CLI reference
+
+    Run these commands from a project with ControlKeel set up. Running `controlkeel obs` is equivalent to `controlkeel obs status`. The `loop-status` spelling is also accepted as an alias for `loop`.
+
+    | Command | Purpose |
+    |---|---|
+    | `controlkeel obs status` | Show the current project's observability overview. |
+    | `controlkeel obs run <session-id>` | Show observability details for one session. |
+    | `controlkeel obs loop` | Inspect learning-loop status and diagnostics. |
+    | `controlkeel obs problems` | Review grouped workspace problems. |
+    | `controlkeel obs costs` | Inspect workspace spend; optionally group with `--by`. |
+    | `controlkeel obs imports` | List imported telemetry snapshots. |
+    | `controlkeel obs trends` | Review telemetry trends over a day window with `--days`. |
+    | `controlkeel obs regressions` | Review regression signals; supports `--days` and `--limit`. |
+    | `controlkeel obs recommend` | Show ranked next-step recommendations. |
+    | `controlkeel obs evals` | List advisory eval candidates. |
+    | `controlkeel obs evals save` | Save current eval candidates locally. |
+    | `controlkeel obs evals persisted` | List saved eval candidates. |
+    | `controlkeel obs benchmarks draft` | Generate local benchmark drafts from workspace evidence. |
+    | `controlkeel obs benchmarks drafts` | List benchmark drafts and their review state. |
+    | `controlkeel obs benchmarks approve <draft-id>` | Approve a draft. |
+    | `controlkeel obs benchmarks reject <draft-id>` | Reject a draft. |
+    | `controlkeel obs benchmarks archive <draft-id>` | Archive a draft. |
+    | `controlkeel obs benchmarks materialize` | Create benchmark suites and scenarios from approved drafts; does not run them. |
+    | `controlkeel obs benchmarks scenarios` | List observability benchmark scenarios. |
+    | `controlkeel obs benchmarks run` | Preview with `--dry-run`; actual execution requires explicit `--execute`. |
+    | `controlkeel obs benchmarks history` | Review prior observability benchmark runs. |
+    | `controlkeel obs promotions` | Review advisory memory promotion candidates. |
+    | `controlkeel obs compare` | Compare workspace telemetry periods; optionally group with `--by`. |
+    | `controlkeel obs timeline [session-id]` | Show a session event timeline; defaults to the current session. |
+    | `controlkeel obs memory [session-id]` | Show session memory context; defaults to the current session. |
+    | `controlkeel obs memory-quality` | Find stale or duplicate memory records; configure age with `--stale-days`. |
+    | `controlkeel obs export <session-id>` | Export a session observability envelope. |
+    | `controlkeel obs import <file>` | Validate an envelope with `--dry-run` or persist it with `--persist`. |
+
+    Supported flags vary by command. Common options include `--format` or `--json` for output, `--limit` for list sizes, and `--project-root` to select a project. Benchmark runs also accept `--suite`, `--subjects`, `--baseline-subject`, and `--scenario-slugs`.
+
     ## Proving an improvement
 
     The benchmark workflow is how a claim becomes evidence, and it is deliberately human-gated at every step that spends money or changes memory:

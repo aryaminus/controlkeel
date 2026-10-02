@@ -173,6 +173,70 @@
     </div>
   </section>
 
+  <section class="space-y-4">
+    <.section_title>CLI reference</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Run these commands from a project with ControlKeel set up. Running
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs</code>
+      is equivalent to
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs status</code>.
+      The <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">loop-status</code>
+      spelling is also accepted as an alias for <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">loop</code>.
+    </p>
+    <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+      <table class="min-w-full divide-y divide-border text-left text-sm">
+        <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Command after <code>controlkeel</code></th>
+            <th class="px-5 py-3 font-semibold">Purpose</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs status</td><td class="px-5 py-3 text-muted-foreground">Show the current project's observability overview.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs run &lt;session-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Show observability details for one session.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs loop</td><td class="px-5 py-3 text-muted-foreground">Inspect learning-loop status and diagnostics.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs problems</td><td class="px-5 py-3 text-muted-foreground">Review grouped workspace problems.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs costs</td><td class="px-5 py-3 text-muted-foreground">Inspect workspace spend, optionally grouped with <code>--by</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs imports</td><td class="px-5 py-3 text-muted-foreground">List imported telemetry snapshots.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs trends</td><td class="px-5 py-3 text-muted-foreground">Review telemetry trends over a day window with <code>--days</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs regressions</td><td class="px-5 py-3 text-muted-foreground">Review regression signals; supports <code>--days</code> and <code>--limit</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs recommend</td><td class="px-5 py-3 text-muted-foreground">Show ranked next-step recommendations.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs evals</td><td class="px-5 py-3 text-muted-foreground">List advisory eval candidates.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs evals save</td><td class="px-5 py-3 text-muted-foreground">Save current eval candidates locally.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs evals persisted</td><td class="px-5 py-3 text-muted-foreground">List saved eval candidates.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks draft</td><td class="px-5 py-3 text-muted-foreground">Generate local benchmark drafts from workspace evidence.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks drafts</td><td class="px-5 py-3 text-muted-foreground">List benchmark drafts and their review state.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks approve &lt;draft-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Approve a draft.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks reject &lt;draft-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Reject a draft.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks archive &lt;draft-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Archive a draft.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks materialize</td><td class="px-5 py-3 text-muted-foreground">Create benchmark suites and scenarios from approved drafts; does not run them.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks scenarios</td><td class="px-5 py-3 text-muted-foreground">List observability benchmark scenarios.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks run</td><td class="px-5 py-3 text-muted-foreground">Preview with <code>--dry-run</code>; actual execution requires explicit <code>--execute</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks history</td><td class="px-5 py-3 text-muted-foreground">Review prior observability benchmark runs.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs promotions</td><td class="px-5 py-3 text-muted-foreground">Review advisory memory promotion candidates.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs compare</td><td class="px-5 py-3 text-muted-foreground">Compare workspace telemetry periods, optionally grouped with <code>--by</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs timeline [session-id]</td><td class="px-5 py-3 text-muted-foreground">Show a session event timeline; defaults to the current session.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs memory [session-id]</td><td class="px-5 py-3 text-muted-foreground">Show session memory context; defaults to the current session.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs memory-quality</td><td class="px-5 py-3 text-muted-foreground">Find stale or duplicate memory records; configure age with <code>--stale-days</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs export &lt;session-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Export a session observability envelope.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs import &lt;file&gt;</td><td class="px-5 py-3 text-muted-foreground">Validate an envelope with <code>--dry-run</code> or persist it with <code>--persist</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Supported flags vary by command. Common options include
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--format</code>
+      or <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--json</code>
+      for output, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--limit</code>
+      for list sizes, and <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--project-root</code>
+      to select a project. Benchmark runs also accept
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--suite</code>,
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--subjects</code>,
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--baseline-subject</code>,
+      and <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--scenario-slugs</code>.
+    </p>
+  </section>
+
   <section class="space-y-3">
     <.section_title>Proving an improvement</.section_title>
     <p class="text-sm leading-7 text-muted-foreground">
