@@ -20,6 +20,10 @@ defmodule ControlKeelWeb.DocsController do
     render(conn, :agents, agent_integrations: Skills.agent_integrations())
   end
 
+  def governance(conn, _params) do
+    render(conn, :governance)
+  end
+
   # Legacy guide URL (removed when the guide moved under /docs).
   def legacy_redirect(conn, _params) do
     redirect(conn, to: ~p"/docs/getting-started")

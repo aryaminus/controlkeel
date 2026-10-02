@@ -11,6 +11,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     "/" => :home,
     "/docs/getting-started" => :getting_started,
     "/docs/agents" => :docs_agents,
+    "/docs/governance" => :docs_governance,
     "/about" => :about,
     "/contact" => :contact,
     "/developers" => :developers
@@ -158,6 +159,34 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     Where ControlKeel runs. Attach ControlKeel to the agent host your team already uses. Binding auto-bootstraps on first use; attach defaults to project scope.
 
     OpenCode is the recommended quick start. Run `controlkeel attach doctor` to verify the active host.
+    """
+  end
+
+  defp page_to_markdown(:docs_governance) do
+    """
+    # How It Governs
+
+    The delivery lifecycle, proof loop, and operating modes behind every governed change.
+
+    ## Governed delivery lifecycle
+
+    Intent intake at `/sessions/start`, task graph and findings during execution, proof bundles and benchmarks as evidence.
+
+    ## Proof console loop
+
+    Session Control, findings, Proof Browser, Ship Dashboard, and benchmarks.
+
+    ## Autonomy and findings
+
+    Severity maps to expected human gates; findings stay readable in plain language.
+
+    ## Operating modes
+
+    Local mode ships with SQLite, Ollama, or heuristic fallback. Cloud mode connects orgs, projects, users, webhooks, and service accounts.
+
+    ## Project rescue
+
+    Bootstrap the repo, run `controlkeel watch`, and use findings, proofs, and validation to recover.
     """
   end
 

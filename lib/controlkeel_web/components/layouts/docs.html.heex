@@ -1,6 +1,7 @@
 <% nav_items = [
   %{label: "Docs", to: "/docs"},
   %{label: "Getting started", to: "/docs/getting-started"},
+  %{label: "How it governs", to: "/docs/governance"},
   %{label: "Agents", to: "/docs/agents"}
 ] %>
 <% current_page = Enum.find(nav_items, &(&1.to == @conn.request_path)) %>
