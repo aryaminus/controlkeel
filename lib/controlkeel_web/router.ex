@@ -76,7 +76,12 @@ defmodule ControlKeelWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
-    get "/getting-started", PageController, :getting_started
+
+    get "/docs", DocsController, :index
+    get "/docs/getting-started", DocsController, :getting_started
+
+    # Legacy guide URL (removed when the guide moved under /docs).
+    get "/getting-started", DocsController, :legacy_redirect
     get "/about", PageController, :about
     get "/contact", PageController, :contact
     get "/privacy", PageController, :privacy

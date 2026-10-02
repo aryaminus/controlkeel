@@ -1,4 +1,4 @@
-<section class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-8 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-6">
+<section class="w-full px-4 sm:px-8 pt-8 pb-16">
   <div class="flex items-center justify-between gap-4 mt-6 mb-4 max-[900px]:flex-col max-[900px]:items-start">
     <div>
       <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
@@ -7,14 +7,14 @@
       <h1 class="text-[clamp(2rem,4vw,3.4rem)] leading-[1.02]">
         Install to first finding in five minutes
       </h1>
-      <p class="text-muted-foreground text-[1.05rem] leading-[1.7] max-w-[48rem]">
+      <p class="text-muted-foreground text-[1.05rem] leading-[1.7]">
         ControlKeel turns project rules, domain knowledge, and security boundaries into findings, proofs, approval gates, budgets, evals, and durable context across supported hosts. Agent output is cheap; reviewability, release safety, and cost control are not. ControlKeel governs that loop from the first attach.
       </p>
     </div>
   </div>
 </section>
 
-<section class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-0 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-0">
+<section class="w-full px-4 sm:px-8 pt-0 pb-16">
   <div class="space-y-4">
     <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">Install</p>
     <%= for channel <- @install_channels do %>
@@ -44,7 +44,7 @@
   <.available_where agent_integrations={@agent_integrations} />
 </section>
 
-<section class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-0 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-0">
+<section class="w-full px-4 sm:px-8 pt-0 pb-16">
   <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
     Quick start
   </p>
@@ -118,7 +118,7 @@
   </p>
 </section>
 
-<section class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-0 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-0">
+<section class="w-full px-4 sm:px-8 pt-0 pb-16">
   <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
     How it governs
   </p>

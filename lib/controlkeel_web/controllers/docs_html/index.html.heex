@@ -1,0 +1,80 @@
+<div class="space-y-10">
+  <section class="rounded-2xl border bg-card p-6 shadow-card sm:p-10">
+    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+      ControlKeel docs
+    </p>
+    <h1 class="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+      Documentation for ControlKeel
+    </h1>
+    <p class="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+      Set up your workspace, connect an agent, and understand how ControlKeel records governed work and spend.
+    </p>
+    <.link
+      navigate="/docs/getting-started"
+      class="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    >
+      Start with the quick guide <.icon name="hero-arrow-right" class="size-4" />
+    </.link>
+  </section>
+
+  <section aria-labelledby="docs-browse-heading">
+    <h2
+      id="docs-browse-heading"
+      class="text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+    >
+      Browse documentation
+    </h2>
+    <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <.link
+        navigate="/docs/getting-started"
+        class="group flex min-h-44 flex-col rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <span class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <.icon name="hero-rocket-launch" class="size-5" />
+        </span>
+        <span class="mt-4 text-base font-semibold text-foreground">Getting started</span>
+        <span class="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
+          Install ControlKeel, attach an agent host, and reach your first finding.
+        </span>
+        <span class="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+          Read the guide
+          <.icon name="hero-arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
+        </span>
+      </.link>
+
+      <.link
+        navigate="/docs/agents"
+        class="group flex min-h-44 flex-col rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <span class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <.icon name="hero-cpu-chip" class="size-5" />
+        </span>
+        <span class="mt-4 text-base font-semibold text-foreground">Agent hosts</span>
+        <span class="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
+          See supported integrations and how to attach ControlKeel to your host.
+        </span>
+        <span class="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+          Explore agents
+          <.icon name="hero-arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
+        </span>
+      </.link>
+
+      <.link
+        navigate="/docs/costs"
+        class="group flex min-h-44 flex-col rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <span class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <.icon name="hero-chart-bar" class="size-5" />
+        </span>
+        <span class="mt-4 text-base font-semibold text-foreground">Costs and usage</span>
+        <span class="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
+          Review spend reporting, usage trends, and cost comparisons.
+        </span>
+        <span class="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+          Understand costs
+          <.icon name="hero-arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
+        </span>
+      </.link>
+    </div>
+  </section>
+</div>

@@ -37,7 +37,8 @@ defmodule ControlKeelWeb.SitemapController do
   defp public_urls do
     [
       {"/", "weekly", "1.0"},
-      {"/getting-started", "weekly", "0.9"},
+      {"/docs", "weekly", "0.9"},
+      {"/docs/getting-started", "weekly", "0.9"},
       {"/about", "monthly", "0.7"},
       {"/contact", "monthly", "0.6"},
       {"/developers", "weekly", "0.8"},
