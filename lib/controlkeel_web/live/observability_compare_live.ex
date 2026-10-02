@@ -7,10 +7,7 @@ defmodule ControlKeelWeb.ObservabilityCompareLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @groupings ~w(source model provider tool)
 
@@ -99,10 +96,6 @@ defmodule ControlKeelWeb.ObservabilityCompareLive do
             {@comparison.totals.invocations} invocation(s)
           </span>
         </div>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3">
-        <CommandPill.command_pill command="controlkeel obs compare" />
       </div>
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

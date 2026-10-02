@@ -7,10 +7,7 @@ defmodule ControlKeelWeb.ObservabilityMemoryQualityLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = params, _session, socket) do
@@ -92,8 +89,6 @@ defmodule ControlKeelWeb.ObservabilityMemoryQualityLive do
           </span>
         </div>
       </div>
-
-      <CommandPill.command_pill command="controlkeel obs memory-quality" />
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article
