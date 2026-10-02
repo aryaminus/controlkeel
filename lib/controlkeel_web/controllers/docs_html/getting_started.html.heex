@@ -46,91 +46,40 @@
   <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
     Quick start
   </p>
-  <div class="grid grid-cols-[minmax(0,1.35fr)_minmax(280px,0.75fr)] gap-6 max-[900px]:grid-cols-1 mt-4">
-    <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
-      <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-        Packaged binary
-      </p>
-      <ol class="grid gap-4 m-0 p-0 list-none mt-4">
-        <li class="text-sm text-muted-foreground">
-          1. Run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel</code>
-          to boot the local web app.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          2. In your project, run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel setup</code>, then <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach opencode</code>.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          3. Binding auto-bootstraps on first use; use
-          <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
-            controlkeel bootstrap
-          </code>
-          or <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel init</code>
-          to do it explicitly.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          4. Run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach doctor</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel provider doctor</code>, and <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel status</code>.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          5. Trigger a controlled validation, then open Session Control or run
-          <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
-            controlkeel findings
-          </code>
-          to verify the block.
-        </li>
-      </ol>
-    </div>
-
-    <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
-      <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-        Source setup
-      </p>
-      <ol class="grid gap-4 m-0 p-0 list-none mt-4">
-        <li class="text-sm text-muted-foreground">
-          1. Run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">mix setup</code>
-          once.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          2. Run
-          <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">mix phx.server</code>
-          in the ControlKeel repo.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          3. In your project, run
-          <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
-            mix ck.attach opencode
-          </code>
-          from the same source environment.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          4. <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">mix ck.init</code>
-          is available for explicit setup.
-        </li>
-        <li class="text-sm text-muted-foreground">
-          5. Run a built-in smoke benchmark or validate a pending change to trigger the first finding.
-        </li>
-      </ol>
-    </div>
+  <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-4">
+    <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
+      Packaged binary
+    </p>
+    <ol class="grid gap-4 m-0 p-0 list-none mt-4">
+      <li class="text-sm text-muted-foreground">
+        1. Run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel</code>
+        to boot the local web app.
+      </li>
+      <li class="text-sm text-muted-foreground">
+        2. In your project, run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel setup</code>, then <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach opencode</code>.
+      </li>
+      <li class="text-sm text-muted-foreground">
+        3. Binding auto-bootstraps on first use; use
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
+          controlkeel bootstrap
+        </code>
+        or <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel init</code>
+        to do it explicitly.
+      </li>
+      <li class="text-sm text-muted-foreground">
+        4. Run <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach doctor</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel provider doctor</code>, and <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel status</code>.
+      </li>
+      <li class="text-sm text-muted-foreground">
+        5. Trigger a controlled validation, then open Session Control or run
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
+          controlkeel findings
+        </code>
+        to verify the block.
+      </li>
+    </ol>
   </div>
   <p class="text-muted-foreground mt-4 text-sm">
     Attach defaults to project scope and writes inside the governed repository. User scope is available only for hosts that advertise it. Local stdio MCP exposes the full local tool set; hosted MCP is a separate, narrower OAuth-scoped surface.
   </p>
 </section>
 
-<section class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-0 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-0">
-  <div class="grid grid-cols-[minmax(0,1.35fr)_minmax(280px,0.75fr)] gap-6 max-[900px]:grid-cols-1">
-    <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6">
-      <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-        What it is not
-      </p>
-      <ul class="grid gap-4 m-0 p-0 list-none mt-3">
-        <li class="text-sm text-muted-foreground">Not another IDE or coding model</li>
-        <li class="text-sm text-muted-foreground">
-          Not a prompt marketplace or generic memory API
-        </li>
-        <li class="text-sm text-muted-foreground">
-          Not passive monitoring or post-hoc review only
-        </li>
-      </ul>
-    </div>
-  </div>
-</section>
