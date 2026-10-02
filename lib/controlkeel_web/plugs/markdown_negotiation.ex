@@ -12,6 +12,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     "/docs/getting-started" => :getting_started,
     "/docs/agents" => :docs_agents,
     "/docs/governance" => :docs_governance,
+    "/docs/observability" => :docs_observability,
     "/about" => :about,
     "/contact" => :contact,
     "/developers" => :developers
@@ -202,6 +203,74 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     ## Project rescue
 
     If another tool already touched the repo, bootstrap it, run `controlkeel watch`, and use findings, proofs, and `ck_validate` to recover. Add governed proxy only when the tool points at compatible OpenAI or Anthropic endpoints.
+    """
+  end
+
+  defp page_to_markdown(:docs_observability) do
+    """
+    # Observability
+
+    Evidence, not impressions — how ControlKeel turns agent work into costs, regressions, benchmarks, and durable improvements.
+
+    ## Why observability
+
+    Agent output is cheap to produce and expensive to verify. Without evidence, every claim about a workflow — it costs less, it regresses less, it ships safer — is an impression. Observability is how ControlKeel replaces impressions with measurements: sessions emit telemetry as the agent works, and that telemetry becomes views you can act on.
+
+    In practice this gives you:
+
+    - Spend visibility per model, tool, source, and provider over rolling windows.
+    - Regression detection — advisory eval candidates derived from grouped problems and feedback evidence.
+    - Benchmarks with explicit execution gating, so claims are backed by runs you chose to make.
+    - Memory quality signals — stale entries and duplicate clusters surfaced before they pollute context.
+    - Ranked recommendations for the next improvement action.
+    - Immutable evidence exports — session JSON and audit logs for review or compliance.
+
+    ## The evidence loop
+
+    1. **Collect.** Sessions record events, spend, findings, and proofs as the agent works.
+    2. **Aggregate.** Telemetry rolls up per workspace into costs, trends, and period comparisons.
+    3. **Detect.** Anomalies become eval candidates; grouped problems and feedback mark regressions; memory scans flag staleness and duplicates.
+    4. **Prove.** Benchmark drafts turn evidence into runnable scenarios; execution is gated behind an explicit flag.
+    5. **Improve.** Surviving outcomes drive promotions and memory writes, and the improved memory serves the next session.
+
+    ## Reading a single session
+
+    Use the session view when the question is about one run. Each session has a stacked observability page at `/:org_slug/workspaces/:ws_slug/sessions/:id/observability` covering run state and memory, with the full event timeline at `/activity`. The same page exports evidence: `observability/export.json` for the full session payload and `observability/audit-log/:format` for the audit trail.
+
+    ## Monitoring a workspace
+
+    Workspace pages live under `/:org_slug/workspaces/:ws_slug/observability`. Every page has a terminal parallel:
+
+    | Page | Terminal |
+    |---|---|
+    | Overview | `controlkeel obs` |
+    | Loop | `controlkeel obs loop` |
+    | Costs | `controlkeel obs costs` |
+    | Trends | `controlkeel obs trends --days 30` |
+    | Compare | `controlkeel obs compare` |
+    | Evals | `controlkeel obs evals` |
+    | Imports | `controlkeel obs imports` |
+    | Memory quality | `controlkeel obs memory-quality` |
+    | Recommendations | `controlkeel obs recommend` |
+    | Promotions | `controlkeel obs promotions` |
+    | Benchmark | `controlkeel obs benchmarks drafts` |
+
+    ## Proving an improvement
+
+    The benchmark workflow is how a claim becomes evidence, and it is deliberately human-gated at every step that spends money or changes memory:
+
+    1. Generate drafts from workspace evidence: `controlkeel obs benchmarks draft`
+    2. Review the generated scenarios before anything runs — the web benchmark page shows the same drafts with full context.
+    3. Approve the draft: `controlkeel obs benchmarks approve <id>`
+    4. Dry-run first: `controlkeel obs benchmarks run --dry-run`
+    5. Execute explicitly: `controlkeel obs benchmarks run --execute --suite <suite>`
+    6. Read the outcome in history, watch for regressions, and promote what survived: `controlkeel obs benchmarks history`, `controlkeel obs regressions`, `controlkeel obs promotions`
+
+    ## Safety and automation
+
+    Benchmark execution is CLI-only and refuses to run without an explicit `--execute` flag — a dry-run can never silently become a real run. Promotions and memory writes follow the same human-gated pattern: evidence proposes, a person disposes.
+
+    Agents should call the structured `ck_observability` MCP tool instead of copying these shell commands — it returns the same surfaces as typed data.
     """
   end
 

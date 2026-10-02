@@ -75,6 +75,39 @@ defmodule ControlKeelWeb.DocsControllerTest do
     end
   end
 
+  describe "GET /docs/observability" do
+    test "renders the observability guide with the command map", %{conn: conn} do
+      conn = get(conn, ~p"/docs/observability")
+      body = html_response(conn, 200)
+
+      assert body =~ "Observability"
+      assert body =~ "The evidence loop"
+      assert body =~ "Reading a single session"
+      assert body =~ "Monitoring a workspace"
+      assert body =~ "Proving an improvement"
+      assert body =~ "Safety and automation"
+      assert body =~ "controlkeel obs costs"
+      assert body =~ "controlkeel obs benchmarks draft"
+      assert body =~ "--execute"
+      assert body =~ "ck_observability"
+      assert body =~ ~r{href="/docs/observability"[^>]*aria-current="page"}
+    end
+
+    test "GET /docs/observability with text/markdown returns markdown", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("accept", "text/markdown")
+        |> get(~p"/docs/observability")
+
+      body = response(conn, 200)
+
+      assert body =~ "# Observability"
+      assert body =~ "## The evidence loop"
+      assert body =~ "## Proving an improvement"
+      assert body =~ "controlkeel obs memory-quality"
+    end
+  end
+
   describe "legacy guide URL" do
     test "GET /getting-started redirects to /docs/getting-started", %{conn: conn} do
       conn = get(conn, "/getting-started")

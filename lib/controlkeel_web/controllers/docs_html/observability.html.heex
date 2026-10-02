@@ -1,0 +1,193 @@
+<.page_title
+  title="Observability"
+  subtitle="Evidence, not impressions — how ControlKeel turns agent work into costs, regressions, benchmarks, and durable improvements."
+/>
+
+<div class="mt-10 space-y-10">
+  <section class="space-y-3">
+    <.section_title>Why observability</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Agent output is cheap to produce and expensive to verify. Without evidence, every claim about a workflow — it costs less, it regresses less, it ships safer — is an impression. Observability is how ControlKeel replaces impressions with measurements: sessions emit telemetry as the agent works, and that telemetry becomes views you can act on, not dashboards you scroll past.
+    </p>
+    <p class="text-sm leading-7 text-muted-foreground">
+      In practice this gives you:
+    </p>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>Spend visibility per model, tool, source, and provider over rolling windows.</li>
+      <li>Regression detection — advisory eval candidates derived from grouped problems and feedback evidence.</li>
+      <li>Benchmarks with explicit execution gating, so claims are backed by runs you chose to make.</li>
+      <li>Memory quality signals — stale entries and duplicate clusters surfaced before they pollute context.</li>
+      <li>Ranked recommendations for the next improvement action.</li>
+      <li>Immutable evidence exports — session JSON and audit logs for review or compliance.</li>
+    </ul>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>The evidence loop</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Every observability surface is one stage of a loop that ends where it started — a better-informed next session:
+    </p>
+    <ol class="space-y-2 text-sm leading-6 text-muted-foreground list-decimal ml-5">
+      <li>
+        <span class="font-medium text-foreground">Collect.</span>
+        Sessions record events, spend, findings, and proofs as the agent works.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Aggregate.</span>
+        Telemetry rolls up per workspace into costs, trends, and period comparisons.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Detect.</span>
+        Anomalies become eval candidates; grouped problems and feedback mark regressions; memory scans flag staleness and duplicates.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Prove.</span>
+        Benchmark drafts turn evidence into runnable scenarios; execution is gated behind an explicit flag.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Improve.</span>
+        Surviving outcomes drive promotions and memory writes, and the improved memory serves the next session.
+      </li>
+    </ol>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Reading a single session</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Use the session view when the question is about one run — what happened, what it cost, what it touched. Each session has a stacked observability page at
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/:org_slug/workspaces/:ws_slug/sessions/:id/observability</code>
+      covering run state and memory, with the full event timeline at
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/activity</code>.
+      The same page exports evidence:
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">observability/export.json</code>
+      for the full session payload and
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">observability/audit-log/:format</code>
+      for the audit trail.
+    </p>
+  </section>
+
+  <section class="space-y-4">
+    <.section_title>Monitoring a workspace</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Use the workspace pages for ongoing signal across sessions. They live under
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/:org_slug/workspaces/:ws_slug/observability</code>,
+      and every page has a terminal parallel for when you are not in a browser:
+    </p>
+    <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+      <table class="min-w-full divide-y divide-border text-left text-sm">
+        <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Page</th>
+            <th class="px-5 py-3 font-semibold">Answers</th>
+            <th class="px-5 py-3 font-semibold">Terminal</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Overview</td>
+            <td class="px-5 py-4 text-muted-foreground">Where does this workspace stand right now?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Loop</td>
+            <td class="px-5 py-4 text-muted-foreground">Is the improvement loop moving or blocked?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs loop</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Costs</td>
+            <td class="px-5 py-4 text-muted-foreground">What is spend, grouped by model, tool, source, provider?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs costs</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Trends</td>
+            <td class="px-5 py-4 text-muted-foreground">How is it moving over a rolling window?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs trends --days 30</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Compare</td>
+            <td class="px-5 py-4 text-muted-foreground">Did it change between two periods?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs compare</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Evals</td>
+            <td class="px-5 py-4 text-muted-foreground">Which regressions are candidates for review?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs evals</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Imports</td>
+            <td class="px-5 py-4 text-muted-foreground">What external telemetry came in?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs imports</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Memory quality</td>
+            <td class="px-5 py-4 text-muted-foreground">Is stored memory stale or duplicated?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs memory-quality</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Recommendations</td>
+            <td class="px-5 py-4 text-muted-foreground">What is the highest-value next action?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs recommend</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Promotions</td>
+            <td class="px-5 py-4 text-muted-foreground">Which memory earned promotion from evidence?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs promotions</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark</td>
+            <td class="px-5 py-4 text-muted-foreground">Drafts, scenarios, history, regressions</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks drafts</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Proving an improvement</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      The benchmark workflow is how a claim becomes evidence, and it is deliberately human-gated at every step that spends money or changes memory:
+    </p>
+    <ol class="space-y-2 text-sm leading-6 text-muted-foreground list-decimal ml-5">
+      <li>
+        Generate drafts from workspace evidence:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks draft</code>
+      </li>
+      <li>
+        Review the generated scenarios before anything runs — the web benchmark page shows the same drafts with full context.
+      </li>
+      <li>
+        Approve the draft:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks approve &lt;id&gt;</code>
+      </li>
+      <li>
+        Dry-run first:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks run --dry-run</code>
+      </li>
+      <li>
+        Execute explicitly:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks run --execute --suite &lt;suite&gt;</code>
+      </li>
+      <li>
+        Read the outcome in history, watch for regressions, and promote what survived:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks history</code>,
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs regressions</code>,
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs promotions</code>
+      </li>
+    </ol>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Safety and automation</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Benchmark execution is CLI-only and refuses to run without an explicit
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--execute</code>
+      flag — a dry-run can never silently become a real run. Promotions and memory writes follow the same human-gated pattern: evidence proposes, a person disposes.
+    </p>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Agents should call the structured
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_observability</code>
+      MCP tool instead of copying these shell commands — it returns the same surfaces as typed data.
+    </p>
+  </section>
+</div>
