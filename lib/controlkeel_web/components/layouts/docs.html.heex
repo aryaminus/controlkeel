@@ -69,6 +69,15 @@
         </ol>
       </nav>
       <div class="flex shrink-0 items-center gap-3">
+        <a
+          href="https://github.com/aryaminus/controlkeel"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="ControlKeel on GitHub (opens in a new tab)"
+        >
+          GitHub
+        </a>
         <%= if ControlKeel.Runtime.Mode.current() == :local do %>
           <a
             href={~p"/dashboard"}
