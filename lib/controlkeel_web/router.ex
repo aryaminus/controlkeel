@@ -79,6 +79,7 @@ defmodule ControlKeelWeb.Router do
 
     get "/docs", DocsController, :index
     get "/docs/getting-started", DocsController, :getting_started
+    get "/docs/agents", DocsController, :agents
 
     # Legacy guide URL (removed when the guide moved under /docs).
     get "/getting-started", DocsController, :legacy_redirect

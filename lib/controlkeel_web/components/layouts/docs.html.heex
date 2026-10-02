@@ -1,6 +1,7 @@
 <% nav_items = [
   %{label: "Docs", to: "/docs"},
-  %{label: "Getting started", to: "/docs/getting-started"}
+  %{label: "Getting started", to: "/docs/getting-started"},
+  %{label: "Agents", to: "/docs/agents"}
 ] %>
 <% current_page = Enum.find(nav_items, &(&1.to == @conn.request_path)) %>
 <div class="h-screen flex overflow-hidden">
@@ -94,7 +95,7 @@
       </div>
     </div>
 
-    <main id="docs-content" class="flex-1 overflow-y-auto">
+    <main class="flex-1 overflow-y-auto">
       <div class="px-4 pt-6 pb-12 sm:px-8 lg:px-8 container mx-auto">
         {@inner_content}
       </div>
