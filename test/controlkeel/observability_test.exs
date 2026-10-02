@@ -426,7 +426,7 @@ defmodule ControlKeel.ObservabilityTest do
   end
 
   test "eval_candidates/1 turns grouped problems into advisory backlog items" do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
     finding_fixture(%{
       session: session,
@@ -447,8 +447,11 @@ defmodule ControlKeel.ObservabilityTest do
     assert candidate.benchmark_hint == "security-regression"
     assert candidate.example_session_id == session.id
     assert candidate.human_gate_required == true
-    assert candidate.links.problems == "/observability/problems"
+    assert candidate.links.problems == "/observability"
     assert candidate.links.benchmarks == "/benchmarks"
+
+    assert candidate.links.example_session ==
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability"
   end
 
   test "problems/1 groups active findings by rule and category" do

@@ -26,7 +26,7 @@ Cloud-auth gated dashboard routes:
 - `/cloud/telemetry`, `/cloud/projects`, `/cloud/projects/:ws_id`
 - `/org/:slug/members`, `/org/:slug/settings/auth`, `/org/:slug/settings/general`
 - `/workspaces/:id/repos`, `/workspaces/:id/service-accounts`, `/workspaces/:id/webhooks`, `/workspaces/:id/tool-policy`
-- `/observability` and the observability subroutes for loop, costs, evals, imports, memory quality, recommendations, regressions, trends, problems, promotions, sessions, and benchmark history/drafts/scenarios
+- `/observability` and the observability subroutes for loop, costs, evals, imports, memory quality, recommendations, regressions, trends, promotions, sessions, and benchmark history/drafts/scenarios
 - `/policies`, `/skills`, `/deploy`
 
 ## JSON API (`/api/v1`)
