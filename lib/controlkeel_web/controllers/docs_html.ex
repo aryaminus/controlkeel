@@ -3,18 +3,6 @@ defmodule ControlKeelWeb.DocsHTML do
 
   embed_templates "docs_html/*"
 
-  defp user_scoped(integrations) do
-    Enum.filter(integrations, &("user" in List.wrap(&1.supported_scopes)))
-  end
-
-  defp export_scoped(integrations) do
-    Enum.filter(integrations, &("export" in List.wrap(&1.supported_scopes)))
-  end
-
-  defp non_bootstrapped(integrations) do
-    Enum.filter(integrations, &(not &1.auto_bootstrap))
-  end
-
   defp format_targets([]), do: "none"
   defp format_targets(nil), do: "none"
   defp format_targets(values), do: Enum.join(values, ", ")
