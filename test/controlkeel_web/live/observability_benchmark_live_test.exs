@@ -47,11 +47,6 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     assert has_element?(view, "#observability-benchmark-history-runs")
     assert has_element?(view, "#observability-regressions-runs")
 
-    assert html =~ "controlkeel obs benchmarks drafts"
-    assert html =~ "controlkeel obs benchmarks scenarios"
-    assert html =~ "controlkeel obs benchmarks history"
-    assert html =~ "controlkeel obs regressions"
-
     assert html =~ "No benchmark drafts yet."
     assert html =~ "No benchmark tests yet."
     assert html =~ "No observability benchmark runs yet."

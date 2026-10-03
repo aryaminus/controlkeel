@@ -11,10 +11,7 @@ defmodule ControlKeelWeb.ObservabilityCostsLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @groupings ~w(model tool source provider)
 
@@ -102,10 +99,6 @@ defmodule ControlKeelWeb.ObservabilityCostsLive do
         <p class="text-sm text-muted-foreground">
           Estimated spend, token usage, and invocation counts grouped by model, tool, source, or provider.
         </p>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3">
-        <CommandPill.command_pill command="controlkeel obs costs" />
       </div>
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">

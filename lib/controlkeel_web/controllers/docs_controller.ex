@@ -21,6 +21,10 @@ defmodule ControlKeelWeb.DocsController do
     render(conn, :governance)
   end
 
+  def observability(conn, _params) do
+    render(conn, :observability)
+  end
+
   # Legacy guide URL (removed when the guide moved under /docs).
   def legacy_redirect(conn, _params) do
     redirect(conn, to: ~p"/docs/getting-started")

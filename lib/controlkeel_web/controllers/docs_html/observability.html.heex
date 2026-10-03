@@ -1,0 +1,287 @@
+<.page_title
+  title="Observability"
+  subtitle="Evidence, not impressions — how ControlKeel turns agent work into costs, regressions, benchmarks, and durable improvements."
+/>
+
+<div class="mt-10 space-y-10">
+  <section class="space-y-3">
+    <.section_title>Why observability</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Agent output is cheap to produce and expensive to verify. Without evidence, every claim about a workflow — it costs less, it regresses less, it ships safer — is an impression. Observability is how ControlKeel replaces impressions with measurements: sessions emit telemetry as the agent works, and that telemetry becomes views you can act on, not dashboards you scroll past.
+    </p>
+    <p class="text-sm leading-7 text-muted-foreground">
+      In practice this gives you:
+    </p>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>Spend visibility per model, tool, source, and provider over rolling windows.</li>
+      <li>Regression detection — advisory eval candidates derived from grouped problems and feedback evidence.</li>
+      <li>Benchmarks with explicit execution gating, so claims are backed by runs you chose to make.</li>
+      <li>Memory quality signals — stale entries and duplicate clusters surfaced before they pollute context.</li>
+      <li>Ranked recommendations for the next improvement action.</li>
+      <li>Immutable evidence exports — session JSON and audit logs for review or compliance.</li>
+    </ul>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>The evidence loop</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Every observability surface is one stage of a loop that ends where it started — a better-informed next session:
+    </p>
+    <ol class="space-y-2 text-sm leading-6 text-muted-foreground list-decimal ml-5">
+      <li>
+        <span class="font-medium text-foreground">Collect.</span>
+        Sessions record events, spend, findings, and proofs as the agent works.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Aggregate.</span>
+        Telemetry rolls up per workspace into costs, trends, and period comparisons.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Detect.</span>
+        Anomalies become eval candidates; grouped problems and feedback mark regressions; memory scans flag staleness and duplicates.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Prove.</span>
+        Benchmark drafts turn evidence into runnable scenarios; execution is gated behind an explicit flag.
+      </li>
+      <li>
+        <span class="font-medium text-foreground">Improve.</span>
+        Surviving outcomes drive promotions and memory writes, and the improved memory serves the next session.
+      </li>
+    </ol>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Reading a single session</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Use the session observability view when the question is about one run — what happened, what it cost, and what it touched. It brings together run state, memory context, the event timeline, and downloadable session and audit evidence.
+    </p>
+  </section>
+
+  <section class="space-y-4">
+    <.section_title>Monitoring a workspace</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Use <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/observability</code>
+      for ongoing signal across workspace sessions. Each page has a terminal parallel for when
+      you are not in a browser. The benchmark workflow groups drafts, scenarios, history, and
+      regressions on its benchmark page; these sections map to the following commands:
+    </p>
+    <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+      <table class="min-w-full divide-y divide-border text-left text-sm">
+        <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Page</th>
+            <th class="px-5 py-3 font-semibold">Answers</th>
+            <th class="px-5 py-3 font-semibold">Terminal</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Overview</td>
+            <td class="px-5 py-4 text-muted-foreground">Where does this workspace stand right now?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Loop</td>
+            <td class="px-5 py-4 text-muted-foreground">Is the improvement loop moving or blocked?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs loop</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Costs</td>
+            <td class="px-5 py-4 text-muted-foreground">What is spend, grouped by model, tool, source, provider?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs costs</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Trends</td>
+            <td class="px-5 py-4 text-muted-foreground">How is it moving over a rolling window?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs trends --days 30</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Compare</td>
+            <td class="px-5 py-4 text-muted-foreground">Did it change between two periods?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs compare</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Evals</td>
+            <td class="px-5 py-4 text-muted-foreground">Which regressions are candidates for review?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs evals</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Imports</td>
+            <td class="px-5 py-4 text-muted-foreground">What external telemetry came in?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs imports</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Memory quality</td>
+            <td class="px-5 py-4 text-muted-foreground">Is stored memory stale or duplicated?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs memory-quality</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Recommendations</td>
+            <td class="px-5 py-4 text-muted-foreground">What is the highest-value next action?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs recommend</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Promotions</td>
+            <td class="px-5 py-4 text-muted-foreground">Which memory earned promotion from evidence?</td>
+            <td class="px-5 py-4"><code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs promotions</code></td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — drafts</td>
+            <td class="px-5 py-4 text-muted-foreground">Review generated benchmark drafts.</td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs benchmarks drafts
+              </code>
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — scenarios</td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Inspect the available benchmark scenarios.
+            </td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs benchmarks scenarios
+              </code>
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — history</td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Review previous benchmark runs and outcomes.
+            </td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs benchmarks history
+              </code>
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4 font-medium text-foreground">Benchmark — regressions</td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Review regression signals from workspace evidence.
+            </td>
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel obs regressions
+              </code>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <.section_title>CLI reference</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Run these commands from a project with ControlKeel set up. Running
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs</code>
+      is equivalent to
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs status</code>.
+      The <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">loop-status</code>
+      spelling is also accepted as an alias for <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">loop</code>.
+    </p>
+    <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+      <table class="min-w-full divide-y divide-border text-left text-sm">
+        <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Command after <code>controlkeel</code></th>
+            <th class="px-5 py-3 font-semibold">Purpose</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs status</td><td class="px-5 py-3 text-muted-foreground">Show the current project's observability overview.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs run &lt;session-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Show observability details for one session.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs loop</td><td class="px-5 py-3 text-muted-foreground">Inspect learning-loop status and diagnostics.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs problems</td><td class="px-5 py-3 text-muted-foreground">Review grouped workspace problems.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs costs</td><td class="px-5 py-3 text-muted-foreground">Inspect workspace spend, optionally grouped with <code>--by</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs imports</td><td class="px-5 py-3 text-muted-foreground">List imported telemetry snapshots.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs trends</td><td class="px-5 py-3 text-muted-foreground">Review telemetry trends over a day window with <code>--days</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs regressions</td><td class="px-5 py-3 text-muted-foreground">Review regression signals; supports <code>--days</code> and <code>--limit</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs recommend</td><td class="px-5 py-3 text-muted-foreground">Show ranked next-step recommendations.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs evals</td><td class="px-5 py-3 text-muted-foreground">List advisory eval candidates.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs evals save</td><td class="px-5 py-3 text-muted-foreground">Save current eval candidates locally.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs evals persisted</td><td class="px-5 py-3 text-muted-foreground">List saved eval candidates.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks draft</td><td class="px-5 py-3 text-muted-foreground">Generate local benchmark drafts from workspace evidence.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks drafts</td><td class="px-5 py-3 text-muted-foreground">List benchmark drafts and their review state.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks approve &lt;draft-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Approve a draft.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks reject &lt;draft-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Reject a draft.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks archive &lt;draft-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Archive a draft.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks materialize</td><td class="px-5 py-3 text-muted-foreground">Create benchmark suites and scenarios from approved drafts; does not run them.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks scenarios</td><td class="px-5 py-3 text-muted-foreground">List observability benchmark scenarios.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks run</td><td class="px-5 py-3 text-muted-foreground">Preview with <code>--dry-run</code>; actual execution requires explicit <code>--execute</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs benchmarks history</td><td class="px-5 py-3 text-muted-foreground">Review prior observability benchmark runs.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs promotions</td><td class="px-5 py-3 text-muted-foreground">Review advisory memory promotion candidates.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs compare</td><td class="px-5 py-3 text-muted-foreground">Compare workspace telemetry periods, optionally grouped with <code>--by</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs timeline [session-id]</td><td class="px-5 py-3 text-muted-foreground">Show a session event timeline; defaults to the current session.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs memory [session-id]</td><td class="px-5 py-3 text-muted-foreground">Show session memory context; defaults to the current session.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs memory-quality</td><td class="px-5 py-3 text-muted-foreground">Find stale or duplicate memory records; configure age with <code>--stale-days</code>.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs export &lt;session-id&gt;</td><td class="px-5 py-3 text-muted-foreground">Export a session observability envelope.</td></tr>
+          <tr><td class="px-5 py-3 font-mono text-foreground">obs import &lt;file&gt;</td><td class="px-5 py-3 text-muted-foreground">Validate an envelope with <code>--dry-run</code> or persist it with <code>--persist</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Supported flags vary by command. Common options include
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--format</code>
+      or <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--json</code>
+      for output, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--limit</code>
+      for list sizes, and <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--project-root</code>
+      to select a project. Benchmark runs also accept
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--suite</code>,
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--subjects</code>,
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--baseline-subject</code>,
+      and <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--scenario-slugs</code>.
+    </p>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Proving an improvement</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      The benchmark workflow is how a claim becomes evidence, and it is deliberately human-gated at every step that spends money or changes memory:
+    </p>
+    <ol class="space-y-2 text-sm leading-6 text-muted-foreground list-decimal ml-5">
+      <li>
+        Generate drafts from workspace evidence:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks draft</code>
+      </li>
+      <li>
+        Review the generated scenarios before anything runs — the web benchmark page shows the same drafts with full context.
+      </li>
+      <li>
+        Approve the draft:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks approve &lt;id&gt;</code>
+      </li>
+      <li>
+        Dry-run first:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks run --dry-run</code>
+      </li>
+      <li>
+        Execute explicitly:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks run --execute --suite &lt;suite&gt;</code>
+      </li>
+      <li>
+        Read the outcome in history, watch for regressions, and promote what survived:
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs benchmarks history</code>,
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs regressions</code>,
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel obs promotions</code>
+      </li>
+    </ol>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Safety and automation</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Benchmark execution is CLI-only and refuses to run without an explicit
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--execute</code>
+      flag — a dry-run can never silently become a real run. Promotions and memory writes follow the same human-gated pattern: evidence proposes, a person disposes.
+    </p>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Agents should call the structured
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_observability</code>
+      MCP tool instead of copying these shell commands — it returns the same surfaces as typed data.
+    </p>
+  </section>
+</div>

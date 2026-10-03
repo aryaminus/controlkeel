@@ -7,10 +7,7 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -112,7 +109,6 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
         </form>
       </div>
 
-      <CommandPill.command_pill command="controlkeel obs trends --days [N]" />
       <p class="text-xs text-muted-foreground">
         example:
         <code class="mx-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">

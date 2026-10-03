@@ -7,10 +7,7 @@ defmodule ControlKeelWeb.ObservabilityLoopLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -127,8 +124,6 @@ defmodule ControlKeelWeb.ObservabilityLoopLive do
           </span>
         </div>
       </div>
-
-      <CommandPill.command_pill command="controlkeel obs loop" />
 
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-3">
         <.section_title>Safety boundary</.section_title>

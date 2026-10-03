@@ -75,6 +75,158 @@ defmodule ControlKeelWeb.DocsControllerTest do
     end
   end
 
+  describe "GET /docs/observability" do
+    test "renders the observability guide with the command map", %{conn: conn} do
+      conn = get(conn, ~p"/docs/observability")
+      body = html_response(conn, 200)
+
+      assert body =~ "Observability"
+      assert body =~ "The evidence loop"
+      assert body =~ "Reading a single session"
+      assert body =~ "Monitoring a workspace"
+      assert body =~ "Proving an improvement"
+      assert body =~ "Safety and automation"
+      assert body =~ "controlkeel obs costs"
+      assert body =~ "controlkeel obs benchmarks draft"
+      assert body =~ "controlkeel obs benchmarks drafts"
+      assert body =~ "controlkeel obs benchmarks scenarios"
+      assert body =~ "controlkeel obs benchmarks history"
+      assert body =~ "controlkeel obs regressions"
+      assert body =~ "/observability"
+      refute body =~ "/:org_slug/workspaces/"
+      assert body =~ "--execute"
+      assert body =~ "CLI reference"
+
+      for command <- [
+            "obs status",
+            "obs run",
+            "obs loop",
+            "obs problems",
+            "obs costs",
+            "obs imports",
+            "obs trends",
+            "obs regressions",
+            "obs recommend",
+            "obs evals",
+            "obs evals save",
+            "obs evals persisted",
+            "obs benchmarks draft",
+            "obs benchmarks drafts",
+            "obs benchmarks approve",
+            "obs benchmarks reject",
+            "obs benchmarks archive",
+            "obs benchmarks materialize",
+            "obs benchmarks scenarios",
+            "obs benchmarks run",
+            "obs benchmarks history",
+            "obs promotions",
+            "obs compare",
+            "obs timeline",
+            "obs memory",
+            "obs memory-quality",
+            "obs export",
+            "obs import"
+          ] do
+        assert body =~ command
+      end
+
+      for option <- [
+            "--by",
+            "--days",
+            "--format",
+            "--json",
+            "--limit",
+            "--stale-days",
+            "--suite",
+            "--subjects",
+            "--baseline-subject",
+            "--scenario-slugs",
+            "--dry-run",
+            "--execute",
+            "--project-root",
+            "--persist"
+          ] do
+        assert body =~ option
+      end
+
+      assert body =~ "ck_observability"
+      assert body =~ ~r{href="/docs/observability"[^>]*aria-current="page"}
+    end
+
+    test "GET /docs/observability with text/markdown returns markdown", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("accept", "text/markdown")
+        |> get(~p"/docs/observability")
+
+      body = response(conn, 200)
+
+      assert body =~ "# Observability"
+      assert body =~ "## The evidence loop"
+      assert body =~ "## Proving an improvement"
+      assert body =~ "controlkeel obs memory-quality"
+      assert body =~ "controlkeel obs benchmarks drafts"
+      assert body =~ "controlkeel obs benchmarks scenarios"
+      assert body =~ "controlkeel obs benchmarks history"
+      assert body =~ "controlkeel obs regressions"
+      assert body =~ "`/observability`"
+      refute body =~ "/:org_slug/workspaces/"
+      assert body =~ "## CLI reference"
+
+      for command <- [
+            "controlkeel obs status",
+            "controlkeel obs run",
+            "controlkeel obs loop",
+            "controlkeel obs problems",
+            "controlkeel obs costs",
+            "controlkeel obs imports",
+            "controlkeel obs trends",
+            "controlkeel obs regressions",
+            "controlkeel obs recommend",
+            "controlkeel obs evals",
+            "controlkeel obs evals save",
+            "controlkeel obs evals persisted",
+            "controlkeel obs benchmarks draft",
+            "controlkeel obs benchmarks drafts",
+            "controlkeel obs benchmarks approve",
+            "controlkeel obs benchmarks reject",
+            "controlkeel obs benchmarks archive",
+            "controlkeel obs benchmarks materialize",
+            "controlkeel obs benchmarks scenarios",
+            "controlkeel obs benchmarks run",
+            "controlkeel obs benchmarks history",
+            "controlkeel obs promotions",
+            "controlkeel obs compare",
+            "controlkeel obs timeline",
+            "controlkeel obs memory",
+            "controlkeel obs memory-quality",
+            "controlkeel obs export",
+            "controlkeel obs import"
+          ] do
+        assert body =~ command
+      end
+
+      for option <- [
+            "--by",
+            "--days",
+            "--format",
+            "--json",
+            "--limit",
+            "--stale-days",
+            "--suite",
+            "--subjects",
+            "--baseline-subject",
+            "--scenario-slugs",
+            "--dry-run",
+            "--execute",
+            "--project-root",
+            "--persist"
+          ] do
+        assert body =~ "`#{option}`"
+      end
+    end
+  end
+
   describe "legacy guide URL" do
     test "GET /getting-started redirects to /docs/getting-started", %{conn: conn} do
       conn = get(conn, "/getting-started")

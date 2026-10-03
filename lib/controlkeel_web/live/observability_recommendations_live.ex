@@ -7,10 +7,7 @@ defmodule ControlKeelWeb.ObservabilityRecommendationsLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -94,8 +91,6 @@ defmodule ControlKeelWeb.ObservabilityRecommendationsLive do
           </span>
         </div>
       </div>
-
-      <CommandPill.command_pill command="controlkeel obs recommend" />
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
         <article class="rounded-2xl border bg-card p-5 shadow-card">

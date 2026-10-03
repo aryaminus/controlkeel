@@ -15,10 +15,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -257,10 +254,6 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           </.button>
         </.benchmark_section_header>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <CommandPill.command_pill command="controlkeel obs benchmarks drafts" />
-        </div>
-
         <.benchmark_recommendations
           id="observability-benchmark-drafts-recommendations"
           recommendations={@drafts.recommendations}
@@ -348,10 +341,6 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
           </span>
         </.benchmark_section_header>
 
-        <div class="flex flex-wrap items-center gap-3">
-          <CommandPill.command_pill command="controlkeel obs benchmarks scenarios" />
-        </div>
-
         <.benchmark_recommendations
           id="observability-benchmark-scenarios-summary"
           recommendations={@scenarios.recommendations}
@@ -419,10 +408,6 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
             {@history.readiness.status}
           </span>
         </.benchmark_section_header>
-
-        <div class="flex flex-wrap items-center gap-3">
-          <CommandPill.command_pill command="controlkeel obs benchmarks history" />
-        </div>
 
         <section
           id="observability-benchmark-history-summary"
@@ -509,10 +494,6 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
             {@regressions.health.status}
           </span>
         </.benchmark_section_header>
-
-        <div class="flex flex-wrap items-center gap-3">
-          <CommandPill.command_pill command="controlkeel obs regressions" />
-        </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <section

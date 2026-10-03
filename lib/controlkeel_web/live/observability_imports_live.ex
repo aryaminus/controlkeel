@@ -7,10 +7,7 @@ defmodule ControlKeelWeb.ObservabilityImportsLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -90,10 +87,6 @@ defmodule ControlKeelWeb.ObservabilityImportsLive do
             {@imports.count} persisted
           </span>
         </div>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3">
-        <CommandPill.command_pill command="controlkeel obs imports" />
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

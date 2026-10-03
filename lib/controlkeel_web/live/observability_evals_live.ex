@@ -7,10 +7,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -132,12 +129,9 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3">
-        <CommandPill.command_pill command="controlkeel obs evals" />
-        <p class="text-xs text-muted-foreground">
-          Save persists the current advisory candidates locally for human-gated review.
-        </p>
-      </div>
+      <p class="text-xs text-muted-foreground">
+        Save persists the current advisory candidates locally for human-gated review.
+      </p>
 
       <%= if @eval_candidates.recommendations != [] do %>
         <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">

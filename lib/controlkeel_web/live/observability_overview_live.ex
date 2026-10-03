@@ -7,11 +7,9 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.CommandPill
+  alias ControlKeelWeb.WorkspaceAccess
   alias ControlKeelWeb.RecentSessions
   alias ControlKeelWeb.WorkspaceAccess
-
-  on_mount ControlKeelWeb.CommandPill
 
   @impl true
   def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
@@ -85,8 +83,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
           Session runs, problems, costs, and trace export at a glance.
         </p>
       </div>
-
-      <CommandPill.command_pill command="controlkeel obs" />
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <article
