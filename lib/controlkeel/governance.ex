@@ -258,14 +258,33 @@ defmodule ControlKeel.Governance do
            "session_title" => session.title,
            "sha" => blank_to_nil(opts["sha"] || opts[:sha]),
            "proof" => release_proof_summary(latest_proof),
-           "findings" => %{
-             "open" => Enum.count(open_findings, &(&1.status == "open")),
-             "blocked" => Enum.count(open_findings, &(&1.status == "blocked")),
-             "escalated" => Enum.count(open_findings, &(&1.status == "escalated")),
-             "high_or_critical" =>
-               Enum.count(open_findings, &(&1.severity in ["high", "critical"])),
-             "critical_vulnerability_cases" => length(security_blockers)
-           },
+           "findings" =>
+             # Optimization: Single-pass reduce avoids multiple iterations over open_findings
+             Enum.reduce(
+               open_findings,
+               %{
+                 "open" => 0,
+                 "blocked" => 0,
+                 "escalated" => 0,
+                 "high_or_critical" => 0,
+                 "critical_vulnerability_cases" => length(security_blockers)
+               },
+               fn finding, acc ->
+                 acc =
+                   case finding.status do
+                     "open" -> %{acc | "open" => acc["open"] + 1}
+                     "blocked" -> %{acc | "blocked" => acc["blocked"] + 1}
+                     "escalated" -> %{acc | "escalated" => acc["escalated"] + 1}
+                     _ -> acc
+                   end
+
+                 if finding.severity in ["high", "critical"] do
+                   %{acc | "high_or_critical" => acc["high_or_critical"] + 1}
+                 else
+                   acc
+                 end
+               end
+             ),
            "reasons" => reasons,
            "smoke" => release_evidence_summary(smoke, smoke_ready?),
            "provenance" => release_evidence_summary(provenance, provenance_verified?),
