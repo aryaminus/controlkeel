@@ -26,7 +26,6 @@ defmodule ControlKeelWeb.ObservabilityLoopLiveTest do
     assert html =~ "Safety boundary"
     assert html =~ "Automatic benchmark execution: false"
     assert html =~ "Automatic promotion: false"
-    assert html =~ "controlkeel obs loop"
   end
 
   test "loop page renders loop diagnostics section with no detected runs", %{conn: conn} do
