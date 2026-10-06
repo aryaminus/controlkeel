@@ -3261,10 +3261,21 @@ defmodule ControlKeel.Observability do
   end
 
   defp health(findings, tasks, reviews, budget) do
-    active_findings = Enum.filter(findings, &(&1.status in @active_finding_statuses))
-    critical = Enum.count(active_findings, &(&1.severity == "critical"))
-    high = Enum.count(active_findings, &(&1.severity == "high"))
-    blocked = Enum.count(active_findings, &(&1.status == "blocked"))
+    # Bolt: Replaced Enum.filter/2 and multiple Enum.count/2 passes with a single-pass Enum.reduce/3 to avoid intermediate list allocations.
+    {active_count, critical, high, blocked} =
+      Enum.reduce(findings, {0, 0, 0, 0}, fn finding, {a_acc, c_acc, h_acc, b_acc} ->
+        if finding.status in @active_finding_statuses do
+          {
+            a_acc + 1,
+            c_acc + if(finding.severity == "critical", do: 1, else: 0),
+            h_acc + if(finding.severity == "high", do: 1, else: 0),
+            b_acc + if(finding.status == "blocked", do: 1, else: 0)
+          }
+        else
+          {a_acc, c_acc, h_acc, b_acc}
+        end
+      end)
+
     pending_reviews = Enum.count(reviews, &(&1.status == "pending"))
     active_tasks = Enum.count(tasks, &(&1.status in @active_task_statuses))
 
@@ -3272,7 +3283,7 @@ defmodule ControlKeel.Observability do
       cond do
         Map.get(budget, "decision") == "block" or critical > 0 or blocked > 0 -> "red"
         Map.get(budget, "decision") == "warn" or high > 0 or pending_reviews > 0 -> "yellow"
-        active_findings != [] or active_tasks > 0 -> "yellow"
+        active_count > 0 or active_tasks > 0 -> "yellow"
         true -> "green"
       end
 
