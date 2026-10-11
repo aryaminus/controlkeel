@@ -16,7 +16,10 @@ defmodule ControlKeelWeb.ProofBrowserLive do
      |> assign(:browser, empty_browser())
      |> assign(:memory_hits, [])
      |> assign(:risk_tiers, @risk_tiers)
-     |> assign(:session_options, Mission.list_recent_sessions(30, nil))
+     |> assign(
+       :session_options,
+       Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 30)
+     )
      |> assign(:form, to_form(%{}, as: :filters))}
   end
 

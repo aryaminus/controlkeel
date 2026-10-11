@@ -68,7 +68,7 @@ defmodule ControlKeel.Analytics do
 
   def funnel_summary(opts \\ []) do
     limit = Keyword.get(opts, :limit, @aggregate_session_limit)
-    sessions = recent_sessions(limit)
+    sessions = recent_sessions(opts, limit)
     session_sets = session_event_sets(Enum.map(sessions, & &1.id))
     recent_sessions = ship_session_rows(sessions)
     {outcome_metrics, agent_outcomes} = outcome_metrics(sessions)
@@ -98,8 +98,43 @@ defmodule ControlKeel.Analytics do
     }
   end
 
-  defp recent_sessions(limit) do
-    Session
+  # The funnel is tenant-facing data (time-to-first-finding, findings per
+  # session, agent outcomes). In cloud/self_hosted mode it must be scoped to the
+  # caller's workspaces, and an absent/empty scope must yield no rows rather
+  # than a platform-wide aggregate. In local single-user mode a bare call
+  # (no user, no workspace_ids) keeps the historical unscoped behavior.
+  defp recent_sessions(opts, limit) do
+    scope =
+      case Keyword.get(opts, :workspace_ids) do
+        ids when is_list(ids) ->
+          {:scoped, ids}
+
+        _ ->
+          case Keyword.get(opts, :user) do
+            %{id: user_id} ->
+              {:scoped, ControlKeel.Mission.accessible_workspace_ids(user_id)}
+
+            _ ->
+              # No caller identity. Local single-user mode keeps the historical
+              # unscoped behavior; hosted mode must not aggregate every tenant,
+              # so fail closed.
+              if ControlKeel.Runtime.Mode.current() == :local do
+                {:unscoped, nil}
+              else
+                {:scoped, []}
+              end
+          end
+      end
+
+    base = Session
+
+    base =
+      case scope do
+        {:scoped, ids} -> ControlKeel.Cloud.Scope.scope_workspaces(base, ids)
+        {:unscoped, _} -> base
+      end
+
+    base
     |> order_by(desc: :inserted_at)
     |> preload(:workspace)
     |> limit(^limit)

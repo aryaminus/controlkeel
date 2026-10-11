@@ -9,7 +9,9 @@ defmodule ControlKeelWeb.ObservabilityMemoryQualityLive do
 
   @impl true
   def mount(params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
+    recent_session =
+      Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 1) |> List.first()
+
     stale_days = parse_days(params["stale_days"])
 
     opts =
