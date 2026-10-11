@@ -187,14 +187,22 @@ defmodule ControlKeel.MCP.Tools.CkContext do
   end
 
   defp active_findings_summary(findings) do
-    active = Enum.filter(findings, &(&1.status in ["open", "blocked", "escalated"]))
+    {count, blocked, open, escalated, categories} =
+      Enum.reduce(findings, {0, 0, 0, 0, MapSet.new()}, fn finding, {c, b, o, e, cats} ->
+        case finding.status do
+          "blocked" -> {c + 1, b + 1, o, e, MapSet.put(cats, finding.category)}
+          "open" -> {c + 1, b, o + 1, e, MapSet.put(cats, finding.category)}
+          "escalated" -> {c + 1, b, o, e + 1, MapSet.put(cats, finding.category)}
+          _ -> {c, b, o, e, cats}
+        end
+      end)
 
     %{
-      "count" => length(active),
-      "blocked" => Enum.count(active, &(&1.status == "blocked")),
-      "open" => Enum.count(active, &(&1.status == "open")),
-      "escalated" => Enum.count(active, &(&1.status == "escalated")),
-      "categories" => active |> Enum.map(& &1.category) |> Enum.uniq()
+      "count" => count,
+      "blocked" => blocked,
+      "open" => open,
+      "escalated" => escalated,
+      "categories" => MapSet.to_list(categories)
     }
   end
 
