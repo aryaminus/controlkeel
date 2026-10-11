@@ -466,7 +466,7 @@ defmodule ControlKeelWeb.Layouts do
           <a
             :if={action[:to]}
             href={action.to}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </a>
@@ -475,7 +475,7 @@ defmodule ControlKeelWeb.Layouts do
             :if={action[:form]}
             type="submit"
             form={action.form}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>
@@ -484,7 +484,7 @@ defmodule ControlKeelWeb.Layouts do
             :if={action[:event]}
             type="button"
             phx-click={action.event}
-            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer"
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <.icon :if={action[:icon]} name={action.icon} class="size-4" /> {action.label}
           </button>

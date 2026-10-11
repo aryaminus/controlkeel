@@ -1153,7 +1153,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
             phx-click="toggle_subject"
             phx-value-id={selected_value}
             aria-label={"Remove #{Map.get(@labels_by_value, selected_value, selected_value)}"}
-            class="inline-flex items-center justify-center rounded-full p-0.5 hover:text-primary transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center rounded-full p-0.5 hover:text-primary transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <.icon name="hero-x-mark" class="w-3 h-3" />
           </button>
