@@ -47,8 +47,9 @@ defmodule ControlKeelWeb.OAuthLoginController do
     session_params = get_session(conn, :oauth_session_params) || %{}
 
     with {:ok, provider} <- safe_to_atom(provider_name),
-         {:ok, %{email: email, name: name}} <-
+         {:ok, %{email: email, name: name, email_verified: email_verified}} <-
            OAuthProviders.callback(provider, params, session_params),
+         :ok <- require_verified_email(provider, email_verified),
          {:ok, user, _created} <- Accounts.find_or_create_user(email, name) do
       invitation_token = get_session(conn, :pending_invitation_token)
 
@@ -80,6 +81,16 @@ defmodule ControlKeelWeb.OAuthLoginController do
         |> put_flash(:error, "Provider did not return an email address.")
         |> redirect(to: ~p"/auth/login")
 
+      {:error, :email_not_verified} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(
+          :error,
+          "Your #{provider_display_name(provider_name)} email is not verified. " <>
+            "Verify it with #{provider_display_name(provider_name)} and try again."
+        )
+        |> redirect(to: ~p"/auth/login")
+
       {:error, %Ecto.Changeset{}} ->
         conn
         |> clear_oauth_session()
@@ -95,6 +106,14 @@ defmodule ControlKeelWeb.OAuthLoginController do
   end
 
   # ── Private ─────────────────────────────────────────────────────────
+
+  # Sign-in is refused unless the provider asserts the returned email is
+  # verified. Without this, a provider account carrying someone else's
+  # (unverified) email would match the victim's existing account in
+  # find_or_create_user/2 and take it over — the pre-account-hijacking class
+  # (see #241). Fails closed when the provider sends no verification claim.
+  defp require_verified_email(_provider, true), do: :ok
+  defp require_verified_email(_provider, _unverified), do: {:error, :email_not_verified}
 
   defp safe_to_atom("google"), do: {:ok, :google}
   defp safe_to_atom("github"), do: {:ok, :github}

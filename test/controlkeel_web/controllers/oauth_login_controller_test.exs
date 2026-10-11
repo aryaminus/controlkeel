@@ -44,6 +44,34 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
     :ok
   end
 
+  describe "pre-account-hijack guard (issue #241)" do
+    test "refuses to authenticate when the provider email is unverified", %{conn: conn} do
+      # A victim already holds this account.
+      {:ok, _victim} = Accounts.create_user(%{email: "user@example.com"})
+
+      conn =
+        conn
+        |> get("/auth/github/request")
+        |> get("/auth/github/callback", %{"code" => "unverified"})
+
+      assert redirected_to(conn, 302) == "/auth/login"
+      assert get_session(conn, :current_user_id) == nil
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "not verified"
+    end
+
+    test "an unverified callback does not link to an existing account", %{conn: conn} do
+      {:ok, _victim} = Accounts.create_user(%{email: "user@example.com"})
+
+      conn =
+        conn
+        |> get("/auth/github/request")
+        |> get("/auth/github/callback", %{"code" => "unverified"})
+
+      # No session was established for the attacker.
+      assert get_session(conn, :current_user_id) == nil
+    end
+  end
+
   describe "GET /auth/:provider/request" do
     test "redirects to the provider and stores OAuth session data", %{conn: conn} do
       conn = get(conn, "/auth/github/request")
@@ -179,12 +207,18 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
       {:error, :missing_email}
     end
 
+    # Simulates a provider returning an email it has NOT verified (GitHub
+    # permits unverified emails). Used to prove the pre-account-hijack guard.
+    def callback(:github, _cfg, %{"code" => "unverified"}, _opts) do
+      {:ok, %{email: "user@example.com", name: "Attacker", email_verified: false}}
+    end
+
     def callback(:github, _cfg, _params, _opts) do
-      {:ok, %{email: "user@example.com", name: "Example User"}}
+      {:ok, %{email: "user@example.com", name: "Example User", email_verified: true}}
     end
 
     def callback(:google, _cfg, _params, _opts) do
-      {:ok, %{email: "user@example.com", name: "Example User"}}
+      {:ok, %{email: "user@example.com", name: "Example User", email_verified: true}}
     end
   end
 end
