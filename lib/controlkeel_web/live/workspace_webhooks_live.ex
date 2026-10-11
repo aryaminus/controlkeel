@@ -256,6 +256,7 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
     case WorkspaceAccess.check(workspace, assigns[:current_user], "admin") do
       :ok -> :ok
       {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :suspended} -> {:error, "This organization is suspended."}
       {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
       {:error, :needs_admin} -> {:error, "Admin or owner role required."}
     end

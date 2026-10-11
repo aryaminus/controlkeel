@@ -40,6 +40,15 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
                "You don't have permission to change organization settings.",
                ~p"/#{slug}"
              )}
+
+          {:error, :suspended} ->
+            {:ok,
+             redirect_with_flash(
+               socket,
+               :error,
+               "This organization is suspended.",
+               ~p"/organizations"
+             )}
         end
     end
   end

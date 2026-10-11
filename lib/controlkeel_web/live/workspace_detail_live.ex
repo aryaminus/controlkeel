@@ -326,6 +326,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
     case WorkspaceAccess.check(workspace, assigns[:current_user]) do
       :ok -> :ok
       {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
+      {:error, :suspended} -> {:error, "This organization is suspended."}
       {:error, _} -> {:error, "Workspace belongs to a different organization."}
     end
   end

@@ -9,27 +9,36 @@ defmodule ControlKeelWeb.OrgAccess do
     * cloud/self_hosted → the org must be valid and the user must hold an
       active membership in that org with at least `required_role`
 
-  Returns `{:ok, membership}` or `{:error, reason}` with `:forbidden`
-  (missing user or no active membership) and `:needs_admin` (member below
-  the required role). `membership` is `nil` in local mode, which has no
-  membership table — callers use it directly instead of re-querying.
-  Callers map errors to their page's user-facing messages.
+  Returns `{:ok, membership}` or `{:error, reason}` with `:suspended`
+  (the org is not active — the kill switch), `:forbidden` (missing user or
+  no active membership) and `:needs_admin` (member below the required role).
+  `membership` is `nil` in local mode, which has no membership table — callers
+  use it directly instead of re-querying. Callers map errors to their page's
+  user-facing messages.
   """
 
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.Org
   alias ControlKeel.Runtime.Mode
 
-  @type denial :: :forbidden | :needs_admin
+  @type denial :: :suspended | :forbidden | :needs_admin
   @spec check(Org.t(), map() | nil, String.t()) ::
           {:ok, Accounts.Membership.t() | nil} | {:error, denial()}
   def check(org, user, required_role \\ "viewer")
 
   def check(%Org{} = org, user, required_role) do
     cond do
-      Mode.current() == :local -> {:ok, nil}
-      is_nil(user) -> {:error, :forbidden}
-      true -> check_membership(org, user, required_role)
+      Mode.current() == :local ->
+        {:ok, nil}
+
+      is_nil(user) ->
+        {:error, :forbidden}
+
+      org.status != "active" ->
+        {:error, :suspended}
+
+      true ->
+        check_membership(org, user, required_role)
     end
   end
 
