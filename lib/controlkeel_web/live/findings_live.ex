@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.FindingsLive do
   alias ControlKeel.Governance.SecurityWorkflow
   alias ControlKeel.Mission
   alias ControlKeel.Mission.FindingPlainEnglish
+  alias ControlKeelWeb.WorkspaceAccess
 
   @severities ~w(critical high medium low)
   @statuses ~w(open blocked escalated approved rejected)
@@ -73,8 +74,7 @@ defmodule ControlKeelWeb.FindingsLive do
 
   @impl true
   def handle_event("approve", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Mission.get_finding(finding_id),
+    with {:ok, finding} <- fetch_mutable_finding(socket, id),
          {:ok, _updated} <- Mission.approve_finding(finding, actor_opts(socket)) do
       {:noreply,
        socket
@@ -89,8 +89,7 @@ defmodule ControlKeelWeb.FindingsLive do
 
   @impl true
   def handle_event("escalate", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Mission.get_finding(finding_id),
+    with {:ok, finding} <- fetch_mutable_finding(socket, id),
          {:ok, _updated} <- Mission.escalate_finding(finding, actor_opts(socket)) do
       {:noreply,
        socket
@@ -123,8 +122,7 @@ defmodule ControlKeelWeb.FindingsLive do
     reason =
       socket.assigns.reject_reason |> String.trim() |> then(&if &1 == "", do: nil, else: &1)
 
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Mission.get_finding(finding_id),
+    with {:ok, finding} <- fetch_mutable_finding(socket, id),
          {:ok, _updated} <- Mission.reject_finding(finding, reason, actor_opts(socket)) do
       {:noreply,
        socket
@@ -149,8 +147,7 @@ defmodule ControlKeelWeb.FindingsLive do
 
   @impl true
   def handle_event("view_fix", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
-         %{} = finding <- Mission.get_finding_with_context(finding_id) do
+    with {:ok, finding} <- fetch_readable_finding(socket, id) do
       fix = Mission.auto_fix_for_finding(finding)
       emit_autofix_event(:viewed, finding, fix)
 
@@ -160,7 +157,7 @@ defmodule ControlKeelWeb.FindingsLive do
        |> assign(:selected_fix, fix)
        |> assign(:selected_plain_english, FindingPlainEnglish.translate(finding))
        |> assign(:selected_vuln, vuln_case_summary(finding))
-       |> assign(:selected_audit_events, Mission.finding_audit_events(finding_id))}
+       |> assign(:selected_audit_events, Mission.finding_audit_events(finding.id))}
     else
       _error ->
         {:noreply,
@@ -998,6 +995,34 @@ defmodule ControlKeelWeb.FindingsLive do
     case socket.assigns[:current_user] do
       nil -> [actor_source: "web", actor_identifier: "web"]
       user -> [actor_source: "web", actor_user_id: user.id, actor_identifier: user.email]
+    end
+  end
+
+  # Findings are governance state, so every mutation is gated on the viewer's
+  # admin role *in the finding's own workspace*. This closes two holes at once:
+  # a crafted event could previously target any finding ID across tenants
+  # (cross-tenant write), and any member including a viewer could mutate
+  # disposition. Returns the finding with its workspace preloaded on success,
+  # or {:error, :not_found | :forbidden}.
+  defp fetch_mutable_finding(socket, id) do
+    with {:ok, finding} <- fetch_readable_finding(socket, id, "admin") do
+      {:ok, finding}
+    end
+  end
+
+  # Tenant-scoped read: the viewer must have at least the given role in the
+  # finding's own workspace. Prevents cross-tenant autofix/plain-English
+  # disclosure via a crafted id even though the list view is already scoped.
+  defp fetch_readable_finding(socket, id, required_role \\ "viewer") do
+    with {:ok, finding_id} <- parse_id(id),
+         %{} = finding <- Mission.get_finding_with_context(finding_id),
+         workspace when not is_nil(workspace) <- finding.session.workspace,
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], required_role) do
+      {:ok, finding}
+    else
+      nil -> {:error, :not_found}
+      {:error, _reason} -> {:error, :forbidden}
+      _ -> {:error, :not_found}
     end
   end
 
