@@ -59,6 +59,12 @@ defmodule ControlKeelWeb.APIHelpers do
       %{type: :bootstrap} ->
         :ok
 
+      # Unauthenticated loopback caller (local default, no token configured).
+      # Recorded explicitly by Plugs.ApiAuth; unscoped by design for
+      # single-user local operation.
+      %{type: :local} ->
+        :ok
+
       %{type: :service_account, service_account: service_account} ->
         if service_account.workspace_id == workspace_id and
              Platform.service_account_has_scope?(service_account, scope) do
@@ -67,8 +73,10 @@ defmodule ControlKeelWeb.APIHelpers do
           {:error, :forbidden}
         end
 
+      # No credential was ever established (ApiAuth did not run, or a future
+      # branch forgets to assign). Fail closed rather than authorize.
       _ ->
-        :ok
+        {:error, :forbidden}
     end
   end
 

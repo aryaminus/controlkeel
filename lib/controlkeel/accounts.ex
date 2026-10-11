@@ -101,6 +101,19 @@ defmodule ControlKeel.Accounts do
   @spec get_org(integer()) :: Org.t() | nil
   def get_org(id), do: Repo.get(Org, id)
 
+  @doc """
+  Whether an org is active. A non-active org is suspended: its API traffic is
+  already refused by `authorize_cloud_execution/2`, and the browser gates
+  (`OrgAccess`/`WorkspaceAccess`) use this so suspension is a real kill switch
+  across both tiers.
+  """
+  def org_active?(org_id) when is_integer(org_id) do
+    case Repo.get(Org, org_id) do
+      %Org{status: "active"} -> true
+      _ -> false
+    end
+  end
+
   @spec get_org_by_slug(String.t()) :: Org.t() | nil
   def get_org_by_slug(slug) when is_binary(slug) do
     Repo.get_by(Org, slug: String.downcase(String.trim(slug)))
