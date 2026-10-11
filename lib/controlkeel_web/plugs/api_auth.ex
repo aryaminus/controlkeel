@@ -32,7 +32,7 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
 
       provided ->
         cond do
-          configured_token() && provided == configured_token() ->
+          configured_token() && token_matches?(provided, configured_token()) ->
             assign(conn, :api_auth, %{type: :bootstrap})
 
           true ->
@@ -56,6 +56,14 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
 
   defp configured_token do
     Application.get_env(:controlkeel, :api_token)
+  end
+
+  # Constant-time comparison for the configured bootstrap token so a remote
+  # caller cannot recover it byte-by-byte by measuring response latency.
+  defp token_matches?(provided, configured)
+       when is_binary(provided) and is_binary(configured) do
+    byte_size(provided) == byte_size(configured) and
+      Plug.Crypto.secure_compare(provided, configured)
   end
 
   defp bearer_token(conn) do
