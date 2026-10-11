@@ -20,7 +20,7 @@ defmodule ControlKeelWeb.DashboardLive do
        provider_status: ProviderBroker.status(project_root),
        recent_sessions: Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 4),
        registry_status: ACPRegistry.status(),
-       ship_summary: Analytics.funnel_summary(),
+       ship_summary: Analytics.funnel_summary(user: socket.assigns[:current_user]),
        runtime_mode: Mode.current()
      )}
   end

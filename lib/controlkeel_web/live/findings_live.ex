@@ -18,7 +18,10 @@ defmodule ControlKeelWeb.FindingsLive do
      |> assign(:page_title, "Findings")
      |> assign(:browser, empty_browser())
      |> assign(:categories, Mission.list_finding_categories())
-     |> assign(:session_options, Mission.list_findings_browser_sessions())
+     |> assign(
+       :session_options,
+       Mission.list_findings_browser_sessions_for_user(socket.assigns[:current_user])
+     )
      |> assign(:selected_finding, nil)
      |> assign(:selected_fix, nil)
      |> assign(:selected_plain_english, nil)
@@ -37,7 +40,7 @@ defmodule ControlKeelWeb.FindingsLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    params = inject_org_workspace_ids(params, socket.assigns[:current_org_id])
+    params = inject_org_workspace_ids(params, socket.assigns[:current_user])
     browser = Mission.browse_findings(params)
 
     selected_finding =
@@ -769,15 +772,25 @@ defmodule ControlKeelWeb.FindingsLive do
     """
   end
 
-  defp inject_org_workspace_ids(params, nil), do: params
+  # Scoping is derived from the *authenticated viewer*, never from the ambient
+  # `current_org_id` (which is only a UI hint and defaults to the user's first
+  # membership). In cloud mode an empty accessible set must degrade to "no
+  # rows", not to an unscoped query — otherwise a user whose orgs have no
+  # workspaces sees every finding in the database.
+  defp inject_org_workspace_ids(params, user) do
+    if ControlKeel.Runtime.Mode.current() == :local do
+      params
+    else
+      workspace_ids =
+        case user do
+          %{id: user_id} -> Mission.accessible_workspace_ids(user_id)
+          _ -> []
+        end
 
-  defp inject_org_workspace_ids(params, org_id) when is_integer(org_id) do
-    workspace_ids =
-      org_id
-      |> ControlKeel.Accounts.list_workspaces_for_org()
-      |> Enum.map(& &1.id)
-
-    if workspace_ids == [], do: params, else: Map.put(params, "workspace_ids", workspace_ids)
+      params
+      |> Map.put("workspace_ids", workspace_ids)
+      |> Map.delete("workspace_id")
+    end
   end
 
   defp pill_base do

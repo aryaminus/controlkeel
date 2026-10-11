@@ -9,7 +9,9 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
+    recent_session =
+      Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 1) |> List.first()
+
     opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
     eval_candidates = Observability.eval_candidates(opts)
     saved = Observability.saved_eval_candidates(opts)

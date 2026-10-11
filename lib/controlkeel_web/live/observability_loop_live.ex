@@ -9,7 +9,9 @@ defmodule ControlKeelWeb.ObservabilityLoopLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
+    recent_session =
+      Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 1) |> List.first()
+
     opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
     loop = Observability.loop_status(opts)
     diagnostics = Observability.loop_diagnostics(opts)
