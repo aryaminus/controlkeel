@@ -2,8 +2,10 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Mission
+  alias ControlKeel.Mission.Workspace
   alias ControlKeelWeb.SessionScope
   alias ControlKeelWeb.FindingComponents
+  alias ControlKeelWeb.WorkspaceAccess
 
   @refresh_interval_ms 2_000
   @filters ~w(all blocked open resolved)
@@ -72,7 +74,26 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     ])
     |> assign(:page_title, "#{session.title} — Findings")
     |> assign(:session, session)
+    |> assign(:can_mutate, can_mutate?(workspace, socket.assigns))
     |> assign_view()
+  end
+
+  # Mutation gate (viewer reads stay open): action buttons render and the
+  # approve/escalate/reject events run only for admin/owner. Local mode
+  # always passes.
+  defp can_mutate?(%Workspace{} = workspace, assigns) do
+    WorkspaceAccess.check(workspace, assigns[:current_user], "admin") == :ok
+  end
+
+  defp can_mutate?(_workspace, _assigns), do: false
+
+  defp require_admin(socket) do
+    with %Workspace{} = workspace <- socket.assigns.session.workspace,
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      {:ok, socket}
+    else
+      _ -> {:error, :forbidden, put_flash(socket, :error, "Admin or owner role required.")}
+    end
   end
 
   # Derives the filtered + sorted list and the chip counts from the session.
@@ -157,7 +178,8 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
   @impl true
   def handle_event("approve_finding", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
+    with {:ok, socket} <- require_admin(socket),
+         {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.approve_finding(finding, actor_opts(socket)) do
       {:noreply,
@@ -165,6 +187,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
        |> put_flash(:info, "Finding approved.")
        |> refresh_session()}
     else
+      {:error, :forbidden, socket} -> {:noreply, socket}
       _error -> {:noreply, put_flash(socket, :error, "Could not approve finding.")}
     end
   end
@@ -174,13 +197,15 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   # (also wired as the modal's on_close for backdrop/X/Escape).
   @impl true
   def handle_event("reject_finding", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
+    with {:ok, socket} <- require_admin(socket),
+         {:ok, finding_id} <- parse_id(id),
          %{} = _finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)) do
       {:noreply,
        socket
        |> assign(:reject_id, finding_id)
        |> assign(:reject_reason, "")}
     else
+      {:error, :forbidden, socket} -> {:noreply, socket}
       _error -> {:noreply, socket}
     end
   end
@@ -200,7 +225,8 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
   @impl true
   def handle_event("confirm_reject_finding", _params, socket) do
-    with finding_id when not is_nil(finding_id) <- socket.assigns.reject_id,
+    with {:ok, socket} <- require_admin(socket),
+         finding_id when not is_nil(finding_id) <- socket.assigns.reject_id,
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <-
            Mission.reject_finding(finding, reject_reason(socket), actor_opts(socket)) do
@@ -211,13 +237,15 @@ defmodule ControlKeelWeb.SessionFindingsLive do
        |> assign(:reject_reason, "")
        |> refresh_session()}
     else
+      {:error, :forbidden, socket} -> {:noreply, socket}
       _error -> {:noreply, put_flash(socket, :error, "Could not reject finding.")}
     end
   end
 
   @impl true
   def handle_event("escalate_finding", %{"id" => id}, socket) do
-    with {:ok, finding_id} <- parse_id(id),
+    with {:ok, socket} <- require_admin(socket),
+         {:ok, finding_id} <- parse_id(id),
          %{} = finding <- Enum.find(socket.assigns.session.findings, &(&1.id == finding_id)),
          {:ok, _updated} <- Mission.escalate_finding(finding, actor_opts(socket)) do
       {:noreply,
@@ -225,6 +253,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
        |> put_flash(:info, "Finding escalated.")
        |> refresh_session()}
     else
+      {:error, :forbidden, socket} -> {:noreply, socket}
       _error -> {:noreply, put_flash(socket, :error, "Could not escalate finding.")}
     end
   end
@@ -292,6 +321,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
               finding={finding}
               open?={MapSet.member?(@open_ids, finding.id)}
               fix={Map.get(@fixes, finding.id)}
+              can_mutate={@can_mutate}
             />
           </ul>
 
@@ -344,6 +374,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   attr :finding, :map, required: true
   attr :open?, :boolean, required: true
   attr :fix, :map, default: nil
+  attr :can_mutate, :boolean, default: false
 
   defp finding_card(assigns) do
     ~H"""
@@ -471,7 +502,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
         />
 
         <div
-          :if={@finding.status in ["open", "blocked"]}
+          :if={@can_mutate and @finding.status in ["open", "blocked"]}
           class="flex flex-wrap items-center gap-2"
         >
           <.button phx-click="approve_finding" phx-value-id={@finding.id}>
