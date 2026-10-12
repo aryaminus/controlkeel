@@ -504,7 +504,7 @@ defmodule ControlKeel.Observability do
   def observability_benchmark_history(opts \\ []) do
     limit = Keyword.get(opts, :limit, 12)
     workspace_id = Keyword.get(opts, :workspace_id)
-    scenarios = observability_scenario_records([workspace_id: workspace_id, limit: 500], 500)
+    scenarios = observability_scenario_records([workspace_id: workspace_id], 500)
     scenario_ids = Enum.map(scenarios, & &1.id)
     runs = observability_benchmark_run_records(scenarios, limit)
 
@@ -563,7 +563,7 @@ defmodule ControlKeel.Observability do
     drafts = benchmark_drafts(opts)
 
     all_scenarios =
-      observability_scenario_records([workspace_id: workspace_id, limit: 500], 500)
+      observability_scenario_records([workspace_id: workspace_id], 500)
 
     scenarios = Enum.take(all_scenarios, scenario_limit)
 
@@ -1995,7 +1995,7 @@ defmodule ControlKeel.Observability do
 
   defp regression_run_records(workspace_id, days, limit) do
     scenarios =
-      observability_scenario_records([workspace_id: workspace_id, limit: 500], 500)
+      observability_scenario_records([workspace_id: workspace_id], 500)
 
     observability_benchmark_run_records(scenarios, limit, days)
   end
@@ -2249,6 +2249,10 @@ defmodule ControlKeel.Observability do
     |> Repo.update!()
   end
 
+  # Callers pass 500 as a safety ceiling, not a page limit. Workspaces with
+  # more than 500 materialized scenarios silently truncate regression/history
+  # coverage to the newest 500; the limit is positional — opts only carries
+  # :workspace_id.
   defp observability_scenario_records(opts, limit) do
     Scenario
     |> join(:inner, [s], suite in assoc(s, :suite))
