@@ -12,6 +12,8 @@ defmodule ControlKeel.Platform.ServiceAccount do
     field :scopes, :map, default: %{"values" => []}
     field :status, :string, default: "active"
     field :last_used_at, :utc_datetime
+    field :expires_at, :utc_datetime
+    field :rotated_at, :utc_datetime
     field :metadata, :map, default: %{}
 
     belongs_to :workspace, Workspace
@@ -27,7 +29,17 @@ defmodule ControlKeel.Platform.ServiceAccount do
       |> normalize_scopes()
 
     service_account
-    |> cast(attrs, [:workspace_id, :name, :token_hash, :scopes, :status, :last_used_at, :metadata])
+    |> cast(attrs, [
+      :workspace_id,
+      :name,
+      :token_hash,
+      :scopes,
+      :status,
+      :last_used_at,
+      :expires_at,
+      :rotated_at,
+      :metadata
+    ])
     |> validate_required([:workspace_id, :name, :token_hash, :scopes, :status, :metadata])
     |> validate_inclusion(:status, ["active", "revoked", "disabled"])
     |> assoc_constraint(:workspace)
@@ -39,6 +51,25 @@ defmodule ControlKeel.Platform.ServiceAccount do
 
   def active?(%__MODULE__{status: "active"}), do: true
   def active?(%__MODULE__{}), do: false
+
+  @doc """
+  True when the credential's expiry has been reached. A `nil` `expires_at`
+  never expires, which is the default for accounts provisioned before expiry
+  was supported.
+  """
+  def expired?(%__MODULE__{expires_at: nil}), do: false
+
+  def expired?(%__MODULE__{expires_at: %DateTime{} = expires_at}),
+    do: DateTime.compare(expires_at, DateTime.utc_now()) != :gt
+
+  def expired?(%__MODULE__{}), do: false
+
+  @doc """
+  True when the account may authenticate: status is active *and* the
+  credential has not expired. Every authentication path must gate on this
+  instead of `active?/1`, which ignores expiry.
+  """
+  def usable?(%__MODULE__{} = account), do: active?(account) and not expired?(account)
 
   defp normalize_scopes(attrs) when is_map(attrs) do
     case Map.get(attrs, "scopes") do
