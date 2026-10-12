@@ -5,18 +5,38 @@ defmodule ControlKeelWeb.PolicyStudioLive do
   alias ControlKeel.Platform
   alias ControlKeel.Platform.PolicySet
   alias ControlKeel.Policy.PackLoader
+  alias ControlKeel.Runtime.Mode
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Policy Studio")
-     |> assign(:open_packs, MapSet.new())
-     |> assign(:show_packs_dialog, false)
-     |> assign_packs()
-     |> assign_policy_sets()
-     |> assign(:show_create_modal, false)
-     |> assign_policy_set_form(empty_policy_set_changeset(), "", nil)}
+    # Policy sets execute inside whichever workspace they are assigned to, so
+    # reading and creating them is an org-admin action. This was explicitly
+    # deferred ("tighten both in a future auth pass", #117) and that pass had not
+    # happened; see issue #249. Local mode has no membership table and stays open.
+    case admin_access?(socket) do
+      :ok ->
+        {:ok,
+         socket
+         |> assign(:page_title, "Policy Studio")
+         |> assign(:open_packs, MapSet.new())
+         |> assign(:show_packs_dialog, false)
+         |> assign_packs()
+         |> assign_policy_sets()
+         |> assign(:show_create_modal, false)
+         |> assign_policy_set_form(empty_policy_set_changeset(), "", nil)}
+
+      {:error, :unauthenticated} ->
+        {:ok, redirect_with_flash(socket, :error, "Sign in to manage policies.", ~p"/auth/login")}
+
+      {:error, :forbidden} ->
+        {:ok,
+         redirect_with_flash(
+           socket,
+           :error,
+           "You don't have permission to manage policies.",
+           ~p"/organizations"
+         )}
+    end
   end
 
   @impl true
@@ -72,6 +92,16 @@ defmodule ControlKeelWeb.PolicyStudioLive do
 
   @impl true
   def handle_event("save_policy_set", %{"policy_set" => params}, socket) do
+    # Defence in depth: mount already denies non-admins, but a mutation must
+    # never rely on the page having been rendered to an authorized viewer.
+    if admin_access?(socket) != :ok do
+      {:noreply, put_flash(socket, :error, "You don't have permission to manage policies.")}
+    else
+      do_save_policy_set(params, socket)
+    end
+  end
+
+  defp do_save_policy_set(params, socket) do
     {attrs, changeset, raw, ui_error} = prepare_policy_set(params, :insert)
 
     if ui_error do
@@ -370,11 +400,49 @@ defmodule ControlKeelWeb.PolicyStudioLive do
     |> assign(:blocked_rules, blocked_rules)
   end
 
+  # Resolves whether the viewer may read/create policy sets. Authority is
+  # derived from `(user, current org)` — never from the ambient cookie alone.
+  defp admin_access?(socket) do
+    cond do
+      Mode.current() == :local ->
+        :ok
+
+      is_nil(socket.assigns[:current_user]) ->
+        {:error, :unauthenticated}
+
+      true ->
+        case socket.assigns[:current_org_id] do
+          org_id when is_integer(org_id) ->
+            case ControlKeel.Accounts.get_active_membership(
+                   socket.assigns.current_user.id,
+                   org_id
+                 ) do
+              %{role: role} ->
+                if ControlKeel.Accounts.role_at_least?(role, "admin"),
+                  do: :ok,
+                  else: {:error, :forbidden}
+
+              _ ->
+                {:error, :forbidden}
+            end
+
+          _ ->
+            {:error, :forbidden}
+        end
+    end
+  end
+
+  defp redirect_with_flash(socket, kind, msg, path) do
+    socket
+    |> Phoenix.LiveView.put_flash(kind, msg)
+    |> Phoenix.LiveView.redirect(to: path)
+  end
+
   defp assign_policy_sets(socket) do
-    # Operator ruling (issue #117 review): creating policy sets here is
-    # intentionally open to all members — no role gate, regardless of the
-    # set's intended use. Cross-org visibility of assignments below is also
-    # accepted for now; tighten both in a future auth pass.
+    # Visibility of workspace assignments is scoped to the viewer's org. The
+    # underlying policy-set rows remain global (see issue #249): they carry no
+    # tenant column yet, so the role gate above is what prevents one org from
+    # creating rules that execute in another's workspace.
     assignments_by_set =
       Platform.list_workspace_policy_assignments()
       |> Enum.group_by(& &1.policy_set_id)
