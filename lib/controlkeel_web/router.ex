@@ -68,6 +68,9 @@ defmodule ControlKeelWeb.Router do
     get "/.well-known/agent-card.json", ProtocolController, :a2a_card
     get "/.well-known/agent.json", ProtocolController, :a2a_card
     post "/oauth/token", OAuthController, :token
+    # RFC 8628 device authorization grant (CLI sign-in).
+    post "/device_authorization", DeviceAuthController, :authorize
+    post "/oauth/device_token", DeviceAuthController, :token
     get "/mcp", ProtocolController, :mcp_get
     delete "/mcp", ProtocolController, :mcp_delete
   end
@@ -139,6 +142,9 @@ defmodule ControlKeelWeb.Router do
       # reserved in Accounts.Org.@reserved_slugs, so no org can ever claim
       # the URL. Regression-tested in router_test.exs.
       live "/benchmarks/runs/:id", BenchmarksLive, :show
+      # RFC 8628 device approval page (auth-gated: only a signed-in user can
+      # authorize a device against their own account).
+      live "/device", DeviceAuthLive, :index
 
       # /cloud/projects and /cloud/telemetry removed (owner directive, 10/22:
       # "no cloud routes" — the cloud-project concept is stale; the org is the
