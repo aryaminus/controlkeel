@@ -251,10 +251,19 @@ defmodule ControlKeelWeb.Router do
     # Legacy observability benchmark sub-routes (consolidated into the stacked
     # `/observability/benchmark` page): redirect bookmarks there, preserving
     # the query string.
-    get "/observability/benchmarks/drafts", PageController, :observability_benchmarks_redirect
-    get "/observability/benchmarks/scenarios", PageController, :observability_benchmarks_redirect
-    get "/observability/benchmarks/history", PageController, :observability_benchmarks_redirect
-    get "/observability/regressions", PageController, :observability_benchmarks_redirect
+    get "/observability/benchmarks/drafts",
+        PageController,
+        :observability_benchmarks_drafts_redirect
+
+    get "/observability/benchmarks/scenarios",
+        PageController,
+        :observability_benchmarks_scenarios_redirect
+
+    get "/observability/benchmarks/history",
+        PageController,
+        :observability_benchmarks_history_redirect
+
+    get "/observability/regressions", PageController, :observability_regressions_redirect
 
     # Legacy export paths (dual-route for backwards compat): keep functional
     # so existing `controlkeel obs export` downloads and old bookmarks still

@@ -165,16 +165,25 @@ defmodule ControlKeelWeb.PageController do
 
   # Legacy observability benchmark sub-routes (pre-consolidation): the drafts,
   # scenarios, history, and regressions pages now live stacked in the global
-  # `/observability/benchmark` page. Single redirect target for all routes;
-  # query string is preserved, no section anchors.
-  def observability_benchmarks_redirect(conn, _params) do
-    redirect(conn, to: "/observability/benchmark#{query_suffix(conn)}")
-  end
+  # `/observability/benchmark` page. Bare redirects deep-link to the matching
+  # section anchor; redirects carrying a query string preserve it as-is (no
+  # anchor) so filtered views keep their existing top-of-page behavior.
+  def observability_benchmarks_drafts_redirect(conn, params),
+    do: observability_benchmark_redirect(conn, params, "benchmarks-drafts")
 
-  defp query_suffix(conn) do
+  def observability_benchmarks_scenarios_redirect(conn, params),
+    do: observability_benchmark_redirect(conn, params, "benchmarks-scenarios")
+
+  def observability_benchmarks_history_redirect(conn, params),
+    do: observability_benchmark_redirect(conn, params, "benchmarks-history")
+
+  def observability_regressions_redirect(conn, params),
+    do: observability_benchmark_redirect(conn, params, "benchmarks-regressions")
+
+  defp observability_benchmark_redirect(conn, _params, anchor) do
     case conn.query_string do
-      "" -> ""
-      query -> "?#{query}"
+      "" -> redirect(conn, to: "/observability/benchmark##{anchor}")
+      query -> redirect(conn, to: "/observability/benchmark?#{query}")
     end
   end
 end

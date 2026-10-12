@@ -110,14 +110,14 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   test "legacy benchmark sub-routes redirect to the global benchmark page", %{conn: conn} do
     base = benchmark_path()
 
-    for path <- [
-          "/observability/benchmarks/drafts",
-          "/observability/benchmarks/scenarios",
-          "/observability/benchmarks/history",
-          "/observability/regressions"
+    for {path, anchor} <- [
+          {"/observability/benchmarks/drafts", "benchmarks-drafts"},
+          {"/observability/benchmarks/scenarios", "benchmarks-scenarios"},
+          {"/observability/benchmarks/history", "benchmarks-history"},
+          {"/observability/regressions", "benchmarks-regressions"}
         ] do
       conn = get(conn, path)
-      assert redirected_to(conn, 302) == base
+      assert redirected_to(conn, 302) == "#{base}##{anchor}"
     end
 
     conn = get(conn, "/observability/benchmarks/drafts?suite=x")
@@ -182,12 +182,12 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     } do
       conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
 
-      for path <- [
-            "/observability/benchmarks/drafts",
-            "/observability/regressions"
+      for {path, anchor} <- [
+            {"/observability/benchmarks/drafts", "benchmarks-drafts"},
+            {"/observability/regressions", "benchmarks-regressions"}
           ] do
         conn = get(conn, path)
-        assert redirected_to(conn, 302) == "/observability/benchmark"
+        assert redirected_to(conn, 302) == "/observability/benchmark##{anchor}"
       end
     end
 
