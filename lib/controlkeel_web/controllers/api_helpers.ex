@@ -57,7 +57,7 @@ defmodule ControlKeelWeb.APIHelpers do
   def authorize_workspace_for_conn(conn, workspace_id, scope) do
     case conn.assigns[:api_auth] do
       %{type: :bootstrap} ->
-        :ok
+        authorize_bootstrap(conn, workspace_id, scope)
 
       # Unauthenticated loopback caller (local default, no token configured).
       # Recorded explicitly by Plugs.ApiAuth; unscoped by design for
@@ -78,6 +78,80 @@ defmodule ControlKeelWeb.APIHelpers do
       _ ->
         {:error, :forbidden}
     end
+  end
+
+  # The bootstrap token is a break-glass credential, not a platform superuser.
+  #
+  # Previously it authorized every workspace unconditionally, so one leaked
+  # env var was a silent, total cross-tenant compromise. Break-glass best
+  # practice (OWASP, CyberArk, Microsoft Zero Trust) converges on four
+  # properties: no standing privilege, least privilege for the actual task,
+  # explicit activation, and full auditing of every use. This implements the
+  # first two; the credential is opt-in per environment and scoped to a single
+  # workspace rather than the whole platform.
+  #
+  # Local single-user mode is unaffected - this is a hosted-mode control.
+  defp authorize_bootstrap(conn, workspace_id, _scope) do
+    cond do
+      ControlKeel.Runtime.Mode.current() == :local ->
+        :ok
+
+      not break_glass_enabled?() ->
+        {:error, :forbidden}
+
+      # Scoped break-glass: the operator must name the one workspace the
+      # credential may act on. Without it, there is no least-privilege bound.
+      is_nil(break_glass_workspace_id()) ->
+        {:error, :forbidden}
+
+      true ->
+        if break_glass_workspace_id() == workspace_id do
+          audit_break_glass_use(conn, workspace_id)
+          :ok
+        else
+          {:error, :forbidden}
+        end
+    end
+  end
+
+  defp break_glass_enabled? do
+    truthy?(Application.get_env(:controlkeel, :break_glass_enabled, false))
+  end
+
+  defp truthy?(true), do: true
+  defp truthy?("true"), do: true
+  defp truthy?(_), do: false
+
+  defp break_glass_workspace_id do
+    case Application.get_env(:controlkeel, :break_glass_workspace_id) do
+      id when is_integer(id) ->
+        id
+
+      id when is_binary(id) ->
+        case Integer.parse(id) do
+          {parsed, ""} -> parsed
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  # Every break-glass use is recorded. A credential that bypasses per-tenant
+  # isolation is exactly the thing that must leave a trail.
+  defp audit_break_glass_use(conn, workspace_id) do
+    ControlKeel.Platform.record_nhi_event(nil, "break_glass_api_access",
+      actor: "bootstrap-token",
+      metadata: %{
+        "workspace_id" => workspace_id,
+        "path" => conn.request_path,
+        "method" => conn.method,
+        "remote_ip" => inspect(conn.remote_ip)
+      }
+    )
+  rescue
+    _ -> :ok
   end
 
   @doc """

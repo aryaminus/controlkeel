@@ -76,9 +76,8 @@ defmodule ControlKeel.Mcp.ProtocolInterop do
 
   def authorize_hosted_tool_call(auth_context, tool_name, arguments, resource_id)
       when is_map(auth_context) and is_binary(tool_name) and is_map(arguments) do
-    workspace_id = workspace_id_from_auth(auth_context)
-
-    with :ok <- Policy.check(auth_context, tool_name, resource_id),
+    with {:ok, workspace_id} <- require_workspace(auth_context),
+         :ok <- Policy.check(auth_context, tool_name, resource_id),
          :ok <- Accounts.check_workspace_tool_policy(workspace_id, tool_name),
          :ok <- Guardrails.scan(arguments, tool_name),
          :ok <- verify_resource_access(auth_context, resource_id),
@@ -91,6 +90,20 @@ defmodule ControlKeel.Mcp.ProtocolInterop do
       {:error, reason} = err ->
         audit_record(:denied, auth_context, tool_name, arguments, resource_id, reason)
         err
+    end
+  end
+
+  # A hosted tool call must resolve to exactly one workspace.
+  #
+  # `check_workspace_tool_policy(nil, _) -> :ok` is correct for the local stdio
+  # transport (no workspace means single-user local), but on the hosted path it
+  # meant an auth context that resolved no workspace skipped tool policy
+  # entirely. Requiring resolution here closes that bypass and makes the
+  # workspace the authorization boundary it is supposed to be.
+  defp require_workspace(auth_context) do
+    case workspace_id_from_auth(auth_context) do
+      id when is_integer(id) -> {:ok, id}
+      _ -> {:error, {:policy, :workspace_unresolved}}
     end
   end
 
