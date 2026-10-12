@@ -138,7 +138,6 @@ defmodule ControlKeelWeb.Layouts do
       %{label: "Sessions", href: ~p"/sessions", icon: "hero-rocket-launch"},
       %{label: "Organizations", href: ~p"/organizations", icon: "hero-building-office-2"},
       %{label: "Skills", href: ~p"/skills", icon: "hero-puzzle-piece"},
-      %{label: "Proofs", href: ~p"/proofs", icon: "hero-shield-check"},
       %{label: "Policy Studio", href: ~p"/policies", icon: "hero-adjustments-horizontal"},
       %{label: "Benchmarks", href: ~p"/benchmarks", icon: "hero-chart-bar-square"},
       %{label: "Findings", href: ~p"/findings", icon: "hero-exclamation-triangle"}

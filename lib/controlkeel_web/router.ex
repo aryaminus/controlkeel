@@ -131,8 +131,6 @@ defmodule ControlKeelWeb.Router do
       live "/findings", FindingsLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
-      live "/proofs", ProofBrowserLive, :index
-      live "/proofs/:id", ProofBrowserLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
@@ -277,6 +275,14 @@ defmodule ControlKeelWeb.Router do
 
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/observability",
            SessionObservabilityLive,
+           :show
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs",
+           ProofBrowserLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id",
+           ProofBrowserLive,
            :show
     end
   end
