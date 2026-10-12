@@ -18,6 +18,8 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    # TODO (#141): multi-tenant scope — resolves the most recent session across all
+    # tenants; resolve the workspace from the org-scoped route instead when it lands.
     recent_session = Mission.list_recent_sessions(1) |> List.first()
     opts = if recent_session, do: [workspace_id: recent_session.workspace_id], else: []
 
