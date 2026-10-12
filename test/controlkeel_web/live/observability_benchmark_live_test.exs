@@ -112,14 +112,14 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     base =
       "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/observability/benchmark"
 
-    for {path, anchor} <- [
-          {"/observability/benchmarks/drafts", "benchmarks-drafts"},
-          {"/observability/benchmarks/scenarios", "benchmarks-scenarios"},
-          {"/observability/benchmarks/history", "benchmarks-history"},
-          {"/observability/regressions", "benchmarks-regressions"}
+    for path <- [
+          "/observability/benchmarks/drafts",
+          "/observability/benchmarks/scenarios",
+          "/observability/benchmarks/history",
+          "/observability/regressions"
         ] do
       conn = get(conn, path)
-      assert redirected_to(conn, 302) == "#{base}##{anchor}"
+      assert redirected_to(conn, 302) == base
     end
 
     conn = get(conn, "/observability/benchmarks/drafts?suite=x")

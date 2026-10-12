@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.PageControllerTest do
   alias ControlKeel.Accounts
   alias ControlKeel.Bootstrap.LocalDefaults
   alias ControlKeel.Mission
+  alias ControlKeel.Repo
 
   defp create_workspace(org, name) do
     slug = String.replace(String.downcase(name), " ", "-")
@@ -200,6 +201,115 @@ defmodule ControlKeelWeb.PageControllerTest do
       conn = get(conn, "/organizations/acme-corp/settings")
 
       assert redirected_to(conn, 302) == "/acme-corp/settings"
+    end
+  end
+
+  describe "workspace observability resolvers (local mode)" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :local)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      :ok
+    end
+
+    test "no sessions falls back to the seeded default workspace", %{conn: conn} do
+      conn = get(conn, "/observability/loop")
+
+      assert redirected_to(conn, 302) ==
+               "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/observability/loop"
+    end
+
+    test "query string survives the happy-path redirect", %{conn: conn} do
+      {:ok, org} = Accounts.create_org(%{name: "Local Org", slug: "local-org"})
+      workspace = create_workspace(org, "Local Workspace")
+      create_session(workspace, "Local session")
+
+      conn = get(conn, "/observability/loop?days=30")
+
+      assert redirected_to(conn, 302) ==
+               "/local-org/workspaces/local-workspace/observability/loop?days=30"
+    end
+  end
+
+  describe "workspace observability resolvers (cloud mode)" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      :ok
+    end
+
+    test "anonymous visitors go to /auth/login", %{conn: conn} do
+      conn = get(conn, "/observability/loop")
+
+      assert redirected_to(conn, 302) == "/auth/login"
+    end
+
+    test "signed-in users without memberships land on /organizations", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "orgless@example.com"})
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get("/observability/loop")
+
+      assert redirected_to(conn, 302) == "/organizations"
+      assert conn.assigns.flash["info"] =~ "Join or create an organization"
+    end
+
+    test "a newer cross-tenant session never wins over the accessible workspace", %{
+      conn: conn
+    } do
+      {:ok, user} = Accounts.create_user(%{email: "member@example.com"})
+
+      {:ok, org} =
+        Accounts.create_org_with_owner(user.id, %{name: "Member Org", slug: "member-org"})
+
+      workspace = create_workspace(org, "Member Workspace")
+      own_session = create_session(workspace, "Own session")
+
+      {:ok, outsider} = Accounts.create_user(%{email: "outsider@example.com"})
+
+      {:ok, other_org} =
+        Accounts.create_org_with_owner(outsider.id, %{name: "Other Org", slug: "other-org"})
+
+      other_workspace = create_workspace(other_org, "Other Workspace")
+      create_session(other_workspace, "Foreign session")
+
+      # Backdate the accessible session so the cross-tenant one is strictly
+      # newest. Pre-scoping already excludes foreign workspaces from the
+      # resolver's candidate list; this pins the tenant boundary even when
+      # the foreign session sorts first.
+      own_session
+      |> Ecto.Changeset.change(
+        inserted_at:
+          DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+      )
+      |> Repo.update!()
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get("/observability/loop")
+
+      assert redirected_to(conn, 302) ==
+               "/member-org/workspaces/member-workspace/observability/loop"
     end
   end
 end
