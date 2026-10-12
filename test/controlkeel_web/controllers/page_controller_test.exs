@@ -273,6 +273,37 @@ defmodule ControlKeelWeb.PageControllerTest do
       assert conn.assigns.flash["info"] =~ "Join or create an organization"
     end
 
+    test "members with a workspace but no sessions land on their workspace", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "newsession@example.com"})
+
+      {:ok, org} =
+        Accounts.create_org_with_owner(user.id, %{name: "New Org", slug: "new-org"})
+
+      create_workspace(org, "New Workspace")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get("/observability/loop")
+
+      assert redirected_to(conn, 302) ==
+               "/new-org/workspaces/new-workspace/observability/loop"
+    end
+
+    test "members with no workspaces anywhere still land on /organizations", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "noworkspace@example.com"})
+
+      {:ok, _} =
+        Accounts.create_org_with_owner(user.id, %{name: "Bare Org", slug: "bare-org"})
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get("/observability/loop")
+
+      assert redirected_to(conn, 302) == "/organizations"
+    end
+
     test "a newer cross-tenant session never wins over the accessible workspace", %{
       conn: conn
     } do
