@@ -304,6 +304,36 @@ defmodule ControlKeelWeb.PageControllerTest do
       assert redirected_to(conn, 302) == "/organizations"
     end
 
+    test "cloud resolution selects the newest accessible workspace", %{conn: conn} do
+      {:ok, user} = Accounts.create_user(%{email: "multiws@example.com"})
+
+      {:ok, org} =
+        Accounts.create_org_with_owner(user.id, %{name: "Multi Org", slug: "multi-org"})
+
+      old_workspace = create_workspace(org, "Old Workspace")
+      new_workspace = create_workspace(org, "New Workspace")
+
+      old_session = create_session(old_workspace, "Old session")
+
+      # Backdate so ordering is deterministic (inserted_at is second-precision).
+      old_session
+      |> Ecto.Changeset.change(
+        inserted_at:
+          DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+      )
+      |> Repo.update!()
+
+      create_session(new_workspace, "New session")
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get("/observability/loop")
+
+      assert redirected_to(conn, 302) ==
+               "/multi-org/workspaces/new-workspace/observability/loop"
+    end
+
     test "a newer cross-tenant session never wins over the accessible workspace", %{
       conn: conn
     } do
