@@ -128,6 +128,14 @@ defmodule ControlKeel.Observability do
     }
   end
 
+  @doc """
+  Grouped active findings by `(rule_id, category)`, newest groups first.
+
+  `count` is the true distinct group count and is *not* capped by `:limit`
+  (only the returned `problems` rows are). Header counts may read higher than
+  pre-fix output that reported `length(problems)` — that jump is the
+  correction, not a regression.
+  """
   def problems(opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
 
@@ -1783,6 +1791,9 @@ defmodule ControlKeel.Observability do
     |> Repo.one() || 0
   end
 
+  # Separate COUNT DISTINCT round-trip: the groups query above is limited, so
+  # the true total cannot be folded in without a window/subquery count. Fine
+  # at current scale; revisit if problems/1 shows up in perf snapshots.
   defp problem_group_count(opts) do
     session_id = Keyword.get(opts, :session_id)
     workspace_id = Keyword.get(opts, :workspace_id)
