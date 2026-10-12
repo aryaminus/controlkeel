@@ -9,13 +9,39 @@ defmodule ControlKeel.MCP.IntegrationTest do
   Each test starts a fresh MCP.Server GenServer and stops it on exit.
   """
 
-  use ExUnit.Case, async: true
+  # tools/call runs the stdio authorization chain (workspace tool policy,
+  # guardrails, audit trail), which reads and writes the workspace DB through
+  # the server GenServer. The shared, non-async sandbox is what lets that
+  # process reach the connection; `async: true` had no ownership at all.
+  use ControlKeel.DataCase, async: false
 
   alias ControlKeel.MCP.Server
 
   # ── Setup ──────────────────────────────────────────────────────────────
 
   setup do
+    # The stdio authorization chain resolves the workspace from CK_PROJECT_ROOT.
+    # Point it at an unbound temp root so this transport-level suite never depends
+    # on whatever `controlkeel/project.json` the developer's checkout happens to
+    # carry. Bound-project enforcement is covered in stdio_authorization_test.exs.
+    root =
+      Path.join(System.tmp_dir!(), "ck-mcp-integration-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+
+    previous_root = System.get_env("CK_PROJECT_ROOT")
+    System.put_env("CK_PROJECT_ROOT", root)
+
+    on_exit(fn ->
+      File.rm_rf!(root)
+
+      if previous_root do
+        System.put_env("CK_PROJECT_ROOT", previous_root)
+      else
+        System.delete_env("CK_PROJECT_ROOT")
+      end
+    end)
+
     pid = start_supervised!({Server, start_reader: false})
     {:ok, server: pid}
   end

@@ -2053,6 +2053,9 @@ defmodule ControlKeelWeb.ApiController do
       scopes: ControlKeel.Platform.ServiceAccount.scope_list(account),
       status: account.status,
       last_used_at: account.last_used_at,
+      expires_at: account.expires_at,
+      expired: ControlKeel.Platform.ServiceAccount.expired?(account),
+      rotated_at: account.rotated_at,
       inserted_at: account.inserted_at
     }
   end
