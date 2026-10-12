@@ -188,13 +188,68 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
 
       base = "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark"
 
-      for {path, anchor} <- [
-            {"/observability/benchmarks/drafts", "benchmarks-drafts"},
-            {"/observability/regressions", "benchmarks-regressions"}
+      for path <- [
+            "/observability/benchmarks/drafts",
+            "/observability/regressions"
           ] do
         conn = get(conn, path)
         assert redirected_to(conn, 302) == base
       end
+    end
+
+    test "viewers see no mutation controls and are denied direct draft events", %{
+      conn: conn,
+      org: org,
+      workspace: workspace,
+      viewer: viewer
+    } do
+      conn = init_test_session(conn, %{current_user_id: viewer.id, current_org_id: org.id})
+      session = session_fixture(%{workspace: workspace})
+      draft_id = draft_fixture(workspace, session)
+
+      {:ok, view, _html} =
+        live(conn, "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark")
+
+      refute has_element?(view, "#observability-benchmark-drafts-generate")
+      refute has_element?(view, "#observability-benchmark-draft-approve-#{draft_id}")
+      refute has_element?(view, "#observability-benchmark-draft-reject-#{draft_id}")
+      refute has_element?(view, "#observability-benchmark-draft-archive-#{draft_id}")
+
+      for {event, params} <- [
+            {"approve-draft", %{"id" => draft_id}},
+            {"reject-draft", %{"id" => draft_id}},
+            {"archive-draft", %{"id" => draft_id}},
+            {"generate-drafts", %{}}
+          ] do
+        denied_html = render_click(view, event, params)
+        assert denied_html =~ "Admin or owner role required."
+      end
+
+      assert Repo.get!(Observability.BenchmarkDraft, draft_id).status == "draft"
+    end
+
+    test "admins can approve drafts and run draft generation", %{
+      conn: conn,
+      org: org,
+      workspace: workspace,
+      admin: admin
+    } do
+      conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
+      session = session_fixture(%{workspace: workspace})
+      draft_id = draft_fixture(workspace, session)
+
+      {:ok, view, _html} =
+        live(conn, "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark")
+
+      assert has_element?(view, "#observability-benchmark-drafts-generate")
+      assert has_element?(view, "#observability-benchmark-draft-approve-#{draft_id}")
+
+      approved_html = render_click(view, "approve-draft", %{"id" => draft_id})
+      assert approved_html =~ "Approved and created"
+      assert Repo.get!(Observability.BenchmarkDraft, draft_id).status == "approved"
+
+      generated_html = render_click(view, "generate-drafts")
+      refute generated_html =~ "Admin or owner role required."
     end
 
     test "viewers can view the benchmark page", %{
