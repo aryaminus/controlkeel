@@ -294,8 +294,8 @@ defmodule ControlKeelWeb.PageController do
 
   defp query_suffix(conn) do
     case conn.query_string do
-      "" -> ""
-      query -> "?#{query}"
+      "" -> redirect(conn, to: "/observability/benchmark##{anchor}")
+      query -> redirect(conn, to: "/observability/benchmark?#{query}")
     end
   end
 end
