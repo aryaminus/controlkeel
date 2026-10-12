@@ -59,7 +59,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
   end
 
   def handle_params(%{"id" => id}, _uri, socket) do
-    case Benchmark.get_run(id) do
+    case fetch_run(id, socket) do
       nil ->
         # The global index this page used to fall back to moved into the
         # workspace scope, so an unknown run goes home instead.
@@ -84,7 +84,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
   @impl true
   def handle_event("run", %{"benchmark" => params}, socket) do
     with {:ok, socket} <- require_admin(socket) do
-      case Benchmark.run_suite(params) do
+      case Benchmark.run_suite(stamp_workspace(socket, params)) do
         {:ok, run} ->
           # Intentionally the global run page: the run detail remains a global
           # backward-compatibility surface even when the run starts from the
@@ -1018,13 +1018,52 @@ defmodule ControlKeelWeb.BenchmarksLive do
 
   defp refresh_dashboard_assigns(socket) do
     subjects = Benchmark.available_subjects()
+    workspace_ids = accessible_workspace_ids(socket)
 
     socket
-    |> assign(:summary, Benchmark.benchmark_summary([]))
-    |> assign(:suites, Benchmark.list_suites([]))
-    |> assign(:recent_runs, Benchmark.list_recent_runs([]))
+    |> assign(:summary, Benchmark.benchmark_summary(workspace_ids: workspace_ids))
+    |> assign(:suites, Benchmark.list_suites(workspace_ids: workspace_ids))
+    |> assign(:recent_runs, Benchmark.list_recent_runs(workspace_ids: workspace_ids))
     |> assign(:available_subjects, subjects)
     |> assign(:subjects_by_id, Map.new(subjects, fn s -> {s["id"], s} end))
+  end
+
+  # Stamp the run with the viewer's workspace so the resulting run is tenant
+  # scoped. The workspace comes from the server-resolved binding, never from
+  # user-supplied form params.
+  defp stamp_workspace(socket, params) do
+    workspace_id =
+      case accessible_workspace_ids(socket) do
+        [single | _] -> single
+        _ -> nil
+      end
+
+    if workspace_id, do: Map.put(params, "workspace_id", workspace_id), else: params
+  end
+
+  # The viewer's accessible workspaces, or nil in local single-user mode where
+  # benchmarks stay unscoped by design.
+  defp accessible_workspace_ids(socket) do
+    case socket.assigns[:current_user] do
+      %{id: user_id} -> ControlKeel.Mission.accessible_workspace_ids(user_id)
+      _ -> nil
+    end
+  end
+
+  # Fetch a run the viewer is allowed to see. In cloud mode this is scoped to
+  # their workspaces so an IDOR cannot pull another tenant's benchmark results;
+  # local mode keeps the unscoped behaviour.
+  defp fetch_run(id, socket) do
+    case accessible_workspace_ids(socket) do
+      nil ->
+        Benchmark.get_run(id)
+
+      workspace_ids ->
+        case Integer.parse(to_string(id)) do
+          {parsed, ""} -> Benchmark.get_run_for_user(parsed, workspace_ids)
+          _ -> nil
+        end
+    end
   end
 
   defp format_percent(nil), do: "Not recorded"
