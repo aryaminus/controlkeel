@@ -59,7 +59,9 @@ defmodule ControlKeelWeb.SessionActivityLiveTest do
     assert html =~ "Finding created: Linked finding"
   end
 
-  test "session activity no longer links to observability timeline (full feed is here)", %{conn: conn} do
+  test "session activity no longer links to observability timeline (full feed is here)", %{
+    conn: conn
+  } do
     {org, ws, session} = org_bound_session_fixture()
 
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/activity"))

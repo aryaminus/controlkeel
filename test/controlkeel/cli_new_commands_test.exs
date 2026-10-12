@@ -1,7 +1,6 @@
 defmodule ControlKeel.CLI.NewCommandsTest do
   use ControlKeel.DataCase
 
-  import ControlKeel.BenchmarkFixtures
   import ControlKeel.MissionFixtures
   import ExUnit.CaptureIO
 
@@ -1886,7 +1885,6 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
     test "obs regressions reports benchmark posture", %{tmp_dir: tmp_dir} do
       session = session_fixture()
-      _run = benchmark_run_fixture()
       write_binding(tmp_dir, session)
 
       output =
@@ -1906,8 +1904,68 @@ defmodule ControlKeel.CLI.NewCommandsTest do
 
     test "obs regressions supports json output", %{tmp_dir: tmp_dir} do
       session = session_fixture()
-      _run = benchmark_run_fixture()
+
+      finding_fixture(%{
+        session: session,
+        title: "CLI regressions finding",
+        severity: "critical",
+        status: "blocked",
+        category: "security",
+        rule_id: "security.cli_regressions"
+      })
+
       write_binding(tmp_dir, session)
+
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(%{command: :obs_evals_save, options: %{}, args: []},
+                   project_root: tmp_dir
+                 )
+      end)
+
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(%{command: :obs_benchmark_draft, options: %{}, args: []},
+                   project_root: tmp_dir
+                 )
+      end)
+
+      draft_output =
+        capture_io(fn ->
+          assert 0 ==
+                   CLI.execute(
+                     %{command: :obs_benchmark_drafts, options: %{json: true}, args: []},
+                     project_root: tmp_dir
+                   )
+        end)
+
+      %{"drafts" => [%{"id" => draft_id}]} = decode_cli_json(draft_output)
+
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(%{command: :obs_benchmark_approve, options: %{}, args: [draft_id]},
+                   project_root: tmp_dir
+                 )
+      end)
+
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(%{command: :obs_benchmark_materialize, options: %{}, args: []},
+                   project_root: tmp_dir
+                 )
+      end)
+
+      capture_io(fn ->
+        assert 0 ==
+                 CLI.execute(
+                   %{
+                     command: :obs_benchmark_run,
+                     options: %{subjects: "controlkeel_validate", execute: true},
+                     args: []
+                   },
+                   project_root: tmp_dir
+                 )
+      end)
 
       output =
         capture_io(fn ->
