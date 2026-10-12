@@ -4,86 +4,146 @@ defmodule ControlKeelWeb.ProofBrowserLive do
   alias ControlKeel.Intent
   alias ControlKeel.Memory
   alias ControlKeel.Mission
+  alias ControlKeelWeb.SessionScope
 
   @risk_tiers ~w(low moderate high critical)
 
   @impl true
-  def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Proof Browser")
-     |> assign(:proof, nil)
-     |> assign(:browser, empty_browser())
-     |> assign(:memory_hits, [])
-     |> assign(:risk_tiers, @risk_tiers)
-     |> assign(:session_options, Mission.list_recent_sessions(30, nil))
-     |> assign(:form, to_form(%{}, as: :filters))}
+  def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
+    current_user = socket.assigns[:current_user]
+
+    case SessionScope.fetch_session(id) do
+      nil ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Session not found.")
+         |> push_navigate(to: ~p"/")}
+
+      session ->
+        cond do
+          not ControlKeel.Accounts.session_accessible?(session, current_user) ->
+            {:ok,
+             socket
+             |> put_flash(:error, "Session not found.")
+             |> push_navigate(to: ~p"/")}
+
+          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
+            {:ok,
+             socket
+             |> put_flash(:error, "Session not found.")
+             |> push_navigate(to: ~p"/")}
+
+          true ->
+            {:ok, assign_scope(socket, session, org_slug, ws_slug)}
+        end
+    end
+  end
+
+  defp assign_scope(socket, session, org_slug, ws_slug) do
+    workspace = session.workspace
+    org = workspace && workspace.org
+
+    socket
+    |> assign(:page_title, "Proof Browser")
+    |> assign(:proof, nil)
+    |> assign(:browser, empty_browser())
+    |> assign(:memory_hits, [])
+    |> assign(:risk_tiers, @risk_tiers)
+    |> assign(:form, to_form(%{}, as: :filters))
+    |> assign(:session, session)
+    |> assign(:org_slug, org_slug)
+    |> assign(:ws_slug, ws_slug)
+    |> assign(:nav_org, org)
+    |> assign(:nav_workspace, workspace)
+    |> assign(:nav_session, %{id: session.id, title: session.title})
+    |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
+    |> assign(:breadcrumbs, [
+      %{label: org.name, to: "/#{org.slug}"},
+      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+      %{
+        label: session.title,
+        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+      },
+      %{label: "Proofs", to: nil}
+    ])
+  end
+
+  defp scoped_session(socket), do: socket.assigns[:session]
+
+  defp proof_not_found(socket) do
+    socket
+    |> assign(:page_title, "Proof not found")
+    |> assign(:proof, nil)
+    |> assign(:memory_hits, [])
   end
 
   @impl true
-  def handle_params(%{"id" => id}, _uri, socket) do
-    case parse_int(id) do
+  def handle_params(%{"proof_id" => proof_id}, _uri, socket) do
+    case scoped_session(socket) do
       nil ->
-        {:noreply,
-         socket
-         |> assign(:page_title, "Proof not found")
-         |> assign(:proof, nil)
-         |> assign(:memory_hits, [])}
+        {:noreply, socket}
 
-      parsed_id ->
-        case Mission.get_proof_bundle_with_context(parsed_id) do
+      session ->
+        session_id = session.id
+
+        case parse_int(proof_id) do
           nil ->
-            {:noreply,
-             socket
-             |> assign(:page_title, "Proof not found")
-             |> assign(:proof, nil)
-             |> assign(:memory_hits, [])}
+            {:noreply, proof_not_found(socket)}
 
-          proof ->
-            current_org_id = socket.assigns[:current_org_id]
-            workspace_ids = org_workspace_ids(current_org_id)
+          parsed_id ->
+            case Mission.get_proof_bundle_with_context(parsed_id) do
+              %{session_id: ^session_id} = proof ->
+                memory_hits = related_memory_hits(proof)
 
-            if current_org_id && proof.session.workspace_id not in workspace_ids do
-              {:noreply,
-               socket
-               |> assign(:page_title, "Proof not found")
-               |> assign(:proof, nil)
-               |> assign(:memory_hits, [])}
-            else
-              memory_hits = related_memory_hits(proof)
+                {:noreply,
+                 socket
+                 |> assign(:page_title, "Proof #{proof.id}")
+                 |> assign(:proof, proof)
+                 |> assign(:memory_hits, memory_hits)}
 
-              {:noreply,
-               socket
-               |> assign(:page_title, "Proof #{proof.id}")
-               |> assign(:proof, proof)
-               |> assign(:memory_hits, memory_hits)}
+              _ ->
+                {:noreply, proof_not_found(socket)}
             end
         end
     end
   end
 
   def handle_params(params, _uri, socket) do
-    workspace_ids = org_workspace_ids(socket.assigns[:current_org_id])
+    case scoped_session(socket) do
+      nil ->
+        {:noreply, socket}
 
-    params =
-      if workspace_ids != [],
-        do: Map.put(params, "workspace_ids", workspace_ids),
-        else: params
+      session ->
+        params = Map.put(params, "session_id", session.id)
+        browser = Mission.browse_proof_bundles(params)
 
-    browser = Mission.browse_proof_bundles(params)
-
-    {:noreply,
-     socket
-     |> assign(:page_title, "Proof Browser")
-     |> assign(:proof, nil)
-     |> assign(:memory_hits, [])
-     |> assign(:browser, browser)
-     |> assign(:form, to_form(browser_form_params(browser.filters), as: :filters))}
+        {:noreply,
+         socket
+         |> assign(:page_title, "Proof Browser")
+         |> assign(:proof, nil)
+         |> assign(:memory_hits, [])
+         |> assign(:browser, browser)
+         |> assign(:form, to_form(browser_form_params(browser.filters), as: :filters))}
+    end
   end
 
   @impl true
   def handle_event("filter", %{"filters" => filters}, socket) do
-    {:noreply, push_patch(socket, to: ~p"/proofs?#{filter_params(filters)}")}
+    case scoped_session(socket) do
+      nil ->
+        {:noreply, socket}
+
+      session ->
+        org_slug = socket.assigns[:org_slug]
+        ws_slug = socket.assigns[:ws_slug]
+        query = filter_params(Map.drop(filters, ["session_id"]))
+
+        {:noreply,
+         push_patch(
+           socket,
+           to: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/proofs?#{query}"
+         )}
+    end
   end
 
   @impl true
@@ -92,7 +152,7 @@ defmodule ControlKeelWeb.ProofBrowserLive do
     <section class="mx-auto w-[min(1180px,calc(100%-2rem))]">
       <div :if={@proof} class="space-y-8 mb-12">
         <.link
-          navigate={~p"/proofs"}
+          navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs"}
           class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
         >
           <.icon name="hero-arrow-left" class="w-3 h-3" /> Back to proofs
@@ -109,7 +169,7 @@ defmodule ControlKeelWeb.ProofBrowserLive do
           </div>
 
           <.link
-            navigate={~p"/sessions/#{@proof.session_id}"}
+            navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}"}
             class="text-xs font-semibold uppercase tracking-[0.14em] text-primary border-muted-foreground border rounded-md px-3 py-2 hover:bg-primary/10"
           >
             Open session
@@ -128,7 +188,7 @@ defmodule ControlKeelWeb.ProofBrowserLive do
           No proof bundle exists with this identifier.
         </p>
         <.link
-          navigate={~p"/proofs"}
+          navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs"}
           class="rounded-md border border-input bg-background px-5 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-primary transition hover:border-primary inline-flex items-center gap-2"
         >
           <.icon name="hero-arrow-left" class="w-4 h-4" /> Browse proofs
@@ -538,7 +598,7 @@ defmodule ControlKeelWeb.ProofBrowserLive do
 
       <div class="rounded-lg border bg-card">
         <div class="space-y-4 p-4">
-          <form id="proof-filters" phx-change="filter" class="grid gap-4 xl:grid-cols-5">
+          <form id="proof-filters" phx-change="filter" class="grid gap-4 xl:grid-cols-4">
             <div class="space-y-4">
               <label
                 for="filters-q"
@@ -551,34 +611,10 @@ defmodule ControlKeelWeb.ProofBrowserLive do
                 name="filters[q]"
                 type="text"
                 value={@form[:q].value}
-                placeholder="Session or task..."
+                placeholder="Task..."
                 phx-debounce="300"
                 class="w-full rounded-md border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none"
               />
-            </div>
-
-            <div class="space-y-2">
-              <label
-                for="filters-session_id"
-                class="text-xs uppercase tracking-[0.28em]"
-              >
-                Session
-              </label>
-              <select
-                id="filters-session_id"
-                name="filters[session_id]"
-                class="w-full rounded-md border border-input bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none"
-              >
-                <option value="">All sessions</option>
-                <%= for session_option <- @session_options do %>
-                  <option
-                    value={session_option.id}
-                    selected={to_string(@form[:session_id].value) == to_string(session_option.id)}
-                  >
-                    {session_option.title}
-                  </option>
-                <% end %>
-              </select>
             </div>
 
             <div class="space-y-2">
@@ -639,12 +675,8 @@ defmodule ControlKeelWeb.ProofBrowserLive do
           </form>
 
           <div class="flex items-center justify-between">
-            <p class="text-muted-foreground tracking-tight">
-              <span class="text-primary mr-1">{@browser.total_count}</span> total proof bundles found
-            </p>
-
             <.link
-              patch={~p"/proofs"}
+              patch={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs"}
               class="self-end rounded-md border border-input bg-background px-4 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground transition hover:border-destructive/40 hover:text-destructive text-center"
             >
               Reset all
@@ -673,16 +705,12 @@ defmodule ControlKeelWeb.ProofBrowserLive do
                     <th class="px-8 py-6 text-left text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                       Readiness
                     </th>
-
-                    <th class="px-8 py-6 text-right text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                      Actions
-                    </th>
                   </tr>
                 </thead>
 
                 <tbody class="divide-y divide-border">
                   <tr :if={@browser.entries == []}>
-                    <td colspan="5" class="px-8 py-12 text-center text-sm text-muted-foreground">
+                    <td colspan="4" class="px-8 py-12 text-center text-sm text-muted-foreground">
                       No proof bundles match the current filters.
                     </td>
                   </tr>
@@ -692,13 +720,12 @@ defmodule ControlKeelWeb.ProofBrowserLive do
                   >
                     <td class="px-8 py-6 align-top">
                       <div>
-                        <p class="font-bold text-foreground">
+                        <.link
+                          navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs/#{proof.id}"}
+                          class="font-bold text-primary transition hover:underline"
+                        >
                           {proof.task.title}
-                        </p>
-
-                        <p class="mt-2 max-w-md text-sm text-muted-foreground">
-                          {proof.session.title}
-                        </p>
+                        </.link>
                       </div>
                     </td>
 
@@ -790,24 +817,6 @@ defmodule ControlKeelWeb.ProofBrowserLive do
                         </div>
                       </div>
                     </td>
-
-                    <td class="px-2 py-6 text-right align-top">
-                      <div class="flex justify-end gap-2 font-semibold text-sm">
-                        <.link
-                          navigate={~p"/sessions/#{proof.session_id}"}
-                          class="text-muted-foreground transition hover:text-foreground border px-2 py-1 rounded-md"
-                        >
-                          Session
-                        </.link>
-
-                        <.link
-                          navigate={~p"/proofs/#{proof.id}"}
-                          class="text-primary transition hover:text-primary border px-2 py-1 rounded-md"
-                        >
-                          View
-                        </.link>
-                      </div>
-                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -823,7 +832,7 @@ defmodule ControlKeelWeb.ProofBrowserLive do
                   <%= if @browser.page > 1 do %>
                     <.link
                       patch={
-                        ~p"/proofs?#{Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page - 1})}"
+                        ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page - 1}), ["session_id"])}"
                       }
                       class="rounded-md border bg-overlay px-5 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-primary transition hover:border-primary"
                     >
@@ -838,7 +847,7 @@ defmodule ControlKeelWeb.ProofBrowserLive do
                   <%= if @browser.page < @browser.total_pages do %>
                     <.link
                       patch={
-                        ~p"/proofs?#{Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page + 1})}"
+                        ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page + 1}), ["session_id"])}"
                       }
                       class="rounded-md border bg-overlay px-5 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-primary transition hover:border-primary"
                     >
@@ -947,12 +956,4 @@ defmodule ControlKeelWeb.ProofBrowserLive do
   defp risk_bar_width(nil), do: 0
   defp risk_bar_width(score) when is_float(score), do: min(round(score * 100), 100)
   defp risk_bar_width(_), do: 0
-
-  defp org_workspace_ids(nil), do: []
-
-  defp org_workspace_ids(org_id) when is_integer(org_id) do
-    org_id
-    |> ControlKeel.Accounts.list_workspaces_for_org()
-    |> Enum.map(& &1.id)
-  end
 end
