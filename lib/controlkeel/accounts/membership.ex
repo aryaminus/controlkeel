@@ -35,6 +35,7 @@ defmodule ControlKeel.Accounts.Membership do
     field :status, :string, default: "pending"
     field :invitation_token_hash, :string
     field :invited_at, :utc_datetime
+    field :expires_at, :utc_datetime
     field :accepted_at, :utc_datetime
     field :revoked_at, :utc_datetime
 
@@ -59,6 +60,7 @@ defmodule ControlKeel.Accounts.Membership do
       :status,
       :invitation_token_hash,
       :invited_at,
+      :expires_at,
       :accepted_at,
       :revoked_at,
       :invited_by_user_id,
@@ -77,4 +79,17 @@ defmodule ControlKeel.Accounts.Membership do
   @doc "True when the membership grants active access."
   def active?(%__MODULE__{status: "active"}), do: true
   def active?(%__MODULE__{}), do: false
+
+  @doc """
+  Whether a pending invitation has passed its expiry.
+
+  A `nil` `expires_at` means the invitation never expires (used for memberships
+  created outside the invite flow). Anything else is compared against server time.
+  """
+  def invitation_expired?(%__MODULE__{expires_at: nil}), do: false
+
+  def invitation_expired?(%__MODULE__{expires_at: %DateTime{} = expires_at}),
+    do: DateTime.compare(expires_at, DateTime.utc_now()) != :gt
+
+  def invitation_expired?(%__MODULE__{}), do: false
 end

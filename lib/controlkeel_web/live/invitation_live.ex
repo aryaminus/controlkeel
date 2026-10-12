@@ -26,6 +26,34 @@ defmodule ControlKeelWeb.InvitationLive do
 
   @impl true
   def mount(%{"token" => token}, session, socket) do
+    # The invitation preview page is intentionally unauthenticated and
+    # distinguishes ready/accepted/invalid, so throttle per IP on the HTTP
+    # (mount) pass. The WebSocket reconnect does not re-run mount.
+    case ControlKeel.Cloud.RateLimiter.hit_key("ip:invitation:#{remote_ip(socket)}",
+           burst: 20,
+           refill_per_sec: 0.5
+         ) do
+      :ok ->
+        mount_invitation(token, session, socket)
+
+      {:error, :rate_limited, _retry_after} ->
+        socket =
+          socket
+          |> put_flash(:error, "Too many invitation lookups. Try again shortly.")
+          |> assign(:page_title, "Invitation")
+          |> assign(:rate_limited, true)
+
+        {:ok, socket}
+    end
+  end
+
+  defp remote_ip(%Phoenix.LiveView.Socket{private: %{connect_info: %{remote_ip: ip}}})
+       when is_tuple(ip),
+       do: ip |> Tuple.to_list() |> Enum.join(".")
+
+  defp remote_ip(_socket), do: "unknown"
+
+  defp mount_invitation(token, session, socket) do
     socket = assign(socket, :page_title, "Invitation")
     current_user = current_user_from_session(session)
 
