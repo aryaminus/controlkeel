@@ -20,6 +20,7 @@ defmodule ControlKeel.Benchmark.Run do
     field :metadata, :map, default: %{}
 
     belongs_to :suite, Suite
+    belongs_to :workspace, ControlKeel.Mission.Workspace
     has_many :results, Result
 
     timestamps(type: :utc_datetime)
@@ -29,6 +30,7 @@ defmodule ControlKeel.Benchmark.Run do
     run
     |> cast(attrs, [
       :suite_id,
+      :workspace_id,
       :status,
       :baseline_subject,
       :subjects,
