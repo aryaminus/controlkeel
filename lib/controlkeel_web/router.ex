@@ -68,6 +68,9 @@ defmodule ControlKeelWeb.Router do
     get "/.well-known/agent-card.json", ProtocolController, :a2a_card
     get "/.well-known/agent.json", ProtocolController, :a2a_card
     post "/oauth/token", OAuthController, :token
+    # RFC 8628 device authorization grant (CLI sign-in).
+    post "/device_authorization", DeviceAuthController, :authorize
+    post "/oauth/device_token", DeviceAuthController, :token
     get "/mcp", ProtocolController, :mcp_get
     delete "/mcp", ProtocolController, :mcp_delete
   end
@@ -126,6 +129,9 @@ defmodule ControlKeelWeb.Router do
       live "/proofs", ProofBrowserLive, :index
       live "/proofs/:id", ProofBrowserLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
+      # RFC 8628 device approval page (auth-gated: only a signed-in user can
+      # authorize a device against their own account).
+      live "/device", DeviceAuthLive, :index
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
       live "/organizations", OrganizationsLive, :index

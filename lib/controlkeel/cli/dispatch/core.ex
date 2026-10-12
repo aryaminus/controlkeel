@@ -21,6 +21,12 @@ defmodule ControlKeel.CLI.Dispatch.Core do
 
   def run_command(%{command: :serve}, _project_root), do: :ok
 
+  # CLI sign-in via the RFC 8628 device flow (issue #251).
+  def run_command(%{command: command} = parsed, project_root)
+      when command in [:login, :logout, :whoami] do
+    ControlKeel.CLI.Dispatch.Login.run_command(parsed, project_root)
+  end
+
   def run_command(%{command: :capabilities, options: options}, _project_root) do
     with {:ok, format} <- effective_cli_format(options) do
       payload = ControlKeel.CLI.Capabilities.payload()
