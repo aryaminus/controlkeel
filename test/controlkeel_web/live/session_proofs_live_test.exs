@@ -1,4 +1,4 @@
-defmodule ControlKeelWeb.ProofBrowserLiveTest do
+defmodule ControlKeelWeb.SessionProofsLiveTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest

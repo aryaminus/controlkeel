@@ -278,11 +278,11 @@ defmodule ControlKeelWeb.Router do
            :show
 
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs",
-           ProofBrowserLive,
+           SessionProofsLive,
            :index
 
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id",
-           ProofBrowserLive,
+           ProofLive,
            :show
     end
   end
