@@ -49,7 +49,8 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistry do
   public key bytes) before calling. This keeps the registry agnostic to
   encoding choices.
   """
-  @spec enroll(enrollment()) :: {:ok, %Key{}} | {:error, Ecto.Changeset.t()}
+  @spec enroll(enrollment()) ::
+          {:ok, %Key{}} | {:error, Ecto.Changeset.t() | :revoked}
   def enroll(%{workspace_id: ws} = attrs) when is_binary(ws) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     base = Map.put(attrs, :last_seen_at, now)
@@ -60,10 +61,19 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistry do
         |> Key.changeset(base)
         |> Repo.insert()
 
-      %Key{} = existing ->
+      %Key{revoked_at: nil} = existing ->
+        # Re-registration of a live key only refreshes the material.
         existing
-        |> Key.changeset(Map.put(base, :revoked_at, nil))
+        |> Key.changeset(base)
         |> Repo.update()
+
+      %Key{revoked_at: %DateTime{}} ->
+        # A revoked registration stays revoked. Previously this branch cleared
+        # `revoked_at`, which let a caller holding the old private key silently
+        # un-revoke itself by re-posting to the (unauthenticated) register
+        # endpoint — revocation has to be terminal to mean anything. An operator
+        # can re-provision by removing the row, which is an explicit action.
+        {:error, :revoked}
     end
   end
 
