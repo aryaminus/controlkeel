@@ -679,7 +679,10 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   # stay stable while triaging. The status filter chips and the resolved
   # dimming separate done from todo instead.
   defp sort_findings(findings) do
-    # id breaks same-second ties (inserted_at has second precision).
+    # id breaks same-second ties (inserted_at has second precision). Keep it:
+    # without a total order, same-second rows reshuffle on every 2s poll and
+    # rows jump under the cursor. Pinned by the order assertions in
+    # session_findings_live_test.exs.
     Enum.sort_by(findings, &{unix(&1.inserted_at), &1.id}, :desc)
   end
 
