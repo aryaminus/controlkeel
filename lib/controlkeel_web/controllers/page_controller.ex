@@ -296,4 +296,142 @@ defmodule ControlKeelWeb.PageController do
       query -> "?#{query}"
     end
   end
+
+  # Legacy global proof browser URLs (pre-session-scope nesting): the index
+  # and detail now live at
+  # `/:org_slug/workspaces/:ws_slug/sessions/:id/proofs[/:proof_id]`.
+  # These actions keep old bookmarks working by resolving the proof (or the
+  # `session_id` query param) to its session's org/workspace slugs and 302ing
+  # there, preserving the remaining query string. Like the observability
+  # resolvers they must sit before the `:org_slug` live block so the
+  # single-segment match does not swallow `/proofs`. Resolvers never render
+  # data — unknown or inaccessible targets 404, and access is re-enforced by
+  # the target LiveView.
+  def proofs_redirect(conn, %{"id" => id} = params) do
+    case Integer.parse(id) do
+      {proof_id, ""} ->
+        case Mission.get_proof_bundle_with_context(proof_id) do
+          nil -> FallbackController.not_found(conn, params)
+          proof -> redirect_session_proofs(conn, proof.session_id, params, "/#{proof.id}", "")
+        end
+
+      _ ->
+        FallbackController.not_found(conn, params)
+    end
+  end
+
+  def proofs_redirect(conn, params) do
+    case proofs_session_id_param(params) do
+      nil -> redirect_recent_session_proofs(conn, params)
+      session_id -> redirect_session_proofs(conn, session_id, params, "", proofs_query_suffix(conn))
+    end
+  end
+
+  defp redirect_session_proofs(conn, session_id, params, proof_suffix, query) do
+    user = conn.assigns[:current_user]
+
+    case Repo.get(Session, session_id) do
+      nil ->
+        FallbackController.not_found(conn, params)
+
+      %Session{} = session ->
+        case Repo.preload(session, workspace: :org) do
+          %{workspace: %Workspace{org: %{slug: org_slug}, slug: ws_slug}} ->
+            if Accounts.session_accessible?(session, user) do
+              redirect(
+                conn,
+                to:
+                  "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/proofs#{proof_suffix}#{query}"
+              )
+            else
+              FallbackController.not_found(conn, params)
+            end
+
+          _ ->
+            if Runtime.local?() do
+              redirect(
+                conn,
+                to:
+                  "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/proofs#{proof_suffix}#{query}"
+              )
+            else
+              FallbackController.not_found(conn, params)
+            end
+        end
+    end
+  end
+
+  defp redirect_recent_session_proofs(conn, params) do
+    user = conn.assigns[:current_user]
+
+    if Mode.current() == :local do
+      case Mission.list_recent_sessions(1) do
+        [%Session{id: session_id} | _] ->
+          redirect_session_proofs(conn, session_id, params, "", proofs_query_suffix(conn))
+
+        [] ->
+          case LocalDefaults.ensure() do
+            {:ok, {%{slug: org_slug}, %{slug: ws_slug}}} ->
+              redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}")
+
+            _ ->
+              redirect(
+                conn,
+                to:
+                  "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}"
+              )
+          end
+      end
+    else
+      cond do
+        is_nil(user) ->
+          redirect(conn, to: "/auth/login")
+
+        not Accounts.any_active_membership?(user.id) ->
+          conn
+          |> put_flash(:info, "Join or create an organization to continue.")
+          |> redirect(to: "/organizations")
+
+        true ->
+          case recent_accessible_proof_session(user) do
+            nil ->
+              conn
+              |> put_flash(:info, "No workspace available. Join or create an organization to continue.")
+              |> redirect(to: "/organizations")
+
+            session ->
+              redirect_session_proofs(conn, session.id, params, "", proofs_query_suffix(conn))
+          end
+      end
+    end
+  end
+
+  defp recent_accessible_proof_session(user) do
+    user
+    |> Mission.list_recent_sessions_for_user(10)
+    |> Enum.find(&Accounts.session_accessible?(&1, user))
+  end
+
+  defp proofs_session_id_param(params) do
+    case params["session_id"] do
+      nil ->
+        nil
+
+      value ->
+        case Integer.parse(to_string(value)) do
+          {id, ""} when id > 0 -> id
+          _ -> nil
+        end
+    end
+  end
+
+  defp proofs_query_suffix(conn) do
+    conn.query_params
+    |> Map.delete("session_id")
+    |> URI.encode_query()
+    |> case do
+      "" -> ""
+      query -> "?#{query}"
+    end
+  end
 end

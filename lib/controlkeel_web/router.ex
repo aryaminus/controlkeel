@@ -202,6 +202,15 @@ defmodule ControlKeelWeb.Router do
     get "/observability/benchmarks/history", PageController, :observability_workspace_redirect
     get "/observability/regressions", PageController, :observability_workspace_redirect
 
+    # Legacy global proof browser URLs (pre-session-scope nesting): the index
+    # and detail now live under the session
+    # (`.../sessions/:id/proofs[/:proof_id]`). Kept as auth-aware resolvers
+    # that 302 to the session-scoped URL so old bookmarks keep working.
+    # Defined before the ":org_slug" live block below so the single-segment
+    # match does not swallow "/proofs".
+    get "/proofs", PageController, :proofs_redirect
+    get "/proofs/:id", PageController, :proofs_redirect
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the
