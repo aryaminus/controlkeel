@@ -42,7 +42,7 @@ defmodule ControlKeelWeb.ProofLive do
     org = workspace && workspace.org
 
     socket
-    |> assign(:page_title, "Proof")
+    |> assign(:page_title, "Proofs")
     |> assign(:proof, nil)
     |> assign(:memory_hits, [])
     |> assign(:session, session)
@@ -89,12 +89,27 @@ defmodule ControlKeelWeb.ProofLive do
             case Mission.get_proof_bundle_with_context(parsed_id) do
               %{session_id: ^session_id} = proof ->
                 memory_hits = related_memory_hits(proof)
+                workspace = session.workspace
+                org = workspace && workspace.org
 
                 {:noreply,
                  socket
-                 |> assign(:page_title, "Proof #{proof.id}")
+                 |> assign(:page_title, "#{proof.task.title} — Proofs")
                  |> assign(:proof, proof)
-                 |> assign(:memory_hits, memory_hits)}
+                 |> assign(:memory_hits, memory_hits)
+                 |> assign(:breadcrumbs, [
+                   %{label: org.name, to: "/#{org.slug}"},
+                   %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+                   %{
+                     label: session.title,
+                     to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+                   },
+                   %{
+                     label: "Proofs",
+                     to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/proofs"
+                   },
+                   %{label: proof.task.title, to: nil}
+                 ])}
 
               _ ->
                 {:noreply, proof_not_found(socket)}
@@ -107,21 +122,11 @@ defmodule ControlKeelWeb.ProofLive do
   def render(%{live_action: :show} = assigns) do
     ~H"""
     <div class="space-y-6">
-      <div :if={@proof} class="flex items-center justify-between gap-3">
-        <.link
-          navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs"}
-          class="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-primary"
-        >
-          <.icon name="hero-arrow-left" class="size-3" /> Back to proofs
-        </.link>
-
-        <.link
-          navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}"}
-          class="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-primary"
-        >
-          Open session <.icon name="hero-arrow-up-right" class="size-3" />
-        </.link>
-      </div>
+      <.page_title
+        :if={@proof}
+        title={@proof.task.title}
+        subtitle="Immutable evidence for this task version."
+      />
 
       <.link
         :if={!@proof}
