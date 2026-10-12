@@ -65,10 +65,14 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
     if name == "" do
       {:noreply, assign(socket, :create_error, "Name is required.")}
     else
-      case Platform.create_service_account(socket.assigns.workspace.id, %{
-             "name" => name,
-             "scopes" => scopes
-           }) do
+      case Platform.provision_agent_identity(
+             socket.assigns.workspace.id,
+             %{
+               "name" => name,
+               "scopes" => scopes
+             },
+             actor: nhi_actor(socket)
+           ) do
         {:ok, %{service_account: sa, token: token}} ->
           {:noreply,
            socket
@@ -92,7 +96,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
 
   def handle_event("revoke", %{"id" => id}, socket) do
     with {sa_id, ""} <- Integer.parse(id),
-         {:ok, _} <- Platform.revoke_service_account(sa_id) do
+         {:ok, _} <- Platform.revoke_agent_identity(sa_id, actor: nhi_actor(socket)) do
       {:noreply,
        socket
        |> assign(:accounts, Platform.list_service_accounts(socket.assigns.workspace.id))
@@ -104,7 +108,8 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
 
   def handle_event("rotate", %{"id" => id}, socket) do
     with {sa_id, ""} <- Integer.parse(id),
-         {:ok, %{service_account: sa, token: token}} <- Platform.rotate_service_account(sa_id) do
+         {:ok, %{service_account: sa, token: token}} <-
+           Platform.rotate_agent_identity_token(sa_id, actor: nhi_actor(socket)) do
       {:noreply,
        socket
        |> assign(:accounts, Platform.list_service_accounts(socket.assigns.workspace.id))
@@ -274,6 +279,17 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
 
   defp format_dt(nil), do: "never"
   defp format_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
+
+  # Credential lifecycle is exactly what a customer audits, so these mutations go
+  # through the NHI-audited wrappers (provision/revoke/rotate_agent_identity) rather
+  # than the raw Platform functions, which record nothing. The API and CLI paths
+  # already used the wrappers; this LiveView was the odd one out (issue #250).
+  defp nhi_actor(socket) do
+    case socket.assigns[:current_user] do
+      %{email: email} -> "web:#{email}"
+      _ -> "web:unknown"
+    end
+  end
 
   defp redirect_with_flash(socket, kind, msg, path) do
     socket
