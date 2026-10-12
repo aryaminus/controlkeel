@@ -622,7 +622,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   defp severity_pill("low"), do: "bg-success/10 text-success ring-success/20"
   defp severity_pill(_), do: "bg-muted text-muted-foreground ring-border"
 
-  defp resolved?(finding), do: finding.status not in ["open", "blocked"]
+  defp resolved?(finding), do: finding.status in ["approved", "rejected", "resolved"]
 
   defp meta_value(%{metadata: %{} = metadata}, key), do: metadata[key]
   defp meta_value(_finding, _key), do: nil
@@ -721,8 +721,14 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
   defp refresh_session(socket) do
     case Mission.get_session_context(socket.assigns.session.id, @refresh_opts) do
-      nil -> SessionScope.session_not_found(socket)
-      session -> assign_session(socket, session)
+      nil ->
+        SessionScope.session_not_found(socket)
+
+      session ->
+        case SessionScope.reauthorize(socket, session) do
+          {:ok, session} -> assign_session(socket, session)
+          {:error, :not_found} -> SessionScope.session_not_found(socket)
+        end
     end
   end
 

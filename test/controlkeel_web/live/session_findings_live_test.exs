@@ -159,6 +159,26 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
       user
     end
 
+    test "post-mutation refresh redirects when the session leaves scope", %{conn: conn} do
+      {org, ws, session} = org_bound_session_fixture()
+      admin = member_for(org, "admin", "findings-scope-admin")
+      conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
+
+      finding = finding_fixture(%{session: session, status: "open", title: "Scope move target"})
+      other_ws = workspace_fixture(%{org_id: org.id})
+
+      {:ok, view, _html} = live(conn, org_session_path(org, ws, session, "/findings"))
+
+      # Session moves workspaces mid-view: the stale socket still authorizes
+      # the mutation, but the post-mutation refetch must not render the
+      # out-of-scope session.
+      {:ok, _} = Mission.update_session(session, %{workspace_id: other_ws.id})
+
+      render_click(view, "approve_finding", %{"id" => finding.id})
+
+      assert_redirect(view, "/")
+    end
+
     test "viewers can read but cannot approve, escalate, or reject", %{conn: conn} do
       {org, ws, session} = org_bound_session_fixture()
       viewer = member_for(org, "viewer", "findings-viewer")

@@ -858,33 +858,47 @@ defmodule ControlKeel.Observability do
     snapshot
   end
 
-  def eval_candidates(opts \\ []) do
-    problem_summary = problems(opts)
-    session_links_base = session_links_base(opts)
+  @doc """
+  Advisory eval backlog derived from grouped active problems.
 
-    candidates =
+  Derivation always covers the complete group set: `:limit` only bounds the
+  returned `candidates` rows for presentation, while `count`, `health`, and
+  `recommendations` reflect every group. Capping derivation would silently
+  drop candidates (and downstream saves) for busy workspaces.
+  """
+  def eval_candidates(opts \\ []) do
+    limit = Keyword.get(opts, :limit)
+    problem_summary = problems(Keyword.delete(opts, :limit))
+    session_link = session_link_builder(opts)
+
+    all_candidates =
       problem_summary.problems
-      |> Enum.map(&eval_candidate_from_problem(&1, session_links_base))
+      |> Enum.map(&eval_candidate_from_problem(&1, session_link))
       |> Enum.sort_by(&{priority_rank(&1.priority), &1.rule_id})
 
     %{
-      count: length(candidates),
-      health: eval_candidates_health(candidates),
-      candidates: candidates,
-      recommendations: eval_candidate_recommendations(candidates)
+      count: length(all_candidates),
+      health: eval_candidates_health(all_candidates),
+      candidates: maybe_take(all_candidates, limit),
+      recommendations: eval_candidate_recommendations(all_candidates)
     }
   end
 
+  defp maybe_take(candidates, nil), do: candidates
+  defp maybe_take(candidates, limit), do: Enum.take(candidates, limit)
+
   # Org-scoped session URLs need slugs the problem structs don't carry;
   # resolve once per call from the workspace all groups share. Falls back
-  # to the legacy global shape (still 302s) when no workspace is in scope.
-  defp session_links_base(opts) do
+  # to the legacy global shape (still 302s in one hop) when no workspace is
+  # in scope. The legacy shape has no /observability suffix route, so the
+  # fallback links to /observability/sessions/:id directly.
+  defp session_link_builder(opts) do
     with workspace_id when not is_nil(workspace_id) <- Keyword.get(opts, :workspace_id),
          %Mission.Workspace{} = workspace <- Repo.get(Mission.Workspace, workspace_id),
          %{slug: ws_slug, org: %{slug: org_slug}} <- Repo.preload(workspace, :org) do
-      "/#{org_slug}/workspaces/#{ws_slug}/sessions"
+      &"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{&1}/observability"
     else
-      _ -> "/observability/sessions"
+      _ -> &"/observability/sessions/#{&1}"
     end
   end
 
@@ -3188,7 +3202,7 @@ defmodule ControlKeel.Observability do
     end
   end
 
-  defp eval_candidate_from_problem(problem, session_links_base) do
+  defp eval_candidate_from_problem(problem, session_link) do
     feedback = problem.feedback_loop
 
     %{
@@ -3210,9 +3224,7 @@ defmodule ControlKeel.Observability do
       links: %{
         problems: "/observability",
         benchmarks: "/benchmarks",
-        example_session:
-          feedback.example_session_id &&
-            "#{session_links_base}/#{feedback.example_session_id}/observability"
+        example_session: feedback.example_session_id && session_link.(feedback.example_session_id)
       }
     }
   end
