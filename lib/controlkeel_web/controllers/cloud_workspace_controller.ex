@@ -73,6 +73,11 @@ defmodule ControlKeelWeb.CloudWorkspaceController do
       {:error, :fingerprint_conflict} ->
         conflict(conn, "fingerprint_belongs_to_other_workspace")
 
+      {:error, :revoked} ->
+        # This workspace's registration was revoked. Re-enrollment must not
+        # silently undo that, even for a caller that still holds the old key.
+        conflict(conn, "workspace_registration_revoked")
+
       {:error, %Ecto.Changeset{} = cs} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -117,6 +122,7 @@ defmodule ControlKeelWeb.CloudWorkspaceController do
            mission_workspace_id: mws_id
          }) do
       {:ok, key} -> {:ok, key, status}
+      {:error, :revoked} -> {:error, :revoked}
       {:error, cs} -> {:error, cs}
     end
   end

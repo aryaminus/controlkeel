@@ -175,6 +175,46 @@ defmodule ControlKeelWeb.CloudProjectsLive do
     {:noreply, assign(socket, :show_create_form, !socket.assigns.show_create_form)}
   end
 
+  def handle_event("revoke-workspace", %{"ws_id" => ws_id}, socket) do
+    cond do
+      is_nil(socket.assigns.current_membership) ->
+        {:noreply, put_flash(socket, :error, "You must be signed in.")}
+
+      not Accounts.role_at_least?(socket.assigns.current_membership.role, "admin") ->
+        {:noreply, put_flash(socket, :error, "Admin or owner role required.")}
+
+      true ->
+        # Only keys belonging to the viewer's own org may be revoked.
+        owned? =
+          socket.assigns.current_org_id
+          |> KeyRegistry.list_for_org()
+          |> Enum.any?(&(&1.workspace_id == ws_id))
+
+        cond do
+          not owned? ->
+            {:noreply, put_flash(socket, :error, "Workspace not found.")}
+
+          true ->
+            case KeyRegistry.revoke(ws_id) do
+              {:ok, _key} ->
+                keys =
+                  socket.assigns.current_org_id
+                  |> KeyRegistry.list_for_org()
+                  |> Repo.preload(:mission_workspace)
+
+                {:noreply,
+                 socket
+                 |> assign(:keys, keys)
+                 |> assign(:state, list_state(socket, keys))
+                 |> put_flash(:info, "Workspace access revoked.")}
+
+              {:error, _reason} ->
+                {:noreply, put_flash(socket, :error, "Could not revoke workspace.")}
+            end
+        end
+    end
+  end
+
   def handle_event("create-workspace", %{"workspace" => params}, socket) do
     cond do
       is_nil(socket.assigns.current_membership) ->
@@ -446,6 +486,7 @@ defmodule ControlKeelWeb.CloudProjectsLive do
             <th>Fingerprint</th>
             <th>Last seen</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -458,6 +499,17 @@ defmodule ControlKeelWeb.CloudProjectsLive do
               <td>{format_dt(key.last_seen_at)}</td>
               <td>
                 <.link navigate={~p"/cloud/projects/#{key.workspace_id}"}>view</.link>
+              </td>
+              <td>
+                <button
+                  type="button"
+                  phx-click="revoke-workspace"
+                  phx-value-ws_id={key.workspace_id}
+                  data-confirm={"Revoke access for #{key.name || key.workspace_id}?"}
+                  class="text-xs font-semibold text-destructive hover:underline"
+                >
+                  revoke
+                </button>
               </td>
             </tr>
           <% end %>
