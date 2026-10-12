@@ -26,6 +26,10 @@ defmodule ControlKeel.Accounts do
 
   @org_budget_setting_key "budget_cents"
 
+  # Invitations default to 14 days. A pending token is a bearer credential, so it
+  # should not stay valid indefinitely once disclosed via email or chat.
+  @default_invitation_expiry_days 14
+
   @role_rank %{
     "owner" => 3,
     "admin" => 2,
@@ -169,6 +173,33 @@ defmodule ControlKeel.Accounts do
 
   # ──────────────── Memberships ────────────
 
+  defp invitation_expiry(opts, now) do
+    days =
+      case Keyword.get(opts, :expires_in_days) do
+        d when is_integer(d) and d > 0 ->
+          d
+
+        d when is_binary(d) ->
+          case Integer.parse(d) do
+            {parsed, ""} when parsed > 0 -> parsed
+            _ -> nil
+          end
+
+        _ ->
+          Application.get_env(
+            :controlkeel,
+            :invitation_expiry_days,
+            @default_invitation_expiry_days
+          )
+      end
+
+    if is_integer(days) and days > 0 do
+      DateTime.add(now, days * 24 * 60 * 60, :second)
+    else
+      nil
+    end
+  end
+
   @doc """
   Create a `pending` membership with an invitation token.
 
@@ -199,6 +230,7 @@ defmodule ControlKeel.Accounts do
     mission_workspace_id = Keyword.get(opts, :mission_workspace_id)
     raw_token = generate_token()
     now = DateTime.utc_now() |> DateTime.truncate(:second)
+    expires_at = invitation_expiry(opts, now)
 
     with :ok <- authorize_invite_role(invited_by, org_id, role) do
       case Repo.get_by(Membership, user_id: user_id, org_id: org_id) do
@@ -211,6 +243,7 @@ defmodule ControlKeel.Accounts do
             status: "pending",
             invitation_token_hash: token_hash(raw_token),
             invited_at: now,
+            expires_at: expires_at,
             invited_by_user_id: invited_by,
             mission_workspace_id: mission_workspace_id
           })
@@ -300,13 +333,63 @@ defmodule ControlKeel.Accounts do
         {:error, :invalid_token}
 
       %Membership{status: "pending"} = membership ->
-        {:ok,
-         %{
-           membership: membership,
-           org: Repo.get(Org, membership.org_id),
-           user: Repo.get(User, membership.user_id),
-           mission_workspace_id: membership.mission_workspace_id
-         }}
+        if Membership.invitation_expired?(membership) do
+          # Expired: report invalid, matching accept_invitation, so token
+          # probing cannot distinguish expired from nonexistent.
+          {:error, :invalid_token}
+        else
+          {:ok,
+           %{
+             membership: membership,
+             org: Repo.get(Org, membership.org_id),
+             user: Repo.get(User, membership.user_id),
+             mission_workspace_id: membership.mission_workspace_id
+           }}
+        end
+
+      %Membership{status: "active"} ->
+        {:error, :already_accepted}
+
+      _ ->
+        {:error, :invalid_token}
+    end
+  end
+
+  @doc """
+  Consume an invitation for cloud workspace enrolment.
+
+  Unlike `lookup_invitation/1`, this **uses** the token: on success the hash is
+  cleared, so a single invitation can bind exactly one cloud workspace key.
+  Previously the register endpoint looked the invite up non-consumingly and never
+  marked it used, letting one token enroll unlimited keys.
+  """
+  @spec consume_invitation_for_enrolment(String.t()) ::
+          {:ok, map()} | {:error, :invalid_token | :already_accepted}
+  def consume_invitation_for_enrolment(raw_token) when is_binary(raw_token) do
+    hash = token_hash(raw_token)
+
+    case Repo.get_by(Membership, invitation_token_hash: hash) do
+      %Membership{status: "pending"} = membership ->
+        if Membership.invitation_expired?(membership) do
+          {:error, :invalid_token}
+        else
+          {:ok, {updated, org}} =
+            Repo.transaction(fn ->
+              updated_membership =
+                membership
+                |> Membership.changeset(%{invitation_token_hash: nil})
+                |> Repo.update!()
+
+              {updated_membership, Repo.get(Org, membership.org_id)}
+            end)
+
+          {:ok,
+           %{
+             membership: updated,
+             org: org,
+             mission_workspace_id: membership.mission_workspace_id
+           }}
+        end
 
       %Membership{status: "active"} ->
         {:error, :already_accepted}
@@ -333,13 +416,19 @@ defmodule ControlKeel.Accounts do
         {:error, :invalid_token}
 
       %Membership{user_id: ^user_id, status: "pending"} = membership ->
-        membership
-        |> Membership.changeset(%{
-          status: "active",
-          invitation_token_hash: nil,
-          accepted_at: DateTime.utc_now() |> DateTime.truncate(:second)
-        })
-        |> Repo.update()
+        # An expired invitation is dead: report it as invalid so the caller
+        # cannot distinguish "expired" from "never existed" by probing tokens.
+        if Membership.invitation_expired?(membership) do
+          {:error, :invalid_token}
+        else
+          membership
+          |> Membership.changeset(%{
+            status: "active",
+            invitation_token_hash: nil,
+            accepted_at: DateTime.utc_now() |> DateTime.truncate(:second)
+          })
+          |> Repo.update()
+        end
 
       %Membership{status: "active"} ->
         {:error, :already_accepted}
