@@ -44,6 +44,25 @@ defmodule ControlKeel.Cloud.RateLimiter do
   def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
   @doc """
+  Hit the bucket for an arbitrary key (not just a workspace id).
+
+  Same token-bucket semantics as `hit/2`, but accepts any term. Used for
+  per-IP throttling on unauthenticated surfaces and per-secret throttling on
+  short-lived codes, where there is no workspace to key on yet. Callers
+  namespace their keys so they cannot collide with workspace buckets.
+  """
+  @spec hit_key(term(), keyword()) :: result()
+  def hit_key(key, opts \\ []) when not is_nil(key) do
+    burst = Keyword.get(opts, :burst, configured(:burst, @default_burst))
+
+    refill =
+      Keyword.get(opts, :refill_per_sec, configured(:refill_per_sec, @default_refill_per_sec))
+
+    now_ms = System.monotonic_time(:millisecond)
+    do_hit(key, burst, refill, now_ms)
+  end
+
+  @doc """
   Consume one token for `workspace_id`. Returns `:ok` on success or
   `{:error, :rate_limited, retry_after_seconds}` when the bucket is empty.
   """
@@ -87,19 +106,19 @@ defmodule ControlKeel.Cloud.RateLimiter do
 
   # ── Token-bucket math ──────────────────────────────────────────────
 
-  defp do_hit(workspace_id, burst, refill, now_ms) do
-    case :ets.lookup(@table, workspace_id) do
+  defp do_hit(key, burst, refill, now_ms) do
+    case :ets.lookup(@table, key) do
       [] ->
         # First request from this workspace: hand out a burst-1 bucket.
-        :ets.insert(@table, {workspace_id, burst - 1, now_ms})
+        :ets.insert(@table, {key, burst - 1, now_ms})
         :ok
 
-      [{^workspace_id, tokens, last_ms}] ->
+      [{^key, tokens, last_ms}] ->
         elapsed_s = max(now_ms - last_ms, 0) / 1000
         refilled = min(burst, tokens + elapsed_s * refill)
 
         if refilled >= 1 do
-          :ets.insert(@table, {workspace_id, refilled - 1, now_ms})
+          :ets.insert(@table, {key, refilled - 1, now_ms})
           :ok
         else
           retry_after = max(ceil_div(1 - refilled, refill), 1)
