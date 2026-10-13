@@ -44,6 +44,31 @@ defmodule ControlKeelWeb.SessionProofsLiveTest do
     assert html =~ "No proof bundles found."
   end
 
+  test "pagination links preserve filters and change only the page", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+    base = org_session_path(org, ws, session, "/proofs")
+
+    for n <- 1..21 do
+      task = task_fixture(%{session: session, status: "done", title: "Paged proof #{n}"})
+      proof_bundle_fixture(%{task: task})
+    end
+
+    {:ok, view, html} = live(conn, base <> "?q=paged")
+    assert html =~ "Page 1 of 2"
+
+    next_href = "#{base}?page=2&q=paged"
+    assert has_element?(view, "a[href=\"" <> next_href <> "\"]", "Next")
+
+    {:ok, view, html} = live(conn, base <> "?q=paged&page=2")
+    assert html =~ "Page 2 of 2"
+
+    prev_href = "#{base}?page=1&q=paged"
+    assert has_element?(view, "a[href=\"" <> prev_href <> "\"]", "Previous")
+
+    # The session stays in the path — never leaked into the query string.
+    refute html =~ "session_id"
+  end
+
   test "proof detail renders immutable proof content and related memory", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     task = task_fixture(%{session: session, status: "done", title: "Detailed proof"})

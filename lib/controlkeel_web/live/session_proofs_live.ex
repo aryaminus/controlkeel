@@ -203,7 +203,7 @@ defmodule ControlKeelWeb.SessionProofsLive do
             <%= if @browser.page > 1 do %>
               <.link
                 patch={
-                  ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page - 1}), ["session_id"])}"
+                  ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{page_params(@browser, @browser.page - 1)}"
                 }
                 class="text-sm font-medium text-primary transition hover:underline"
               >
@@ -216,7 +216,7 @@ defmodule ControlKeelWeb.SessionProofsLive do
             <%= if @browser.page < @browser.total_pages do %>
               <.link
                 patch={
-                  ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page + 1}), ["session_id"])}"
+                  ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{page_params(@browser, @browser.page + 1)}"
                 }
                 class="text-sm font-medium text-primary transition hover:underline"
               >
@@ -232,10 +232,16 @@ defmodule ControlKeelWeb.SessionProofsLive do
     """
   end
 
+  # Current filters as URL params for pagination links, with the page
+  # number swapped in. `session_id` is deliberately omitted: the session
+  # already scopes the path, and `handle_params` forces it back in anyway.
+  defp page_params(browser, page) do
+    browser.filters |> browser_form_params() |> Map.put("page", page)
+  end
+
   defp browser_form_params(filters) do
     %{
       "q" => filters.q,
-      "session_id" => filters.session_id,
       "task_id" => filters.task_id,
       "deploy_ready" => if(filters.deploy_ready != nil, do: to_string(filters.deploy_ready)),
       "risk_tier" => filters.risk_tier
