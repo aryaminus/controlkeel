@@ -75,7 +75,7 @@ defmodule ControlKeelWeb.CoreComponents do
           </div>
           <button
             type="button"
-            class="group self-start cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            class="group self-start cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label={gettext("close")}
           >
             <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
