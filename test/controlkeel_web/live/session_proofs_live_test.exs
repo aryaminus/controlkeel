@@ -139,6 +139,17 @@ defmodule ControlKeelWeb.SessionProofsLiveTest do
                "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/proofs/#{proof.id}"
     end
 
+    test "GET /proofs?id= takes the index clause, not the detail clause", %{conn: conn} do
+      {org, ws, session} = org_bound_session_fixture()
+
+      # `id` here is a query param, not the `:id` path segment: it must
+      # not hijack the detail redirect (which would 404 on proof 999999).
+      # Remaining query params are preserved, as with `?q=`.
+      conn = get(conn, "/proofs?id=999999")
+
+      assert redirected_to(conn) == org_session_path(org, ws, session, "/proofs?id=999999")
+    end
+
     test "GET /proofs without session_id falls back to the most recent session", %{conn: conn} do
       {org, ws, session} = org_bound_session_fixture()
 

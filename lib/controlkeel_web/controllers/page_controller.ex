@@ -323,7 +323,7 @@ defmodule ControlKeelWeb.PageController do
   # single-segment match does not swallow `/proofs`. Resolvers never render
   # data — unknown or inaccessible targets 404, and access is re-enforced by
   # the target LiveView.
-  def proofs_redirect(conn, %{"id" => id} = params) do
+  def proofs_redirect(%{path_params: %{"id" => id}} = conn, params) do
     case Integer.parse(id) do
       {proof_id, ""} ->
         case Mission.get_proof_bundle_with_context(proof_id) do
