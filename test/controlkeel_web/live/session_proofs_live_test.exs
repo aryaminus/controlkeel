@@ -4,85 +4,132 @@ defmodule ControlKeelWeb.SessionProofsLiveTest do
   import Phoenix.LiveViewTest
   import ControlKeel.MissionFixtures
 
-  alias ControlKeel.Repo
-  alias ControlKeel.Accounts.Org
-
-  test "session nav bridges to the session-filtered proof browser", %{conn: conn} do
+  test "session nav links to the session-scoped proofs route", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
     {:ok, _view, html} = live(conn, org_session_path(org, ws, session))
 
-    assert html =~ "sidebar-org-nav"
     assert html =~ "Proofs"
-    assert html =~ ~s(href="/proofs?session_id=#{session.id}")
+    assert html =~ ~s(href="#{org_session_path(org, ws, session, "/proofs")}")
   end
 
-  test "proof browser filters and paginates proof bundles", %{conn: conn} do
-    session = session_fixture(%{title: "Proof mission"})
+  test "session proofs index lists only this session's bundles", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    other_session = session_fixture(%{workspace: ws, title: "Other mission"})
     task = task_fixture(%{session: session, status: "done", title: "Ship proof"})
+    other_task = task_fixture(%{session: other_session, status: "done", title: "Harbor audit"})
     proof = proof_bundle_fixture(%{task: task})
+    _other_proof = proof_bundle_fixture(%{task: other_task})
 
-    {:ok, view, html} = live(conn, ~p"/proofs?#{%{q: "Ship", session_id: session.id}}")
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/proofs"))
 
-    assert html =~ "Proof browser"
     assert html =~ "Ship proof"
-    assert has_element?(view, "a[href=\"/proofs/#{proof.id}\"]", "View")
+    assert html =~ ~s(href="#{org_session_path(org, ws, session, "/proofs/#{proof.id}")}")
+    refute html =~ "Harbor audit"
   end
 
-  test "proof browser detail renders immutable proof content and related memory", %{conn: conn} do
-    session = session_fixture()
+  test "session proofs index supports the q filter via query params", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+    task = task_fixture(%{session: session, status: "done", title: "Ship proof"})
+    proof_bundle_fixture(%{task: task})
+
+    base = org_session_path(org, ws, session, "/proofs")
+
+    {:ok, view, html} = live(conn, base <> "?q=ship")
+    assert html =~ "Ship proof"
+    assert has_element?(view, "a", "Ship proof")
+
+    {:ok, _view, html} = live(conn, base <> "?q=nomatch")
+    assert html =~ "No proof bundles found."
+  end
+
+  test "proof detail renders immutable proof content and related memory", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
     task = task_fixture(%{session: session, status: "done", title: "Detailed proof"})
     proof = proof_bundle_fixture(%{task: task})
     _memory = memory_record_fixture(%{session: session, task_id: task.id, title: "Proof memory"})
 
-    {:ok, _view, html} = live(conn, ~p"/proofs/#{proof.id}")
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/proofs/#{proof.id}"))
 
-    assert html =~ "Immutable proof snapshot"
     assert html =~ "Detailed proof"
     assert html =~ "Rollback instructions"
     assert html =~ "Related memory"
+    assert html =~ "Proof memory"
   end
 
-  test "detail view enforces org workspace boundary", %{conn: conn} do
-    {:ok, org_a} =
-      %Org{}
-      |> Org.changeset(%{name: "Proof Org A", slug: "proof-org-a", status: "active"})
-      |> Repo.insert()
+  test "proof detail enforces the session boundary", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+    other_session = session_fixture(%{workspace: ws, title: "Other mission"})
+    other_task = task_fixture(%{session: other_session, status: "done", title: "Harbor audit"})
+    other_proof = proof_bundle_fixture(%{task: other_task})
 
-    {:ok, org_b} =
-      %Org{}
-      |> Org.changeset(%{name: "Proof Org B", slug: "proof-org-b", status: "active"})
-      |> Repo.insert()
+    {:ok, _view, html} =
+      live(conn, org_session_path(org, ws, session, "/proofs/#{other_proof.id}"))
 
-    workspace_a = workspace_fixture(%{name: "Org A Workspace", org_id: org_a.id})
-    workspace_b = workspace_fixture(%{name: "Org B Workspace", org_id: org_b.id})
-
-    session_a = session_fixture(%{workspace: workspace_a, title: "Org A Session"})
-    session_b = session_fixture(%{workspace: workspace_b, title: "Org B Session"})
-
-    task_a = task_fixture(%{session: session_a, status: "done", title: "Org A Task"})
-    task_b = task_fixture(%{session: session_b, status: "done", title: "Org B Task"})
-
-    proof_a = proof_bundle_fixture(%{task: task_a})
-    proof_b = proof_bundle_fixture(%{task: task_b})
-
-    conn_a = Plug.Test.init_test_session(conn, %{"current_org_id" => org_a.id})
-
-    {:ok, _view, html} = live(conn_a, ~p"/proofs/#{proof_a.id}")
-    assert html =~ "Immutable proof snapshot"
-    assert html =~ "Org A Task"
-    refute html =~ "Org B Task"
-
-    {:ok, _view, html_unauth} = live(conn_a, ~p"/proofs/#{proof_b.id}")
-    assert html_unauth =~ "Proof not found"
-    assert html_unauth =~ "No proof bundle exists with this identifier."
-    refute html_unauth =~ "Immutable proof snapshot"
-    refute html_unauth =~ "Org B Task"
+    assert html =~ "Proof not found"
+    assert html =~ "No proof bundle exists with this identifier."
+    refute html =~ "Harbor audit"
   end
 
   test "malformed proof id shows not-found inline", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/proofs/not-an-id")
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, _view, html} = live(conn, org_session_path(org, ws, session, "/proofs/not-an-id"))
+
     assert html =~ "Proof not found"
     assert html =~ "No proof bundle exists with this identifier."
+  end
+
+  test "scope-mismatched org or workspace slugs redirect with not-found", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    assert {:error, {:live_redirect, %{to: "/"}}} =
+             live(conn, "/#{org.slug}/workspaces/not-the-workspace/sessions/#{session.id}/proofs")
+
+    assert {:error, {:live_redirect, %{to: "/"}}} =
+             live(conn, "/not-the-org/workspaces/#{ws.slug}/sessions/#{session.id}/proofs")
+  end
+
+  describe "legacy /proofs redirects" do
+    test "GET /proofs?session_id= redirects to the session-scoped route preserving params", %{
+      conn: conn
+    } do
+      {org, ws, session} = org_bound_session_fixture()
+
+      conn = get(conn, "/proofs?session_id=#{session.id}&q=Ship")
+
+      assert redirected_to(conn) ==
+               "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/proofs?q=Ship"
+    end
+
+    test "GET /proofs/:id redirects to the session-scoped proof detail", %{conn: conn} do
+      {org, ws, session} = org_bound_session_fixture()
+      task = task_fixture(%{session: session, status: "done", title: "Redirected proof"})
+      proof = proof_bundle_fixture(%{task: task})
+
+      conn = get(conn, "/proofs/#{proof.id}")
+
+      assert redirected_to(conn) ==
+               "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/proofs/#{proof.id}"
+    end
+
+    test "GET /proofs without session_id falls back to the most recent session", %{conn: conn} do
+      {org, ws, session} = org_bound_session_fixture()
+
+      conn = get(conn, "/proofs")
+
+      assert redirected_to(conn) == org_session_path(org, ws, session, "/proofs")
+    end
+
+    test "GET /proofs/:id with an unknown id returns 404", %{conn: conn} do
+      conn = get(conn, "/proofs/999999")
+      assert conn.status == 404
+    end
+
+    test "GET /proofs?session_id= with an unknown id returns 404", %{conn: conn} do
+      conn = get(conn, "/proofs?session_id=999999")
+      assert conn.status == 404
+    end
   end
 end
