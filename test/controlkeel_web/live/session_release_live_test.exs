@@ -91,7 +91,7 @@ defmodule ControlKeelWeb.SessionReleaseLiveTest do
 
     assert updated_html =~ "Release readiness checked."
     assert updated_html =~ "Release is backed by proof, smoke, and provenance evidence."
-    assert updated_html =~ ~s(/proofs/#{proof.id})
+    assert updated_html =~ org_session_path(org, ws, session, "/proofs/#{proof.id}")
   end
 
   test "blocked verdict renders every applicable reason alongside green evidence", %{conn: conn} do

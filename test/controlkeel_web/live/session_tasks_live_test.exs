@@ -148,7 +148,7 @@ defmodule ControlKeelWeb.SessionTasksLiveTest do
 
       proof = ControlKeel.Mission.latest_proof_bundle_for_task(task.id)
       assert proof
-      assert updated_html =~ "/proofs/#{proof.id}"
+      assert updated_html =~ org_session_path(org, ws, session, "/proofs/#{proof.id}")
     end
 
     test "surfaces unresolved findings when completion is blocked", %{conn: conn} do

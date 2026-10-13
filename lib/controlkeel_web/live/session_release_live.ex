@@ -37,6 +37,8 @@ defmodule ControlKeelWeb.SessionReleaseLive do
 
             {:ok,
              socket
+             |> assign(:org_slug, org_slug)
+             |> assign(:ws_slug, ws_slug)
              |> assign_session(session)
              |> assign_release_readiness(release_form_defaults(), false)}
         end
@@ -180,7 +182,9 @@ defmodule ControlKeelWeb.SessionReleaseLive do
                     <%= if @release_readiness["proof"] do %>
                       <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <.link
-                          navigate={~p"/proofs/#{@release_readiness["proof"]["id"]}"}
+                          navigate={
+                            ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs/#{@release_readiness["proof"]["id"]}"
+                          }
                           class="text-base font-semibold text-primary transition hover:text-primary"
                         >
                           Proof #{@release_readiness["proof"]["id"]} v{@release_readiness["proof"][
