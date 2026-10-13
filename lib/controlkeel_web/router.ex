@@ -128,7 +128,6 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/dashboard", DashboardLive, :index
       live "/sessions", MissionsLive, :index
-      live "/findings", FindingsLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
