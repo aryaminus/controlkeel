@@ -210,6 +210,13 @@ defmodule ControlKeelWeb.Router do
     get "/proofs", PageController, :proofs_redirect
     get "/proofs/:id", PageController, :proofs_redirect
 
+    # Legacy global findings browser URL (pre-session-scope nesting): the
+    # index now lives under the session
+    # (`.../sessions/:id/findings`). Same auth-aware resolver shape as the
+    # proof browser above — old bookmarks 302 to the session-scoped URL.
+    # Single-segment, so it must also stay ahead of the ":org_slug" block.
+    get "/findings", PageController, :findings_redirect
+
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
     # same reason, single-segment protocol GETs must stay ahead of the

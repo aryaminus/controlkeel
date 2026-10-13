@@ -327,8 +327,11 @@ defmodule ControlKeelWeb.PageController do
     case Integer.parse(id) do
       {proof_id, ""} ->
         case Mission.get_proof_bundle_with_context(proof_id) do
-          nil -> FallbackController.not_found(conn, params)
-          proof -> redirect_session_proofs(conn, proof.session_id, params, "/#{proof.id}", "")
+          nil ->
+            FallbackController.not_found(conn, params)
+
+          proof ->
+            redirect_session_browser(conn, proof.session_id, params, "proofs", "/#{proof.id}", "")
         end
 
       _ ->
@@ -337,16 +340,48 @@ defmodule ControlKeelWeb.PageController do
   end
 
   def proofs_redirect(conn, params) do
-    case proofs_session_id_param(params) do
+    case browser_session_id_param(params) do
       nil ->
-        redirect_recent_session_proofs(conn, params)
+        redirect_recent_session_browser(conn, params, "proofs")
 
       session_id ->
-        redirect_session_proofs(conn, session_id, params, "", proofs_query_suffix(conn))
+        redirect_session_browser(
+          conn,
+          session_id,
+          params,
+          "proofs",
+          "",
+          browser_query_suffix(conn)
+        )
     end
   end
 
-  defp redirect_session_proofs(conn, session_id, params, proof_suffix, query) do
+  # Legacy global findings browser URL (pre-session-scope nesting): the
+  # index now lives at
+  # `/:org_slug/workspaces/:ws_slug/sessions/:id/findings`. Same
+  # auth-aware resolution as the proof browser above — the `session_id`
+  # query param (or the most recent accessible session) decides the
+  # target, remaining params are preserved. Single-segment, so it must
+  # also sit before the `:org_slug` live block. The old page was
+  # index-only, so there is no `:id` detail clause.
+  def findings_redirect(conn, params) do
+    case browser_session_id_param(params) do
+      nil ->
+        redirect_recent_session_browser(conn, params, "findings")
+
+      session_id ->
+        redirect_session_browser(
+          conn,
+          session_id,
+          params,
+          "findings",
+          "",
+          browser_query_suffix(conn)
+        )
+    end
+  end
+
+  defp redirect_session_browser(conn, session_id, params, page, suffix, query) do
     user = conn.assigns[:current_user]
 
     case resolve_session_scope(session_id) do
@@ -358,7 +393,7 @@ defmodule ControlKeelWeb.PageController do
           redirect(
             conn,
             to:
-              "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/proofs#{proof_suffix}#{query}"
+              "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/#{page}#{suffix}#{query}"
           )
         else
           FallbackController.not_found(conn, params)
@@ -369,13 +404,13 @@ defmodule ControlKeelWeb.PageController do
     end
   end
 
-  defp redirect_recent_session_proofs(conn, params) do
+  defp redirect_recent_session_browser(conn, params, page) do
     user = conn.assigns[:current_user]
 
     if Mode.current() == :local do
       case Mission.list_recent_sessions(1) do
         [%Session{id: session_id} | _] ->
-          redirect_session_proofs(conn, session_id, params, "", proofs_query_suffix(conn))
+          redirect_session_browser(conn, session_id, params, page, "", browser_query_suffix(conn))
 
         [] ->
           case LocalDefaults.ensure() do
@@ -401,7 +436,7 @@ defmodule ControlKeelWeb.PageController do
           |> redirect(to: "/organizations")
 
         true ->
-          case recent_accessible_proof_session(user) do
+          case recent_accessible_browser_session(user) do
             nil ->
               conn
               |> put_flash(
@@ -411,19 +446,26 @@ defmodule ControlKeelWeb.PageController do
               |> redirect(to: "/organizations")
 
             session ->
-              redirect_session_proofs(conn, session.id, params, "", proofs_query_suffix(conn))
+              redirect_session_browser(
+                conn,
+                session.id,
+                params,
+                page,
+                "",
+                browser_query_suffix(conn)
+              )
           end
       end
     end
   end
 
-  defp recent_accessible_proof_session(user) do
+  defp recent_accessible_browser_session(user) do
     user
     |> Mission.list_recent_sessions_for_user(10)
     |> Enum.find(&Accounts.session_accessible?(&1, user))
   end
 
-  defp proofs_session_id_param(params) do
+  defp browser_session_id_param(params) do
     case params["session_id"] do
       nil ->
         nil
@@ -436,7 +478,7 @@ defmodule ControlKeelWeb.PageController do
     end
   end
 
-  defp proofs_query_suffix(conn) do
+  defp browser_query_suffix(conn) do
     conn.query_params
     |> Map.delete("session_id")
     |> URI.encode_query()

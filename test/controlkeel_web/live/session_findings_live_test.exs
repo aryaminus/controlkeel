@@ -124,4 +124,31 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
     assert rejected_html =~ "Could not approve finding."
     assert Mission.get_finding!(foreign_finding.id).status == "open"
   end
+
+  describe "legacy /findings redirects" do
+    test "GET /findings?session_id= redirects to the session-scoped route preserving params",
+         %{conn: conn} do
+      {org, ws, session} = org_bound_session_fixture()
+
+      conn = get(conn, "/findings?session_id=#{session.id}&status=open")
+
+      assert redirected_to(conn) ==
+               "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/findings?status=open"
+    end
+
+    test "GET /findings without session_id falls back to the most recent session", %{
+      conn: conn
+    } do
+      {org, ws, session} = org_bound_session_fixture()
+
+      conn = get(conn, "/findings")
+
+      assert redirected_to(conn) == org_session_path(org, ws, session, "/findings")
+    end
+
+    test "GET /findings?session_id= with an unknown id returns 404", %{conn: conn} do
+      conn = get(conn, "/findings?session_id=999999")
+      assert conn.status == 404
+    end
+  end
 end
