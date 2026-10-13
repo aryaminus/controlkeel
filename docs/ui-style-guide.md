@@ -25,7 +25,7 @@ When an existing component is close but not exact, extend the component (new att
 
 ### Form inputs
 
-Write new form fields against `<.input_component>` (or `<.textarea>`), not the legacy `<.input>`:
+Write new form fields against `<.input_component>` (or `<.textarea>`), not the legacy `<.input>` (kept only for backward compatibility):
 
 ```heex
 <.input_component field={@form[:q]} type="text" label="Search" placeholder="Task..." phx-debounce="300" />

@@ -148,6 +148,9 @@ defmodule ControlKeelWeb.CoreComponents do
   @doc """
   Renders an input with label and error messages.
 
+  Legacy component, kept for backward compatibility with existing templates.
+  Build new fields with `<.input_component>` instead (text and `type="select"`).
+
   A `Phoenix.HTML.FormField` may be passed as argument,
   which is used to retrieve the input name, id, and values.
   Otherwise all attributes may be passed explicitly.
@@ -496,7 +499,7 @@ defmodule ControlKeelWeb.CoreComponents do
     |> assign(:errors, Enum.map(field.errors, &translate_error(&1)))
   end
 
-  defp assign_component_field(assigns), do: assigns
+  defp assign_component_field(assigns), do: assign_new(assigns, :value, fn -> nil end)
 
   # Helper used by inputs to generate form errors
   defp error(assigns) do

@@ -104,7 +104,7 @@ defmodule ControlKeelWeb.SessionProofsLive do
                 <td colspan="4" class="px-5 py-12 text-center">
                   <p class="text-base font-medium text-foreground">No proof bundles found.</p>
                   <p class="mt-1 text-sm text-muted-foreground">
-                    Adjust the filters to broaden the search.
+                    Proof bundles appear here as tasks are completed and verified.
                   </p>
                 </td>
               </tr>
@@ -130,97 +130,97 @@ defmodule ControlKeelWeb.SessionProofsLive do
                   </p>
                 </td>
 
-                    <td class="px-5 py-4">
-                      <span class={[
-                        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                        risk_tier_pill_class(proof.session.risk_tier)
-                      ]}>
-                        {proof.session.risk_tier}
-                      </span>
-                      <span class="ml-2 text-sm tabular-nums text-muted-foreground">
-                        {proof.risk_score}
-                      </span>
-                      <% ver = bundle_get(proof, ["verification_assessment"], %{}) %>
-                      <p :if={ver["score"] || ver["status"]} class="mt-1 text-xs text-muted-foreground">
-                        Verification
-                        <span class={[
-                          "font-semibold tabular-nums",
-                          verification_score_color(ver["score"])
-                        ]}>
-                          {ver["score"] || "—"}
-                        </span>
-                        <span class={[
-                          "ml-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1",
-                          verification_status_color(ver["status"])
-                        ]}>
-                          {ver["status"] || "n/a"}
-                        </span>
-                      </p>
-                    </td>
+                <td class="px-5 py-4">
+                  <span class={[
+                    "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+                    risk_tier_pill_class(proof.session.risk_tier)
+                  ]}>
+                    {proof.session.risk_tier}
+                  </span>
+                  <span class="ml-2 text-sm tabular-nums text-muted-foreground">
+                    {proof.risk_score}
+                  </span>
+                  <% ver = bundle_get(proof, ["verification_assessment"], %{}) %>
+                  <p :if={ver["score"] || ver["status"]} class="mt-1 text-xs text-muted-foreground">
+                    Verification
+                    <span class={[
+                      "font-semibold tabular-nums",
+                      verification_score_color(ver["score"])
+                    ]}>
+                      {ver["score"] || "—"}
+                    </span>
+                    <span class={[
+                      "ml-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ring-1",
+                      verification_status_color(ver["status"])
+                    ]}>
+                      {ver["status"] || "n/a"}
+                    </span>
+                  </p>
+                </td>
 
-                    <td class="px-5 py-4">
-                      <span class={[
-                        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                        deploy_badge_class(proof.deploy_ready)
-                      ]}>
-                        {if proof.deploy_ready,
-                          do: "Certified ready",
-                          else: "Review required"}
-                      </span>
-                      <% tc = bundle_get(proof, ["task_checks"], %{}) %>
-                      <% t_total = tc["total"] || 0 %>
-                      <% t_passed = tc["passed"] || 0 %>
-                      <div :if={t_total > 0} class="mt-2 max-w-40">
-                        <div class="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Checks</span>
-                          <span class="tabular-nums">{t_passed}/{t_total} passed</span>
-                        </div>
-                        <div class="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                          <div
-                            style={"width: #{round(t_passed / t_total * 100)}%"}
-                            class="h-full rounded-full bg-primary transition-all"
-                          />
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                <td class="px-5 py-4">
+                  <span class={[
+                    "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+                    deploy_badge_class(proof.deploy_ready)
+                  ]}>
+                    {if proof.deploy_ready,
+                      do: "Certified ready",
+                      else: "Review required"}
+                  </span>
+                  <% tc = bundle_get(proof, ["task_checks"], %{}) %>
+                  <% t_total = tc["total"] || 0 %>
+                  <% t_passed = tc["passed"] || 0 %>
+                  <div :if={t_total > 0} class="mt-2 max-w-40">
+                    <div class="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Checks</span>
+                      <span class="tabular-nums">{t_passed}/{t_total} passed</span>
+                    </div>
+                    <div class="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        style={"width: #{round(t_passed / t_total * 100)}%"}
+                        class="h-full rounded-full bg-primary transition-all"
+                      />
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-4 border-t px-5 py-4">
-            <p class="text-sm text-muted-foreground">
-              Page {@browser.page} of {@browser.total_pages}
-            </p>
-            <div class="flex gap-4">
-              <%= if @browser.page > 1 do %>
-                <.link
-                  patch={
-                    ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page - 1}), ["session_id"])}"
-                  }
-                  class="text-sm font-medium text-primary transition hover:underline"
-                >
-                  Previous
-                </.link>
-              <% else %>
-                <span class="text-sm text-muted-foreground">Previous</span>
-              <% end %>
+        <div class="flex flex-wrap items-center justify-between gap-4 border-t px-5 py-4">
+          <p class="text-sm text-muted-foreground">
+            Page {@browser.page} of {@browser.total_pages}
+          </p>
+          <div class="flex gap-4">
+            <%= if @browser.page > 1 do %>
+              <.link
+                patch={
+                  ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page - 1}), ["session_id"])}"
+                }
+                class="text-sm font-medium text-primary transition hover:underline"
+              >
+                Previous
+              </.link>
+            <% else %>
+              <span class="text-sm text-muted-foreground">Previous</span>
+            <% end %>
 
-              <%= if @browser.page < @browser.total_pages do %>
-                <.link
-                  patch={
-                    ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page + 1}), ["session_id"])}"
-                  }
-                  class="text-sm font-medium text-primary transition hover:underline"
-                >
-                  Next
-                </.link>
-              <% else %>
-                <span class="text-sm text-muted-foreground">Next</span>
-              <% end %>
-            </div>
+            <%= if @browser.page < @browser.total_pages do %>
+              <.link
+                patch={
+                  ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs?#{Map.drop(Map.merge(browser_form_params(@browser.filters), %{"page" => @browser.page + 1}), ["session_id"])}"
+                }
+                class="text-sm font-medium text-primary transition hover:underline"
+              >
+                Next
+              </.link>
+            <% else %>
+              <span class="text-sm text-muted-foreground">Next</span>
+            <% end %>
           </div>
         </div>
+      </div>
     </div>
     """
   end
