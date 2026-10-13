@@ -4,6 +4,16 @@ defmodule ControlKeelWeb.SessionProofsLive do
   alias ControlKeel.Mission
   alias ControlKeelWeb.SessionScope
 
+  import ControlKeelWeb.ProofComponents,
+    only: [
+      bundle_get: 3,
+      deploy_badge_class: 1,
+      risk_tier_pill_class: 1,
+      session_breadcrumb_base: 3,
+      verification_score_color: 1,
+      verification_status_color: 1
+    ]
+
   @impl true
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
     current_user = socket.assigns[:current_user]
@@ -49,15 +59,10 @@ defmodule ControlKeelWeb.SessionProofsLive do
     |> assign(:nav_workspace, workspace)
     |> assign(:nav_session, %{id: session.id, title: session.title})
     |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
-    |> assign(:breadcrumbs, [
-      %{label: org.name, to: "/#{org.slug}"},
-      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
-      %{
-        label: session.title,
-        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
-      },
-      %{label: "Proofs", to: nil}
-    ])
+    |> assign(
+      :breadcrumbs,
+      session_breadcrumb_base(org, workspace, session) ++ [%{label: "Proofs", to: nil}]
+    )
   end
 
   defp scoped_session(socket), do: socket.assigns[:session]
@@ -114,7 +119,9 @@ defmodule ControlKeelWeb.SessionProofsLive do
               >
                 <td class="px-5 py-4">
                   <.link
-                    navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs/#{proof.id}"}
+                    navigate={
+                      ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs/#{proof.id}"
+                    }
                     class="font-medium text-foreground transition hover:text-primary hover:underline"
                   >
                     {proof.task.title}
@@ -240,42 +247,4 @@ defmodule ControlKeelWeb.SessionProofsLive do
   defp empty_browser do
     %{entries: [], filters: %{page: 1}, total_count: 0, total_pages: 1, page: 1, page_size: 20}
   end
-
-  defp bundle_get(proof, keys, default) do
-    if proof, do: get_in(proof.bundle || %{}, keys) || default, else: default
-  end
-
-  defp verification_score_color(score) when is_integer(score) do
-    cond do
-      score >= 80 -> "text-primary"
-      score >= 50 -> "text-warning"
-      true -> "text-destructive"
-    end
-  end
-
-  defp verification_score_color(_), do: "text-muted-foreground"
-
-  defp verification_status_color("strong"), do: "bg-primary/10 text-primary ring-primary/20"
-
-  defp verification_status_color("moderate"),
-    do: "bg-warning/10 text-warning ring-warning/20"
-
-  defp verification_status_color("weak"),
-    do: "bg-destructive/10 text-destructive ring-destructive/20"
-
-  defp verification_status_color(_), do: "bg-muted text-muted-foreground ring-border"
-
-  defp deploy_badge_class(true), do: "bg-success/10 text-success ring-success/20"
-
-  defp deploy_badge_class(_),
-    do: "bg-warning/10 text-warning ring-warning/20"
-
-  defp risk_tier_pill_class("low"), do: "bg-success/10 text-success ring-success/20"
-
-  defp risk_tier_pill_class("moderate"), do: "bg-warning/10 text-warning ring-warning/20"
-
-  defp risk_tier_pill_class(tier) when tier in ["high", "critical"],
-    do: "bg-destructive/10 text-destructive ring-destructive/20"
-
-  defp risk_tier_pill_class(_), do: "bg-muted text-muted-foreground ring-border"
 end

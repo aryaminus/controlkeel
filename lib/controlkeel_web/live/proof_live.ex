@@ -2,9 +2,21 @@ defmodule ControlKeelWeb.ProofLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Intent
-  alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeelWeb.SessionScope
+
+  import ControlKeelWeb.ProofComponents,
+    only: [
+      bundle_get: 2,
+      bundle_get: 3,
+      context_status_color: 1,
+      deploy_badge_class: 1,
+      related_memory_hits: 1,
+      risk_tier_pill_class: 1,
+      session_breadcrumb_base: 3,
+      verification_score_color: 1,
+      verification_status_color: 1
+    ]
 
   @impl true
   def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
@@ -52,15 +64,10 @@ defmodule ControlKeelWeb.ProofLive do
     |> assign(:nav_workspace, workspace)
     |> assign(:nav_session, %{id: session.id, title: session.title})
     |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
-    |> assign(:breadcrumbs, [
-      %{label: org.name, to: "/#{org.slug}"},
-      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
-      %{
-        label: session.title,
-        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
-      },
-      %{label: "Proofs", to: nil}
-    ])
+    |> assign(
+      :breadcrumbs,
+      session_breadcrumb_base(org, workspace, session) ++ [%{label: "Proofs", to: nil}]
+    )
   end
 
   defp scoped_session(socket), do: socket.assigns[:session]
@@ -97,19 +104,18 @@ defmodule ControlKeelWeb.ProofLive do
                  |> assign(:page_title, "#{proof.task.title} — Proofs")
                  |> assign(:proof, proof)
                  |> assign(:memory_hits, memory_hits)
-                 |> assign(:breadcrumbs, [
-                   %{label: org.name, to: "/#{org.slug}"},
-                   %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
-                   %{
-                     label: session.title,
-                     to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
-                   },
-                   %{
-                     label: "Proofs",
-                     to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/proofs"
-                   },
-                   %{label: proof.task.title, to: nil}
-                 ])}
+                 |> assign(
+                   :breadcrumbs,
+                   session_breadcrumb_base(org, workspace, session) ++
+                     [
+                       %{
+                         label: "Proofs",
+                         to:
+                           "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/proofs"
+                       },
+                       %{label: proof.task.title, to: nil}
+                     ]
+                 )}
 
               _ ->
                 {:noreply, proof_not_found(socket)}
@@ -473,7 +479,10 @@ defmodule ControlKeelWeb.ProofLive do
               {length(List.wrap(@proof.bundle["compliance_attestations"]))}
             </p>
           </div>
-          <p :if={gate = bundle_get(@proof, ["security_workflow", "release_gate_decision"])} class="mt-3">
+          <p
+            :if={gate = bundle_get(@proof, ["security_workflow", "release_gate_decision"])}
+            class="mt-3"
+          >
             <span class={[
               "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
               gate == "ready" && "bg-success/10 text-success ring-success/20",
@@ -498,20 +507,6 @@ defmodule ControlKeelWeb.ProofLive do
     """
   end
 
-  defp related_memory_hits(proof) do
-    related = Memory.list_related_to_task(proof.task_id, 5)
-
-    if related != [] do
-      related
-    else
-      Memory.search(proof.task.title,
-        session_id: proof.session_id,
-        task_id: proof.task_id,
-        top_k: 5
-      ).entries
-    end
-  end
-
   defp parse_int(value) when is_binary(value) do
     case Integer.parse(value) do
       {parsed, ""} when parsed > 0 -> parsed
@@ -524,49 +519,4 @@ defmodule ControlKeelWeb.ProofLive do
   defp format_domain_pack(nil), do: "Unknown"
   defp format_domain_pack(pack) when pack in ["baseline", "cost"], do: String.capitalize(pack)
   defp format_domain_pack(pack), do: Intent.pack_label(pack)
-
-  defp bundle_get(proof, keys, default \\ nil) do
-    if proof, do: get_in(proof.bundle || %{}, keys) || default, else: default
-  end
-
-  defp verification_score_color(score) when is_integer(score) do
-    cond do
-      score >= 80 -> "text-primary"
-      score >= 50 -> "text-warning"
-      true -> "text-destructive"
-    end
-  end
-
-  defp verification_score_color(_), do: "text-muted-foreground"
-
-  defp verification_status_color("strong"), do: "bg-primary/10 text-primary ring-primary/20"
-
-  defp verification_status_color("moderate"),
-    do: "bg-warning/10 text-warning ring-warning/20"
-
-  defp verification_status_color("weak"),
-    do: "bg-destructive/10 text-destructive ring-destructive/20"
-
-  defp verification_status_color(_), do: "bg-muted text-muted-foreground ring-border"
-
-  defp context_status_color("clean"), do: "bg-success/10 text-success ring-success/20"
-
-  defp context_status_color("degraded"),
-    do: "bg-destructive/10 text-destructive ring-destructive/20"
-
-  defp context_status_color(_), do: "bg-muted text-muted-foreground ring-border"
-
-  defp deploy_badge_class(true), do: "bg-success/10 text-success ring-success/20"
-
-  defp deploy_badge_class(_),
-    do: "bg-warning/10 text-warning ring-warning/20"
-
-  defp risk_tier_pill_class("low"), do: "bg-success/10 text-success ring-success/20"
-
-  defp risk_tier_pill_class("moderate"), do: "bg-warning/10 text-warning ring-warning/20"
-
-  defp risk_tier_pill_class(tier) when tier in ["high", "critical"],
-    do: "bg-destructive/10 text-destructive ring-destructive/20"
-
-  defp risk_tier_pill_class(_), do: "bg-muted text-muted-foreground ring-border"
 end
