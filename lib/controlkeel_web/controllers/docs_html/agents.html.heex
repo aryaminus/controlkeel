@@ -13,13 +13,19 @@
     </div>
     <ul class="mt-4 space-y-2 text-sm text-muted-foreground list-disc ml-5">
       <li>
-        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach codex-cli</code>
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
+          controlkeel attach codex-cli
+        </code>
         installs native Codex skills and the CK operator agent.
       </li>
       <li>
-        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach vscode</code>
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
+          controlkeel attach vscode
+        </code>
         and
-        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">controlkeel attach copilot</code>
+        <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">
+          controlkeel attach copilot
+        </code>
         prepare repo-native skills plus MCP config.
       </li>
       <li>
@@ -70,8 +76,22 @@
           </p>
 
           <%= if integration.attach_command do %>
-            <div class="mt-4 overflow-hidden rounded-2xl border border-border bg-muted/30">
-              <pre class="whitespace-pre-wrap px-4 py-3 text-sm leading-6 text-foreground"><code>{integration.attach_command}</code></pre>
+            <div class="relative mt-4 overflow-hidden rounded-2xl border border-border bg-muted/30">
+              <pre class="whitespace-pre-wrap px-4 py-3 pr-12 text-sm leading-6 text-foreground"><code>{integration.attach_command}</code></pre>
+              <button
+                type="button"
+                data-copy-command={integration.attach_command}
+                class="absolute right-2 top-2 rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label={"Copy #{integration.label} attach command"}
+                title="Copy command"
+              >
+                <span data-copy-icon="idle">
+                  <.icon name="hero-clipboard-document" class="size-4" />
+                </span>
+                <span data-copy-icon="done" class="hidden">
+                  <.icon name="hero-check" class="size-4" />
+                </span>
+              </button>
             </div>
           <% else %>
             <code class="text-sm text-foreground">
@@ -141,9 +161,7 @@
             Plan phases: {format_targets(integration.plan_phase_support)}
           </p>
           <p class="text-sm text-muted-foreground">
-            Runtime sessions: {format_runtime_session_support(
-              integration.runtime_session_support
-            )}
+            Runtime sessions: {format_runtime_session_support(integration.runtime_session_support)}
           </p>
           <p class="text-sm text-muted-foreground">
             Files written: {format_paths(integration.artifact_surfaces)}

@@ -57,6 +57,14 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "Get CK:"
       assert body =~ ~r{href="/docs/agents"[^>]*aria-current="page"}
     end
+
+    test "renders each attach command as copyable", %{conn: conn} do
+      conn = get(conn, ~p"/docs/agents")
+      body = html_response(conn, 200)
+
+      assert body =~ "data-copy-command"
+      assert body =~ "hero-clipboard-document"
+    end
   end
 
   describe "GET /docs/governance" do
