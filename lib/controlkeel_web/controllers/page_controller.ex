@@ -9,7 +9,6 @@ defmodule ControlKeelWeb.PageController do
   alias ControlKeel.Repo
   alias ControlKeel.Runtime
   alias ControlKeel.Runtime.Mode
-  alias ControlKeel.Skills
   alias ControlKeelWeb.FallbackController
   alias ControlKeelWeb.WorkspaceAccess
 
@@ -65,13 +64,6 @@ defmodule ControlKeelWeb.PageController do
 
       %{org: org, workspaces: workspaces}
     end)
-  end
-
-  def getting_started(conn, _params) do
-    render(conn, :getting_started,
-      install_channels: Skills.install_channels(),
-      agent_integrations: Skills.agent_integrations()
-    )
   end
 
   def about(conn, _params) do

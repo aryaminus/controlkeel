@@ -28,12 +28,25 @@ defmodule ControlKeel.Accounts.Org do
   @valid_statuses ~w(active disabled)
   @slug_regex ~r/^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$/
 
+  # Single-segment paths declared before the `/:org_slug` live route in
+  # `ControlKeelWeb.Router`. Without this, an org named e.g. "docs" would be
+  # shadowed by `get "/docs"` and become unreachable at its canonical URL.
+  # Existing colliding rows (if any) are left untouched — this only blocks new
+  # inserts/renames; they remain reachable via `/organizations/:slug` listing.
+  @reserved_slugs ~w(
+    docs getting-started about contact privacy developers
+    auth dashboard sessions findings benchmarks proofs
+    cloud organizations policies skills observability invitations
+    workspaces api proxy mcp oauth dev assets
+  )
+
   def changeset(org, attrs) do
     org
     |> cast(attrs, [:name, :slug, :status, :settings])
     |> validate_required([:name, :slug])
     |> update_change(:slug, &normalize_slug/1)
     |> validate_format(:slug, @slug_regex)
+    |> validate_exclusion(:slug, @reserved_slugs, message: "is reserved")
     |> validate_inclusion(:status, @valid_statuses)
     |> validate_length(:name, min: 1, max: 200)
     |> unique_constraint(:slug)

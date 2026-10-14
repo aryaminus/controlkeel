@@ -119,7 +119,7 @@ defmodule ControlKeel.Mcp.ProtocolAccess do
       "authorization_servers" => [issuer()],
       "scopes_supported" => @protocol_scopes,
       "bearer_methods_supported" => ["header"],
-      "resource_documentation" => Endpoint.url() <> "/getting-started"
+      "resource_documentation" => Endpoint.url() <> "/docs/getting-started"
     }
   end
 

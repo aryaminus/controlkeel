@@ -9,7 +9,8 @@ It is intentionally grouped by boundary instead of being a generated route dump;
 Public entry points:
 
 - `GET /` — home
-- `GET /getting-started` — first-run guidance
+- `GET /docs`, `GET /docs/getting-started`, `GET /docs/agents`, `GET /docs/governance` — documentation
+- `GET /getting-started` — legacy redirect to `/docs/getting-started`
 - `GET /auth/login` — sign-in via configured OAuth providers (Google/GitHub); creates an account on first sign-in
 - `GET /auth/logout` — logout
 - `GET /auth/complete/:token` — auth completion

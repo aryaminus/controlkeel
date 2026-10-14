@@ -193,7 +193,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         class="flex flex-col justify-end border-t mt-2 px-3 py-2"
       >
         <a
-          href={~p"/getting-started"}
+          href={~p"/docs"}
           target="_blank"
           rel="noopener"
           class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
@@ -1030,7 +1030,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         <% end %>
 
         <a
-          href={~p"/getting-started"}
+          href={~p"/docs"}
           target="_blank"
           rel="noopener"
           class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"

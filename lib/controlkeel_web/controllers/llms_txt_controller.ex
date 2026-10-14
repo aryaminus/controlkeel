@@ -56,7 +56,7 @@ defmodule ControlKeelWeb.LlmsTxtController do
 
     ## Documentation
 
-    - Getting Started: https://controlkeel.com/getting-started
+    - Getting Started: https://controlkeel.com/docs/getting-started
     - GitHub: https://github.com/aryaminus/controlkeel
     - OpenAPI Spec: https://controlkeel.com/openapi.json
 
