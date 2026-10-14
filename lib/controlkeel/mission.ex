@@ -3307,14 +3307,20 @@ defmodule ControlKeel.Mission do
     packs = List.wrap(domain_pack) ++ ["baseline"]
 
     Enum.map(packs, fn pack ->
-      pack_findings = Enum.filter(findings, &String.starts_with?(&1.rule_id, pack))
-      blocked = Enum.filter(pack_findings, &(&1.status == "blocked"))
+      {findings_count, blocked_count} =
+        Enum.reduce(findings, {0, 0}, fn finding, {found, blocked} ->
+          if String.starts_with?(finding.rule_id, pack) do
+            {found + 1, blocked + if(finding.status == "blocked", do: 1, else: 0)}
+          else
+            {found, blocked}
+          end
+        end)
 
       %{
         pack: pack,
-        status: if(blocked == [], do: "passed", else: "failed"),
-        findings_count: length(pack_findings),
-        blocked_count: length(blocked)
+        status: if(blocked_count == 0, do: "passed", else: "failed"),
+        findings_count: findings_count,
+        blocked_count: blocked_count
       }
     end)
   end
