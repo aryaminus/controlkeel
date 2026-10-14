@@ -7,7 +7,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.WorkspaceAccess
   alias ControlKeelWeb.RecentSessions
   alias ControlKeelWeb.WorkspaceAccess
 
@@ -61,7 +60,9 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
       :ok -> :ok
       {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
       {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
-      {:error, :needs_admin} -> {:error, "Viewer role or higher required."}
+      # Unreachable with the default "viewer" role (viewer >= viewer), kept
+      # for exhaustiveness over WorkspaceAccess.check/3's spec.
+      {:error, :needs_admin} -> {:error, "This workspace requires an active membership."}
     end
   end
 

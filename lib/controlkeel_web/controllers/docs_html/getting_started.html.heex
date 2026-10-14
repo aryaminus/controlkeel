@@ -24,8 +24,12 @@
             aria-label={"Copy #{channel.label} install command"}
             title="Copy command"
           >
-            <span data-copy-icon="idle"><.icon name="hero-clipboard-document" class="size-4" /></span>
-            <span data-copy-icon="done" class="hidden"><.icon name="hero-check" class="size-4" /></span>
+            <span data-copy-icon="idle">
+              <.icon name="hero-clipboard-document" class="size-4" />
+            </span>
+            <span data-copy-icon="done" class="hidden">
+              <.icon name="hero-check" class="size-4" />
+            </span>
           </button>
         </div>
       </div>
@@ -45,20 +49,28 @@
       <ol class="space-y-2 text-sm leading-6 text-muted-foreground list-decimal ml-5">
         <li>
           In your project, run
-          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel setup</code>
+          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+            controlkeel setup
+          </code>
           to bind it and see detected hosts and recommended attach paths.
         </li>
         <li>
           Run
-          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel attach opencode</code>
+          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+            controlkeel attach opencode
+          </code>
           to wire the agent host. Other hosts follow the same command shape.
         </li>
       </ol>
       <p class="text-sm leading-7 text-muted-foreground">
         Binding auto-bootstraps on first use. If it didn't fire,
-        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel bootstrap</code>
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+          controlkeel bootstrap
+        </code>
         or
-        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel init</code>
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+          controlkeel init
+        </code>
         does it explicitly — both are idempotent and safe to re-run.
       </p>
     </div>
@@ -76,18 +88,26 @@
           boots the local web app.
         </li>
         <li>
-          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel attach doctor</code>
+          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+            controlkeel attach doctor
+          </code>
           and
-          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel provider doctor</code>
+          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+            controlkeel provider doctor
+          </code>
           check host wiring and provider health.
         </li>
         <li>
-          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel status</code>
+          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+            controlkeel status
+          </code>
           shows the binding and session snapshot.
         </li>
         <li>
           Trigger a controlled validation, then check Session Control or run
-          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel findings</code>
+          <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+            controlkeel findings
+          </code>
           to see your first finding.
         </li>
       </ul>

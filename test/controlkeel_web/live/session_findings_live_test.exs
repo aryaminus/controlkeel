@@ -4,7 +4,9 @@ defmodule ControlKeelWeb.SessionFindingsLiveTest do
   import Phoenix.LiveViewTest
   import ControlKeel.MissionFixtures
 
+  alias ControlKeel.Accounts
   alias ControlKeel.Mission
+  alias ControlKeel.Repo
 
   test "session findings renders and copies a guided fix for supported findings", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()

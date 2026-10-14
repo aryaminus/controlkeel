@@ -57,6 +57,14 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "Get CK:"
       assert body =~ ~r{href="/docs/agents"[^>]*aria-current="page"}
     end
+
+    test "renders each attach command as copyable", %{conn: conn} do
+      conn = get(conn, ~p"/docs/agents")
+      body = html_response(conn, 200)
+
+      assert body =~ "data-copy-command"
+      assert body =~ "hero-clipboard-document"
+    end
   end
 
   describe "GET /docs/governance" do
@@ -93,7 +101,10 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "controlkeel obs benchmarks history"
       assert body =~ "controlkeel obs regressions"
       assert body =~ "/observability"
-      refute body =~ "/:org_slug/workspaces/"
+      assert body =~ "/:org_slug/workspaces/"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/observability"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-drafts"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/sessions/:id/observability"
       assert body =~ "--execute"
       assert body =~ "CLI reference"
 
@@ -169,8 +180,8 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "controlkeel obs benchmarks scenarios"
       assert body =~ "controlkeel obs benchmarks history"
       assert body =~ "controlkeel obs regressions"
-      assert body =~ "`/observability`"
-      refute body =~ "/:org_slug/workspaces/"
+      assert body =~ "`/:org_slug/workspaces/:ws_slug/observability`"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-history"
       assert body =~ "## CLI reference"
 
       for command <- [

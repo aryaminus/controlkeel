@@ -507,6 +507,33 @@ defmodule ControlKeel.ObservabilityTest do
     assert Enum.any?(sql_problem.examples, &(&1.session_id == session.id))
   end
 
+  test "problems/1 reports the true group count beyond the aggregate limit" do
+    session = session_fixture()
+
+    finding_fixture(%{
+      session: session,
+      title: "First group finding",
+      severity: "high",
+      status: "open",
+      category: "security",
+      rule_id: "security.first_group"
+    })
+
+    finding_fixture(%{
+      session: session,
+      title: "Second group finding",
+      severity: "high",
+      status: "open",
+      category: "security",
+      rule_id: "security.second_group"
+    })
+
+    problems = Observability.problems(workspace_id: session.workspace_id, limit: 1)
+
+    assert problems.count == 2
+    assert length(problems.problems) == 1
+  end
+
   test "workspace_overview/1 summarizes recent runs, problems, costs, and recommendations" do
     workspace = workspace_fixture()
     session = session_fixture(%{workspace: workspace, budget_cents: 2_000, spent_cents: 450})

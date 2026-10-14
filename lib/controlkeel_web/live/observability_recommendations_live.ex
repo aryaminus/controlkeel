@@ -16,7 +16,11 @@ defmodule ControlKeelWeb.ObservabilityRecommendationsLive do
          :ok <- check_org_slug(workspace, %{slug: slug}),
          :ok <- check_workspace_access(workspace, socket.assigns) do
       opts = [workspace_id: workspace.id]
-      recommendations = Observability.recommendations(opts)
+
+      recommendations =
+        opts
+        |> Observability.recommendations()
+        |> scope_recommendation_links(workspace)
 
       {:ok,
        socket
@@ -59,7 +63,9 @@ defmodule ControlKeelWeb.ObservabilityRecommendationsLive do
       :ok -> :ok
       {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
       {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
-      {:error, :needs_admin} -> {:error, "Viewer role or higher required."}
+      # Unreachable with the default "viewer" role (viewer >= viewer), kept
+      # for exhaustiveness over WorkspaceAccess.check/3's spec.
+      {:error, :needs_admin} -> {:error, "This workspace requires an active membership."}
     end
   end
 
@@ -67,6 +73,24 @@ defmodule ControlKeelWeb.ObservabilityRecommendationsLive do
     socket
     |> Phoenix.LiveView.put_flash(kind, msg)
     |> Phoenix.LiveView.push_navigate(to: path)
+  end
+
+  # Recommendation links are authored as global paths; rewrite the
+  # observability ones to this workspace so "Open related view" never
+  # bounces multi-workspace visitors through the global resolver.
+  # Non-observability links (e.g. /proofs) pass through untouched.
+  defp scope_recommendation_links(recommendations, workspace) do
+    prefix = "/#{workspace.org.slug}/workspaces/#{workspace.slug}"
+
+    Map.update!(recommendations, :actions, fn actions ->
+      Enum.map(actions, fn
+        %{link: "/observability" <> rest} = action ->
+          %{action | link: prefix <> "/observability" <> rest}
+
+        action ->
+          action
+      end)
+    end)
   end
 
   @impl true
