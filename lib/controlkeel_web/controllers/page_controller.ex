@@ -186,6 +186,12 @@ defmodule ControlKeelWeb.PageController do
     "/regressions" => "/benchmark"
   }
 
+  # Problems page removed: the aggregate counts live on the workspace
+  # observability overview. This legacy-global URL keeps resolving there.
+  def observability_problems_redirect(conn, _params) do
+    redirect_observability(conn, "")
+  end
+
   def observability_workspace_redirect(conn, _params) do
     suffix =
       conn.request_path

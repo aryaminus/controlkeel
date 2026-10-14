@@ -23,7 +23,14 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     assert html =~ "Observability"
     assert has_element?(view, "#observability-overview-page")
     assert has_element?(view, "#observability-overview-run-list")
-    assert html =~ "#{base}/problems"
+    # Problems page removed: no route link, and the Top findings rows deep
+    # link into the respective session's findings for per-finding detail.
+    refute html =~ "#{base}/problems"
+    assert html =~ "1 group"
+    assert html =~ "Overview grouped finding"
+    assert html =~ "security.overview"
+    assert html =~ "Inspect findings in this session"
+    assert html =~ "/sessions/#{session.id}/findings"
     assert html =~ "#{base}/loop"
     assert html =~ "#{base}/promotions"
     assert html =~ "#{base}/compare"
@@ -39,7 +46,8 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
   end
 
   test "overview page scopes recent runs to the visited workspace", %{conn: conn} do
-    {org, ws_one, _session_one} = org_bound_session_fixture(%{budget_cents: 2_000, spent_cents: 450})
+    {org, ws_one, _session_one} =
+      org_bound_session_fixture(%{budget_cents: 2_000, spent_cents: 450})
 
     ws_two = workspace_fixture(%{org_id: org.id})
     session_fixture(%{workspace: ws_two, budget_cents: 2_000, spent_cents: 450})

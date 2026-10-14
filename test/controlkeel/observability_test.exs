@@ -426,7 +426,7 @@ defmodule ControlKeel.ObservabilityTest do
   end
 
   test "eval_candidates/1 turns grouped problems into advisory backlog items" do
-    session = session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
 
     finding_fixture(%{
       session: session,
@@ -447,8 +447,11 @@ defmodule ControlKeel.ObservabilityTest do
     assert candidate.benchmark_hint == "security-regression"
     assert candidate.example_session_id == session.id
     assert candidate.human_gate_required == true
-    assert candidate.links.problems == "/observability/problems"
+    assert candidate.links.problems == "/observability"
     assert candidate.links.benchmarks == "/benchmarks"
+
+    assert candidate.links.example_session ==
+             "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability"
   end
 
   test "problems/1 groups active findings by rule and category" do
@@ -502,6 +505,33 @@ defmodule ControlKeel.ObservabilityTest do
     assert sql_problem.feedback_loop.benchmark_hint == "security-regression"
     assert sql_problem.feedback_loop.suggested_action =~ "regression benchmark"
     assert Enum.any?(sql_problem.examples, &(&1.session_id == session.id))
+  end
+
+  test "problems/1 reports the true group count beyond the aggregate limit" do
+    session = session_fixture()
+
+    finding_fixture(%{
+      session: session,
+      title: "First group finding",
+      severity: "high",
+      status: "open",
+      category: "security",
+      rule_id: "security.first_group"
+    })
+
+    finding_fixture(%{
+      session: session,
+      title: "Second group finding",
+      severity: "high",
+      status: "open",
+      category: "security",
+      rule_id: "security.second_group"
+    })
+
+    problems = Observability.problems(workspace_id: session.workspace_id, limit: 1)
+
+    assert problems.count == 2
+    assert length(problems.problems) == 1
   end
 
   test "workspace_overview/1 summarizes recent runs, problems, costs, and recommendations" do

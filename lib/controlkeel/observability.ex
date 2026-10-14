@@ -128,6 +128,14 @@ defmodule ControlKeel.Observability do
     }
   end
 
+  @doc """
+  Grouped active findings by `(rule_id, category)`, newest groups first.
+
+  `count` is the true distinct group count and is *not* capped by `:limit`
+  (only the returned `problems` rows are). Header counts may read higher than
+  pre-fix output that reported `length(problems)` — that jump is the
+  correction, not a regression.
+  """
   def problems(opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
 
@@ -144,7 +152,9 @@ defmodule ControlKeel.Observability do
       end)
 
     %{
-      count: length(groups),
+      # True distinct (rule_id, category) count: `length(groups)` would be
+      # capped by the aggregate query limit and underreport busy workspaces.
+      count: problem_group_count(opts),
       total_findings: total_findings,
       problems: groups,
       health: problems_health(groups),
@@ -848,20 +858,48 @@ defmodule ControlKeel.Observability do
     snapshot
   end
 
-  def eval_candidates(opts \\ []) do
-    problem_summary = problems(opts)
+  @doc """
+  Advisory eval backlog derived from grouped active problems.
 
-    candidates =
+  Derivation always covers the complete group set: `:limit` only bounds the
+  returned `candidates` rows for presentation, while `count`, `health`, and
+  `recommendations` reflect every group. Capping derivation would silently
+  drop candidates (and downstream saves) for busy workspaces.
+  """
+  def eval_candidates(opts \\ []) do
+    limit = Keyword.get(opts, :limit)
+    problem_summary = problems(Keyword.delete(opts, :limit))
+    session_link = session_link_builder(opts)
+
+    all_candidates =
       problem_summary.problems
-      |> Enum.map(&eval_candidate_from_problem/1)
+      |> Enum.map(&eval_candidate_from_problem(&1, session_link))
       |> Enum.sort_by(&{priority_rank(&1.priority), &1.rule_id})
 
     %{
-      count: length(candidates),
-      health: eval_candidates_health(candidates),
-      candidates: candidates,
-      recommendations: eval_candidate_recommendations(candidates)
+      count: length(all_candidates),
+      health: eval_candidates_health(all_candidates),
+      candidates: maybe_take(all_candidates, limit),
+      recommendations: eval_candidate_recommendations(all_candidates)
     }
+  end
+
+  defp maybe_take(candidates, nil), do: candidates
+  defp maybe_take(candidates, limit), do: Enum.take(candidates, limit)
+
+  # Org-scoped session URLs need slugs the problem structs don't carry;
+  # resolve once per call from the workspace all groups share. Falls back
+  # to the legacy global shape (still 302s in one hop) when no workspace is
+  # in scope. The legacy shape has no /observability suffix route, so the
+  # fallback links to /observability/sessions/:id directly.
+  defp session_link_builder(opts) do
+    with workspace_id when not is_nil(workspace_id) <- Keyword.get(opts, :workspace_id),
+         %Mission.Workspace{} = workspace <- Repo.get(Mission.Workspace, workspace_id),
+         %{slug: ws_slug, org: %{slug: org_slug}} <- Repo.preload(workspace, :org) do
+      &"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{&1}/observability"
+    else
+      _ -> &"/observability/sessions/#{&1}"
+    end
   end
 
   def timeline(session_or_id, opts \\ [])
@@ -1775,6 +1813,27 @@ defmodule ControlKeel.Observability do
     |> maybe_filter_aggregate_session(session_id)
     |> maybe_filter_aggregate_workspace(workspace_id)
     |> Repo.one() || 0
+  end
+
+  # Separate COUNT DISTINCT round-trip: the groups query above is limited, so
+  # the true total cannot be folded in without a window/subquery count. Fine
+  # at current scale; revisit if problems/1 shows up in perf snapshots.
+  defp problem_group_count(opts) do
+    session_id = Keyword.get(opts, :session_id)
+    workspace_id = Keyword.get(opts, :workspace_id)
+
+    base =
+      from(f in Finding,
+        join: s in assoc(f, :session),
+        where: f.status in ^@active_finding_statuses,
+        select: %{rule_id: f.rule_id, category: f.category},
+        distinct: true
+      )
+
+    base
+    |> maybe_filter_aggregate_session(session_id)
+    |> maybe_filter_aggregate_workspace(workspace_id)
+    |> Repo.aggregate(:count)
   end
 
   defp problem_examples(rule_id, category, opts, limit) do
@@ -3157,7 +3216,7 @@ defmodule ControlKeel.Observability do
     end
   end
 
-  defp eval_candidate_from_problem(problem) do
+  defp eval_candidate_from_problem(problem, session_link) do
     feedback = problem.feedback_loop
 
     %{
@@ -3177,10 +3236,9 @@ defmodule ControlKeel.Observability do
       example_finding_id: feedback.example_finding_id,
       human_gate_required: feedback.human_gate_required,
       links: %{
-        problems: "/observability/problems",
+        problems: "/observability",
         benchmarks: "/benchmarks",
-        example_session:
-          feedback.example_session_id && "/observability/sessions/#{feedback.example_session_id}"
+        example_session: feedback.example_session_id && session_link.(feedback.example_session_id)
       }
     }
   end

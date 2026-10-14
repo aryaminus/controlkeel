@@ -187,7 +187,7 @@ defmodule ControlKeelWeb.Router do
     get "/observability/memory-quality", PageController, :observability_workspace_redirect
     get "/observability/recommendations", PageController, :observability_workspace_redirect
     get "/observability/trends", PageController, :observability_workspace_redirect
-    get "/observability/problems", PageController, :observability_workspace_redirect
+    get "/observability/problems", PageController, :observability_problems_redirect
     get "/observability/promotions", PageController, :observability_workspace_redirect
     # Pre-consolidation benchmark aliases (never real pages): same resolver,
     # landing on the workspace benchmark page.
@@ -242,10 +242,6 @@ defmodule ControlKeelWeb.Router do
            :index
 
       live "/:org_slug/workspaces/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/problems",
-           ObservabilityProblemsLive,
-           :index
 
       live "/:org_slug/workspaces/:ws_slug/observability/promotions",
            ObservabilityPromotionsLive,

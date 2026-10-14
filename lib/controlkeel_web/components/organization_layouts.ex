@@ -710,11 +710,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
             icon: "hero-arrow-trending-up"
           },
           %{
-            label: "Problems",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/problems",
-            icon: "hero-exclamation-triangle"
-          },
-          %{
             label: "Recommendations",
             href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/recommendations",
             icon: "hero-light-bulb"

@@ -65,10 +65,11 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
 
     # Findings feed has moved to session findings page
     refute html =~ "Findings feed"
-    {:ok, _fview, fhtml} = live(conn, org_session_path(org, ws, session, "/findings"))
+    {:ok, fview, fhtml} = live(conn, org_session_path(org, ws, session, "/findings"))
     assert fhtml =~ "Sql injection"
     assert fhtml =~ "blocked"
-    assert fhtml =~ "View fix"
+    # Accordion rows: details reveal on toggle
+    assert render_click(element(fview, "button[id^='finding-toggle-']")) =~ "Guided fix"
   end
 
   test "mission control shows the derived production boundary summary", %{conn: conn} do
