@@ -7,7 +7,6 @@ defmodule ControlKeelWeb.ObservabilityOverviewLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
   alias ControlKeel.Repo
-  alias ControlKeelWeb.WorkspaceAccess
   alias ControlKeelWeb.RecentSessions
   alias ControlKeelWeb.WorkspaceAccess
 
