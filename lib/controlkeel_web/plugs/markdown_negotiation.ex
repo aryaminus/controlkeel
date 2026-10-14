@@ -310,7 +310,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     Benchmark execution is CLI-only and refuses to run without an explicit `--execute` flag — a dry-run can never silently become a real run. Promotions and memory writes follow the same human-gated pattern: evidence proposes, a person disposes.
 
-    Agents should call the structured `ck_observability` MCP tool instead of copying these shell commands — it returns the same surfaces as typed data.
+    For read-only inspection, agents should call the structured `ck_observability` MCP tool to receive typed report data. Draft approval, materialization, benchmark execution, and other mutations still require their dedicated governed workflows.
     """
   end
 
