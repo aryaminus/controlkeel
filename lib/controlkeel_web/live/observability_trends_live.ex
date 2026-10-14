@@ -159,7 +159,8 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
   end
 
   defp load_trends(socket, days) do
-    recent_session = Mission.list_recent_sessions(1) |> List.first()
+    recent_session =
+      Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 1) |> List.first()
 
     opts =
       if recent_session,

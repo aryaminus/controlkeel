@@ -15,6 +15,7 @@ defmodule ControlKeel.Observability do
   alias ControlKeel.Observability.{BenchmarkDraft, EvalCandidate, ImportedEnvelope, Promotion}
   alias ControlKeel.Mission.{Finding, Invocation, Session, SessionEvent}
   alias ControlKeel.Repo
+  alias ControlKeel.Runtime.Mode
 
   @active_finding_statuses ~w(open blocked escalated)
   @active_task_statuses ~w(queued in_progress blocked paused)
@@ -37,8 +38,18 @@ defmodule ControlKeel.Observability do
       end)
 
     workspace_id =
-      Keyword.get(opts, :workspace_id) ||
-        run_summaries |> List.first() |> then(&(&1 && &1.workspace_id))
+      case Keyword.get(opts, :workspace_id) do
+        id when is_integer(id) ->
+          id
+
+        # Never adopt a workspace from the rows we just read: in cloud mode
+        # those rows are already tenant-scoped, but deriving the scope from
+        # unfiltered data laundered a fail-open into a plausible-looking
+        # tenant. Without an explicit filter, stay unscoped and let the
+        # fail-closed helpers decide (empty in cloud).
+        _ ->
+          nil
+      end
 
     problems_opts = if workspace_id, do: [workspace_id: workspace_id, limit: 5], else: [limit: 5]
     problem_summary = problems(problems_opts)
@@ -1568,7 +1579,19 @@ defmodule ControlKeel.Observability do
     )
   end
 
-  defp maybe_filter_session_workspace(query, nil), do: query
+  # A nil workspace filter is ambiguous: it means "unscoped" in local
+  # single-user mode, but in cloud/self_hosted mode an absent filter means the
+  # caller had no accessible workspace, which must render as no rows — never as
+  # every row. Mirrors Cloud.Scope.scope_workspaces/2 empty-list semantics.
+  defp unfiltered(query) do
+    if Mode.current() == :local do
+      query
+    else
+      where(query, [x], false)
+    end
+  end
+
+  defp maybe_filter_session_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_session_workspace(query, workspace_id),
     do: where(query, [s], s.workspace_id == ^workspace_id)
@@ -1808,7 +1831,7 @@ defmodule ControlKeel.Observability do
   defp maybe_filter_aggregate_workspace(query, workspace_id),
     do: where(query, [_f, s], s.workspace_id == ^workspace_id)
 
-  defp maybe_filter_workspace(query, nil), do: query
+  defp maybe_filter_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_workspace(query, workspace_id),
     do: where(query, [_f, s], s.workspace_id == ^workspace_id)
@@ -1828,7 +1851,7 @@ defmodule ControlKeel.Observability do
   defp maybe_filter_invocation_session(query, session_id),
     do: where(query, [i, _s], i.session_id == ^session_id)
 
-  defp maybe_filter_invocation_workspace(query, nil), do: query
+  defp maybe_filter_invocation_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_invocation_workspace(query, workspace_id),
     do: where(query, [_i, s], s.workspace_id == ^workspace_id)
@@ -2122,7 +2145,7 @@ defmodule ControlKeel.Observability do
     |> Repo.aggregate(:count, :id)
   end
 
-  defp maybe_filter_draft_workspace(query, nil), do: query
+  defp maybe_filter_draft_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_draft_workspace(query, workspace_id),
     do: where(query, [d], d.workspace_id == ^workspace_id)
@@ -2880,7 +2903,7 @@ defmodule ControlKeel.Observability do
     |> Repo.aggregate(:count, :id)
   end
 
-  defp maybe_filter_eval_workspace(query, nil), do: query
+  defp maybe_filter_eval_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_eval_workspace(query, workspace_id),
     do: where(query, [c], c.workspace_id == ^workspace_id)
