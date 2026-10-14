@@ -63,7 +63,15 @@ defmodule ControlKeel.Accounts do
   def find_or_create_user(email, name \\ nil) when is_binary(email) do
     case get_user_by_email(email) do
       %User{} = user ->
-        {:ok, user, false}
+        # A disabled account must not be able to sign in again. Without this
+        # check, offboarding was purely cosmetic: disable_user/1 flipped a field
+        # that nothing read, and the OAuth callback happily re-established the
+        # session on every login.
+        if user_active?(user) do
+          {:ok, user, false}
+        else
+          {:error, :account_disabled}
+        end
 
       nil ->
         case create_user(%{email: email, name: name}) do
@@ -88,6 +96,29 @@ defmodule ControlKeel.Accounts do
       user -> user |> User.changeset(%{status: "disabled"}) |> Repo.update()
     end
   end
+
+  @doc """
+  Re-enable a previously disabled user.
+  """
+  @spec enable_user(integer()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t() | :not_found}
+  def enable_user(user_id) do
+    case Repo.get(User, user_id) do
+      nil -> {:error, :not_found}
+      user -> user |> User.changeset(%{status: "active"}) |> Repo.update()
+    end
+  end
+
+  @doc """
+  Whether a user account is active.
+
+  Every authentication boundary MUST gate on this. `disable_user/1` previously
+  had no production call site and no auth path read `user.status`, so disabling
+  an account did nothing: the user kept signing in through OAuth and kept their
+  session. Offboarding has to actually revoke access.
+  """
+  @spec user_active?(User.t() | nil) :: boolean()
+  def user_active?(%User{status: "active"}), do: true
+  def user_active?(_), do: false
 
   # ──────────────── Orgs ───────────────────
 
@@ -1241,6 +1272,10 @@ defmodule ControlKeel.Accounts do
       nil ->
         {:error, :not_found}
 
+      # NOTE: an org-less workspace currently authorizes unconditionally here, which
+      # is a real gap (no owner can vouch for it, and even the caller's identity
+      # is unchecked). Tracked separately for a focused fix with fixture
+      # migration; see the cloud execution authz follow-up.
       %Workspace{org_id: nil} ->
         {:ok, :authorized}
 

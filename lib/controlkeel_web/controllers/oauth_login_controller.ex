@@ -80,6 +80,12 @@ defmodule ControlKeelWeb.OAuthLoginController do
         |> put_flash(:error, "Provider did not return an email address.")
         |> redirect(to: ~p"/auth/login")
 
+      {:error, :account_disabled} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "This account has been disabled. Contact your administrator.")
+        |> redirect(to: ~p"/auth/login")
+
       {:error, %Ecto.Changeset{}} ->
         conn
         |> clear_oauth_session()

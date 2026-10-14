@@ -27,7 +27,15 @@ defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
       user_id = get_session(conn, :current_user_id)
       org_id = get_session(conn, :current_org_id)
 
-      user = if is_integer(user_id), do: Accounts.get_user(user_id)
+      # A disabled account loses access immediately, even mid-session: loading
+      # the user is the single point every authenticated surface flows through.
+      user =
+        if is_integer(user_id) do
+          case Accounts.get_user(user_id) do
+            %{} = found -> if Accounts.user_active?(found), do: found, else: nil
+            _ -> nil
+          end
+        end
 
       # Production never writes current_org_id (issue #141): when the
       # session carries no org, derive the default (first active
