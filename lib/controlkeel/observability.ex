@@ -3116,7 +3116,7 @@ defmodule ControlKeel.Observability do
             evidence: feedback.evidence_summary,
             suggested_action: feedback.suggested_action,
             benchmark_hint: feedback.benchmark_hint,
-            link: "/observability",
+            link: "/observability/problems",
             example_session_id: feedback.example_session_id,
             example_finding_id: feedback.example_finding_id,
             human_gate_required: feedback.human_gate_required
