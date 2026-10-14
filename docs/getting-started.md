@@ -100,7 +100,6 @@ controlkeel status
 Web:
 
 - `/missions/:id` — governed session
-- `/findings` — findings browser
 - `/proofs` — proof bundles
 - `/deploy` — deployment guidance and generated config previews
 - `/benchmarks` — benchmark evidence
