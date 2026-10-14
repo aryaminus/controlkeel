@@ -148,6 +148,9 @@ defmodule ControlKeelWeb.CoreComponents do
   @doc """
   Renders an input with label and error messages.
 
+  Legacy component, kept for backward compatibility with existing templates.
+  Build new fields with `<.input_component>` instead (text and `type="select"`).
+
   A `Phoenix.HTML.FormField` may be passed as argument,
   which is used to retrieve the input name, id, and values.
   Otherwise all attributes may be passed explicitly.
@@ -362,6 +365,33 @@ defmodule ControlKeelWeb.CoreComponents do
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
                 multiple pattern placeholder readonly required size step)
 
+  attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
+  attr :options, :list, doc: "the options to pass to Phoenix.HTML.Form.options_for_select/2"
+  attr :multiple, :boolean, default: false, doc: "the multiple flag for select inputs"
+
+  def input_component(%{type: "select"} = assigns) do
+    assigns = assign_component_field(assigns)
+
+    ~H"""
+    <div>
+      <.component_field_header icon={@icon} label={@label} id={@id} />
+      <select
+        id={@id}
+        name={@name}
+        aria-invalid={@errors != [] || nil}
+        class={[select_component_field_class(), @class]}
+        multiple={@multiple}
+        {@rest}
+      >
+        <option :if={@prompt} value="">{@prompt}</option>
+        {Phoenix.HTML.Form.options_for_select(@options, @value)}
+      </select>
+      <.component_field_error :for={msg <- @errors} message={msg} />
+      <.component_field_hint :if={@hint} hint={@hint} />
+    </div>
+    """
+  end
+
   def input_component(assigns) do
     assigns = assign_component_field(assigns)
 
@@ -382,6 +412,10 @@ defmodule ControlKeelWeb.CoreComponents do
     </div>
     """
   end
+
+  defp select_component_field_class(),
+    do:
+      "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm"
 
   defp input_component_field_class(),
     do:
@@ -465,7 +499,7 @@ defmodule ControlKeelWeb.CoreComponents do
     |> assign(:errors, Enum.map(field.errors, &translate_error(&1)))
   end
 
-  defp assign_component_field(assigns), do: assigns
+  defp assign_component_field(assigns), do: assign_new(assigns, :value, fn -> nil end)
 
   # Helper used by inputs to generate form errors
   defp error(assigns) do

@@ -263,7 +263,9 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
                     </p>
                   </div>
                   <.link
-                    navigate={~p"/proofs/#{event.proof_id}"}
+                    navigate={
+                      ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@run.session.id}/proofs/#{event.proof_id}"
+                    }
                     class="text-xs font-semibold text-primary transition hover:underline"
                   >
                     Proof #{event.proof_id} →

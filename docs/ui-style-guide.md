@@ -17,11 +17,29 @@ Reference: `lib/controlkeel_web/components/layouts/dashboard.html.heex`.
 
 Before hand-writing markup, check whether a shared component already covers it — use it instead of duplicating classes inline:
 
-- `ControlKeelWeb.CoreComponents`: `<.button>`, `<.input>`, `<.table>`, `<.flash>`, `<.icon>` (`lib/controlkeel_web/components/core_components.ex`).
+- `ControlKeelWeb.CoreComponents`: `<.button>`, `<.input>`, `<.input_component>`, `<.textarea>`, `<.table>`, `<.flash>`, `<.icon>` (`lib/controlkeel_web/components/core_components.ex`).
 - `ControlKeelWeb.Typography`: `<.page_title>`, `<.section_title>`, `<.card_title>`.
 - Feature modules: `FindingComponents`, `DeploymentComponents`, `ShipReadiness`, `RecentSessions`, `CommandPill` (`lib/controlkeel_web/components/`).
 
 When an existing component is close but not exact, extend the component (new attr or variant) rather than copy-pasting its markup into a page — one source of truth per pattern. Drop to raw markup only when no component fits, and then follow the token and class rules in this guide so the one-off stays consistent.
+
+### Form inputs
+
+Write new form fields against `<.input_component>` (or `<.textarea>`), not the legacy `<.input>` (kept only for backward compatibility):
+
+```heex
+<.input_component field={@form[:q]} type="text" label="Search" placeholder="Task..." phx-debounce="300" />
+<.input_component
+  field={@form[:risk_tier]}
+  type="select"
+  label="Risk tier"
+  prompt="All tiers"
+  options={Enum.map(@risk_tiers, &{String.capitalize(&1), &1})}
+/>
+```
+
+- `field` binds id/name/value from the form; `label` renders the shared field header.
+- Selects take `prompt` (empty option) and `options` (as in `Phoenix.HTML.Form.options_for_select/2`).
 
 ## Page title
 

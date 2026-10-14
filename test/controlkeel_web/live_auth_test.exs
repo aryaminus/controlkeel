@@ -1,7 +1,6 @@
 defmodule ControlKeelWeb.LiveAuthTest do
   use ControlKeelWeb.ConnCase, async: false
 
-  import ControlKeel.MissionFixtures
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
@@ -53,7 +52,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
 
   test "memberless users are redirected to /organizations on authenticated pages" do
     assert {:error, {:redirect, %{to: "/organizations"}}} =
-             live(memberless_conn(), ~p"/proofs")
+             live(memberless_conn(), ~p"/sessions")
   end
 
   test "memberless users can open /organizations (onboarding surface)" do
@@ -63,7 +62,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
 
   test "users with a membership render authenticated pages" do
     {conn, _user, _org} = member_conn()
-    {:ok, _view, html} = live(conn, ~p"/proofs")
+    {:ok, _view, html} = live(conn, ~p"/sessions")
     refute html =~ "Join or create an organization"
   end
 
@@ -112,6 +111,6 @@ defmodule ControlKeelWeb.LiveAuthTest do
   end
 
   test "unauthenticated users are still sent to login, not /organizations" do
-    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/proofs")
+    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/sessions")
   end
 end

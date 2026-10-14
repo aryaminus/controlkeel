@@ -823,13 +823,9 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         scope: :session_section,
         icon: "hero-chart-bar-square"
       },
-      # TODO: interim bridge to the global proof browser, pre-filtered to this
-      # session. Move to nested session routes (e.g. `.../sessions/:id/proofs`
-      # and `.../sessions/:id/proofs/:proof_id`) under the organization layout
-      # instead of linking out to the standalone `/proofs` layout.
       %{
         label: "Proofs",
-        href: ~p"/proofs?#{%{"session_id" => session_id}}",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/proofs",
         scope: :session_section,
         icon: "hero-shield-check"
       }

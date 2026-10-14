@@ -37,7 +37,12 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
           true ->
             if connected?(socket), do: schedule_refresh()
-            {:ok, assign_session(socket, session)}
+
+            {:ok,
+             socket
+             |> assign(:org_slug, org_slug)
+             |> assign(:ws_slug, ws_slug)
+             |> assign_session(session)}
         end
     end
   end
@@ -484,7 +489,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
                       </button>
                       <.link
                         :if={Map.get(@latest_proofs, task.id)}
-                        navigate={~p"/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"}
+                        navigate={
+                          ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"
+                        }
                         class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
                         phx-click={
                           JS.hide(to: "#task-menu-#{task.id}")

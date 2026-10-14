@@ -131,8 +131,6 @@ defmodule ControlKeelWeb.Router do
       live "/findings", FindingsLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
-      live "/proofs", ProofBrowserLive, :index
-      live "/proofs/:id", ProofBrowserLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
@@ -203,6 +201,15 @@ defmodule ControlKeelWeb.Router do
     get "/observability/benchmarks/scenarios", PageController, :observability_workspace_redirect
     get "/observability/benchmarks/history", PageController, :observability_workspace_redirect
     get "/observability/regressions", PageController, :observability_workspace_redirect
+
+    # Legacy global proof browser URLs (pre-session-scope nesting): the index
+    # and detail now live under the session
+    # (`.../sessions/:id/proofs[/:proof_id]`). Kept as auth-aware resolvers
+    # that 302 to the session-scoped URL so old bookmarks keep working.
+    # Defined before the ":org_slug" live block below so the single-segment
+    # match does not swallow "/proofs".
+    get "/proofs", PageController, :proofs_redirect
+    get "/proofs/:id", PageController, :proofs_redirect
 
     # NB: keep this block last in the scope — ":org_slug" matches any single
     # segment, so routes added below it would be silently swallowed. For the
@@ -277,6 +284,14 @@ defmodule ControlKeelWeb.Router do
 
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/observability",
            SessionObservabilityLive,
+           :show
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs",
+           SessionProofsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id",
+           ProofLive,
            :show
     end
   end
