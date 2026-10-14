@@ -1381,7 +1381,11 @@ defmodule ControlKeel.Accounts do
       # is unchecked). Tracked separately for a focused fix with fixture
       # migration; see the cloud execution authz follow-up.
       %Workspace{org_id: nil} ->
-        {:ok, :authorized}
+        # Fail closed. A workspace with no org has no tenant to authorize
+        # against, so treating it as authorized let any caller (or no caller)
+        # execute cloud work against an unowned workspace. Org-less workspaces
+        # are a local-dev/test artifact and must never authorize cloud runs.
+        {:error, :unbound_workspace}
 
       %Workspace{org_id: org_id} ->
         org = Repo.get(Org, org_id)

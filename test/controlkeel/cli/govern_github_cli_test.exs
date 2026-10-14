@@ -11,25 +11,30 @@ defmodule ControlKeel.CLI.GovernGithubTest do
   alias ControlKeel.MissionFixtures
 
   setup do
-    workspace = MissionFixtures.workspace_fixture()
+    {workspace, user, _org} = MissionFixtures.org_bound_workspace_fixture()
     session = MissionFixtures.session_fixture(%{workspace: workspace})
     task = MissionFixtures.task_fixture(%{session: session, title: "Build feature"})
-    {:ok, workspace: workspace, session: session, task: task}
+    {:ok, workspace: workspace, session: session, task: task, user: user}
   end
 
   describe "controlkeel govern bind github" do
-    test "binds a repo to the workspace and prints summary", %{workspace: ws} do
+    test "binds a repo to the workspace and prints summary", %{workspace: ws, user: user} do
       assert {:ok, lines} =
                CLI.run_command(
                  %{
                    command: :govern_bind_github,
-                   options: %{
-                     workspace_id: ws.id,
-                     owner: "acme",
-                     repo: "widget",
-                     default_branch: "main",
-                     installation_id: "12345"
-                   },
+                   options:
+                     Map.put_new(
+                       %{
+                         workspace_id: ws.id,
+                         owner: "acme",
+                         repo: "widget",
+                         default_branch: "main",
+                         installation_id: "12345"
+                       },
+                       :user_id,
+                       user.id
+                     ),
                    args: []
                  },
                  File.cwd!()
@@ -45,12 +50,12 @@ defmodule ControlKeel.CLI.GovernGithubTest do
       assert binding.installation_id == "12345"
     end
 
-    test "errors when required flags are missing", %{workspace: ws} do
+    test "errors when required flags are missing", %{workspace: ws, user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :govern_bind_github,
-                   options: %{workspace_id: ws.id, owner: "acme"},
+                   options: Map.put_new(%{workspace_id: ws.id, owner: "acme"}, :user_id, user.id),
                    args: []
                  },
                  File.cwd!()
@@ -59,14 +64,19 @@ defmodule ControlKeel.CLI.GovernGithubTest do
       assert msg =~ "--repo"
     end
 
-    test "surfaces changeset errors on duplicate bind", %{workspace: ws} do
+    test "surfaces changeset errors on duplicate bind", %{workspace: ws, user: user} do
       Mission.bind_github_repo(ws.id, "acme", "widget")
 
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :govern_bind_github,
-                   options: %{workspace_id: ws.id, owner: "acme", repo: "widget"},
+                   options:
+                     Map.put_new(
+                       %{workspace_id: ws.id, owner: "acme", repo: "widget"},
+                       :user_id,
+                       user.id
+                     ),
                    args: []
                  },
                  File.cwd!()
@@ -77,14 +87,19 @@ defmodule ControlKeel.CLI.GovernGithubTest do
   end
 
   describe "controlkeel govern unbind github" do
-    test "removes the binding", %{workspace: ws} do
+    test "removes the binding", %{workspace: ws, user: user} do
       Mission.bind_github_repo(ws.id, "acme", "widget")
 
       assert {:ok, lines} =
                CLI.run_command(
                  %{
                    command: :govern_unbind_github,
-                   options: %{workspace_id: ws.id, owner: "acme", repo: "widget"},
+                   options:
+                     Map.put_new(
+                       %{workspace_id: ws.id, owner: "acme", repo: "widget"},
+                       :user_id,
+                       user.id
+                     ),
                    args: []
                  },
                  File.cwd!()
@@ -94,12 +109,17 @@ defmodule ControlKeel.CLI.GovernGithubTest do
       assert Mission.list_github_repos(ws.id) == []
     end
 
-    test "errors when binding does not exist", %{workspace: ws} do
+    test "errors when binding does not exist", %{workspace: ws, user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :govern_unbind_github,
-                   options: %{workspace_id: ws.id, owner: "acme", repo: "absent"},
+                   options:
+                     Map.put_new(
+                       %{workspace_id: ws.id, owner: "acme", repo: "absent"},
+                       :user_id,
+                       user.id
+                     ),
                    args: []
                  },
                  File.cwd!()
@@ -110,7 +130,7 @@ defmodule ControlKeel.CLI.GovernGithubTest do
   end
 
   describe "controlkeel govern list github" do
-    test "lists bound repos", %{workspace: ws} do
+    test "lists bound repos", %{workspace: ws, user: user} do
       Mission.bind_github_repo(ws.id, "acme", "widget", default_branch: "trunk")
       Mission.bind_github_repo(ws.id, "acme", "gadget")
 
@@ -118,7 +138,7 @@ defmodule ControlKeel.CLI.GovernGithubTest do
                CLI.run_command(
                  %{
                    command: :govern_list_github,
-                   options: %{workspace_id: ws.id},
+                   options: Map.put_new(%{workspace_id: ws.id}, :user_id, user.id),
                    args: []
                  },
                  File.cwd!()
@@ -129,10 +149,14 @@ defmodule ControlKeel.CLI.GovernGithubTest do
       assert Enum.any?(lines, &(&1 =~ "acme/gadget"))
     end
 
-    test "reports empty state when nothing is bound", %{workspace: ws} do
+    test "reports empty state when nothing is bound", %{workspace: ws, user: user} do
       assert {:ok, lines} =
                CLI.run_command(
-                 %{command: :govern_list_github, options: %{workspace_id: ws.id}, args: []},
+                 %{
+                   command: :govern_list_github,
+                   options: Map.put_new(%{workspace_id: ws.id}, :user_id, user.id),
+                   args: []
+                 },
                  File.cwd!()
                )
 
@@ -143,7 +167,8 @@ defmodule ControlKeel.CLI.GovernGithubTest do
   describe "cloud payload propagation" do
     test "run cloud-agent payload includes bound github repos", %{
       workspace: ws,
-      task: task
+      task: task,
+      user: user
     } do
       Mission.bind_github_repo(ws.id, "acme", "widget", default_branch: "main")
       Mission.bind_github_repo(ws.id, "acme", "gadget", installation_id: "9999")
@@ -152,7 +177,7 @@ defmodule ControlKeel.CLI.GovernGithubTest do
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0},
+                   options: Map.put_new(%{runtime: "devin", budget_cents: 0}, :user_id, user.id),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -175,13 +200,14 @@ defmodule ControlKeel.CLI.GovernGithubTest do
 
     test "payload omits github_repos key when nothing is bound", %{
       workspace: ws,
-      task: task
+      task: task,
+      user: user
     } do
       assert {:ok, _lines} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0},
+                   options: Map.put_new(%{runtime: "devin", budget_cents: 0}, :user_id, user.id),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()

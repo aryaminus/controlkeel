@@ -6,24 +6,32 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
   alias ControlKeel.MissionFixtures
 
   setup do
-    workspace = MissionFixtures.workspace_fixture()
+    {workspace, user, _org} = MissionFixtures.org_bound_workspace_fixture()
     session = MissionFixtures.session_fixture(%{workspace: workspace})
     task = MissionFixtures.task_fixture(%{session: session, title: "Add cloud feature"})
-    {:ok, workspace: workspace, session: session, task: task}
+    {:ok, workspace: workspace, session: session, task: task, user: user}
   end
 
   describe "controlkeel run cloud-agent <task-id>" do
-    test "creates a run package, prints token and metadata", %{task: task, workspace: workspace} do
+    test "creates a run package, prints token and metadata", %{
+      task: task,
+      user: user,
+      workspace: workspace
+    } do
       assert {:ok, lines} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{
-                     runtime: "devin",
-                     budget_cents: 500,
-                     scopes: "mcp:access,context:read",
-                     note: "investigate flaky test"
-                   },
+                   options:
+                     opts(
+                       %{
+                         runtime: "devin",
+                         budget_cents: 500,
+                         scopes: "mcp:access,context:read",
+                         note: "investigate flaky test"
+                       },
+                       user
+                     ),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -46,13 +54,14 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
     end
 
     test "external_id is unique across packages and looks up via get_by_external_id", %{
-      task: task
+      task: task,
+      user: user
     } do
       assert {:ok, _lines1} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0},
+                   options: opts(%{runtime: "devin", budget_cents: 0}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -62,7 +71,7 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "open-swe", budget_cents: 0},
+                   options: opts(%{runtime: "open-swe", budget_cents: 0}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -77,12 +86,12 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert RuntimeContext.get_by_external_id("pkg_bogus") == nil
     end
 
-    test "rejects unknown runtime with helpful message", %{task: task} do
+    test "rejects unknown runtime with helpful message", %{task: task, user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "not-a-real-runtime", budget_cents: 0},
+                   options: opts(%{runtime: "not-a-real-runtime", budget_cents: 0}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -92,12 +101,12 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert msg =~ "devin"
     end
 
-    test "requires --runtime", %{task: task} do
+    test "requires --runtime", %{task: task, user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{budget_cents: 100},
+                   options: opts(%{budget_cents: 100}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -106,12 +115,12 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert msg =~ "runtime"
     end
 
-    test "rejects negative budget", %{task: task} do
+    test "rejects negative budget", %{task: task, user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "open-swe", budget_cents: -10},
+                   options: opts(%{runtime: "open-swe", budget_cents: -10}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -120,12 +129,12 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert msg =~ "non-negative integer"
     end
 
-    test "rejects non-numeric task id", %{} do
+    test "rejects non-numeric task id", %{user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0},
+                   options: opts(%{runtime: "devin", budget_cents: 0}, user),
                    args: ["not-a-number"]
                  },
                  File.cwd!()
@@ -134,12 +143,12 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert msg =~ "Invalid task-id"
     end
 
-    test "returns 'Task not found' for unknown id", %{} do
+    test "returns 'Task not found' for unknown id", %{user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0},
+                   options: opts(%{runtime: "devin", budget_cents: 0}, user),
                    args: ["999999"]
                  },
                  File.cwd!()
@@ -193,12 +202,16 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
   end
 
   describe "--dispatch flag (CK-CLOUD-DISPATCH-001)" do
-    test "create-then-dispatch chains in one CLI invocation", %{task: task, workspace: workspace} do
+    test "create-then-dispatch chains in one CLI invocation", %{
+      task: task,
+      user: user,
+      workspace: workspace
+    } do
       assert {:ok, lines} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0, dispatch: true},
+                   options: opts(%{runtime: "devin", budget_cents: 0, dispatch: true}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -213,12 +226,16 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert get_in(package.payload, ["dispatch_metadata", "mode"]) == "manual"
     end
 
-    test "default (no --dispatch) leaves package pending", %{task: task, workspace: workspace} do
+    test "default (no --dispatch) leaves package pending", %{
+      task: task,
+      user: user,
+      workspace: workspace
+    } do
       assert {:ok, lines} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0},
+                   options: opts(%{runtime: "devin", budget_cents: 0}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -235,7 +252,8 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
   describe "git metadata capture (CK-CLOUD-PAYLOAD-001)" do
     test "captures repo/branch/commit_sha from a real git repo", %{
       task: task,
-      workspace: workspace
+      workspace: workspace,
+      user: user
     } do
       tmp = make_git_repo()
 
@@ -243,7 +261,7 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0, project_root: tmp},
+                   options: opts(%{runtime: "devin", budget_cents: 0, project_root: tmp}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  tmp
@@ -258,7 +276,8 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
 
     test "leaves git fields nil when project_root is not a git repo", %{
       task: task,
-      workspace: workspace
+      workspace: workspace,
+      user: user
     } do
       tmp = Path.join(System.tmp_dir!(), "ck-no-git-#{System.unique_integer([:positive])}")
       File.mkdir_p!(tmp)
@@ -267,7 +286,7 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{runtime: "devin", budget_cents: 0, project_root: tmp},
+                   options: opts(%{runtime: "devin", budget_cents: 0, project_root: tmp}, user),
                    args: [Integer.to_string(task.id)]
                  },
                  tmp
@@ -279,21 +298,25 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert package.commit_sha == nil
     end
 
-    test "explicit CLI overrides win over git", %{task: task, workspace: workspace} do
+    test "explicit CLI overrides win over git", %{task: task, user: user, workspace: workspace} do
       tmp = make_git_repo()
 
       assert {:ok, _lines} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{
-                     runtime: "devin",
-                     budget_cents: 0,
-                     project_root: tmp,
-                     repo_url: "git@github.com:acme/override.git",
-                     branch: "release-2.0",
-                     commit_sha: "1234567"
-                   },
+                   options:
+                     opts(
+                       %{
+                         runtime: "devin",
+                         budget_cents: 0,
+                         project_root: tmp,
+                         repo_url: "git@github.com:acme/override.git",
+                         branch: "release-2.0",
+                         commit_sha: "1234567"
+                       },
+                       user
+                     ),
                    args: [Integer.to_string(task.id)]
                  },
                  tmp
@@ -305,16 +328,20 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert package.commit_sha == "1234567"
     end
 
-    test "rejects malformed commit_sha", %{task: task} do
+    test "rejects malformed commit_sha", %{task: task, user: user} do
       assert {:error, msg} =
                CLI.run_command(
                  %{
                    command: :run_cloud_agent,
-                   options: %{
-                     runtime: "devin",
-                     budget_cents: 0,
-                     commit_sha: "not-a-sha"
-                   },
+                   options:
+                     opts(
+                       %{
+                         runtime: "devin",
+                         budget_cents: 0,
+                         commit_sha: "not-a-sha"
+                       },
+                       user
+                     ),
                    args: [Integer.to_string(task.id)]
                  },
                  File.cwd!()
@@ -323,6 +350,10 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
       assert msg =~ "commit_sha"
     end
   end
+
+  # Cloud execution fails closed without an authorized user (#269), so every
+  # CLI invocation in this file runs as the org owner that setup created.
+  defp opts(map, user), do: Map.put_new(map, :user_id, user.id)
 
   defp make_git_repo do
     suffix =

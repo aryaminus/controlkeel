@@ -4,6 +4,28 @@ defmodule ControlKeel.MissionFixtures do
   alias ControlKeel.Mission
   alias ControlKeel.Memory
 
+  @doc """
+  An org-bound workspace plus a user who is actually authorized to run cloud
+  work against it.
+
+  Cloud execution fails closed for org-less workspaces (#269), so any test that
+  dispatches, transitions or authorizes a run package must use this instead of
+  a bare `workspace_fixture/1` - otherwise it is testing a path that can no
+  longer happen in production.
+  """
+  def org_bound_workspace_fixture(attrs \\ %{}) do
+    user = ControlKeel.AccountsFixtures.user_fixture()
+
+    {:ok, org} =
+      ControlKeel.Accounts.create_org_with_owner(user.id, %{
+        name: "Bound Org",
+        slug: "bound-org-#{System.unique_integer([:positive])}"
+      })
+
+    workspace = workspace_fixture(Map.put(Map.new(attrs), :org_id, org.id))
+    {workspace, user, org}
+  end
+
   def workspace_fixture(attrs \\ %{}) do
     {:ok, workspace} =
       attrs

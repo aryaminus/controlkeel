@@ -29,7 +29,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
   end
 
   setup do
-    workspace = MissionFixtures.workspace_fixture()
+    {workspace, user, _org} = MissionFixtures.org_bound_workspace_fixture()
     session = MissionFixtures.session_fixture(%{workspace: workspace})
     task = MissionFixtures.task_fixture(%{session: session})
 
@@ -52,7 +52,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
         else: System.delete_env("CONTROLKEEL_RUNTIME_MODE")
     end)
 
-    {:ok, workspace: workspace, session: session, task: task}
+    {:ok, workspace: workspace, session: session, task: task, user: user}
   end
 
   describe "RuntimeDispatcher.for_runtime/1" do
@@ -89,12 +89,14 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
   describe "RuntimeDispatcher.Manual.dispatch/2" do
     test "records the manual handoff intent", %{
       workspace: workspace,
+      user: user,
       session: session,
       task: task
     } do
       {:ok, package, _token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           session_id: session.id,
           task_id: task.id,
           runtime_target: "devin",
@@ -111,6 +113,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
   describe "RuntimeContext.dispatch_package/3" do
     test "transitions pending → dispatched and stores metadata", %{
       workspace: workspace,
+      user: user,
       session: session,
       task: task
     } do
@@ -121,6 +124,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           session_id: session.id,
           task_id: task.id,
           runtime_target: "devin",
@@ -138,6 +142,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
 
     test "transitions to failed and records error_summary when dispatcher errors", %{
       workspace: workspace,
+      user: user,
       session: session,
       task: task
     } do
@@ -148,6 +153,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           session_id: session.id,
           task_id: task.id,
           runtime_target: "open-swe",
@@ -164,6 +170,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
 
     test "remote mode without configured dispatcher fails closed instead of manual handoff", %{
       workspace: workspace,
+      user: user,
       session: session,
       task: task
     } do
@@ -173,6 +180,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           session_id: session.id,
           task_id: task.id,
           runtime_target: "devin",
@@ -192,6 +200,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
 
     test "remote mode uses configured dispatcher when present", %{
       workspace: workspace,
+      user: user,
       session: session,
       task: task
     } do
@@ -204,6 +213,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           session_id: session.id,
           task_id: task.id,
           runtime_target: "devin",
@@ -217,6 +227,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
 
     test "Manual default still produces a clean dispatched transition in local mode", %{
       workspace: workspace,
+      user: user,
       session: session,
       task: task
     } do
@@ -225,6 +236,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcherTest do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           session_id: session.id,
           task_id: task.id,
           runtime_target: "devin",
