@@ -15,13 +15,16 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
 
   alias ControlKeel.Cloud.{RunPackage, RuntimeContext}
   alias ControlKeel.Mission
+  alias ControlKeel.MissionFixtures
   alias ControlKeel.Repo
 
   # ── Fixtures ─────────────────────────────────────────────────────────
 
+  # Cloud execution fails closed for org-less workspaces (#269), so these
+  # packages must run against a real tenant with a real authorized user.
   defp workspace!(seed) do
-    {:ok, ws} =
-      Mission.create_workspace(%{
+    {ws, user, _org} =
+      MissionFixtures.org_bound_workspace_fixture(%{
         name: "E2E-#{seed}",
         slug: "e2e-#{seed}-#{System.unique_integer([:positive])}",
         industry: "software",
@@ -31,7 +34,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
         status: "active"
       })
 
-    ws
+    {ws, user}
   end
 
   defp session!(ws) do
@@ -66,7 +69,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
   # ── Tests ─────────────────────────────────────────────────────────────
 
   test "full pending → in_progress → completed callback cycle", %{conn: conn} do
-    ws = workspace!("full")
+    {ws, user} = workspace!("full")
     session = session!(ws)
     task = task!(session)
 
@@ -75,6 +78,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
         session_id: session.id,
         task_id: task.id,
         workspace_id: ws.id,
+        user_id: user.id,
         runtime_target: "devin"
       })
 
@@ -117,7 +121,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
   end
 
   test "terminal package rejects further callbacks with 403", %{conn: conn} do
-    ws = workspace!("terminal")
+    {ws, user} = workspace!("terminal")
     session = session!(ws)
     task = task!(session)
 
@@ -126,6 +130,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
         session_id: session.id,
         task_id: task.id,
         workspace_id: ws.id,
+        user_id: user.id,
         runtime_target: "devin"
       })
 
@@ -145,7 +150,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
   end
 
   test "failed transition recorded correctly", %{conn: conn} do
-    ws = workspace!("failed")
+    {ws, user} = workspace!("failed")
     session = session!(ws)
     task = task!(session)
 
@@ -154,6 +159,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
         session_id: session.id,
         task_id: task.id,
         workspace_id: ws.id,
+        user_id: user.id,
         runtime_target: "open-swe"
       })
 
@@ -185,7 +191,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
   end
 
   test "invalid status value returns 400", %{conn: conn} do
-    ws = workspace!("badstatus")
+    {ws, user} = workspace!("badstatus")
     session = session!(ws)
     task = task!(session)
 
@@ -194,6 +200,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
         session_id: session.id,
         task_id: task.id,
         workspace_id: ws.id,
+        user_id: user.id,
         runtime_target: "executor"
       })
 
@@ -206,7 +213,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
   end
 
   test "callback with proof_refs stores them on the package", %{conn: conn} do
-    ws = workspace!("proof")
+    {ws, user} = workspace!("proof")
     session = session!(ws)
     task = task!(session)
 
@@ -215,6 +222,7 @@ defmodule ControlKeel.Cloud.CloudAgentE2ETest do
         session_id: session.id,
         task_id: task.id,
         workspace_id: ws.id,
+        user_id: user.id,
         runtime_target: "cursor-cloud-agents"
       })
 
