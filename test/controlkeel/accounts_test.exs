@@ -39,6 +39,13 @@ defmodule ControlKeel.AccountsTest do
       assert "has invalid format" in errors_on(changeset).slug
     end
 
+    test "rejects reserved slugs that collide with static routes" do
+      for slug <- ~w(docs about observability sessions auth) do
+        assert {:error, changeset} = Accounts.create_org(%{name: "X", slug: slug})
+        assert "is reserved" in errors_on(changeset).slug
+      end
+    end
+
     test "enforces unique slug" do
       {:ok, _} = Accounts.create_org(%{name: "One", slug: "shared-slug"})
       assert {:error, changeset} = Accounts.create_org(%{name: "Two", slug: "shared-slug"})
