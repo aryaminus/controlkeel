@@ -93,7 +93,10 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "controlkeel obs benchmarks history"
       assert body =~ "controlkeel obs regressions"
       assert body =~ "/observability"
-      refute body =~ "/:org_slug/workspaces/"
+      assert body =~ "/:org_slug/workspaces/"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/observability"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-drafts"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/sessions/:id/observability"
       assert body =~ "--execute"
       assert body =~ "CLI reference"
 
@@ -169,8 +172,8 @@ defmodule ControlKeelWeb.DocsControllerTest do
       assert body =~ "controlkeel obs benchmarks scenarios"
       assert body =~ "controlkeel obs benchmarks history"
       assert body =~ "controlkeel obs regressions"
-      assert body =~ "`/observability`"
-      refute body =~ "/:org_slug/workspaces/"
+      assert body =~ "`/:org_slug/workspaces/:ws_slug/observability`"
+      assert body =~ "/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-history"
       assert body =~ "## CLI reference"
 
       for command <- [

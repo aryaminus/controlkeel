@@ -235,28 +235,28 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     ## Reading a single session
 
-    Use the session observability view when the question is about one run — what happened, what it cost, and what it touched. It brings together run state, memory context, the event timeline, and downloadable session and audit evidence.
+    Use the session observability view (`/:org_slug/workspaces/:ws_slug/sessions/:id/observability`) when the question is about one run — what happened, what it cost, and what it touched. It brings together run state, memory context, the event timeline, and downloadable session and audit evidence.
 
     ## Monitoring a workspace
 
-    Use `/observability` for ongoing signal across workspace sessions. Each page has a terminal parallel. The benchmark workflow groups drafts, scenarios, history, and regressions on its benchmark page; these sections map to the following commands:
+    Use `/:org_slug/workspaces/:ws_slug/observability` for ongoing signal across workspace sessions. Each page has a terminal parallel. The benchmark workflow groups drafts, scenarios, history, and regressions on its benchmark page; these sections map to the following commands:
 
     | Page | Terminal |
     |---|---|
-    | Overview | `controlkeel obs` |
-    | Loop | `controlkeel obs loop` |
-    | Costs | `controlkeel obs costs` |
-    | Trends | `controlkeel obs trends --days 30` |
-    | Compare | `controlkeel obs compare` |
-    | Evals | `controlkeel obs evals` |
-    | Imports | `controlkeel obs imports` |
-    | Memory quality | `controlkeel obs memory-quality` |
-    | Recommendations | `controlkeel obs recommend` |
-    | Promotions | `controlkeel obs promotions` |
-    | Benchmark — drafts | `controlkeel obs benchmarks drafts` |
-    | Benchmark — scenarios | `controlkeel obs benchmarks scenarios` |
-    | Benchmark — history | `controlkeel obs benchmarks history` |
-    | Benchmark — regressions | `controlkeel obs regressions` |
+    | Overview — `/:org_slug/workspaces/:ws_slug/observability` | `controlkeel obs` |
+    | Loop — `/:org_slug/workspaces/:ws_slug/observability/loop` | `controlkeel obs loop` |
+    | Costs — `/:org_slug/workspaces/:ws_slug/observability/costs` | `controlkeel obs costs` |
+    | Trends — `/:org_slug/workspaces/:ws_slug/observability/trends` | `controlkeel obs trends --days 30` |
+    | Compare — `/:org_slug/workspaces/:ws_slug/observability/compare` | `controlkeel obs compare` |
+    | Evals — `/:org_slug/workspaces/:ws_slug/observability/evals` | `controlkeel obs evals` |
+    | Imports — `/:org_slug/workspaces/:ws_slug/observability/imports` | `controlkeel obs imports` |
+    | Memory quality — `/:org_slug/workspaces/:ws_slug/observability/memory-quality` | `controlkeel obs memory-quality` |
+    | Recommendations — `/:org_slug/workspaces/:ws_slug/observability/recommendations` | `controlkeel obs recommend` |
+    | Promotions — `/:org_slug/workspaces/:ws_slug/observability/promotions` | `controlkeel obs promotions` |
+    | Benchmark — drafts — `/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-drafts` | `controlkeel obs benchmarks drafts` |
+    | Benchmark — scenarios — `/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-scenarios` | `controlkeel obs benchmarks scenarios` |
+    | Benchmark — history — `/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-history` | `controlkeel obs benchmarks history` |
+    | Benchmark — regressions — `/:org_slug/workspaces/:ws_slug/observability/benchmark#benchmarks-regressions` | `controlkeel obs regressions` |
 
     ## CLI reference
 
