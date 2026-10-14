@@ -303,7 +303,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     2. Review the generated scenarios before anything runs — the web benchmark page shows the same drafts with full context.
     3. Approve the draft: `controlkeel obs benchmarks approve <id>`
     4. Dry-run first: `controlkeel obs benchmarks run --dry-run`
-    5. Execute explicitly: `controlkeel obs benchmarks run --execute --suite <suite>`
+    5. Execute explicitly: `controlkeel obs benchmarks run --suite <suite> --subjects <subject-ids> --execute`
     6. Read the outcome in history, watch for regressions, and promote what survived: `controlkeel obs benchmarks history`, `controlkeel obs regressions`, `controlkeel obs promotions`
 
     ## Safety and automation
