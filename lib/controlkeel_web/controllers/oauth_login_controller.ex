@@ -16,6 +16,9 @@ defmodule ControlKeelWeb.OAuthLoginController do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.OAuthProviders
+  alias ControlKeel.Accounts.OrgIdentityProvider
+  alias ControlKeel.Accounts.OrgIdentityProviders
+  alias ControlKeel.Accounts.OAuthProviders.DefaultAdapter
 
   @doc "Phase 1 — redirect the user to the OAuth provider's authorization page"
   def request(conn, %{"provider" => provider_name}) do
@@ -96,6 +99,107 @@ defmodule ControlKeelWeb.OAuthLoginController do
 
   # ── Private ─────────────────────────────────────────────────────────
 
+  @doc "Phase 1 — redirect to a tenant's own OIDC provider"
+  def oidc_request(conn, %{"slug" => slug}) do
+    with {:ok, provider} <- OrgIdentityProviders.fetch_by_slug(slug),
+         {:ok, cfg} <- OrgIdentityProviders.assent_config(provider) do
+      session_params = %{}
+
+      case DefaultAdapter.oidc_authorize_url(cfg, session_params) do
+        {:ok, %{url: url, session_params: sp}} ->
+          conn
+          |> put_session(:oidc_session_params, sp)
+          |> put_session(:oidc_slug, slug)
+          |> redirect(external: url)
+
+        {:error, _reason} ->
+          conn
+          |> clear_oauth_session()
+          |> put_flash(:error, "Could not start sign-in with this provider.")
+          |> redirect(to: ~p"/auth/login")
+      end
+    else
+      {:error, :undecryptable_secret} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(
+          :error,
+          "This identity provider is misconfigured. Contact your administrator."
+        )
+        |> redirect(to: ~p"/auth/login")
+
+      _ ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "Unknown identity provider.")
+        |> redirect(to: ~p"/auth/login")
+    end
+  end
+
+  @doc "Phase 2 — handle a tenant OIDC provider callback"
+  def oidc_callback(conn, %{"slug" => slug} = params) do
+    session_params = get_session(conn, :oidc_session_params) || %{}
+
+    with {:ok, provider} <- OrgIdentityProviders.fetch_by_slug(slug),
+         {:ok, cfg} <- OrgIdentityProviders.assent_config(provider),
+         {:ok, %{email: email, name: name}} <-
+           DefaultAdapter.oidc_callback(cfg, params, session_params),
+         :ok <- check_domain(provider, email),
+         {:ok, user, _created} <- Accounts.find_or_create_user(email, name) do
+      conn
+      |> clear_oauth_session()
+      |> put_session(:current_user_id, user.id)
+      |> put_session(:session_last_active, DateTime.utc_now() |> DateTime.to_iso8601())
+      |> put_flash(:info, "Signed in with #{provider.name}.")
+      |> redirect(to: ~p"/")
+    else
+      {:error, :email_not_verified} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "Your #{provider_name(conn)} email is not verified.")
+        |> redirect(to: ~p"/auth/login")
+
+      {:error, :domain_not_allowed} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "That email domain is not allowed for this provider.")
+        |> redirect(to: ~p"/auth/login")
+
+      {:error, :undecryptable_secret} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "This identity provider is misconfigured.")
+        |> redirect(to: ~p"/auth/login")
+
+      {:error, :account_disabled} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "This account has been disabled. Contact your administrator.")
+        |> redirect(to: ~p"/auth/login")
+
+      _ ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "Authentication failed. Please try again.")
+        |> redirect(to: ~p"/auth/login")
+    end
+  end
+
+  defp check_domain(provider, email) do
+    if OrgIdentityProvider.domain_allowed?(provider, email) do
+      :ok
+    else
+      {:error, :domain_not_allowed}
+    end
+  end
+
+  defp provider_name(conn) do
+    case get_session(conn, :oidc_slug) do
+      nil -> "your identity provider"
+      slug -> slug
+    end
+  end
+
   defp safe_to_atom("google"), do: {:ok, :google}
   defp safe_to_atom("github"), do: {:ok, :github}
   defp safe_to_atom(_), do: {:error, :invalid_provider}
@@ -104,6 +208,8 @@ defmodule ControlKeelWeb.OAuthLoginController do
     conn
     |> delete_session(:oauth_session_params)
     |> delete_session(:oauth_provider)
+    |> delete_session(:oidc_session_params)
+    |> delete_session(:oidc_slug)
   end
 
   defp provider_display_name(provider_name) when is_binary(provider_name) do
