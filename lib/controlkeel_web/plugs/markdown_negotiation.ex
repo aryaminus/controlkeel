@@ -107,38 +107,22 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     ## Install
 
-    ### Homebrew (macOS/Linux)
-    ```
-    brew tap aryaminus/controlkeel && brew install controlkeel
-    ```
+    """ <>
+      Enum.map_join(ControlKeel.Skills.install_channels(), "\n", &install_channel_markdown/1) <>
+      """
 
-    ### npm
-    ```
-    npm i -g @aryaminus/controlkeel
-    ```
+      ## Quick Start
 
-    ### Unix
-    ```
-    curl -fsSL https://github.com/aryaminus/controlkeel/releases/latest/download/install.sh | sh
-    ```
+      1. Run `controlkeel` to boot the local web app
+      2. In your project, run `controlkeel setup`, then `controlkeel attach opencode`
+      3. Binding auto-bootstraps on first use
+      4. Run `controlkeel attach doctor` and `controlkeel status`
+      5. Trigger a controlled validation, then check findings
 
-    ### PowerShell (Windows)
-    ```
-    irm https://github.com/aryaminus/controlkeel/releases/latest/download/install.ps1 | iex
-    ```
+      ## API
 
-    ## Quick Start
-
-    1. Run `controlkeel` to boot the local web app
-    2. In your project, run `controlkeel setup`, then `controlkeel attach opencode`
-    3. Binding auto-bootstraps on first use
-    4. Run `controlkeel attach doctor` and `controlkeel status`
-    5. Trigger a controlled validation, then check findings
-
-    ## API
-
-    REST API at `/api/v1`. See https://controlkeel.com/openapi.json for the full specification.
-    """
+      REST API at `/api/v1`. See https://controlkeel.com/openapi.json for the full specification.
+      """
   end
 
   defp page_to_markdown(:docs_agents) do
@@ -320,6 +304,15 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     - CLI: `npm i -g @aryaminus/controlkeel`
     - GitHub: https://github.com/aryaminus/controlkeel
+    """
+  end
+
+  defp install_channel_markdown(channel) do
+    """
+    ### #{channel.label}
+    ```
+    #{channel.command}
+    ```
     """
   end
 
