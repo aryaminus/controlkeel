@@ -64,8 +64,10 @@ defmodule ControlKeelWeb.AvailableInstallComponents do
                     </code>
                     <button
                       type="button"
-                      class="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-primary bg-[rgba(196,240,66,0.08)] hover:bg-[rgba(196,240,66,0.16)] transition-colors duration-150 border-l whitespace-nowrap"
+                      class="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-primary bg-[rgba(196,240,66,0.08)] hover:bg-[rgba(196,240,66,0.16)] transition-colors duration-150 border-l whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       id={"copy-agent-#{integration.id}"}
+                      aria-label="Copy attach command"
+                      title="Copy attach command"
                       phx-click="copy_command"
                       phx-value-command={integration.attach_command}
                     >

@@ -246,11 +246,25 @@ defmodule ControlKeelWeb.PageController do
       end
     end)
     |> case do
-      nil ->
-        {:organizations, "No workspace available. Join or create an organization to continue."}
+      nil -> default_member_workspace(user)
+      ok -> ok
+    end
+  end
 
-      ok ->
-        ok
+  # Brand-new cloud tenants may hold memberships but own zero sessions: land
+  # them on their first org's first workspace instead of dead-ending on
+  # /organizations (cloud analogue of the LocalDefaults fallback below). The
+  # workspace comes from an org where the user holds an active membership, so
+  # the target page's access check passes; nothing resolvable keeps the
+  # /organizations outcome.
+  defp default_member_workspace(user) do
+    with org_id when is_integer(org_id) <- Accounts.default_org_for_user(user.id),
+         [workspace | _] <- Mission.list_workspaces_for_orgs([org_id]),
+         %{slug: ws_slug, org: %{slug: org_slug}} <- Repo.preload(workspace, :org) do
+      {:ok, {org_slug, ws_slug}}
+    else
+      _ ->
+        {:organizations, "No workspace available. Join or create an organization to continue."}
     end
   end
 
