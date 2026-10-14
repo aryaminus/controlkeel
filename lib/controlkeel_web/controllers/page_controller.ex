@@ -11,6 +11,7 @@ defmodule ControlKeelWeb.PageController do
   alias ControlKeel.Runtime.Mode
   alias ControlKeel.Skills
   alias ControlKeelWeb.FallbackController
+  alias ControlKeelWeb.WorkspaceAccess
 
   # Public marketing pages render inside the `:public` framework layout
   # (ControlKeelWeb.Layouts). The layout reads @current_user/@flash directly,
@@ -163,27 +164,152 @@ defmodule ControlKeelWeb.PageController do
     Ecto.Query.CastError -> ControlKeelWeb.FallbackController.not_found(conn, params)
   end
 
-  # Legacy observability benchmark sub-routes (pre-consolidation): the drafts,
-  # scenarios, history, and regressions pages now live stacked in the global
-  # `/observability/benchmark` page. Bare redirects deep-link to the matching
-  # section anchor; redirects carrying a query string preserve it as-is (no
-  # anchor) so filtered views keep their existing top-of-page behavior.
-  def observability_benchmarks_drafts_redirect(conn, params),
-    do: observability_benchmark_redirect(conn, params, "benchmarks-drafts")
+  # Global observability page URLs (pre-workspace-scope nesting): every
+  # `/observability` and `/observability/<page>` path now lives at
+  # `/:org_slug/workspaces/:ws_slug/observability/<page>`. These actions keep
+  # old bookmarks and `controlkeel obs` flows working by resolving the
+  # visitor's workspace and 302ing there with the query string preserved.
+  # Resolution is workspace-first: the most recent session the visitor can
+  # access decides, and the org is derived from that workspace so the pair
+  # always agrees. Resolvers never render data — access is re-enforced by the
+  # target LiveView.
+  @observability_page_prefix "/observability"
 
-  def observability_benchmarks_scenarios_redirect(conn, params),
-    do: observability_benchmark_redirect(conn, params, "benchmarks-scenarios")
+  # Pre-consolidation aliases: these paths were never real pages, only
+  # shortcuts into sections of the stacked benchmark page. They resolve
+  # through the same workspace redirect, landing on the workspace benchmark
+  # page (no section anchors, matching the old behavior).
+  @legacy_benchmark_suffixes %{
+    "/benchmarks/drafts" => "/benchmark",
+    "/benchmarks/scenarios" => "/benchmark",
+    "/benchmarks/history" => "/benchmark",
+    "/regressions" => "/benchmark"
+  }
 
-  def observability_benchmarks_history_redirect(conn, params),
-    do: observability_benchmark_redirect(conn, params, "benchmarks-history")
+  def observability_workspace_redirect(conn, _params) do
+    suffix =
+      conn.request_path
+      |> String.replace_prefix(@observability_page_prefix, "")
+      |> then(&Map.get(@legacy_benchmark_suffixes, &1, &1))
 
-  def observability_regressions_redirect(conn, params),
-    do: observability_benchmark_redirect(conn, params, "benchmarks-regressions")
+    redirect_observability(conn, suffix)
+  end
 
-  defp observability_benchmark_redirect(conn, _params, anchor) do
+  defp redirect_observability(conn, suffix) do
+    case resolve_observability_workspace(conn) do
+      {:ok, {org_slug, ws_slug}} ->
+        redirect(
+          conn,
+          to: "/#{org_slug}/workspaces/#{ws_slug}/observability#{suffix}#{query_suffix(conn)}"
+        )
+
+      :login ->
+        redirect(conn, to: "/auth/login")
+
+      {:organizations, message} ->
+        conn |> put_flash(:info, message) |> redirect(to: "/organizations")
+    end
+  end
+
+  defp resolve_observability_workspace(conn) do
+    user = conn.assigns[:current_user]
+
+    if Mode.current() == :local do
+      resolve_local_observability_workspace()
+    else
+      cond do
+        is_nil(user) ->
+          :login
+
+        not Accounts.any_active_membership?(user.id) ->
+          {:organizations, "Join or create an organization to continue."}
+
+        true ->
+          resolve_cloud_observability_workspace(user)
+      end
+    end
+  end
+
+  defp resolve_cloud_observability_workspace(user) do
+    user
+    |> Mission.list_recent_sessions_for_user(10)
+    |> Enum.find_value(fn session ->
+      case observability_workspace_slugs(session, user) do
+        {:ok, _} = ok -> ok
+        :skip -> nil
+      end
+    end)
+    |> case do
+      nil -> default_member_workspace(user)
+      ok -> ok
+    end
+  end
+
+  # Brand-new cloud tenants may hold memberships but own zero sessions: land
+  # them on their first org's first workspace instead of dead-ending on
+  # /organizations (cloud analogue of the LocalDefaults fallback below). The
+  # workspace comes from an org where the user holds an active membership, so
+  # the target page's access check passes; nothing resolvable keeps the
+  # /organizations outcome.
+  defp default_member_workspace(user) do
+    with org_id when is_integer(org_id) <- Accounts.default_org_for_user(user.id),
+         [workspace | _] <- Mission.list_workspaces_for_orgs([org_id]),
+         %{slug: ws_slug, org: %{slug: org_slug}} <- Repo.preload(workspace, :org) do
+      {:ok, {org_slug, ws_slug}}
+    else
+      _ ->
+        {:organizations, "No workspace available. Join or create an organization to continue."}
+    end
+  end
+
+  defp resolve_local_observability_workspace do
+    Mission.list_recent_sessions(10)
+    |> Enum.find_value(fn session ->
+      case observability_workspace_slugs(session, nil) do
+        {:ok, _} = ok -> ok
+        :skip -> nil
+      end
+    end)
+    |> case do
+      # Fresh local installs have no sessions yet: fall back to the seeded
+      # default workspace rather than a picker (single-user deployment).
+      nil -> default_observability_workspace()
+      ok -> ok
+    end
+  end
+
+  # A recent session votes for its workspace only when the workspace is
+  # org-bound and the visitor can access it. The org slug is derived from the
+  # workspace itself, so resolver output always satisfies the target page's
+  # org/workspace agreement check.
+  defp observability_workspace_slugs(session, user) do
+    workspace = session.workspace && Repo.preload(session.workspace, :org)
+
+    case workspace do
+      %Workspace{slug: ws_slug, org: %{slug: org_slug}} ->
+        if WorkspaceAccess.check(workspace, user) == :ok,
+          do: {:ok, {org_slug, ws_slug}},
+          else: :skip
+
+      _ ->
+        :skip
+    end
+  end
+
+  defp default_observability_workspace do
+    case LocalDefaults.ensure() do
+      {:ok, {%{slug: org_slug}, %{slug: ws_slug}}} ->
+        {:ok, {org_slug, ws_slug}}
+
+      _ ->
+        {:ok, {LocalDefaults.default_org_slug(), LocalDefaults.default_workspace_slug()}}
+    end
+  end
+
+  defp query_suffix(conn) do
     case conn.query_string do
-      "" -> redirect(conn, to: "/observability/benchmark##{anchor}")
-      query -> redirect(conn, to: "/observability/benchmark?#{query}")
+      "" -> ""
+      query -> "?#{query}"
     end
   end
 end

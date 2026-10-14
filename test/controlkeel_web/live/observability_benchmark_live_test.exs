@@ -5,10 +5,11 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Bootstrap.LocalDefaults
   alias ControlKeel.Observability
   alias ControlKeel.Repo
 
-  defp benchmark_path, do: "/observability/benchmark"
+  defp benchmark_path(org, ws), do: "/#{org.slug}/workspaces/#{ws.slug}/observability/benchmark"
 
   defp draft_fixture(workspace, session) do
     finding_fixture(%{
@@ -28,12 +29,12 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     draft_id
   end
 
-  test "global benchmark page stacks drafts, scenarios, history, and regressions", %{
+  test "workspace benchmark page stacks drafts, scenarios, history, and regressions", %{
     conn: conn
   } do
-    {_org, _ws, _session} = org_bound_session_fixture()
+    {org, ws, _session} = org_bound_session_fixture()
 
-    {:ok, view, html} = live(conn, benchmark_path())
+    {:ok, view, html} = live(conn, benchmark_path(org, ws))
 
     assert html =~ "Benchmark"
     assert has_element?(view, "#observability-benchmark-page")
@@ -57,10 +58,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   end
 
   test "draft approve event refreshes all sections with one flash", %{conn: conn} do
-    {_org, ws, session} = org_bound_session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
     draft_id = draft_fixture(ws, session)
 
-    {:ok, view, _html} = live(conn, benchmark_path())
+    {:ok, view, _html} = live(conn, benchmark_path(org, ws))
 
     assert has_element?(view, "#observability-benchmark-draft-#{draft_id}")
 
@@ -74,10 +75,10 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   end
 
   test "draft reject and archive events update status with flashes", %{conn: conn} do
-    {_org, ws, session} = org_bound_session_fixture()
+    {org, ws, session} = org_bound_session_fixture()
     draft_id = draft_fixture(ws, session)
 
-    {:ok, view, _html} = live(conn, benchmark_path())
+    {:ok, view, _html} = live(conn, benchmark_path(org, ws))
 
     reject_html =
       view
@@ -95,9 +96,9 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
   end
 
   test "generate-drafts event reports when no candidates exist", %{conn: conn} do
-    {_org, _ws, _session} = org_bound_session_fixture()
+    {org, ws, _session} = org_bound_session_fixture()
 
-    {:ok, view, _html} = live(conn, benchmark_path())
+    {:ok, view, _html} = live(conn, benchmark_path(org, ws))
 
     html =
       view
@@ -107,17 +108,18 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     assert html =~ "No open saved eval candidates"
   end
 
-  test "legacy benchmark sub-routes redirect to the global benchmark page", %{conn: conn} do
-    base = benchmark_path()
+  test "legacy benchmark sub-routes redirect to the workspace benchmark page", %{conn: conn} do
+    base =
+      "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/observability/benchmark"
 
-    for {path, anchor} <- [
-          {"/observability/benchmarks/drafts", "benchmarks-drafts"},
-          {"/observability/benchmarks/scenarios", "benchmarks-scenarios"},
-          {"/observability/benchmarks/history", "benchmarks-history"},
-          {"/observability/regressions", "benchmarks-regressions"}
+    for path <- [
+          "/observability/benchmarks/drafts",
+          "/observability/benchmarks/scenarios",
+          "/observability/benchmarks/history",
+          "/observability/regressions"
         ] do
       conn = get(conn, path)
-      assert redirected_to(conn, 302) == "#{base}##{anchor}"
+      assert redirected_to(conn, 302) == base
     end
 
     conn = get(conn, "/observability/benchmarks/drafts?suite=x")
@@ -175,30 +177,91 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
       {:ok, conn: conn, org: org, workspace: workspace, admin: admin, viewer: viewer}
     end
 
-    test "legacy sub-routes redirect to global benchmark anchors", %{
+    test "legacy sub-routes redirect to the workspace benchmark page", %{
       conn: conn,
       org: org,
+      workspace: workspace,
       admin: admin
     } do
       conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
+      session_fixture(%{workspace: workspace})
 
-      for {path, anchor} <- [
-            {"/observability/benchmarks/drafts", "benchmarks-drafts"},
-            {"/observability/regressions", "benchmarks-regressions"}
+      base = "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark"
+
+      for path <- [
+            "/observability/benchmarks/drafts",
+            "/observability/regressions"
           ] do
         conn = get(conn, path)
-        assert redirected_to(conn, 302) == "/observability/benchmark##{anchor}"
+        assert redirected_to(conn, 302) == base
       end
+    end
+
+    test "viewers see no mutation controls and are denied direct draft events", %{
+      conn: conn,
+      org: org,
+      workspace: workspace,
+      viewer: viewer
+    } do
+      conn = init_test_session(conn, %{current_user_id: viewer.id, current_org_id: org.id})
+      session = session_fixture(%{workspace: workspace})
+      draft_id = draft_fixture(workspace, session)
+
+      {:ok, view, _html} =
+        live(conn, "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark")
+
+      refute has_element?(view, "#observability-benchmark-drafts-generate")
+      refute has_element?(view, "#observability-benchmark-draft-approve-#{draft_id}")
+      refute has_element?(view, "#observability-benchmark-draft-reject-#{draft_id}")
+      refute has_element?(view, "#observability-benchmark-draft-archive-#{draft_id}")
+
+      for {event, params} <- [
+            {"approve-draft", %{"id" => draft_id}},
+            {"reject-draft", %{"id" => draft_id}},
+            {"archive-draft", %{"id" => draft_id}},
+            {"generate-drafts", %{}}
+          ] do
+        denied_html = render_click(view, event, params)
+        assert denied_html =~ "Admin or owner role required."
+      end
+
+      assert Repo.get!(Observability.BenchmarkDraft, draft_id).status == "draft"
+    end
+
+    test "admins can approve drafts and run draft generation", %{
+      conn: conn,
+      org: org,
+      workspace: workspace,
+      admin: admin
+    } do
+      conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
+      session = session_fixture(%{workspace: workspace})
+      draft_id = draft_fixture(workspace, session)
+
+      {:ok, view, _html} =
+        live(conn, "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark")
+
+      assert has_element?(view, "#observability-benchmark-drafts-generate")
+      assert has_element?(view, "#observability-benchmark-draft-approve-#{draft_id}")
+
+      approved_html = render_click(view, "approve-draft", %{"id" => draft_id})
+      assert approved_html =~ "Approved and created"
+      assert Repo.get!(Observability.BenchmarkDraft, draft_id).status == "approved"
+
+      generated_html = render_click(view, "generate-drafts")
+      refute generated_html =~ "Admin or owner role required."
     end
 
     test "viewers can view the benchmark page", %{
       conn: conn,
       org: org,
+      workspace: workspace,
       viewer: viewer
     } do
       conn = init_test_session(conn, %{current_user_id: viewer.id, current_org_id: org.id})
 
-      {:ok, view, _html} = live(conn, "/observability/benchmark")
+      {:ok, view, _html} =
+        live(conn, "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark")
 
       assert has_element?(view, "#observability-benchmark-page")
     end
@@ -206,11 +269,13 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLiveTest do
     test "admins can view the benchmark page", %{
       conn: conn,
       org: org,
+      workspace: workspace,
       admin: admin
     } do
       conn = init_test_session(conn, %{current_user_id: admin.id, current_org_id: org.id})
 
-      {:ok, view, _html} = live(conn, "/observability/benchmark")
+      {:ok, view, _html} =
+        live(conn, "/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark")
 
       assert has_element?(view, "#observability-benchmark-page")
     end

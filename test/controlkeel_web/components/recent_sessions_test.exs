@@ -6,7 +6,13 @@ defmodule ControlKeelWeb.RecentSessionsTest do
   alias ControlKeelWeb.RecentSessions
 
   test "renders empty state when no runs" do
-    html = render_component(&RecentSessions.session_observability_section/1, runs: [])
+    html =
+      render_component(&RecentSessions.session_observability_section/1,
+        runs: [],
+        org_slug: "acme",
+        ws_slug: "main"
+      )
+
     assert html =~ "Recent session runs"
     assert html =~ "No sessions available yet."
   end
@@ -39,11 +45,17 @@ defmodule ControlKeelWeb.RecentSessionsTest do
       }
     ]
 
-    html = render_component(&RecentSessions.session_observability_section/1, runs: runs)
+    html =
+      render_component(&RecentSessions.session_observability_section/1,
+        runs: runs,
+        org_slug: "acme",
+        ws_slug: "main"
+      )
+
     assert html =~ "Session A"
     assert html =~ "Session B"
     assert html =~ "/acme/workspaces/main/sessions/1/observability"
-    assert html =~ "/observability/sessions/2"
+    assert html =~ "/acme/workspaces/main/sessions/2/observability"
     assert html =~ "3 active"
     assert html =~ "1 blocked"
     assert html =~ "3 bundles"
@@ -66,7 +78,13 @@ defmodule ControlKeelWeb.RecentSessionsTest do
       }
     ]
 
-    html = render_component(&RecentSessions.session_observability_section/1, runs: runs)
+    html =
+      render_component(&RecentSessions.session_observability_section/1,
+        runs: runs,
+        org_slug: "acme",
+        ws_slug: "main"
+      )
+
     assert html =~ "Legacy session"
     assert html =~ "No proofs yet"
   end

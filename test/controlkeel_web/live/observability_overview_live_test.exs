@@ -5,7 +5,7 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
   import Phoenix.LiveViewTest
 
   test "overview page renders workspace observability cockpit", %{conn: conn} do
-    session = session_fixture(%{budget_cents: 2_000, spent_cents: 450})
+    {org, ws, session} = org_bound_session_fixture(%{budget_cents: 2_000, spent_cents: 450})
     task_fixture(%{session: session, status: "in_progress"})
 
     finding_fixture(%{
@@ -17,19 +17,20 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
       rule_id: "security.overview"
     })
 
-    {:ok, view, html} = live(conn, ~p"/observability")
+    base = "/#{org.slug}/workspaces/#{ws.slug}/observability"
+    {:ok, view, html} = live(conn, base)
 
     assert html =~ "Observability"
     assert has_element?(view, "#observability-overview-page")
     assert has_element?(view, "#observability-overview-run-list")
-    assert html =~ "/observability/problems"
-    assert html =~ "/observability/loop"
-    assert html =~ "/observability/promotions"
-    assert html =~ "/observability/compare"
-    assert html =~ "/observability/imports"
-    assert html =~ "/observability/memory-quality"
-    assert html =~ "/observability/trends"
-    assert html =~ "/observability/evals"
+    assert html =~ "#{base}/problems"
+    assert html =~ "#{base}/loop"
+    assert html =~ "#{base}/promotions"
+    assert html =~ "#{base}/compare"
+    assert html =~ "#{base}/imports"
+    assert html =~ "#{base}/memory-quality"
+    assert html =~ "#{base}/trends"
+    assert html =~ "#{base}/evals"
     # Benchmark depth pages consolidated into the global benchmark page
     refute html =~ "/observability/benchmarks/drafts"
     refute html =~ "/observability/benchmarks/scenarios"
@@ -37,15 +38,16 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     refute html =~ "/observability/regressions"
   end
 
-  test "overview page scopes recent runs to the latest workspace", %{conn: conn} do
-    workspace_one = workspace_fixture()
-    workspace_two = workspace_fixture()
+  test "overview page scopes recent runs to the visited workspace", %{conn: conn} do
+    {org, ws_one, _session_one} = org_bound_session_fixture(%{budget_cents: 2_000, spent_cents: 450})
 
-    session_fixture(%{workspace: workspace_one, budget_cents: 2_000, spent_cents: 450})
-    session_fixture(%{workspace: workspace_two, budget_cents: 2_000, spent_cents: 450})
+    ws_two = workspace_fixture(%{org_id: org.id})
+    session_fixture(%{workspace: ws_two, budget_cents: 2_000, spent_cents: 450})
 
-    {:ok, _view, html} = live(conn, ~p"/observability")
+    {:ok, _view, html_one} = live(conn, "/#{org.slug}/workspaces/#{ws_one.slug}/observability")
+    {:ok, _view, html_two} = live(conn, "/#{org.slug}/workspaces/#{ws_two.slug}/observability")
 
-    assert html =~ "1 recent"
+    assert html_one =~ "1 recent"
+    assert html_two =~ "1 recent"
   end
 end
