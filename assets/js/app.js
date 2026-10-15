@@ -149,29 +149,61 @@ document.addEventListener("click", async event => {
   }, 1500)
 })
 
-// Remember last org path for root / post-login redirect (v1: org switcher
-// only). Links tagged with data-remember-path store their href in
-// localStorage before LiveView patches the URL — the write is synchronous,
-// so it always lands first. Same-origin relative paths only; storage
-// failures (e.g. private mode) must never break navigation.
-document.addEventListener("click", event => {
-  const link = event.target.closest("[data-remember-path]")
-  if (!link) return
-  const href = link.getAttribute("href")
-  if (!href || !href.startsWith("/") || href.startsWith("//") || href.includes("\\")) return
-  try {
-    localStorage.setItem("ck.lastPath", href)
-  } catch (_error) {
-    // Ignore — navigation proceeds without remembering.
+// Last-path memory: the settled route is the source of truth — one
+// observer covers switcher clicks, pasted URLs, bookmarks, back/forward,
+// and full page loads. Only scoped overview roots are kept, with sub-routes
+// trimmed to their root (`/:org`, `/:org/workspaces/:ws`,
+// `.../sessions/:id`). Top-level globals are never stored (org slugs
+// cannot collide with them — see Org reserved slugs). `parseOverviewRoot`
+// doubles as the boot-shell validator, so writer and reader can never
+// disagree on shape.
+const CK_RESERVED_TOP_LEVEL = new Set([
+  "docs", "getting-started", "about", "contact", "privacy", "developers",
+  "auth", "login", "logout", "dashboard", "sessions", "findings",
+  "benchmarks", "proofs", "cloud", "organizations", "policies", "skills",
+  "observability", "invitations", "workspaces", "api", "proxy", "mcp",
+  "oauth", "dev", "assets"
+])
+
+function parseOverviewRoot(pathname) {
+  const segments = String(pathname || "").split("/").filter(Boolean)
+
+  if (segments.length === 1 && !CK_RESERVED_TOP_LEVEL.has(segments[0])) {
+    return `/${segments[0]}`
   }
-})
+
+  if (segments.length >= 3 && segments[1] === "workspaces") {
+    let root = `/${segments[0]}/workspaces/${segments[2]}`
+    if (segments.length >= 5 && segments[3] === "sessions") {
+      root = `${root}/sessions/${segments[4]}`
+    }
+    return root
+  }
+
+  return null
+}
+
+function rememberLastPath() {
+  const root = parseOverviewRoot(window.location.pathname)
+  if (!root) return
+
+  try {
+    localStorage.setItem("ck.lastPath", root)
+  } catch (_error) {
+    // Storage failures (e.g. private mode) must not break navigation.
+  }
+}
+
+window.addEventListener("phx:page-loading-stop", rememberLastPath)
 
 // Root boot redirect (`GET /` for signed-in users): the server cannot read
-// localStorage, so the boot shell resolves the last org path here and
-// replaces the location before any branding renders. Only single-segment
-// org roots are accepted; anything else falls back to the server-provided
-// default. `replace` keeps the shell out of the back-button history.
+// localStorage, so the boot shell resolves the last path here and replaces
+// the location before any branding renders. The stored value is re-parsed
+// (never trusted blindly); anything unparseable falls back to the
+// server-provided default. `replace` keeps the shell out of history.
 document.addEventListener("DOMContentLoaded", () => {
+  rememberLastPath()
+
   const boot = document.querySelector("[data-boot-redirect]")
   if (!boot) return
   const fallback = boot.dataset.bootFallback || "/"
@@ -181,9 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch (_error) {
     stored = null
   }
-  const valid =
-    typeof stored === "string" && /^\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(stored)
-  window.location.replace(valid ? stored : fallback)
+  window.location.replace(parseOverviewRoot(stored) || fallback)
 })
 
 // connect if there are any LiveViews on the page

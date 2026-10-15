@@ -395,9 +395,6 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "sidebar-org-switcher"
       assert html =~ ~s(href="/tabco")
       assert html =~ ~s(href="/second-org")
-      # Org switcher links carry the remember-path marker so the click
-      # listener in app.js stores the org URL in localStorage.
-      assert html =~ "data-remember-path"
       refute html =~ ~s(href="/organizations")
     end
   end
