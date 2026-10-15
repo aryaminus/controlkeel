@@ -2,6 +2,8 @@
 
 Remove the `/` landing/selector page for signed-in users and route them to their last-visited scoped path (Vercel-style). v1 stores the **whole path string** in **`localStorage`** only. Known loopholes (stale slugs, revocation, cross-device) are accepted for v1 and tracked as follow-ups below.
 
+Every signed-in user always holds at least one org: first OAuth signup auto-provisions a personal org + owner membership (`OAuthLoginController`), so org-less runtime states are impossible and no onboarding gate exists. `/organizations` stays as an orphaned safety net for pre-existing memberless rows.
+
 ## Context / evidence
 
 * `lib/controlkeel_web/router.ex:78` — `GET /` → `PageController.home`.
@@ -12,16 +14,12 @@ Remove the `/` landing/selector page for signed-in users and route them to their
 
 ## v1 scope
 
-1. **Writer (client):** JS hook (`RememberLastPath`) on scoped pages writes `localStorage["ck.lastPath"]` on `handle_params` settlement, trimmed to the nearest **overview root** — never a sub-route, never a query string. Writes only under `/:org_slug/*`; never on `/auth/*`, `/invitations/*`, `/docs/*`. Trim rules:
-   - `/:org_slug/**` → `/:org_slug` (e.g. `/:org_slug/settings` → `/:org_slug`)
-   - `/:org_slug/workspaces/:ws_slug/**` → `/:org_slug/workspaces/:ws_slug`
-   - `/:org_slug/workspaces/:ws_slug/sessions/:id/**` → `/:org_slug/workspaces/:ws_slug/sessions/:id`
-2. **Reader — `GET /`:** `/` becomes a minimal boot LiveView (not a rendered page):
-   - unauthenticated → redirect `/auth/login` (server decides via `LoadCurrentUser`).
-   - authenticated → client pushes `ck.lastPath` via `push_event`; server validates same-origin path shape (`/org...` prefix, no `//`, no `\`) and redirects there; empty/missing → resolve `default_org_for_user` → first workspace → org page.
-3. **Reader — post-login:** `OAuthLoginController.callback` redirects to validated `return_to`/`ck.lastPath` equivalent when present (via session `post_login_path` set by boot view), else `/` (which re-resolves). Invitation flow (`pending_invitation_token` → `/invitations/:token`) takes precedence, unchanged.
-4. **Login page:** keep the Home link to `/` (`auth_live.ex:40-46`) — `/` is now a smart redirector to the last path, so the link stays correct.
+1. **Writer (client, v1: org switcher only):** org-switcher popover links carry `data-remember-path`; a document-level click listener in `assets/js/app.js` writes the link href to `localStorage["ck.lastPath"]` synchronously before LiveView navigates. Switcher hrefs are org roots by construction, so no trimming needed at this writer. No writes on `/auth/*`, `/invitations/*`, `/docs/*` (no tagged links there).
+2. **Reader — `GET /`:** `/` stays the branding page. `PageController.home` branches: local → default-org redirect; anon → branding `:home`; signed-in → layout-less `boot_redirect` shell carrying `data-boot-fallback` (default org path, `/organizations` safety net). `app.js` resolves `ck.lastPath` client-side (single-segment slug shape) and `location.replace`s to it, else the fallback — the shell never lands in back-button history. The server cannot read localStorage, so a pure 302 would lose the last path.
+3. **Reader — post-login:** `OAuthLoginController.callback` keeps redirecting to `/`; the shell resolves the last path from there. Invitation flow (`pending_invitation_token` → `/invitations/:token`) takes precedence, unchanged.
+4. **Login page:** keep the Home link to `/` (`auth_live.ex:40-46`) — anon sees branding, signed-in users bounce via the shell, so the link stays correct for both.
 5. **Logout:** `AuthController.logout` keeps clearing server session; boot/login JS clears `ck.lastPath` on explicit sign-out only (not on expiry).
+6. **Signup invariant:** `OAuthLoginController.callback` provisions a personal org + owner membership for freshly created cloud/self_hosted users with no active membership. Failures never block login.
 
 ## Non-goals (v1)
 
@@ -41,16 +39,16 @@ Remove the `/` landing/selector page for signed-in users and route them to their
 
 ## Acceptance criteria
 
-* [ ] Signed-in visit to `/` never renders marketing/selector; lands on last scoped path (or deterministic default when empty).
+* [ ] Signed-in visit to `/` never renders branding; shell `location.replace`s to last scoped path (or server-provided default fallback when empty).
 * [ ] Browser close → reopen → `/` restores last path on same machine/browser.
-* [ ] OAuth login lands on last path (invitation flow unaffected).
-* [ ] Anon `/` → `/auth/login`.
-* [ ] Login page Home link points to `/` (redirects to last path).
+* [ ] OAuth login lands on last path via the `/` shell (invitation flow unaffected).
+* [ ] Anon `/` renders the branding page.
+* [ ] Login page Home link points to `/` (branding for anon, shell bounce for authed).
 * [ ] Legacy redirects (`/organizations/:slug`, `/sessions/:id`, observability/proof resolvers) keep working until sunset.
 * [ ] `mix precommit` clean; targeted LiveView/controller tests for `/` boot redirect + callback redirect.
 
 ## Test plan
 
-* `PageController`/`boot LiveView` test: anon → login; auth + valid stored path → 302/navigate; malformed/external path → default.
-* `OAuthLoginController` test: with/without `post_login_path`, with invitation token.
-* JS hook test (if harness exists): writes only on scoped paths, trims sub-routes to overview roots, clears on logout.
+* `PageController` test: anon → branding 200; authed → shell 200 with `data-boot-fallback`; malformed fallback → `/organizations`.
+* `OAuthLoginController` test: first signup provisions personal org; repeat login adds none; invitation token path.
+* Switcher marker test: popover links carry `data-remember-path` with org-root hrefs.
