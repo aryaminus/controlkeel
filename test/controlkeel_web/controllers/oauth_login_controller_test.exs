@@ -75,6 +75,50 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
   end
 
   describe "GET /auth/:provider/callback" do
+    test "first signup provisions a personal org with an owner membership", %{conn: conn} do
+      conn =
+        conn
+        |> init_test_session(%{oauth_provider: "github", oauth_session_params: %{}})
+        |> get("/auth/github/callback", %{"code" => "good"})
+
+      assert redirected_to(conn, 302) == "/"
+
+      user = Accounts.get_user_by_email("user@example.com")
+
+      assert [%{org: org, role: "owner"}] = Accounts.list_orgs_for_user(user.id)
+      assert org.name == "Example User's Org"
+      assert org.slug =~ ~r/^example-user-[a-z0-9]{5}$/
+    end
+
+    test "repeat sign-in provisions no additional org", %{conn: conn} do
+      login = fn ->
+        build_conn()
+        |> init_test_session(%{oauth_provider: "github", oauth_session_params: %{}})
+        |> get("/auth/github/callback", %{"code" => "good"})
+      end
+
+      login.()
+      login.()
+
+      user = Accounts.get_user_by_email("user@example.com")
+      assert [%{org: _org, role: "owner"}] = Accounts.list_orgs_for_user(user.id)
+    end
+
+    test "existing users sign in without a new org", %{conn: conn} do
+      {:ok, existing} = Accounts.create_user(%{email: "user@example.com", name: "Example User"})
+
+      assert {:ok, _} =
+               Accounts.create_org_with_owner(existing.id, %{name: "Prior Org", slug: "prior-org"})
+
+      conn =
+        conn
+        |> init_test_session(%{oauth_provider: "github", oauth_session_params: %{}})
+        |> get("/auth/github/callback", %{"code" => "good"})
+
+      assert redirected_to(conn, 302) == "/"
+      assert [%{org: %{slug: "prior-org"}}] = Accounts.list_orgs_for_user(existing.id)
+    end
+
     test "provisions the user and shows a success flash", %{conn: conn} do
       conn =
         conn
