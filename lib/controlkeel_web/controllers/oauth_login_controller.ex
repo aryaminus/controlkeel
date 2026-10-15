@@ -14,11 +14,8 @@ defmodule ControlKeelWeb.OAuthLoginController do
 
   use ControlKeelWeb, :controller
 
-  require Logger
-
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.OAuthProviders
-  alias ControlKeel.Runtime.Mode
 
   @doc "Phase 1 — redirect the user to the OAuth provider's authorization page"
   def request(conn, %{"provider" => provider_name}) do
@@ -52,9 +49,8 @@ defmodule ControlKeelWeb.OAuthLoginController do
     with {:ok, provider} <- safe_to_atom(provider_name),
          {:ok, %{email: email, name: name}} <-
            OAuthProviders.callback(provider, params, session_params),
-         {:ok, user, created} <- Accounts.find_or_create_user(email, name) do
+         {:ok, user, _created} <- Accounts.find_or_create_user(email, name) do
       invitation_token = get_session(conn, :pending_invitation_token)
-      :ok = maybe_provision_personal_org(user, created)
 
       conn
       |> delete_session(:oauth_session_params)
@@ -99,58 +95,6 @@ defmodule ControlKeelWeb.OAuthLoginController do
   end
 
   # ── Private ─────────────────────────────────────────────────────────
-
-  # Signup invariant: every cloud/self_hosted user owns at least one org, so
-  # org-less runtime states are impossible and no onboarding gate is needed.
-  # Only freshly created users without any active membership are provisioned
-  # (a pre-acceptance sign-in keeps its personal org alongside the invited
-  # one). Failures never block login — `/organizations` remains the safety
-  # net for the resulting memberless rows.
-  defp maybe_provision_personal_org(user, true) do
-    if Mode.current() in [:cloud, :self_hosted] and
-         not Accounts.any_active_membership?(user.id) do
-      case Accounts.create_org_with_owner(user.id, personal_org_attrs(user)) do
-        {:ok, _org} ->
-          :ok
-
-        {:error, reason} ->
-          Logger.warning("[auth] personal org provisioning failed: #{inspect(reason)}")
-          :ok
-      end
-    else
-      :ok
-    end
-  end
-
-  defp maybe_provision_personal_org(_user, _created), do: :ok
-
-  defp personal_org_attrs(user) do
-    display = user.name || user.email |> String.split("@") |> hd()
-
-    base =
-      display
-      |> slugify()
-      |> String.slice(0, 40)
-      |> then(fn slug -> if slug == "", do: "personal", else: slug end)
-
-    %{name: "#{display}'s Org", slug: "#{base}-#{random_alnum(5)}"}
-  end
-
-  defp slugify(name) when is_binary(name) do
-    name
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9]+/u, "-")
-    |> String.trim("-")
-  end
-
-  defp slugify(_), do: ""
-
-  defp random_alnum(n) do
-    "abcdefghijklmnopqrstuvwxyz0123456789"
-    |> String.graphemes()
-    |> Enum.take_random(n)
-    |> Enum.join()
-  end
 
   defp safe_to_atom("google"), do: {:ok, :google}
   defp safe_to_atom("github"), do: {:ok, :github}

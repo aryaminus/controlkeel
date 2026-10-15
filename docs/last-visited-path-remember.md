@@ -2,7 +2,7 @@
 
 Remove the `/` landing/selector page for signed-in users and route them to their last-visited scoped path (Vercel-style). v1 stores the **whole path string** in **`localStorage`** only. Known loopholes (stale slugs, revocation, cross-device) are accepted for v1 and tracked as follow-ups below.
 
-Every signed-in user always holds at least one org: first OAuth signup auto-provisions a personal org + owner membership (`OAuthLoginController`), so org-less runtime states are impossible and no onboarding gate exists. `/organizations` stays as an orphaned safety net for pre-existing memberless rows.
+Signed-in users share one `/` home: the client navigates to the stored last path, else the default org; users with no orgs at all get an inline creation form on the same page (no separate shell/onboarding cases). Known loopholes (stale slugs, revocation, cross-device) are accepted for v1 and tracked as follow-ups below.
 
 ## Context / evidence
 
@@ -15,11 +15,10 @@ Every signed-in user always holds at least one org: first OAuth signup auto-prov
 ## v1 scope
 
 1. **Writer (client, route observer):** `app.js` observes the settled route (`DOMContentLoaded` + `phx:page-loading-stop`) and stores the trimmed overview root in `localStorage["ck.lastPath"]` — one observer covers switcher clicks, pasted URLs, bookmarks, back/forward, and full loads. No per-widget tagging. Top-level globals are never stored (reserved-slug exclusion); sub-routes trim to `/:org`, `/:org/workspaces/:ws`, or `.../sessions/:id`.
-2. **Reader — `GET /`:** `/` stays the branding page. `PageController.home` branches: local → default-org redirect; anon → branding `:home`; signed-in → layout-less `boot_redirect` shell carrying `data-boot-fallback` (default org path, `/organizations` safety net). `app.js` re-parses `ck.lastPath` with the same overview-root parser (writer and reader share shape logic) and `location.replace`s to it, else the fallback — the shell never lands in back-button history. The server cannot read localStorage, so a pure 302 would lose the last path.
-3. **Reader — post-login:** `OAuthLoginController.callback` keeps redirecting to `/`; the shell resolves the last path from there. Invitation flow (`pending_invitation_token` → `/invitations/:token`) takes precedence, unchanged.
+2. **Reader — `GET /`:** `/` stays the branding page for anon. `PageController.home` serves signed-in users one layout-less `app_home` template carrying `data-home-fallback` (default org path) and `data-home-has-orgs`. `app.js`: no orgs → reveal the inline creation form (stored path ignored as stale, e.g. all orgs deleted); otherwise `location.replace` to the re-parsed stored path or the fallback. Creation posts to `POST /orgs` (same controller): success lands on `/:slug`, failure re-renders with the form shown and an error. The server cannot read localStorage, so a pure 302 would lose the last path.
+3. **Reader — post-login:** `OAuthLoginController.callback` keeps redirecting to `/` (find-or-create user only, no auto-provisioning); the shell resolves the last path from there, or the onboarding screen for memberless users. Invitation flow (`pending_invitation_token` → `/invitations/:token`) takes precedence, unchanged.
 4. **Login page:** keep the Home link to `/` (`auth_live.ex:40-46`) — anon sees branding, signed-in users bounce via the shell, so the link stays correct for both.
 5. **Logout:** `AuthController.logout` keeps clearing server session; boot/login JS clears `ck.lastPath` on explicit sign-out only (not on expiry).
-6. **Signup invariant:** `OAuthLoginController.callback` provisions a personal org + owner membership for freshly created cloud/self_hosted users with no active membership. Failures never block login.
 
 ## Non-goals (v1)
 

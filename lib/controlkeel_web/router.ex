@@ -77,6 +77,9 @@ defmodule ControlKeelWeb.Router do
 
     get "/", PageController, :home
 
+    # Inline org creation from the `/` home screen.
+    post "/orgs", PageController, :create_org
+
     get "/docs", DocsController, :index
     get "/docs/getting-started", DocsController, :getting_started
     get "/docs/agents", DocsController, :agents

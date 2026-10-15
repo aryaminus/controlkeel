@@ -196,17 +196,67 @@ function rememberLastPath() {
 
 window.addEventListener("phx:page-loading-stop", rememberLastPath)
 
-// Root boot redirect (`GET /` for signed-in users): the server cannot read
-// localStorage, so the boot shell resolves the last path here and replaces
-// the location before any branding renders. The stored value is re-parsed
-// (never trusted blindly); anything unparseable falls back to the
-// server-provided default. `replace` keeps the shell out of history.
+// Inline org slug generation (`/` home form): mirrors the server-side
+// slugify so the slug field fills as the name is typed. Stops the moment
+// the user edits the slug by hand (a server-repopulated value counts as
+// edited). The server still validates on submit (reserved words,
+// uniqueness) — this is a typing convenience, not the rule.
+function slugifyName(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/g, "")
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const orgName = document.getElementById("org_name")
+  const orgSlug = document.getElementById("org_slug")
+  if (!orgName || !orgSlug) return
+
+  let slugEdited = orgSlug.value !== ""
+
+  orgSlug.addEventListener("input", () => {
+    slugEdited = true
+  })
+
+  orgName.addEventListener("input", () => {
+    if (slugEdited) return
+    orgSlug.value = slugifyName(orgName.value)
+  })
+})
+// the default fallback and whether the user holds any org; the stored
+// last path decides the rest. Users with no orgs skip navigation entirely
+// and get the inline creation form instead (a stored path would be stale
+// — e.g. all orgs deleted). Server re-renders after a failed create carry
+// `data-home-show-form`, shown immediately. `replace` keeps the home out
+// of the back-button history.
 document.addEventListener("DOMContentLoaded", () => {
   rememberLastPath()
 
-  const boot = document.querySelector("[data-boot-redirect]")
+  const boot = document.querySelector("[data-app-home]")
   if (!boot) return
-  const fallback = boot.dataset.bootFallback || "/"
+
+  const loading = document.getElementById("app-home-loading")
+  const create = document.getElementById("app-home-create")
+
+  const showForm = () => {
+    loading?.classList.add("hidden")
+    create?.classList.remove("hidden")
+  }
+
+  if (boot.dataset.homeShowForm === "true") {
+    showForm()
+    return
+  }
+
+  if (boot.dataset.homeHasOrgs !== "true") {
+    showForm()
+    return
+  }
+
+  const fallback = boot.dataset.homeFallback || "/"
   let stored = null
   try {
     stored = localStorage.getItem("ck.lastPath")

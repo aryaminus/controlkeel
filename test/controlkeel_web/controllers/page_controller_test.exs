@@ -80,10 +80,10 @@ defmodule ControlKeelWeb.PageControllerTest do
 
       assert body =~ "Turn team knowledge into"
       assert body =~ "Install ControlKeel"
-      refute body =~ "data-boot-redirect"
+      refute body =~ "data-app-home"
     end
 
-    test "signed-in users get the boot shell, never the branding", %{
+    test "signed-in users get the unified home shell", %{
       conn: conn,
       user: user
     } do
@@ -97,13 +97,16 @@ defmodule ControlKeelWeb.PageControllerTest do
 
       body = html_response(conn, 200)
 
-      assert body =~ "data-boot-redirect"
-      assert body =~ ~s(data-boot-fallback="/#{org.slug}")
+      assert body =~ "data-app-home"
+      assert body =~ ~s(data-home-fallback="/#{org.slug}")
+      assert body =~ ~s(data-home-has-orgs="true")
       assert body =~ "Opening your workspace"
       refute body =~ "Turn team knowledge into"
     end
 
-    test "signed-in users without an org fall back to /organizations", %{conn: conn} do
+    test "signed-in users without an org get the inline creation form", %{
+      conn: conn
+    } do
       {:ok, fresh} = Accounts.create_user(%{email: "fresh@example.com"})
 
       conn =
@@ -113,7 +116,61 @@ defmodule ControlKeelWeb.PageControllerTest do
 
       body = html_response(conn, 200)
 
-      assert body =~ ~s(data-boot-fallback="/organizations")
+      assert body =~ "data-app-home"
+      assert body =~ ~s(data-home-has-orgs="false")
+      assert body =~ "No organizations yet"
+      assert body =~ ~s(action="/orgs")
+      refute body =~ "Turn team knowledge into"
+    end
+  end
+
+  describe "POST /orgs" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      {:ok, user} = Accounts.create_user(%{email: "creator@example.com"})
+
+      {:ok, user: user}
+    end
+
+    test "anonymous visitors are redirected to login", %{conn: conn} do
+      conn = post(conn, ~p"/orgs", %{"org" => %{"name" => "Nope"}})
+
+      assert redirected_to(conn, 302) == "/auth/login"
+    end
+
+    test "creates the org and lands on it", %{conn: conn, user: user} do
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> post(~p"/orgs", %{"org" => %{"name" => "Fresh Co"}})
+
+      assert redirected_to(conn, 302) == "/fresh-co"
+
+      assert [%{org: org, role: "owner"}] = Accounts.list_orgs_for_user(user.id)
+      assert org.slug == "fresh-co"
+    end
+
+    test "failures re-render the home with the form shown", %{conn: conn, user: user} do
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> post(~p"/orgs", %{"org" => %{"name" => ""}})
+
+      body = html_response(conn, 422)
+
+      assert body =~ "data-app-home"
+      assert body =~ ~s(data-home-show-form="true")
+      assert body =~ "No organizations yet"
     end
   end
 
