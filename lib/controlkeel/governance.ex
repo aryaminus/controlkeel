@@ -676,12 +676,24 @@ defmodule ControlKeel.Governance do
     chunks_reviewed = length(fragments)
     added_lines_reviewed = Enum.reduce(fragments, 0, &(&1.added_line_count + &2))
 
+    # Bolt: Replaced multiple passes with a single-pass tuple reduction to accumulate counts efficiently without Map.update! overhead.
+    {total, crit, high, med, low} =
+      Enum.reduce(findings, {0, 0, 0, 0, 0}, fn finding, {t, c, h, m, l} ->
+        case finding.severity do
+          "critical" -> {t + 1, c + 1, h, m, l}
+          "high" -> {t + 1, c, h + 1, m, l}
+          "medium" -> {t + 1, c, h, m + 1, l}
+          "low" -> {t + 1, c, h, m, l + 1}
+          _ -> {t + 1, c, h, m, l}
+        end
+      end)
+
     finding_totals = %{
-      "total" => length(findings),
-      "critical" => Enum.count(findings, &(&1.severity == "critical")),
-      "high" => Enum.count(findings, &(&1.severity == "high")),
-      "medium" => Enum.count(findings, &(&1.severity == "medium")),
-      "low" => Enum.count(findings, &(&1.severity == "low"))
+      "total" => total,
+      "critical" => crit,
+      "high" => high,
+      "medium" => med,
+      "low" => low
     }
 
     summary =
