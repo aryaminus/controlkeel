@@ -109,6 +109,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                 <% active = org.id == @nav_org.id %>
                 <.link
                   navigate={~p"/#{org.slug}"}
+                  data-remember-path
                   phx-click={
                     JS.hide(to: "#sidebar-org-switcher-popover")
                     |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")

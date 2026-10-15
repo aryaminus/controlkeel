@@ -149,6 +149,43 @@ document.addEventListener("click", async event => {
   }, 1500)
 })
 
+// Remember last org path for root / post-login redirect (v1: org switcher
+// only). Links tagged with data-remember-path store their href in
+// localStorage before LiveView patches the URL — the write is synchronous,
+// so it always lands first. Same-origin relative paths only; storage
+// failures (e.g. private mode) must never break navigation.
+document.addEventListener("click", event => {
+  const link = event.target.closest("[data-remember-path]")
+  if (!link) return
+  const href = link.getAttribute("href")
+  if (!href || !href.startsWith("/") || href.startsWith("//") || href.includes("\\")) return
+  try {
+    localStorage.setItem("ck.lastPath", href)
+  } catch (_error) {
+    // Ignore — navigation proceeds without remembering.
+  }
+})
+
+// Root boot redirect (`GET /` for signed-in users): the server cannot read
+// localStorage, so the boot shell resolves the last org path here and
+// replaces the location before any branding renders. Only single-segment
+// org roots are accepted; anything else falls back to the server-provided
+// default. `replace` keeps the shell out of the back-button history.
+document.addEventListener("DOMContentLoaded", () => {
+  const boot = document.querySelector("[data-boot-redirect]")
+  if (!boot) return
+  const fallback = boot.dataset.bootFallback || "/"
+  let stored = null
+  try {
+    stored = localStorage.getItem("ck.lastPath")
+  } catch (_error) {
+    stored = null
+  }
+  const valid =
+    typeof stored === "string" && /^\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(stored)
+  window.location.replace(valid ? stored : fallback)
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 
