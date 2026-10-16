@@ -36,6 +36,13 @@ defmodule ControlKeelWeb.PageController do
       # navigates to the stored last path, else the default org; users
       # with no orgs at all get the inline creation form instead. One
       # template — no separate shell/onboarding cases.
+      #
+      # FUTURE (cross-browser): `localStorage` is per-browser, so a new
+      # machine has no memory. Persist the last overview root account-side
+      # (e.g. `user_last_contexts`, upserted from
+      # `OrganizationLayoutDefaults` only when the derived root changes,
+      # read here and embedded as `data-server-path`) — the Vercel model:
+      # session proves identity, the account record supplies the route.
       user = conn.assigns[:current_user] ->
         conn
         |> put_layout(false)

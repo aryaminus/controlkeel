@@ -263,6 +263,11 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch (_error) {
     stored = null
   }
+  // FUTURE (cross-browser): insert a server-provided tier here —
+  // `home/2` embeds the account-side last path as `data-server-path`
+  // (see the note there) and priority becomes
+  // localStorage → server path → default → form. Parse it with
+  // `parseOverviewRoot` like `stored` (untrusted until parsed).
   window.location.replace(parseOverviewRoot(stored) || fallback)
 })
 
