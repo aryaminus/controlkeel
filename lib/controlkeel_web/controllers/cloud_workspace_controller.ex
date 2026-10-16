@@ -84,7 +84,10 @@ defmodule ControlKeelWeb.CloudWorkspaceController do
   defp resolve_invite(""), do: {:ok, %{org_id: nil, mission_workspace_id: nil}}
 
   defp resolve_invite(token) when is_binary(token) do
-    case Accounts.lookup_invitation(token) do
+    # Consuming lookup: one invitation binds exactly one cloud workspace key.
+    # A non-consuming lookup let a single disclosed token enroll unlimited keys
+    # into the target org.
+    case Accounts.consume_invitation_for_enrolment(token) do
       {:ok, %{org: %{id: org_id}, mission_workspace_id: mws_id}} ->
         {:ok, %{org_id: org_id, mission_workspace_id: mws_id}}
 

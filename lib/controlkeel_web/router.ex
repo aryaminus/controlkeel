@@ -31,6 +31,13 @@ defmodule ControlKeelWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Unauthenticated, token-consuming registration endpoint: JSON plus a per-IP
+  # throttle so invitation-token enumeration cannot be driven at full rate.
+  pipeline :cloud_register do
+    plug :accepts, ["json"]
+    plug ControlKeelWeb.Plugs.IpRateLimit, bucket: "cloud_register"
+  end
+
   pipeline :cloud_api_auth do
     plug ControlKeelWeb.Plugs.CloudWorkspaceKeyAuth
     plug ControlKeelWeb.Plugs.CloudRateLimit
@@ -459,6 +466,15 @@ defmodule ControlKeelWeb.Router do
 
     post "/telemetry", CloudTelemetryController, :ingest
     post "/runtime/callbacks", CloudRuntimeCallbackController, :update
+  end
+
+  # Workspace registration is unauthenticated and token-consuming: it
+  # distinguishes a valid invite from an invalid one, so it is throttled per IP.
+  # Kept out of :cloud_telemetry_ingest's scope because the ingest routes carry
+  # legitimate high-volume traffic and must not share this budget.
+  scope "/cloud/v1", ControlKeelWeb do
+    pipe_through :cloud_register
+
     post "/workspaces/register", CloudWorkspaceController, :register
   end
 
