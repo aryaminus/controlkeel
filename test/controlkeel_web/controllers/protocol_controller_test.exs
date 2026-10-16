@@ -5,6 +5,7 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
   import ControlKeel.PlatformFixtures
 
   alias ControlKeel.Mcp.ProtocolAccess
+  alias ControlKeel.Platform
 
   describe "OAuth token endpoint" do
     test "issues a client-credentials access token for hosted MCP", %{conn: conn} do
@@ -56,6 +57,27 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
         })
 
       assert %{"error" => "invalid_scope"} = json_response(conn, 400)
+    end
+
+    test "refuses to issue an access token for an expired service account", %{conn: conn} do
+      workspace = workspace_fixture()
+
+      %{service_account: account, token: secret} =
+        service_account_fixture(%{workspace_id: workspace.id, scopes: "mcp:access"})
+
+      {:ok, _expired} = Platform.expire_service_account(account.id)
+
+      conn =
+        post(conn, "/oauth/token", %{
+          grant_type: "client_credentials",
+          client_id: ProtocolAccess.oauth_client_id(account),
+          client_secret: secret,
+          resource: "mcp",
+          scope: "mcp:access"
+        })
+
+      assert conn.status == 401
+      assert %{"error" => "invalid_client"} = json_response(conn, 401)
     end
   end
 
@@ -289,6 +311,58 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
                  "structuredContent" => %{"decision" => "allow"}
                }
              } = json_response(conn, 200)
+    end
+
+    test "an outstanding access token dies with its service account", %{conn: conn} do
+      workspace = workspace_fixture()
+
+      %{service_account: account, token: secret} =
+        service_account_fixture(%{
+          workspace_id: workspace.id,
+          scopes: "mcp:access validate:run"
+        })
+
+      access_token =
+        request_access_token(
+          ProtocolAccess.oauth_client_id(account),
+          secret,
+          "mcp",
+          "mcp:access validate:run"
+        )
+
+      tool_call = %{
+        jsonrpc: "2.0",
+        id: 6,
+        method: "tools/call",
+        params: %{
+          name: "ck_validate",
+          arguments: %{content: "def hello, do: :world", kind: "code"}
+        }
+      }
+
+      assert %{"result" => _result} =
+               conn
+               |> put_req_header("authorization", "Bearer #{access_token}")
+               |> post("/mcp", tool_call)
+               |> json_response(200)
+
+      {:ok, _expired} = Platform.expire_service_account(account.id)
+
+      conn =
+        build_conn()
+        |> put_req_header("authorization", "Bearer #{access_token}")
+        |> post("/mcp", %{
+          jsonrpc: "2.0",
+          id: 7,
+          method: "tools/call",
+          params: %{
+            name: "ck_validate",
+            arguments: %{content: "def hello, do: :world", kind: "code"}
+          }
+        })
+
+      assert conn.status == 401
+      assert %{"error" => "unauthorized"} = json_response(conn, 401)
     end
 
     test "requires delegate:run for ck_delegate", %{conn: conn} do

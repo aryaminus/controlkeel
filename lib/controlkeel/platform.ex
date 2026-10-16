@@ -57,8 +57,26 @@ defmodule ControlKeel.Platform do
 
   def get_service_account(id), do: Repo.get(ServiceAccount, id)
 
+  @doc """
+  Provisions a service account and returns its plaintext token exactly once.
+
+  Callers may bound the credential lifetime with either key:
+
+    * `"expires_in_days"` — positive integer (or numeric string); the account
+      expires that many days from now
+    * `"expires_at"` — absolute `:utc_datetime` or ISO8601 string
+
+  `"expires_in_days"` wins when both are supplied. Omitting both leaves
+  `expires_at` `nil`, meaning the credential never expires — the behavior of
+  every account provisioned before expiry existed.
+
+  Returns `{:error, %Ecto.Changeset{}}` when either key is malformed or when
+  an explicit expiry is not in the future, so a credential can never be
+  created already dead.
+  """
   def create_service_account(workspace_id, attrs) do
     token = generate_token()
+    {expiry_opts, attrs} = pop_expiry_opts(attrs)
 
     attrs =
       attrs
@@ -68,7 +86,12 @@ defmodule ControlKeel.Platform do
       |> Map.put_new("status", "active")
       |> Map.put_new("metadata", %{})
 
-    with {:ok, account} <- %ServiceAccount{} |> ServiceAccount.changeset(attrs) |> Repo.insert() do
+    with {:ok, expires_at} <- parse_expiry(expiry_opts),
+         :ok <- ensure_future_expiry(expires_at),
+         {:ok, account} <-
+           %ServiceAccount{}
+           |> ServiceAccount.changeset(Map.put(attrs, "expires_at", expires_at))
+           |> Repo.insert() do
       {:ok, %{service_account: account, token: token}}
     end
   end
@@ -80,23 +103,82 @@ defmodule ControlKeel.Platform do
     end
   end
 
-  def rotate_service_account(id) when is_integer(id) do
+  @doc """
+  Issues a fresh token for `id` and stamps `rotated_at`.
+
+  Rotation replaces the secret, it does not renew the credential. Without
+  expiry options the existing `expires_at` is preserved verbatim (`nil` stays
+  non-expiring) so rotation can never silently extend a lifetime. Pass
+  `:expires_in_days` or `:expires_at` to deliberately re-arm one.
+
+  An already-expired account is not rotated unless a fresh expiry is supplied,
+  which would otherwise hand back a token that fails on first use.
+  """
+  def rotate_service_account(id, opts \\ []) when is_integer(id) do
     case Repo.get(ServiceAccount, id) do
       nil ->
         {:error, :not_found}
 
       account ->
-        token = generate_token()
+        with {:ok, expiry_attrs} <- rotation_expiry_attrs(account, opts) do
+          token = generate_token()
 
-        attrs = %{
-          token_hash: token_hash(token),
-          last_used_at: nil,
-          status: "active"
-        }
+          attrs =
+            %{
+              token_hash: token_hash(token),
+              last_used_at: nil,
+              status: "active",
+              rotated_at: now()
+            }
+            |> Map.merge(expiry_attrs)
 
-        with {:ok, updated} <- account |> ServiceAccount.changeset(attrs) |> Repo.update() do
-          {:ok, %{service_account: updated, token: token}}
+          with {:ok, updated} <- account |> ServiceAccount.changeset(attrs) |> Repo.update() do
+            {:ok, %{service_account: updated, token: token}}
+          end
         end
+    end
+  end
+
+  @doc """
+  Sets, extends, or clears the expiry of an existing credential.
+
+  Accepts `:expires_at` (`:utc_datetime`, ISO8601 string, or `nil` to clear)
+  or `:expires_in_days` (positive integer). Unlike creation, a past
+  `:expires_at` is accepted: expiring a credential immediately is a valid
+  administrative action, and `expire_service_account/1` builds on it.
+  """
+  @spec update_service_account_expiry(integer(), keyword()) ::
+          {:ok, ServiceAccount.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def update_service_account_expiry(id, opts \\ []) when is_integer(id) do
+    case Repo.get(ServiceAccount, id) do
+      nil ->
+        {:error, :not_found}
+
+      account ->
+        with {:ok, expires_at} <- requested_expiry(opts),
+             {:ok, updated} <-
+               account |> ServiceAccount.changeset(%{expires_at: expires_at}) |> Repo.update() do
+          {:ok, updated}
+        end
+    end
+  end
+
+  @doc """
+  Expires a credential immediately by setting `expires_at` to now, leaving
+  `status` untouched. The token stops authenticating on the next request; the
+  row stays visible for audit and can be revived by extending the expiry.
+  """
+  @spec expire_service_account(integer()) ::
+          {:ok, ServiceAccount.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def expire_service_account(id) when is_integer(id) do
+    case Repo.get(ServiceAccount, id) do
+      nil ->
+        {:error, :not_found}
+
+      account ->
+        account
+        |> ServiceAccount.changeset(%{expires_at: now()})
+        |> Repo.update()
     end
   end
 
@@ -106,14 +188,21 @@ defmodule ControlKeel.Platform do
         {:error, :unauthorized}
 
       account ->
-        {:ok, _updated} =
-          account
-          |> ServiceAccount.changeset(%{
-            last_used_at: DateTime.utc_now() |> DateTime.truncate(:second)
-          })
-          |> Repo.update()
+        # An expired credential answers exactly like a revoked or unknown one:
+        # callers keep their existing `:unauthorized` handling and the response
+        # body cannot be used to probe which tokens exist.
+        if ServiceAccount.expired?(account) do
+          {:error, :unauthorized}
+        else
+          {:ok, _updated} =
+            account
+            |> ServiceAccount.changeset(%{
+              last_used_at: DateTime.utc_now() |> DateTime.truncate(:second)
+            })
+            |> Repo.update()
 
-        {:ok, Repo.preload(account, :workspace)}
+          {:ok, Repo.preload(account, :workspace)}
+        end
     end
   end
 
@@ -1060,6 +1149,114 @@ defmodule ControlKeel.Platform do
     DateTime.utc_now() |> DateTime.truncate(:second)
   end
 
+  # ── Credential expiry ───────────────────────────────────────────────────────
+  #
+  # `nil` is the default expiry: a credential with no `expires_at` never
+  # expires. Rotation never touches an expiry unless the caller asks, so a
+  # secret refresh can never quietly become a lifetime extension.
+
+  # Rotation keeps the current expiry unless the caller supplies a new one.
+  defp rotation_expiry_attrs(account, opts) do
+    expiry_given? =
+      Keyword.get(opts, :expires_in_days) != nil or Keyword.has_key?(opts, :expires_at)
+
+    cond do
+      expiry_given? ->
+        with {:ok, expires_at} <- parse_expiry(opts), do: {:ok, %{expires_at: expires_at}}
+
+      ServiceAccount.expired?(account) ->
+        {:error, :expired}
+
+      true ->
+        {:ok, %{}}
+    end
+  end
+
+  # Explicit administrative update: the caller must say which expiry they
+  # want, so an empty call can never read as "clear the expiry".
+  defp requested_expiry(opts) do
+    if opts == [] or opts == %{} do
+      {:error, expiry_error("expires_at", "is required")}
+    else
+      parse_expiry(opts)
+    end
+  end
+
+  defp parse_expiry(opts) when is_list(opts),
+    do: parse_expiry(Enum.into(opts, %{}, fn {key, value} -> {to_string(key), value} end))
+
+  defp parse_expiry(opts) when is_map(opts) do
+    case Map.get(opts, "expires_in_days") do
+      nil -> parse_expires_at(Map.get(opts, "expires_at"))
+      value -> with {:ok, at} <- expires_in_days_to_datetime(value), do: parse_expires_at(at)
+    end
+  end
+
+  defp expires_in_days_to_datetime(value) when is_integer(value) and value > 0,
+    do: {:ok, DateTime.add(now(), value, :day)}
+
+  defp expires_in_days_to_datetime(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {days, ""} when days > 0 -> {:ok, DateTime.add(now(), days, :day)}
+      _ -> {:error, expiry_error("expires_in_days", "must be a positive number of days")}
+    end
+  end
+
+  defp expires_in_days_to_datetime(_value),
+    do: {:error, expiry_error("expires_in_days", "must be a positive number of days")}
+
+  defp parse_expires_at(nil), do: {:ok, nil}
+  defp parse_expires_at(%DateTime{} = at), do: {:ok, DateTime.truncate(at, :second)}
+
+  defp parse_expires_at(value) when is_binary(value) do
+    case DateTime.from_iso8601(String.trim(value)) do
+      {:ok, at, _offset} -> {:ok, DateTime.truncate(at, :second)}
+      {:error, _reason} -> {:error, expiry_error("expires_at", "must be an ISO8601 timestamp")}
+    end
+  end
+
+  defp parse_expires_at(_value),
+    do: {:error, expiry_error("expires_at", "must be a UTC timestamp")}
+
+  defp ensure_future_expiry(nil), do: :ok
+
+  defp ensure_future_expiry(%DateTime{} = expires_at) do
+    if DateTime.compare(expires_at, now()) == :gt do
+      :ok
+    else
+      {:error, expiry_error("expires_at", "must be in the future")}
+    end
+  end
+
+  defp expiry_error(field, message) do
+    %ServiceAccount{}
+    |> Ecto.Changeset.change()
+    |> Ecto.Changeset.add_error(field, message)
+  end
+
+  @expiry_opts [:expires_at, :expires_in_days]
+
+  # Lifted out before `stringify_keys_deep_list/1`, which walks maps
+  # structurally and would descend into a `%DateTime{}` expiry value.
+  defp pop_expiry_opts(attrs) when is_map(attrs) do
+    Enum.reduce(@expiry_opts, {%{}, attrs}, fn key, {opts, rest} ->
+      string_key = Atom.to_string(key)
+
+      case {Map.fetch(rest, key), Map.fetch(rest, string_key)} do
+        {{:ok, value}, _} ->
+          {Map.put(opts, string_key, value), Map.delete(rest, key)}
+
+        {_, {:ok, value}} ->
+          {Map.put(opts, string_key, value), Map.delete(rest, string_key)}
+
+        _other ->
+          {opts, rest}
+      end
+    end)
+  end
+
+  defp pop_expiry_opts(_other), do: {%{}, %{}}
+
   defp sign_payload(body, secret) do
     :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
   end
@@ -1238,7 +1435,10 @@ defmodule ControlKeel.Platform do
           id: account.id,
           name: account.name,
           status: account.status,
+          expired: ServiceAccount.expired?(account),
           last_used_at: account.last_used_at,
+          expires_at: account.expires_at,
+          rotated_at: account.rotated_at,
           provisioned_at: account.inserted_at,
           last_event_type: last_event && last_event.event_type,
           last_event_at: last_event && last_event.occurred_at,
@@ -1249,6 +1449,7 @@ defmodule ControlKeel.Platform do
     %{
       total: length(accounts),
       active: Enum.count(accounts, &ServiceAccount.active?/1),
+      expired: Enum.count(accounts, &ServiceAccount.expired?/1),
       revoked: Enum.count(accounts, &(&1.status == "revoked")),
       identities: identities
     }
