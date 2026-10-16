@@ -388,7 +388,7 @@ defmodule ControlKeelWeb.Layouts do
             <.link
               navigate={~p"/dashboard"}
               aria-label="Dashboard home"
-              class="flex items-center gap-1 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+              class="flex items-center gap-1 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
             >
               <.icon name="hero-home" class="size-3.5" />
             </.link>
@@ -399,7 +399,7 @@ defmodule ControlKeelWeb.Layouts do
               <%= if path do %>
                 <.link
                   navigate={path}
-                  class="text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+                  class="text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
                 >
                   {label}
                 </.link>
