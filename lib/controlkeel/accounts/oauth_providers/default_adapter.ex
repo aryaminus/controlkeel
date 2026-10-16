@@ -35,9 +35,14 @@ defmodule ControlKeel.Accounts.OAuthProviders.DefaultAdapter do
       {:ok, %{user: user}} when is_map(user) ->
         email = user[:email] || user["email"]
         name = user[:name] || user["name"]
+        # Assent surfaces the provider's verification state for both providers:
+        # Google from the OIDC `email_verified` claim, GitHub from the
+        # primary entry's `verified` flag on /user/emails. Callers must not
+        # trust an unverified email (see OAuthLoginController).
+        email_verified = truthy(user[:email_verified] || user["email_verified"])
 
         if is_binary(email) and String.trim(email) != "" do
-          {:ok, %{email: email, name: name}}
+          {:ok, %{email: email, name: name, email_verified: email_verified}}
         else
           {:error, :missing_email}
         end
@@ -46,6 +51,12 @@ defmodule ControlKeel.Accounts.OAuthProviders.DefaultAdapter do
         {:error, reason}
     end
   end
+
+  # Providers are inconsistent about the type of this flag; treat only a
+  # literal true (or a truthy string) as verified. Absent ⇒ false (fail closed).
+  defp truthy(true), do: true
+  defp truthy("true"), do: true
+  defp truthy(_), do: false
 
   # ── Private ─────────────────────────────────────────────────────────
 
