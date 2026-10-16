@@ -43,12 +43,39 @@ defmodule ControlKeel.Benchmark do
     domain_pack = normalize_domain_pack_filter(Keyword.get(opts, :domain_pack))
 
     Suite
+    |> scope_suites(Keyword.get(opts, :workspace_ids))
     |> order_by([suite], asc: suite.name)
     |> preload([:scenarios])
     |> Repo.all()
     |> maybe_exclude_internal(include_internal)
     |> maybe_filter_suites_by_domain(domain_pack)
   end
+
+  # Restrict suites to platform content (workspace_id NULL) plus the caller's
+  # own workspaces. Built-in suites are shipped platform content that every
+  # tenant may run, so they stay visible; tenant-created suites are isolated.
+  # In cloud mode, a caller with no accessible workspaces still sees platform
+  # suites but nobody else's.
+  defp scope_suites(query, workspace_ids) when is_list(workspace_ids) do
+    from(s in query, where: is_nil(s.workspace_id) or s.workspace_id in ^workspace_ids)
+  end
+
+  # Local mode has no tenancy: everything is visible.
+  defp scope_suites(query, _workspace_ids), do: query
+
+  # Restrict runs to the caller's workspaces. Runs are tenant data, never
+  # platform content, so this is strict: an empty accessible set yields no rows
+  # rather than every run (matches Cloud.Scope semantics).
+  defp scope_runs(query, workspace_ids) when is_list(workspace_ids) do
+    if workspace_ids == [] do
+      from(r in query, where: false)
+    else
+      from(r in query, where: r.workspace_id in ^workspace_ids)
+    end
+  end
+
+  # Local mode has no tenancy.
+  defp scope_runs(query, _workspace_ids), do: query
 
   def list_recent_runs(limit) when is_integer(limit) do
     list_recent_runs(limit: limit)
@@ -60,6 +87,7 @@ defmodule ControlKeel.Benchmark do
     query_limit = if domain_pack, do: max(limit * 5, 50), else: limit
 
     Run
+    |> scope_runs(Keyword.get(opts, :workspace_ids))
     |> order_by([run], desc: run.inserted_at)
     |> limit(^query_limit)
     |> preload([:suite, results: [scenario: []]])
@@ -109,6 +137,19 @@ defmodule ControlKeel.Benchmark do
 
   def get_run(id) when is_integer(id) do
     Run
+    |> Repo.get(id)
+    |> preload_run()
+  end
+
+  @doc """
+  Fetch a run scoped to the caller's accessible workspaces.
+
+  Returns nil for another tenant's run. Used by tenant-facing reads so an IDOR
+  cannot pull cross-tenant benchmark results.
+  """
+  def get_run_for_user(id, workspace_ids) when is_integer(id) and is_list(workspace_ids) do
+    Run
+    |> scope_runs(workspace_ids)
     |> Repo.get(id)
     |> preload_run()
   end
@@ -168,10 +209,18 @@ defmodule ControlKeel.Benchmark do
 
       subjects = SubjectLoader.resolve(subject_ids, project_root)
       metadata = run_metadata(suite, subjects, project_root, domain_pack)
+      workspace_id = Map.get(attrs, :workspace_id) || Map.get(attrs, "workspace_id")
 
       with true <- scenarios != [] || {:error, :no_scenarios},
            {:ok, run} <-
-             create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata),
+             create_run_record(
+               suite,
+               scenarios,
+               subject_ids,
+               baseline_subject,
+               metadata,
+               workspace_id
+             ),
            result_attrs <- Runner.execute(scenarios, subjects, project_root: project_root),
            {:ok, _results} <- insert_results(run, result_attrs),
            {:ok, updated_run} <- recalculate_run(run.id) do
@@ -1082,10 +1131,18 @@ defmodule ControlKeel.Benchmark do
     |> Repo.delete_all()
   end
 
-  defp create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata) do
+  defp create_run_record(
+         suite,
+         scenarios,
+         subject_ids,
+         baseline_subject,
+         metadata,
+         workspace_id
+       ) do
     %Run{}
     |> Run.changeset(%{
       suite_id: suite.id,
+      workspace_id: workspace_id,
       status: "running",
       baseline_subject: baseline_subject,
       subjects: subject_ids,
