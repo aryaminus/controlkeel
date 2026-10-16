@@ -54,6 +54,15 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
           {:error, :needs_admin} ->
             {:ok,
              redirect_with_flash(socket, :error, "You don't have permission.", ~p"/organizations")}
+
+          {:error, :suspended} ->
+            {:ok,
+             redirect_with_flash(
+               socket,
+               :error,
+               "This organization is suspended.",
+               ~p"/organizations"
+             )}
         end
     end
   end

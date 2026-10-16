@@ -14,7 +14,8 @@ defmodule ControlKeelWeb.WorkspaceAccess do
       admin tabs).
 
   Returns `:ok` or `{:error, reason}` with `:unbound` (workspace has no
-  org), `:forbidden` (no active membership — includes missing user), or
+  org), `:suspended` (the owning org is not active — the kill switch),
+  `:forbidden` (no active membership — includes missing user), or
   `:needs_admin` (member below the required role). Callers map these to
   their page's user-facing messages.
   """
@@ -23,13 +24,21 @@ defmodule ControlKeelWeb.WorkspaceAccess do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Runtime.Mode
 
-  @type denial :: :unbound | :forbidden | :needs_admin
+  @type denial :: :unbound | :suspended | :forbidden | :needs_admin
   @spec check(Workspace.t(), map() | nil, String.t()) :: :ok | {:error, denial()}
   def check(%Workspace{} = workspace, user, required_role \\ "viewer") do
     cond do
-      Mode.current() == :local -> :ok
-      is_nil(workspace.org_id) -> {:error, :unbound}
-      true -> check_membership(workspace, user, required_role)
+      Mode.current() == :local ->
+        :ok
+
+      is_nil(workspace.org_id) ->
+        {:error, :unbound}
+
+      true ->
+        case Accounts.org_active?(workspace.org_id) do
+          false -> {:error, :suspended}
+          true -> check_membership(workspace, user, required_role)
+        end
     end
   end
 
