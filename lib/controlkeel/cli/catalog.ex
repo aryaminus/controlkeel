@@ -145,6 +145,9 @@ defmodule ControlKeel.CLI.Catalog do
   defp command_path(:serve), do: "serve"
   defp command_path(:help), do: "help"
   defp command_path(:version), do: "version"
+  defp command_path(:login), do: "login"
+  defp command_path(:logout), do: "logout"
+  defp command_path(:whoami), do: "whoami"
   defp command_path(:doctor), do: "doctor"
   defp command_path(:capabilities), do: "capabilities"
   defp command_path(:detach), do: "detach <agent>"
@@ -306,7 +309,10 @@ defmodule ControlKeel.CLI.Catalog do
           :init,
           :bootstrap,
           :status,
-          :watch
+          :watch,
+          :login,
+          :logout,
+          :whoami
         ],
         help_topic: "getting-started",
         outputs: [:text, :json],
