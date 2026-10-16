@@ -31,11 +31,16 @@ defmodule ControlKeelWeb.CloudTelemetryLive do
 
   @impl true
   def mount(_params, session, socket) do
-    # Admin-only: operator dashboard shows cross-tenant data.
-    # Require an active org membership with admin role.
+    # This is an operator dashboard showing CROSS-TENANT data: global telemetry
+    # ingestion, the MCP audit log, and the registry. Gating it on the viewer's
+    # *own* org admin role was wrong — any customer who promotes one colleague
+    # to admin gained a view of every tenant's telemetry (issue #246).
+    #
+    # Until a platform-operator role exists in the membership model, require an
+    # explicit operator allowlist. Local mode is single-user and stays open.
     membership = resolve_membership(socket, session)
 
-    if admin?(membership) do
+    if access_allowed?(socket, membership) do
       if connected?(socket), do: Process.send_after(self(), :refresh, @refresh_ms)
 
       {:ok,
@@ -46,15 +51,46 @@ defmodule ControlKeelWeb.CloudTelemetryLive do
       {:ok,
        socket
        |> assign(:page_title, "Cloud telemetry")
-       |> put_flash(:error, "Admin access required.")
+       |> put_flash(:error, "Platform operator access required.")
        |> redirect(to: "/")}
     end
   end
 
-  defp admin?(%ControlKeel.Accounts.Membership{status: "active", role: role}),
-    do: ControlKeel.Accounts.role_at_least?(role, "admin")
+  defp access_allowed?(socket, _membership) do
+    ControlKeel.Runtime.Mode.current() == :local or platform_operator?(socket)
+  end
 
-  defp admin?(_), do: false
+  # Cross-tenant operator allowlist, from CONTROLKEEL_PLATFORM_OPERATORS as a
+  # comma-separated list of user emails. Unset or empty means nobody is a
+  # platform operator, so this surface is closed by default in cloud mode.
+  defp platform_operator?(socket) do
+    case platform_operator_emails() do
+      [] ->
+        false
+
+      allowed ->
+        case viewer_email(socket) do
+          nil -> false
+          email -> String.downcase(email) in allowed
+        end
+    end
+  end
+
+  defp platform_operator_emails do
+    "CONTROLKEEL_PLATFORM_OPERATORS"
+    |> System.get_env()
+    |> case do
+      nil -> []
+      list -> list |> String.split(~r/[\s,]+/, trim: true) |> Enum.map(&String.downcase/1)
+    end
+  end
+
+  defp viewer_email(socket) do
+    case socket.assigns[:current_user] do
+      %{email: email} when is_binary(email) -> email
+      _ -> nil
+    end
+  end
 
   defp resolve_membership(socket, session) do
     # Prefer pre-loaded assign from LoadCurrentUser plug (production),
