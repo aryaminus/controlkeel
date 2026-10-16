@@ -36,20 +36,36 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistryTest do
       assert %DateTime{} = key.last_seen_at
     end
 
-    test "is idempotent on workspace_id and clears revoked_at" do
+    test "is idempotent on workspace_id and refuses to clear a revocation" do
+      # Re-registering a revoked workspace must NOT resurrect it: the register
+      # endpoint is unauthenticated, so a caller holding an old private key
+      # could otherwise un-revoke itself. Revocation is terminal until an
+      # operator removes the row.
       attrs = sample_key()
       {:ok, first} = KeyRegistry.enroll(attrs)
-      {:ok, _} = KeyRegistry.revoke(first.workspace_id)
+      {:ok, revoked} = KeyRegistry.revoke(first.workspace_id)
+      refute is_nil(revoked.revoked_at)
 
-      {:ok, second} = KeyRegistry.enroll(attrs)
-      assert second.id == first.id
-      assert second.revoked_at == nil
+      assert {:error, :revoked} = KeyRegistry.enroll(attrs)
+
+      # Still revoked on disk.
+      assert {:error, :not_found} = KeyRegistry.fetch(first.workspace_id)
     end
 
     test "rejects malformed workspace_id" do
       attrs = sample_key(%{workspace_id: "not-a-ws-id"})
 
       assert {:error, %Ecto.Changeset{}} = KeyRegistry.enroll(attrs)
+    end
+
+    test "re-registering a live key refreshes it without changing identity" do
+      attrs = sample_key()
+      {:ok, first} = KeyRegistry.enroll(attrs)
+
+      {:ok, second} = KeyRegistry.enroll(attrs)
+
+      assert second.id == first.id
+      assert is_nil(second.revoked_at)
     end
   end
 
