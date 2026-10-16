@@ -2,6 +2,12 @@ defmodule ControlKeel.Mission.Workspace do
   use Ecto.Schema
   import Ecto.Changeset
 
+  # The UI renders a workspace as active only when status == "active", so a
+  # free-form status string silently degrades to "not active" with no
+  # validation error. Constrain it the way org.ex / policy_set.ex /
+  # service_account.ex already do.
+  @valid_statuses ~w(draft active archived)
+
   alias ControlKeel.Accounts.Org
   alias ControlKeel.Memory.Record
   alias ControlKeel.Mission.Session
@@ -49,6 +55,7 @@ defmodule ControlKeel.Mission.Workspace do
     ])
     |> validate_number(:budget_cents, greater_than_or_equal_to: 0)
     |> update_change(:slug, &normalize_slug/1)
+    |> validate_inclusion(:status, @valid_statuses)
     |> unique_constraint(:slug)
   end
 
