@@ -149,7 +149,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
             <strong>Token for {@new_token_for}.</strong> Copy it now — it will not be shown again.
           </p>
           <pre><code id="new-token-value">{@new_token}</code></pre>
-          <button type="button" phx-click="dismiss-token">
+          <button type="button" phx-click="dismiss-token" class="text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
             Dismiss
           </button>
         </div>

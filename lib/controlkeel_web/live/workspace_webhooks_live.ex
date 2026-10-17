@@ -144,7 +144,7 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
             Copy now — it will not be shown again.
           </p>
           <pre><code id="new-secret-value">{@new_secret}</code></pre>
-          <button type="button" phx-click="dismiss-secret">
+          <button type="button" phx-click="dismiss-secret" class="text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
             Dismiss
           </button>
         </div>

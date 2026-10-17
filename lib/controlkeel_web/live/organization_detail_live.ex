@@ -425,7 +425,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
           <button
             type="button"
             phx-click="dismiss-token"
-            class="mt-3 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+            class="mt-3 text-xs font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Dismiss
           </button>
