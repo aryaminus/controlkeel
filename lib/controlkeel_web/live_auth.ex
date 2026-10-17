@@ -7,10 +7,12 @@ defmodule ControlKeelWeb.LiveAuth do
     * `:require_cloud_auth` — in cloud/self_hosted mode requires a signed-in
       user (`current_user`) **with at least one active membership**; users
       without any membership are redirected to `/organizations` (the
-      onboarding surface, which is exempt so they can join or create an
-      org) instead of proceeding with effectively global read access
-      (issue #141, R3). In local mode this is a passthrough so local
-      single-user deployments are unaffected.
+      legacy onboarding surface, which is exempt so they can join or create
+      an org) instead of proceeding with effectively global read access
+      (issue #141, R3). Signup auto-provisions a personal org
+      (`OAuthLoginController`), so the membership-less branch is a safety
+      net for pre-existing rows, not a reachable flow. In local mode this
+      is a passthrough so local single-user deployments are unaffected.
 
     * `:load_if_available` — loads user/membership from session without gating.
       Use for pages that are public in local mode but show org-scoped data when
@@ -45,9 +47,11 @@ defmodule ControlKeelWeb.LiveAuth do
         is_nil(socket.assigns[:current_user]) ->
           {:halt, redirect(socket, to: "/auth/login")}
 
-        # `/organizations` is the onboarding surface (org list + create +
-        # invite acceptance): a membership-less user is allowed there so they
-        # can join or create an org. Everywhere else requires membership.
+        # `/organizations` is the legacy onboarding surface (kept as-is,
+        # orphaned): a membership-less user is allowed there so existing
+        # bookmarks keep working. Everywhere else requires membership.
+        # Signup auto-provisioning makes this branch unreachable for new
+        # users; it remains as a safety net for pre-existing rows.
         socket.view == ControlKeelWeb.OrganizationsLive ->
           {:cont, attach_membership_eviction(socket)}
 

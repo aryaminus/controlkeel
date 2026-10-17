@@ -149,6 +149,128 @@ document.addEventListener("click", async event => {
   }, 1500)
 })
 
+// Last-path memory: the settled route is the source of truth — one
+// observer covers switcher clicks, pasted URLs, bookmarks, back/forward,
+// and full page loads. Only scoped overview roots are kept, with sub-routes
+// trimmed to their root (`/:org`, `/:org/workspaces/:ws`,
+// `.../sessions/:id`). Top-level globals are never stored (org slugs
+// cannot collide with them — see Org reserved slugs). `parseOverviewRoot`
+// doubles as the boot-shell validator, so writer and reader can never
+// disagree on shape.
+const CK_RESERVED_TOP_LEVEL = new Set([
+  "docs", "getting-started", "about", "contact", "privacy", "developers",
+  "auth", "login", "logout", "dashboard", "sessions", "findings",
+  "benchmarks", "proofs", "cloud", "organizations", "policies", "skills",
+  "observability", "invitations", "workspaces", "api", "proxy", "mcp",
+  "oauth", "dev", "assets"
+])
+
+function parseOverviewRoot(pathname) {
+  const segments = String(pathname || "").split("/").filter(Boolean)
+
+  if (segments.length === 1 && !CK_RESERVED_TOP_LEVEL.has(segments[0])) {
+    return `/${segments[0]}`
+  }
+
+  if (segments.length >= 3 && segments[1] === "workspaces") {
+    let root = `/${segments[0]}/workspaces/${segments[2]}`
+    if (segments.length >= 5 && segments[3] === "sessions") {
+      root = `${root}/sessions/${segments[4]}`
+    }
+    return root
+  }
+
+  return null
+}
+
+function rememberLastPath() {
+  const root = parseOverviewRoot(window.location.pathname)
+  if (!root) return
+
+  try {
+    localStorage.setItem("ck.lastPath", root)
+  } catch (_error) {
+    // Storage failures (e.g. private mode) must not break navigation.
+  }
+}
+
+window.addEventListener("phx:page-loading-stop", rememberLastPath)
+
+// Inline org slug generation (`/` home form): mirrors the server-side
+// slugify so the slug field fills as the name is typed. Stops the moment
+// the user edits the slug by hand (a server-repopulated value counts as
+// edited). The server still validates on submit (reserved words,
+// uniqueness) — this is a typing convenience, not the rule.
+function slugifyName(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/g, "")
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const orgName = document.getElementById("org_name")
+  const orgSlug = document.getElementById("org_slug")
+  if (!orgName || !orgSlug) return
+
+  let slugEdited = orgSlug.value !== ""
+
+  orgSlug.addEventListener("input", () => {
+    slugEdited = true
+  })
+
+  orgName.addEventListener("input", () => {
+    if (slugEdited) return
+    orgSlug.value = slugifyName(orgName.value)
+  })
+})
+// the default fallback and whether the user holds any org; the stored
+// last path decides the rest. Users with no orgs skip navigation entirely
+// and get the inline creation form instead (a stored path would be stale
+// — e.g. all orgs deleted). Server re-renders after a failed create carry
+// `data-home-show-form`, shown immediately. `replace` keeps the home out
+// of the back-button history.
+document.addEventListener("DOMContentLoaded", () => {
+  rememberLastPath()
+
+  const boot = document.querySelector("[data-app-home]")
+  if (!boot) return
+
+  const loading = document.getElementById("app-home-loading")
+  const create = document.getElementById("app-home-create")
+
+  const showForm = () => {
+    loading?.classList.add("hidden")
+    create?.classList.remove("hidden")
+  }
+
+  if (boot.dataset.homeShowForm === "true") {
+    showForm()
+    return
+  }
+
+  if (boot.dataset.homeHasOrgs !== "true") {
+    showForm()
+    return
+  }
+
+  const fallback = boot.dataset.homeFallback || "/"
+  let stored = null
+  try {
+    stored = localStorage.getItem("ck.lastPath")
+  } catch (_error) {
+    stored = null
+  }
+  // FUTURE (cross-browser): insert a server-provided tier here —
+  // `home/2` embeds the account-side last path as `data-server-path`
+  // (see the note there) and priority becomes
+  // localStorage → server path → default → form. Parse it with
+  // `parseOverviewRoot` like `stored` (untrusted until parsed).
+  window.location.replace(parseOverviewRoot(stored) || fallback)
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 
