@@ -41,18 +41,27 @@ defmodule ControlKeelWeb.PageControllerTest do
   end
 
   describe "local mode GET /" do
-    test "redirects to the default organization page", %{conn: conn} do
+    test "renders a last-path handoff without requiring authentication", %{conn: conn} do
       conn = get(conn, ~p"/")
+      body = html_response(conn, 200)
 
-      assert redirected_to(conn) == ~p"/#{LocalDefaults.default_org_slug()}"
+      assert body =~ "data-last-path-boot"
+      assert body =~ ~s(data-last-path-fallback="/#{LocalDefaults.default_org_slug()}")
     end
 
-    test "provisions the default org on first visit", %{conn: conn} do
+    test "uses the most recently created organization as fallback", %{conn: conn} do
       assert Accounts.get_org_by_slug(LocalDefaults.default_org_slug()) == nil
+      assert {:ok, _defaults} = LocalDefaults.ensure()
 
-      get(conn, ~p"/")
+      {:ok, first_org} = Accounts.create_org(%{name: "First Org", slug: "first-org"})
+      {:ok, newest_org} = Accounts.create_org(%{name: "Newest Org", slug: "newest-org"})
+
+      conn = get(conn, ~p"/")
+      body = html_response(conn, 200)
 
       assert Accounts.get_org_by_slug(LocalDefaults.default_org_slug()) != nil
+      assert first_org.id < newest_org.id
+      assert body =~ ~s(data-last-path-fallback="/newest-org")
     end
   end
 
@@ -83,13 +92,39 @@ defmodule ControlKeelWeb.PageControllerTest do
       refute body =~ "data-app-home"
     end
 
-    test "signed-in users get the unified home shell", %{
+    test "signed-in users get the shared last-path handoff with their newest accessible org fallback",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, _first_org} =
+        Accounts.create_org_with_owner(user.id, %{name: "Acme Corp", slug: "acme-corp"})
+
+      {:ok, newest_org} =
+        Accounts.create_org_with_owner(user.id, %{name: "Newest Corp", slug: "newest-corp"})
+
+      {:ok, other_user} = Accounts.create_user(%{email: "other@example.com"})
+
+      {:ok, _other_org} =
+        Accounts.create_org_with_owner(other_user.id, %{name: "Other Corp", slug: "other-corp"})
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get(~p"/")
+
+      body = html_response(conn, 200)
+
+      assert body =~ "data-last-path-boot"
+      assert body =~ ~s(data-last-path-fallback="/#{newest_org.slug}")
+      refute body =~ "other-corp"
+      refute body =~ "Turn team knowledge into"
+    end
+
+    test "signed-in users without an accessible organization fall back to /organizations", %{
       conn: conn,
       user: user
     } do
-      {:ok, org} =
-        Accounts.create_org_with_owner(user.id, %{name: "Acme Corp", slug: "acme-corp"})
-
       conn =
         conn
         |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
@@ -97,80 +132,8 @@ defmodule ControlKeelWeb.PageControllerTest do
 
       body = html_response(conn, 200)
 
-      assert body =~ "data-app-home"
-      assert body =~ ~s(data-home-fallback="/#{org.slug}")
-      assert body =~ ~s(data-home-has-orgs="true")
-      assert body =~ "Opening your workspace"
-      refute body =~ "Turn team knowledge into"
-    end
-
-    test "signed-in users without an org get the inline creation form", %{
-      conn: conn
-    } do
-      {:ok, fresh} = Accounts.create_user(%{email: "fresh@example.com"})
-
-      conn =
-        conn
-        |> Plug.Test.init_test_session(%{"current_user_id" => fresh.id})
-        |> get(~p"/")
-
-      body = html_response(conn, 200)
-
-      assert body =~ "data-app-home"
-      assert body =~ ~s(data-home-has-orgs="false")
-      assert body =~ "No organizations yet"
-      assert body =~ ~s(action="/orgs")
-      refute body =~ "Turn team knowledge into"
-    end
-  end
-
-  describe "POST /orgs" do
-    setup do
-      original = Application.get_env(:controlkeel, :runtime_mode)
-      Application.put_env(:controlkeel, :runtime_mode, :cloud)
-
-      on_exit(fn ->
-        if is_nil(original) do
-          Application.delete_env(:controlkeel, :runtime_mode)
-        else
-          Application.put_env(:controlkeel, :runtime_mode, original)
-        end
-      end)
-
-      {:ok, user} = Accounts.create_user(%{email: "creator@example.com"})
-
-      {:ok, user: user}
-    end
-
-    test "anonymous visitors are redirected to login", %{conn: conn} do
-      conn = post(conn, ~p"/orgs", %{"org" => %{"name" => "Nope"}})
-
-      assert redirected_to(conn, 302) == "/auth/login"
-    end
-
-    test "creates the org and lands on it", %{conn: conn, user: user} do
-      conn =
-        conn
-        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
-        |> post(~p"/orgs", %{"org" => %{"name" => "Fresh Co"}})
-
-      assert redirected_to(conn, 302) == "/fresh-co"
-
-      assert [%{org: org, role: "owner"}] = Accounts.list_orgs_for_user(user.id)
-      assert org.slug == "fresh-co"
-    end
-
-    test "failures re-render the home with the form shown", %{conn: conn, user: user} do
-      conn =
-        conn
-        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
-        |> post(~p"/orgs", %{"org" => %{"name" => ""}})
-
-      body = html_response(conn, 422)
-
-      assert body =~ "data-app-home"
-      assert body =~ ~s(data-home-show-form="true")
-      assert body =~ "No organizations yet"
+      assert body =~ "data-last-path-boot"
+      assert body =~ ~s(data-last-path-fallback="/organizations")
     end
   end
 

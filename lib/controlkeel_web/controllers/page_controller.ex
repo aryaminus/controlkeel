@@ -16,117 +16,43 @@ defmodule ControlKeelWeb.PageController do
   # (ControlKeelWeb.Layouts). The layout reads @current_user/@flash directly,
   # so nothing needs to be forwarded from the templates.
   #
-  # NOTE: `GET /` is the branding page. Signed-in users never see it:
-  # they get a layout-less boot shell that client-navigates to their last
-  # org path (`localStorage["ck.lastPath"]`) before any branding renders.
-  # The server cannot read localStorage, so a pure 302 here would lose the
-  # last path and could only fall back to the default org.
+  # The root handoff is shared by local and signed-in cloud users. Anonymous
+  # cloud visitors keep the marketing page.
   plug :put_layout, html: {ControlKeelWeb.Layouts, :public}
 
   def home(conn, _params) do
     cond do
-      # Local mode has no marketing surface — `/` goes straight to the
-      # default org. ensure/0 is idempotent (find-or-create), so a fresh
-      # local install provisions the org on first visit.
       Mode.current() == :local ->
-        _ = LocalDefaults.ensure()
-        redirect(conn, to: ~p"/#{LocalDefaults.default_org_slug()}")
+        {:ok, _defaults} = LocalDefaults.ensure()
 
-      # Signed-in cloud/self_hosted users share one home: the client
-      # navigates to the stored last path, else the default org; users
-      # with no orgs at all get the inline creation form instead. One
-      # template — no separate shell/onboarding cases.
-      #
-      # FUTURE (cross-browser): `localStorage` is per-browser, so a new
-      # machine has no memory. Persist the last overview root account-side
-      # (e.g. `user_last_contexts`, upserted from
-      # `OrganizationLayoutDefaults` only when the derived root changes,
-      # read here and embedded as `data-server-path`) — the Vercel model:
-      # session proves identity, the account record supplies the route.
-      user = conn.assigns[:current_user] ->
         conn
         |> put_layout(false)
-        |> render(:app_home,
-          default_path: default_org_path(user),
-          has_orgs: Accounts.any_active_membership?(user.id),
-          error: nil,
-          name: "",
-          slug: ""
+        |> render(:home,
+          last_path_boot: true,
+          fallback_path: latest_org_path(Accounts.list_orgs(status: "active"))
         )
 
+      user = conn.assigns[:current_user] ->
+        fallback_path =
+          user.id
+          |> Accounts.list_orgs_for_user()
+          |> Enum.map(& &1.org)
+          |> Enum.filter(&(&1.status == "active"))
+          |> latest_org_path()
+
+        conn
+        |> put_layout(false)
+        |> render(:home, last_path_boot: true, fallback_path: fallback_path)
+
       true ->
-        render(conn, :home)
+        render(conn, :home, last_path_boot: false, fallback_path: nil)
     end
   end
 
-  # Inline org creation from the `/` home (no-org users only). Mirrors the
-  # `/organizations` modal without leaving the page: success lands on the
-  # new org, failures re-render the home with the form shown and an error.
-  def create_org(conn, %{"org" => params}) do
-    case conn.assigns[:current_user] do
-      nil ->
-        redirect(conn, to: ~p"/auth/login")
-
-      user ->
-        params = Map.put(params, "slug", resolve_org_slug(params))
-
-        case Accounts.create_org_with_owner(user.id, params) do
-          {:ok, org} ->
-            redirect(conn, to: "/#{org.slug}")
-
-          {:error, changeset} ->
-            conn
-            |> put_layout(false)
-            |> put_status(:unprocessable_entity)
-            |> render(:app_home,
-              default_path: default_org_path(user),
-              has_orgs: false,
-              error: changeset_error(changeset),
-              name: params["name"] || "",
-              slug: params["slug"] || ""
-            )
-        end
-    end
-  end
-
-  def create_org(conn, _params), do: redirect(conn, to: ~p"/")
-
-  defp resolve_org_slug(params) do
-    case Map.get(params, "slug", "") do
-      slug when is_binary(slug) and slug != "" -> slug
-      _ -> slugify(Map.get(params, "name", ""))
-    end
-  end
-
-  defp slugify(name) when is_binary(name) do
-    name
-    |> String.downcase()
-    |> String.replace(~r/[^a-z0-9]+/u, "-")
-    |> String.trim("-")
-  end
-
-  defp slugify(_), do: ""
-
-  defp changeset_error(changeset) do
-    changeset.errors
-    |> Enum.map_join(", ", fn {field, {message, _}} -> "#{field} #{message}" end)
-    |> then(fn message -> if message == "", do: "Could not create the organization.", else: message end)
-  end
-
-  defp default_org_path(user) do
-    # No membership (or a vanished org row) means there is nowhere to go:
-    # stay on `/`, whose home reveals the creation form. This value is only
-    # ever navigated to when the user holds an org, so the fallback below
-    # is a stay-put signal, not a route.
-    case Accounts.default_org_for_user(user.id) do
-      nil ->
-        "/"
-
-      org_id ->
-        case Accounts.get_org(org_id) do
-          %{slug: slug} when is_binary(slug) -> "/#{slug}"
-          _ -> "/"
-        end
+  defp latest_org_path(orgs) do
+    case Enum.max_by(orgs, &{DateTime.to_unix(&1.inserted_at, :microsecond), &1.id}, fn -> nil end) do
+      %{slug: slug} -> "/#{slug}"
+      nil -> ~p"/organizations"
     end
   end
 
