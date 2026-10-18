@@ -4,8 +4,6 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Membership
-  alias ControlKeel.Repo
 
   describe "local mode /organizations" do
     test "index lists every active org" do
@@ -44,39 +42,13 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
       refute render(view) =~ "ring-info/20"
     end
 
-    test "new_org shows the local-mode info panel instead of the create form" do
-      {:ok, view, html} = live(build_conn(), ~p"/organizations")
+    test "no create modal, button, or form remains on this page (issue #277)" do
+      {:ok, _view, html} = live(build_conn(), ~p"/organizations")
 
-      # The New Organization button is still shown in local mode.
-      assert html =~ "New Organization"
-      assert html =~ "new_org"
-
-      render_click(view, "new_org")
-
-      html = render(view)
-      assert html =~ "New organization"
-      assert html =~ "Only the default organization is available in local mode"
-      # The form is not rendered — only the info panel.
-      refute html =~ ~s(id="organization-form")
-    end
-
-    test "cancel_new click closes the create modal" do
-      {:ok, view, _html} = live(build_conn(), ~p"/organizations")
-
-      render_click(view, "new_org")
-      assert render(view) =~ ~s(id="organization-create-modal")
-
-      render_click(view, "cancel_new")
-      refute render(view) =~ ~s(id="organization-create-modal")
-    end
-
-    test "save is denied in local mode and creates no org" do
-      {:ok, view, _html} = live(build_conn(), ~p"/organizations")
-
-      html = render_submit(view, "save", %{"org" => %{name: "New Co", slug: "new-co"}})
-
-      refute Repo.get_by(ControlKeel.Accounts.Org, slug: "new-co")
-      assert html =~ "Organizations are not created in local mode"
+      # Creation moved to /new/org — no modal shell, no page action.
+      refute html =~ ~s(id="organization-create-modal")
+      refute html =~ "New Organization"
+      refute html =~ "new_org"
     end
   end
 
@@ -126,22 +98,14 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
       refute html =~ "—"
     end
 
-    test "save inserts an org plus an owner membership for the current user", %{
-      conn: conn,
-      user: user
+    test "memberless empty state links to /new/org instead of a create modal", %{
+      conn: conn
     } do
-      {:ok, view, _html} = live(conn, ~p"/organizations")
-      render_click(view, "new_org")
+      {:ok, view, html} = live(conn, ~p"/organizations")
 
-      view
-      |> form("#organization-form", org: %{name: "Cloud Co", slug: "cloud-co"})
-      |> render_submit()
-
-      org = Repo.get_by!(ControlKeel.Accounts.Org, slug: "cloud-co")
-
-      membership = Accounts.get_active_membership(user.id, org.id)
-      assert membership != nil
-      assert membership.role == "owner"
+      assert html =~ "No organizations yet."
+      assert has_element?(view, ~s(a[href="/new/org"]))
+      refute html =~ ~s(id="organization-create-modal")
     end
 
     test "default org is active and switching redirects to the signed switch URL", %{

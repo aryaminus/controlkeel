@@ -6,12 +6,13 @@ defmodule ControlKeelWeb.LiveAuth do
 
     * `:require_cloud_auth` — in cloud/self_hosted mode requires a signed-in
       user (`current_user`) **with at least one active membership**; users
-      without any membership are redirected to `/organizations` (the
-      legacy onboarding surface) instead of proceeding with effectively
-      global read access. `/organizations`, the standalone `/new/org`
-      creation page, and `/new/session` are exempt so membership-less
-      users can join or create an org (and see why starting a session needs
-      one) (issue #141, R3). Signup auto-provisions a personal org
+      without any membership are redirected to `/organizations` instead of
+      proceeding with effectively global read access. `/organizations`,
+      the standalone `/new/org` creation page, and `/new/session` are exempt
+      so membership-less users can see their invitations and empty state
+      (which points at `/new/org`), create an org, and see why starting a
+      session needs one (issue #141, R3; creation lives at `/new/org` since
+      #277). Signup auto-provisions a personal org
       (`OAuthLoginController`), so the membership-less branch is a safety
       net for pre-existing rows, not a reachable flow. In local mode this
       is a passthrough so local single-user deployments are unaffected.
@@ -50,8 +51,10 @@ defmodule ControlKeelWeb.LiveAuth do
           {:halt, redirect(socket, to: "/auth/login")}
 
         # `/organizations`, `/new/org`, and `/new/session` remain available
-        # to membership-less users so they can join or create an org and see
-        # why they cannot start a session yet. Everywhere else requires
+        # to membership-less users: the empty state and invitations continue
+        # on `/organizations`, creation happens at `/new/org`, and the
+        # launcher explains why starting a session still needs an org.
+        # Everywhere else requires
         # membership. Signup auto-provisioning makes this branch unreachable
         # for new users; it remains as a safety net for pre-existing rows.
         socket.view in [
