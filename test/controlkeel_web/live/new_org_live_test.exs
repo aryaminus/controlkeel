@@ -139,15 +139,10 @@ defmodule ControlKeelWeb.NewOrgLiveTest do
       user = user_fixture()
       {:ok, view, _html} = live(cloud_conn(user), ~p"/new/org")
 
-      view
-      |> form("#new-org-form",
-        org: %{
-          name: "No WS",
-          slug: "no-ws",
-          create_default_workspace: "false"
-        }
-      )
-      |> render_submit()
+      # A checkbox cannot submit "false" — an unchecked box is simply absent
+      # from the payload — so the declined path is exercised at the event
+      # level with no `create_default_workspace` param at all.
+      render_submit(view, "save", %{"org" => %{"name" => "No WS", "slug" => "no-ws"}})
 
       org = Repo.get_by!(Org, slug: "no-ws")
       assert Accounts.list_workspaces_for_org(org.id) == []
