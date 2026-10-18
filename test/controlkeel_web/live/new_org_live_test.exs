@@ -131,7 +131,28 @@ defmodule ControlKeelWeb.NewOrgLiveTest do
 
       org = Repo.get_by!(Org, slug: "with-ws")
       assert length(Accounts.list_workspaces_for_org(org.id)) == 1
-      assert {"/with-ws", _flash} = assert_redirect(view)
+      assert {"/with-ws", flash} = assert_redirect(view)
+      assert flash["info"] =~ "created with a default workspace"
+    end
+
+    test "save with the default workspace box declined creates no workspace", %{} do
+      user = user_fixture()
+      {:ok, view, _html} = live(cloud_conn(user), ~p"/new/org")
+
+      view
+      |> form("#new-org-form",
+        org: %{
+          name: "No WS",
+          slug: "no-ws",
+          create_default_workspace: "false"
+        }
+      )
+      |> render_submit()
+
+      org = Repo.get_by!(Org, slug: "no-ws")
+      assert Accounts.list_workspaces_for_org(org.id) == []
+      assert {"/no-ws", flash} = assert_redirect(view)
+      assert flash["info"] =~ "Organization \"No WS\" created."
     end
 
     test "an invalid slug shows a validation error and creates nothing", %{} do

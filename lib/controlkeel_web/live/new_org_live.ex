@@ -2,13 +2,13 @@ defmodule ControlKeelWeb.NewOrgLive do
   @moduledoc """
   `/new/org` — standalone create-organization page.
 
-  Mounted in the `:onboarding` live_session with the headless
-  `NewPagesLayouts.new_pages` layout (top bar + centered column). It
-  mirrors the create form from the `/organizations` modal so the org switcher
-  can send membered and memberless users straight here to create an
-  additional organization. Save creates the org plus an owner membership for
-  the current user (optionally with a starter workspace) and navigates to the
-  new org.
+  Mounted in the `:new_pages` live_session with the headless
+  `NewPagesLayouts.new_pages` layout (top bar + centered column). Save creates
+  an org plus an owner membership for the current user (optionally with a
+  starter workspace) and navigates to the new org. It is exempt from the
+  membership gate, so first-run memberless users create their org here;
+  membered users may also visit to create an additional organization (wired
+  to the org switcher's create entry in a follow-up PR — issue #277).
 
   Local mode has no membership concept, so only the default organization
   exists there — the page shows an info panel instead of the form and save is
@@ -51,10 +51,30 @@ defmodule ControlKeelWeb.NewOrgLive do
     create_default_workspace? = Map.get(params, "create_default_workspace") == "true"
 
     case create_org(socket, params, create_default_workspace?) do
-      {:ok, org, _created_workspace?} ->
+      {:ok, org, true} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Organization \"#{org.name}\" created.")
+         |> put_flash(:info, "Organization \"#{org.name}\" created with a default workspace.")
+         |> push_navigate(to: ~p"/#{org.slug}")}
+
+      {:ok, org, false} ->
+        # The org exists either way and the user still lands in it; only the
+        # feedback differs. Without the checked box this is the plain success
+        # path. With it, the starter workspace insert failed and the checkbox
+        # promise is broken — surface that instead of staying silent. The
+        # org page they land on shows its empty workspace state with a
+        # "Create workspace" affordance, so the guidance stays actionable.
+        {kind, text} =
+          if create_default_workspace? do
+            {:error,
+             "Organization \"#{org.name}\" was created, but its starter workspace could not be created. You can add one from the organization page."}
+          else
+            {:info, "Organization \"#{org.name}\" created."}
+          end
+
+        {:noreply,
+         socket
+         |> put_flash(kind, text)
          |> push_navigate(to: ~p"/#{org.slug}")}
 
       {:error, %Ecto.Changeset{} = changeset} ->
