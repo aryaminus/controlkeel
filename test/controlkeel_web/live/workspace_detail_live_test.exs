@@ -259,10 +259,10 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, _view, html} = live(conn, ~p"/ctaco/workspaces/#{ws.slug}")
 
       assert html =~ "New Session"
-      assert html =~ ~s(href="/sessions/start?org_slug=ctaco&amp;ws_slug=ctaws")
+      assert html =~ ~s(href="/new/session?org_slug=ctaco&amp;ws_slug=ctaws")
       # The old inline duplicate is gone; only the parametrized header
       # action links to the launcher.
-      refute html =~ ~s(href="/sessions/start")
+      refute html =~ ~s(href="/new/session")
     end
 
     test "header New Session is bare for a non-admin member" do
@@ -292,7 +292,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/ctaview/workspaces/#{ws.slug}")
 
-      assert html =~ ~s(href="/sessions/start")
+      assert html =~ ~s(href="/new/session")
       refute html =~ "org_slug=ctaview"
     end
 

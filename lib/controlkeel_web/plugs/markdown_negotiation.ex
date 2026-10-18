@@ -157,7 +157,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
 
     Every change moves through the same loop, from stated intent to recorded evidence:
 
-    - Intent intake and execution briefs at `/sessions/start`
+    - Intent intake and execution briefs at `/new/session`
     - Task graph, validation, and findings during execution
     - Proof bundles, Ship Dashboard, and benchmarks as evidence
 

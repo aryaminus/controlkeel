@@ -1,4 +1,4 @@
-defmodule ControlKeelWeb.OnboardingLive do
+defmodule ControlKeelWeb.NewSessionLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
@@ -901,10 +901,10 @@ defmodule ControlKeelWeb.OnboardingLive do
   # The URL is the selection state: picker events patch these params and
   # handle_params re-applies them.
   defp scope_path(org_slug, nil) when is_binary(org_slug),
-    do: ~p"/sessions/start?#{%{org_slug: org_slug}}"
+    do: ~p"/new/session?#{%{org_slug: org_slug}}"
 
   defp scope_path(org_slug, ws_slug) when is_binary(org_slug) and is_binary(ws_slug),
-    do: ~p"/sessions/start?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
+    do: ~p"/new/session?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
 
   defp org_slug_for_id(org_options, org_id) do
     Enum.find_value(org_options, fn {id, _name, slug} -> if id == org_id, do: slug end)

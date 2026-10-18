@@ -10,7 +10,7 @@ defmodule ControlKeelWeb.MissionsLive do
      |> assign(:page_title, "Sessions")
      |> assign(
        :page_action,
-       %{label: "New Session", to: ~p"/sessions/start", icon: "hero-plus"}
+       %{label: "New Session", to: ~p"/new/session", icon: "hero-plus"}
      )
      |> assign(
        :recent_sessions,

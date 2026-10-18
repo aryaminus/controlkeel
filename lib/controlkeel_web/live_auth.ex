@@ -9,7 +9,7 @@ defmodule ControlKeelWeb.LiveAuth do
       without any membership are redirected to `/organizations` (the
       legacy onboarding surface) instead of proceeding with effectively
       global read access. `/organizations`, the standalone `/new/org`
-      creation page, and `/sessions/start` are exempt so membership-less
+      creation page, and `/new/session` are exempt so membership-less
       users can join or create an org (and see why starting a session needs
       one) (issue #141, R3). Signup auto-provisions a personal org
       (`OAuthLoginController`), so the membership-less branch is a safety
@@ -49,7 +49,7 @@ defmodule ControlKeelWeb.LiveAuth do
         is_nil(socket.assigns[:current_user]) ->
           {:halt, redirect(socket, to: "/auth/login")}
 
-        # `/organizations`, `/new/org`, and `/sessions/start` remain available
+        # `/organizations`, `/new/org`, and `/new/session` remain available
         # to membership-less users so they can join or create an org and see
         # why they cannot start a session yet. Everywhere else requires
         # membership. Signup auto-provisioning makes this branch unreachable
@@ -57,7 +57,7 @@ defmodule ControlKeelWeb.LiveAuth do
         socket.view in [
           ControlKeelWeb.OrganizationsLive,
           ControlKeelWeb.NewOrgLive,
-          ControlKeelWeb.OnboardingLive
+          ControlKeelWeb.NewSessionLive
         ] ->
           {:cont, attach_membership_eviction(socket)}
 

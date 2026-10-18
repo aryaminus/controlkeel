@@ -148,7 +148,7 @@ defmodule ControlKeelWeb.Router do
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults
       ] do
-      live "/sessions/start", OnboardingLive, :new
+      live "/new/session", NewSessionLive, :new
       live "/new/org", NewOrgLive, :new
     end
 

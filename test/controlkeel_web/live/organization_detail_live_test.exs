@@ -55,14 +55,14 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, view, html} = live(conn_for(owner), ~p"/#{org.slug}")
 
       assert html =~ "New Session"
-      assert html =~ ~s(href="/sessions/start?org_slug=#{org.slug}")
+      assert html =~ ~s(href="/new/session?org_slug=#{org.slug}")
       refute has_element?(view, "#organization-page-action", "Invite")
     end
 
     test "member header New Session is bare (no slug params)", %{org: org, member: member} do
       {:ok, _view, html} = live(conn_for(member), ~p"/#{org.slug}")
 
-      assert html =~ ~s(href="/sessions/start")
+      assert html =~ ~s(href="/new/session")
       refute html =~ "org_slug=ctaorg"
     end
 

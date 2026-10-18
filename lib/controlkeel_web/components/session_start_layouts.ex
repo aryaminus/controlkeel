@@ -1,7 +1,7 @@
 defmodule ControlKeelWeb.SessionStartLayouts do
   @moduledoc """
   Standalone framework layout for the session-start onboarding flow
-  (`/sessions/start`, Vercel-type wizard).
+  (`/new/session`, Vercel-type wizard).
 
   Deliberately independent from `ControlKeelWeb.Layouts` and
   `ControlKeelWeb.OrganizationLayouts`: no sidebar, no breadcrumb header,
