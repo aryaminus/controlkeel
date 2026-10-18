@@ -40,7 +40,7 @@ defmodule ControlKeel.AccountsTest do
     end
 
     test "rejects reserved slugs that collide with static routes" do
-      for slug <- ~w(docs about observability sessions auth) do
+      for slug <- ~w(docs about observability sessions auth new) do
         assert {:error, changeset} = Accounts.create_org(%{name: "X", slug: slug})
         assert "is reserved" in errors_on(changeset).slug
       end

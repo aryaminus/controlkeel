@@ -151,6 +151,28 @@ defmodule ControlKeelWeb.PageControllerTest do
     end
   end
 
+  describe "legacy session launcher redirect" do
+    test "GET /sessions/start redirects to /new/session (issue #277 rename)", %{conn: conn} do
+      conn = get(conn, "/sessions/start")
+
+      assert redirected_to(conn, 302) == "/new/session"
+    end
+
+    test "GET /sessions/start preserves the org_slug/ws_slug scoping params", %{conn: conn} do
+      conn = get(conn, "/sessions/start?org_slug=acme-corp&ws_slug=core")
+
+      assert redirected_to(conn, 302) == "/new/session?org_slug=acme-corp&ws_slug=core"
+    end
+
+    test "GET /sessions/:id still 404s for unknown ids (start must not be parsed as an id)", %{
+      conn: conn
+    } do
+      conn = get(conn, "/sessions/999999")
+
+      assert response(conn, 404) != ""
+    end
+  end
+
   describe "workspace observability resolvers (local mode)" do
     setup do
       original = Application.get_env(:controlkeel, :runtime_mode)

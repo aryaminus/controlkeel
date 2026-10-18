@@ -31,13 +31,15 @@ defmodule ControlKeel.Accounts.Org do
   # Single-segment paths declared before the `/:org_slug` live route in
   # `ControlKeelWeb.Router`. Without this, an org named e.g. "docs" would be
   # shadowed by `get "/docs"` and become unreachable at its canonical URL.
+  # "new" is reserved for the `/new/*` first-run namespace (`/new/org`,
+  # `/new/session`, and any future sibling pages).
   # Existing colliding rows (if any) are left untouched — this only blocks new
   # inserts/renames; they remain reachable via `/organizations/:slug` listing.
   @reserved_slugs ~w(
     docs getting-started about contact privacy developers
     auth dashboard sessions findings benchmarks proofs
     cloud organizations policies skills observability invitations
-    workspaces api proxy mcp oauth dev assets
+    workspaces api proxy mcp oauth dev assets new
   )
 
   def changeset(org, attrs) do

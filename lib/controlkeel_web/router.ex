@@ -168,6 +168,13 @@ defmodule ControlKeelWeb.Router do
     get "/organizations/:slug/workspaces/:id/settings", LegacyController, :workspace
     get "/workspaces/:id/*rest", LegacyController, :workspace
 
+    # Legacy launcher URL (pre-/new/* rename): the session wizard moved from
+    # /sessions/start to /new/session, which accepts the same org_slug/ws_slug
+    # scoping params, so the query string is preserved verbatim. Static path,
+    # so it must stay ahead of the "/sessions/:id" numeric resolvers below,
+    # which would otherwise match "start" as an id.
+    get "/sessions/start", PageController, :session_start_legacy_redirect
+
     # Legacy session URLs (pre-org-scope consolidation): `/sessions/:id` and
     # its `/reviews` and `/deploy-review` subpages now live at
     # `/:org_slug/workspaces/:ws_slug/sessions/:id/*`, so resolve the numeric
