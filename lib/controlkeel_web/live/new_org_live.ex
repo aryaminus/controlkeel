@@ -28,6 +28,7 @@ defmodule ControlKeelWeb.NewOrgLive do
      socket
      |> assign(:page_title, "Create an organization")
      |> assign(:local_mode, Mode.current() == :local)
+     |> assign(:show_back, has_org?(socket))
      |> assign_form(Org.changeset(%Org{}, %{}))}
   end
 
@@ -76,89 +77,96 @@ defmodule ControlKeelWeb.NewOrgLive do
         subtitle="Organizations group workspaces, members, budgets, and policies."
       />
 
-      <section class="rounded-2xl border bg-card p-6 shadow-card">
-        <%= if @local_mode do %>
-          <div class="rounded-xl border border-warning/30 bg-warning/10 p-4">
-            <div class="flex items-center gap-2">
-              <.icon name="hero-lock-closed" class="size-4 text-warning" />
-              <p class="text-sm font-semibold text-warning">Local mode</p>
-            </div>
-            <p class="mt-2 text-sm text-foreground/80">
-              Only the default organization is available in local mode.
-            </p>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Upgrade to cloud mode to create additional organizations.
-            </p>
+      <%= if @local_mode do %>
+        <div class="rounded-xl border border-warning/30 bg-warning/10 p-4">
+          <div class="flex items-center gap-2">
+            <.icon name="hero-lock-closed" class="size-4 text-warning" />
+            <p class="text-sm font-semibold text-warning">Local mode</p>
           </div>
-        <% else %>
-          <.form
-            for={@form}
-            phx-change="validate"
-            phx-submit="save"
-            id="new-org-form"
-            class="space-y-4"
-          >
-            <.input
-              field={@form[:name]}
-              type="text"
-              label="Name"
-              placeholder="Acme Inc"
-              class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          <p class="mt-2 text-sm text-foreground/80">
+            Only the default organization is available in local mode.
+          </p>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Upgrade to cloud mode to create additional organizations.
+          </p>
+        </div>
+      <% else %>
+        <.form
+          for={@form}
+          phx-change="validate"
+          phx-submit="save"
+          id="new-org-form"
+          class="space-y-4"
+        >
+          <.input
+            field={@form[:name]}
+            type="text"
+            label="Name"
+            placeholder="Acme Inc"
+            class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+
+          <.input
+            field={@form[:slug]}
+            type="text"
+            label="Slug"
+            placeholder="acme-inc"
+            class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+
+          <p class="text-xs text-muted-foreground">
+            Lowercase letters, numbers, and hyphens. Used in URLs.
+          </p>
+
+          <label class="flex items-start gap-3 rounded-xl border border-input bg-background p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              name="org[create_default_workspace]"
+              value="true"
+              checked
+              class="mt-0.5 size-4 rounded border-input text-primary focus:ring-primary"
             />
-
-            <.input
-              field={@form[:slug]}
-              type="text"
-              label="Slug"
-              placeholder="acme-inc"
-              class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-
-            <p class="text-xs text-muted-foreground">
-              Lowercase letters, numbers, and hyphens. Used in URLs.
-            </p>
-
-            <label class="flex items-start gap-3 rounded-xl border border-input bg-background p-3 cursor-pointer">
-              <input
-                type="checkbox"
-                name="org[create_default_workspace]"
-                value="true"
-                checked
-                class="mt-0.5 size-4 rounded border-input text-primary focus:ring-primary"
-              />
-              <span>
-                <span class="block text-sm font-medium text-foreground">
-                  Create a default workspace
-                </span>
-                <span class="block text-xs text-muted-foreground">
-                  A starter workspace with a unique auto-generated slug will be created in this organization.
-                </span>
+            <span>
+              <span class="block text-sm font-medium text-foreground">
+                Create a default workspace
               </span>
-            </label>
+              <span class="block text-xs text-muted-foreground">
+                A starter workspace with a unique auto-generated slug will be created in this organization.
+              </span>
+            </span>
+          </label>
 
-            <div class="flex items-center justify-end gap-3 border-t pt-4">
-              <.link
-                navigate={~p"/"}
-                class="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-              >
-                Cancel
-              </.link>
-              <button
-                type="submit"
-                class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary"
-              >
-                Create organization
-              </button>
-            </div>
-          </.form>
-        <% end %>
-      </section>
+          <div class="flex items-center justify-end pt-2">
+            <button
+              type="submit"
+              class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary"
+            >
+              Create organization
+            </button>
+          </div>
+        </.form>
+      <% end %>
     </div>
     """
   end
 
   defp assign_form(socket, changeset) do
     assign(socket, :form, to_form(changeset, as: :org))
+  end
+
+  # Back is only meaningful once the viewer belongs to an org: a memberless
+  # first-run user has nowhere to go back to (the `/` handoff falls straight
+  # back here), so the top bar renders it disabled. Local mode always has the
+  # seeded default org.
+  defp has_org?(socket) do
+    if Mode.current() == :local do
+      true
+    else
+      case socket.assigns[:current_user] do
+        %{id: id} when is_integer(id) -> Accounts.any_active_membership?(id)
+        _ -> false
+      end
+    end
   end
 
   defp create_org(socket, params, create_default_workspace?) do

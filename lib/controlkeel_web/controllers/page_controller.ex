@@ -52,7 +52,7 @@ defmodule ControlKeelWeb.PageController do
   defp latest_org_path(orgs) do
     case Enum.max_by(orgs, &{DateTime.to_unix(&1.inserted_at, :microsecond), &1.id}, fn -> nil end) do
       %{slug: slug} -> "/#{slug}"
-      nil -> ~p"/organizations"
+      nil -> ~p"/new/org"
     end
   end
 

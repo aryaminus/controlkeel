@@ -121,7 +121,7 @@ defmodule ControlKeelWeb.PageControllerTest do
       refute body =~ "Turn team knowledge into"
     end
 
-    test "signed-in users without an accessible organization fall back to /organizations", %{
+    test "signed-in users without an accessible organization fall back to /new/org", %{
       conn: conn,
       user: user
     } do
@@ -133,7 +133,7 @@ defmodule ControlKeelWeb.PageControllerTest do
       body = html_response(conn, 200)
 
       assert body =~ "data-last-path-boot"
-      assert body =~ ~s(data-last-path-fallback="/organizations")
+      assert body =~ ~s(data-last-path-fallback="/new/org")
     end
   end
 

@@ -20,6 +20,7 @@ defmodule ControlKeelWeb.SessionStartLayouts do
   user menu on the right.
   """
   attr :current_user, :any, default: nil
+  attr :show_back, :boolean, default: true
 
   def topbar(assigns) do
     assigns =
@@ -37,11 +38,19 @@ defmodule ControlKeelWeb.SessionStartLayouts do
     <header class="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
       <div class="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
         <.link
+          :if={@show_back}
           navigate={@back_path}
           class="inline-flex shrink-0 items-center gap-2 rounded-3xl px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           <.icon name="hero-arrow-left" class="size-4" /> Back
         </.link>
+        <span
+          :if={not @show_back}
+          aria-disabled="true"
+          class="inline-flex shrink-0 cursor-not-allowed items-center gap-2 rounded-3xl px-4 py-2 text-sm font-semibold text-muted-foreground opacity-50"
+        >
+          <.icon name="hero-arrow-left" class="size-4" /> Back
+        </span>
 
         <div class="flex shrink-0 items-center gap-2">
           <ControlKeelWeb.Layouts.user_menu

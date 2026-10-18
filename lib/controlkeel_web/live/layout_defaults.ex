@@ -13,6 +13,10 @@ defmodule ControlKeelWeb.LayoutDefaults do
   - `@breadcrumbs` — defaults to `nil`; a LiveView overrides it with explicit
     breadcrumb crumbs (`%{label: ..., to: ...}` where `to: nil` renders plain
     text) when the path-derived trail would show opaque ids or dead segments.
+  - `@show_back` — defaults to `true`; the standalone session-start top bar
+    (`ControlKeelWeb.SessionStartLayouts`) reads it to enable/disable its Back
+    button. `NewOrgLive` disables it when the viewer has no orgs yet, so Back
+    cannot bounce through the `/` handoff back to `/new/org`.
 
   Attached as an `on_mount` hook on the live_sessions whose layout needs these,
   so individual LiveViews don't have to set them manually.
@@ -27,6 +31,7 @@ defmodule ControlKeelWeb.LayoutDefaults do
       |> assign(:current_path, nil)
       |> assign_new(:page_action, fn -> nil end)
       |> assign_new(:breadcrumbs, fn -> nil end)
+      |> assign_new(:show_back, fn -> true end)
       |> attach_hook(:__current_path__, :handle_params, fn _params, uri, socket ->
         {:cont, assign(socket, :current_path, URI.parse(uri).path)}
       end)

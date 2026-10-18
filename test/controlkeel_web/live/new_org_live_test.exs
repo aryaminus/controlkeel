@@ -70,6 +70,27 @@ defmodule ControlKeelWeb.NewOrgLiveTest do
       assert has_element?(view, "#new-org-form input[name=\"org[name]\"]")
     end
 
+    test "back button is disabled for a memberless first-run user", %{} do
+      user = user_fixture()
+
+      {:ok, view, _html} = live(cloud_conn(user), ~p"/new/org")
+
+      # No org to go back to: the top bar renders the disabled affordance
+      # instead of the "/" back link, so Back cannot loop through the handoff.
+      assert has_element?(view, ~s(span[aria-disabled="true"]))
+      refute has_element?(view, ~s(a[href="/"]))
+    end
+
+    test "back button is enabled once the user has an org", %{} do
+      user = user_fixture()
+      {:ok, _org} = Accounts.create_org_with_owner(user.id, %{name: "Has Org", slug: "has-org"})
+
+      {:ok, view, _html} = live(cloud_conn(user), ~p"/new/org")
+
+      assert has_element?(view, ~s(a[href="/"]))
+      refute has_element?(view, ~s(span[aria-disabled="true"]))
+    end
+
     test "signed-out user is redirected to login", %{conn: conn} do
       conn = Plug.Test.init_test_session(conn, %{})
 

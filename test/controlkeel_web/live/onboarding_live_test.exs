@@ -323,14 +323,20 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       })
     end
 
-    test "blocks onboarding when the user has no organizations", %{} do
-      # Memberless users never reach the launcher: require_cloud_auth
-      # redirects them to /organizations where they can join or create one
-      # (issue #141, R3).
+    test "lets a user with no organizations view onboarding with a create-org notice", %{} do
+      # Memberless users can reach the launcher, but the entire session UI is
+      # replaced by an empty state that points them at the org-creation page.
       user = user_fixture()
 
-      assert {:error, {:redirect, %{to: "/organizations"}}} =
-               live(cloud_conn(user, nil), ~p"/sessions/start")
+      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/sessions/start")
+
+      assert html =~ "You cannot start a session without an organization"
+      assert has_element?(view, ~s(a[href="/new/org"]))
+
+      # The wizard/scope UI (and its steps header) is replaced entirely.
+      refute html =~ "Organization and workspace"
+      refute html =~ "Choose the domain and primary agent"
+      refute has_element?(view, "#onboarding-wizard-form")
     end
 
     test "excludes orgs where the user is only a member or viewer from the picker", %{} do

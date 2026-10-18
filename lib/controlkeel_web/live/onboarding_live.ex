@@ -21,6 +21,7 @@ defmodule ControlKeelWeb.OnboardingLive do
      |> assign(:project_root, project_root)
      |> assign(:mode, mode)
      |> assign(:cloud_mode, cloud_mode)
+     |> assign(:memberless?, false)
      |> assign(:occupation_profiles, Intent.occupation_profiles())
      |> assign(:agent_options, Intent.agent_options())
      |> assign(:step, 1)
@@ -277,11 +278,31 @@ defmodule ControlKeelWeb.OnboardingLive do
           title="Start a session"
           subtitle="Scope it, describe the product, answer the interview, then review the compiled brief."
         />
-        <ControlKeelWeb.SessionStartLayouts.steps step={@step} cloud_mode={@cloud_mode} />
+        <ControlKeelWeb.SessionStartLayouts.steps :if={not @memberless?} step={@step} cloud_mode={@cloud_mode} />
       </div>
 
-      <%= if @cloud_mode do %>
-        <section class="rounded-2xl border bg-card p-5 shadow-card" aria-label="Scope">
+      <%= if @memberless? do %>
+        <section
+          class="rounded-2xl border bg-card p-10 shadow-card"
+          aria-label="Organization required"
+        >
+          <div class="mx-auto flex max-w-md flex-col items-center gap-4 text-center">
+            <.icon name="hero-building-office-2" class="size-10 text-muted-foreground" />
+            <p class="text-base leading-relaxed text-foreground">
+              You cannot start a session without an organization and a workspace. Create an
+              organization to continue.
+            </p>
+            <.link
+              navigate={~p"/new/org"}
+              class="rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground transition-all duration-200 hover:shadow-[0_0_20px_rgba(196,240,66,0.3)]"
+            >
+              Create an organization
+            </.link>
+          </div>
+        </section>
+      <% else %>
+        <%= if @cloud_mode do %>
+          <section class="rounded-2xl border bg-card p-5 shadow-card" aria-label="Scope">
           <div class="flex items-center justify-between gap-3">
             <.section_title>Organization and workspace</.section_title>
             <span class="rounded-full border px-3 py-1 text-xs text-muted-foreground">
@@ -739,6 +760,7 @@ defmodule ControlKeelWeb.OnboardingLive do
           </.form>
         </section>
       </div>
+      <% end %>
     </div>
     """
   end
@@ -808,6 +830,7 @@ defmodule ControlKeelWeb.OnboardingLive do
         |> assign(:workspace_options, Enum.map(workspaces, &{&1.id, &1.name, &1.slug}))
         |> assign(:selected_org_id, selected_org_id)
         |> assign(:selected_workspace_id, default_workspace_id(workspaces))
+        |> assign(:memberless?, not Accounts.any_active_membership?(user.id))
         |> assign(:scope_notice, nil)
         |> recompute_onboarding_state()
     end
@@ -957,6 +980,14 @@ defmodule ControlKeelWeb.OnboardingLive do
 
   defp workspace_notice(assigns) do
     cond do
+      assigns.org_options == [] and assigns[:memberless?] ->
+        %{
+          text:
+            "You cannot start a session without an organization and a workspace. Create an organization to continue.",
+          link: ~p"/new/org",
+          link_text: "Create an organization"
+        }
+
       assigns.org_options == [] ->
         %{
           text:
