@@ -149,6 +149,7 @@ defmodule ControlKeelWeb.Router do
         ControlKeelWeb.LayoutDefaults
       ] do
       live "/sessions/start", OnboardingLive, :new
+      live "/new/org", NewOrgLive, :new
     end
 
     # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
