@@ -47,9 +47,8 @@ defmodule ControlKeelWeb.LiveAuth do
         is_nil(socket.assigns[:current_user]) ->
           {:halt, redirect(socket, to: "/auth/login")}
 
-        # `/organizations` is the legacy onboarding surface (kept as-is,
-        # orphaned): a membership-less user is allowed there so existing
-        # bookmarks keep working. Everywhere else requires membership.
+        # `/organizations` remains available to membership-less users so they
+        # can join or create an org. Everywhere else requires membership.
         # Signup auto-provisioning makes this branch unreachable for new
         # users; it remains as a safety net for pre-existing rows.
         socket.view == ControlKeelWeb.OrganizationsLive ->
