@@ -161,6 +161,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.addEventListener("phx:page-loading-stop", rememberLastPath)
 
+document.addEventListener("click", event => {
+  if (!(event.target instanceof Element)) return
+  if (!event.target.closest('a[href="/auth/logout"]')) return
+
+  try {
+    localStorage.removeItem("ck.lastPath")
+  } catch (error) {
+    console.warn("Could not clear the last ControlKeel path on sign-out.", error)
+  }
+}, true)
+
 window.addEventListener("phx:copy-to-clipboard", async ({detail}) => {
   const text = detail?.text
 
