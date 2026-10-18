@@ -278,7 +278,7 @@ defmodule ControlKeelWeb.NewSessionLive do
           title="Start a session"
           subtitle="Scope it, describe the product, answer the interview, then review the compiled brief."
         />
-        <ControlKeelWeb.SessionStartLayouts.steps :if={not @memberless?} step={@step} cloud_mode={@cloud_mode} />
+        <ControlKeelWeb.NewPagesLayouts.steps :if={not @memberless?} step={@step} cloud_mode={@cloud_mode} />
       </div>
 
       <%= if @memberless? do %>

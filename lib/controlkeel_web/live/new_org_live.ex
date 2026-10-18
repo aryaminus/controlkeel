@@ -3,7 +3,7 @@ defmodule ControlKeelWeb.NewOrgLive do
   `/new/org` — standalone create-organization page.
 
   Mounted in the `:onboarding` live_session with the headless
-  `SessionStartLayouts.session_start` layout (top bar + centered column). It
+  `NewPagesLayouts.new_pages` layout (top bar + centered column). It
   mirrors the create form from the `/organizations` modal so the org switcher
   can send membered and memberless users straight here to create an
   additional organization. Save creates the org plus an owner membership for

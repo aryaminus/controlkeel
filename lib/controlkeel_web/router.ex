@@ -139,11 +139,11 @@ defmodule ControlKeelWeb.Router do
       live "/skills", SkillsLive, :index
     end
 
-    # Session start uses a standalone Vercel-type onboarding layout
-    # (own SessionStartLayouts module — no sidebar/breadcrumb):
+    # /new/* pages use a standalone headless layout (own
+    # NewPagesLayouts module — no sidebar/breadcrumb):
     # top bar + centered wizard column.
-    live_session :onboarding,
-      layout: {ControlKeelWeb.SessionStartLayouts, :session_start},
+    live_session :new_pages,
+      layout: {ControlKeelWeb.NewPagesLayouts, :new_pages},
       on_mount: [
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults

@@ -1,7 +1,7 @@
-defmodule ControlKeelWeb.SessionStartLayouts do
+defmodule ControlKeelWeb.NewPagesLayouts do
   @moduledoc """
-  Standalone framework layout for the session-start onboarding flow
-  (`/new/session`, Vercel-type wizard).
+  Standalone framework layout for the `/new/*` pages (create Org, start
+  Session wizard).
 
   Deliberately independent from `ControlKeelWeb.Layouts` and
   `ControlKeelWeb.OrganizationLayouts`: no sidebar, no breadcrumb header,
@@ -12,11 +12,11 @@ defmodule ControlKeelWeb.SessionStartLayouts do
 
   use ControlKeelWeb, :html
 
-  embed_templates "session_start_layouts/*"
+  embed_templates "new_pages_layouts/*"
 
   @doc """
-  Sticky top bar. The left side renders a back button for the onboarding
-  wizard (cloud → `/`, local → the default org page). Dashboard-style
+  Sticky top bar. The left side renders a back button for the `/new/*`
+  pages (cloud → `/`, local → the default org page). Dashboard-style
   user menu on the right.
   """
   attr :current_user, :any, default: nil
@@ -55,7 +55,7 @@ defmodule ControlKeelWeb.SessionStartLayouts do
         <div class="flex shrink-0 items-center gap-2">
           <ControlKeelWeb.Layouts.user_menu
             :if={@current_user != nil and @mode != :local}
-            id="session-start-user-menu"
+            id="new-pages-user-menu"
             current_user={@current_user}
             compact
             show_dashboard

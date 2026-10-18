@@ -14,7 +14,7 @@ defmodule ControlKeelWeb.LayoutDefaults do
     breadcrumb crumbs (`%{label: ..., to: ...}` where `to: nil` renders plain
     text) when the path-derived trail would show opaque ids or dead segments.
   - `@show_back` — defaults to `true`; the standalone session-start top bar
-    (`ControlKeelWeb.SessionStartLayouts`) reads it to enable/disable its Back
+    (`ControlKeelWeb.NewPagesLayouts`) reads it to enable/disable its Back
     button. `NewOrgLive` disables it when the viewer has no orgs yet, so Back
     cannot bounce through the `/` handoff back to `/new/org`.
 
