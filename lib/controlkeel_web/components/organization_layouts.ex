@@ -130,6 +130,22 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                 </.link>
               <% end %>
             </div>
+
+            <div class="mt-1 border-t pt-1">
+              <.link
+                navigate={~p"/new/org"}
+                phx-click={
+                  JS.hide(to: "#sidebar-org-switcher-popover")
+                  |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+                }
+                class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-primary transition hover:bg-muted"
+              >
+                <.icon name="hero-plus" class="size-4 shrink-0" /> Create organization
+              </.link>
+              <p class="px-2.5 pb-1.5 pt-0.5 text-xs text-muted-foreground">
+                Joining a team? Open the invitation link from your email.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -885,6 +901,71 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   defp organization_nav_icon_class(false),
     do: "size-4 text-muted-foreground group-hover:text-primary"
+
+  @doc """
+  In-place not-found panel for an org-level URL.
+
+  Rendered by `organization.html.heex` when a LiveView assigns
+  `:org_scope_error` (see `ControlKeelWeb.OrgScope`), replacing the org chrome
+  — an unknown `org_slug` has no sidebar to render. Shows the requested
+  address plus the actions that can actually help: home, create an
+  organization, or sign in.
+  """
+  attr :error, :map, required: true
+  attr :path, :string, default: nil
+  attr :current_user, :any, default: nil
+
+  def organization_scope_not_found(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:mode, fn -> ControlKeel.Runtime.Mode.current() end)
+      |> assign(:signed_in?, assigns.current_user != nil and assigns.mode != :local)
+
+    ~H"""
+    <section class="mx-auto flex w-full max-w-lg flex-col items-center text-center">
+      <span class="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        <.icon name="hero-map-pin" class="size-6" />
+      </span>
+
+      <h1 class="mt-5 text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+        {@error.title}
+      </h1>
+      <p class="mt-2 text-sm text-muted-foreground">{@error.message}</p>
+
+      <div class="mt-5 w-full rounded-2xl border bg-card p-5 text-left shadow-card">
+        <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Requested address
+        </p>
+        <p class="mt-2 break-all font-mono text-sm text-foreground">{@path}</p>
+      </div>
+
+      <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <.link
+          :if={@signed_in? or @mode == :local}
+          href="/"
+          data-forget-last-path
+          class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+        >
+          <.icon name="hero-home" class="size-3.5" /> Go to my workspace
+        </.link>
+        <.link
+          :if={@signed_in?}
+          navigate={~p"/new/org"}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted"
+        >
+          <.icon name="hero-plus" class="size-3.5" /> Create an organization
+        </.link>
+        <.link
+          :if={not @signed_in? and @mode != :local}
+          href={~p"/auth/login"}
+          class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+        >
+          <.icon name="hero-arrow-right-end-on-rectangle" class="size-3.5" /> Sign in
+        </.link>
+      </div>
+    </section>
+    """
+  end
 
   attr :children, :list, required: true
   attr :current_path, :string, default: nil

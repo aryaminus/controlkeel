@@ -130,6 +130,10 @@ function parseOverviewRoot(pathname) {
 }
 
 function rememberLastPath() {
+  // A not-found panel (unknown org/workspace slug) must never become the
+  // remembered path, or visiting `/` would keep restoring a dead address.
+  if (document.querySelector("[data-scope-error]")) return
+
   const root = parseOverviewRoot(window.location.pathname)
   if (!root) return
 
@@ -161,14 +165,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.addEventListener("phx:page-loading-stop", rememberLastPath)
 
+// Clears the remembered path when the visitor explicitly asks to forget it:
+// sign-out, or "go home" from the org not-found panel — otherwise `/` would
+// restore the dead address it was called from and bounce straight back.
 document.addEventListener("click", event => {
   if (!(event.target instanceof Element)) return
-  if (!event.target.closest('a[href="/auth/logout"]')) return
+  if (!event.target.closest('a[href="/auth/logout"], a[data-forget-last-path]')) return
 
   try {
     localStorage.removeItem("ck.lastPath")
   } catch (error) {
-    console.warn("Could not clear the last ControlKeel path on sign-out.", error)
+    console.warn("Could not clear the last ControlKeel path.", error)
   }
 }, true)
 

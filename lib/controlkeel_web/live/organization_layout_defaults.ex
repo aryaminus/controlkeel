@@ -6,6 +6,11 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
   on workspace pages, which switches the sidebar to workspace nav). This hook
   supplies the shared URL, breadcrumb, and navigation assigns independently
   from the dashboard layout defaults.
+
+  `:org_scope_error` is defaulted to `nil` here: an org-level LiveView sets it
+  (see `ControlKeelWeb.OrgScope`) when the URL's `org_slug` does not resolve,
+  and the org layout then renders an in-place not-found panel instead of the
+  org chrome.
   """
 
   import Phoenix.Component, only: [assign: 3, assign_new: 3]
@@ -19,6 +24,7 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
       socket
       |> assign(:current_path, nil)
       |> assign(:current_query, nil)
+      |> assign_new(:org_scope_error, fn -> nil end)
       |> assign_new(:nav_org, fn -> nil end)
       |> assign_new(:nav_workspace, fn -> nil end)
       |> assign_new(:nav_session, fn -> nil end)

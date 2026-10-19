@@ -66,6 +66,14 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       refute html =~ "org_slug=ctaorg"
     end
 
+    test "switcher offers a create-organization entry", %{org: org, owner: owner} do
+      {:ok, _view, html} = live(conn_for(owner), ~p"/#{org.slug}")
+
+      assert html =~ ~s(href="/new/org")
+      assert html =~ "Create organization"
+      assert html =~ "Joining a team?"
+    end
+
     test "owner can open Invite member from the Members tab", %{org: org, owner: owner} do
       {:ok, view, _html} = live(conn_for(owner), ~p"/#{org.slug}?tab=members")
 
@@ -258,6 +266,38 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
 
       # Persisted.
       assert Accounts.get_active_membership(owner_m.user_id, owner_m.org_id).role == "member"
+    end
+  end
+
+  describe "unknown organization slug" do
+    setup do
+      owner = create_user!("missing-org@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Real Org", slug: "realorg"})
+
+      {:ok, org: org, owner: owner}
+    end
+
+    test "org page renders the in-place not-found panel instead of redirecting", %{owner: owner} do
+      assert {:ok, _view, html} = live(conn_for(owner), "/no-such-org")
+
+      assert html =~ "Organization not found"
+      # The requested address is preserved and shown back, no redirect target.
+      assert html =~ "/no-such-org"
+      refute html =~ ~s(href="/organizations")
+    end
+
+    test "settings route handles the same unknown slug in place", %{owner: owner} do
+      assert {:ok, _view, html} = live(conn_for(owner), "/no-such-org/settings")
+
+      assert html =~ "Organization not found"
+      assert html =~ "/no-such-org/settings"
+    end
+
+    test "a resolvable org still renders the org page", %{owner: owner, org: org} do
+      assert {:ok, _view, html} = live(conn_for(owner), ~p"/#{org.slug}")
+
+      assert html =~ "Real Org"
+      refute html =~ "Organization not found"
     end
   end
 

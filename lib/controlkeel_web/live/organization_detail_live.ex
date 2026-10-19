@@ -19,7 +19,9 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   live membership changes can refresh or leave the page.
   Local mode has no membership table and is unrestricted. Cloud/self_hosted
   requires the signed-in user to hold an active membership for this specific
-  org; others are redirected to `/organizations`.
+  org; a missing membership is redirected to sign-in, while an unknown org
+  slug renders the shared in-place not-found panel at the requested URL
+  (`ControlKeelWeb.OrgScope`) instead of bouncing to a global page.
   """
 
   use ControlKeelWeb, :live_view
@@ -29,14 +31,20 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   alias ControlKeel.Repo
   alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.OrgAccess
+  alias ControlKeelWeb.OrgScope
 
   @valid_roles ~w(owner admin member viewer)
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case Accounts.get_org_by_slug(slug) do
+    case OrgScope.fetch(slug) do
       nil ->
-        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
+        error = OrgScope.org_not_found(slug)
+
+        {:ok,
+         socket
+         |> assign(:page_title, error.title)
+         |> assign(:org_scope_error, error)}
 
       org ->
         case OrgAccess.check(org, socket.assigns[:current_user]) do
@@ -53,8 +61,16 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
              )}
 
           {:error, :needs_admin} ->
+            error =
+              OrgScope.org_forbidden(
+                slug,
+                "You don't have permission to view this organization."
+              )
+
             {:ok,
-             redirect_with_flash(socket, :error, "You don't have permission.", ~p"/organizations")}
+             socket
+             |> assign(:page_title, error.title)
+             |> assign(:org_scope_error, error)}
         end
     end
   end
@@ -348,6 +364,12 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   def handle_event("dismiss-token", _params, socket) do
     {:noreply, assign(socket, :invite_token, nil)}
   end
+
+  # An unresolved org scope renders the shared not-found panel from the org
+  # layout (see `ControlKeelWeb.OrgScope`); this page body stays empty. The
+  # assign is always present (defaulted to nil by the layout hook), so the
+  # clause must match only a real error map.
+  def render(%{org_scope_error: error}) when not is_nil(error), do: ~H""
 
   @impl true
   def render(assigns) do

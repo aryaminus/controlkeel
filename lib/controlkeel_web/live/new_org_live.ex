@@ -7,8 +7,8 @@ defmodule ControlKeelWeb.NewOrgLive do
   an org plus an owner membership for the current user (optionally with a
   starter workspace) and navigates to the new org. It is exempt from the
   membership gate, so first-run memberless users create their org here;
-  membered users may also visit to create an additional organization (wired
-  to the org switcher's create entry in a follow-up PR — issue #277).
+  membered users may also visit to create an additional organization (the org
+  sidebar switcher links here).
 
   Local mode has no membership concept, so only the default organization
   exists there — the page shows an info panel instead of the form and save is

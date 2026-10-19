@@ -11,12 +11,18 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   alias ControlKeel.Accounts
   alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.OrgAccess
+  alias ControlKeelWeb.OrgScope
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case Accounts.get_org_by_slug(slug) do
+    case OrgScope.fetch(slug) do
       nil ->
-        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
+        error = OrgScope.org_not_found(slug)
+
+        {:ok,
+         socket
+         |> assign(:page_title, error.title)
+         |> assign(:org_scope_error, error)}
 
       org ->
         case OrgAccess.check(org, socket.assigns[:current_user], "admin") do
@@ -151,6 +157,12 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
         {:error, "Budget must be a non-negative integer in cents."}
     end
   end
+
+  # An unresolved org scope renders the shared not-found panel from the org
+  # layout (see `ControlKeelWeb.OrgScope`); this page body stays empty. The
+  # assign is always present (defaulted to nil by the layout hook), so the
+  # clause must match only a real error map.
+  def render(%{org_scope_error: error}) when not is_nil(error), do: ~H""
 
   @impl true
   def render(assigns) do
