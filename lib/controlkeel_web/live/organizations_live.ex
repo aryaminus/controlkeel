@@ -1,14 +1,14 @@
 defmodule ControlKeelWeb.OrganizationsLive do
   @moduledoc """
-  `/organizations` — list organizations the signed-in user belongs to.
+  `/organizations` — list organizations.
 
   Local mode (no user) shows every org in the DB. Cloud/self_hosted mode
   shows only orgs where the signed-in user has an active membership, with a
   role badge per row. Organization creation moved to `/new/org`
   (issue #277) — this page no longer hosts a create form.
 
-  The page is a navigator, not a switcher: each row links to `/:org_slug`
-  and that URL is the only org context. There is no ambient "active org".
+  Switching orgs is URL-driven (`/:org_slug`) and happens through the org
+  sidebar switcher; this page only highlights the derived default org.
   """
 
   use ControlKeelWeb, :live_view
@@ -104,6 +104,13 @@ defmodule ControlKeelWeb.OrganizationsLive do
                 </div>
                 <div class="flex items-center gap-2">
                   <.role_badge role={row.role} />
+                  <span
+                    :if={not @local_mode and @current_org_id == row.org.id}
+                    id={"org-active-#{row.org.id}"}
+                    class="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/30"
+                  >
+                    Active
+                  </span>
                 </div>
               </div>
             </div>
