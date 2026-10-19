@@ -664,13 +664,15 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   defp matches_filter?(finding, "resolved"), do: resolved?(finding)
   defp matches_filter?(_finding, _other), do: true
 
+  # Performance: Single-pass reduce replaces four list iterations (length + 3x Enum.count) to reduce intermediate allocations and improve iteration speed.
   defp counts(findings) do
-    %{
-      all: length(findings),
-      blocked: Enum.count(findings, &(&1.status == "blocked")),
-      open: Enum.count(findings, &(&1.status == "open")),
-      resolved: Enum.count(findings, &resolved?/1)
-    }
+    Enum.reduce(findings, %{all: 0, blocked: 0, open: 0, resolved: 0}, fn finding, acc ->
+      acc
+      |> Map.put(:all, acc.all + 1)
+      |> Map.put(:blocked, if(finding.status == "blocked", do: acc.blocked + 1, else: acc.blocked))
+      |> Map.put(:open, if(finding.status == "open", do: acc.open + 1, else: acc.open))
+      |> Map.put(:resolved, if(resolved?(finding), do: acc.resolved + 1, else: acc.resolved))
+    end)
   end
 
   # Newest first, and nothing else. Deliberately no status/severity
