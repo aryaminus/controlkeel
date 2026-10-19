@@ -75,6 +75,21 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
   end
 
   describe "GET /auth/:provider/callback" do
+    test "existing users sign in without a new org", %{conn: conn} do
+      {:ok, existing} = Accounts.create_user(%{email: "user@example.com", name: "Example User"})
+
+      assert {:ok, _} =
+               Accounts.create_org_with_owner(existing.id, %{name: "Prior Org", slug: "prior-org"})
+
+      conn =
+        conn
+        |> init_test_session(%{oauth_provider: "github", oauth_session_params: %{}})
+        |> get("/auth/github/callback", %{"code" => "good"})
+
+      assert redirected_to(conn, 302) == "/"
+      assert [%{org: %{slug: "prior-org"}}] = Accounts.list_orgs_for_user(existing.id)
+    end
+
     test "provisions the user and shows a success flash", %{conn: conn} do
       conn =
         conn

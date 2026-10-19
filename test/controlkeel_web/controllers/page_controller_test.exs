@@ -41,18 +41,27 @@ defmodule ControlKeelWeb.PageControllerTest do
   end
 
   describe "local mode GET /" do
-    test "redirects to the default organization page", %{conn: conn} do
+    test "renders a last-path handoff without requiring authentication", %{conn: conn} do
       conn = get(conn, ~p"/")
+      body = html_response(conn, 200)
 
-      assert redirected_to(conn) == ~p"/#{LocalDefaults.default_org_slug()}"
+      assert body =~ "data-last-path-boot"
+      assert body =~ ~s(data-last-path-fallback="/#{LocalDefaults.default_org_slug()}")
     end
 
-    test "provisions the default org on first visit", %{conn: conn} do
+    test "uses the most recently created organization as fallback", %{conn: conn} do
       assert Accounts.get_org_by_slug(LocalDefaults.default_org_slug()) == nil
+      assert {:ok, _defaults} = LocalDefaults.ensure()
 
-      get(conn, ~p"/")
+      {:ok, first_org} = Accounts.create_org(%{name: "First Org", slug: "first-org"})
+      {:ok, newest_org} = Accounts.create_org(%{name: "Newest Org", slug: "newest-org"})
+
+      conn = get(conn, ~p"/")
+      body = html_response(conn, 200)
 
       assert Accounts.get_org_by_slug(LocalDefaults.default_org_slug()) != nil
+      assert first_org.id < newest_org.id
+      assert body =~ ~s(data-last-path-fallback="/newest-org")
     end
   end
 
@@ -74,30 +83,30 @@ defmodule ControlKeelWeb.PageControllerTest do
       {:ok, user: user}
     end
 
-    test "renders the landing page for anonymous visitors", %{conn: conn} do
+    test "anonymous visitors get the branding page", %{conn: conn} do
       conn = get(conn, ~p"/")
       body = html_response(conn, 200)
 
       assert body =~ "Turn team knowledge into"
       assert body =~ "Install ControlKeel"
-      assert body =~ "Policy gates for agents"
-      assert body =~ "Evidence, not vibes"
-      assert body =~ "Host-agnostic control"
-      assert body =~ "How it works"
-      assert body =~ "Ready to govern"
-      assert body =~ "<footer"
-      assert body =~ "Agent control plane for governed AI engineering."
+      refute body =~ "data-app-home"
     end
 
-    test "renders the org → workspace → session tree for signed-in users", %{
-      conn: conn,
-      user: user
-    } do
-      {:ok, org} =
+    test "signed-in users get the shared last-path handoff with their newest accessible org fallback",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, _first_org} =
         Accounts.create_org_with_owner(user.id, %{name: "Acme Corp", slug: "acme-corp"})
 
-      workspace = create_workspace(org, "Platform")
-      session = create_session(workspace, "Launch checklist")
+      {:ok, newest_org} =
+        Accounts.create_org_with_owner(user.id, %{name: "Newest Corp", slug: "newest-corp"})
+
+      {:ok, other_user} = Accounts.create_user(%{email: "other@example.com"})
+
+      {:ok, _other_org} =
+        Accounts.create_org_with_owner(other_user.id, %{name: "Other Corp", slug: "other-corp"})
 
       conn =
         conn
@@ -106,27 +115,16 @@ defmodule ControlKeelWeb.PageControllerTest do
 
       body = html_response(conn, 200)
 
-      assert body =~ "Home"
-      assert body =~ "Acme Corp"
-      assert body =~ "Platform"
-      assert body =~ "Launch checklist"
-      assert body =~ ~p"/#{org.slug}"
-      assert body =~ ~p"/#{org.slug}/workspaces/#{workspace.slug}"
-      assert body =~ ~p"/sessions/#{session.id}"
+      assert body =~ "data-last-path-boot"
+      assert body =~ ~s(data-last-path-fallback="/#{newest_org.slug}")
+      refute body =~ "other-corp"
       refute body =~ "Turn team knowledge into"
     end
 
-    test "tree shows only orgs where the user has an active membership", %{
+    test "signed-in users without an accessible organization fall back to /organizations", %{
       conn: conn,
       user: user
     } do
-      {:ok, mine} = Accounts.create_org_with_owner(user.id, %{name: "Mine Co", slug: "mine-co"})
-      workspace = create_workspace(mine, "Core")
-      session = create_session(workspace, "My session")
-
-      {:ok, other} = Accounts.create_user(%{email: "other@example.com"})
-      {:ok, _} = Accounts.create_org_with_owner(other.id, %{name: "Theirs Co", slug: "theirs-co"})
-
       conn =
         conn
         |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
@@ -134,42 +132,8 @@ defmodule ControlKeelWeb.PageControllerTest do
 
       body = html_response(conn, 200)
 
-      assert body =~ "Mine Co"
-      assert body =~ "My session"
-      assert body =~ ~p"/sessions/#{session.id}"
-      refute body =~ "Theirs Co"
-    end
-
-    test "tree renders nested empty states for a member with an empty org", %{
-      conn: conn,
-      user: user
-    } do
-      {:ok, _} = Accounts.create_org_with_owner(user.id, %{name: "Empty Co", slug: "empty-co"})
-
-      conn =
-        conn
-        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
-        |> get(~p"/")
-
-      body = html_response(conn, 200)
-
-      assert body =~ "Empty Co"
-      assert body =~ "No workspaces yet."
-    end
-
-    test "tree renders the org-less empty state for a member with no orgs", %{conn: conn} do
-      {:ok, fresh} = Accounts.create_user(%{email: "fresh@example.com"})
-
-      conn =
-        conn
-        |> Plug.Test.init_test_session(%{"current_user_id" => fresh.id})
-        |> get(~p"/")
-
-      body = html_response(conn, 200)
-
-      assert body =~ "No organizations yet."
-      assert body =~ ~p"/organizations"
-      assert body =~ ~p"/sessions/start"
+      assert body =~ "data-last-path-boot"
+      assert body =~ ~s(data-last-path-fallback="/organizations")
     end
   end
 

@@ -103,6 +103,75 @@ const liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+
+const CK_RESERVED_TOP_LEVEL = new Set([
+  "docs", "getting-started", "about", "contact", "privacy", "developers",
+  "auth", "dashboard", "sessions", "findings", "benchmarks", "proofs",
+  "cloud", "organizations", "policies", "skills", "observability",
+  "invitations", "workspaces", "api", "proxy", "mcp", "oauth", "dev", "assets"
+])
+
+function parseOverviewRoot(pathname) {
+  const segments = String(pathname || "").split("/").filter(Boolean)
+
+  if (segments.length === 1 && !CK_RESERVED_TOP_LEVEL.has(segments[0])) {
+    return `/${segments[0]}`
+  }
+
+  if (segments.length >= 3 && segments[1] === "workspaces") {
+    let root = `/${segments[0]}/workspaces/${segments[2]}`
+    if (segments.length >= 5 && segments[3] === "sessions") {
+      root = `${root}/sessions/${segments[4]}`
+    }
+    return root
+  }
+
+  return null
+}
+
+function rememberLastPath() {
+  const root = parseOverviewRoot(window.location.pathname)
+  if (!root) return
+
+  try {
+    localStorage.setItem("ck.lastPath", root)
+  } catch (error) {
+    console.warn("Could not remember the last ControlKeel path.", error)
+  }
+}
+
+function restoreLastPath() {
+  const boot = document.querySelector("[data-last-path-boot]")
+  if (!boot) return
+
+  let lastPath = null
+  try {
+    lastPath = localStorage.getItem("ck.lastPath")
+  } catch (error) {
+    console.warn("Could not read the last ControlKeel path.", error)
+  }
+
+  window.location.replace(lastPath || boot.dataset.lastPathFallback)
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  rememberLastPath()
+  restoreLastPath()
+})
+
+window.addEventListener("phx:page-loading-stop", rememberLastPath)
+
+document.addEventListener("click", event => {
+  if (!(event.target instanceof Element)) return
+  if (!event.target.closest('a[href="/auth/logout"]')) return
+
+  try {
+    localStorage.removeItem("ck.lastPath")
+  } catch (error) {
+    console.warn("Could not clear the last ControlKeel path on sign-out.", error)
+  }
+}, true)
+
 window.addEventListener("phx:copy-to-clipboard", async ({detail}) => {
   const text = detail?.text
 

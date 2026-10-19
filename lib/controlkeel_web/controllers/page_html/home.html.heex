@@ -1,140 +1,161 @@
-<section class="mx-auto max-w-5xl flex flex-col items-center text-center py-12">
-  <div class="mb-5 inline-flex items-center gap-2 rounded-full border bg-muted px-3 py-1 text-xs text-muted-foreground">
-    <span class="size-1.5 rounded-full bg-primary"></span>
-    Open source governance for AI coding agents
-  </div>
-  <h1 class="text-5xl font-bold tracking-tight sm:text-6xl">
-    Turn team knowledge into<br />
-    <span class="text-primary">agent guardrails</span>
-  </h1>
-  <p class="mt-6 max-w-2xl text-lg text-muted-foreground">
-    Static docs don't enforce anything. ControlKeel turns your policies, review taste, and domain rules into live findings, proofs, approval gates, and budgets that work across every supported agent.
-  </p>
-  <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
-    <a
-      href={~p"/docs/getting-started"}
-      class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90"
-    >
-      <.icon name="hero-arrow-down-tray" class="size-4" /> Install ControlKeel
-    </a>
-    <a
-      href="https://github.com/aryaminus/controlkeel"
-      target="_blank"
-      rel="noopener"
-      class="inline-flex items-center gap-2 rounded-full border bg-muted px-6 py-3 text-sm font-semibold transition hover:border-primary/40 hover:bg-accent"
-    >
-      <.icon name="hero-star" class="size-4" /> Star on GitHub
-    </a>
-  </div>
-</section>
+<%= if @last_path_boot do %>
+  <main
+    id="last-path-boot"
+    data-last-path-boot
+    data-last-path-fallback={@fallback_path}
+    class="flex min-h-screen items-center justify-center bg-background text-foreground"
+  >
+    <div class="flex flex-col items-center gap-4">
+      <span class="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+        <.icon name="hero-bolt-solid" class="size-6 motion-safe:animate-pulse" />
+      </span>
+      <p class="text-sm text-muted-foreground">Opening your workspace…</p>
+      <noscript>
+        <a href={@fallback_path} class="text-sm text-primary underline">
+          Continue to your organization
+        </a>
+      </noscript>
+    </div>
+  </main>
+<% else %>
+  <section class="mx-auto max-w-5xl flex flex-col items-center text-center py-12">
+    <div class="mb-5 inline-flex items-center gap-2 rounded-full border bg-muted px-3 py-1 text-xs text-muted-foreground">
+      <span class="size-1.5 rounded-full bg-primary"></span>
+      Open source governance for AI coding agents
+    </div>
+    <h1 class="text-5xl font-bold tracking-tight sm:text-6xl">
+      Turn team knowledge into<br />
+      <span class="text-primary">agent guardrails</span>
+    </h1>
+    <p class="mt-6 max-w-2xl text-lg text-muted-foreground">
+      Static docs don't enforce anything. ControlKeel turns your policies, review taste, and domain rules into live findings, proofs, approval gates, and budgets that work across every supported agent.
+    </p>
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
+      <a
+        href={~p"/docs/getting-started"}
+        class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary/90"
+      >
+        <.icon name="hero-arrow-down-tray" class="size-4" /> Install ControlKeel
+      </a>
+      <a
+        href="https://github.com/aryaminus/controlkeel"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-2 rounded-full border bg-muted px-6 py-3 text-sm font-semibold transition hover:border-primary/40 hover:bg-accent"
+      >
+        <.icon name="hero-star" class="size-4" /> Star on GitHub
+      </a>
+    </div>
+  </section>
 
-<section class="mx-auto max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6 py-12">
-  <div class="rounded-xl border bg-card p-6">
-    <div class="mb-3">
-      <.icon name="hero-shield-check" class="size-8 text-primary" />
-    </div>
-    <h3 class="text-lg font-semibold mb-2">Policy gates for agents</h3>
-    <p class="text-sm text-muted-foreground">
-      Convert domain knowledge and review decisions into typed memory, policy checks, governed findings, and approval gates.
-    </p>
-  </div>
-  <div class="rounded-xl border bg-card p-6">
-    <div class="mb-3">
-      <.icon name="hero-chart-bar-square" class="size-8 text-primary" />
-    </div>
-    <h3 class="text-lg font-semibold mb-2">Evidence, not vibes</h3>
-    <p class="text-sm text-muted-foreground">
-      Proof bundles, benchmark runs, and cost signals show whether agent workflows are getting safer and cheaper.
-    </p>
-  </div>
-  <div class="rounded-xl border bg-card p-6">
-    <div class="mb-3">
-      <.icon name="hero-bolt-solid" class="size-8 text-primary" />
-    </div>
-    <h3 class="text-lg font-semibold mb-2">Host-agnostic control</h3>
-    <p class="text-sm text-muted-foreground">
-      Keep governance state outside the chat window so teams can move between supported agents without losing context.
-    </p>
-  </div>
-</section>
-
-<section class="mx-auto max-w-5xl py-12">
-  <h2 class="text-center text-3xl font-bold mb-4">How it works</h2>
-  <p class="text-center text-sm text-muted-foreground mb-10">
-    From intent to evidence in four steps
-  </p>
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-    <div class="flex flex-col items-center text-center">
-      <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
-        <.icon name="hero-document-text" class="size-5" />
+  <section class="mx-auto max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6 py-12">
+    <div class="rounded-xl border bg-card p-6">
+      <div class="mb-3">
+        <.icon name="hero-shield-check" class="size-8 text-primary" />
       </div>
-      <h4 class="text-sm font-semibold">Capture intent</h4>
-      <p class="text-xs text-muted-foreground mt-1.5">Set scope, policy, risk, and budget</p>
-    </div>
-    <div class="flex flex-col items-center text-center">
-      <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
-        <.icon name="hero-command-line" class="size-5" />
-      </div>
-      <h4 class="text-sm font-semibold">Agent works</h4>
-      <p class="text-xs text-muted-foreground mt-1.5">Use the host your team already likes</p>
-    </div>
-    <div class="flex flex-col items-center text-center">
-      <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
-        <.icon name="hero-shield-exclamation" class="size-5" />
-      </div>
-      <h4 class="text-sm font-semibold">CK validates</h4>
-      <p class="text-xs text-muted-foreground mt-1.5">
-        Findings, proofs, and gates fire as needed
+      <h3 class="text-lg font-semibold mb-2">Policy gates for agents</h3>
+      <p class="text-sm text-muted-foreground">
+        Convert domain knowledge and review decisions into typed memory, policy checks, governed findings, and approval gates.
       </p>
     </div>
-    <div class="flex flex-col items-center text-center">
-      <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
-        <.icon name="hero-arrow-trending-up" class="size-5" />
+    <div class="rounded-xl border bg-card p-6">
+      <div class="mb-3">
+        <.icon name="hero-chart-bar-square" class="size-8 text-primary" />
       </div>
-      <h4 class="text-sm font-semibold">Improve the loop</h4>
-      <p class="text-xs text-muted-foreground mt-1.5">Evals show what changed</p>
+      <h3 class="text-lg font-semibold mb-2">Evidence, not vibes</h3>
+      <p class="text-sm text-muted-foreground">
+        Proof bundles, benchmark runs, and cost signals show whether agent workflows are getting safer and cheaper.
+      </p>
     </div>
-  </div>
-</section>
+    <div class="rounded-xl border bg-card p-6">
+      <div class="mb-3">
+        <.icon name="hero-bolt-solid" class="size-8 text-primary" />
+      </div>
+      <h3 class="text-lg font-semibold mb-2">Host-agnostic control</h3>
+      <p class="text-sm text-muted-foreground">
+        Keep governance state outside the chat window so teams can move between supported agents without losing context.
+      </p>
+    </div>
+  </section>
 
-<section class="mx-auto max-w-5xl py-12">
-  <h2 class="text-center text-3xl font-bold mb-4">What it is not</h2>
-  <p class="text-center text-sm text-muted-foreground mb-10">
-    Clear scope, on purpose
-  </p>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div class="rounded-xl border bg-card p-6 text-center">
-      <div class="mb-3 flex justify-center">
-        <.icon name="hero-code-bracket-square" class="size-8 text-primary" />
-      </div>
-      <h3 class="text-lg font-semibold mb-2">Not another IDE or coding model</h3>
-    </div>
-    <div class="rounded-xl border bg-card p-6 text-center">
-      <div class="mb-3 flex justify-center">
-        <.icon name="hero-building-storefront" class="size-8 text-primary" />
-      </div>
-      <h3 class="text-lg font-semibold mb-2">Not a prompt marketplace or generic memory API</h3>
-    </div>
-    <div class="rounded-xl border bg-card p-6 text-center">
-      <div class="mb-3 flex justify-center">
-        <.icon name="hero-eye-slash" class="size-8 text-primary" />
-      </div>
-      <h3 class="text-lg font-semibold mb-2">Not passive monitoring or post-hoc review only</h3>
-    </div>
-  </div>
-</section>
-
-<section class="mx-auto max-w-5xl py-16 text-center">
-  <div class="rounded-2xl border bg-muted p-10">
-    <h2 class="text-2xl font-bold mb-3">Ready to govern your agents?</h2>
-    <p class="text-sm text-muted-foreground mb-6">
-      Install in under five minutes. No account required for local mode.
+  <section class="mx-auto max-w-5xl py-12">
+    <h2 class="text-center text-3xl font-bold mb-4">How it works</h2>
+    <p class="text-center text-sm text-muted-foreground mb-10">
+      From intent to evidence in four steps
     </p>
-    <a
-      href={~p"/docs/getting-started"}
-      class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:-translate-y-0.5 hover:bg-primary/90"
-    >
-      Get started <.icon name="hero-arrow-right" class="size-4" />
-    </a>
-  </div>
-</section>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div class="flex flex-col items-center text-center">
+        <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+          <.icon name="hero-document-text" class="size-5" />
+        </div>
+        <h4 class="text-sm font-semibold">Capture intent</h4>
+        <p class="text-xs text-muted-foreground mt-1.5">Set scope, policy, risk, and budget</p>
+      </div>
+      <div class="flex flex-col items-center text-center">
+        <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+          <.icon name="hero-command-line" class="size-5" />
+        </div>
+        <h4 class="text-sm font-semibold">Agent works</h4>
+        <p class="text-xs text-muted-foreground mt-1.5">Use the host your team already likes</p>
+      </div>
+      <div class="flex flex-col items-center text-center">
+        <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+          <.icon name="hero-shield-exclamation" class="size-5" />
+        </div>
+        <h4 class="text-sm font-semibold">CK validates</h4>
+        <p class="text-xs text-muted-foreground mt-1.5">
+          Findings, proofs, and gates fire as needed
+        </p>
+      </div>
+      <div class="flex flex-col items-center text-center">
+        <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+          <.icon name="hero-arrow-trending-up" class="size-5" />
+        </div>
+        <h4 class="text-sm font-semibold">Improve the loop</h4>
+        <p class="text-xs text-muted-foreground mt-1.5">Evals show what changed</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-5xl py-12">
+    <h2 class="text-center text-3xl font-bold mb-4">What it is not</h2>
+    <p class="text-center text-sm text-muted-foreground mb-10">
+      Clear scope, on purpose
+    </p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="rounded-xl border bg-card p-6 text-center">
+        <div class="mb-3 flex justify-center">
+          <.icon name="hero-code-bracket-square" class="size-8 text-primary" />
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Not another IDE or coding model</h3>
+      </div>
+      <div class="rounded-xl border bg-card p-6 text-center">
+        <div class="mb-3 flex justify-center">
+          <.icon name="hero-building-storefront" class="size-8 text-primary" />
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Not a prompt marketplace or generic memory API</h3>
+      </div>
+      <div class="rounded-xl border bg-card p-6 text-center">
+        <div class="mb-3 flex justify-center">
+          <.icon name="hero-eye-slash" class="size-8 text-primary" />
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Not passive monitoring or post-hoc review only</h3>
+      </div>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-5xl py-16 text-center">
+    <div class="rounded-2xl border bg-muted p-10">
+      <h2 class="text-2xl font-bold mb-3">Ready to govern your agents?</h2>
+      <p class="text-sm text-muted-foreground mb-6">
+        Install in under five minutes. No account required for local mode.
+      </p>
+      <a
+        href={~p"/docs/getting-started"}
+        class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:-translate-y-0.5 hover:bg-primary/90"
+      >
+        Get started <.icon name="hero-arrow-right" class="size-4" />
+      </a>
+    </div>
+  </section>
+<% end %>

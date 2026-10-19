@@ -15,55 +15,45 @@ defmodule ControlKeelWeb.PageController do
   # Public marketing pages render inside the `:public` framework layout
   # (ControlKeelWeb.Layouts). The layout reads @current_user/@flash directly,
   # so nothing needs to be forwarded from the templates.
+  #
+  # The root handoff is shared by local and signed-in cloud users. Anonymous
+  # cloud visitors keep the marketing page.
   plug :put_layout, html: {ControlKeelWeb.Layouts, :public}
 
   def home(conn, _params) do
     cond do
-      # Local mode has no marketing surface — `/` goes straight to the
-      # default org. ensure/0 is idempotent (find-or-create), so a fresh
-      # local install provisions the org on first visit.
       Mode.current() == :local ->
-        _ = LocalDefaults.ensure()
-        redirect(conn, to: ~p"/#{LocalDefaults.default_org_slug()}")
+        {:ok, _defaults} = LocalDefaults.ensure()
 
-      # Signed-in cloud/self_hosted users get their org → workspace →
-      # session selector tree instead of the marketing landing.
+        conn
+        |> put_layout(false)
+        |> render(:home,
+          last_path_boot: true,
+          fallback_path: latest_org_path(Accounts.list_orgs(status: "active"))
+        )
+
       user = conn.assigns[:current_user] ->
-        render(conn, :selector_tree, tree: selector_tree(user))
+        fallback_path =
+          user.id
+          |> Accounts.list_orgs_for_user()
+          |> Enum.map(& &1.org)
+          |> Enum.filter(&(&1.status == "active"))
+          |> latest_org_path()
+
+        conn
+        |> put_layout(false)
+        |> render(:home, last_path_boot: true, fallback_path: fallback_path)
 
       true ->
-        render(conn, :home)
+        render(conn, :home, last_path_boot: false, fallback_path: nil)
     end
   end
 
-  defp selector_tree(user) do
-    orgs =
-      user.id
-      |> Accounts.list_orgs_for_user()
-      |> Enum.map(& &1.org)
-      |> Enum.sort_by(& &1.name)
-
-    workspaces =
-      orgs
-      |> Enum.map(& &1.id)
-      |> Mission.list_workspaces_for_orgs()
-
-    sessions_by_workspace =
-      workspaces
-      |> Enum.map(& &1.id)
-      |> Mission.list_sessions_for_workspaces()
-      |> Enum.group_by(& &1.workspace_id)
-
-    workspaces_by_org = Enum.group_by(workspaces, & &1.org_id)
-
-    Enum.map(orgs, fn org ->
-      workspaces =
-        Enum.map(workspaces_by_org[org.id] || [], fn workspace ->
-          %{workspace: workspace, sessions: sessions_by_workspace[workspace.id] || []}
-        end)
-
-      %{org: org, workspaces: workspaces}
-    end)
+  defp latest_org_path(orgs) do
+    case Enum.max_by(orgs, &{DateTime.to_unix(&1.inserted_at, :microsecond), &1.id}, fn -> nil end) do
+      %{slug: slug} -> "/#{slug}"
+      nil -> ~p"/organizations"
+    end
   end
 
   def about(conn, _params) do
