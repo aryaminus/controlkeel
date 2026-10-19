@@ -360,18 +360,18 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   # Slug params are attached only when the viewer is admin/owner of nav_org
-  # (issue #183); OnboardingLive re-validates anything it receives. Local
+  # (issue #183); NewSessionLive re-validates anything it receives. Local
   # mode and lower roles get the bare launcher URL.
   defp new_session_path(
          %{nav_org: %{slug: org_slug}, nav_workspace: %{slug: ws_slug}, nav_org_admin?: true} =
            _assigns
        ),
-       do: ~p"/sessions/start?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
+       do: ~p"/new/session?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
 
   defp new_session_path(%{nav_org: %{slug: org_slug}, nav_org_admin?: true} = _assigns),
-    do: ~p"/sessions/start?#{%{org_slug: org_slug}}"
+    do: ~p"/new/session?#{%{org_slug: org_slug}}"
 
-  defp new_session_path(_assigns), do: ~p"/sessions/start"
+  defp new_session_path(_assigns), do: ~p"/new/session"
 
   attr :id, :string, required: true, doc: "base id; button/popover derive from it"
   attr :label, :string, required: true, doc: "aria-label for the toggle button"

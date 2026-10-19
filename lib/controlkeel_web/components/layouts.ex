@@ -352,7 +352,7 @@ defmodule ControlKeelWeb.Layouts do
       <.dashboard_header
         current_path={@current_path}
         page_action={[
-          %{to: "/sessions/start", label: "New session", icon: "hero-plus"}
+          %{to: "/new/session", label: "New session", icon: "hero-plus"}
         ]}
       />
   """

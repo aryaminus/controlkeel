@@ -1,4 +1,4 @@
-defmodule ControlKeelWeb.OnboardingLiveTest do
+defmodule ControlKeelWeb.NewSessionLiveTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
@@ -13,7 +13,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
     # assert against the delta, not an absolute empty list.
     initial_session_count = length(Mission.list_sessions())
 
-    {:ok, view, html} = live(conn, ~p"/sessions/start")
+    {:ok, view, html} = live(conn, ~p"/new/session")
 
     assert html =~ "Choose the domain and primary agent"
     assert html =~ "Founder / Product Builder"
@@ -84,7 +84,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
   test "onboarding UI prevents duplicate project names", %{conn: conn} do
     _session = session_fixture(%{title: "Existing Project"})
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/start")
+    {:ok, view, _html} = live(conn, ~p"/new/session")
 
     render_submit(
       form(view, "#onboarding-wizard-form",
@@ -126,7 +126,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       }
     )
 
-    {:ok, view, html} = live(conn, ~p"/sessions/start")
+    {:ok, view, html} = live(conn, ~p"/new/session")
     refute html =~ "sk-secret-test"
 
     render_submit(
@@ -151,7 +151,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
   test "review step explains heuristic mode and provider status without leaking secrets", %{
     conn: conn
   } do
-    {:ok, view, _html} = live(conn, ~p"/sessions/start")
+    {:ok, view, _html} = live(conn, ~p"/new/session")
 
     render_submit(
       form(view, "#onboarding-wizard-form",
@@ -193,7 +193,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
   end
 
   test "expanded domain occupations render and advance through onboarding", %{conn: conn} do
-    {:ok, view, html} = live(conn, ~p"/sessions/start")
+    {:ok, view, html} = live(conn, ~p"/new/session")
 
     assert html =~ "Domain pack:"
 
@@ -220,7 +220,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
   end
 
   test "onboarding creates the session in the default workspace", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/sessions/start")
+    {:ok, view, _html} = live(conn, ~p"/new/session")
 
     assert render_submit(
              form(view, "#onboarding-wizard-form",
@@ -282,7 +282,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
         }
       })
 
-    {:ok, view, _html} = live(conn, ~p"/sessions/start")
+    {:ok, view, _html} = live(conn, ~p"/new/session")
 
     # Step 1
     render_submit(
@@ -299,7 +299,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
     assert render(view) =~ "Original project objective"
   end
 
-  describe "cloud mode /sessions/start" do
+  describe "cloud mode /new/session" do
     setup do
       original = Application.get_env(:controlkeel, :runtime_mode)
       Application.put_env(:controlkeel, :runtime_mode, :cloud)
@@ -323,14 +323,20 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       })
     end
 
-    test "blocks onboarding when the user has no organizations", %{} do
-      # Memberless users never reach the launcher: require_cloud_auth
-      # redirects them to /organizations where they can join or create one
-      # (issue #141, R3).
+    test "lets a user with no organizations view onboarding with a create-org notice", %{} do
+      # Memberless users can reach the launcher, but the entire session UI is
+      # replaced by an empty state that points them at the org-creation page.
       user = user_fixture()
 
-      assert {:error, {:redirect, %{to: "/organizations"}}} =
-               live(cloud_conn(user, nil), ~p"/sessions/start")
+      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/new/session")
+
+      assert html =~ "You cannot start a session without an organization"
+      assert has_element?(view, ~s(a[href="/new/org"]))
+
+      # The wizard/scope UI (and its steps header) is replaced entirely.
+      refute html =~ "Organization and workspace"
+      refute html =~ "Choose the domain and primary agent"
+      refute has_element?(view, "#onboarding-wizard-form")
     end
 
     test "excludes orgs where the user is only a member or viewer from the picker", %{} do
@@ -352,7 +358,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
         })
         |> ControlKeel.Repo.insert()
 
-      {:ok, view, html} = live(cloud_conn(member, org.id), ~p"/sessions/start")
+      {:ok, view, html} = live(cloud_conn(member, org.id), ~p"/new/session")
 
       assert html =~ "Organization and workspace"
       assert html =~ "admin or owner of at least one organization"
@@ -398,7 +404,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       # An admin membership that was revoked must not grant access.
       add_membership(user, revoked, "admin", "revoked")
 
-      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/sessions/start")
+      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/new/session")
 
       assert has_element?(view, "#onboarding-org-select option[value=\"#{owned.id}\"]")
       assert has_element?(view, "#onboarding-org-select option[value=\"#{administered.id}\"]")
@@ -412,7 +418,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       user = user_fixture()
       {:ok, org} = Accounts.create_org_with_owner(user.id, %{name: "No WS", slug: "no-ws"})
 
-      {:ok, view, html} = live(cloud_conn(user, org.id), ~p"/sessions/start")
+      {:ok, view, html} = live(cloud_conn(user, org.id), ~p"/new/session")
 
       assert html =~ "Organization and workspace"
       assert html =~ "has no workspaces yet"
@@ -434,7 +440,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       {:ok, org} = Accounts.create_org_with_owner(user.id, %{name: "Acme", slug: "acme"})
       ws = workspace_fixture(%{org_id: org.id, name: "Backend", slug: "backend"})
 
-      {:ok, view, html} = live(cloud_conn(user, org.id), ~p"/sessions/start")
+      {:ok, view, html} = live(cloud_conn(user, org.id), ~p"/new/session")
 
       assert html =~ "Organization and workspace"
       assert has_element?(view, "#onboarding-org-select option[value=\"#{org.id}\"]")
@@ -491,7 +497,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       ws_a = workspace_fixture(%{org_id: org_a.id, name: "Alpha WS", slug: "alpha-ws"})
       ws_b = workspace_fixture(%{org_id: org_b.id, name: "Beta WS", slug: "beta-ws"})
 
-      {:ok, view, _html} = live(cloud_conn(user, org_a.id), ~p"/sessions/start")
+      {:ok, view, _html} = live(cloud_conn(user, org_a.id), ~p"/new/session")
 
       # The selects must live inside a form: LV 1.x clients refuse to push
       # phx-change for form-less inputs, which strands the workspace options.
@@ -531,7 +537,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       ws_b = workspace_fixture(%{org_id: org_b.id, name: "Bee", slug: "bee"})
 
       # No params: defaults — first admin org + its first workspace.
-      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/sessions/start")
+      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/new/session")
 
       assert has_element?(view, "#onboarding-org-select option[value=\"#{org_a.id}\"][selected]")
 
@@ -546,7 +552,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       {:ok, view, html} =
         live(
           cloud_conn(user, nil),
-          ~p"/sessions/start?#{%{org_slug: "param-a", ws_slug: "a-two"}}"
+          ~p"/new/session?#{%{org_slug: "param-a", ws_slug: "a-two"}}"
         )
 
       assert has_element?(view, "#onboarding-org-select option[value=\"#{org_a.id}\"][selected]")
@@ -560,7 +566,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
 
       # Org-only param (org-scope header button): org + first workspace.
       {:ok, _view, html} =
-        live(cloud_conn(user, nil), ~p"/sessions/start?#{%{org_slug: "param-b"}}")
+        live(cloud_conn(user, nil), ~p"/new/session?#{%{org_slug: "param-b"}}")
 
       assert html =~ "Param B"
       assert html =~ "Bee"
@@ -578,14 +584,14 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       their_ws = workspace_fixture(%{org_id: theirs.id, name: "Nope", slug: "nope"})
 
       # Unknown org slug.
-      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/sessions/start?#{%{org_slug: "ghost"}}")
+      {:ok, view, html} = live(cloud_conn(user, nil), ~p"/new/session?#{%{org_slug: "ghost"}}")
 
       assert html =~ "Organization &quot;ghost&quot; is not available to you"
       assert has_element?(view, "#onboarding-org-select option[value=\"#{org.id}\"][selected]")
 
       # Non-admin org: the param is ignored even though the user is a member.
       {:ok, view, html} =
-        live(cloud_conn(user, nil), ~p"/sessions/start?#{%{org_slug: "theirs", ws_slug: "nope"}}")
+        live(cloud_conn(user, nil), ~p"/new/session?#{%{org_slug: "theirs", ws_slug: "nope"}}")
 
       assert html =~ "is not available to you"
       assert has_element?(view, "#onboarding-org-select option[value=\"#{org.id}\"][selected]")
@@ -593,7 +599,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
 
       # Valid org, foreign workspace slug.
       {:ok, view, html} =
-        live(cloud_conn(user, nil), ~p"/sessions/start?#{%{org_slug: "mine", ws_slug: "nope"}}")
+        live(cloud_conn(user, nil), ~p"/new/session?#{%{org_slug: "mine", ws_slug: "nope"}}")
 
       assert html =~ "does not belong to that organization"
       assert has_element?(view, "#onboarding-org-select option[value=\"#{org.id}\"][selected]")
@@ -610,7 +616,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       _ws_one = workspace_fixture(%{org_id: org.id, name: "One", slug: "one"})
       ws_two = workspace_fixture(%{org_id: org.id, name: "Two", slug: "two"})
 
-      {:ok, view, _html} = live(cloud_conn(user, nil), ~p"/sessions/start")
+      {:ok, view, _html} = live(cloud_conn(user, nil), ~p"/new/session")
 
       org_select = element(view, "#onboarding-org-select")
       ws_select = element(view, "#onboarding-workspace-select")
@@ -668,7 +674,7 @@ defmodule ControlKeelWeb.OnboardingLiveTest do
       other_ws = workspace_fixture(%{org_id: other_org.id, name: "Far WS", slug: "far-ws"})
       foreign = session_fixture(%{workspace: other_ws, title: "Someone Elses Session"})
 
-      {:ok, view, _html} = live(cloud_conn(user, org.id), ~p"/sessions/start")
+      {:ok, view, _html} = live(cloud_conn(user, org.id), ~p"/new/session")
 
       # The continue-from-session picker lives on step 2.
       html =

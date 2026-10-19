@@ -1,4 +1,4 @@
-defmodule ControlKeelWeb.OnboardingLive do
+defmodule ControlKeelWeb.NewSessionLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
@@ -21,6 +21,7 @@ defmodule ControlKeelWeb.OnboardingLive do
      |> assign(:project_root, project_root)
      |> assign(:mode, mode)
      |> assign(:cloud_mode, cloud_mode)
+     |> assign(:memberless?, false)
      |> assign(:occupation_profiles, Intent.occupation_profiles())
      |> assign(:agent_options, Intent.agent_options())
      |> assign(:step, 1)
@@ -277,468 +278,495 @@ defmodule ControlKeelWeb.OnboardingLive do
           title="Start a session"
           subtitle="Scope it, describe the product, answer the interview, then review the compiled brief."
         />
-        <ControlKeelWeb.SessionStartLayouts.steps step={@step} cloud_mode={@cloud_mode} />
+        <ControlKeelWeb.NewPagesLayouts.steps
+          :if={not @memberless?}
+          step={@step}
+          cloud_mode={@cloud_mode}
+        />
       </div>
 
-      <%= if @cloud_mode do %>
-        <section class="rounded-2xl border bg-card p-5 shadow-card" aria-label="Scope">
-          <div class="flex items-center justify-between gap-3">
-            <.section_title>Organization and workspace</.section_title>
-            <span class="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-              Step 0 · Scope
-            </span>
+      <%= if @memberless? do %>
+        <section
+          class="rounded-2xl border bg-card p-10 shadow-card"
+          aria-label="Organization required"
+        >
+          <div class="mx-auto flex max-w-md flex-col items-center gap-4 text-center">
+            <.icon name="hero-building-office-2" class="size-10 text-muted-foreground" />
+            <p class="text-base leading-relaxed text-foreground">
+              You cannot start a session without an organization and a workspace. Create an
+              organization to continue.
+            </p>
+            <.link
+              navigate={~p"/new/org"}
+              class="rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground transition-all duration-200 hover:shadow-[0_0_20px_rgba(196,240,66,0.3)]"
+            >
+              Create an organization
+            </.link>
           </div>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Choose where this session will be created.
-          </p>
+        </section>
+      <% else %>
+        <%= if @cloud_mode do %>
+          <section class="rounded-2xl border bg-card p-5 shadow-card" aria-label="Scope">
+            <div class="flex items-center justify-between gap-3">
+              <.section_title>Organization and workspace</.section_title>
+              <span class="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+                Step 0 · Scope
+              </span>
+            </div>
+            <p class="mt-1 text-sm text-muted-foreground">
+              Choose where this session will be created.
+            </p>
 
-          <%!-- LV 1.x only fires phx-change on inputs inside a form; input-level
+            <%!-- LV 1.x only fires phx-change on inputs inside a form; input-level
              bindings are preserved and the client serializes only the bound
              input name/value. --%>
-          <form id="onboarding-scope-form">
-            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div class="space-y-1.5">
-                <label
-                  for="onboarding-org-select"
-                  class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
-                >
-                  Organization
-                </label>
-                <select
-                  id="onboarding-org-select"
-                  name="org_id"
-                  phx-change="select_org"
-                  class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                >
-                  <%= for {id, name, _slug} <- @org_options do %>
-                    <option value={id} selected={@selected_org_id == id}>{name}</option>
-                  <% end %>
-                </select>
-              </div>
-
-              <div class="space-y-1.5">
-                <label
-                  for="onboarding-workspace-select"
-                  class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
-                >
-                  Workspace
-                </label>
-                <select
-                  id="onboarding-workspace-select"
-                  name="workspace_id"
-                  phx-change="select_workspace"
-                  class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                >
-                  <%= for {id, name, _slug} <- @workspace_options do %>
-                    <option value={id} selected={@selected_workspace_id == id}>{name}</option>
-                  <% end %>
-                </select>
-              </div>
-            </div>
-          </form>
-
-          <%= if @scope_notice do %>
-            <div class="mt-4 flex flex-col gap-2 rounded-xl border border-warning/20 bg-warning/10 p-4">
-              <p class="text-sm text-warning font-medium">
-                {@scope_notice}
-              </p>
-            </div>
-          <% end %>
-
-          <%= if @onboarding_notice do %>
-            <div class="mt-4 flex flex-col gap-2 rounded-xl border border-warning/20 bg-warning/10 p-4">
-              <p class="text-sm text-warning font-medium">
-                {@onboarding_notice.text}
-              </p>
-              <%= if @onboarding_notice.link do %>
-                <.link
-                  navigate={@onboarding_notice.link}
-                  class="text-xs font-semibold text-primary hover:text-primary/80 underline underline-offset-4"
-                >
-                  {@onboarding_notice.link_text}
-                </.link>
-              <% end %>
-            </div>
-          <% end %>
-        </section>
-      <% end %>
-
-      <div class="grid grid-cols-1 items-start gap-6">
-        <section
-          class="rounded-2xl border bg-card p-5 shadow-card"
-          aria-label="Setup wizard"
-        >
-          <.form for={@form} phx-change="validate" phx-submit="next" id="onboarding-wizard-form">
-            <%= case @step do %>
-              <% 1 -> %>
-                <div class="space-y-6">
-                  <div>
-                    <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
-                      Step 1 of 4
-                    </p>
-                    <h2 class="text-2xl font-serif text-foreground mt-1">
-                      Choose the domain and primary agent
-                    </h2>
-                  </div>
-
-                  <div class="space-y-1.5">
-                    <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                      Domain profile
-                    </label>
-                    <select
-                      name="launch[occupation]"
-                      class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                    >
-                      <%= for profile <- @occupation_profiles do %>
-                        <option value={profile.id} selected={@attrs["occupation"] == profile.id}>
-                          {profile.label}
-                        </option>
-                      <% end %>
-                    </select>
-                    <%= if error = field_error(@errors, "occupation") do %>
-                      <p class="text-xs text-destructive font-medium mt-1">{error}</p>
+            <form id="onboarding-scope-form">
+              <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="space-y-1.5">
+                  <label
+                    for="onboarding-org-select"
+                    class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
+                  >
+                    Organization
+                  </label>
+                  <select
+                    id="onboarding-org-select"
+                    name="org_id"
+                    phx-change="select_org"
+                    class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                  >
+                    <%= for {id, name, _slug} <- @org_options do %>
+                      <option value={id} selected={@selected_org_id == id}>{name}</option>
                     <% end %>
-                    <p class="text-xs text-muted-foreground leading-relaxed">
-                      {@preflight.occupation.description}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      Domain pack: {@preflight.occupation.domain_pack} · preliminary risk: {@preflight.preliminary_risk_tier}
-                    </p>
-                  </div>
+                  </select>
+                </div>
 
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t">
+                <div class="space-y-1.5">
+                  <label
+                    for="onboarding-workspace-select"
+                    class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono"
+                  >
+                    Workspace
+                  </label>
+                  <select
+                    id="onboarding-workspace-select"
+                    name="workspace_id"
+                    phx-change="select_workspace"
+                    class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                  >
+                    <%= for {id, name, _slug} <- @workspace_options do %>
+                      <option value={id} selected={@selected_workspace_id == id}>{name}</option>
+                    <% end %>
+                  </select>
+                </div>
+              </div>
+            </form>
+
+            <%= if @scope_notice do %>
+              <div class="mt-4 flex flex-col gap-2 rounded-xl border border-warning/20 bg-warning/10 p-4">
+                <p class="text-sm text-warning font-medium">
+                  {@scope_notice}
+                </p>
+              </div>
+            <% end %>
+
+            <%= if @onboarding_notice do %>
+              <div class="mt-4 flex flex-col gap-2 rounded-xl border border-warning/20 bg-warning/10 p-4">
+                <p class="text-sm text-warning font-medium">
+                  {@onboarding_notice.text}
+                </p>
+                <%= if @onboarding_notice.link do %>
+                  <.link
+                    navigate={@onboarding_notice.link}
+                    class="text-xs font-semibold text-primary hover:text-primary/80 underline underline-offset-4"
+                  >
+                    {@onboarding_notice.link_text}
+                  </.link>
+                <% end %>
+              </div>
+            <% end %>
+          </section>
+        <% end %>
+
+        <div class="grid grid-cols-1 items-start gap-6">
+          <section
+            class="rounded-2xl border bg-card p-5 shadow-card"
+            aria-label="Setup wizard"
+          >
+            <.form for={@form} phx-change="validate" phx-submit="next" id="onboarding-wizard-form">
+              <%= case @step do %>
+                <% 1 -> %>
+                  <div class="space-y-6">
+                    <div>
+                      <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
+                        Step 1 of 4
+                      </p>
+                      <h2 class="text-2xl font-serif text-foreground mt-1">
+                        Choose the domain and primary agent
+                      </h2>
+                    </div>
+
                     <div class="space-y-1.5">
                       <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                        Primary agent
+                        Domain profile
                       </label>
                       <select
-                        name="launch[agent]"
+                        name="launch[occupation]"
                         class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
                       >
-                        <%= for {id, label} <- @agent_options do %>
-                          <option value={id} selected={@attrs["agent"] == id}>{label}</option>
+                        <%= for profile <- @occupation_profiles do %>
+                          <option value={profile.id} selected={@attrs["occupation"] == profile.id}>
+                            {profile.label}
+                          </option>
                         <% end %>
                       </select>
-                      <%= if error = field_error(@errors, "agent") do %>
+                      <%= if error = field_error(@errors, "occupation") do %>
                         <p class="text-xs text-destructive font-medium mt-1">{error}</p>
                       <% end %>
+                      <p class="text-xs text-muted-foreground leading-relaxed">
+                        {@preflight.occupation.description}
+                      </p>
+                      <p class="text-xs text-muted-foreground">
+                        Domain pack: {@preflight.occupation.domain_pack} · preliminary risk: {@preflight.preliminary_risk_tier}
+                      </p>
                     </div>
 
-                    <div class="space-y-1.5">
-                      <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                        Daily budget (USD)
-                      </label>
-                      <input
-                        type="number"
-                        name="launch[budget]"
-                        value={@attrs["budget"]}
-                        min="0"
-                        max="500"
-                        step="5"
-                        placeholder="30"
-                        class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                      />
-                      <%= if error = field_error(@errors, "budget") do %>
-                        <p class="text-xs text-destructive font-medium mt-1">{error}</p>
-                      <% end %>
-                    </div>
-                  </div>
-                </div>
-              <% 2 -> %>
-                <div class="space-y-6">
-                  <div>
-                    <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
-                      Step 2 of 4
-                    </p>
-                    <h2 class="text-2xl font-serif text-foreground mt-1">
-                      Describe the product
-                    </h2>
-                  </div>
-
-                  <div class="space-y-4">
-                    <div class="space-y-1.5">
-                      <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                        Project name
-                      </label>
-                      <input
-                        type="text"
-                        name="launch[project_name]"
-                        value={@attrs["project_name"]}
-                        placeholder="e.g., Clinic Intake Portal"
-                        class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                      />
-                      <%= if error = field_error(@errors, "project_name") do %>
-                        <p class="text-xs text-destructive font-medium mt-1">{error}</p>
-                      <% end %>
-                    </div>
-
-                    <div class="space-y-1.5">
-                      <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                        Core product prompt
-                      </label>
-                      <textarea
-                        name="launch[idea]"
-                        rows="8"
-                        placeholder="Describe what you want built in plain language."
-                        class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                      ><%= @attrs["idea"] %></textarea>
-                      <%= if error = field_error(@errors, "idea") do %>
-                        <p class="text-xs text-destructive font-medium mt-1">{error}</p>
-                      <% end %>
-                    </div>
-                  </div>
-
-                  <%= if @recent_sessions != [] do %>
-                    <div class="border-t pt-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t">
                       <div class="space-y-1.5">
                         <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                          Or continue from an existing session
+                          Primary agent
                         </label>
                         <select
-                          id="onboarding-recent-session-select"
-                          name="recent_mission_id"
+                          name="launch[agent]"
                           class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                          phx-change="select_mission"
                         >
-                          <option value="">Select a recent mission...</option>
-                          <%= for session <- @recent_sessions do %>
-                            <option value={session.id}>{session.title}</option>
+                          <%= for {id, label} <- @agent_options do %>
+                            <option value={id} selected={@attrs["agent"] == id}>{label}</option>
                           <% end %>
                         </select>
-                      </div>
-                    </div>
-                  <% end %>
-                </div>
-              <% 3 -> %>
-                <div class="space-y-6">
-                  <div>
-                    <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
-                      Step 3 of 4
-                    </p>
-                    <h2 class="text-2xl font-serif text-foreground mt-1">
-                      Answer the guided interview
-                    </h2>
-                  </div>
-
-                  <div class="space-y-6">
-                    <%= for question <- @interview_questions do %>
-                      <div class="space-y-1.5">
-                        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                          {question.label}
-                        </label>
-                        <p class="text-xs text-muted-foreground leading-relaxed">{question.prompt}</p>
-                        <textarea
-                          name={"launch[interview_answers][#{question.id}]"}
-                          rows="4"
-                          placeholder={question.placeholder}
-                          class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
-                        ><%= Map.get(@attrs["interview_answers"], question.id, "") %></textarea>
-                        <%= if error = field_error(@errors, "interview_answers.#{question.id}") do %>
+                        <%= if error = field_error(@errors, "agent") do %>
                           <p class="text-xs text-destructive font-medium mt-1">{error}</p>
                         <% end %>
                       </div>
-                    <% end %>
-                    <%= if @compile_error do %>
-                      <p class="text-sm text-[var(--ck-warning)] font-medium bg-[var(--ck-warning)]/5 border border-[var(--ck-warning)]/20 rounded-xl p-4 mt-2">
-                        {@compile_error}
+
+                      <div class="space-y-1.5">
+                        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                          Daily budget (USD)
+                        </label>
+                        <input
+                          type="number"
+                          name="launch[budget]"
+                          value={@attrs["budget"]}
+                          min="0"
+                          max="500"
+                          step="5"
+                          placeholder="30"
+                          class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                        />
+                        <%= if error = field_error(@errors, "budget") do %>
+                          <p class="text-xs text-destructive font-medium mt-1">{error}</p>
+                        <% end %>
+                      </div>
+                    </div>
+                  </div>
+                <% 2 -> %>
+                  <div class="space-y-6">
+                    <div>
+                      <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
+                        Step 2 of 4
                       </p>
+                      <h2 class="text-2xl font-serif text-foreground mt-1">
+                        Describe the product
+                      </h2>
+                    </div>
+
+                    <div class="space-y-4">
+                      <div class="space-y-1.5">
+                        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                          Project name
+                        </label>
+                        <input
+                          type="text"
+                          name="launch[project_name]"
+                          value={@attrs["project_name"]}
+                          placeholder="e.g., Clinic Intake Portal"
+                          class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                        />
+                        <%= if error = field_error(@errors, "project_name") do %>
+                          <p class="text-xs text-destructive font-medium mt-1">{error}</p>
+                        <% end %>
+                      </div>
+
+                      <div class="space-y-1.5">
+                        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                          Core product prompt
+                        </label>
+                        <textarea
+                          name="launch[idea]"
+                          rows="8"
+                          placeholder="Describe what you want built in plain language."
+                          class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                        ><%= @attrs["idea"] %></textarea>
+                        <%= if error = field_error(@errors, "idea") do %>
+                          <p class="text-xs text-destructive font-medium mt-1">{error}</p>
+                        <% end %>
+                      </div>
+                    </div>
+
+                    <%= if @recent_sessions != [] do %>
+                      <div class="border-t pt-6">
+                        <div class="space-y-1.5">
+                          <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                            Or continue from an existing session
+                          </label>
+                          <select
+                            id="onboarding-recent-session-select"
+                            name="recent_mission_id"
+                            class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                            phx-change="select_mission"
+                          >
+                            <option value="">Select a recent mission...</option>
+                            <%= for session <- @recent_sessions do %>
+                              <option value={session.id}>{session.title}</option>
+                            <% end %>
+                          </select>
+                        </div>
+                      </div>
                     <% end %>
                   </div>
-                </div>
-              <% 4 -> %>
-                <div class="space-y-6">
-                  <div>
-                    <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
-                      Step 4 of 4
-                    </p>
-                    <h2 class="text-2xl font-serif text-foreground mt-1">
-                      Review the compiled brief
-                    </h2>
+                <% 3 -> %>
+                  <div class="space-y-6">
+                    <div>
+                      <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
+                        Step 3 of 4
+                      </p>
+                      <h2 class="text-2xl font-serif text-foreground mt-1">
+                        Answer the guided interview
+                      </h2>
+                    </div>
+
+                    <div class="space-y-6">
+                      <%= for question <- @interview_questions do %>
+                        <div class="space-y-1.5">
+                          <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                            {question.label}
+                          </label>
+                          <p class="text-xs text-muted-foreground leading-relaxed">
+                            {question.prompt}
+                          </p>
+                          <textarea
+                            name={"launch[interview_answers][#{question.id}]"}
+                            rows="4"
+                            placeholder={question.placeholder}
+                            class="w-full border border-input bg-background hover:border-primary rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition"
+                          ><%= Map.get(@attrs["interview_answers"], question.id, "") %></textarea>
+                          <%= if error = field_error(@errors, "interview_answers.#{question.id}") do %>
+                            <p class="text-xs text-destructive font-medium mt-1">{error}</p>
+                          <% end %>
+                        </div>
+                      <% end %>
+                      <%= if @compile_error do %>
+                        <p class="text-sm text-[var(--ck-warning)] font-medium bg-[var(--ck-warning)]/5 border border-[var(--ck-warning)]/20 rounded-xl p-4 mt-2">
+                          {@compile_error}
+                        </p>
+                      <% end %>
+                    </div>
                   </div>
-
-                  <%= if @compiled_brief do %>
-                    <% brief = Intent.to_brief_map(@compiled_brief) %>
-                    <% compiler = brief["compiler"] || %{} %>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-6">
-                      <div>
-                        <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                          Objective
-                        </h4>
-                        <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
-                          {brief["objective"]}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                          Project Name
-                        </h4>
-                        <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
-                          {@attrs["project_name"]}
-                        </p>
-                      </div>
-                      <div class="md:col-span-2">
-                        <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                          Core Product Prompt
-                        </h4>
-                        <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
-                          {@attrs["idea"]}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                          Next Step
-                        </h4>
-                        <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
-                          {brief["next_step"]}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
-                          Compiler Info
-                        </h4>
-                        <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
-                          {compiler["provider"]} / {compiler["model"]}
-                        </p>
-                      </div>
+                <% 4 -> %>
+                  <div class="space-y-6">
+                    <div>
+                      <p class="text-xs font-semibold tracking-wider text-primary uppercase font-mono">
+                        Step 4 of 4
+                      </p>
+                      <h2 class="text-2xl font-serif text-foreground mt-1">
+                        Review the compiled brief
+                      </h2>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                      <div class="rounded-xl border bg-card/20 p-4">
-                        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
-                          Acceptance criteria
-                        </h4>
-                        <p class="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
-                          {brief["acceptance_criteria"]}
-                        </p>
-                      </div>
+                    <%= if @compiled_brief do %>
+                      <% brief = Intent.to_brief_map(@compiled_brief) %>
+                      <% compiler = brief["compiler"] || %{} %>
 
-                      <div class="rounded-xl border bg-card/20 p-4">
-                        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
-                          Production boundary
-                        </h4>
-                        <div class="space-y-3">
-                          <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span class="text-muted-foreground block font-mono text-[10px] uppercase">
-                                Risk Tier
-                              </span>
-                              <span class="text-muted-foreground font-medium">
-                                {boundary_value(@compiled_boundary_summary, "risk_tier")}
-                              </span>
-                            </div>
-                            <div>
-                              <span class="text-muted-foreground block font-mono text-[10px] uppercase">
-                                Launch Window
-                              </span>
-                              <span class="text-muted-foreground font-medium">
-                                {boundary_value(@compiled_boundary_summary, "launch_window")}
-                              </span>
-                            </div>
-                          </div>
-                          <div>
-                            <span class="text-muted-foreground text-xs block font-mono text-[10px] uppercase">
-                              Budget Note
-                            </span>
-                            <span class="text-muted-foreground text-xs font-medium leading-relaxed">
-                              {boundary_value(@compiled_boundary_summary, "budget_note")}
-                            </span>
-                          </div>
-                          <div>
-                            <span class="text-muted-foreground text-xs block mb-1 font-mono text-[10px] uppercase">
-                              Constraints
-                            </span>
-                            <p class="text-xs text-muted-foreground leading-relaxed">
-                              {boundary_text(@compiled_boundary_summary, "constraints")}
-                            </p>
-                          </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-6">
+                        <div>
+                          <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                            Objective
+                          </h4>
+                          <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
+                            {brief["objective"]}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                            Project Name
+                          </h4>
+                          <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
+                            {@attrs["project_name"]}
+                          </p>
+                        </div>
+                        <div class="md:col-span-2">
+                          <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                            Core Product Prompt
+                          </h4>
+                          <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
+                            {@attrs["idea"]}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                            Next Step
+                          </h4>
+                          <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
+                            {brief["next_step"]}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider font-mono">
+                            Compiler Info
+                          </h4>
+                          <p class="text-muted-foreground text-sm mt-1 leading-relaxed">
+                            {compiler["provider"]} / {compiler["model"]}
+                          </p>
                         </div>
                       </div>
 
-                      <div class="rounded-xl border bg-card/20 p-4 md:col-span-2">
-                        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
-                          Governance that will apply
-                        </h4>
-                        <p class="text-xs text-muted-foreground leading-relaxed">
-                          This session will be governed under the {@preflight.occupation.domain_pack} domain pack
-                          at preliminary risk {@preflight.preliminary_risk_tier}. {@preflight.validation_language} High-risk and destructive actions route to human review.
-                        </p>
-                        <div class="flex flex-wrap gap-1 mt-2">
-                          <%= for item <- @preflight.compliance do %>
-                            <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-border">
-                              {item}
-                            </span>
-                          <% end %>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        <div class="rounded-xl border bg-card/20 p-4">
+                          <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
+                            Acceptance criteria
+                          </h4>
+                          <p class="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
+                            {brief["acceptance_criteria"]}
+                          </p>
+                        </div>
+
+                        <div class="rounded-xl border bg-card/20 p-4">
+                          <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
+                            Production boundary
+                          </h4>
+                          <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span class="text-muted-foreground block font-mono text-[10px] uppercase">
+                                  Risk Tier
+                                </span>
+                                <span class="text-muted-foreground font-medium">
+                                  {boundary_value(@compiled_boundary_summary, "risk_tier")}
+                                </span>
+                              </div>
+                              <div>
+                                <span class="text-muted-foreground block font-mono text-[10px] uppercase">
+                                  Launch Window
+                                </span>
+                                <span class="text-muted-foreground font-medium">
+                                  {boundary_value(@compiled_boundary_summary, "launch_window")}
+                                </span>
+                              </div>
+                            </div>
+                            <div>
+                              <span class="text-muted-foreground text-xs block font-mono text-[10px] uppercase">
+                                Budget Note
+                              </span>
+                              <span class="text-muted-foreground text-xs font-medium leading-relaxed">
+                                {boundary_value(@compiled_boundary_summary, "budget_note")}
+                              </span>
+                            </div>
+                            <div>
+                              <span class="text-muted-foreground text-xs block mb-1 font-mono text-[10px] uppercase">
+                                Constraints
+                              </span>
+                              <p class="text-xs text-muted-foreground leading-relaxed">
+                                {boundary_text(@compiled_boundary_summary, "constraints")}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="rounded-xl border bg-card/20 p-4 md:col-span-2">
+                          <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
+                            Governance that will apply
+                          </h4>
+                          <p class="text-xs text-muted-foreground leading-relaxed">
+                            This session will be governed under the {@preflight.occupation.domain_pack} domain pack
+                            at preliminary risk {@preflight.preliminary_risk_tier}. {@preflight.validation_language} High-risk and destructive actions route to human review.
+                          </p>
+                          <div class="flex flex-wrap gap-1 mt-2">
+                            <%= for item <- @preflight.compliance do %>
+                              <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+                                {item}
+                              </span>
+                            <% end %>
+                          </div>
+                        </div>
+
+                        <div class="rounded-xl border bg-card/20 p-4 md:col-span-2">
+                          <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
+                            Open Questions
+                          </h4>
+                          <ul class="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
+                            <%= for item <- brief["open_questions"] || [] do %>
+                              <li>{item}</li>
+                            <% end %>
+                          </ul>
                         </div>
                       </div>
-
-                      <div class="rounded-xl border bg-card/20 p-4 md:col-span-2">
-                        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider font-mono mb-2">
-                          Open Questions
-                        </h4>
-                        <ul class="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
-                          <%= for item <- brief["open_questions"] || [] do %>
-                            <li>{item}</li>
-                          <% end %>
-                        </ul>
-                      </div>
-                    </div>
-                  <% else %>
-                    <p class="text-muted-foreground text-sm">The brief is not available yet.</p>
-                  <% end %>
-                </div>
-            <% end %>
-
-            <div class="flex items-center justify-between gap-4 mt-8 pt-4 border-t">
-              <%= if @step > 1 do %>
-                <button
-                  class="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-primary hover:text-primary transition font-mono"
-                  type="button"
-                  phx-click="back"
-                >
-                  Back
-                </button>
-              <% else %>
-                <div></div>
+                    <% else %>
+                      <p class="text-muted-foreground text-sm">The brief is not available yet.</p>
+                    <% end %>
+                  </div>
               <% end %>
 
-              <button
-                :if={@step < 4}
-                disabled={not @can_onboard}
-                class={[
-                  "px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-sm transition-all duration-200",
-                  "hover:bg-primary hover:shadow-[0_0_20px_rgba(196,240,66,0.3)]",
-                  not @can_onboard && "opacity-50 cursor-not-allowed"
-                ]}
-                type="submit"
-              >
-                {if @step == 3, do: "Compile brief", else: "Continue"}
-              </button>
+              <div class="flex items-center justify-between gap-4 mt-8 pt-4 border-t">
+                <%= if @step > 1 do %>
+                  <button
+                    class="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-primary hover:text-primary transition font-mono"
+                    type="button"
+                    phx-click="back"
+                  >
+                    Back
+                  </button>
+                <% else %>
+                  <div></div>
+                <% end %>
 
-              <div :if={@step == 4} class="flex flex-wrap items-center justify-between gap-4">
                 <button
-                  class="px-6 py-2.5 rounded-full bg-card text-muted-foreground font-semibold text-sm hover:bg-muted hover:text-foreground transition-all duration-200"
-                  phx-click="regenerate"
-                >
-                  Regenerate
-                </button>
-                <button
+                  :if={@step < 4}
                   disabled={not @can_onboard}
                   class={[
                     "px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-sm transition-all duration-200",
                     "hover:bg-primary hover:shadow-[0_0_20px_rgba(196,240,66,0.3)]",
                     not @can_onboard && "opacity-50 cursor-not-allowed"
                   ]}
-                  type="button"
-                  phx-click="accept"
+                  type="submit"
                 >
-                  Create session
+                  {if @step == 3, do: "Compile brief", else: "Continue"}
                 </button>
+
+                <div :if={@step == 4} class="flex flex-wrap items-center justify-between gap-4">
+                  <button
+                    class="px-6 py-2.5 rounded-full bg-card text-muted-foreground font-semibold text-sm hover:bg-muted hover:text-foreground transition-all duration-200"
+                    phx-click="regenerate"
+                  >
+                    Regenerate
+                  </button>
+                  <button
+                    disabled={not @can_onboard}
+                    class={[
+                      "px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-sm transition-all duration-200",
+                      "hover:bg-primary hover:shadow-[0_0_20px_rgba(196,240,66,0.3)]",
+                      not @can_onboard && "opacity-50 cursor-not-allowed"
+                    ]}
+                    type="button"
+                    phx-click="accept"
+                  >
+                    Create session
+                  </button>
+                </div>
               </div>
-            </div>
-          </.form>
-        </section>
-      </div>
+            </.form>
+          </section>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -808,6 +836,7 @@ defmodule ControlKeelWeb.OnboardingLive do
         |> assign(:workspace_options, Enum.map(workspaces, &{&1.id, &1.name, &1.slug}))
         |> assign(:selected_org_id, selected_org_id)
         |> assign(:selected_workspace_id, default_workspace_id(workspaces))
+        |> assign(:memberless?, not Accounts.any_active_membership?(user.id))
         |> assign(:scope_notice, nil)
         |> recompute_onboarding_state()
     end
@@ -878,10 +907,10 @@ defmodule ControlKeelWeb.OnboardingLive do
   # The URL is the selection state: picker events patch these params and
   # handle_params re-applies them.
   defp scope_path(org_slug, nil) when is_binary(org_slug),
-    do: ~p"/sessions/start?#{%{org_slug: org_slug}}"
+    do: ~p"/new/session?#{%{org_slug: org_slug}}"
 
   defp scope_path(org_slug, ws_slug) when is_binary(org_slug) and is_binary(ws_slug),
-    do: ~p"/sessions/start?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
+    do: ~p"/new/session?#{%{org_slug: org_slug, ws_slug: ws_slug}}"
 
   defp org_slug_for_id(org_options, org_id) do
     Enum.find_value(org_options, fn {id, _name, slug} -> if id == org_id, do: slug end)
@@ -957,6 +986,14 @@ defmodule ControlKeelWeb.OnboardingLive do
 
   defp workspace_notice(assigns) do
     cond do
+      assigns.org_options == [] and assigns[:memberless?] ->
+        %{
+          text:
+            "You cannot start a session without an organization and a workspace. Create an organization to continue.",
+          link: ~p"/new/org",
+          link_text: "Create an organization"
+        }
+
       assigns.org_options == [] ->
         %{
           text:

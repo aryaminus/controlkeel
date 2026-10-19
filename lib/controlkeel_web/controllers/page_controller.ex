@@ -52,7 +52,7 @@ defmodule ControlKeelWeb.PageController do
   defp latest_org_path(orgs) do
     case Enum.max_by(orgs, &{DateTime.to_unix(&1.inserted_at, :microsecond), &1.id}, fn -> nil end) do
       %{slug: slug} -> "/#{slug}"
-      nil -> ~p"/organizations"
+      nil -> ~p"/new/org"
     end
   end
 
@@ -84,6 +84,14 @@ defmodule ControlKeelWeb.PageController do
         else: "/#{slug}"
 
     redirect(conn, to: target)
+  end
+
+  # Legacy launcher URL (pre-/new/* rename): the session wizard now lives at
+  # `/new/session`, which accepts the identical org_slug/ws_slug scoping
+  # params, so the query string is preserved verbatim. Fixed same-origin
+  # target, same shape as `org_legacy_redirect` above (issue #277).
+  def session_start_legacy_redirect(conn, _params) do
+    redirect(conn, to: "/new/session#{query_suffix(conn)}")
   end
 
   # Legacy session observability URLs (pre-org-scope nesting): the

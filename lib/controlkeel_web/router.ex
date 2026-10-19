@@ -139,16 +139,17 @@ defmodule ControlKeelWeb.Router do
       live "/skills", SkillsLive, :index
     end
 
-    # Session start uses a standalone Vercel-type onboarding layout
-    # (own SessionStartLayouts module — no sidebar/breadcrumb):
+    # /new/* pages use a standalone headless layout (own
+    # NewPagesLayouts module — no sidebar/breadcrumb):
     # top bar + centered wizard column.
-    live_session :onboarding,
-      layout: {ControlKeelWeb.SessionStartLayouts, :session_start},
+    live_session :new_pages,
+      layout: {ControlKeelWeb.NewPagesLayouts, :new_pages},
       on_mount: [
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults
       ] do
-      live "/sessions/start", OnboardingLive, :new
+      live "/new/session", NewSessionLive, :new
+      live "/new/org", NewOrgLive, :new
     end
 
     # Legacy org URLs (pre-/:org_slug simplification): the /organizations/:slug
@@ -166,6 +167,13 @@ defmodule ControlKeelWeb.Router do
     get "/organizations/:slug/workspaces/:id", LegacyController, :workspace
     get "/organizations/:slug/workspaces/:id/settings", LegacyController, :workspace
     get "/workspaces/:id/*rest", LegacyController, :workspace
+
+    # Legacy launcher URL (pre-/new/* rename): the session wizard moved from
+    # /sessions/start to /new/session, which accepts the same org_slug/ws_slug
+    # scoping params, so the query string is preserved verbatim. Static path,
+    # so it must stay ahead of the "/sessions/:id" numeric resolvers below,
+    # which would otherwise match "start" as an id.
+    get "/sessions/start", PageController, :session_start_legacy_redirect
 
     # Legacy session URLs (pre-org-scope consolidation): `/sessions/:id` and
     # its `/reviews` and `/deploy-review` subpages now live at

@@ -121,7 +121,7 @@ defmodule ControlKeelWeb.PageControllerTest do
       refute body =~ "Turn team knowledge into"
     end
 
-    test "signed-in users without an accessible organization fall back to /organizations", %{
+    test "signed-in users without an accessible organization fall back to /new/org", %{
       conn: conn,
       user: user
     } do
@@ -133,7 +133,7 @@ defmodule ControlKeelWeb.PageControllerTest do
       body = html_response(conn, 200)
 
       assert body =~ "data-last-path-boot"
-      assert body =~ ~s(data-last-path-fallback="/organizations")
+      assert body =~ ~s(data-last-path-fallback="/new/org")
     end
   end
 
@@ -148,6 +148,28 @@ defmodule ControlKeelWeb.PageControllerTest do
       conn = get(conn, "/organizations/acme-corp/settings")
 
       assert redirected_to(conn, 302) == "/acme-corp/settings"
+    end
+  end
+
+  describe "legacy session launcher redirect" do
+    test "GET /sessions/start redirects to /new/session (issue #277 rename)", %{conn: conn} do
+      conn = get(conn, "/sessions/start")
+
+      assert redirected_to(conn, 302) == "/new/session"
+    end
+
+    test "GET /sessions/start preserves the org_slug/ws_slug scoping params", %{conn: conn} do
+      conn = get(conn, "/sessions/start?org_slug=acme-corp&ws_slug=core")
+
+      assert redirected_to(conn, 302) == "/new/session?org_slug=acme-corp&ws_slug=core"
+    end
+
+    test "GET /sessions/:id still 404s for unknown ids (start must not be parsed as an id)", %{
+      conn: conn
+    } do
+      conn = get(conn, "/sessions/999999")
+
+      assert response(conn, 404) != ""
     end
   end
 

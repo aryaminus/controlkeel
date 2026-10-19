@@ -1,7 +1,7 @@
-defmodule ControlKeelWeb.SessionStartLayouts do
+defmodule ControlKeelWeb.NewPagesLayouts do
   @moduledoc """
-  Standalone framework layout for the session-start onboarding flow
-  (`/sessions/start`, Vercel-type wizard).
+  Standalone framework layout for the `/new/*` pages (create Org, start
+  Session wizard).
 
   Deliberately independent from `ControlKeelWeb.Layouts` and
   `ControlKeelWeb.OrganizationLayouts`: no sidebar, no breadcrumb header,
@@ -12,14 +12,15 @@ defmodule ControlKeelWeb.SessionStartLayouts do
 
   use ControlKeelWeb, :html
 
-  embed_templates "session_start_layouts/*"
+  embed_templates "new_pages_layouts/*"
 
   @doc """
-  Sticky top bar. The left side renders a back button for the onboarding
-  wizard (cloud → `/`, local → the default org page). Dashboard-style
+  Sticky top bar. The left side renders a back button for the `/new/*`
+  pages (cloud → `/`, local → the default org page). Dashboard-style
   user menu on the right.
   """
   attr :current_user, :any, default: nil
+  attr :show_back, :boolean, default: true
 
   def topbar(assigns) do
     assigns =
@@ -37,16 +38,24 @@ defmodule ControlKeelWeb.SessionStartLayouts do
     <header class="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
       <div class="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
         <.link
+          :if={@show_back}
           navigate={@back_path}
           class="inline-flex shrink-0 items-center gap-2 rounded-3xl px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           <.icon name="hero-arrow-left" class="size-4" /> Back
         </.link>
+        <span
+          :if={not @show_back}
+          aria-disabled="true"
+          class="inline-flex shrink-0 cursor-not-allowed items-center gap-2 rounded-3xl px-4 py-2 text-sm font-semibold text-muted-foreground opacity-50"
+        >
+          <.icon name="hero-arrow-left" class="size-4" /> Back
+        </span>
 
         <div class="flex shrink-0 items-center gap-2">
           <ControlKeelWeb.Layouts.user_menu
             :if={@current_user != nil and @mode != :local}
-            id="session-start-user-menu"
+            id="new-pages-user-menu"
             current_user={@current_user}
             compact
             show_dashboard
