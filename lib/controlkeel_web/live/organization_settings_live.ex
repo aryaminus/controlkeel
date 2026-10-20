@@ -56,6 +56,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:nav_org, org)
      |> assign(:local_mode, local_mode)
      |> assign(:is_owner, !!is_owner)
+     |> assign(:current_membership, membership)
      |> assign(:settings_form, settings_form(org, budget_cents))
      |> assign(:settings_error, nil)}
   end

@@ -1,11 +1,14 @@
 defmodule ControlKeelWeb.OrganizationsLive do
   @moduledoc """
-  `/organizations` — list organizations (and switch the active one).
+  `/organizations` — list organizations the signed-in user belongs to.
 
   Local mode (no user) shows every org in the DB. Cloud/self_hosted mode
   shows only orgs where the signed-in user has an active membership, with a
   role badge per row. Organization creation moved to `/new/org`
   (issue #277) — this page no longer hosts a create form.
+
+  The page is a navigator, not a switcher: each row links to `/:org_slug`
+  and that URL is the only org context. There is no ambient "active org".
   """
 
   use ControlKeelWeb, :live_view
@@ -40,28 +43,6 @@ defmodule ControlKeelWeb.OrganizationsLive do
 
       true ->
         []
-    end
-  end
-
-  @impl true
-  def handle_event("switch_org", %{"org_id" => org_id}, socket) do
-    # Membership-verified here; the controller re-verifies before writing.
-    # The switch travels as a short-lived signed token (not a raw id) so the
-    # controller GET cannot be forged or replayed across users — LiveView
-    # events are CSRF-safe by session, plain controller GETs are not.
-    with %{id: user_id} <- socket.assigns[:current_user],
-         {org_id, ""} <- Integer.parse(to_string(org_id || "")),
-         %Accounts.Membership{} <- Accounts.get_active_membership(user_id, org_id) do
-      token =
-        Phoenix.Token.sign(ControlKeelWeb.Endpoint, "org-switch", %{
-          user_id: user_id,
-          org_id: org_id
-        })
-
-      {:noreply, redirect(socket, to: ~p"/auth/org/#{org_id}?#{%{t: token}}")}
-    else
-      _ ->
-        {:noreply, put_flash(socket, :error, "Organization not found or unavailable.")}
     end
   end
 
@@ -123,26 +104,6 @@ defmodule ControlKeelWeb.OrganizationsLive do
                 </div>
                 <div class="flex items-center gap-2">
                   <.role_badge role={row.role} />
-                  <%= if not @local_mode do %>
-                    <%= if @current_org_id == row.org.id do %>
-                      <span
-                        id={"org-active-#{row.org.id}"}
-                        class="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary ring-1 ring-primary/30"
-                      >
-                        Active
-                      </span>
-                    <% else %>
-                      <button
-                        id={"org-switch-#{row.org.id}"}
-                        type="button"
-                        phx-click="switch_org"
-                        phx-value-org_id={row.org.id}
-                        class="rounded-full border border-input px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:border-primary hover:text-primary cursor-pointer"
-                      >
-                        Make active
-                      </button>
-                    <% end %>
-                  <% end %>
                 </div>
               </div>
             </div>
