@@ -916,10 +916,13 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :current_user, :any, default: nil
 
   def organization_scope_not_found(assigns) do
+    mode = ControlKeel.Runtime.Mode.current()
+    current_user = assigns[:current_user]
+
     assigns =
       assigns
-      |> assign_new(:mode, fn -> ControlKeel.Runtime.Mode.current() end)
-      |> assign(:signed_in?, assigns.current_user != nil and assigns.mode != :local)
+      |> assign(:mode, mode)
+      |> assign(:signed_in?, current_user != nil and mode != :local)
 
     ~H"""
     <section class="mx-auto flex w-full max-w-lg flex-col items-center text-center">

@@ -162,7 +162,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   # layout (see `ControlKeelWeb.OrgScope`); this page body stays empty. The
   # assign is always present (defaulted to nil by the layout hook), so the
   # clause must match only a real error map.
-  def render(%{org_scope_error: error}) when not is_nil(error), do: ~H""
+  def render(%{org_scope_error: error} = assigns) when not is_nil(error), do: ~H""
 
   @impl true
   def render(assigns) do
