@@ -54,7 +54,7 @@
             <%= if @conn.request_path == "/docs" do %>
               <span aria-current="page" class="font-semibold text-foreground">Docs</span>
             <% else %>
-              <a href="/docs" class="text-muted-foreground transition hover:text-foreground">
+              <a href="/docs" class="rounded-sm text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 Docs
               </a>
             <% end %>
@@ -82,7 +82,7 @@
         <%= if ControlKeel.Runtime.Mode.current() == :local do %>
           <a
             href={~p"/dashboard"}
-            class="rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            class="rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             Dashboard
           </a>
@@ -97,7 +97,7 @@
           <% else %>
             <a
               href={~p"/auth/login"}
-              class="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+              class="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               Sign in
             </a>
