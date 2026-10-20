@@ -15,7 +15,8 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   ## Access
 
   Resolved per-URL via `ControlKeelWeb.OrgAccess.check(org, user)`
-  (default `"viewer"` role; NOT the session's pinned `current_membership`).
+  (default `"viewer"` role). The resolved membership is kept page-local so
+  live membership changes can refresh or leave the page.
   Local mode has no membership table and is unrestricted. Cloud/self_hosted
   requires the signed-in user to hold an active membership for this specific
   org; others are redirected to `/organizations`.
@@ -75,6 +76,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
      |> assign(:member_count, member_count)
      |> assign(:can_manage, can_manage)
      |> assign(:current_role, membership && membership.role)
+     |> assign(:current_membership, membership)
      |> assign(:memberships, memberships)
      |> assign(:workspaces, load_workspaces(org.id))
      |> assign(:active_tab, :workspaces)

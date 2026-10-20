@@ -17,17 +17,19 @@ defmodule ControlKeelWeb.LiveAuth do
       net for pre-existing rows, not a reachable flow. In local mode this
       is a passthrough so local single-user deployments are unaffected.
 
-    * `:load_if_available` — loads user/membership from session without gating.
+    * `:load_if_available` — loads the user from session without gating.
       Use for pages that are public in local mode but show org-scoped data when
       a membership is present (e.g. home page).
 
   Both hooks assign:
-    * `:current_user`       — `%Accounts.User{}` or `nil`
-    * `:current_org_id`     — integer org id or `nil`
-    * `:current_membership` — `%Accounts.Membership{}` or `nil`
+    * `:current_user`        — `%Accounts.User{}` or `nil`
+    * `:session_last_active` — `DateTime` or `nil`
 
-  These override whatever the LoadCurrentUser plug may have already put in
-  socket.assigns (they carry the same values from the same source).
+  Org context is not ambient. Org-scoped pages resolve the org and the
+  visitor's membership from the URL slug (`ControlKeelWeb.OrgAccess`);
+  workspace-scoped pages resolve authority from `(user, workspace.org_id)`
+  (`ControlKeelWeb.WorkspaceAccess`). Pages that need a membership for their
+  own org keep it in a page-local assign.
   """
 
   import Phoenix.LiveView,
@@ -81,13 +83,23 @@ defmodule ControlKeelWeb.LiveAuth do
     {:cont, load_auth(socket, session)}
   end
 
-  # ── Real-time membership eviction ─────────────────────────────────
+  # ── Real-time membership changes ─────────────────────────────────
   #
-  # When an org owner revokes or demotes a membership, Accounts broadcasts
+  # When a membership is revoked or its role changes, Accounts broadcasts
   # `{:membership_changed, %Membership{}}` on `membership:user:<id>`. We
   # subscribe per-socket here and attach a `:handle_info` hook so every
   # cloud-mode LiveView reacts uniformly. The hook returns `{:halt, socket}`
   # so subsequent application handlers don't fire after the redirect is queued.
+  #
+  # There is no ambient "current org": each page resolves its own org from the
+  # URL and keeps the membership in a page-local `:current_membership` assign.
+  # A revocation of that membership sends the visitor to `/organizations` —
+  # the neutral surface every signed-in user can open — so the next page's own
+  # access check decides what they may see. A role change refreshes the assign
+  # so pages that derive permissions from it re-render in place. Changes to
+  # other orgs are ignored; this page is unaffected. We do not sign the user
+  # out: a revocation from one org must not end a session that still has
+  # access to another.
 
   defp attach_membership_eviction(socket) do
     if connected?(socket) and socket.assigns[:current_user] do
@@ -103,54 +115,41 @@ defmodule ControlKeelWeb.LiveAuth do
   end
 
   defp handle_membership_event(
-         {:membership_changed, %{user_id: uid, org_id: changed_org_id}},
-         %{assigns: %{current_user: %{id: uid}, current_org_id: current_org_id}} = socket
-       )
-       when changed_org_id != current_org_id do
-    {:halt, socket}
-  end
-
-  defp handle_membership_event(
-         {:membership_changed, %{user_id: uid, status: "revoked"}},
+         {:membership_changed, %{user_id: uid, org_id: org_id} = change},
          %{assigns: %{current_user: %{id: uid}}} = socket
        ) do
-    {:halt,
-     socket
-     |> put_flash(:error, "Your access has changed. Please sign in again.")
-     |> push_navigate(to: "/auth/login")}
-  end
-
-  defp handle_membership_event(
-         {:membership_changed, %{user_id: uid, org_id: org_id}},
-         %{assigns: %{current_user: %{id: uid}, current_org_id: org_id}} = socket
-       ) do
-    # Role changed but the membership is still active (revocation is handled
-    # by the clause above): refresh the socket's membership in place so the
-    # assigns never carry a stale elevated role, and let the page rebind its
-    # own permission-derived UI without bouncing to login. Falls back to
-    # re-login if the membership is gone entirely.
-    case Accounts.get_active_membership(uid, org_id) do
-      %Accounts.Membership{} = membership ->
-        {:halt, assign(socket, :current_membership, membership)}
+    case socket.assigns[:current_membership] do
+      %Accounts.Membership{org_id: ^org_id} ->
+        if Map.get(change, :status) == "revoked" do
+          # The page's own membership is gone. Leave the page and let the next
+          # page's access check decide what the visitor may see.
+          {:halt,
+           socket
+           |> put_flash(:info, "Your access to this organization changed.")
+           |> push_navigate(to: "/organizations")}
+        else
+          # Role change: refresh the page-local membership in place so pages
+          # that derive permissions from it re-render without a reload.
+          {:halt, assign(socket, :current_membership, change)}
+        end
 
       _ ->
-        {:halt,
-         socket
-         |> put_flash(:info, "Your access has changed. Please sign in again.")
-         |> push_navigate(to: "/auth/login")}
+        # This page did not resolve a membership for this org, so there is
+        # nothing page-specific to invalidate. A revocation may still have
+        # removed the user's last membership; in that case no authenticated
+        # page is valid anymore, so send them to /organizations (open to
+        # memberless users) rather than a login screen. Role changes and
+        # changes in other orgs need no action here.
+        if Map.get(change, :status) == "revoked" and
+             not Accounts.any_active_membership?(uid) do
+          {:halt,
+           socket
+           |> put_flash(:info, "You no longer have access to any organization.")
+           |> push_navigate(to: "/organizations")}
+        else
+          {:halt, socket}
+        end
     end
-  end
-
-  defp handle_membership_event(
-         {:membership_changed, %{user_id: uid, org_id: _org_id}},
-         %{assigns: %{current_user: %{id: uid}}} = socket
-       ) do
-    # Cross-org event: irrelevant to this socket, and no LiveView handles
-    # {:membership_changed, ...} directly (this hook is the sole consumer),
-    # so consume it here. Returning :cont would leak the message into the
-    # module's handle_info/2, which crashes views that define no clause for
-    # it (e.g. CloudProjectsLive only handles :refresh).
-    {:halt, socket}
   end
 
   defp handle_membership_event(:sign_out_everywhere, %{assigns: %{current_user: _user}} = socket) do
@@ -165,55 +164,29 @@ defmodule ControlKeelWeb.LiveAuth do
   # --- Private ---
 
   defp load_auth(socket, session) do
-    # Prefer values already put in socket.assigns by LoadCurrentUser plug
-    # (set during initial HTTP request). Fall back to session map for WebSocket
-    # reconnects and direct WS connections.
-    case socket.assigns[:current_membership] do
-      %Accounts.Membership{} ->
-        socket
+    # Prefer the user already put in socket.assigns by LoadCurrentUser
+    # (set during the initial HTTP request). Fall back to session for
+    # WebSocket reconnects and direct WS connections.
+    user_id =
+      (socket.assigns[:current_user] && socket.assigns.current_user.id) ||
+        Map.get(session, "current_user_id") ||
+        Map.get(session, :current_user_id)
 
-      _ ->
-        user_id =
-          (socket.assigns[:current_user] && socket.assigns.current_user.id) ||
-            Map.get(session, "current_user_id") ||
-            Map.get(session, :current_user_id)
+    user = if is_integer(user_id), do: Accounts.get_user(user_id)
 
-        org_id =
-          socket.assigns[:current_org_id] ||
-            Map.get(session, "current_org_id") ||
-            Map.get(session, :current_org_id)
+    # Session idle timeout — check last_active timestamp from session.
+    # When idle exceeds the configured threshold, redirect to login.
+    # A timeout of 0 (default) disables the idle check entirely.
+    last_active =
+      Map.get(session, "session_last_active") ||
+        Map.get(session, :session_last_active)
 
-        user = if is_integer(user_id), do: Accounts.get_user(user_id)
+    socket =
+      socket
+      |> assign(:current_user, user)
+      |> assign(:session_last_active, parse_timestamp(last_active))
 
-        # Production never writes current_org_id (issue #141): when the
-        # session carries no org, derive the default (first active
-        # membership) so org-scoped consumers have a real value. This is a
-        # default hint only — access decisions resolve (user, resource).
-        org_id =
-          if is_nil(org_id) && user,
-            do: Accounts.default_org_for_user(user.id),
-            else: org_id
-
-        membership =
-          if user && is_integer(org_id),
-            do: Accounts.get_active_membership(user.id, org_id)
-
-        # Session idle timeout — check last_active timestamp from session.
-        # When idle exceeds the configured threshold, redirect to login.
-        # A timeout of 0 (default) disables the idle check entirely.
-        last_active =
-          Map.get(session, "session_last_active") ||
-            Map.get(session, :session_last_active)
-
-        socket =
-          socket
-          |> assign(:current_user, user)
-          |> assign(:current_org_id, org_id)
-          |> assign(:current_membership, membership)
-          |> assign(:session_last_active, parse_timestamp(last_active))
-
-        check_session_idle(socket)
-    end
+    check_session_idle(socket)
   end
 
   # ── Session idle timeout ──────────────────────────────────────────
