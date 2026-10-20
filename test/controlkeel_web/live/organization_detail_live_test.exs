@@ -281,8 +281,6 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert {:ok, _view, html} = live(conn_for(owner), "/no-such-org")
 
       assert html =~ "Organization not found"
-      # The requested address is preserved and shown back, no redirect target.
-      assert html =~ "/no-such-org"
       refute html =~ ~s(href="/organizations")
     end
 
@@ -290,7 +288,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert {:ok, _view, html} = live(conn_for(owner), "/no-such-org/settings")
 
       assert html =~ "Organization not found"
-      assert html =~ "/no-such-org/settings"
+      refute html =~ ~s(href="/organizations")
     end
 
     test "a resolvable org still renders the org page", %{owner: owner, org: org} do

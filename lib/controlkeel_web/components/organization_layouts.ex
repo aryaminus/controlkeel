@@ -907,12 +907,10 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   Rendered by `organization.html.heex` when a LiveView assigns
   `:org_scope_error` (see `ControlKeelWeb.OrgScope`), replacing the org chrome
-  — an unknown `org_slug` has no sidebar to render. Shows the requested
-  address plus the actions that can actually help: home, create an
-  organization, or sign in.
+  — an unknown `org_slug` has no sidebar to render. Offers the actions that
+  can actually help: home, create an organization, or sign in.
   """
   attr :error, :map, required: true
-  attr :path, :string, default: nil
   attr :current_user, :any, default: nil
 
   def organization_scope_not_found(assigns) do
@@ -935,13 +933,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       </h1>
       <p class="mt-2 text-sm text-muted-foreground">{@error.message}</p>
 
-      <div class="mt-5 w-full rounded-2xl border bg-card p-5 text-left shadow-card">
-        <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Requested address
-        </p>
-        <p class="mt-2 break-all font-mono text-sm text-foreground">{@path}</p>
-      </div>
-
       <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
         <.link
           :if={@signed_in? or @mode == :local}
@@ -949,7 +940,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           data-forget-last-path
           class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
         >
-          <.icon name="hero-home" class="size-3.5" /> Go to my workspace
+          <.icon name="hero-home" class="size-3.5" /> Back to home
         </.link>
         <.link
           :if={@signed_in?}

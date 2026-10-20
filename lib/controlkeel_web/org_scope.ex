@@ -8,7 +8,8 @@ defmodule ControlKeelWeb.OrgScope do
   are orphans on the way out), so org-level page resolution now records a
   structured error on the socket instead of redirecting:
 
-    * the requested URL is preserved, so the visitor can see and fix it
+    * the requested URL is preserved in the address bar, so the visitor can
+      see and fix it
     * no server redirect means no interaction with the `/:org_slug` catch-all
       or the client-side last-path restore on `/` — the two redirect loops the
       global fallback used to invite
