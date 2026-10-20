@@ -906,7 +906,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   In-place not-found panel for an org-level URL.
 
   Rendered by `organization.html.heex` when a LiveView assigns
-  `:org_scope_error` (see `ControlKeelWeb.OrgScope`), replacing the org chrome
+  `:org_scope_error` (see `ControlKeelWeb.OrgAccess`), replacing the org chrome
   — an unknown `org_slug` has no sidebar to render. Offers the actions that
   can actually help: home, create an organization, or sign in.
   """

@@ -8,7 +8,7 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
   from the dashboard layout defaults.
 
   `:org_scope_error` is defaulted to `nil` here: an org-level LiveView sets it
-  (see `ControlKeelWeb.OrgScope`) when the URL's `org_slug` does not resolve,
+  (see `ControlKeelWeb.OrgAccess`) when the URL's `org_slug` does not resolve,
   and the org layout then renders an in-place not-found panel instead of the
   org chrome.
   """

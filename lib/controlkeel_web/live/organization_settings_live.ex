@@ -11,42 +11,29 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   alias ControlKeel.Accounts
   alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.OrgAccess
-  alias ControlKeelWeb.OrgScope
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case OrgScope.fetch(slug) do
-      nil ->
-        error = OrgScope.org_not_found(slug)
+    case OrgAccess.resolve(slug, socket.assigns[:current_user], "admin") do
+      {:ok, org, membership} ->
+        mount_ok(socket, org, membership)
 
+      # A member who cannot manage settings still belongs to the org; send them
+      # back to it rather than the not-found panel.
+      {:error, %{kind: :needs_admin}} ->
+        {:ok,
+         redirect_with_flash(
+           socket,
+           :error,
+           "You don't have permission to change organization settings.",
+           ~p"/#{slug}"
+         )}
+
+      {:error, error} ->
         {:ok,
          socket
          |> assign(:page_title, error.title)
          |> assign(:org_scope_error, error)}
-
-      org ->
-        case OrgAccess.check(org, socket.assigns[:current_user], "admin") do
-          {:ok, membership} ->
-            mount_ok(socket, org, membership)
-
-          {:error, :forbidden} ->
-            {:ok,
-             redirect_with_flash(
-               socket,
-               :error,
-               "Sign in to view this organization.",
-               ~p"/auth/login"
-             )}
-
-          {:error, :needs_admin} ->
-            {:ok,
-             redirect_with_flash(
-               socket,
-               :error,
-               "You don't have permission to change organization settings.",
-               ~p"/#{slug}"
-             )}
-        end
     end
   end
 
@@ -159,7 +146,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   end
 
   # An unresolved org scope renders the shared not-found panel from the org
-  # layout (see `ControlKeelWeb.OrgScope`); this page body stays empty. The
+  # layout (see `ControlKeelWeb.OrgAccess`); this page body stays empty. The
   # assign is always present (defaulted to nil by the layout hook), so the
   # clause must match only a real error map.
   def render(%{org_scope_error: error} = assigns) when not is_nil(error), do: ~H""
