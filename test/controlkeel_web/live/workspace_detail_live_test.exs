@@ -204,8 +204,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => owner.id,
-          "current_org_id" => org.id
+          "current_user_id" => owner.id
         })
 
       {:ok, _view, html} = live(conn, ~p"/scopeco/workspaces/#{ws.slug}")
@@ -235,8 +234,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => viewer.id,
-          "current_org_id" => org.id
+          "current_user_id" => viewer.id
         })
 
       {:ok, _view, html} = live(conn, ~p"/viewco/workspaces/#{ws.slug}")
@@ -252,8 +250,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => owner.id,
-          "current_org_id" => org.id
+          "current_user_id" => owner.id
         })
 
       {:ok, _view, html} = live(conn, ~p"/ctaco/workspaces/#{ws.slug}")
@@ -286,8 +283,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => viewer.id,
-          "current_org_id" => org.id
+          "current_user_id" => viewer.id
         })
 
       {:ok, _view, html} = live(conn, ~p"/ctaview/workspaces/#{ws.slug}")
@@ -304,13 +300,12 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
         create_workspace(%{name: "Secret WS", slug: "secret", industry: "web", org_id: org_a.id})
 
       outsider = create_user!("scope-b@example.com")
-      {:ok, org_b} = Accounts.create_org_with_owner(outsider.id, %{name: "B", slug: "b"})
+      {:ok, _org_b} = Accounts.create_org_with_owner(outsider.id, %{name: "B", slug: "b"})
 
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => outsider.id,
-          "current_org_id" => org_b.id
+          "current_user_id" => outsider.id
         })
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
