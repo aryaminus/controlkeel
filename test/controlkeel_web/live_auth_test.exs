@@ -37,6 +37,13 @@ defmodule ControlKeelWeb.LiveAuthTest do
     {:ok, user} =
       Accounts.create_user(%{email: "member-#{System.unique_integer([:positive])}@example.com"})
 
+    insert_membership(user, org, role)
+
+    conn = build_conn() |> Plug.Test.init_test_session(%{current_user_id: user.id})
+    {conn, user, org}
+  end
+
+  defp insert_membership(user, org, role) do
     %Accounts.Membership{}
     |> Accounts.Membership.changeset(%{
       user_id: user.id,
@@ -45,9 +52,14 @@ defmodule ControlKeelWeb.LiveAuthTest do
       status: "active"
     })
     |> Repo.insert!()
+  end
 
-    conn = build_conn() |> Plug.Test.init_test_session(%{current_user_id: user.id})
-    {conn, user, org}
+  defp create_owner(org) do
+    {:ok, owner} =
+      Accounts.create_user(%{email: "owner-#{System.unique_integer([:positive])}@example.com"})
+
+    insert_membership(owner, org, "owner")
+    owner
   end
 
   test "memberless users are redirected to /organizations on authenticated pages" do
@@ -66,7 +78,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
     refute html =~ "Join or create an organization"
   end
 
-  test "role changes from another org do not overwrite the current org membership" do
+  test "membership changes for another org do not elevate the page's resolved membership" do
     {:ok, org_a} =
       Accounts.create_org(%{name: "Org A", slug: "org-a-#{System.unique_integer([:positive])}"})
 
@@ -96,7 +108,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
 
     conn =
       build_conn()
-      |> Plug.Test.init_test_session(%{current_user_id: user.id, current_org_id: org_a.id})
+      |> Plug.Test.init_test_session(%{current_user_id: user.id})
 
     {:ok, view, html} = live(conn, ~p"/cloud/projects")
     refute html =~ "+ Create workspace"
@@ -108,6 +120,55 @@ defmodule ControlKeelWeb.LiveAuthTest do
     )
 
     refute render(view) =~ "+ Create workspace"
+  end
+
+  test "revoking the page's membership redirects to /organizations" do
+    {conn, user, org} = member_conn()
+    membership = Accounts.get_active_membership(user.id, org.id)
+    owner = create_owner(org)
+
+    {:ok, view, _html} = live(conn, ~p"/cloud/projects")
+
+    assert {:ok, %Accounts.Membership{status: "revoked"}} =
+             Accounts.revoke_membership(membership.id, owner.id)
+
+    assert %{"info" => "Your access to this organization changed."} =
+             assert_redirect(view, "/organizations")
+  end
+
+  test "revoking a membership in another org leaves the page in place" do
+    {conn, user, _org} = member_conn()
+
+    {:ok, other} =
+      Accounts.create_org(%{
+        name: "Other",
+        slug: "other-#{System.unique_integer([:positive])}"
+      })
+
+    other_membership = insert_membership(user, other, "viewer")
+    owner = create_owner(other)
+
+    {:ok, view, _html} = live(conn, ~p"/cloud/projects")
+
+    assert {:ok, %Accounts.Membership{status: "revoked"}} =
+             Accounts.revoke_membership(other_membership.id, owner.id)
+
+    assert has_element?(view, "#cloud-projects-page")
+    refute_redirected(view)
+  end
+
+  test "revoking the last membership returns to /organizations, not the login screen" do
+    {conn, user, org} = member_conn()
+    membership = Accounts.get_active_membership(user.id, org.id)
+    owner = create_owner(org)
+
+    {:ok, view, _html} = live(conn, ~p"/organizations")
+
+    assert {:ok, %Accounts.Membership{status: "revoked"}} =
+             Accounts.revoke_membership(membership.id, owner.id)
+
+    assert %{"info" => "You no longer have access to any organization."} =
+             assert_redirect(view, "/organizations")
   end
 
   test "unauthenticated users are still sent to login, not /organizations" do
