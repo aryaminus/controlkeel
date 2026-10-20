@@ -63,7 +63,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
     member_count = Accounts.count_memberships_for_org(org.id)
-    can_manage = membership && Accounts.role_at_least?(membership.role, "admin")
     memberships = if(local_mode, do: [], else: load_memberships(org.id))
 
     {:ok,
@@ -74,8 +73,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
      |> assign(:local_mode, local_mode)
      |> assign(:budget_cents, budget_cents)
      |> assign(:member_count, member_count)
-     |> assign(:can_manage, can_manage)
-     |> assign(:current_role, membership && membership.role)
      |> assign(:current_membership, membership)
      |> assign(:memberships, memberships)
      |> assign(:workspaces, load_workspaces(org.id))
@@ -138,29 +135,33 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
          "Only the default workspace is available in local mode. Upgrade to cloud mode to create additional workspaces."
        )}
     else
-      org = socket.assigns.org
+      if can_manage?(socket.assigns) do
+        org = socket.assigns.org
 
-      params =
-        params |> Map.put("slug", resolve_workspace_slug(params)) |> Map.put("org_id", org.id)
+        params =
+          params |> Map.put("slug", resolve_workspace_slug(params)) |> Map.put("org_id", org.id)
 
-      case create_workspace(params) do
-        {:ok, workspace} ->
-          {:noreply,
-           socket
-           |> assign(:show_new_workspace, false)
-           |> assign(:new_workspace_error, nil)
-           |> assign(:workspaces, load_workspaces(org.id))
-           |> put_flash(:info, "Workspace #{workspace.name} created.")}
+        case create_workspace(params) do
+          {:ok, workspace} ->
+            {:noreply,
+             socket
+             |> assign(:show_new_workspace, false)
+             |> assign(:new_workspace_error, nil)
+             |> assign(:workspaces, load_workspaces(org.id))
+             |> put_flash(:info, "Workspace #{workspace.name} created.")}
 
-        {:error, %Ecto.Changeset{} = cs} ->
-          msg =
-            cs.errors
-            |> Enum.map_join(", ", fn {f, {m, _}} -> "#{f}: #{m}" end)
+          {:error, %Ecto.Changeset{} = cs} ->
+            msg =
+              cs.errors
+              |> Enum.map_join(", ", fn {f, {m, _}} -> "#{f}: #{m}" end)
 
-          {:noreply, assign(socket, :new_workspace_error, msg)}
+            {:noreply, assign(socket, :new_workspace_error, msg)}
 
-        {:error, reason} ->
-          {:noreply, assign(socket, :new_workspace_error, inspect(reason))}
+          {:error, reason} ->
+            {:noreply, assign(socket, :new_workspace_error, inspect(reason))}
+        end
+      else
+        {:noreply, put_flash(socket, :error, "You don't have permission to create workspaces.")}
       end
     end
   end
@@ -210,7 +211,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   end
 
   def handle_event("confirm_revoke", %{"membership-id" => id}, socket) do
-    if Accounts.role_at_least?(socket.assigns[:current_role] || "", "admin") do
+    if can_manage?(socket.assigns) do
       case Integer.parse(id) do
         {membership_id, ""} ->
           target = Enum.find(socket.assigns.memberships, &(&1.id == membership_id))
@@ -531,7 +532,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
               Manage organization members and their roles.
             </p>
             <.button
-              :if={@can_manage}
+              :if={can_manage?(assigns)}
               id="invite-member-button"
               variant="outline"
               phx-click="open_invite"
@@ -581,10 +582,15 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
                           </div>
                         </td>
                         <td class="px-5 py-4">
-                          <%= if @can_manage do %>
+                          <%= if can_manage?(assigns) do %>
                             <% is_self = @current_user && m.user_id == @current_user.id %>
                             <% state =
-                              role_select_state(@current_role, m.role, is_self, @active_owner_count) %>
+                              role_select_state(
+                                current_role(assigns),
+                                m.role,
+                                is_self,
+                                @active_owner_count
+                              ) %>
                             <form id={"role-form-#{m.id}"} phx-change="change-role">
                               <input type="hidden" name="membership-id" value={m.id} />
                               <select
@@ -624,7 +630,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
                           </span>
                         </td>
                         <td class="px-4 py-4 text-right whitespace-nowrap w-px">
-                          <%= if can_revoke?(@current_role, m, @current_user) do %>
+                          <%= if can_revoke?(current_role(assigns), m, @current_user) do %>
                             <button
                               type="button"
                               phx-click="confirm_revoke"
@@ -649,7 +655,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
         :if={@show_invite_modal}
         form={@invite_form}
         error={@invite_error}
-        role_options={invite_role_options(@current_role)}
+        role_options={invite_role_options(current_role(assigns))}
       />
 
       <.new_workspace_modal
@@ -987,30 +993,29 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     memberships = load_memberships(org_id)
 
     # The viewer's own role may have just changed (self-demotion) or their
-    # membership been revoked. Rebind the permission-derived assigns from the
-    # refreshed list so the table re-renders with the correct controls without
-    # a full reload.
-    viewer_role =
+    # membership been revoked. Rebind the page-local membership from the
+    # refreshed list so permission-derived controls re-render without a full
+    # reload.
+    viewer_membership =
       case socket.assigns[:current_user] do
         %{id: uid} ->
-          case Enum.find(memberships, &(&1.user_id == uid)) do
-            nil -> nil
-            m -> m.role
-          end
+          Enum.find(memberships, &(&1.user_id == uid and &1.status == "active"))
 
         _ ->
           nil
       end
 
-    can_manage = viewer_role && Accounts.role_at_least?(viewer_role, "admin")
-
     socket
     |> assign(:memberships, memberships)
     |> assign(:member_count, Accounts.count_memberships_for_org(org_id))
     |> assign(:active_owner_count, count_active_owners(memberships))
-    |> assign(:current_role, viewer_role)
-    |> assign(:can_manage, can_manage)
+    |> assign(:current_membership, viewer_membership)
   end
+
+  defp current_role(%{current_membership: %{role: role}}), do: role
+  defp current_role(_assigns), do: nil
+
+  defp can_manage?(assigns), do: Accounts.role_at_least?(current_role(assigns) || "", "admin")
 
   defp count_active_owners(memberships) do
     Enum.count(memberships, &(&1.role == "owner" and &1.status == "active"))

@@ -25,11 +25,12 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
     with %Workspace{} = workspace <-
            Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
          :ok <- check_org_slug(workspace, %{slug: slug}),
-         :ok <- check_workspace_access(workspace, socket.assigns) do
+         {:ok, current_membership} <- check_workspace_access(workspace, socket.assigns) do
       {:ok,
        socket
        |> assign(:page_title, "Service accounts — #{workspace.name}")
        |> assign(:workspace, workspace)
+       |> assign(:current_membership, current_membership)
        |> assign(:nav_org, workspace.org)
        |> assign(:nav_workspace, workspace)
        |> assign(
@@ -264,8 +265,8 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
   # Workspace admin surface: org-bound workspace + active admin/owner
   # membership, resolved from (user, resource) via the shared gate.
   defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check(workspace, assigns[:current_user], "admin") do
-      :ok -> :ok
+    case WorkspaceAccess.check_membership(workspace, assigns[:current_user], "admin") do
+      {:ok, membership} -> {:ok, membership}
       {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
       {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
       {:error, :needs_admin} -> {:error, "Admin or owner role required."}
