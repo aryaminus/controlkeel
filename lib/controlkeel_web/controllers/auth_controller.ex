@@ -24,6 +24,9 @@ defmodule ControlKeelWeb.AuthController do
     |> delete_session(:oauth_session_params)
     |> delete_session(:session_last_active)
     |> delete_session(:pending_invitation_token)
+    # Legacy ambient-org key from older sessions; nothing reads it anymore,
+    # but scrub it so existing browsers do not carry it forward.
+    |> delete_session(:current_org_id)
     |> put_flash(:info, "Signed out")
     |> redirect(to: ~p"/auth/login")
   end
