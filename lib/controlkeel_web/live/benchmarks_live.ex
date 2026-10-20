@@ -1164,6 +1164,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
         phx-click="toggle_subjects_dropdown"
         aria-haspopup="listbox"
         aria-expanded={to_string(@open)}
+        aria-label="Select subjects"
         class={[
           "select w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm rounded-xl border bg-card text-foreground focus:outline-none focus:border-primary cursor-pointer"
         ]}
