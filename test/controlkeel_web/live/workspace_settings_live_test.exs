@@ -461,8 +461,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => admin.id,
-          "current_org_id" => org.id
+          "current_user_id" => admin.id
         })
 
       {:ok, _view, html} = live(conn, ~p"/adminco/workspaces/#{ws.slug}/settings")
@@ -485,8 +484,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => viewer.id,
-          "current_org_id" => org.id
+          "current_user_id" => viewer.id
         })
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
@@ -503,13 +501,12 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
         create_workspace(%{name: "Secret", slug: "secret", industry: "web", org_id: org_a.id})
 
       outsider = create_user!("settings-b@example.com")
-      {:ok, org_b} = Accounts.create_org_with_owner(outsider.id, %{name: "SetB", slug: "setb"})
+      {:ok, _org_b} = Accounts.create_org_with_owner(outsider.id, %{name: "SetB", slug: "setb"})
 
       conn =
         build_conn()
         |> Plug.Test.init_test_session(%{
-          "current_user_id" => outsider.id,
-          "current_org_id" => org_b.id
+          "current_user_id" => outsider.id
         })
 
       assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
@@ -519,9 +516,9 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
     end
 
     test "a user-only session still enforces org access (issue #141, R5)" do
-      # Production shape: the session map carries only current_user_id —
-      # nothing ever writes current_org_id. The gate must resolve authority
-      # from (user, resource) without a seeded org.
+      # Production shape: the session map carries only current_user_id. The
+      # gate must resolve authority from (user, resource) without a seeded
+      # org.
       owner_a = create_user!("settings-noseed-a@example.com")
 
       {:ok, org_a} =

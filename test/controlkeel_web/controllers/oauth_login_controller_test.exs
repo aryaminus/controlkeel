@@ -140,7 +140,7 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
 
       user_id = get_session(login_conn, :current_user_id)
       assert is_integer(user_id)
-      # Locks the production shape: nothing writes current_org_id at login.
+      # Locks the production shape: login does not seed an ambient org.
       assert get_session(login_conn, :current_org_id) == nil
 
       user = Accounts.get_user(user_id)

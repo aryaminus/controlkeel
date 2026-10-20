@@ -87,4 +87,33 @@ defmodule ControlKeelWeb.WorkspaceAccessTest do
     assert WorkspaceAccess.check(ws, outsider, "viewer") == {:error, :forbidden}
     assert WorkspaceAccess.check(ws, outsider, "admin") == {:error, :forbidden}
   end
+
+  test "check_membership returns the membership the page was admitted with", %{
+    workspace: ws,
+    viewer: viewer
+  } do
+    Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+    assert {:ok, %Accounts.Membership{role: "viewer", org_id: org_id}} =
+             WorkspaceAccess.check_membership(ws, viewer)
+
+    assert org_id == ws.org_id
+  end
+
+  test "check_membership returns nil in local mode", %{workspace: ws} do
+    Application.put_env(:controlkeel, :runtime_mode, :local)
+    assert {:ok, nil} = WorkspaceAccess.check_membership(ws, nil)
+    assert {:ok, nil} = WorkspaceAccess.check_membership(ws, nil, "admin")
+  end
+
+  test "check_membership carries the same denials as check", %{
+    workspace: ws,
+    viewer: viewer,
+    outsider: outsider
+  } do
+    Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+    assert {:error, :needs_admin} = WorkspaceAccess.check_membership(ws, viewer, "admin")
+    assert {:error, :forbidden} = WorkspaceAccess.check_membership(ws, outsider)
+  end
 end
