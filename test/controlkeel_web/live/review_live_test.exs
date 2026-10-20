@@ -212,7 +212,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
 
     conn =
       conn
-      |> Plug.Test.init_test_session(%{current_user_id: user.id, current_org_id: my_org.id})
+      |> Plug.Test.init_test_session(%{current_user_id: user.id})
 
     {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Review not found."}}}} =
       live(
@@ -225,9 +225,7 @@ defmodule ControlKeelWeb.ReviewLiveTest do
     conn: conn
   } do
     # Same shape as above, but the session map carries only current_user_id —
-    # the production shape, since nothing ever writes current_org_id. The
-    # socket must derive the default org (org B) and still deny the org-A
-    # review.
+    # the production shape. The socket must still deny the org-A review.
     original = Application.get_env(:controlkeel, :runtime_mode)
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
 

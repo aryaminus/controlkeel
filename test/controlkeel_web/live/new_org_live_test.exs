@@ -43,11 +43,10 @@ defmodule ControlKeelWeb.NewOrgLiveTest do
       :ok
     end
 
-    defp cloud_conn(user, org_id \\ nil) do
+    defp cloud_conn(user, _org_id \\ nil) do
       build_conn()
       |> Plug.Test.init_test_session(%{
-        "current_user_id" => user.id,
-        "current_org_id" => org_id
+        "current_user_id" => user.id
       })
     end
 
