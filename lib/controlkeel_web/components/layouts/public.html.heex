@@ -1,7 +1,11 @@
 <div class="flex min-h-screen flex-col">
   <header class="sticky top-0 z-50 border-b bg-background/90 backdrop-blur">
     <div class="mx-auto flex items-center justify-between px-4 py-3 sm:px-6 lg:px-16">
-      <a href={~p"/"} class="flex items-center gap-3">
+      <a
+        href={~p"/"}
+        aria-label="ControlKeel home"
+        class="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      >
         <span class="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
           <.icon name="hero-bolt-solid" class="size-4" />
         </span>
@@ -10,7 +14,7 @@
       <nav class="flex items-center gap-4 text-sm">
         <a
           href={~p"/docs"}
-          class="text-muted-foreground transition hover:text-foreground"
+          class="rounded-sm text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           Docs
         </a>
@@ -18,12 +22,15 @@
           href="https://github.com/aryaminus/controlkeel"
           target="_blank"
           rel="noopener"
-          class="text-muted-foreground transition hover:text-foreground"
+          class="rounded-sm text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           GitHub
         </a>
         <%= if ControlKeel.Runtime.Mode.current() == :local do %>
-          <a href={~p"/dashboard"} class="text-muted-foreground transition hover:text-foreground">
+          <a
+            href={~p"/dashboard"}
+            class="rounded-sm text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             Dashboard
           </a>
         <% end %>
@@ -33,7 +40,7 @@
           <% else %>
             <a
               href={~p"/auth/login"}
-              class="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+              class="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               Sign in
             </a>
