@@ -901,9 +901,8 @@ defmodule ControlKeel.Project.WorkspaceContext do
   end
 
   defp line_count(contents) when is_binary(contents) do
-    contents
-    |> String.split("\n", trim: false)
-    |> length()
+    # ⚡ Bolt: Use binary matching instead of String.split to avoid massive intermediate list allocations for large files
+    length(:binary.matches(contents, "\n")) + 1
   end
 
   defp blank_or_none(""), do: "none"
