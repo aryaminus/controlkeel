@@ -90,14 +90,6 @@ defmodule ControlKeelWeb.SessionFindingsLive do
 
   defp page_membership(_workspace, _assigns), do: nil
 
-  # Mutation gate (viewer reads stay open): action buttons render and the
-  # approve/escalate/reject events run only for admin/owner. Local mode
-  # always passes.
-  defp can_mutate?(%ControlKeel.Accounts.Membership{role: role}),
-    do: ControlKeel.Accounts.role_at_least?(role, "admin")
-
-  defp can_mutate?(_membership), do: ControlKeel.Runtime.Mode.current() == :local
-
   defp require_admin(socket) do
     with %Workspace{} = workspace <- socket.assigns.session.workspace,
          :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
@@ -332,7 +324,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
               finding={finding}
               open?={MapSet.member?(@open_ids, finding.id)}
               fix={Map.get(@fixes, finding.id)}
-              can_mutate={can_mutate?(@current_membership)}
+              can_mutate={WorkspaceAccess.can_mutate?(@current_membership)}
             />
           </ul>
 
