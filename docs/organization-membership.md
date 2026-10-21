@@ -84,3 +84,49 @@ Server enforcement lives in `update_membership_role/3` (`accounts.ex`). The UI m
 - The web invite modal withholds owner/admin from the role dropdown for non-owners via `invite_role_options/1`, matching the server guard.
 
 This closes the gap where an admin could otherwise grant owner/admin by inviting a brand-new user (which the role-change matrix forbids for existing members).
+
+## Live Eviction and Role Refresh
+
+There is no ambient "current org". Every page resolves the org it renders from
+its own URL, so `ControlKeelWeb.LiveAuth` refreshes and evicts per page:
+
+- **Org-scoped pages** (`/:org_slug`, `/:org_slug/settings`) resolve the
+  visitor's membership for the URL org and keep it in `:current_membership`.
+- **Workspace-scoped pages**
+  (`/:org_slug/workspaces/:ws_slug/...`) resolve authority from
+  `(user, workspace.org_id)` through `ControlKeelWeb.WorkspaceScope`, which
+  wraps `ControlKeelWeb.WorkspaceAccess.check_membership/3` and assigns the
+  same `:current_membership`.
+
+`LiveAuth` subscribes each connected socket to `membership:user:<id>` and
+reacts to `{:membership_changed, %Membership{}}`:
+
+| Event                                                        | Result                                                                |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Revocation of the page's membership                           | Redirect to `/organizations` with an info flash — never a sign-out.    |
+| Role change in the page's organization                        | `:current_membership` is reassigned in place; permission-derived UI re-renders without a reload. |
+| Change in an unrelated organization                           | No-op; the page is unaffected.                                        |
+| Revocation that removes the visitor's last active membership  | Redirect to `/organizations` with a different flash.                  |
+| `:sign_out_everywhere`                                        | Redirect to `/auth/login`.                                            |
+
+Server-side gates stay authoritative: event handlers re-check the database
+(`WorkspaceAccess.check/3`), while render-time controls derive from the
+refreshed membership (`WorkspaceAccess.can_mutate?/1`), so a demotion collapses
+the controls and the event is still denied if it is triggered directly.
+
+On `push_patch` the LiveView process survives the URL change, so
+`WorkspaceScope.refresh/2` re-runs the workspace gate when `org_slug`/`ws_slug`
+change and the page reloads its data for the new workspace. Without it a
+workspace switch would keep rendering the previous workspace's data — and the
+previous organization's membership — under the new URL.
+
+### Open Item: Global Surfaces
+
+`/cloud/projects`, `/cloud/telemetry`, and the legacy global `/observability/*`
+redirects have no org in the URL. They resolve the visitor's **default org**
+once at mount, and `/cloud/telemetry` renders cross-tenant data behind an
+"admin of my own org" check rather than an explicit platform-operator
+boundary. Membership eviction parity is in place for both pages (they keep the
+resolved membership in `:current_membership` and re-check the admin gate on
+each refresh tick), but the operator authorization boundary is still
+undecided — see PR #287 follow-up 2.
