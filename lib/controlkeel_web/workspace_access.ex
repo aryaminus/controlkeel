@@ -22,6 +22,12 @@ defmodule ControlKeelWeb.WorkspaceAccess do
   keep the membership it was admitted with and let `LiveAuth` evict it when
   that membership is revoked. Local mode has no membership and returns
   `{:ok, nil}`.
+
+  `can_mutate?/1` answers the narrower question a page asks while rendering:
+  may this already-admitted visitor see or run admin-only mutations? It reads
+  the refreshed `:current_membership` assign rather than the database, so a
+  role change re-renders the controls in place. Local mode has no membership
+  and always passes.
   """
 
   alias ControlKeel.Accounts
@@ -48,6 +54,15 @@ defmodule ControlKeelWeb.WorkspaceAccess do
       true -> resolve_membership(workspace, user, required_role)
     end
   end
+
+  @doc """
+  Whether a page that already resolved its membership may show and run
+  mutations. Admin/owner memberships pass; local mode (no membership) passes;
+  everything else is read-only.
+  """
+  @spec can_mutate?(Accounts.Membership.t() | nil) :: boolean()
+  def can_mutate?(%Accounts.Membership{role: role}), do: Accounts.role_at_least?(role, "admin")
+  def can_mutate?(nil), do: Mode.current() == :local
 
   defp resolve_membership(%Workspace{org_id: ws_org}, %{id: user_id}, required_role)
        when is_integer(ws_org) and is_integer(user_id) do
