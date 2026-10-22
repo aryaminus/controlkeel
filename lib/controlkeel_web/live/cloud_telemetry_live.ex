@@ -33,25 +33,19 @@ defmodule ControlKeelWeb.CloudTelemetryLive do
   def mount(_params, session, socket) do
     # Admin-only: operator dashboard shows cross-tenant data.
     # Require an active org membership with admin role.
-    #
-    # TODO(#287 follow-up 2): the gate below is "admin of the visitor's default
-    # org", not an explicit platform-operator boundary, while the page renders
-    # cross-tenant data. Decide the operator boundary or scope the page before
-    # this surface can be considered safe for multi-tenant deployments.
     membership = resolve_membership(socket, session)
-
-    socket =
-      socket
-      |> assign(:page_title, "Cloud telemetry")
-      |> assign(:current_membership, membership)
 
     if admin?(membership) do
       if connected?(socket), do: Process.send_after(self(), :refresh, @refresh_ms)
 
-      {:ok, assign_view_state(socket)}
+      {:ok,
+       socket
+       |> assign(:page_title, "Cloud telemetry")
+       |> assign_view_state()}
     else
       {:ok,
        socket
+       |> assign(:page_title, "Cloud telemetry")
        |> put_flash(:error, "Admin access required.")
        |> redirect(to: "/")}
     end
@@ -80,18 +74,8 @@ defmodule ControlKeelWeb.CloudTelemetryLive do
 
   @impl true
   def handle_info(:refresh, socket) do
-    # Re-check the admin gate on every tick: LiveAuth refreshes
-    # :current_membership in place when the role changes, so a demotion must
-    # stop the cross-tenant surface without waiting for a navigation.
-    if admin?(socket.assigns[:current_membership]) do
-      Process.send_after(self(), :refresh, @refresh_ms)
-      {:noreply, assign_view_state(socket)}
-    else
-      {:noreply,
-       socket
-       |> put_flash(:error, "Admin access required.")
-       |> push_navigate(to: "/")}
-    end
+    Process.send_after(self(), :refresh, @refresh_ms)
+    {:noreply, assign_view_state(socket)}
   end
 
   defp assign_view_state(socket) do

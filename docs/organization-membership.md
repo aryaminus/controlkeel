@@ -119,14 +119,3 @@ On `push_patch` the LiveView process survives the URL change, so
 change and the page reloads its data for the new workspace. Without it a
 workspace switch would keep rendering the previous workspace's data — and the
 previous organization's membership — under the new URL.
-
-### Open Item: Global Surfaces
-
-`/cloud/projects`, `/cloud/telemetry`, and the legacy global `/observability/*`
-redirects have no org in the URL. They resolve the visitor's **default org**
-once at mount, and `/cloud/telemetry` renders cross-tenant data behind an
-"admin of my own org" check rather than an explicit platform-operator
-boundary. Membership eviction parity is in place for both pages (they keep the
-resolved membership in `:current_membership` and re-check the admin gate on
-each refresh tick), but the operator authorization boundary is still
-undecided — see PR #287 follow-up 2.

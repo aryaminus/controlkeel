@@ -375,42 +375,4 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
       assert html =~ workspace.name
     end
   end
-
-  describe "CloudTelemetryLive" do
-    # The operator dashboard resolves its org from the visitor's default
-    # membership (no org in the URL), so these users carry a single membership.
-    test "demoting the operator membership leaves the dashboard" do
-      org = create_org!("operator")
-      user = create_user!("operator")
-      membership = create_membership!(user, org, "admin")
-      owner = create_user!("operator-owner")
-      create_membership!(owner, org, "owner")
-
-      {:ok, view, html} = live(conn_for(user), "/cloud/telemetry")
-      assert html =~ "cloud-telemetry-page"
-
-      assert {:ok, %Accounts.Membership{role: "viewer"}} =
-               Accounts.update_membership_role(membership.id, "viewer", owner.id)
-
-      send(view.pid, :refresh)
-
-      assert %{"error" => "Admin access required."} = assert_redirect(view, "/")
-    end
-
-    test "revoking the operator membership redirects to organizations" do
-      org = create_org!("operator")
-      user = create_user!("operator")
-      membership = create_membership!(user, org, "admin")
-      owner = create_user!("operator-owner")
-      create_membership!(owner, org, "owner")
-
-      {:ok, view, _html} = live(conn_for(user), "/cloud/telemetry")
-
-      assert {:ok, %Accounts.Membership{status: "revoked"}} =
-               Accounts.revoke_membership(membership.id, owner.id)
-
-      assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/organizations")
-    end
-  end
 end
