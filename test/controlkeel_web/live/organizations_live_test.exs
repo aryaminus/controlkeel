@@ -108,21 +108,19 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
       refute html =~ ~s(id="organization-create-modal")
     end
 
-    test "default org is highlighted as active; no switch control remains", %{
+    test "lists every org as a plain link, with no ambient switch affordance", %{
       conn: conn,
       user: user
     } do
       {:ok, _first} = Accounts.create_org_with_owner(user.id, %{name: "First", slug: "first"})
       {:ok, _second} = Accounts.create_org_with_owner(user.id, %{name: "Second", slug: "second"})
 
-      {:ok, _view, html} = live(conn, ~p"/organizations")
+      {:ok, view, _html} = live(conn, ~p"/organizations")
 
-      # Default = first active membership; switching is URL-driven via the org
-      # sidebar switcher, so the page carries no in-page switch control.
-      assert html =~ "org-active-#{first.id}"
-      refute html =~ "org-active-#{second.id}"
-      refute html =~ "org-switch-"
-      refute html =~ "Make active"
+      assert has_element?(view, ~s(a[href="/first"]))
+      assert has_element?(view, ~s(a[href="/second"]))
+      refute has_element?(view, ~s([id^="org-active-"]))
+      refute has_element?(view, ~s([id^="org-switch-"]))
     end
 
     test "index redirects to login when there is no signed-in user" do
