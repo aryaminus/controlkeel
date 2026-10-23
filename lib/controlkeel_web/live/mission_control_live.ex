@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.MissionControlLive do
   alias ControlKeel.Analytics
   alias ControlKeel.Intent
   alias ControlKeel.Mission
+  alias ControlKeelWeb.ScopeError
   alias ControlKeelWeb.SessionScope
 
   @refresh_interval_ms 2_000
@@ -21,7 +22,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         {:ok,
          socket
          |> put_flash(:error, "Session not found.")
-         |> push_navigate(to: ~p"/")}
+         |> assign(:scope_error, ScopeError.session(org_slug, ws_slug, id))}
 
       session when not is_nil(session) ->
         cond do
@@ -29,13 +30,13 @@ defmodule ControlKeelWeb.MissionControlLive do
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
+             |> assign(:scope_error, ScopeError.session(org_slug, ws_slug, id))}
 
           SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
             {:ok,
              socket
              |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
+             |> assign(:scope_error, ScopeError.session(org_slug, ws_slug, id))}
 
           true ->
             if connected?(socket), do: schedule_refresh()
@@ -79,7 +80,13 @@ defmodule ControlKeelWeb.MissionControlLive do
 
     case Mission.get_session_context(socket.assigns.session.id, opts) do
       nil ->
-        {:noreply, SessionScope.session_not_found(socket)}
+        org_slug = socket.assigns.nav_org && socket.assigns.nav_org.slug
+        ws_slug = socket.assigns.nav_workspace && socket.assigns.nav_workspace.slug
+
+        {:noreply,
+         socket
+         |> put_flash(:error, "Session not found.")
+         |> assign(:scope_error, ScopeError.session(org_slug, ws_slug, socket.assigns.session.id))}
 
       session ->
         case SessionScope.reauthorize(socket, session) do
@@ -88,7 +95,13 @@ defmodule ControlKeelWeb.MissionControlLive do
             {:noreply, tick_assign(socket, session)}
 
           {:error, :not_found} ->
-            {:noreply, SessionScope.session_not_found(socket)}
+            org_slug = socket.assigns.nav_org && socket.assigns.nav_org.slug
+            ws_slug = socket.assigns.nav_workspace && socket.assigns.nav_workspace.slug
+
+            {:noreply,
+             socket
+             |> put_flash(:error, "Session not found.")
+             |> assign(:scope_error, ScopeError.session(org_slug, ws_slug, session.id))}
         end
     end
   end
@@ -97,8 +110,9 @@ defmodule ControlKeelWeb.MissionControlLive do
   @spec render(any()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
-    <section class="w-full space-y-6">
-      <%= if @launched do %>
+    <.scope_error_panel error={@scope_error} current_user={@current_user}>
+      <section class="w-full space-y-6">
+        <%= if @launched do %>
         <div class="rounded-2xl border bg-card p-5 shadow-card">
           <div class="flex items-start gap-3">
             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success/10 text-success">
@@ -498,6 +512,7 @@ defmodule ControlKeelWeb.MissionControlLive do
         </details>
       </details>
     </section>
+    </.scope_error_panel>
     """
   end
 
