@@ -43,7 +43,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
         {:ok,
          socket
          |> assign(:page_title, error.title)
-         |> assign(:org_scope_error, error)}
+         |> assign(:scope_error, error)}
     end
   end
 
@@ -93,10 +93,26 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   def handle_params(params, _uri, socket) do
     socket =
       socket
+      |> maybe_refresh_org(params["org_slug"])
       |> assign(:active_tab, normalize_tab(params["tab"]))
 
     {:noreply, socket}
   end
+
+  defp maybe_refresh_org(%{assigns: %{org: %{slug: slug}}} = socket, slug), do: socket
+
+  defp maybe_refresh_org(socket, slug) when is_binary(slug) do
+    case OrgAccess.resolve(slug, socket.assigns[:current_user]) do
+      {:ok, org, membership} ->
+        {:ok, socket} = mount_ok(socket, org, membership)
+        assign(socket, :scope_error, nil)
+
+      {:error, error} ->
+        assign(socket, :scope_error, error)
+    end
+  end
+
+  defp maybe_refresh_org(socket, _slug), do: socket
 
   def handle_event("new_workspace", _params, socket) do
     {:noreply, assign(socket, :show_new_workspace, true)}
@@ -341,7 +357,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   # layout (see `ControlKeelWeb.OrgAccess`); this page body stays empty. The
   # assign is always present (defaulted to nil by the layout hook), so the
   # clause must match only a real error map.
-  def render(%{org_scope_error: error} = assigns) when not is_nil(error), do: ~H""
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
 
   @impl true
   def render(assigns) do

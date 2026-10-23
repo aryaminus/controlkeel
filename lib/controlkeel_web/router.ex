@@ -302,6 +302,10 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id",
            ProofLive,
            :show
+
+      # Catch-all for unmatched URLs inside an org scope. Must be last so it
+      # does not shadow any real route above.
+      live "/:org_slug/*rest", OrgCatchAllLive, :not_found
     end
   end
 

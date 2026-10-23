@@ -31,17 +31,18 @@ defmodule ControlKeelWeb.OrgAccess do
 
   ## Rendering the failure
 
-  An org-level LiveView assigns the error to `:org_scope_error` and adds an
-  early render clause matching only a real error
-  (`def render(%{org_scope_error: error}) when not is_nil(error)`). The assign
-  is always present because `ControlKeelWeb.OrganizationLayoutDefaults`
-  defaults it to `nil`; a bare `%{org_scope_error: _}` pattern would shadow the
-  real render on every org page.
+  A scoped LiveView assigns the error to `:scope_error` and adds an early
+  render clause matching only a real error
+  (`def render(%{scope_error: error}) when not is_nil(error)`). The assign is
+  always present because `ControlKeelWeb.OrganizationLayoutDefaults` defaults
+  it to `nil`; a bare `%{scope_error: _}` pattern would shadow the real render
+  on every org page.
   """
 
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.Org
   alias ControlKeel.Runtime.Mode
+  alias ControlKeelWeb.ScopeError
 
   @typedoc """
   Why the URL cannot be used.
@@ -50,20 +51,15 @@ defmodule ControlKeelWeb.OrgAccess do
     * `:forbidden` — the org exists but the visitor has no active membership
     * `:needs_admin` — the visitor is a member below the required role
   """
-  @type kind :: :not_found | :forbidden | :needs_admin
+  @type kind :: ScopeError.kind()
 
   @typedoc """
-  Everything the not-found panel needs to explain the miss.
+  Everything the scope panel needs to explain the miss.
 
   `:title`/`:message` are pre-composed so the panel stays a dumb renderer;
   `:org_slug` echoes back the offending URL segment.
   """
-  @type error :: %{
-          required(:kind) => kind(),
-          required(:title) => String.t(),
-          required(:message) => String.t(),
-          required(:org_slug) => String.t() | nil
-        }
+  @type error :: ScopeError.t()
 
   @type result :: {:ok, Org.t(), Accounts.Membership.t() | nil} | {:error, error()}
 
@@ -120,25 +116,11 @@ defmodule ControlKeelWeb.OrgAccess do
 
   # --- Error payloads ----------------------------------------------------
 
-  defp not_found(slug) do
-    %{
-      kind: :not_found,
-      title: "Organization not found",
-      message: "No organization exists at this address. It may have been renamed or deleted.",
-      org_slug: slug
-    }
-  end
+  defp not_found(slug), do: ScopeError.org(slug, :not_found)
 
   # Same public copy as `not_found/1`; only `:kind` differs. This keeps the
   # page from being usable to enumerate org slugs.
-  defp forbidden(slug), do: %{not_found(slug) | kind: :forbidden}
+  defp forbidden(slug), do: ScopeError.org(slug, :forbidden)
 
-  defp needs_admin(slug) do
-    %{
-      kind: :needs_admin,
-      title: "Organization unavailable",
-      message: "You don't have permission to access this part of the organization.",
-      org_slug: slug
-    }
-  end
+  defp needs_admin(slug), do: ScopeError.org(slug, :needs_admin)
 end

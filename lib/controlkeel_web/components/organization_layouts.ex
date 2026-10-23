@@ -903,25 +903,40 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     do: "size-4 text-muted-foreground group-hover:text-primary"
 
   @doc """
-  In-place not-found panel for an org-level URL.
+  The current scope root for the saved-path handoff.
 
-  Rendered by `organization.html.heex` when a LiveView assigns
-  `:org_scope_error` (see `ControlKeelWeb.OrgAccess`), replacing the org chrome
-  — an unknown `org_slug` has no sidebar to render. Offers the actions that
-  can actually help: home, create an organization, or sign in.
+  Returns `/:org`, `/:org/workspaces/:ws`, or
+  `/:org/workspaces/:ws/sessions/:id`. The organization layout uses this to
+  mark a valid page so the browser saves only scopes the server resolved.
+  """
+  def scope_root(%{
+        nav_session: %{id: id},
+        nav_workspace: %{slug: ws_slug},
+        nav_org: %{slug: org_slug}
+      })
+      when not is_nil(id) do
+    "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{id}"
+  end
+
+  def scope_root(%{nav_workspace: %{slug: ws_slug}, nav_org: %{slug: org_slug}}) do
+    "/#{org_slug}/workspaces/#{ws_slug}"
+  end
+
+  def scope_root(%{nav_org: %{slug: org_slug}}), do: "/#{org_slug}"
+  def scope_root(_assigns), do: nil
+
+  @doc """
+  In-place panel for an unresolvable or inaccessible scope.
+
+  Rendered by `organization.html.heex` when a LiveView assigns `:scope_error`.
+  The panel replaces the org chrome because an invalid scope has no sidebar to
+  render. It offers home, the parent scope, create-organization, or sign-in
+  actions depending on the error and the visitor.
   """
   attr :error, :map, required: true
   attr :current_user, :any, default: nil
 
-  def organization_scope_not_found(assigns) do
-    mode = ControlKeel.Runtime.Mode.current()
-    current_user = assigns[:current_user]
-
-    assigns =
-      assigns
-      |> assign(:mode, mode)
-      |> assign(:signed_in?, current_user != nil and mode != :local)
-
+  def scope_error_panel(assigns) do
     ~H"""
     <section class="mx-auto flex w-full max-w-lg flex-col items-center text-center">
       <span class="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
@@ -933,28 +948,18 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       </h1>
       <p class="mt-2 text-sm text-muted-foreground">{@error.message}</p>
 
-      <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+      <div :if={@error.scope == :org} class="mt-6 flex flex-wrap items-center justify-center gap-3">
         <.link
-          :if={@signed_in? or @mode == :local}
           href="/"
-          data-forget-last-path
           class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
         >
           <.icon name="hero-home" class="size-3.5" /> Back to home
         </.link>
         <.link
-          :if={@signed_in?}
           navigate={~p"/new/org"}
           class="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted"
         >
           <.icon name="hero-plus" class="size-3.5" /> Create an organization
-        </.link>
-        <.link
-          :if={not @signed_in? and @mode != :local}
-          href={~p"/auth/login"}
-          class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
-        >
-          <.icon name="hero-arrow-right-end-on-rectangle" class="size-3.5" /> Sign in
         </.link>
       </div>
     </section>

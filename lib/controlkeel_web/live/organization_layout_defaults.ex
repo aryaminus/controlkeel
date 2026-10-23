@@ -7,10 +7,11 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
   supplies the shared URL, breadcrumb, and navigation assigns independently
   from the dashboard layout defaults.
 
-  `:org_scope_error` is defaulted to `nil` here: an org-level LiveView sets it
-  (see `ControlKeelWeb.OrgAccess`) when the URL's `org_slug` does not resolve,
-  and the org layout then renders an in-place not-found panel instead of the
-  org chrome.
+  `:scope_error` is defaulted to `nil` here: a scoped LiveView sets it when
+  the URL's org, workspace, or session does not resolve (or is inaccessible),
+  and the org layout renders an in-place panel instead of the org chrome.
+  `:scope_aware?` marks the page for the live-eviction hook so a membership
+  change can render the same panel instead of navigating away.
   """
 
   import Phoenix.Component, only: [assign: 3, assign_new: 3]
@@ -24,7 +25,8 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
       socket
       |> assign(:current_path, nil)
       |> assign(:current_query, nil)
-      |> assign_new(:org_scope_error, fn -> nil end)
+      |> assign(:scope_aware?, true)
+      |> assign_new(:scope_error, fn -> nil end)
       |> assign_new(:nav_org, fn -> nil end)
       |> assign_new(:nav_workspace, fn -> nil end)
       |> assign_new(:nav_session, fn -> nil end)

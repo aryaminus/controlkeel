@@ -118,6 +118,14 @@ function parseOverviewRoot(pathname) {
     return `/${segments[0]}`
   }
 
+  if (
+    segments.length === 2 &&
+    segments[1] === "settings" &&
+    !CK_RESERVED_TOP_LEVEL.has(segments[0])
+  ) {
+    return `/${segments[0]}`
+  }
+
   if (segments.length >= 3 && segments[1] === "workspaces") {
     let root = `/${segments[0]}/workspaces/${segments[2]}`
     if (segments.length >= 5 && segments[3] === "sessions") {
@@ -130,11 +138,40 @@ function parseOverviewRoot(pathname) {
 }
 
 function rememberLastPath() {
-  // A not-found panel (unknown org/workspace slug) must never become the
-  // remembered path, or visiting `/` would keep restoring a dead address.
-  if (document.querySelector("[data-scope-error]")) return
+  const errorPanel = document.querySelector("[data-scope-error]")
 
-  const root = parseOverviewRoot(window.location.pathname)
+  // A scope error panel never becomes the remembered path. If the saved
+  // value belongs to the invalid scope, remove it so `/` cannot keep
+  // restoring the dead address.
+  if (errorPanel) {
+    try {
+      const stored = localStorage.getItem("ck.lastPath")
+      const invalidRoot =
+        errorPanel.dataset.scopeInvalidRoot || parseOverviewRoot(window.location.pathname)
+
+      if (
+        stored &&
+        invalidRoot &&
+        (stored === invalidRoot ||
+          stored.startsWith(`${invalidRoot}/`) ||
+          invalidRoot.startsWith(`${stored}/`))
+      ) {
+        localStorage.removeItem("ck.lastPath")
+      }
+    } catch (error) {
+      console.warn("Could not clear the last ControlKeel path.", error)
+    }
+
+    return
+  }
+
+  // Only pages the server marked as a resolved scope may be saved. This is a
+  // positive check: a page that never resolved its scope cannot overwrite a
+  // previously valid path.
+  const validScope = document.querySelector("[data-scope-valid]")
+  if (!validScope) return
+
+  const root = validScope.dataset.scopeRoot || parseOverviewRoot(window.location.pathname)
   if (!root) return
 
   try {
@@ -155,29 +192,60 @@ function restoreLastPath() {
     console.warn("Could not read the last ControlKeel path.", error)
   }
 
-  window.location.replace(lastPath || boot.dataset.lastPathFallback)
+  const validLastPath =
+    lastPath &&
+    lastPath.startsWith("/") &&
+    !lastPath.startsWith("//") &&
+    !lastPath.includes("?") &&
+    !lastPath.includes("#") &&
+    parseOverviewRoot(lastPath)
+
+  if (lastPath && !validLastPath) {
+    try {
+      localStorage.removeItem("ck.lastPath")
+    } catch (error) {
+      console.warn("Could not clear the last ControlKeel path.", error)
+    }
+  }
+
+  window.location.replace(validLastPath || boot.dataset.lastPathFallback)
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  clearLastPathOnAuth()
   rememberLastPath()
   restoreLastPath()
 })
 
-window.addEventListener("phx:page-loading-stop", rememberLastPath)
+window.addEventListener("phx:page-loading-stop", () => {
+  clearLastPathOnAuth()
+  rememberLastPath()
+})
 
-// Clears the remembered path when the visitor explicitly asks to forget it:
-// sign-out, or "go home" from the org not-found panel — otherwise `/` would
-// restore the dead address it was called from and bounce straight back.
-document.addEventListener("click", event => {
-  if (!(event.target instanceof Element)) return
-  if (!event.target.closest('a[href="/auth/logout"], a[data-forget-last-path]')) return
-
+// Signing out forgets the last scoped path. Scope error panels clear only
+// their own invalid root, so a different valid path survives.
+function clearLastPath() {
   try {
     localStorage.removeItem("ck.lastPath")
   } catch (error) {
     console.warn("Could not clear the last ControlKeel path.", error)
   }
+}
+
+document.addEventListener("click", event => {
+  if (!(event.target instanceof Element)) return
+  if (!event.target.closest('a[href="/auth/logout"], a[href^="/auth/logout?"]')) return
+
+  clearLastPath()
 }, true)
+
+// Clear saved path if landing on the login or logout page directly
+function clearLastPathOnAuth() {
+  const path = window.location.pathname
+  if (path === "/auth/login" || path === "/auth/logout") {
+    clearLastPath()
+  }
+}
 
 window.addEventListener("phx:copy-to-clipboard", async ({detail}) => {
   const text = detail?.text
