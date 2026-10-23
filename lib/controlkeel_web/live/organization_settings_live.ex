@@ -14,35 +14,40 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case Accounts.get_org_by_slug(slug) do
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
+    case OrgAccess.resolve(slug, socket.assigns[:current_user], "admin") do
+      {:ok, org, membership} ->
+        mount_ok(socket, org, membership)
 
-      org ->
-        case OrgAccess.check(org, socket.assigns[:current_user], "admin") do
-          {:ok, membership} ->
-            mount_ok(socket, org, membership)
-
-          {:error, :forbidden} ->
-            {:ok,
-             redirect_with_flash(
-               socket,
-               :error,
-               "Sign in to view this organization.",
-               ~p"/auth/login"
-             )}
-
-          {:error, :needs_admin} ->
-            {:ok,
-             redirect_with_flash(
-               socket,
-               :error,
-               "You don't have permission to change organization settings.",
-               ~p"/#{slug}"
-             )}
-        end
+      {:error, error} ->
+        {:ok,
+         socket
+         |> assign(:page_title, error.title)
+         |> assign(:scope_error, error)}
     end
   end
+
+  @impl true
+  def handle_params(%{"org_slug" => slug}, _uri, socket) do
+    socket =
+      case socket.assigns[:org] do
+        %{slug: ^slug} ->
+          socket
+
+        _ ->
+          case OrgAccess.resolve(slug, socket.assigns[:current_user], "admin") do
+            {:ok, org, membership} ->
+              {:ok, socket} = mount_ok(socket, org, membership)
+              assign(socket, :scope_error, nil)
+
+            {:error, error} ->
+              assign(socket, :scope_error, error)
+          end
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   defp mount_ok(socket, org, membership) do
     local_mode = Mode.current() == :local
@@ -124,12 +129,6 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     )
   end
 
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> put_flash(kind, msg)
-    |> push_navigate(to: path)
-  end
-
   defp maybe_add_owner_field(attrs, _key, _value, false), do: attrs
   defp maybe_add_owner_field(attrs, _key, nil, _is_owner), do: attrs
 
@@ -151,6 +150,12 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
         {:error, "Budget must be a non-negative integer in cents."}
     end
   end
+
+  # An unresolved org scope renders the shared not-found panel from the org
+  # layout (see `ControlKeelWeb.OrgAccess`); this page body stays empty. The
+  # assign is always present (defaulted to nil by the layout hook), so the
+  # clause must match only a real error map.
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
 
   @impl true
   def render(assigns) do

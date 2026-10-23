@@ -14,12 +14,13 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   ## Access
 
-  Resolved per-URL via `ControlKeelWeb.OrgAccess.check(org, user)`
-  (default `"viewer"` role). The resolved membership is kept page-local so
-  live membership changes can refresh or leave the page.
-  Local mode has no membership table and is unrestricted. Cloud/self_hosted
-  requires the signed-in user to hold an active membership for this specific
-  org; others are redirected to `/organizations`.
+  Resolved per-URL via `ControlKeelWeb.OrgAccess.resolve/3`, which checks
+  existence before authorization (default `"viewer"` role; NOT the session's
+  pinned `current_membership`). Local mode has no membership table and is
+  unrestricted. Cloud/self_hosted requires the signed-in user to hold an
+  active membership for this specific org. An org that does not exist, or that
+  the visitor cannot access, renders the shared in-place not-found panel at the
+  requested URL instead of bouncing to a global page.
   """
 
   use ControlKeelWeb, :live_view
@@ -34,28 +35,15 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
-    case Accounts.get_org_by_slug(slug) do
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Organization not found.", ~p"/organizations")}
+    case OrgAccess.resolve(slug, socket.assigns[:current_user]) do
+      {:ok, org, membership} ->
+        mount_ok(socket, org, membership)
 
-      org ->
-        case OrgAccess.check(org, socket.assigns[:current_user]) do
-          {:ok, membership} ->
-            mount_ok(socket, org, membership)
-
-          {:error, :forbidden} ->
-            {:ok,
-             redirect_with_flash(
-               socket,
-               :error,
-               "Sign in to view this organization.",
-               ~p"/auth/login"
-             )}
-
-          {:error, :needs_admin} ->
-            {:ok,
-             redirect_with_flash(socket, :error, "You don't have permission.", ~p"/organizations")}
-        end
+      {:error, error} ->
+        {:ok,
+         socket
+         |> assign(:page_title, error.title)
+         |> assign(:scope_error, error)}
     end
   end
 
@@ -105,10 +93,26 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   def handle_params(params, _uri, socket) do
     socket =
       socket
+      |> maybe_refresh_org(params["org_slug"])
       |> assign(:active_tab, normalize_tab(params["tab"]))
 
     {:noreply, socket}
   end
+
+  defp maybe_refresh_org(%{assigns: %{org: %{slug: slug}}} = socket, slug), do: socket
+
+  defp maybe_refresh_org(socket, slug) when is_binary(slug) do
+    case OrgAccess.resolve(slug, socket.assigns[:current_user]) do
+      {:ok, org, membership} ->
+        {:ok, socket} = mount_ok(socket, org, membership)
+        assign(socket, :scope_error, nil)
+
+      {:error, error} ->
+        assign(socket, :scope_error, error)
+    end
+  end
+
+  defp maybe_refresh_org(socket, _slug), do: socket
 
   def handle_event("new_workspace", _params, socket) do
     {:noreply, assign(socket, :show_new_workspace, true)}
@@ -348,6 +352,12 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   def handle_event("dismiss-token", _params, socket) do
     {:noreply, assign(socket, :invite_token, nil)}
   end
+
+  # An unresolved org scope renders the shared not-found panel from the org
+  # layout (see `ControlKeelWeb.OrgAccess`); this page body stays empty. The
+  # assign is always present (defaulted to nil by the layout hook), so the
+  # clause must match only a real error map.
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
 
   @impl true
   def render(assigns) do
@@ -1019,12 +1029,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   defp count_active_owners(memberships) do
     Enum.count(memberships, &(&1.role == "owner" and &1.status == "active"))
-  end
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> put_flash(kind, msg)
-    |> push_navigate(to: path)
   end
 
   defp tab_class(active?) do
