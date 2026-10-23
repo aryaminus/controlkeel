@@ -111,6 +111,8 @@ const CK_RESERVED_TOP_LEVEL = new Set([
   "invitations", "workspaces", "api", "proxy", "mcp", "oauth", "dev", "assets"
 ])
 
+const CK_RESTORED_LAST_PATH_KEY = "ck.restoredLastPath"
+
 function parseOverviewRoot(pathname) {
   const segments = String(pathname || "").split("/").filter(Boolean)
 
@@ -137,33 +139,44 @@ function parseOverviewRoot(pathname) {
   return null
 }
 
+function clearRestoredLastPathMarker() {
+  try {
+    sessionStorage.removeItem(CK_RESTORED_LAST_PATH_KEY)
+  } catch (error) {
+    console.warn("Could not clear the restored ControlKeel path marker.", error)
+  }
+}
+
 function rememberLastPath() {
   const errorPanel = document.querySelector("[data-scope-error]")
+  let restoredPath = null
 
-  // A scope error panel never becomes the remembered path. If the saved
-  // value belongs to the invalid scope, remove it so `/` cannot keep
-  // restoring the dead address.
+  try {
+    restoredPath = sessionStorage.getItem(CK_RESTORED_LAST_PATH_KEY)
+  } catch (error) {
+    console.warn("Could not read the restored ControlKeel path marker.", error)
+  }
+
   if (errorPanel) {
-    try {
-      const stored = localStorage.getItem("ck.lastPath")
-      const invalidRoot =
-        errorPanel.dataset.scopeInvalidRoot || parseOverviewRoot(window.location.pathname)
-
-      if (
-        stored &&
-        invalidRoot &&
-        (stored === invalidRoot ||
-          stored.startsWith(`${invalidRoot}/`) ||
-          invalidRoot.startsWith(`${stored}/`))
-      ) {
-        localStorage.removeItem("ck.lastPath")
+    if (restoredPath) {
+      try {
+        if (
+          window.location.pathname === restoredPath &&
+          localStorage.getItem("ck.lastPath") === restoredPath
+        ) {
+          localStorage.removeItem("ck.lastPath")
+        }
+      } catch (error) {
+        console.warn("Could not clear the stale ControlKeel path.", error)
       }
-    } catch (error) {
-      console.warn("Could not clear the last ControlKeel path.", error)
+
+      clearRestoredLastPathMarker()
     }
 
     return
   }
+
+  if (restoredPath) clearRestoredLastPathMarker()
 
   // Only pages the server marked as a resolved scope may be saved. This is a
   // positive check: a page that never resolved its scope cannot overwrite a
@@ -208,6 +221,16 @@ function restoreLastPath() {
     }
   }
 
+  if (validLastPath) {
+    try {
+      sessionStorage.setItem(CK_RESTORED_LAST_PATH_KEY, validLastPath)
+    } catch (error) {
+      console.warn("Could not mark the restored ControlKeel path.", error)
+    }
+  } else {
+    clearRestoredLastPathMarker()
+  }
+
   window.location.replace(validLastPath || boot.dataset.lastPathFallback)
 }
 
@@ -222,14 +245,15 @@ window.addEventListener("phx:page-loading-stop", () => {
   rememberLastPath()
 })
 
-// Signing out forgets the last scoped path. Scope error panels clear only
-// their own invalid root, so a different valid path survives.
+// Signing out forgets the last scoped path and any in-flight restore marker.
 function clearLastPath() {
   try {
     localStorage.removeItem("ck.lastPath")
   } catch (error) {
     console.warn("Could not clear the last ControlKeel path.", error)
   }
+
+  clearRestoredLastPathMarker()
 }
 
 document.addEventListener("click", event => {

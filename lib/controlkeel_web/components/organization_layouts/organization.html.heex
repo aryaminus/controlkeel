@@ -39,56 +39,55 @@
 
   <.flash_group flash={@flash} />
 <% else %>
-<%= if @scope_error do %>
-  <main
-    id="scope-not-found"
-    data-scope-error
-    data-scope-invalid-root={@scope_error.invalid_root}
-    class="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-16"
-  >
-    <.scope_error_panel
-      error={@scope_error}
-      current_user={@current_user}
-    />
-  </main>
-  <.flash_group flash={@flash} />
-<% else %>
-  <div
-    class="h-screen flex overflow-hidden"
-    data-scope-valid
-    data-scope-root={scope_root(assigns)}
-  >
-    <.organization_sidebar
-      current_user={@current_user}
-      current_path={@current_path}
-      current_query={@current_query}
-      nav_org={@nav_org}
-      nav_workspace={@nav_workspace}
-      nav_session={@nav_session}
-    />
-
-    <div class="flex flex-1 flex-col overflow-hidden">
-      <.breadcrumbs_header
+  <%= if @scope_error do %>
+    <main
+      id="scope-not-found"
+      data-scope-error
+      data-scope-invalid-root={@scope_error.invalid_root}
+      class="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-16"
+    >
+      <.scope_error_panel
+        error={@scope_error}
+        current_user={@current_user}
+      />
+    </main>
+    <.flash_group flash={@flash} />
+  <% else %>
+    <div
+      class="h-screen flex overflow-hidden"
+      data-scope-valid
+      data-scope-root={scope_root(assigns)}
+    >
+      <.organization_sidebar
+        current_user={@current_user}
         current_path={@current_path}
         current_query={@current_query}
-        nav_org_admin?={@nav_org_admin?}
-        breadcrumbs={@breadcrumbs}
         nav_org={@nav_org}
         nav_workspace={@nav_workspace}
         nav_session={@nav_session}
-        sibling_workspaces={@sibling_workspaces}
-        sibling_sessions={@sibling_sessions}
       />
 
-      <main class="flex-1 overflow-y-auto">
-        <div class="px-4 pt-6 pb-12 sm:px-8 lg:px-8 container mx-auto">
-          {@inner_content}
-        </div>
-      </main>
+      <div class="flex flex-1 flex-col overflow-hidden">
+        <.breadcrumbs_header
+          current_path={@current_path}
+          current_query={@current_query}
+          nav_org_admin?={@nav_org_admin?}
+          breadcrumbs={@breadcrumbs}
+          nav_org={@nav_org}
+          nav_workspace={@nav_workspace}
+          nav_session={@nav_session}
+          sibling_workspaces={@sibling_workspaces}
+          sibling_sessions={@sibling_sessions}
+        />
+
+        <main class="flex-1 overflow-y-auto">
+          <div class="px-4 pt-6 pb-12 sm:px-8 lg:px-8 container mx-auto">
+            {@inner_content}
+          </div>
+        </main>
+      </div>
     </div>
-  </div>
 
-  <.flash_group flash={@flash} />
+    <.flash_group flash={@flash} />
+  <% end %>
 <% end %>
-<% end %>
-

@@ -65,7 +65,8 @@ defmodule ControlKeelWeb.ScopeError do
       kind: kind,
       scope: :url,
       title: "Can't find the page",
-      message: "We can't find the page you're looking for, or you don't have permission to view it.",
+      message:
+        "We can't find the page you're looking for, or you don't have permission to view it.",
       scope_root: root,
       invalid_root: invalid_root(kind, invalid),
       parent_path: root,
