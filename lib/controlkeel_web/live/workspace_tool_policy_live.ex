@@ -164,7 +164,7 @@ defmodule ControlKeelWeb.WorkspaceToolPolicyLive do
           <button type="submit" class="self-start">Save policy</button>
         </.form>
       </section>
-      </.scope_error_panel>
+    </.scope_error_panel>
     """
   end
 

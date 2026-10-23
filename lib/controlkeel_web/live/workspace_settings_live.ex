@@ -242,7 +242,8 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
                       "w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition",
                       @active_tab == tab &&
                         "bg-primary/10 font-semibold text-primary",
-                      @active_tab != tab && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      @active_tab != tab &&
+                        "text-muted-foreground hover:bg-muted hover:text-foreground"
                     ]}
                   >
                     {tab_label(tab)}
@@ -271,7 +272,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
           <% end %>
         </div>
       </section>
-      </.scope_error_panel>
+    </.scope_error_panel>
     """
   end
 

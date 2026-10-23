@@ -228,7 +228,7 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
           <% end %>
         </div>
       </section>
-      </.scope_error_panel>
+    </.scope_error_panel>
     """
   end
 

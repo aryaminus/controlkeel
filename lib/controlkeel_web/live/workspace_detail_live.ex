@@ -174,7 +174,9 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
                                 {rule["action"]}
                               </.rule_tag>
                               <span class="font-mono text-xs text-foreground">{rule["id"]}</span>
-                              <span class="text-xs text-muted-foreground">{rule["plain_message"]}</span>
+                              <span class="text-xs text-muted-foreground">
+                                {rule["plain_message"]}
+                              </span>
                             </div>
                           <% end %>
                         </div>
@@ -326,7 +328,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
           </div>
         </div>
       </section>
-      </.scope_error_panel>
+    </.scope_error_panel>
     """
   end
 
