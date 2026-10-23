@@ -91,7 +91,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
             aria-label="Copy workspace slug"
             title="Copy slug"
             phx-click={JS.dispatch("phx:copy-to-clipboard", detail: %{text: @workspace.slug})}
-            class="inline-flex items-center rounded p-0.5 text-muted-foreground transition hover:text-primary"
+            class="inline-flex items-center rounded p-0.5 text-muted-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <.icon name="hero-clipboard" class="size-3.5" />
           </button>
