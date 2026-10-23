@@ -18,6 +18,7 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
   alias ControlKeel.Platform
   alias ControlKeel.Platform.IntegrationWebhook
   alias ControlKeel.Repo
+  alias ControlKeelWeb.ScopeError
   alias ControlKeelWeb.WorkspaceAccess
 
   @impl true
@@ -52,10 +53,16 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
        |> assign(:create_error, nil)}
     else
       nil ->
-        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+        {:ok,
+         socket
+         |> put_flash(:error, "Workspace not found.")
+         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
 
       {:error, reason} ->
-        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+        {:ok,
+         socket
+         |> put_flash(:error, reason)
+         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
     end
   end
 
@@ -231,6 +238,7 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
         <% end %>
       </div>
     </section>
+    </.scope_error_panel>
     """
   end
 
