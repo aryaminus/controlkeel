@@ -10,8 +10,8 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
   `:scope_error` is defaulted to `nil` here: a scoped LiveView sets it when
   the URL's org, workspace, or session does not resolve (or is inaccessible),
   and the org layout renders an in-place panel instead of the org chrome.
-  `:scope_aware?` marks the page for the live-eviction hook so a membership
-  change can render the same panel instead of navigating away.
+  Membership revocations are handled separately by `LiveAuth` and navigate
+  the visitor to `/organizations`.
   """
 
   import Phoenix.Component, only: [assign: 3, assign_new: 3]
@@ -25,7 +25,6 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
       socket
       |> assign(:current_path, nil)
       |> assign(:current_query, nil)
-      |> assign(:scope_aware?, true)
       |> assign_new(:scope_error, fn -> nil end)
       |> assign_new(:nav_org, fn -> nil end)
       |> assign_new(:nav_workspace, fn -> nil end)
