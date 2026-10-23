@@ -18,6 +18,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform
   alias ControlKeel.Repo
+  alias ControlKeelWeb.ScopeError
   alias ControlKeelWeb.WorkspaceAccess
 
   @tabs ["policies", "agent_tools"]
@@ -63,10 +64,16 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
        |> refresh_policy_assigns()}
     else
       nil ->
-        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
+        {:ok,
+         socket
+         |> put_flash(:error, "Workspace not found.")
+         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
 
       {:error, reason} ->
-        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+        {:ok,
+         socket
+         |> put_flash(:error, reason)
+         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
     end
   end
 
@@ -208,61 +215,63 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <section class="w-full space-y-8">
-      <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div class="space-y-2">
-          <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-            Workspace settings
-          </h1>
+    <.scope_error_panel error={@scope_error} current_user={@current_user}>
+      <section class="w-full space-y-8">
+        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div class="space-y-2">
+            <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+              Workspace settings
+            </h1>
+          </div>
         </div>
-      </div>
 
-      <div class="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <nav
-          class="rounded-2xl border bg-card shadow-card lg:self-start lg:p-3"
-          aria-label="Workspace settings sections"
-        >
-          <ul class="flex gap-1 list-none m-0 overflow-x-auto p-2 lg:flex-col lg:gap-1 lg:p-0">
-            <%= for tab <- @tabs do %>
-              <li class="shrink-0">
-                <button
-                  type="button"
-                  phx-click="set_tab"
-                  phx-value-tab={tab}
-                  aria-current={@active_tab == tab && "page"}
-                  class={[
-                    "w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition",
-                    @active_tab == tab &&
-                      "bg-primary/10 font-semibold text-primary",
-                    @active_tab != tab && "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  ]}
-                >
-                  {tab_label(tab)}
-                </button>
-              </li>
-            <% end %>
-          </ul>
-        </nav>
+        <div class="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
+          <nav
+            class="rounded-2xl border bg-card shadow-card lg:self-start lg:p-3"
+            aria-label="Workspace settings sections"
+          >
+            <ul class="flex gap-1 list-none m-0 overflow-x-auto p-2 lg:flex-col lg:gap-1 lg:p-0">
+              <%= for tab <- @tabs do %>
+                <li class="shrink-0">
+                  <button
+                    type="button"
+                    phx-click="set_tab"
+                    phx-value-tab={tab}
+                    aria-current={@active_tab == tab && "page"}
+                    class={[
+                      "w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition",
+                      @active_tab == tab &&
+                        "bg-primary/10 font-semibold text-primary",
+                      @active_tab != tab && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    ]}
+                  >
+                    {tab_label(tab)}
+                  </button>
+                </li>
+              <% end %>
+            </ul>
+          </nav>
 
-        <%= case @active_tab do %>
-          <% "agent_tools" -> %>
-            <.tool_policy_panel
-              workspace={@workspace}
-              modes={@modes}
-              tool_options={@tool_options}
-              selected_tools={@selected_tools}
-              unknown_tools={@unknown_tools}
-              live_mode={@live_mode}
-            />
-          <% _ -> %>
-            <.policy_sets_panel
-              policy_assignments={@policy_assignments}
-              available_sets={@available_sets}
-              apply_form={@apply_form}
-            />
-        <% end %>
-      </div>
-    </section>
+          <%= case @active_tab do %>
+            <% "agent_tools" -> %>
+              <.tool_policy_panel
+                workspace={@workspace}
+                modes={@modes}
+                tool_options={@tool_options}
+                selected_tools={@selected_tools}
+                unknown_tools={@unknown_tools}
+                live_mode={@live_mode}
+              />
+            <% _ -> %>
+              <.policy_sets_panel
+                policy_assignments={@policy_assignments}
+                available_sets={@available_sets}
+                apply_form={@apply_form}
+              />
+          <% end %>
+        </div>
+      </section>
+      </.scope_error_panel>
     """
   end
 
@@ -540,11 +549,5 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
       {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
       {:error, :needs_admin} -> {:error, "Admin or owner role required."}
     end
-  end
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
   end
 end
