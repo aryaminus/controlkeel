@@ -109,126 +109,126 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
-    <.scope_error_panel error={@scope_error} current_user={@current_user}>
-      <section
-        class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-12 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-6"
-        style="max-width: 920px; margin: 4rem auto;"
-      >
-        <div class="flex items-center justify-between gap-4 mt-6 mb-4 max-[900px]:flex-col max-[900px]:items-start">
-          <div>
-            <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-              {@workspace.name}
-            </p>
-            <h1 class="text-[clamp(2rem,4vw,3.4rem)] leading-[1.02]">GitHub repositories</h1>
-            <p class="text-muted-foreground text-[1.05rem] leading-[1.7] max-w-[48rem]">
-              Bind GitHub repos so sessions, findings, and proofs can reference them.
-              For governance via the GitHub App, set <code>installation_id</code>.
-            </p>
+    <section
+      class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-12 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-6"
+      style="max-width: 920px; margin: 4rem auto;"
+    >
+      <div class="flex items-center justify-between gap-4 mt-6 mb-4 max-[900px]:flex-col max-[900px]:items-start">
+        <div>
+          <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
+            {@workspace.name}
+          </p>
+          <h1 class="text-[clamp(2rem,4vw,3.4rem)] leading-[1.02]">GitHub repositories</h1>
+          <p class="text-muted-foreground text-[1.05rem] leading-[1.7] max-w-[48rem]">
+            Bind GitHub repos so sessions, findings, and proofs can reference them.
+            For governance via the GitHub App, set <code>installation_id</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
+        <h2>Bind a repository</h2>
+        <.form for={@bind_form} phx-submit="bind" class="flex flex-col gap-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-muted-foreground mb-1">Owner</label>
+              <input
+                type="text"
+                name="bind[owner]"
+                value={@bind_form[:owner].value || ""}
+                placeholder="acme"
+                required
+                class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-muted-foreground mb-1">Repo</label>
+              <input
+                type="text"
+                name="bind[repo]"
+                value={@bind_form[:repo].value || ""}
+                placeholder="payments"
+                required
+                class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
+              />
+            </div>
           </div>
-        </div>
-
-        <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
-          <h2>Bind a repository</h2>
-          <.form for={@bind_form} phx-submit="bind" class="flex flex-col gap-3">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Owner</label>
-                <input
-                  type="text"
-                  name="bind[owner]"
-                  value={@bind_form[:owner].value || ""}
-                  placeholder="acme"
-                  required
-                  class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Repo</label>
-                <input
-                  type="text"
-                  name="bind[repo]"
-                  value={@bind_form[:repo].value || ""}
-                  placeholder="payments"
-                  required
-                  class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
-                />
-              </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-muted-foreground mb-1">
+                Default branch (optional)
+              </label>
+              <input
+                type="text"
+                name="bind[default_branch]"
+                value={@bind_form[:default_branch].value || ""}
+                placeholder="main"
+                class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
+              />
             </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">
-                  Default branch (optional)
-                </label>
-                <input
-                  type="text"
-                  name="bind[default_branch]"
-                  value={@bind_form[:default_branch].value || ""}
-                  placeholder="main"
-                  class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">
-                  Installation ID (optional)
-                </label>
-                <input
-                  type="number"
-                  name="bind[installation_id]"
-                  value={@bind_form[:installation_id].value || ""}
-                  class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
-                />
-              </div>
+            <div>
+              <label class="block text-sm font-medium text-muted-foreground mb-1">
+                Installation ID (optional)
+              </label>
+              <input
+                type="number"
+                name="bind[installation_id]"
+                value={@bind_form[:installation_id].value || ""}
+                class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
+              />
             </div>
-            <%= if @bind_error do %>
-              <p class="text-muted-foreground">{@bind_error}</p>
-            <% end %>
-            <button type="submit" class="self-start">Bind repository</button>
-          </.form>
-        </div>
-
-        <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
-          <h2>Bound repositories</h2>
-          <%= if @repos == [] do %>
-            <p class="max-w-[48rem]">No repositories bound yet.</p>
-          <% else %>
-            <table>
-              <thead>
-                <tr>
-                  <th>Owner / Repo</th>
-                  <th>Default branch</th>
-                  <th>Installation ID</th>
-                  <th>Bound at</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <%= for r <- @repos do %>
-                  <tr id={"binding-#{r.id}"}>
-                    <td><code>{r.owner}/{r.repo}</code></td>
-                    <td>{r.default_branch || "—"}</td>
-                    <td>{r.installation_id || "—"}</td>
-                    <td>{format_dt(r.inserted_at)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        phx-click="unbind"
-                        phx-value-owner={r.owner}
-                        phx-value-repo={r.repo}
-                        data-confirm={"Unbind #{r.owner}/#{r.repo}?"}
-                      >
-                        Unbind
-                      </button>
-                    </td>
-                  </tr>
-                <% end %>
-              </tbody>
-            </table>
+          </div>
+          <%= if @bind_error do %>
+            <p class="text-muted-foreground">{@bind_error}</p>
           <% end %>
-        </div>
-      </section>
-    </.scope_error_panel>
+          <button type="submit" class="self-start">Bind repository</button>
+        </.form>
+      </div>
+
+      <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
+        <h2>Bound repositories</h2>
+        <%= if @repos == [] do %>
+          <p class="max-w-[48rem]">No repositories bound yet.</p>
+        <% else %>
+          <table>
+            <thead>
+              <tr>
+                <th>Owner / Repo</th>
+                <th>Default branch</th>
+                <th>Installation ID</th>
+                <th>Bound at</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for r <- @repos do %>
+                <tr id={"binding-#{r.id}"}>
+                  <td><code>{r.owner}/{r.repo}</code></td>
+                  <td>{r.default_branch || "—"}</td>
+                  <td>{r.installation_id || "—"}</td>
+                  <td>{format_dt(r.inserted_at)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      phx-click="unbind"
+                      phx-value-owner={r.owner}
+                      phx-value-repo={r.repo}
+                      data-confirm={"Unbind #{r.owner}/#{r.repo}?"}
+                    >
+                      Unbind
+                    </button>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        <% end %>
+      </div>
+    </section>
     """
   end
 
@@ -275,10 +275,4 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
   defp format_dt(nil), do: "—"
   defp format_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
   defp format_dt(%NaiveDateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
-  end
 end

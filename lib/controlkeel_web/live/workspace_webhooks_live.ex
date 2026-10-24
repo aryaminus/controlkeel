@@ -123,6 +123,8 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section
@@ -238,7 +240,6 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
         <% end %>
       </div>
     </section>
-    </.scope_error_panel>
     """
   end
 
@@ -268,11 +269,5 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLive do
       {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
       {:error, :needs_admin} -> {:error, "Admin or owner role required."}
     end
-  end
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
   end
 end

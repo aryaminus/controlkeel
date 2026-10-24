@@ -129,125 +129,125 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
-    <.scope_error_panel error={@scope_error} current_user={@current_user}>
-      <section
-        class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-12 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-6"
-        style="max-width: 920px; margin: 4rem auto;"
-      >
-        <div class="flex items-center justify-between gap-4 mt-6 mb-4 max-[900px]:flex-col max-[900px]:items-start">
+    <section
+      class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-12 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-6"
+      style="max-width: 920px; margin: 4rem auto;"
+    >
+      <div class="flex items-center justify-between gap-4 mt-6 mb-4 max-[900px]:flex-col max-[900px]:items-start">
+        <div>
+          <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
+            {@workspace.name}
+          </p>
+          <h1 class="text-[clamp(2rem,4vw,3.4rem)] leading-[1.02]">Service accounts</h1>
+          <p class="text-muted-foreground text-[1.05rem] leading-[1.7] max-w-[48rem]">
+            Machine identities for CI, MCP, and external integrations. Tokens are shown once at creation or rotation; store them securely.
+          </p>
+        </div>
+      </div>
+
+      <%= if @new_token do %>
+        <div
+          class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6"
+          id="new-token-banner"
+          style="border-color: rgba(190, 242, 100, 0.4);"
+        >
+          <p>
+            <strong>Token for {@new_token_for}.</strong> Copy it now — it will not be shown again.
+          </p>
+          <pre><code id="new-token-value">{@new_token}</code></pre>
+          <button type="button" phx-click="dismiss-token">
+            Dismiss
+          </button>
+        </div>
+      <% end %>
+
+      <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
+        <h2>Create service account</h2>
+        <.form for={@create_form} phx-submit="create" class="flex flex-col gap-3">
           <div>
-            <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
-              {@workspace.name}
-            </p>
-            <h1 class="text-[clamp(2rem,4vw,3.4rem)] leading-[1.02]">Service accounts</h1>
-            <p class="text-muted-foreground text-[1.05rem] leading-[1.7] max-w-[48rem]">
-              Machine identities for CI, MCP, and external integrations. Tokens are shown once at creation or rotation; store them securely.
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
+            <input
+              type="text"
+              name="sa[name]"
+              value={@create_form[:name].value || ""}
+              required
+              class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">
+              Scopes (space or comma separated)
+            </label>
+            <input
+              type="text"
+              name="sa[scopes]"
+              value={@create_form[:scopes].value || ""}
+              placeholder="mcp:access context:read findings:write"
+              class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
+            />
+            <p class="mt-1 text-xs text-muted-foreground">
+              Use <code>admin</code> for full access, or scope strings like <code>mcp:access</code>.
             </p>
           </div>
-        </div>
-
-        <%= if @new_token do %>
-          <div
-            class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6"
-            id="new-token-banner"
-            style="border-color: rgba(190, 242, 100, 0.4);"
-          >
-            <p>
-              <strong>Token for {@new_token_for}.</strong> Copy it now — it will not be shown again.
-            </p>
-            <pre><code id="new-token-value">{@new_token}</code></pre>
-            <button type="button" phx-click="dismiss-token">
-              Dismiss
-            </button>
-          </div>
-        <% end %>
-
-        <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
-          <h2>Create service account</h2>
-          <.form for={@create_form} phx-submit="create" class="flex flex-col gap-3">
-            <div>
-              <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-              <input
-                type="text"
-                name="sa[name]"
-                value={@create_form[:name].value || ""}
-                required
-                class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-muted-foreground mb-1">
-                Scopes (space or comma separated)
-              </label>
-              <input
-                type="text"
-                name="sa[scopes]"
-                value={@create_form[:scopes].value || ""}
-                placeholder="mcp:access context:read findings:write"
-                class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
-              />
-              <p class="mt-1 text-xs text-muted-foreground">
-                Use <code>admin</code> for full access, or scope strings like <code>mcp:access</code>.
-              </p>
-            </div>
-            <%= if @create_error do %>
-              <p class="text-muted-foreground">{@create_error}</p>
-            <% end %>
-            <button type="submit" class="self-start">Create</button>
-          </.form>
-        </div>
-
-        <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
-          <h2>Active service accounts</h2>
-          <%= if @accounts == [] do %>
-            <p class="max-w-[48rem]">No service accounts yet.</p>
-          <% else %>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Scopes</th>
-                  <th>Status</th>
-                  <th>Last used</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <%= for sa <- @accounts do %>
-                  <tr id={"sa-#{sa.id}"}>
-                    <td>{sa.name}</td>
-                    <td><code>{ServiceAccount.scope_list(sa) |> Enum.join(" ")}</code></td>
-                    <td>{sa.status}</td>
-                    <td>{format_dt(sa.last_used_at)}</td>
-                    <td>
-                      <%= if sa.status == "active" do %>
-                        <button
-                          type="button"
-                          phx-click="rotate"
-                          phx-value-id={sa.id}
-                        >
-                          Rotate
-                        </button>
-                        <button
-                          type="button"
-                          phx-click="revoke"
-                          phx-value-id={sa.id}
-                          data-confirm={"Revoke #{sa.name}?"}
-                        >
-                          Revoke
-                        </button>
-                      <% end %>
-                    </td>
-                  </tr>
-                <% end %>
-              </tbody>
-            </table>
+          <%= if @create_error do %>
+            <p class="text-muted-foreground">{@create_error}</p>
           <% end %>
-        </div>
-      </section>
-    </.scope_error_panel>
+          <button type="submit" class="self-start">Create</button>
+        </.form>
+      </div>
+
+      <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
+        <h2>Active service accounts</h2>
+        <%= if @accounts == [] do %>
+          <p class="max-w-[48rem]">No service accounts yet.</p>
+        <% else %>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Scopes</th>
+                <th>Status</th>
+                <th>Last used</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for sa <- @accounts do %>
+                <tr id={"sa-#{sa.id}"}>
+                  <td>{sa.name}</td>
+                  <td><code>{ServiceAccount.scope_list(sa) |> Enum.join(" ")}</code></td>
+                  <td>{sa.status}</td>
+                  <td>{format_dt(sa.last_used_at)}</td>
+                  <td>
+                    <%= if sa.status == "active" do %>
+                      <button
+                        type="button"
+                        phx-click="rotate"
+                        phx-value-id={sa.id}
+                      >
+                        Rotate
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="revoke"
+                        phx-value-id={sa.id}
+                        data-confirm={"Revoke #{sa.name}?"}
+                      >
+                        Revoke
+                      </button>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        <% end %>
+      </div>
+    </section>
     """
   end
 
@@ -284,10 +284,4 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
 
   defp format_dt(nil), do: "never"
   defp format_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
-  end
 end
