@@ -127,6 +127,28 @@ defmodule ControlKeelWeb.SessionProofsLiveTest do
     assert html =~ "No proof bundle exists with this identifier."
   end
 
+  test "proof detail renders in-place errors for missing or malformed sessions", %{
+    conn: conn
+  } do
+    {org, ws, session} = org_bound_session_fixture()
+    task = task_fixture(%{session: session, status: "done", title: "Scoped proof"})
+    proof = proof_bundle_fixture(%{task: task})
+
+    for session_id <- ["not-a-session-id", "999999999"] do
+      {:ok, view, _html} =
+        live(
+          conn,
+          "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session_id}/proofs/#{proof.id}"
+        )
+
+      assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+      assert has_element?(view, "h1", "Can't find the page")
+      refute has_element?(view, "Proof not found")
+      refute_redirected(view)
+    end
+  end
+
   test "scope-mismatched org or workspace slugs show in-place errors", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 

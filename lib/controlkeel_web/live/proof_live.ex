@@ -109,6 +109,9 @@ defmodule ControlKeelWeb.ProofLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
+  @impl true
   def render(%{live_action: :show} = assigns) do
     ~H"""
     <div class="space-y-6">
