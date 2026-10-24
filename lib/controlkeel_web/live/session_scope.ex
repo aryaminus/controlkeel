@@ -11,10 +11,19 @@ defmodule ControlKeelWeb.SessionScope do
   `workspace`/`org` (a nil/inaccessible session never reaches it).
   """
 
+  alias ControlKeel.Accounts
+  alias ControlKeel.Mission
+  alias ControlKeel.Repo
+  alias ControlKeelWeb.OrgAccess
+  alias ControlKeelWeb.ScopeError
+  alias ControlKeelWeb.WorkspaceAccess
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [attach_hook: 4]
+
   @doc """
   Loads the session context for a mount `id` param. Non-integer ids return
   `nil` (same as missing) instead of raising `Ecto.Query.CastError` in
-  `Repo.get`, so `/sessions/abc` gets the generic not-found redirect.
+  `Repo.get`, so `/sessions/abc` gets the generic in-place not-found state.
   """
   def fetch_session(id) when is_integer(id), do: ControlKeel.Mission.get_session_context(id)
 
@@ -26,6 +35,65 @@ defmodule ControlKeelWeb.SessionScope do
   end
 
   def fetch_session(_), do: nil
+
+  @doc """
+  Resolves and authorizes a session against the URL scope.
+
+  Successful session pages retain the workspace membership resolved from the
+  session's organization so `LiveAuth` can react to revocation and role changes.
+  """
+  @spec resolve(Phoenix.LiveView.Socket.t(), map()) ::
+          {:ok, map(), Phoenix.LiveView.Socket.t()} | {:error, Phoenix.LiveView.Socket.t()}
+  def resolve(socket, %{
+        "id" => id,
+        "org_slug" => org_slug,
+        "ws_slug" => ws_slug
+      }) do
+    case fetch_session(id) do
+      nil ->
+        {:error, socket}
+
+      session ->
+        if Accounts.session_accessible?(session, socket.assigns[:current_user]) and
+             check_scope(session, org_slug, ws_slug) == :ok do
+          membership =
+            case WorkspaceAccess.check_membership(
+                   session.workspace,
+                   socket.assigns[:current_user]
+                 ) do
+              {:ok, membership} -> membership
+              {:error, _reason} -> nil
+            end
+
+          {:ok, session, Phoenix.Component.assign(socket, :current_membership, membership)}
+        else
+          {:error, socket}
+        end
+    end
+  end
+
+  def resolve(socket, _params), do: {:error, socket}
+
+  @doc """
+  Revalidates the session when a session-scoped LiveView handles new params.
+
+  Returns whether the resolved session changed so pages can reset session-local
+  assigns only when navigation switches to a different session.
+  """
+  @spec refresh(Phoenix.LiveView.Socket.t(), map()) ::
+          {:ok, map(), Phoenix.LiveView.Socket.t(), boolean()}
+          | {:error, Phoenix.LiveView.Socket.t()}
+  def refresh(socket, params) do
+    previous_session = socket.assigns[:session]
+
+    case resolve(socket, params) do
+      {:ok, session, socket} ->
+        {:ok, session, socket, is_nil(previous_session) or previous_session.id != session.id}
+
+      {:error, socket} ->
+        {:error, socket}
+    end
+  end
 
   @doc "Returns `:ok` or `{:error, :workspace | :org}`."
   def check_scope(session, org_slug, ws_slug) do
@@ -69,12 +137,97 @@ defmodule ControlKeelWeb.SessionScope do
   end
 
   @doc """
-  Generic not-found redirect. Uses the same flash for missing, inaccessible,
-  or scope-mismatched sessions to avoid existence disclosure.
+  Generic in-place not-found state for missing, inaccessible, or
+  scope-mismatched sessions to avoid existence disclosure.
   """
-  def session_not_found(socket) do
-    socket
-    |> Phoenix.LiveView.put_flash(:error, "Session not found.")
-    |> Phoenix.LiveView.push_navigate(to: "/")
+  def session_not_found(socket, params \\ %{}) do
+    socket = ensure_invalid_scope_event_guard(socket)
+
+    org_slug = params["org_slug"] || get_in(socket.assigns, [:nav_org, Access.key(:slug)])
+    ws_slug = params["ws_slug"] || get_in(socket.assigns, [:nav_workspace, Access.key(:slug)])
+    session_id = params["id"] || get_in(socket.assigns, [:nav_session, Access.key(:id)])
+
+    case OrgAccess.resolve(org_slug, socket.assigns[:current_user]) do
+      {:ok, org, membership} ->
+        case resolve_workspace(org, ws_slug, socket.assigns[:current_user]) do
+          {:ok, workspace, workspace_membership} ->
+            socket
+            |> assign(:scope_error, ScopeError.session(org_slug, ws_slug, session_id))
+            |> assign(:page_title, "Can't find the page")
+            |> assign(:session, nil)
+            |> assign(:nav_org, org)
+            |> assign(:nav_workspace, workspace)
+            |> assign(:nav_session, nil)
+            |> assign(:current_membership, workspace_membership || membership)
+            |> assign(:breadcrumbs, [
+              %{label: org.name, to: "/#{org.slug}"},
+              %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"}
+            ])
+
+          :error ->
+            socket
+            |> assign(:scope_error, ScopeError.workspace(org_slug, ws_slug))
+            |> assign(:page_title, "Can't find the page")
+            |> assign(:session, nil)
+            |> assign(:nav_org, org)
+            |> assign(:nav_workspace, nil)
+            |> assign(:nav_session, nil)
+            |> assign(:current_membership, membership)
+            |> assign(:breadcrumbs, [%{label: org.name, to: "/#{org.slug}"}])
+        end
+
+      {:error, error} ->
+        socket
+        |> assign(:scope_error, error)
+        |> assign(:page_title, error.title)
+        |> assign(:session, nil)
+        |> assign(:nav_org, nil)
+        |> assign(:nav_workspace, nil)
+        |> assign(:nav_session, nil)
+        |> assign(:current_membership, nil)
+        |> assign(:breadcrumbs, [])
+    end
   end
+
+  defp resolve_workspace(org, ws_slug, user) when is_binary(ws_slug) do
+    case Mission.get_workspace_by_slug(ws_slug) do
+      nil ->
+        :error
+
+      workspace ->
+        workspace = Repo.preload(workspace, :org)
+
+        if workspace.org_id == org.id and workspace.org.slug == org.slug do
+          case WorkspaceAccess.check_membership(workspace, user) do
+            {:ok, membership} -> {:ok, workspace, membership}
+            {:error, _reason} -> :error
+          end
+        else
+          :error
+        end
+    end
+  end
+
+  defp resolve_workspace(_org, _ws_slug, _user), do: :error
+
+  defp ensure_invalid_scope_event_guard(
+         %{assigns: %{session_scope_error_guard_attached: true}} = socket
+       ),
+       do: socket
+
+  defp ensure_invalid_scope_event_guard(socket) do
+    socket
+    |> attach_hook(:session_scope_error_guard, :handle_event, &reject_invalid_scope_event/3)
+    |> assign(:session_scope_error_guard_attached, true)
+  end
+
+  defp reject_invalid_scope_event(
+         _event,
+         _params,
+         %{assigns: %{scope_error: error}} = socket
+       )
+       when not is_nil(error),
+       do: {:halt, socket}
+
+  defp reject_invalid_scope_event(_event, _params, socket), do: {:cont, socket}
 end
