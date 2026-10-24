@@ -9,34 +9,14 @@ defmodule ControlKeelWeb.SessionShipLive do
   @refresh_interval_ms 2_000
 
   @impl true
-  def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
-    current_user = socket.assigns[:current_user]
+  def mount(params, _session, socket) do
+    case SessionScope.resolve(socket, params) do
+      {:ok, session, socket} ->
+        if connected?(socket), do: schedule_refresh()
+        {:ok, assign_session(socket, session)}
 
-    case SessionScope.fetch_session(id) do
-      nil ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Session not found.")
-         |> push_navigate(to: ~p"/")}
-
-      session when not is_nil(session) ->
-        cond do
-          not ControlKeel.Accounts.session_accessible?(session, current_user) ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          true ->
-            if connected?(socket), do: schedule_refresh()
-            {:ok, assign_session(socket, session)}
-        end
+      {:error, socket} ->
+        {:ok, SessionScope.session_not_found(socket, params)}
     end
   end
 
@@ -135,6 +115,8 @@ defmodule ControlKeelWeb.SessionShipLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <div class="space-y-6">

@@ -19,33 +19,13 @@ defmodule ControlKeelWeb.ProofLive do
     ]
 
   @impl true
-  def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
-    current_user = socket.assigns[:current_user]
+  def mount(params, _session, socket) do
+    case SessionScope.resolve(socket, params) do
+      {:ok, session, socket} ->
+        {:ok, assign_scope(socket, session, params["org_slug"], params["ws_slug"])}
 
-    case SessionScope.fetch_session(id) do
-      nil ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Session not found.")
-         |> push_navigate(to: ~p"/")}
-
-      session ->
-        cond do
-          not ControlKeel.Accounts.session_accessible?(session, current_user) ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          true ->
-            {:ok, assign_scope(socket, session, org_slug, ws_slug)}
-        end
+      {:error, socket} ->
+        {:ok, SessionScope.session_not_found(socket, params)}
     end
   end
 
@@ -70,8 +50,6 @@ defmodule ControlKeelWeb.ProofLive do
     )
   end
 
-  defp scoped_session(socket), do: socket.assigns[:session]
-
   defp proof_not_found(socket) do
     socket
     |> assign(:page_title, "Proof not found")
@@ -80,49 +58,58 @@ defmodule ControlKeelWeb.ProofLive do
   end
 
   @impl true
-  def handle_params(%{"proof_id" => proof_id}, _uri, socket) do
-    case scoped_session(socket) do
+  def handle_params(%{"proof_id" => proof_id} = params, _uri, socket) do
+    case SessionScope.refresh(socket, params) do
+      {:ok, session, socket, changed?} ->
+        socket =
+          if changed? do
+            assign_scope(socket, session, params["org_slug"], params["ws_slug"])
+          else
+            socket
+          end
+
+        {:noreply, load_proof(socket, session, proof_id)}
+
+      {:error, socket} ->
+        {:noreply, SessionScope.session_not_found(socket, params)}
+    end
+  end
+
+  defp load_proof(socket, session, proof_id) do
+    case parse_int(proof_id) do
       nil ->
-        {:noreply, socket}
+        proof_not_found(socket)
 
-      session ->
-        session_id = session.id
+      parsed_id ->
+        case Mission.get_proof_bundle_with_context(parsed_id) do
+          %{session_id: session_id} = proof when session_id == session.id ->
+            workspace = session.workspace
+            org = workspace && workspace.org
 
-        case parse_int(proof_id) do
-          nil ->
-            {:noreply, proof_not_found(socket)}
+            socket
+            |> assign(:page_title, "#{proof.task.title} — Proofs")
+            |> assign(:proof, proof)
+            |> assign(:memory_hits, related_memory_hits(proof))
+            |> assign(
+              :breadcrumbs,
+              session_breadcrumb_base(org, workspace, session) ++
+                [
+                  %{
+                    label: "Proofs",
+                    to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/proofs"
+                  },
+                  %{label: proof.task.title, to: nil}
+                ]
+            )
 
-          parsed_id ->
-            case Mission.get_proof_bundle_with_context(parsed_id) do
-              %{session_id: ^session_id} = proof ->
-                memory_hits = related_memory_hits(proof)
-                workspace = session.workspace
-                org = workspace && workspace.org
-
-                {:noreply,
-                 socket
-                 |> assign(:page_title, "#{proof.task.title} — Proofs")
-                 |> assign(:proof, proof)
-                 |> assign(:memory_hits, memory_hits)
-                 |> assign(
-                   :breadcrumbs,
-                   session_breadcrumb_base(org, workspace, session) ++
-                     [
-                       %{
-                         label: "Proofs",
-                         to:
-                           "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/proofs"
-                       },
-                       %{label: proof.task.title, to: nil}
-                     ]
-                 )}
-
-              _ ->
-                {:noreply, proof_not_found(socket)}
-            end
+          _ ->
+            proof_not_found(socket)
         end
     end
   end
+
+  @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
 
   @impl true
   def render(%{live_action: :show} = assigns) do
