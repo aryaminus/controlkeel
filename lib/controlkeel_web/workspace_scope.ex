@@ -31,6 +31,7 @@ defmodule ControlKeelWeb.WorkspaceScope do
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Repo
+  alias ControlKeelWeb.OrgAccess
   alias ControlKeelWeb.ScopeError
   alias ControlKeelWeb.WorkspaceAccess
 
@@ -152,13 +153,20 @@ defmodule ControlKeelWeb.WorkspaceScope do
         _ -> :not_found
       end
 
-    assign(
-      socket,
-      :scope_error,
-      ScopeError.workspace(params["org_slug"], params["ws_slug"], kind)
-    )
-    |> assign(:nav_org, nil)
-    |> assign(:nav_workspace, nil)
-    |> assign(:breadcrumbs, [])
+    case OrgAccess.resolve(params["org_slug"], socket.assigns[:current_user]) do
+      {:ok, org, _membership} ->
+        socket
+        |> assign(:scope_error, ScopeError.workspace(params["org_slug"], params["ws_slug"], kind))
+        |> assign(:nav_org, org)
+        |> assign(:nav_workspace, nil)
+        |> assign(:breadcrumbs, [%{label: org.name, to: "/#{org.slug}"}])
+
+      {:error, org_error} ->
+        socket
+        |> assign(:scope_error, org_error)
+        |> assign(:nav_org, nil)
+        |> assign(:nav_workspace, nil)
+        |> assign(:breadcrumbs, [])
+    end
   end
 end

@@ -150,11 +150,13 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
     end
 
     test "renders an in-place error for an unknown workspace slug" do
-      {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
+      {:ok, org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      {:ok, view, _html} = live(build_conn(), ~p"/none/workspaces/no-such-ws")
+      {:ok, view, html} = live(build_conn(), ~p"/none/workspaces/no-such-ws")
 
       assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+      assert html =~ org.name
     end
 
     test "renders an in-place error for an unknown workspace slug regardless of case" do
