@@ -6,16 +6,15 @@ defmodule ControlKeelWeb.LiveAuth do
 
     * `:require_cloud_auth` — in cloud/self_hosted mode requires a signed-in
       user (`current_user`) **with at least one active membership**; users
-      without any membership are redirected to `/organizations` instead of
-      proceeding with effectively global read access. `/organizations`,
-      the standalone `/new/org` creation page, and `/new/session` are exempt
-      so membership-less users can see their invitations and empty state
-      (which points at `/new/org`), create an org, and see why starting a
-      session needs one (issue #141, R3; creation lives at `/new/org` since
-      #277). Signup auto-provisions a personal org
-      (`OAuthLoginController`), so the membership-less branch is a safety
-      net for pre-existing rows, not a reachable flow. In local mode this
-      is a passthrough so local single-user deployments are unaffected.
+      without any membership are redirected to `/new/org` instead of
+      proceeding with effectively global read access. The standalone
+      `/new/org` creation page and `/new/session` are exempt so membership-less
+      users can create an org and see why starting a session needs one
+      (issue #141, R3; creation lives at `/new/org` since #277). Signup
+      auto-provisions a personal org (`OAuthLoginController`), so the
+      membership-less branch is a safety net for pre-existing rows, not a
+      reachable flow. In local mode this is a passthrough so local single-user
+      deployments are unaffected.
 
     * `:load_if_available` — loads the user from session without gating.
       Use for pages that are public in local mode but show org-scoped data when
@@ -52,15 +51,13 @@ defmodule ControlKeelWeb.LiveAuth do
         is_nil(socket.assigns[:current_user]) ->
           {:halt, redirect(socket, to: "/auth/login")}
 
-        # `/organizations`, `/new/org`, and `/new/session` remain available
-        # to membership-less users: the empty state and invitations continue
-        # on `/organizations`, creation happens at `/new/org`, and the
-        # launcher explains why starting a session still needs an org.
-        # Everywhere else requires
-        # membership. Signup auto-provisioning makes this branch unreachable
-        # for new users; it remains as a safety net for pre-existing rows.
+        # `/new/org` and `/new/session` remain available to membership-less
+        # users: creation happens at `/new/org`, and the launcher explains
+        # why starting a session still needs an org.
+        # Every other authenticated page requires membership. Signup
+        # auto-provisioning makes this branch unreachable for new users; it
+        # remains a safety net for pre-existing rows.
         socket.view in [
-          ControlKeelWeb.OrganizationsLive,
           ControlKeelWeb.NewOrgLive,
           ControlKeelWeb.NewSessionLive
         ] ->
@@ -70,7 +67,7 @@ defmodule ControlKeelWeb.LiveAuth do
           {:halt,
            socket
            |> put_flash(:info, "Join or create an organization to continue.")
-           |> redirect(to: "/organizations")}
+           |> redirect(to: "/new/org")}
 
         true ->
           {:cont, attach_membership_eviction(socket)}
@@ -93,8 +90,8 @@ defmodule ControlKeelWeb.LiveAuth do
   #
   # There is no ambient "current org": each page resolves its own org from the
   # URL and keeps the membership in a page-local `:current_membership` assign.
-  # A revocation of that membership sends the visitor to `/organizations` —
-  # the neutral surface every signed-in user can open — so the next page's own
+  # A revocation of that membership sends the visitor to `/new/org` — the
+  # available organization setup surface — so the next page's own
   # access check decides what they may see. A role change refreshes the assign
   # so pages that derive permissions from it re-render in place. Changes to
   # other orgs are ignored; this page is unaffected. We do not sign the user
@@ -126,7 +123,7 @@ defmodule ControlKeelWeb.LiveAuth do
           {:halt,
            socket
            |> put_flash(:info, "Your access to this organization changed.")
-           |> push_navigate(to: "/organizations")}
+           |> push_navigate(to: "/new/org")}
         else
           # Role change: refresh the page-local membership in place so pages
           # that derive permissions from it re-render without a reload.
@@ -137,15 +134,14 @@ defmodule ControlKeelWeb.LiveAuth do
         # This page did not resolve a membership for this org, so there is
         # nothing page-specific to invalidate. A revocation may still have
         # removed the user's last membership; in that case no authenticated
-        # page is valid anymore, so send them to /organizations (open to
-        # memberless users) rather than a login screen. Role changes and
-        # changes in other orgs need no action here.
+        # page is valid anymore, so send them to /new/org rather than a login
+        # screen. Role changes and changes in other orgs need no action here.
         if Map.get(change, :status) == "revoked" and
              not Accounts.any_active_membership?(uid) do
           {:halt,
            socket
            |> put_flash(:info, "You no longer have access to any organization.")
-           |> push_navigate(to: "/organizations")}
+           |> push_navigate(to: "/new/org")}
         else
           {:halt, socket}
         end
