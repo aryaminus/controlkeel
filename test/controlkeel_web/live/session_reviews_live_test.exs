@@ -15,7 +15,10 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
     Repo.delete!(session)
     send(view.pid, :refresh)
 
-    assert_redirect(view, "/")
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
   test "session reviews lists the reviews for the session", %{conn: conn} do
@@ -86,16 +89,28 @@ defmodule ControlKeelWeb.SessionReviewsLiveTest do
     assert refreshed_html =~ "approved"
   end
 
-  test "session reviews redirects when the session does not exist", %{conn: conn} do
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/acme/workspaces/core/sessions/999999/reviews")
+  test "session reviews shows an in-place error when the session does not exist", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/999999/reviews")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
-  test "session reviews redirects when the workspace slug disagrees", %{conn: conn} do
+  test "session reviews shows an in-place error when the workspace slug disagrees", %{conn: conn} do
     {org, _ws, session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => _}}}} =
-             live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/reviews")
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/reviews")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
   test "session breadcrumb offers a switcher with sibling sessions", %{conn: conn} do
