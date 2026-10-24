@@ -149,34 +149,36 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert html =~ "No sessions yet."
     end
 
-    test "redirects for an unknown workspace slug" do
-      {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
+    test "renders an in-place error for an unknown workspace slug" do
+      {:ok, org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/no-such-ws")
+      {:ok, view, html} = live(build_conn(), ~p"/none/workspaces/no-such-ws")
 
-      assert msg =~ "Workspace not found."
+      assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+      assert has_element?(view, "#sidebar-org-nav")
+      assert has_element?(view, "nav[aria-label='Breadcrumb'] a[href='/none']")
+      assert html =~ org.name
+      refute has_element?(view, "a[href='/none/workspaces/no-such-ws']")
     end
 
-    test "redirects for an unknown workspace slug regardless of case" do
+    test "renders an in-place error for an unknown workspace slug regardless of case" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/NO-SUCH-WS")
+      {:ok, view, _html} = live(build_conn(), ~p"/none/workspaces/NO-SUCH-WS")
 
-      assert msg =~ "Workspace not found."
+      assert has_element?(view, "[data-scope-error]")
     end
 
-    test "redirects when the workspace belongs to a different org slug" do
+    test "renders an in-place error when the workspace belongs to a different org slug" do
       {:ok, org_a} = Accounts.create_org(%{name: "Org A", slug: "org-a"})
 
       ws =
         create_workspace(%{name: "Belongs To A", slug: "a-ws", industry: "web", org_id: org_a.id})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/org-b/workspaces/#{ws.slug}")
+      {:ok, view, _html} = live(build_conn(), ~p"/org-b/workspaces/#{ws.slug}")
 
-      assert msg =~ "does not belong to this organization"
+      assert has_element?(view, "[data-scope-error]")
     end
   end
 
@@ -211,6 +213,23 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       assert html =~ "Scoped"
       assert html =~ "Scoped"
+    end
+
+    test "a member sees the org scope when the workspace slug is unknown" do
+      owner = create_user!("ws-missing-owner@example.com")
+
+      {:ok, org} =
+        Accounts.create_org_with_owner(owner.id, %{name: "MissingCo", slug: "missingco"})
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{"current_user_id" => owner.id})
+
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/workspaces/invalid")
+
+      assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+      assert has_element?(view, "nav[aria-label='Breadcrumb'] a[href='/#{org.slug}']")
     end
 
     test "a viewer role member of the workspace's org can view it" do
@@ -308,10 +327,9 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_user_id" => outsider.id
         })
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/a/workspaces/#{ws_a.slug}")
+      {:ok, view, _html} = live(conn, ~p"/a/workspaces/#{ws_a.slug}")
 
-      assert msg =~ "Workspace belongs to a different organization."
+      assert has_element?(view, "[data-scope-error]")
     end
   end
 

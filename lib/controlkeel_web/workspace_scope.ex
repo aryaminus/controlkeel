@@ -11,9 +11,9 @@ defmodule ControlKeelWeb.WorkspaceScope do
     3. the visitor must pass `ControlKeelWeb.WorkspaceAccess.check_membership/3`
        for that workspace's organization at the page's `required_role`.
 
-  On success the page gets the org chrome it shares with every other
-  workspace page (`:workspace`, `:nav_org`, `:nav_workspace`, `:breadcrumbs`)
-  plus `:current_membership` — the membership the page was admitted with.
+  On success the page gets the organization context derived from its
+  workspace (`:workspace`, `:nav_org`, `:nav_workspace`, `:breadcrumbs`) plus
+  `:current_membership` — the membership the page was admitted with.
   Keeping that assign page-local is what lets `ControlKeelWeb.LiveAuth` evict
   the page when the membership is revoked and re-render permission-derived UI
   when the role changes.
@@ -27,26 +27,30 @@ defmodule ControlKeelWeb.WorkspaceScope do
   """
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [put_flash: 3, push_navigate: 2]
+  import Phoenix.LiveView, only: [attach_hook: 4]
 
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Repo
+  alias ControlKeelWeb.OrgAccess
+  alias ControlKeelWeb.ScopeError
   alias ControlKeelWeb.WorkspaceAccess
-
-  @organizations_path "/organizations"
 
   @doc """
   Resolves the URL workspace, checks access, and assigns the shared chrome.
 
-  `label` is the trailing breadcrumb ("Benchmark", "Trends", …). Returns
-  `{:redirect, socket}` with the error flash and navigation already applied
-  when the workspace is missing, belongs to another organization, or is not
-  accessible to the visitor.
+  `label` is the trailing breadcrumb ("Benchmark", "Trends", …), or `nil` for
+  the workspace overview. Returns
+  `{:error, socket}` with `:scope_error` assigned when the workspace is
+  missing, belongs to another organization, or is not accessible to the
+  visitor. The organization layout renders the in-place panel at the requested
+  URL, so the visitor is not navigated away from the scope that failed.
   """
-  @spec assign_scope(Phoenix.LiveView.Socket.t(), map(), String.t(), String.t()) ::
-          {:ok, Phoenix.LiveView.Socket.t()} | {:redirect, Phoenix.LiveView.Socket.t()}
+  @spec assign_scope(Phoenix.LiveView.Socket.t(), map(), String.t() | nil, String.t()) ::
+          {:ok, Phoenix.LiveView.Socket.t()} | {:error, Phoenix.LiveView.Socket.t()}
   def assign_scope(socket, params, label, required_role \\ "viewer") do
+    socket = ensure_scope_event_guard(socket)
+
     with {:ok, workspace} <- fetch_workspace(params),
          :ok <- check_org_slug(workspace, params["org_slug"]),
          {:ok, membership} <-
@@ -62,6 +66,7 @@ defmodule ControlKeelWeb.WorkspaceScope do
        |> assign(:nav_workspace, workspace)
        |> assign(:current_membership, membership)
        |> assign(:breadcrumbs, breadcrumbs(workspace, label))
+       |> assign(:scope_error, nil)
        |> assign(:workspace_scope, %{
          org_slug: workspace.org.slug,
          ws_slug: workspace.slug,
@@ -70,7 +75,7 @@ defmodule ControlKeelWeb.WorkspaceScope do
        })}
     else
       {:error, reason} ->
-        {:redirect, redirect_with_flash(socket, reason_message(reason, required_role))}
+        {:error, assign_scope_error(socket, params, reason, required_role)}
     end
   end
 
@@ -80,24 +85,26 @@ defmodule ControlKeelWeb.WorkspaceScope do
   Returns `{:ok, socket, changed?}` when the URL still names an accessible
   workspace. `changed?` is `true` when the URL names a different workspace
   (or organization) than the one mounted, so the caller reloads its page
-  data. Returns `{:redirect, socket}` when the new URL is not accessible.
+  data. Returns `{:error, socket}` with `:scope_error` assigned when the new
+  URL is not accessible.
   """
   @spec refresh(Phoenix.LiveView.Socket.t(), map()) ::
-          {:ok, Phoenix.LiveView.Socket.t(), boolean()} | {:redirect, Phoenix.LiveView.Socket.t()}
+          {:ok, Phoenix.LiveView.Socket.t(), boolean()} | {:error, Phoenix.LiveView.Socket.t()}
   def refresh(socket, params) do
     case socket.assigns[:workspace_scope] do
       %{org_slug: org_slug, ws_slug: ws_slug} = meta ->
-        if params["org_slug"] == org_slug and params["ws_slug"] == ws_slug do
+        if params["org_slug"] == org_slug and params["ws_slug"] == ws_slug and
+             is_nil(socket.assigns[:scope_error]) do
           {:ok, socket, false}
         else
           case assign_scope(socket, params, meta.label, meta.required_role) do
             {:ok, socket} -> {:ok, socket, true}
-            {:redirect, socket} -> {:redirect, socket}
+            {:error, socket} -> {:error, socket}
           end
         end
 
       _ ->
-        # Nothing to re-resolve (page is already redirecting).
+        # Nothing to re-resolve (the page already has a scope error).
         {:ok, socket, false}
     end
   end
@@ -113,7 +120,7 @@ defmodule ControlKeelWeb.WorkspaceScope do
     case refresh(socket, params) do
       {:ok, socket, true} -> {:noreply, reload.(socket, params)}
       {:ok, socket, false} -> {:noreply, socket}
-      {:redirect, socket} -> {:noreply, socket}
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
@@ -130,31 +137,60 @@ defmodule ControlKeelWeb.WorkspaceScope do
   defp check_org_slug(_workspace, _slug), do: {:error, :wrong_org}
 
   defp breadcrumbs(workspace, label) do
+    workspace_breadcrumb = %{
+      label: workspace.name,
+      to: if(is_nil(label), do: nil, else: "/#{workspace.org.slug}/workspaces/#{workspace.slug}")
+    }
+
     [
       %{label: workspace.org.name, to: "/#{workspace.org.slug}"},
-      %{label: workspace.name, to: "/#{workspace.org.slug}/workspaces/#{workspace.slug}"},
-      %{label: label, to: nil}
-    ]
+      workspace_breadcrumb
+    ] ++ if(is_nil(label), do: [], else: [%{label: label, to: nil}])
   end
 
-  defp redirect_with_flash(socket, message) do
+  defp assign_scope_error(socket, params, reason, _required_role) do
+    kind =
+      case reason do
+        :forbidden -> :forbidden
+        :needs_admin -> :needs_admin
+        _ -> :not_found
+      end
+
+    socket = assign(socket, :workspace, nil)
+
+    case OrgAccess.resolve(params["org_slug"], socket.assigns[:current_user]) do
+      {:ok, org, membership} ->
+        socket
+        |> assign(:scope_error, ScopeError.workspace(params["org_slug"], params["ws_slug"], kind))
+        |> assign(:nav_org, org)
+        |> assign(:nav_workspace, nil)
+        |> assign(:nav_session, nil)
+        |> assign(:current_membership, membership)
+        |> assign(:breadcrumbs, [%{label: org.name, to: "/#{org.slug}"}])
+
+      {:error, org_error} ->
+        socket
+        |> assign(:scope_error, org_error)
+        |> assign(:nav_org, nil)
+        |> assign(:nav_workspace, nil)
+        |> assign(:nav_session, nil)
+        |> assign(:current_membership, nil)
+        |> assign(:breadcrumbs, [])
+    end
+  end
+
+  defp reject_invalid_scope(_event, _params, %{assigns: %{scope_error: error}} = socket)
+       when not is_nil(error),
+       do: {:halt, socket}
+
+  defp reject_invalid_scope(_event, _params, socket), do: {:cont, socket}
+
+  defp ensure_scope_event_guard(%{assigns: %{workspace_scope_guard_attached: true}} = socket),
+    do: socket
+
+  defp ensure_scope_event_guard(socket) do
     socket
-    |> put_flash(:error, message)
-    |> push_navigate(to: @organizations_path)
+    |> attach_hook(:workspace_scope_guard, :handle_event, &reject_invalid_scope/3)
+    |> assign(:workspace_scope_guard_attached, true)
   end
-
-  defp reason_message(:not_found, _required_role), do: "Workspace not found."
-
-  defp reason_message(:wrong_org, _required_role),
-    do: "Workspace does not belong to this organization."
-
-  defp reason_message(:unbound, _required_role), do: "Workspace is not bound to an org."
-
-  defp reason_message(:forbidden, _required_role),
-    do: "Workspace belongs to a different organization."
-
-  # Unreachable for read surfaces (`required_role` is "viewer"), kept for the
-  # admin surfaces that adopt this module.
-  defp reason_message(:needs_admin, "viewer"), do: "This workspace requires an active membership."
-  defp reason_message(:needs_admin, _required_role), do: "Admin or owner role required."
 end
