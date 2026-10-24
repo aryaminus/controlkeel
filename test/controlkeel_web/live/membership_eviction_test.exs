@@ -111,6 +111,29 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
   end
 
   describe "WorkspaceDetailLive" do
+    test "revoking membership from a missing-workspace page redirects" do
+      org = create_org!("missing-workspace")
+      user = create_user!("missing-workspace")
+      membership = create_membership!(user, org, "viewer")
+      other_org = create_org!("still-member")
+      create_membership!(user, other_org, "viewer")
+
+      owner = create_user!("missing-workspace-owner")
+      create_membership!(owner, org, "owner")
+
+      {:ok, view, _html} =
+        live(conn_for(user), ~p"/#{org.slug}/workspaces/does-not-exist")
+
+      assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+
+      assert {:ok, %Accounts.Membership{status: "revoked"}} =
+               Accounts.revoke_membership(membership.id, owner.id)
+
+      assert %{"info" => "Your access to this organization changed."} =
+               assert_redirect(view, "/organizations")
+    end
+
     test "revoking the page's membership redirects while other memberships remain" do
       {org, user, membership, workspace} = org_with_workspace!()
 
@@ -365,6 +388,27 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
       assert has_element?(view, "[data-scope-error]")
       refute has_element?(view, "#observability-overview-page")
       refute_redirected(view)
+    end
+
+    test "patching to an inaccessible workspace blocks stale workspace mutations" do
+      {org, user, _membership, workspace} = org_with_workspace!("admin")
+      other_org = create_org!("no-workspace-access")
+      other_workspace = create_workspace!(other_org)
+
+      {:ok, view, _html} =
+        live(conn_for(user), ~p"/#{org.slug}/workspaces/#{workspace.slug}/settings")
+
+      render_patch(view, ~p"/#{other_org.slug}/workspaces/#{other_workspace.slug}/settings")
+
+      assert has_element?(view, "[data-scope-error]")
+      assert Accounts.get_workspace_tool_policy(workspace.id).mode == "inherit"
+
+      render_submit(view, "submit", %{
+        "policy" => %{"mode" => "denylist", "tools" => "mcp__controlkeel__ck_validate"}
+      })
+
+      assert Accounts.get_workspace_tool_policy(workspace.id).mode == "inherit"
+      assert has_element?(view, "[data-scope-error]")
     end
 
     test "local mode renders without a membership" do

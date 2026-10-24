@@ -27,6 +27,7 @@ defmodule ControlKeelWeb.WorkspaceScope do
   """
 
   import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [attach_hook: 4]
 
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Workspace
@@ -48,6 +49,8 @@ defmodule ControlKeelWeb.WorkspaceScope do
   @spec assign_scope(Phoenix.LiveView.Socket.t(), map(), String.t() | nil, String.t()) ::
           {:ok, Phoenix.LiveView.Socket.t()} | {:error, Phoenix.LiveView.Socket.t()}
   def assign_scope(socket, params, label, required_role \\ "viewer") do
+    socket = ensure_scope_event_guard(socket)
+
     with {:ok, workspace} <- fetch_workspace(params),
          :ok <- check_org_slug(workspace, params["org_slug"]),
          {:ok, membership} <-
@@ -153,12 +156,16 @@ defmodule ControlKeelWeb.WorkspaceScope do
         _ -> :not_found
       end
 
+    socket = assign(socket, :workspace, nil)
+
     case OrgAccess.resolve(params["org_slug"], socket.assigns[:current_user]) do
-      {:ok, org, _membership} ->
+      {:ok, org, membership} ->
         socket
         |> assign(:scope_error, ScopeError.workspace(params["org_slug"], params["ws_slug"], kind))
         |> assign(:nav_org, org)
         |> assign(:nav_workspace, nil)
+        |> assign(:nav_session, nil)
+        |> assign(:current_membership, membership)
         |> assign(:breadcrumbs, [%{label: org.name, to: "/#{org.slug}"}])
 
       {:error, org_error} ->
@@ -166,7 +173,24 @@ defmodule ControlKeelWeb.WorkspaceScope do
         |> assign(:scope_error, org_error)
         |> assign(:nav_org, nil)
         |> assign(:nav_workspace, nil)
+        |> assign(:nav_session, nil)
+        |> assign(:current_membership, nil)
         |> assign(:breadcrumbs, [])
     end
+  end
+
+  defp reject_invalid_scope(_event, _params, %{assigns: %{scope_error: error}} = socket)
+       when not is_nil(error),
+       do: {:halt, socket}
+
+  defp reject_invalid_scope(_event, _params, socket), do: {:cont, socket}
+
+  defp ensure_scope_event_guard(%{assigns: %{workspace_scope_guard_attached: true}} = socket),
+    do: socket
+
+  defp ensure_scope_event_guard(socket) do
+    socket
+    |> attach_hook(:workspace_scope_guard, :handle_event, &reject_invalid_scope/3)
+    |> assign(:workspace_scope_guard_attached, true)
   end
 end
