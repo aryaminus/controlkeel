@@ -149,34 +149,31 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert html =~ "No sessions yet."
     end
 
-    test "redirects for an unknown workspace slug" do
+    test "renders an in-place error for an unknown workspace slug" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/no-such-ws")
+      {:ok, view, _html} = live(build_conn(), ~p"/none/workspaces/no-such-ws")
 
-      assert msg =~ "Workspace not found."
+      assert has_element?(view, "[data-scope-error]")
     end
 
-    test "redirects for an unknown workspace slug regardless of case" do
+    test "renders an in-place error for an unknown workspace slug regardless of case" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/NO-SUCH-WS")
+      {:ok, view, _html} = live(build_conn(), ~p"/none/workspaces/NO-SUCH-WS")
 
-      assert msg =~ "Workspace not found."
+      assert has_element?(view, "[data-scope-error]")
     end
 
-    test "redirects when the workspace belongs to a different org slug" do
+    test "renders an in-place error when the workspace belongs to a different org slug" do
       {:ok, org_a} = Accounts.create_org(%{name: "Org A", slug: "org-a"})
 
       ws =
         create_workspace(%{name: "Belongs To A", slug: "a-ws", industry: "web", org_id: org_a.id})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/org-b/workspaces/#{ws.slug}")
+      {:ok, view, _html} = live(build_conn(), ~p"/org-b/workspaces/#{ws.slug}")
 
-      assert msg =~ "does not belong to this organization"
+      assert has_element?(view, "[data-scope-error]")
     end
   end
 
@@ -308,10 +305,9 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_user_id" => outsider.id
         })
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/a/workspaces/#{ws_a.slug}")
+      {:ok, view, _html} = live(conn, ~p"/a/workspaces/#{ws_a.slug}")
 
-      assert msg =~ "Workspace belongs to a different organization."
+      assert has_element?(view, "[data-scope-error]")
     end
   end
 

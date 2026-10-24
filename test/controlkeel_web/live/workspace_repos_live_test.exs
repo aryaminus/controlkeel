@@ -52,22 +52,21 @@ defmodule ControlKeelWeb.WorkspaceReposLiveTest do
     assert html =~ "aria-current=\"page\""
   end
 
-  test "wrong org slug redirects to organizations" do
+  test "wrong org slug renders an in-place scope error" do
     {_org, ws, owner} = org_workspace!()
     org = %{id: -1, slug: "reposco"}
 
-    assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-             live(conn_for(owner, org), ~p"/other/workspaces/#{ws.slug}/repos")
+    {:ok, view, _html} = live(conn_for(owner, org), ~p"/other/workspaces/#{ws.slug}/repos")
 
-    assert msg =~ "does not belong to this organization"
+    assert has_element?(view, "[data-scope-error]")
   end
 
-  test "unknown workspace slug redirects to organizations" do
+  test "unknown workspace slug renders an in-place scope error" do
     {org, _ws, owner} = org_workspace!()
 
-    assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-             live(conn_for(owner, org), ~p"/reposco/workspaces/no-such-ws/repos")
+    {:ok, view, _html} =
+      live(conn_for(owner, org), ~p"/reposco/workspaces/no-such-ws/repos")
 
-    assert msg =~ "Workspace not found."
+    assert has_element?(view, "[data-scope-error]")
   end
 end

@@ -13,7 +13,7 @@ defmodule ControlKeelWeb.ObservabilityPromotionsLive do
          |> assign(:page_title, "Observability Promotion Candidates")
          |> load_page(params)}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:ok, socket}
     end
   end
@@ -29,6 +29,8 @@ defmodule ControlKeelWeb.ObservabilityPromotionsLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-promotions" class="w-full space-y-5">

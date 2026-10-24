@@ -3,59 +3,30 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
   Workspace GitHub repository bindings at `/:org_slug/workspaces/:ws_slug/repos`.
 
   Admin+owner of the workspace's org can bind / unbind / list
-  `WorkspaceGithubRepo` records. Access is gated by `WorkspaceAccess` on the
-  workspace's own org, so a workspace belonging to another org is rejected.
+  `WorkspaceGithubRepo` records. `WorkspaceScope` resolves organization
+  context from the workspace and rejects a mismatched org URL.
   """
 
   use ControlKeelWeb, :live_view
 
-  alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Org
   alias ControlKeel.Mission
-  alias ControlKeel.Mission.Workspace
-  alias ControlKeel.Repo
-  alias ControlKeelWeb.ScopeError
-  alias ControlKeelWeb.WorkspaceAccess
+  alias ControlKeelWeb.WorkspaceScope
 
   @impl true
-  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug}, _session, socket) do
-    with %Workspace{} = workspace <-
-           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
-         :ok <- check_org_slug(workspace, %{slug: slug}),
-         {:ok, current_membership} <- check_workspace_access(workspace, socket.assigns) do
-      {:ok,
-       socket
-       |> assign(:page_title, "Repositories — #{workspace.name}")
-       |> assign(:workspace, workspace)
-       |> assign(:current_membership, current_membership)
-       |> assign(:nav_org, workspace.org)
-       |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{
-             label: workspace.name,
-             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
-           },
-           %{label: "Repositories", to: nil}
-         ]
-       )
-       |> assign(:repos, Mission.list_github_repos(workspace.id))
-       |> assign(:bind_form, to_form(empty_bind_params(), as: :bind))
-       |> assign(:bind_error, nil)}
-    else
-      nil ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Workspace not found.")
-         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
+  def mount(params, _session, socket) do
+    case WorkspaceScope.assign_scope(socket, params, "Repositories", "admin") do
+      {:ok, socket} ->
+        workspace = socket.assigns.workspace
 
-      {:error, reason} ->
         {:ok,
          socket
-         |> put_flash(:error, reason)
-         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
+         |> assign(:page_title, "Repositories — #{workspace.name}")
+         |> assign(:repos, Mission.list_github_repos(workspace.id))
+         |> assign(:bind_form, to_form(empty_bind_params(), as: :bind))
+         |> assign(:bind_error, nil)}
+
+      {:error, socket} ->
+        {:ok, socket}
     end
   end
 
@@ -233,26 +204,6 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
   end
 
   # ── Private ─────────────────────────────────────────────────────────
-
-  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
-    case Accounts.get_org_by_slug(slug) do
-      %Org{id: ^org_id} -> :ok
-      _ -> {:error, "Workspace does not belong to this organization."}
-    end
-  end
-
-  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
-
-  # Workspace admin surface: org-bound workspace + active admin/owner
-  # membership, resolved from (user, resource) via the shared gate.
-  defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check_membership(workspace, assigns[:current_user], "admin") do
-      {:ok, membership} -> {:ok, membership}
-      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
-      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
-      {:error, :needs_admin} -> {:error, "Admin or owner role required to manage repositories."}
-    end
-  end
 
   defp empty_bind_params do
     %{"owner" => "", "repo" => "", "default_branch" => "", "installation_id" => ""}

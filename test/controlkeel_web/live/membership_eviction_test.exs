@@ -348,7 +348,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
       assert element(view, "#observability-overview-runs") |> render() =~ "2 recent"
     end
 
-    test "patching to an inaccessible organization's workspace redirects" do
+    test "patching to an inaccessible organization's workspace renders an in-place scope error" do
       {org, user, _membership, workspace} = org_with_workspace!("viewer")
 
       other_org = create_org!("no-membership")
@@ -359,10 +359,12 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
 
       assert html =~ workspace.name
 
-      render_patch(view, ~p"/#{other_org.slug}/workspaces/#{other_workspace.slug}/observability")
+      path = ~p"/#{other_org.slug}/workspaces/#{other_workspace.slug}/observability"
+      render_patch(view, path)
 
-      assert %{"error" => "Workspace belongs to a different organization."} =
-               assert_redirect(view, "/organizations")
+      assert has_element?(view, "[data-scope-error]")
+      refute has_element?(view, "#observability-overview-page")
+      refute_redirected(view)
     end
 
     test "local mode renders without a membership" do

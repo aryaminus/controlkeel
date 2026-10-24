@@ -13,67 +13,37 @@ defmodule ControlKeelWeb.WorkspaceToolPolicyLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Org
   alias ControlKeel.Accounts.WorkspaceToolPolicy
-  alias ControlKeel.Mission
-  alias ControlKeel.Mission.Workspace
-  alias ControlKeel.Repo
-  alias ControlKeelWeb.ScopeError
-  alias ControlKeelWeb.WorkspaceAccess
+  alias ControlKeelWeb.WorkspaceScope
 
   @impl true
-  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug}, _session, socket) do
-    with %Workspace{} = workspace <-
-           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
-         :ok <- check_org_slug(workspace, %{slug: slug}),
-         {:ok, current_membership} <- check_workspace_access(workspace, socket.assigns) do
-      policy = Accounts.get_workspace_tool_policy(workspace.id)
-      tools = WorkspaceToolPolicy.decode_tools(policy)
+  def mount(params, _session, socket) do
+    case WorkspaceScope.assign_scope(socket, params, "Tool policy", "admin") do
+      {:ok, socket} ->
+        workspace = socket.assigns.workspace
+        policy = Accounts.get_workspace_tool_policy(workspace.id)
+        tools = WorkspaceToolPolicy.decode_tools(policy)
 
-      {:ok,
-       socket
-       |> assign(:page_title, "Tool policy — #{workspace.name}")
-       |> assign(:workspace, workspace)
-       |> assign(:current_membership, current_membership)
-       |> assign(:nav_org, workspace.org)
-       |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{
-             label: workspace.name,
-             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
-           },
-           %{label: "Tool policy", to: nil}
-         ]
-       )
-       |> assign(:policy, policy)
-       |> assign(:modes, WorkspaceToolPolicy.modes())
-       |> assign(
-         :form,
-         to_form(
-           %{
-             "mode" => policy.mode,
-             "tools" => Enum.join(tools, "\n")
-           },
-           as: :policy
+        {:ok,
+         socket
+         |> assign(:page_title, "Tool policy — #{workspace.name}")
+         |> assign(:policy, policy)
+         |> assign(:modes, WorkspaceToolPolicy.modes())
+         |> assign(
+           :form,
+           to_form(
+             %{
+               "mode" => policy.mode,
+               "tools" => Enum.join(tools, "\n")
+             },
+             as: :policy
+           )
          )
-       )
-       |> assign(:saved, false)
-       |> assign(:error, nil)}
-    else
-      nil ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Workspace not found.")
-         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
+         |> assign(:saved, false)
+         |> assign(:error, nil)}
 
-      {:error, reason} ->
-        {:ok,
-         socket
-         |> put_flash(:error, reason)
-         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
+      {:error, socket} ->
+        {:ok, socket}
     end
   end
 
@@ -178,24 +148,4 @@ defmodule ControlKeelWeb.WorkspaceToolPolicyLive do
   end
 
   defp parse_tools(_), do: []
-
-  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
-    case Accounts.get_org_by_slug(slug) do
-      %Org{id: ^org_id} -> :ok
-      _ -> {:error, "Workspace does not belong to this organization."}
-    end
-  end
-
-  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
-
-  # Workspace admin surface: org-bound workspace + active admin/owner
-  # membership, resolved from (user, resource) via the shared gate.
-  defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check_membership(workspace, assigns[:current_user], "admin") do
-      {:ok, membership} -> {:ok, membership}
-      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
-      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
-      {:error, :needs_admin} -> {:error, "Admin or owner role required."}
-    end
-  end
 end

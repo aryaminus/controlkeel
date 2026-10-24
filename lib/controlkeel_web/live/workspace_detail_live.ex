@@ -11,66 +11,31 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Org
   alias ControlKeel.Accounts.WorkspaceToolPolicy
   alias ControlKeel.MCP.ToolGroups
   alias ControlKeel.Mission
-  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform
-  alias ControlKeel.Repo
-  alias ControlKeelWeb.ScopeError
-  alias ControlKeelWeb.WorkspaceAccess
+  alias ControlKeelWeb.WorkspaceScope
 
   @impl true
-  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
-    with %Workspace{} = workspace <-
-           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
-         :ok <- check_org_slug(workspace, %{slug: slug}),
-         {:ok, current_membership} <- check_workspace_access(workspace, socket.assigns) do
-      sessions = Mission.list_all_sessions(workspace.id)
-      tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
+  def mount(params, _session, socket) do
+    case WorkspaceScope.assign_scope(socket, params, nil) do
+      {:ok, socket} ->
+        workspace = socket.assigns.workspace
+        tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
 
-      {:ok,
-       socket
-       |> assign(:page_title, workspace.name)
-       |> assign(:workspace, workspace)
-       |> assign(:current_membership, current_membership)
-       |> assign(:nav_org, workspace.org)
-       |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{label: workspace.name, to: nil}
-         ]
-       )
-       |> assign(:sessions, sessions)
-       |> assign(:policy_assignments, Platform.list_workspace_policy_assignments(workspace.id))
-       |> assign(:tool_policy_mode, tool_policy.mode)
-       |> assign(:tool_policy_tools, WorkspaceToolPolicy.decode_tools(tool_policy))}
-    else
-      nil ->
         {:ok,
          socket
-         |> put_flash(:error, "Workspace not found.")
-         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
+         |> assign(:page_title, workspace.name)
+         |> assign(:sessions, Mission.list_all_sessions(workspace.id))
+         |> assign(:policy_assignments, Platform.list_workspace_policy_assignments(workspace.id))
+         |> assign(:tool_policy_mode, tool_policy.mode)
+         |> assign(:tool_policy_tools, WorkspaceToolPolicy.decode_tools(tool_policy))}
 
-      {:error, reason} ->
-        {:ok,
-         socket
-         |> put_flash(:error, reason)
-         |> assign(:scope_error, ScopeError.workspace(slug, ws_slug))}
+      {:error, socket} ->
+        {:ok, socket}
     end
   end
-
-  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
-    case Accounts.get_org_by_slug(slug) do
-      %Org{id: ^org_id} -> :ok
-      _ -> {:error, "Workspace does not belong to this organization."}
-    end
-  end
-
-  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
 
   @impl true
   def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
@@ -330,15 +295,5 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
       </div>
     </section>
     """
-  end
-
-  # Workspace read surface: org-bound workspace + any active membership,
-  # resolved from (user, resource) via the shared gate.
-  defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check_membership(workspace, assigns[:current_user]) do
-      {:ok, membership} -> {:ok, membership}
-      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
-      {:error, _} -> {:error, "Workspace belongs to a different organization."}
-    end
   end
 end
