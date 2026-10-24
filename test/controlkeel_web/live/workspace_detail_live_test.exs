@@ -156,7 +156,10 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       assert has_element?(view, "[data-scope-error]")
       assert has_element?(view, "#app-sidebar")
+      assert has_element?(view, "#sidebar-org-nav")
+      assert has_element?(view, "nav[aria-label='Breadcrumb'] a[href='/none']")
       assert html =~ org.name
+      refute has_element?(view, "a[href='/none/workspaces/no-such-ws']")
     end
 
     test "renders an in-place error for an unknown workspace slug regardless of case" do
@@ -210,6 +213,23 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       assert html =~ "Scoped"
       assert html =~ "Scoped"
+    end
+
+    test "a member sees the org scope when the workspace slug is unknown" do
+      owner = create_user!("ws-missing-owner@example.com")
+
+      {:ok, org} =
+        Accounts.create_org_with_owner(owner.id, %{name: "MissingCo", slug: "missingco"})
+
+      conn =
+        build_conn()
+        |> Plug.Test.init_test_session(%{"current_user_id" => owner.id})
+
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/workspaces/invalid")
+
+      assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+      assert has_element?(view, "nav[aria-label='Breadcrumb'] a[href='/#{org.slug}']")
     end
 
     test "a viewer role member of the workspace's org can view it" do
