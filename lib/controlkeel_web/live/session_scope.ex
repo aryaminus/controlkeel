@@ -54,20 +54,16 @@ defmodule ControlKeelWeb.SessionScope do
         {:error, socket}
 
       session ->
-        if Accounts.session_accessible?(session, socket.assigns[:current_user]) and
-             check_scope(session, org_slug, ws_slug) == :ok do
-          membership =
-            case WorkspaceAccess.check_membership(
-                   session.workspace,
-                   socket.assigns[:current_user]
-                 ) do
-              {:ok, membership} -> membership
-              {:error, _reason} -> nil
-            end
-
-          {:ok, session, Phoenix.Component.assign(socket, :current_membership, membership)}
+        with true <- Accounts.session_accessible?(session, socket.assigns[:current_user]),
+             :ok <- check_scope(session, org_slug, ws_slug),
+             {:ok, membership} <-
+               WorkspaceAccess.check_membership(
+                 session.workspace,
+                 socket.assigns[:current_user]
+               ) do
+          {:ok, session, assign(socket, :current_membership, membership)}
         else
-          {:error, socket}
+          _ -> {:error, socket}
         end
     end
   end
@@ -132,7 +128,10 @@ defmodule ControlKeelWeb.SessionScope do
         {:error, :not_found}
 
       true ->
-        {:ok, session}
+        case WorkspaceAccess.check_membership(workspace, current_user) do
+          {:ok, _membership} -> {:ok, session}
+          {:error, _reason} -> {:error, :not_found}
+        end
     end
   end
 

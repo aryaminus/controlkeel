@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import ControlKeel.MissionFixtures
 
   alias ControlKeel.Accounts
   alias ControlKeel.Mission
@@ -276,6 +277,29 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
   end
 
   describe "session-scoped pages" do
+    test "task mutations reauthorize after cloud membership is revoked" do
+      {org, user, membership, workspace} = org_with_workspace!("admin")
+      session = create_session!(workspace, "Task mutation authorization")
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      {:ok, view, _html} =
+        live(
+          conn_for(user),
+          "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/tasks"
+        )
+
+      # Update without broadcasting to model an action arriving before the
+      # connected LiveView processes its membership-change notification.
+      membership
+      |> Ecto.Changeset.change(status: "revoked")
+      |> Repo.update!()
+
+      render_click(view, "pause_task", %{"id" => task.id})
+
+      assert Mission.get_task!(task.id).status == "in_progress"
+      assert has_element?(view, "[data-scope-error]")
+    end
+
     test "invalid session ids render in place with workspace navigation across session pages" do
       for surface <- ["root" | @session_surfaces] do
         {org, user, _membership, workspace} = org_with_workspace!("viewer")

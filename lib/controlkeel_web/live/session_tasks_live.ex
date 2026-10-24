@@ -80,7 +80,8 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
   @impl true
   def handle_event("complete_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
+    with :ok <- authorize_mutation(socket),
+         {:ok, task_id} <- parse_id(id),
          %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
          {:ok, task} <- Mission.complete_task(task.id) do
       {:noreply,
@@ -96,6 +97,9 @@ defmodule ControlKeelWeb.SessionTasksLive do
            "#{length(findings)} unresolved finding(s) must be approved or resolved before marking this task done."
          )}
 
+      {:error, %Phoenix.LiveView.Socket{} = socket} ->
+        {:noreply, socket}
+
       {:error, :proof_not_ready, reason} when is_binary(reason) ->
         {:noreply, put_flash(socket, :error, reason)}
 
@@ -109,7 +113,8 @@ defmodule ControlKeelWeb.SessionTasksLive do
 
   @impl true
   def handle_event("generate_proof", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
+    with :ok <- authorize_mutation(socket),
+         {:ok, task_id} <- parse_id(id),
          %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
          {:ok, _proof} <- Mission.generate_proof_bundle(task.id),
          session when not is_nil(session) <-
@@ -125,13 +130,18 @@ defmodule ControlKeelWeb.SessionTasksLive do
           {:noreply, SessionScope.session_not_found(socket)}
       end
     else
-      _error -> {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
+      {:error, %Phoenix.LiveView.Socket{} = socket} ->
+        {:noreply, socket}
+
+      _error ->
+        {:noreply, put_flash(socket, :error, "Could not generate proof bundle.")}
     end
   end
 
   @impl true
   def handle_event("pause_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
+    with :ok <- authorize_mutation(socket),
+         {:ok, task_id} <- parse_id(id),
          %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
          {:ok, _result} <- Mission.pause_task(task.id, "session_tasks"),
          session when not is_nil(session) <-
@@ -147,13 +157,18 @@ defmodule ControlKeelWeb.SessionTasksLive do
           {:noreply, SessionScope.session_not_found(socket)}
       end
     else
-      _error -> {:noreply, put_flash(socket, :error, "Could not pause task.")}
+      {:error, %Phoenix.LiveView.Socket{} = socket} ->
+        {:noreply, socket}
+
+      _error ->
+        {:noreply, put_flash(socket, :error, "Could not pause task.")}
     end
   end
 
   @impl true
   def handle_event("resume_task", %{"id" => id}, socket) do
-    with {:ok, task_id} <- parse_id(id),
+    with :ok <- authorize_mutation(socket),
+         {:ok, task_id} <- parse_id(id),
          %{} = task <- Enum.find(socket.assigns.session.tasks, &(&1.id == task_id)),
          {:ok, _result} <- Mission.resume_task(task.id, "session_tasks"),
          session when not is_nil(session) <-
@@ -169,7 +184,18 @@ defmodule ControlKeelWeb.SessionTasksLive do
           {:noreply, SessionScope.session_not_found(socket)}
       end
     else
-      _error -> {:noreply, put_flash(socket, :error, "Could not resume task.")}
+      {:error, %Phoenix.LiveView.Socket{} = socket} ->
+        {:noreply, socket}
+
+      _error ->
+        {:noreply, put_flash(socket, :error, "Could not resume task.")}
+    end
+  end
+
+  defp authorize_mutation(socket) do
+    case SessionScope.reauthorize(socket, socket.assigns.session) do
+      {:ok, _session} -> :ok
+      {:error, :not_found} -> {:error, SessionScope.session_not_found(socket)}
     end
   end
 
