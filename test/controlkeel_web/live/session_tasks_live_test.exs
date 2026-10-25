@@ -107,14 +107,21 @@ defmodule ControlKeelWeb.SessionTasksLiveTest do
     Repo.delete!(session)
     send(view.pid, :refresh)
 
-    assert_redirect(view, "/")
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
-  test "session tasks redirects with generic not-found for a non-numeric id", %{conn: conn} do
+  test "session tasks shows an in-place error for a non-numeric id", %{conn: conn} do
     {org, ws, _session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/abc/tasks")
+    {:ok, view, _html} = live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/abc/tasks")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
   test "session tasks rejects a task id from another session", %{conn: conn} do
