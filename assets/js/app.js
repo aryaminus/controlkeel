@@ -111,10 +111,20 @@ const CK_RESERVED_TOP_LEVEL = new Set([
   "invitations", "workspaces", "api", "proxy", "mcp", "oauth", "dev", "assets"
 ])
 
+const CK_RESTORED_LAST_PATH_KEY = "ck.restoredLastPath"
+
 function parseOverviewRoot(pathname) {
   const segments = String(pathname || "").split("/").filter(Boolean)
 
   if (segments.length === 1 && !CK_RESERVED_TOP_LEVEL.has(segments[0])) {
+    return `/${segments[0]}`
+  }
+
+  if (
+    segments.length === 2 &&
+    segments[1] === "settings" &&
+    !CK_RESERVED_TOP_LEVEL.has(segments[0])
+  ) {
     return `/${segments[0]}`
   }
 
@@ -129,8 +139,52 @@ function parseOverviewRoot(pathname) {
   return null
 }
 
+function clearRestoredLastPathMarker() {
+  try {
+    sessionStorage.removeItem(CK_RESTORED_LAST_PATH_KEY)
+  } catch (error) {
+    console.warn("Could not clear the restored ControlKeel path marker.", error)
+  }
+}
+
 function rememberLastPath() {
-  const root = parseOverviewRoot(window.location.pathname)
+  const errorPanel = document.querySelector("[data-scope-error]")
+  let restoredPath = null
+
+  try {
+    restoredPath = sessionStorage.getItem(CK_RESTORED_LAST_PATH_KEY)
+  } catch (error) {
+    console.warn("Could not read the restored ControlKeel path marker.", error)
+  }
+
+  if (errorPanel) {
+    if (restoredPath) {
+      try {
+        if (
+          window.location.pathname === restoredPath &&
+          localStorage.getItem("ck.lastPath") === restoredPath
+        ) {
+          localStorage.removeItem("ck.lastPath")
+        }
+      } catch (error) {
+        console.warn("Could not clear the stale ControlKeel path.", error)
+      }
+
+      clearRestoredLastPathMarker()
+    }
+
+    return
+  }
+
+  if (restoredPath) clearRestoredLastPathMarker()
+
+  // Only pages the server marked as a resolved scope may be saved. This is a
+  // positive check: a page that never resolved its scope cannot overwrite a
+  // previously valid path.
+  const validScope = document.querySelector("[data-scope-valid]")
+  if (!validScope) return
+
+  const root = validScope.dataset.scopeRoot || parseOverviewRoot(window.location.pathname)
   if (!root) return
 
   try {
@@ -151,26 +205,71 @@ function restoreLastPath() {
     console.warn("Could not read the last ControlKeel path.", error)
   }
 
-  window.location.replace(lastPath || boot.dataset.lastPathFallback)
+  const validLastPath =
+    lastPath &&
+    lastPath.startsWith("/") &&
+    !lastPath.startsWith("//") &&
+    !lastPath.includes("?") &&
+    !lastPath.includes("#") &&
+    parseOverviewRoot(lastPath)
+
+  if (lastPath && !validLastPath) {
+    try {
+      localStorage.removeItem("ck.lastPath")
+    } catch (error) {
+      console.warn("Could not clear the last ControlKeel path.", error)
+    }
+  }
+
+  if (validLastPath) {
+    try {
+      sessionStorage.setItem(CK_RESTORED_LAST_PATH_KEY, validLastPath)
+    } catch (error) {
+      console.warn("Could not mark the restored ControlKeel path.", error)
+    }
+  } else {
+    clearRestoredLastPathMarker()
+  }
+
+  window.location.replace(validLastPath || boot.dataset.lastPathFallback)
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  clearLastPathOnAuth()
   rememberLastPath()
   restoreLastPath()
 })
 
-window.addEventListener("phx:page-loading-stop", rememberLastPath)
+window.addEventListener("phx:page-loading-stop", () => {
+  clearLastPathOnAuth()
+  rememberLastPath()
+})
 
-document.addEventListener("click", event => {
-  if (!(event.target instanceof Element)) return
-  if (!event.target.closest('a[href="/auth/logout"]')) return
-
+// Signing out forgets the last scoped path and any in-flight restore marker.
+function clearLastPath() {
   try {
     localStorage.removeItem("ck.lastPath")
   } catch (error) {
-    console.warn("Could not clear the last ControlKeel path on sign-out.", error)
+    console.warn("Could not clear the last ControlKeel path.", error)
   }
+
+  clearRestoredLastPathMarker()
+}
+
+document.addEventListener("click", event => {
+  if (!(event.target instanceof Element)) return
+  if (!event.target.closest('a[href="/auth/logout"], a[href^="/auth/logout?"]')) return
+
+  clearLastPath()
 }, true)
+
+// Clear saved path if landing on the login or logout page directly
+function clearLastPathOnAuth() {
+  const path = window.location.pathname
+  if (path === "/auth/login" || path === "/auth/logout") {
+    clearLastPath()
+  }
+}
 
 window.addEventListener("phx:copy-to-clipboard", async ({detail}) => {
   const text = detail?.text

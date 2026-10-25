@@ -45,46 +45,73 @@ defmodule ControlKeelWeb.OrgAccessTest do
     {:ok, admin: admin, member: member, viewer: viewer, outsider: outsider, org: org}
   end
 
-  test "local mode is open, even without a user", %{org: org} do
+  test "local mode resolves without a user or membership", %{org: org} do
     Application.put_env(:controlkeel, :runtime_mode, :local)
-    assert OrgAccess.check(org, nil, "admin") == {:ok, nil}
+
+    assert {:ok, %Accounts.Org{id: org_id}, nil} = OrgAccess.resolve(org.slug, nil, "admin")
+    assert org_id == org.id
+  end
+
+  test "an unknown slug is :not_found", %{admin: admin} do
+    Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+    assert {:error, %{kind: :not_found} = error} = OrgAccess.resolve("no-such-org", admin)
+    assert error.title == "Organization not found"
+    assert error.org_slug == "no-such-org"
   end
 
   test "cloud mode denies a missing user", %{org: org} do
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    assert OrgAccess.check(org, nil, "viewer") == {:error, :forbidden}
+    assert {:error, %{kind: :forbidden}} = OrgAccess.resolve(org.slug, nil)
   end
 
-  test "cloud mode denies a missing org", %{admin: admin} do
-    Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    assert OrgAccess.check(nil, admin, "viewer") == {:error, :forbidden}
-  end
-
-  test "cloud mode authorizes members at the viewer gate", %{org: org, viewer: viewer} do
+  test "members resolve at the viewer gate", %{org: org, viewer: viewer} do
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
 
-    assert {:ok, %Accounts.Membership{role: "viewer"}} = OrgAccess.check(org, viewer)
-    assert {:ok, %Accounts.Membership{role: "viewer"}} = OrgAccess.check(org, viewer, "viewer")
+    assert {:ok, %Accounts.Org{id: org_id}, %Accounts.Membership{role: "viewer"}} =
+             OrgAccess.resolve(org.slug, viewer)
+
+    assert org_id == org.id
   end
 
-  test "cloud mode rejects viewers and members at the admin gate", %{
+  test "viewers and members are denied at the admin gate", %{
     org: org,
     viewer: viewer,
     member: member
   } do
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    assert OrgAccess.check(org, viewer, "admin") == {:error, :needs_admin}
-    assert OrgAccess.check(org, member, "admin") == {:error, :needs_admin}
+
+    assert {:error, %{kind: :needs_admin}} = OrgAccess.resolve(org.slug, viewer, "admin")
+    assert {:error, %{kind: :needs_admin}} = OrgAccess.resolve(org.slug, member, "admin")
   end
 
-  test "cloud mode authorizes admins at the admin gate", %{org: org, admin: admin} do
+  test "admins resolve at the admin gate", %{org: org, admin: admin} do
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    assert {:ok, %Accounts.Membership{role: "admin"}} = OrgAccess.check(org, admin, "admin")
+
+    assert {:ok, %Accounts.Org{id: org_id}, %Accounts.Membership{role: "admin"}} =
+             OrgAccess.resolve(org.slug, admin, "admin")
+
+    assert org_id == org.id
   end
 
-  test "cloud mode denies outsiders at every gate", %{org: org, outsider: outsider} do
+  test "outsiders are forbidden at every gate", %{org: org, outsider: outsider} do
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    assert OrgAccess.check(org, outsider, "viewer") == {:error, :forbidden}
-    assert OrgAccess.check(org, outsider, "admin") == {:error, :forbidden}
+
+    assert {:error, %{kind: :forbidden}} = OrgAccess.resolve(org.slug, outsider)
+    assert {:error, %{kind: :forbidden}} = OrgAccess.resolve(org.slug, outsider, "admin")
+  end
+
+  test "a forbidden org and a missing org share the same public copy", %{
+    org: org,
+    outsider: outsider
+  } do
+    Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+    {:error, forbidden} = OrgAccess.resolve(org.slug, outsider)
+    {:error, missing} = OrgAccess.resolve("no-such-org", outsider)
+
+    assert forbidden.kind == :forbidden
+    assert missing.kind == :not_found
+    assert {forbidden.title, forbidden.message} == {missing.title, missing.message}
   end
 end
