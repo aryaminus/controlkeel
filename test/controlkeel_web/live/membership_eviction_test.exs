@@ -145,7 +145,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/organizations")
+               assert_redirect(view, "/new/org")
     end
 
     test "revoking the page's membership redirects while other memberships remain" do
@@ -165,7 +165,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/organizations")
+               assert_redirect(view, "/new/org")
     end
 
     test "role changes in another org leave the page in place" do
@@ -209,7 +209,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/organizations")
+               assert_redirect(view, "/new/org")
     end
   end
 
@@ -272,7 +272,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/organizations")
+               assert_redirect(view, "/new/org")
     end
   end
 
@@ -304,7 +304,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/organizations")
+               assert_redirect(view, "/new/org")
     end
 
     test "review responses reauthorize after cloud membership is revoked" do
@@ -402,7 +402,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                  Accounts.revoke_membership(membership.id, owner.id)
 
         assert %{"info" => "Your access to this organization changed."} =
-                 assert_redirect(view, "/organizations"),
+                 assert_redirect(view, "/new/org"),
                "#{surface} did not evict the revoked membership"
       end
     end
@@ -427,7 +427,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                  Accounts.revoke_membership(membership.id, owner.id)
 
         assert %{"info" => "Your access to this organization changed."} =
-                 assert_redirect(view, "/organizations"),
+                 assert_redirect(view, "/new/org"),
                "#{surface} did not evict the revoked membership"
       end
     end
@@ -450,7 +450,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/organizations")
+               assert_redirect(view, "/new/org")
     end
 
     test "demoting an admin hides observability mutation controls without a redirect" do

@@ -4,7 +4,6 @@ defmodule ControlKeelWeb.DashboardLive do
   alias ControlKeel.Agent.ACPRegistry
   alias ControlKeel.Analytics
   alias ControlKeel.Benchmark
-  alias ControlKeel.Mission
   alias ControlKeel.ProviderBroker
   alias ControlKeel.Runtime.Mode
 
@@ -18,7 +17,6 @@ defmodule ControlKeelWeb.DashboardLive do
      |> assign(
        benchmark_summary: Benchmark.benchmark_summary(),
        provider_status: ProviderBroker.status(project_root),
-       recent_sessions: Mission.list_recent_sessions_for_user(socket.assigns[:current_user], 4),
        registry_status: ACPRegistry.status(),
        ship_summary: Analytics.funnel_summary(),
        runtime_mode: Mode.current()
@@ -386,107 +384,6 @@ defmodule ControlKeelWeb.DashboardLive do
               <% end %>
             </ul>
           </article>
-        </div>
-      </section>
-
-      <%!-- Recent Sessions --%>
-      <section class="space-y-3">
-        <div class="flex items-center justify-between gap-3">
-          <.section_title>Recent Sessions</.section_title>
-          <a
-            href={~p"/sessions"}
-            class="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-primary"
-          >
-            View all <.icon name="hero-arrow-up-right" class="size-3" />
-          </a>
-        </div>
-
-        <div class="bg-card border rounded-2xl shadow-card overflow-hidden">
-          <table class="min-w-full divide-y divide-border text-left text-sm">
-            <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
-              <tr>
-                <th class="px-5 py-3 font-semibold">Session</th>
-                <th class="px-5 py-3 font-semibold">Risk</th>
-                <th class="px-5 py-3 font-semibold">Workload</th>
-                <th class="px-5 py-3 font-semibold">Findings</th>
-                <th class="px-5 py-3 font-semibold">Budget</th>
-                <th class="px-5 py-3 font-semibold"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-              <%= if @recent_sessions == [] do %>
-                <tr>
-                  <td colspan="6" class="px-5 py-12 text-center">
-                    <p class="text-base font-medium text-foreground">No sessions yet.</p>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      Start a session to populate live governance telemetry.
-                    </p>
-                  </td>
-                </tr>
-              <% else %>
-                <%= for session <- @recent_sessions do %>
-                  <tr class="transition hover:bg-muted/30">
-                    <td class="max-w-sm px-5 py-4">
-                      <a
-                        href={~p"/sessions/#{session.id}"}
-                        class="font-medium text-foreground transition hover:text-primary"
-                      >
-                        {session.title}
-                      </a>
-                      <p class="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                        {session.objective}
-                      </p>
-                      <p class="mt-2 text-xs text-muted-foreground">
-                        {session.workspace && session.workspace.name}
-                      </p>
-                    </td>
-                    <td class="px-5 py-4">
-                      <span class={[
-                        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                        session.risk_tier in ["critical", "high"] &&
-                          "bg-destructive/10 text-destructive ring-destructive/20",
-                        session.risk_tier in ["medium", "moderate"] &&
-                          "bg-warning/10 text-warning ring-warning/20",
-                        session.risk_tier in ["low"] &&
-                          "bg-success/10 text-success ring-success/20",
-                        session.risk_tier not in ["critical", "high", "medium", "moderate", "low"] &&
-                          "bg-muted text-muted-foreground ring-border"
-                      ]}>
-                        {session.risk_tier}
-                      </span>
-                    </td>
-                    <td class="px-5 py-4">
-                      <div class="flex items-center gap-2 text-muted-foreground">
-                        <.icon name="hero-list-bullet" class="size-4 text-muted-foreground" />
-                        {Enum.count(session.tasks)}
-                      </div>
-                    </td>
-                    <td class="px-5 py-4">
-                      <div class="flex items-center gap-2 text-muted-foreground">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="size-4 text-muted-foreground"
-                        />
-                        {Enum.count(session.findings)}
-                      </div>
-                    </td>
-                    <td class="px-5 py-4 text-muted-foreground">
-                      ${session.budget_cents |> Kernel./(100) |> trunc()}
-                    </td>
-                    <td class="px-5 py-4 text-right">
-                      <a
-                        href={~p"/sessions/#{session.id}"}
-                        aria-label={"Inspect #{session.title}"}
-                        class="inline-flex items-center justify-center rounded-full border p-2 text-muted-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
-                      >
-                        <.icon name="hero-arrow-right" class="size-3" />
-                      </a>
-                    </td>
-                  </tr>
-                <% end %>
-              <% end %>
-            </tbody>
-          </table>
         </div>
       </section>
     </div>

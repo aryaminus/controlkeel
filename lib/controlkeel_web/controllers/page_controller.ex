@@ -72,6 +72,8 @@ defmodule ControlKeelWeb.PageController do
     render(conn, :developers)
   end
 
+  def legacy_global_index_redirect(conn, _params), do: redirect(conn, to: "/")
+
   # Legacy /organizations/:slug URLs (removed when org routes were simplified
   # to /:slug). Single action serves both routes; the /settings suffix is
   # detected from the request path. `slug` is a single router segment (no
@@ -218,8 +220,11 @@ defmodule ControlKeelWeb.PageController do
       :login ->
         redirect(conn, to: "/auth/login")
 
-      {:organizations, message} ->
-        conn |> put_flash(:info, message) |> redirect(to: "/organizations")
+      {:new_org, message} ->
+        conn |> put_flash(:info, message) |> redirect(to: "/new/org")
+
+      {:home, message} ->
+        conn |> put_flash(:info, message) |> redirect(to: "/")
     end
   end
 
@@ -234,7 +239,7 @@ defmodule ControlKeelWeb.PageController do
           :login
 
         not Accounts.any_active_membership?(user.id) ->
-          {:organizations, "Join or create an organization to continue."}
+          {:new_org, "Join or create an organization to continue."}
 
         true ->
           resolve_cloud_observability_workspace(user)
@@ -258,11 +263,11 @@ defmodule ControlKeelWeb.PageController do
   end
 
   # Brand-new cloud tenants may hold memberships but own zero sessions: land
-  # them on their first org's first workspace instead of dead-ending on
-  # /organizations (cloud analogue of the LocalDefaults fallback below). The
+  # them on their first org's first workspace instead of dead-ending on the
+  # removed global organizations index (cloud analogue of LocalDefaults). The
   # workspace comes from an org where the user holds an active membership, so
-  # the target page's access check passes; nothing resolvable keeps the
-  # /organizations outcome.
+  # the target page's access check passes; without a workspace, return to the
+  # root handoff so it can choose the user's latest organization.
   defp default_member_workspace(user) do
     with org_id when is_integer(org_id) <- Accounts.default_org_for_user(user.id),
          [workspace | _] <- Mission.list_workspaces_for_orgs([org_id]),
@@ -270,7 +275,7 @@ defmodule ControlKeelWeb.PageController do
       {:ok, {org_slug, ws_slug}}
     else
       _ ->
-        {:organizations, "No workspace available. Join or create an organization to continue."}
+        {:home, "No workspace available. Join or create an organization to continue."}
     end
   end
 
@@ -445,7 +450,7 @@ defmodule ControlKeelWeb.PageController do
         not Accounts.any_active_membership?(user.id) ->
           conn
           |> put_flash(:info, "Join or create an organization to continue.")
-          |> redirect(to: "/organizations")
+          |> redirect(to: "/new/org")
 
         true ->
           case recent_accessible_browser_session(user) do
@@ -455,7 +460,7 @@ defmodule ControlKeelWeb.PageController do
                 :info,
                 "No workspace available. Join or create an organization to continue."
               )
-              |> redirect(to: "/organizations")
+              |> redirect(to: "/")
 
             session ->
               redirect_session_browser(
