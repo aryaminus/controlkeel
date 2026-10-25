@@ -18,7 +18,7 @@ defmodule ControlKeelWeb.ObservabilityCostsLive do
       {:ok, socket} ->
         {:ok, socket |> assign(:page_title, "Observability Costs") |> load_page(params)}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:ok, socket}
     end
   end
@@ -53,6 +53,8 @@ defmodule ControlKeelWeb.ObservabilityCostsLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-costs" class="w-full space-y-5">

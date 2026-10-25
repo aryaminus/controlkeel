@@ -20,7 +20,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
       {:ok, socket} ->
         {:ok, socket |> assign(:page_title, "Benchmark") |> load_page(params)}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:ok, socket}
     end
   end
@@ -183,6 +183,8 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-benchmark-page" class="w-full space-y-6">

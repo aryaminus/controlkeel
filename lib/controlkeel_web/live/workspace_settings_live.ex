@@ -11,68 +11,35 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Org
   alias ControlKeel.Accounts.WorkspaceToolPolicy
   alias ControlKeel.MCP.ToolGroups
-  alias ControlKeel.Mission
-  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform
-  alias ControlKeel.Repo
-  alias ControlKeelWeb.WorkspaceAccess
+  alias ControlKeelWeb.WorkspaceScope
 
   @tabs ["policies", "agent_tools"]
 
   @impl true
-  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
-    with %Workspace{} = workspace <-
-           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
-         :ok <- check_org_slug(workspace, %{slug: slug}),
-         {:ok, current_membership} <- check_workspace_access(workspace, socket.assigns) do
-      tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
-      tools = WorkspaceToolPolicy.decode_tools(tool_policy)
+  def mount(params, _session, socket) do
+    case WorkspaceScope.assign_scope(socket, params, "Settings", "admin") do
+      {:ok, socket} ->
+        {:ok, socket |> assign_workspace_settings() |> assign(:active_tab, "policies")}
 
-      {:ok,
-       socket
-       |> assign(:page_title, "Settings — #{workspace.name}")
-       |> assign(:workspace, workspace)
-       |> assign(:current_membership, current_membership)
-       |> assign(:nav_org, workspace.org)
-       |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{
-             label: workspace.name,
-             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
-           },
-           %{label: "Settings", to: nil}
-         ]
-       )
-       |> assign(:active_tab, "policies")
-       |> assign(:tabs, @tabs)
-       |> assign(:modes, WorkspaceToolPolicy.modes())
-       |> assign(:selected_tools, tools)
-       |> assign(:unknown_tools, tools -- ToolGroups.all_tools())
-       |> assign(:tool_options, ToolGroups.all_tools())
-       |> assign(:live_mode, tool_policy.mode)
-       |> assign(
-         :apply_form,
-         to_form(%{"policy_set_id" => "", "precedence" => "100"}, as: :assignment)
-       )
-       |> refresh_policy_assigns()}
-    else
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
-
-      {:error, reason} ->
-        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+      {:error, socket} ->
+        {:ok, socket}
     end
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, assign(socket, :active_tab, normalize_tab(params["tab"]))}
+    case WorkspaceScope.refresh(socket, params) do
+      {:ok, socket, changed?} ->
+        socket = assign(socket, :active_tab, normalize_tab(params["tab"]))
+        socket = if changed?, do: assign_workspace_settings(socket), else: socket
+        {:noreply, socket}
+
+      {:error, socket} ->
+        {:noreply, socket}
+    end
   end
 
   defp normalize_tab("agent_tools"), do: "agent_tools"
@@ -206,6 +173,8 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-8">
@@ -234,7 +203,8 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
                     "w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition",
                     @active_tab == tab &&
                       "bg-primary/10 font-semibold text-primary",
-                    @active_tab != tab && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    @active_tab != tab &&
+                      "text-muted-foreground hover:bg-muted hover:text-foreground"
                   ]}
                 >
                   {tab_label(tab)}
@@ -499,6 +469,26 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
     |> assign(:available_sets, available_sets)
   end
 
+  defp assign_workspace_settings(socket) do
+    workspace = socket.assigns.workspace
+    tool_policy = Accounts.get_workspace_tool_policy(workspace.id)
+    tools = WorkspaceToolPolicy.decode_tools(tool_policy)
+
+    socket
+    |> assign(:page_title, "Settings — #{workspace.name}")
+    |> assign(:tabs, @tabs)
+    |> assign(:modes, WorkspaceToolPolicy.modes())
+    |> assign(:selected_tools, tools)
+    |> assign(:unknown_tools, tools -- ToolGroups.all_tools())
+    |> assign(:tool_options, ToolGroups.all_tools())
+    |> assign(:live_mode, tool_policy.mode)
+    |> assign(
+      :apply_form,
+      to_form(%{"policy_set_id" => "", "precedence" => "100"}, as: :assignment)
+    )
+    |> refresh_policy_assigns()
+  end
+
   defp tab_label("policies"), do: "Policies"
   defp tab_label("agent_tools"), do: "Agent tools"
 
@@ -520,31 +510,5 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
       {:ok, n} when n >= 0 -> {:ok, n}
       _ -> :error
     end
-  end
-
-  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
-    case Accounts.get_org_by_slug(slug) do
-      %Org{id: ^org_id} -> :ok
-      _ -> {:error, "Workspace does not belong to this organization."}
-    end
-  end
-
-  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
-
-  # Workspace admin surface: org-bound workspace + active admin/owner
-  # membership, resolved from (user, resource) via the shared gate.
-  defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check_membership(workspace, assigns[:current_user], "admin") do
-      {:ok, membership} -> {:ok, membership}
-      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
-      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
-      {:error, :needs_admin} -> {:error, "Admin or owner role required."}
-    end
-  end
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
   end
 end

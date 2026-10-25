@@ -409,22 +409,21 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       assert WorkspaceToolPolicy.decode_tools(policy) == []
     end
 
-    test "redirects for an unknown workspace slug" do
+    test "renders an in-place error for an unknown workspace slug" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/none/workspaces/no-such-ws/settings")
+      {:ok, view, _html} =
+        live(build_conn(), ~p"/none/workspaces/no-such-ws/settings")
 
-      assert msg =~ "Workspace not found."
+      assert has_element?(view, "[data-scope-error]")
     end
 
-    test "redirects when the workspace belongs to a different org slug" do
+    test "renders an in-place error when the workspace belongs to a different org slug" do
       {_org_a, ws} = org_workspace()
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(build_conn(), ~p"/other-org/workspaces/#{ws.slug}/settings")
+      {:ok, view, _html} = live(build_conn(), ~p"/other-org/workspaces/#{ws.slug}/settings")
 
-      assert msg =~ "does not belong to this organization"
+      assert has_element?(view, "[data-scope-error]")
     end
   end
 
@@ -487,10 +486,9 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
           "current_user_id" => viewer.id
         })
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/viewerco/workspaces/#{ws.slug}/settings")
+      {:ok, view, _html} = live(conn, ~p"/viewerco/workspaces/#{ws.slug}/settings")
 
-      assert msg =~ "Admin or owner role required."
+      assert has_element?(view, "[data-scope-error]")
     end
 
     test "a user outside the org is refused access" do
@@ -509,10 +507,9 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
           "current_user_id" => outsider.id
         })
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/seta/workspaces/#{ws_a.slug}/settings")
+      {:ok, view, _html} = live(conn, ~p"/seta/workspaces/#{ws_a.slug}/settings")
 
-      assert msg =~ "Workspace belongs to a different organization."
+      assert has_element?(view, "[data-scope-error]")
     end
 
     test "a user-only session still enforces org access (issue #141, R5)" do
@@ -536,10 +533,9 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
         build_conn()
         |> Plug.Test.init_test_session(%{"current_user_id" => owner_b.id})
 
-      assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-               live(conn, ~p"/noseeda/workspaces/#{ws_a.slug}/settings")
+      {:ok, view, _html} = live(conn, ~p"/noseeda/workspaces/#{ws_a.slug}/settings")
 
-      assert msg =~ "Workspace belongs to a different organization."
+      assert has_element?(view, "[data-scope-error]")
     end
   end
 end
