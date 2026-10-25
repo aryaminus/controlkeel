@@ -11,7 +11,7 @@ defmodule ControlKeelWeb.OrganizationLayoutDefaults do
   the URL's org, workspace, or session does not resolve (or is inaccessible),
   and the org layout renders an in-place panel instead of the org chrome.
   Membership revocations are handled separately by `LiveAuth` and navigate
-  the visitor to `/organizations`.
+  the visitor to `/new/org`.
   """
 
   import Phoenix.Component, only: [assign: 3, assign_new: 3]

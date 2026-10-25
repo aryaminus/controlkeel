@@ -103,10 +103,10 @@ reacts to `{:membership_changed, %Membership{}}`:
 
 | Event                                                        | Result                                                                |
 | ------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Revocation of the page's membership                           | Redirect to `/organizations` with an info flash — never a sign-out.    |
+| Revocation of the page's membership                           | Redirect to `/new/org` with an info flash — never a sign-out.          |
 | Role change in the page's organization                        | `:current_membership` is reassigned in place; permission-derived UI re-renders without a reload. |
 | Change in an unrelated organization                           | No-op; the page is unaffected.                                        |
-| Revocation that removes the visitor's last active membership  | Redirect to `/organizations` with a different flash.                  |
+| Revocation that removes the visitor's last active membership  | Redirect to `/new/org` with a different flash.                         |
 | `:sign_out_everywhere`                                        | Redirect to `/auth/login`.                                            |
 
 Server-side gates stay authoritative: event handlers re-check the database
