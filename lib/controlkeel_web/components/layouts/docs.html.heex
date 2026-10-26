@@ -3,7 +3,8 @@
   %{label: "Getting started", to: "/docs/getting-started"},
   %{label: "How it governs", to: "/docs/governance"},
   %{label: "Observability", to: "/docs/observability"},
-  %{label: "Agents", to: "/docs/agents"}
+  %{label: "Agents", to: "/docs/agents"},
+  %{label: "Skills", to: "/docs/skills"}
 ] %>
 <% current_page = Enum.find(nav_items, &(&1.to == @conn.request_path)) %>
 <div class="h-screen flex overflow-hidden">
