@@ -238,6 +238,40 @@ defmodule ControlKeelWeb.DocsControllerTest do
     end
   end
 
+  describe "GET /docs/skills" do
+    test "renders the skill catalog with CLI and agent guidance", %{conn: conn} do
+      conn = get(conn, ~p"/docs/skills")
+      body = html_response(conn, 200)
+
+      assert body =~ "Skills"
+      assert body =~ "What skills are"
+      assert body =~ "Available skills"
+      assert body =~ "What you can do from the CLI"
+      assert body =~ "How agents use skills"
+      assert body =~ "controlkeel skills list"
+      assert body =~ "controlkeel skills validate"
+      assert body =~ "controlkeel skills export"
+      assert body =~ "controlkeel skills install"
+      assert body =~ "controlkeel token audit --mode skills"
+      assert body =~ "controlkeel skills doctor"
+      assert body =~ "ck_skill_list"
+      assert body =~ "ck_skill_load"
+      assert body =~ "CONTROLKEEL_TRUST_PROJECT_SKILLS"
+      assert body =~ "Built-in"
+      assert body =~ "controlkeel-governance"
+      assert body =~ ~r{href="/docs/skills"[^>]*aria-current="page"}
+    end
+
+    test "renders every catalogued skill name", %{conn: conn} do
+      body =
+        conn
+        |> get(~p"/docs/skills")
+        |> html_response(200)
+
+      for name <- ControlKeel.Skills.catalog(), do: assert(body =~ name.name)
+    end
+  end
+
   describe "legacy guide URL" do
     test "GET /getting-started redirects to /docs/getting-started", %{conn: conn} do
       conn = get(conn, "/getting-started")
@@ -247,6 +281,24 @@ defmodule ControlKeelWeb.DocsControllerTest do
   end
 
   describe "markdown negotiation" do
+    test "GET /docs/skills with text/markdown returns markdown", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("accept", "text/markdown")
+        |> get(~p"/docs/skills")
+
+      body = response(conn, 200)
+
+      assert body =~ "# Skills"
+      assert body =~ "## What skills are"
+      assert body =~ "## Available skills"
+      assert body =~ "## CLI reference"
+      assert body =~ "`controlkeel skills list`"
+      assert body =~ "`ck_skill_list`"
+      assert body =~ "### `controlkeel-governance`"
+      assert response_content_type(conn, :markdown)
+    end
+
     test "GET /docs/agents with text/markdown returns markdown", %{conn: conn} do
       conn =
         conn
