@@ -9,6 +9,8 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   embed_templates "organization_layouts/*"
 
+  @focus_ring "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+
   attr :current_user, :any, default: nil
   attr :current_path, :string, default: nil
   attr :current_query, :string, default: nil
@@ -874,11 +876,11 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   defp organization_nav_link_class(true) do
-    "group flex items-center gap-3 rounded-xl bg-muted px-3 py-2.5 font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted"
+    "group flex items-center gap-3 rounded-xl bg-muted px-3 py-2.5 font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted #{@focus_ring}"
   end
 
   defp organization_nav_link_class(false) do
-    "group flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    "group flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground #{@focus_ring}"
   end
 
   defp organization_nav_icon_class(true), do: "size-4 text-primary"
@@ -925,11 +927,11 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   defp organization_subnav_link_class(true) do
-    "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted"
+    "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted #{@focus_ring}"
   end
 
   defp organization_subnav_link_class(false) do
-    "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    "group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground #{@focus_ring}"
   end
 
   defp organization_subnav_icon_class(true), do: "size-3.5 shrink-0 text-primary"
