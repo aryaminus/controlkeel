@@ -133,7 +133,11 @@ defmodule ControlKeelWeb.Router do
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
 
       live "/policies", PolicyStudioLive, :index
-      live "/skills", SkillsLive, :index
+
+      # /skills removed from the router: SkillsLive and its test are kept so
+      # the page can return under a different scope (org or workspace) later
+      # instead of a global surface. GET /skills now falls through to the
+      # ":org_slug" live block and the invalid-org handler.
     end
 
     # /new/* pages use a standalone headless layout (own
