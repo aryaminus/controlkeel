@@ -351,14 +351,6 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     """
   end
 
-  defp skill_markdown(skill) do
-    """
-    ### `#{skill.name}` (#{skill.scope})
-
-    #{skill.description}
-    """
-  end
-
   defp page_to_markdown(:about) do
     """
     # About ControlKeel
@@ -483,6 +475,14 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     ```
     #{channel.command}
     ```
+    """
+  end
+
+  defp skill_markdown(skill) do
+    """
+    ### `#{skill.name}` (#{skill.scope})
+
+    #{skill.description}
     """
   end
 

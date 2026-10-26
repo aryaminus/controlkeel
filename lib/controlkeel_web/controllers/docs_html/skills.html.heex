@@ -7,8 +7,7 @@
   <section class="space-y-4">
     <.section_title>What skills are</.section_title>
     <p class="text-sm leading-7 text-muted-foreground">
-      A ControlKeel skill is a portable instruction bundle in the
-      <a
+      A ControlKeel skill is a portable instruction bundle in the <a
         href="https://agentskills.io/specification"
         target="_blank"
         rel="noopener"
@@ -19,7 +18,8 @@
       a plain <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">SKILL.md</code>
       with a name, a description, and a governed workflow body — how to align on a goal, validate
       before an edit, bundle proof, or ship. Skills are how ControlKeel teaches an agent
-      <em>how</em> to work under governance, while MCP tools and hooks give it the machinery to
+      <em>how</em>
+      to work under governance, while MCP tools and hooks give it the machinery to
       do so.
     </p>
     <p class="text-sm leading-7 text-muted-foreground">
@@ -45,9 +45,7 @@
             User
           </p>
           <p class="text-sm leading-6 text-muted-foreground">
-            Installed under your home directory (<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.agents/skills</code>,
-            <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.codex/skills</code>,
-            <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.claude/skills</code>,
+            Installed under your home directory (<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.agents/skills</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.codex/skills</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.claude/skills</code>,
             and other host paths) so they travel with you across projects.
           </p>
         </div>
@@ -56,8 +54,7 @@
             Project
           </p>
           <p class="text-sm leading-6 text-muted-foreground">
-            Inside a governed repository (<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">.agents/skills</code>
-            and host peers). Project skills are only surfaced for trusted bindings, so one repo
+            Inside a governed repository (<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">.agents/skills</code> and host peers). Project skills are only surfaced for trusted bindings, so one repo
             cannot inject instructions into another.
           </p>
         </div>
@@ -113,8 +110,11 @@
       Every skill operation works from a terminal with
       <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--project-root</code>
       selecting the governed project. Exports and installs write under
-      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel/dist/&lt;target&gt;</code>
-      and record a manifest so <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">skills doctor</code>
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        controlkeel/dist/&lt;target&gt;
+      </code>
+      and record a manifest so
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">skills doctor</code>
       can audit what was placed, where, and when.
     </p>
     <div class="bg-card border rounded-2xl shadow-card overflow-clip">
@@ -128,17 +128,25 @@
         <tbody class="divide-y divide-border">
           <tr class="transition hover:bg-muted/30">
             <td class="px-5 py-4">
-              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel skills list</code>
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills list
+              </code>
             </td>
             <td class="px-5 py-4 text-muted-foreground">
-              List the registry with diagnostics. <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--json</code>
-              for machine output; <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--target &lt;target&gt;</code>
+              List the registry with diagnostics.
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--json</code>
+              for machine output;
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                --target &lt;target&gt;
+              </code>
               filters by install target.
             </td>
           </tr>
           <tr class="transition hover:bg-muted/30">
             <td class="px-5 py-4">
-              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel skills validate</code>
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills validate
+              </code>
             </td>
             <td class="px-5 py-4 text-muted-foreground">
               Check every skill's frontmatter and structure; report warnings and errors with codes.
@@ -146,7 +154,9 @@
           </tr>
           <tr class="transition hover:bg-muted/30">
             <td class="px-5 py-4">
-              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel skills export --target &lt;target&gt;</code>
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills export --target &lt;target&gt;
+              </code>
             </td>
             <td class="px-5 py-4 text-muted-foreground">
               Write a host-format skill bundle (targets include open-standard, claude-plugin,
@@ -155,7 +165,9 @@
           </tr>
           <tr class="transition hover:bg-muted/30">
             <td class="px-5 py-4">
-              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel skills install --target &lt;target&gt;</code>
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills install --target &lt;target&gt;
+              </code>
             </td>
             <td class="px-5 py-4 text-muted-foreground">
               Install the bundle straight into the host's expected skills directory and report the
@@ -164,7 +176,9 @@
           </tr>
           <tr class="transition hover:bg-muted/30">
             <td class="px-5 py-4">
-              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel token audit --mode skills</code>
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel token audit --mode skills
+              </code>
             </td>
             <td class="px-5 py-4 text-muted-foreground">
               Measure the token cost of your skill surface. Modes: full, rules, skills, and tools.
@@ -172,7 +186,9 @@
           </tr>
           <tr class="transition hover:bg-muted/30">
             <td class="px-5 py-4">
-              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel skills doctor</code>
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills doctor
+              </code>
             </td>
             <td class="px-5 py-4 text-muted-foreground">
               Diagnose the whole skills surface: catalog health, install manifests, attach
@@ -192,10 +208,16 @@
       makes each trigger available. Host commands come from
       <.link navigate="/docs/agents" class="text-primary underline-offset-2 hover:underline">
         the agents page
-      </.link> —
-      for example <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">controlkeel attach opencode</code>
+      </.link>
+      —
+      for example
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        controlkeel attach opencode
+      </code>
       prepares OpenCode skills plus MCP config, and the AgentSkills-standard
-      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance</code>
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance
+      </code>
       flow reaches any skills.sh-compatible host.
     </p>
     <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
@@ -208,21 +230,23 @@
         validate before editing, bundle proof before shipping.
       </li>
       <li>
-        <strong>Query over MCP.</strong> The same registry is exposed as typed tools:
-        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_list</code>,
-        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_load</code>,
-        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_validate</code>,
+        <strong>Query over MCP.</strong>
+        The same registry is exposed as typed tools: <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_list</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_load</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_validate</code>,
         and <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_token_audit</code>.
       </li>
       <li>
-        <strong>Manage over API.</strong> REST endpoints at
+        <strong>Manage over API.</strong>
+        REST endpoints at
         <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/api/v1/skills</code>
         list, fetch, export, install, and prune duplicates; see the developer portal.
       </li>
     </ul>
     <p class="text-sm leading-7 text-muted-foreground">
       Trust is scoped: project-level skills only load for a bound, trusted project — untrusted
-      project directories are ignored, and <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">CONTROLKEEL_TRUST_PROJECT_SKILLS</code>
+      project directories are ignored, and
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        CONTROLKEEL_TRUST_PROJECT_SKILLS
+      </code>
       flips opt-in scoping explicitly. A repo you just cloned cannot push instructions into your
       agent sessions until you trust it.
     </p>
@@ -232,20 +256,26 @@
     <.section_title>Keep reading</.section_title>
     <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
       <li>
-        Getting started connects the first host:
-        <.link navigate="/docs/getting-started" class="text-primary underline-offset-2 hover:underline">
+        Getting started connects the first host: <.link
+          navigate="/docs/getting-started"
+          class="text-primary underline-offset-2 hover:underline"
+        >
           install to first finding
         </.link>.
       </li>
       <li>
-        The governance loop these skills operate inside:
-        <.link navigate="/docs/governance" class="text-primary underline-offset-2 hover:underline">
+        The governance loop these skills operate inside: <.link
+          navigate="/docs/governance"
+          class="text-primary underline-offset-2 hover:underline"
+        >
           how it governs
         </.link>.
       </li>
       <li>
-        Host-by-host attach commands and what each agent gets:
-        <.link navigate="/docs/agents" class="text-primary underline-offset-2 hover:underline">
+        Host-by-host attach commands and what each agent gets: <.link
+          navigate="/docs/agents"
+          class="text-primary underline-offset-2 hover:underline"
+        >
           how agents use CK
         </.link>.
       </li>
