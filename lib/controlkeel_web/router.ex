@@ -133,7 +133,10 @@ defmodule ControlKeelWeb.Router do
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
 
-      live "/policies", PolicyStudioLive, :index
+      # /policies removed from the router: PolicyStudioLive was org-unowned.
+      # Policy set management now lives under org settings
+      # (/:org_slug/settings?tab=policy_sets). PolicyStudioLive and its test
+      # were deleted together with this route (approved review #1).
 
       # /skills removed from the router: SkillsLive and its test are kept so
       # the page can return under a different scope (org or workspace) later

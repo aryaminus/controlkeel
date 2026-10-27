@@ -93,14 +93,8 @@ defmodule ControlKeelWeb.MissionControlLive do
                 </code>
               </p>
               <p class="text-sm leading-6 text-muted-foreground">
-                Or validate content directly via the
-                <.link
-                  navigate={~p"/policies"}
-                  class="font-medium text-primary underline-offset-4 transition hover:underline"
-                >
-                  Policy Studio
-                </.link>
-                or REST API at <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">POST /api/v1/validate</code>.
+                Or validate content directly via the REST API at
+                <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">POST /api/v1/validate</code>.
               </p>
             </div>
           </div>
