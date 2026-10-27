@@ -20,10 +20,15 @@ defmodule ControlKeel.PlatformFixtures do
   end
 
   def policy_set_fixture(attrs \\ %{}) do
+    # Policy sets are org-owned; a fixture without an explicit `org_id` gets
+    # a private org so each fixture is isolated by default.
+    org_id =
+      Map.get_lazy(attrs, :org_id, fn -> ControlKeel.AccountsFixtures.org_fixture().id end)
+
     {:ok, policy_set} =
       Platform.create_policy_set(%{
+        "org_id" => org_id,
         "name" => Map.get(attrs, :name, "Workspace Guard"),
-        "scope" => Map.get(attrs, :scope, "workspace"),
         "description" => Map.get(attrs, :description, "Workspace-specific controls"),
         "rules" =>
           Map.get(attrs, :rules, [

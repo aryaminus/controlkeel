@@ -37,9 +37,10 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
     {org, ws}
   end
 
-  defp policy_set_fixture!(name) do
+  defp policy_set_fixture!(org, name) do
     {:ok, set} =
       Platform.create_policy_set(%{
+        "org_id" => org.id,
         "name" => name,
         "description" => "Block destructive deletes",
         "rules" => [
@@ -127,7 +128,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "applies a policy set to the workspace" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("no-rm-rf")
+      set = policy_set_fixture!(org, "no-rm-rf")
 
       {:ok, view, _html} =
         live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
@@ -146,9 +147,34 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
       assert set_id == set.id
     end
 
+    test "policy sets from other organizations are rejected at apply time" do
+      {org, ws} = org_workspace()
+
+      {:ok, foreign_org} = Accounts.create_org(%{name: "Foreign Org", slug: "foreign-org"})
+
+      {:ok, foreign_set} =
+        Platform.create_policy_set(%{
+          "org_id" => foreign_org.id,
+          "name" => "foreign-set",
+          "description" => "A set from another organization",
+          "rules" => []
+        })
+
+      {:ok, view, _html} =
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
+
+      # The foreign set is not even offered in the picker.
+      refute has_element?(view, "#policy-set-select option[value='#{foreign_set.id}']")
+
+      html = submit_apply(view, %{"policy_set_id" => "#{foreign_set.id}", "precedence" => "10"})
+
+      assert html =~ "must belong to the workspace"
+      assert Platform.list_workspace_policy_sets(ws.id) == []
+    end
+
     test "re-applying via upsert updates precedence" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("upsert-me")
+      set = policy_set_fixture!(org, "upsert-me")
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 10})
 
       {:ok, view, _html} =
@@ -164,7 +190,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "apply with a non-numeric precedence flashes an error" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("bad-prec")
+      set = policy_set_fixture!(org, "bad-prec")
 
       {:ok, view, _html} =
         live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
@@ -177,7 +203,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "apply with an out-of-range precedence flashes an error instead of crashing" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("huge-prec")
+      set = policy_set_fixture!(org, "huge-prec")
 
       {:ok, view, _html} =
         live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}/settings")
@@ -197,7 +223,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "removes an applied policy set" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("remove-me")
+      set = policy_set_fixture!(org, "remove-me")
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 5})
 
       {:ok, view, _html} =
@@ -213,7 +239,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "disabled assignments are listed with a marker and kept out of the dropdown" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("paused-set")
+      set = policy_set_fixture!(org, "paused-set")
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{"enabled" => false})
 
       {:ok, view, html} =
@@ -233,7 +259,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "toggle_assignment disables an enabled assignment and stops rule evaluation" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("toggle-off")
+      set = policy_set_fixture!(org, "toggle-off")
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 25})
 
       {:ok, view, _html} =
@@ -258,7 +284,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "toggle_assignment re-enables a disabled assignment preserving precedence" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("toggle-on")
+      set = policy_set_fixture!(org, "toggle-on")
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 15, enabled: false})
 
       {:ok, view, _html} =
@@ -289,7 +315,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLiveTest do
 
     test "toggle_assignment with an unknown policy set id flashes an error" do
       {org, ws} = org_workspace()
-      set = policy_set_fixture!("not-toggled")
+      set = policy_set_fixture!(org, "not-toggled")
       {:ok, _} = Platform.apply_policy_set(ws.id, set.id, %{precedence: 1})
 
       {:ok, view, _html} =
