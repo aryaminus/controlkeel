@@ -125,9 +125,15 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
   end
 
   @doc """
-  Interactive gate: empty input (enter / non-interactive :eof) proceeds;
-  anything other than y/yes aborts the migration.
+  Interactive gate: empty input (enter) and non-interactive EOF proceed with
+  the default; anything other than y/yes aborts the migration.
+
+  `:eof` must never be compared as a string (to_string yields "eof"), or a
+  headless release boot would abort mid-migration instead of taking the
+  [Y/n] default.
   """
+  def proceed_answer?(:eof), do: true
+
   def proceed_answer?(input) do
     case input |> to_string() |> String.trim() |> String.downcase() do
       "" -> true
