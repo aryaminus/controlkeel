@@ -19,11 +19,23 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
        local provisioning, which runs right after migrations at boot), so the
        boot seed reuses this org instead of creating a second one — legacy
        sets and the Default Workspace end up in the same org.
-    3. `org_id` is flipped to NOT NULL via a SQLite table rebuild. Because
-       `policy_sets` is the parent of `workspace_policy_sets`
-       (ON DELETE CASCADE), dropping it directly would cascade-wipe every
-       assignment row (the hazard documented in `20260828000001`), so the
-       join table is backed up first and restored after the rebuild.
+    3. `org_id` is flipped to NOT NULL. Because `policy_sets` is the parent of
+       `workspace_policy_sets` (ON DELETE CASCADE), dropping it directly on
+       SQLite would cascade-wipe every assignment row (the hazard documented
+       in `20260828000001`), so the join table is backed up first and
+       restored after the rebuild.
+
+  ## SQLite
+
+  `org_id` is flipped via a table rebuild following the house pattern
+  (`20260717220000`): join-table backup -> rebuild `policy_sets` with
+  `org_id INTEGER NOT NULL` -> restore.
+
+  ## Postgres
+
+  `ALTER TABLE … ALTER COLUMN org_id SET NOT NULL` is native; the backfill
+  above has already replaced any NULLs, so the flip validates in place.
+  No table rebuild (and no join-table dance) is needed.
 
   Empty databases (fresh installs) have no org-less sets, so the prompt and
   default-org creation never fire — new installations are provisioned by
@@ -58,11 +70,37 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
         backfill_sets(sets, org_ids)
     end
 
-    rebuild_policy_sets(org_not_null: true)
+    flip_org_not_null()
   end
 
   def down do
-    rebuild_policy_sets(org_not_null: false)
+    if sqlite_repo?() do
+      rebuild_policy_sets(org_not_null: false)
+    else
+      alter table(:policy_sets) do
+        modify :org_id, :bigint, null: true
+      end
+    end
+  end
+
+  # Postgres flips the flag natively; the backfill above has already
+  # eliminated NULLs, so SET NOT NULL validates in place.
+  defp flip_org_not_null do
+    if sqlite_repo?() do
+      rebuild_policy_sets(org_not_null: true)
+    else
+      alter table(:policy_sets) do
+        modify :org_id, :bigint, null: false
+      end
+    end
+  end
+
+  defp sqlite_repo?, do: repo().__adapter__() == Ecto.Adapters.SQLite3
+
+  # Schema-less insert_all bypasses Ecto type casting: SQLite stores JSON in a
+  # TEXT column (pre-encoded string), Postgres jsonb wants the native map.
+  defp settings_payload do
+    if sqlite_repo?(), do: Jason.encode!(%{}), else: %{}
   end
 
   # --- Ownership resolution (public + pure for tests) ---------------------
@@ -185,7 +223,11 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     %{"name" => @default_org_name, "slug" => @default_org_slug, "status" => "active"}
-    |> Map.merge(%{"inserted_at" => now, "updated_at" => now, "settings" => %{} |> Jason.encode!()})
+    |> Map.merge(%{
+      "inserted_at" => now,
+      "updated_at" => now,
+      "settings" => settings_payload()
+    })
     |> then(fn attrs -> repo().insert_all("orgs", [attrs]) end)
 
     [default_org_id] =
@@ -224,9 +266,10 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
   # --- Table rebuild --------------------------------------------------------
 
   # SQLite cannot ALTER a column to NOT NULL; rebuild per the house pattern
-  # (20260717220000). policy_sets is the PARENT of workspace_policy_sets
-  # (ON DELETE CASCADE): dropping it fires the cascade and wipes assignments,
-  # so the join table is backed up and restored around the rebuild.
+  # (20260717220000, Postgres branch lives in flip_org_not_null/0).
+  # policy_sets is the PARENT of workspace_policy_sets (ON DELETE CASCADE):
+  # dropping it fires the cascade and wipes assignments, so the join table is
+  # backed up and restored around the rebuild. Postgres never takes this path.
   defp rebuild_policy_sets(org_not_null: org_not_null) do
     execute("CREATE TABLE workspace_policy_sets_backfill_backup AS SELECT * FROM workspace_policy_sets")
     execute("DROP TABLE workspace_policy_sets")
