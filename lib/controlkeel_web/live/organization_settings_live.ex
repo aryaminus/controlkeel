@@ -62,8 +62,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def handle_event("set_tab", %{"tab" => tab}, socket) when tab in @tabs do
-    {:noreply,
-     push_patch(socket, to: ~p"/#{socket.assigns.org.slug}/settings?tab=#{tab}")}
+    {:noreply, push_patch(socket, to: ~p"/#{socket.assigns.org.slug}/settings?tab=#{tab}")}
   end
 
   def handle_event("set_tab", _params, socket), do: {:noreply, socket}
@@ -437,16 +436,6 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-8">
-      <div class="space-y-2">
-        <p class="text-sm font-medium text-primary">Organization</p>
-        <h1 class="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          Settings
-        </h1>
-        <p class="text-sm text-muted-foreground">
-          Manage settings for {@org.name}.
-        </p>
-      </div>
-
       <div class="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav
           class="rounded-2xl border bg-card shadow-card lg:self-start lg:p-3"
@@ -518,62 +507,159 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   defp general_panel(assigns) do
     ~H"""
-    <section class="rounded-2xl border bg-card p-6 shadow-card">
+    <section>
+      <div class="space-y-1 mb-8">
+        <.section_title>
+          General
+        </.section_title>
+        <p class="text-sm text-muted-foreground">
+          Organization identity, status, and spend limits.
+        </p>
+      </div>
+
       <.form
         for={@settings_form}
         phx-submit="save_settings"
         id="org-settings-form"
-        class="space-y-5"
+        class="space-y-6"
       >
-        <.input
-          field={@settings_form[:name]}
-          type="text"
-          label="Organization name"
-          required
-          class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        />
+        <div class="rounded-2xl border border-border/80 bg-card shadow-card divide-y divide-border/60">
+          <div class="p-6 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_minmax(0,1.2fr)] sm:items-center">
+            <div>
+              <label
+                for={@settings_form[:name].id || "settings_name"}
+                class="block text-sm font-semibold text-foreground"
+              >
+                Organization name
+              </label>
+              <p class="mt-1 text-xs text-muted-foreground">
+                Shown in the sidebar and breadcrumbs.
+              </p>
+            </div>
+            <div>
+              <input
+                type="text"
+                id={@settings_form[:name].id || "settings_name"}
+                name={@settings_form[:name].name || "settings[name]"}
+                value={@settings_form[:name].value}
+                required
+                class="w-full rounded-xl border border-input/60 bg-background/50 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+              />
+              <%= for msg <- @settings_form[:name].errors do %>
+                <p class="mt-1 text-xs text-destructive">{msg}</p>
+              <% end %>
+            </div>
+          </div>
 
-        <div>
-          <.input
-            field={@settings_form[:status]}
-            type="select"
-            label="Status"
-            options={[{"active", "active"}, {"disabled", "disabled"}]}
-            disabled={!panel_owner?(@current_membership, @local_mode)}
-            class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          <%= unless panel_owner?(@current_membership, @local_mode) do %>
-            <p class="mt-1 text-xs text-muted-foreground">Only owners can change status.</p>
-          <% end %>
+          <div class="p-6 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_minmax(0,1.2fr)] sm:items-center">
+            <div>
+              <label
+                for={@settings_form[:status].id || "settings_status"}
+                class="block text-sm font-semibold text-foreground"
+              >
+                Status
+              </label>
+              <p class="mt-1 text-xs text-muted-foreground">
+                Inactive organizations stop accepting new sessions.
+              </p>
+            </div>
+            <div>
+              <div class="relative w-full">
+                <select
+                  id={@settings_form[:status].id || "settings_status"}
+                  name={@settings_form[:status].name || "settings[status]"}
+                  disabled={!panel_owner?(@current_membership, @local_mode)}
+                  class="w-full appearance-none rounded-xl border border-input/60 bg-background/50 pl-3.5 pr-10 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option
+                    value="active"
+                    selected={to_string(@settings_form[:status].value) != "disabled"}
+                  >
+                    Active
+                  </option>
+                  <option
+                    value="disabled"
+                    selected={to_string(@settings_form[:status].value) == "disabled"}
+                  >
+                    Disabled
+                  </option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-muted-foreground">
+                  <.icon name="hero-chevron-down" class="size-4" />
+                </div>
+              </div>
+              <%= unless panel_owner?(@current_membership, @local_mode) do %>
+                <p class="mt-1 text-xs text-muted-foreground">Only owners can change status.</p>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="p-6 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_minmax(0,1.2fr)] sm:items-center">
+            <div>
+              <label
+                for={@settings_form[:budget_cents].id || "settings_budget_cents"}
+                class="block text-sm font-semibold text-foreground"
+              >
+                Monthly budget
+              </label>
+              <p class="mt-1 text-xs text-muted-foreground">
+                Spend cap in cents. 0 means no limit.
+              </p>
+            </div>
+            <div>
+              <div class="relative w-full">
+                <input
+                  type="number"
+                  id={@settings_form[:budget_cents].id || "settings_budget_cents"}
+                  name={@settings_form[:budget_cents].name || "settings[budget_cents]"}
+                  value={@settings_form[:budget_cents].value}
+                  min="0"
+                  disabled={!panel_owner?(@current_membership, @local_mode)}
+                  class="w-full rounded-xl border border-input/60 bg-background/50 pl-3.5 pr-28 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-sm text-muted-foreground">
+                  cents / mo
+                </div>
+              </div>
+              <%= unless panel_owner?(@current_membership, @local_mode) do %>
+                <p class="mt-1 text-xs text-muted-foreground">Only owners can change budget.</p>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="p-6 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_minmax(0,1.2fr)] sm:items-center">
+            <div>
+              <span class="block text-sm font-semibold text-foreground">
+                Slug
+              </span>
+              <p class="mt-1 text-xs text-muted-foreground">
+                Used in URLs and the API.
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center rounded-lg border border-border/80 bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground shadow-sm">
+                {@org.slug}
+              </span>
+              <span class="text-xs text-muted-foreground">
+                Cannot be changed
+              </span>
+            </div>
+          </div>
         </div>
-
-        <div>
-          <.input
-            field={@settings_form[:budget_cents]}
-            type="number"
-            label="Monthly budget (cents)"
-            disabled={!panel_owner?(@current_membership, @local_mode)}
-            class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          <%= unless panel_owner?(@current_membership, @local_mode) do %>
-            <p class="mt-1 text-xs text-muted-foreground">Only owners can change budget.</p>
-          <% end %>
-        </div>
-
-        <p class="text-xs text-muted-foreground">
-          Slug <code class="text-muted-foreground">{@org.slug}</code> cannot be changed.
-        </p>
 
         <%= if @settings_error do %>
-          <p class="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <p class="rounded-lg bg-destructive/10 px-4 py-2.5 text-sm text-destructive border border-destructive/20">
             {@settings_error}
           </p>
         <% end %>
 
-        <div class="flex justify-end pt-2">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-1">
+          <p class="text-xs sm:text-sm text-muted-foreground">
+            Changes apply to all workspaces.
+          </p>
           <button
             type="submit"
-            class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary"
+            class="inline-flex items-center justify-center rounded-xl bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20 px-5 py-2.5 text-sm font-semibold transition active:scale-[0.98] cursor-pointer shadow-sm disabled:pointer-events-none disabled:opacity-50"
           >
             Save changes
           </button>
@@ -596,61 +682,58 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   defp policy_sets_panel(assigns) do
     ~H"""
-    <section class="space-y-4">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <p class="text-sm font-semibold text-foreground">Custom policy sets</p>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Every agent action passes through these policy packs before it executes. The
-            sets below belong to {@org.name}; its workspaces can apply them.
+    <section>
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
+        <div class="space-y-1">
+          <.section_title>
+            Policy sets
+          </.section_title>
+          <p class="text-sm text-muted-foreground">
+            Every agent action passes through these policy packs before it executes.
           </p>
         </div>
 
-        <div class="flex shrink-0 gap-2">
-          <.button variant="outline" phx-click="open_packs_dialog">View packs</.button>
-          <.button phx-click="open_create_modal">
-            <.icon name="hero-plus" class="size-3.5" /> New policy set
-          </.button>
+        <div class="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            phx-click="open_packs_dialog"
+            class="inline-flex items-center justify-center rounded-xl border border-border/80 bg-background/50 hover:bg-muted/40 px-4 py-2 text-sm font-semibold text-foreground transition cursor-pointer shadow-sm"
+          >
+            View packs
+          </button>
+          <button
+            type="button"
+            phx-click="open_create_modal"
+            class="inline-flex items-center justify-center gap-1 rounded-xl bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20 px-4 py-2 text-sm font-semibold transition active:scale-[0.98] cursor-pointer shadow-sm"
+          >
+            + New policy set
+          </button>
         </div>
       </div>
 
-      <div class="rounded-2xl border bg-card p-5 shadow-card">
+      <div class="rounded-2xl border border-border/80 bg-card shadow-card divide-y divide-border/60">
         <%= if @policy_sets == [] do %>
-          <p class="text-sm text-muted-foreground">
-            No custom policy sets yet. Use the New policy set button to create one.
-          </p>
+          <div class="p-6">
+            <p class="text-sm text-muted-foreground">
+              No custom policy sets yet. Use the New policy set button to create one.
+            </p>
+          </div>
         <% else %>
-          <ul class="divide-y divide-border">
-            <%= for set <- @policy_sets do %>
-              <li class="py-4 first:pt-0 last:pb-0">
-                <div class="flex items-center justify-between gap-4">
-                  <h3 class="text-base font-semibold text-foreground">{set.name}</h3>
-                  <span
-                    title={set.status}
-                    class={"inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 #{status_pill_class(set.status)}"}
-                  >
-                    {set.status}
-                  </span>
-                </div>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {length(ControlKeel.Platform.PolicySet.rule_entries(set))} rules
-                  <%= if set.description not in [nil, ""] do %>
-                    · {set.description}
+          <%= for set <- @policy_sets do %>
+            <div class="p-6 flex items-center justify-between gap-4">
+              <div class="space-y-1">
+                <h3 class="text-base font-semibold text-foreground">{set.name}</h3>
+                <%= if set.description not in [nil, ""] do %>
+                  <p class="text-sm text-muted-foreground">{set.description}</p>
+                <% end %>
+                <p class="text-xs sm:text-sm text-muted-foreground">
+                  {length(ControlKeel.Platform.PolicySet.rule_entries(set))} rules ·
+                  <%= if set.workspace_policy_sets != [] do %>
+                    Applied to {Enum.map_join(set.workspace_policy_sets, ", ", &assignment_summary/1)}
+                  <% else %>
+                    Not applied to any workspace yet
                   <% end %>
                 </p>
-                <%= if set.workspace_policy_sets != [] do %>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    Applied to: {Enum.map_join(
-                      set.workspace_policy_sets,
-                      ", ",
-                      &assignment_summary/1
-                    )}
-                  </p>
-                <% else %>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    Not applied to any workspace yet.
-                  </p>
-                <% end %>
                 <% entries =
                   Enum.filter(ControlKeel.Platform.PolicySet.rule_entries(set), &is_binary(&1["id"])) %>
                 <%= if entries != [] do %>
@@ -666,21 +749,25 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
                     <% end %>
                   </div>
                 <% end %>
-              </li>
-            <% end %>
-          </ul>
-        <% end %>
+              </div>
 
-        <div class="mt-4 border-t pt-4">
-          <p class="text-sm text-muted-foreground">
-            <span class="mr-1 inline-flex rounded-full bg-destructive/10 px-2.5 py-1 align-middle text-xs font-semibold text-destructive ring-1 ring-destructive/20">
-              {@block_count} rules
-            </span>
-            block agent actions when violated; other rules only warn. {@pack_count} packs ·
-            {@rule_count} rules total, shipped with ControlKeel.
-          </p>
-        </div>
+              <div class="shrink-0">
+                <span
+                  title={set.status}
+                  class={"inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset #{status_pill_class(set.status)}"}
+                >
+                  {set.status}
+                </span>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
       </div>
+
+      <p class="mt-6 text-xs sm:text-sm text-muted-foreground">
+        <span class="font-semibold text-destructive">{@block_count} rules</span>
+        block agent actions when violated; other rules only warn. {@pack_count} packs · {@rule_count} rules total, shipped with ControlKeel.
+      </p>
     </section>
     """
   end
