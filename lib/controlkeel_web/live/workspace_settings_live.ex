@@ -229,6 +229,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
               policy_assignments={@policy_assignments}
               available_sets={@available_sets}
               apply_form={@apply_form}
+              org_settings_href={@org_settings_href}
             />
         <% end %>
       </div>
@@ -239,6 +240,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   attr :policy_assignments, :list, required: true
   attr :available_sets, :list, required: true
   attr :apply_form, :map, required: true
+  attr :org_settings_href, :string, default: nil
 
   defp policy_sets_panel(assigns) do
     ~H"""
@@ -339,11 +341,14 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
 
       <%= if @available_sets == [] do %>
         <p class="mt-4 text-xs text-muted-foreground">
-          All policy sets are applied. Go to
-          <.link navigate={~p"/policies"} class="font-medium text-primary hover:underline">
-            Policy Studio
+          All policy sets are applied. Admin can create new org policies under
+          <.link
+            :if={@org_settings_href}
+            navigate={@org_settings_href}
+            class="font-medium text-primary hover:underline"
+          >
+            Organization settings → Policy sets
           </.link>
-          to create new policies.
         </p>
       <% end %>
     </section>
@@ -456,17 +461,25 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
   defp refresh_policy_assigns(socket) do
     # Display list includes disabled assignments; the dropdown excludes any
     # set with an assignment row so re-applying never silently flips a
-    # disabled assignment back to enabled via the upsert.
-    assignments = Platform.list_workspace_policy_assignments(socket.assigns.workspace.id)
+    # disabled assignment back to enabled via the upsert. Availability is
+    # org-scoped: only sets owned by the workspace's org are shown (org-nil
+    # solo workspaces see an empty picker).
+    workspace = socket.assigns.workspace
+    assignments = Platform.list_workspace_policy_assignments(workspace.id)
     assigned_ids = Enum.map(assignments, & &1.policy_set_id)
 
     available_sets =
-      Platform.list_policy_sets()
+      Platform.list_policy_sets(workspace.org_id)
       |> Enum.reject(&(&1.id in assigned_ids))
+
+    org_settings_href =
+      workspace.org &&
+        ~p"/#{workspace.org.slug}/settings?tab=policy_sets"
 
     socket
     |> assign(:policy_assignments, assignments)
     |> assign(:available_sets, available_sets)
+    |> assign(:org_settings_href, org_settings_href)
   end
 
   defp assign_workspace_settings(socket) do

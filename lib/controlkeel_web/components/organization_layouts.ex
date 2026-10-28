@@ -462,7 +462,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     "reviews" => "Reviews",
     "organizations" => "Organizations",
     "workspaces" => "Workspaces",
-    "policies" => "Policy Studio",
     "skills" => "Skills",
     "cloud" => "Cloud",
     "observability" => "Observability",

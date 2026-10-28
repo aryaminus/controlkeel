@@ -4,6 +4,7 @@ defmodule ControlKeel.Platform.WorkspacePolicySet do
 
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform.PolicySet
+  alias ControlKeel.Repo
 
   schema "workspace_policy_sets" do
     field :precedence, :integer, default: 100
@@ -25,6 +26,49 @@ defmodule ControlKeel.Platform.WorkspacePolicySet do
     )
     |> assoc_constraint(:workspace)
     |> assoc_constraint(:policy_set)
+    |> validate_same_org()
     |> unique_constraint([:workspace_id, :policy_set_id])
+  end
+
+  # Org-exclusive linkage invariant (approved plan): a policy set may only be
+  # attached to a workspace of the org that owns it. Both ids must resolve and
+  # be org-bound — legacy org-less sets fail validation until they are
+  # backfilled, and solo (org-nil) workspaces cannot attach org policies.
+  #
+  # Known limitation (CK finding #20, intentional — do not "fix" silently):
+  # legacy assignments on solo (org-nil) workspaces are still evaluated but
+  # can no longer be toggled, because disable/re-enable re-save through this
+  # changeset and the workspace has no org to compare against. Removal still
+  # works (and is one-way). Deferred by decision: a future PR will require
+  # every workspace to live inside an org, which eliminates solo workspaces
+  # and this edge. If the edge survives that PR, the candidate fix is a
+  # disable-direction bypass (existing enabled=true row being set to
+  # enabled=false) — removal cannot create new cross-org coverage, so only
+  # fresh attaches and re-enables need this check.
+  defp validate_same_org(changeset) do
+    with %{} = workspace when not is_nil(workspace.id) <- fetch_workspace(changeset),
+         %{} = policy_set when not is_nil(policy_set.id) <- fetch_policy_set(changeset),
+         ws_org_id when is_integer(ws_org_id) <- workspace.org_id,
+         set_org_id when is_integer(set_org_id) <- policy_set.org_id,
+         true <- ws_org_id == set_org_id do
+      changeset
+    else
+      _ ->
+        add_error(changeset, :policy_set_id, "must belong to the workspace's organization")
+    end
+  end
+
+  defp fetch_workspace(changeset) do
+    case get_field(changeset, :workspace_id) do
+      nil -> nil
+      id -> Repo.get(Workspace, id)
+    end
+  end
+
+  defp fetch_policy_set(changeset) do
+    case get_field(changeset, :policy_set_id) do
+      nil -> nil
+      id -> Repo.get(PolicySet, id)
+    end
   end
 end

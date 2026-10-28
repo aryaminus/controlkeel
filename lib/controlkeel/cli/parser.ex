@@ -166,13 +166,13 @@ defmodule ControlKeel.CLI.Parser do
   ]
   @service_account_list_switches [workspace_id: :integer, json: :boolean]
   @policy_set_create_switches [
+    org_id: :integer,
     name: :string,
-    scope: :string,
     description: :string,
     rules_file: :string,
     json: :boolean
   ]
-  @policy_set_list_switches [workspace_id: :integer, json: :boolean]
+  @policy_set_list_switches [org_id: :integer, workspace_id: :integer, json: :boolean]
   @policy_set_apply_switches [precedence: :integer, json: :boolean]
   @webhook_create_switches [
     workspace_id: :integer,
