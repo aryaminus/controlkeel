@@ -901,9 +901,8 @@ defmodule ControlKeel.Project.WorkspaceContext do
   end
 
   defp line_count(contents) when is_binary(contents) do
-    contents
-    |> String.split("\n", trim: false)
-    |> length()
+    # ⚡ Bolt Optimization: Use :binary.matches to avoid allocating massive intermediate lists for line counting
+    length(:binary.matches(contents, "\n")) + 1
   end
 
   defp blank_or_none(""), do: "none"
