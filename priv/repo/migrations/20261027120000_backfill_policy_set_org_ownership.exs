@@ -240,9 +240,15 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
 
   defp log_mismatched_assignments do
     # Assignment rows whose workspace org cannot match the (now org-owned)
-    # set: solo org-nil workspaces, or workspaces of a different org than the
-    # defaulted set. They keep evaluating rules; re-applying them will ask
-    # for a re-home. Informational only.
+    # set: workspaces of a different org than the defaulted set, or solo
+    # org-nil workspaces. They keep evaluating rules.
+    #
+    # Known consequence for the solo-workspace rows (CK finding #20,
+    # documented at WorkspacePolicySet.validate_same_org/1): their
+    # assignments can no longer be toggled — disable/re-enable re-save
+    # through the changeset, which rejects the org-nil workspace. Removal
+    # still works, and is one-way. Deferred until the future PR requiring
+    # every workspace to live inside an org.
     mismatched =
       from(j in "workspace_policy_sets",
         join: s in "policy_sets",
@@ -258,7 +264,8 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
       Logger.warning(
         "policy_sets org backfill: #{mismatched} workspace assignment(s) reference a " <>
           "workspace whose organization does not match the set's organization. They still " <>
-          "evaluate, but must be re-applied from the matching org to change."
+          "evaluate, but must be re-applied from the matching org to change. Assignments " <>
+          "on org-less workspaces cannot be toggled (see WorkspacePolicySet.validate_same_org)."
       )
     end
   end
