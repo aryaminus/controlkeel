@@ -131,7 +131,6 @@ defmodule ControlKeelWeb.Router do
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults
       ] do
-      live "/dashboard", DashboardLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
