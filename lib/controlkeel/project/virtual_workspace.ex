@@ -620,7 +620,8 @@ defmodule ControlKeel.Project.VirtualWorkspace do
     case File.read(path) do
       {:ok, contents} ->
         if String.valid?(contents) and not String.contains?(contents, <<0>>) do
-          length(String.split(contents, "\n", trim: false))
+          # OPTIMIZATION: Avoid list allocation from String.split for counting lines
+          length(:binary.matches(contents, "\n")) + 1
         else
           nil
         end
