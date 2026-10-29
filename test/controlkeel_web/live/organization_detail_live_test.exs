@@ -303,6 +303,84 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
   end
 
+  describe "org dashboard stats" do
+    setup do
+      owner = create_user!("stats-org@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Statsco", slug: "statsco"})
+
+      {:ok, org: org, owner: owner}
+    end
+
+    test "renders org-scoped stat cards", %{owner: owner, org: org} do
+      {:ok, ws} =
+        ControlKeel.Mission.create_workspace(%{
+          name: "Stats Workspace",
+          slug: "stats-ws",
+          industry: "web",
+          agent: "claude",
+          budget_cents: 1_000,
+          compliance_profile: "general",
+          status: "active",
+          org_id: org.id
+        })
+
+      {:ok, _session} =
+        ControlKeel.Mission.create_session(%{
+          title: "Stats session",
+          objective: "Render org stats",
+          risk_tier: "low",
+          status: "active",
+          budget_cents: 1_000,
+          spent_cents: 0,
+          workspace_id: ws.id
+        })
+
+      # A foreign-org session must stay out of this org's stats.
+      other_owner = create_user!("other-stats@example.com")
+
+      {:ok, other_org} =
+        Accounts.create_org_with_owner(other_owner.id, %{name: "Other Statsco", slug: "ostatsco"})
+
+      {:ok, other_ws} =
+        ControlKeel.Mission.create_workspace(%{
+          name: "Other Workspace",
+          slug: "other-stats-ws",
+          industry: "web",
+          agent: "claude",
+          budget_cents: 1_000,
+          compliance_profile: "general",
+          status: "active",
+          org_id: other_org.id
+        })
+
+      {:ok, _other_session} =
+        ControlKeel.Mission.create_session(%{
+          title: "Foreign session",
+          objective: "Stay out of Statsco",
+          risk_tier: "low",
+          status: "active",
+          budget_cents: 1_000,
+          spent_cents: 0,
+          workspace_id: other_ws.id
+        })
+
+      {:ok, _view, html} = live(conn_for(owner), ~p"/#{org.slug}")
+
+      assert html =~ "Proof Coverage"
+      assert html =~ "Deploy Ready"
+      assert html =~ "Finding Density"
+      assert html =~ "Sessions"
+      assert html =~ "Members"
+    end
+
+    test "an org without sessions shows the no-data defaults", %{owner: owner, org: _org} do
+      {:ok, _view, html} = live(conn_for(owner), ~p"/statsco")
+
+      assert html =~ "Not recorded"
+      refute html =~ "Foreign session"
+    end
+  end
+
   describe "org settings modal" do
     setup do
       owner = create_user!("owner-set@example.com")

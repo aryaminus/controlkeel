@@ -26,6 +26,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Analytics
   alias ControlKeel.Mission
   alias ControlKeel.Repo
   alias ControlKeel.Runtime.Mode
@@ -50,7 +51,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   defp mount_ok(socket, org, membership) do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
-    member_count = Accounts.count_memberships_for_org(org.id)
     memberships = if(local_mode, do: [], else: load_memberships(org.id))
 
     {:ok,
@@ -60,7 +60,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
      |> assign(:nav_org, org)
      |> assign(:local_mode, local_mode)
      |> assign(:budget_cents, budget_cents)
-     |> assign(:member_count, member_count)
+     |> assign(:ship_summary, Analytics.funnel_summary(org_id: org.id))
      |> assign(:current_membership, membership)
      |> assign(:memberships, memberships)
      |> assign(:workspaces, load_workspaces(org.id))
@@ -363,69 +363,88 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-6">
-      <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div class="space-y-2">
-          <div class="flex flex-wrap items-center gap-3">
-            <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-              {@org.name}
-            </h1>
+      <div class="space-y-2">
+        <div class="flex flex-wrap items-center gap-3">
+          <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+            {@org.name}
+          </h1>
 
-            <span class={[
-              "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-              @org.status == "active" && "bg-success/10 text-success ring-success/20",
-              @org.status != "active" && "bg-muted text-muted-foreground ring-border"
-            ]}>
-              {@org.status}
-            </span>
-          </div>
-
-          <%= if @local_mode do %>
-            <p class="text-sm text-muted-foreground">
-              View organization details below. Member management is unavailable in local mode.
-            </p>
-          <% else %>
-            <p class="text-sm text-muted-foreground">
-              Invite teammates, adjust roles, and keep ownership boundaries clear.
-            </p>
-          <% end %>
+          <span class={[
+            "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+            @org.status == "active" && "bg-success/10 text-success ring-success/20",
+            @org.status != "active" && "bg-muted text-muted-foreground ring-border"
+          ]}>
+            {@org.status}
+          </span>
         </div>
 
-        <div class="flex flex-wrap gap-x-8 gap-y-3">
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Slug
-            </span>
-            <span class="font-mono text-sm text-foreground">{@org.slug}</span>
-          </div>
+        <%= if @local_mode do %>
+          <p class="text-sm text-muted-foreground">
+            View organization details below. Member management is unavailable in local mode.
+          </p>
+        <% else %>
+          <p class="text-sm text-muted-foreground">
+            Invite teammates, adjust roles, and keep ownership boundaries clear.
+          </p>
+        <% end %>
+      </div>
 
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Members
-            </span>
-            <span class="text-sm font-semibold text-foreground">{@member_count}</span>
-          </div>
+      <%!-- Identity metadata as plain text — no box; the numbers live in the
+           metrics band below. --%>
+      <p class="text-xs text-muted-foreground">
+        <span class="font-mono">{@org.slug}</span>
+        <span class="mx-2">·</span>
+        Budget {if @budget_cents > 0, do: "$#{Float.round(@budget_cents / 100, 2)}", else: "—"}
+        <span class="mx-2">·</span>
+        Created {Calendar.strftime(@org.inserted_at, "%b %d, %Y")}
+      </p>
 
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Monthly budget
-            </span>
-            <span class="text-sm font-semibold text-foreground">
-              <%= if @budget_cents > 0 do %>
-                {"$#{Float.round(@budget_cents / 100, 2)}"}
-              <% else %>
-                <span class="text-muted-foreground">—</span>
-              <% end %>
-            </span>
-          </div>
+      <%!-- Org-scoped dashboard stats (Analytics.funnel_summary/1 with :org_id),
+           rendered as one compact band instead of per-metric cards. --%>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl border bg-card px-5 py-4 shadow-card sm:grid-cols-3 xl:grid-cols-5">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Proof Coverage
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {format_percent(@ship_summary.outcome_metrics.proof_backed_task_coverage_percent)}
+          </span>
+        </div>
 
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Created
-            </span>
-            <span class="text-sm text-foreground">
-              {Calendar.strftime(@org.inserted_at, "%b %d, %Y")}
-            </span>
-          </div>
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Deploy Ready
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {format_percent(@ship_summary.outcome_metrics.deploy_ready_task_rate_percent)}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Finding Density
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {format_number(@ship_summary.average_findings_per_session)}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Sessions
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {@ship_summary.recent_session_count}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Members
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {if @local_mode, do: "—", else: length(@memberships)}
+          </span>
         </div>
       </div>
 
@@ -953,6 +972,15 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   # ── Private ─────────────────────────────────────────────────────────
 
+  # Stat formatting ported from the retired DashboardLive (docs/retire-dashboard-issue.md).
+  defp format_percent(nil), do: "Not recorded"
+  defp format_percent(value) when is_float(value), do: "#{Float.round(value, 1)}%"
+  defp format_percent(value), do: "#{value}%"
+
+  defp format_number(nil), do: "Not recorded"
+  defp format_number(value) when is_float(value), do: Float.round(value, 1)
+  defp format_number(value), do: value
+
   defp load_memberships(org_id) do
     Accounts.list_memberships_for_org(org_id)
     |> Repo.preload(:user)
@@ -1017,7 +1045,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
     socket
     |> assign(:memberships, memberships)
-    |> assign(:member_count, Accounts.count_memberships_for_org(org_id))
     |> assign(:active_owner_count, count_active_owners(memberships))
     |> assign(:current_membership, viewer_membership)
   end
