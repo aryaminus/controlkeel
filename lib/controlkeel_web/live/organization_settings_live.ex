@@ -912,8 +912,10 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       <%= if @local_mode do %>
         <div class="rounded-2xl border border-border/80 bg-card shadow-card p-6">
           <p class="text-sm text-muted-foreground">
-            Member management is not available in local mode. Switch to cloud or self-hosted mode
-            to invite teammates and manage roles.
+            Member management is not available in local mode.
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Switch to cloud or self-hosted mode to invite teammates and manage roles.
           </p>
         </div>
       <% else %>
@@ -1101,15 +1103,13 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
             <div class="space-y-3">
               <%= if @revoke_is_self do %>
                 <p class="text-sm text-muted-foreground">
-                  You are about to
-                  <strong class="text-foreground">revoke your own membership</strong>
+                  You are about to <strong class="text-foreground">revoke your own membership</strong>
                   in <strong class="text-foreground">{@org_name}</strong>.
                   You will lose access to this organization immediately.
                 </p>
               <% else %>
                 <p class="text-sm text-muted-foreground">
-                  You are about to revoke membership for
-                  <strong class="text-foreground">{@revoke_target.user && @revoke_target.user.email}</strong>.
+                  You are about to revoke membership for <strong class="text-foreground">{@revoke_target.user && @revoke_target.user.email}</strong>.
                   They will lose access to <strong class="text-foreground">{@org_name}</strong>
                   immediately.
                 </p>

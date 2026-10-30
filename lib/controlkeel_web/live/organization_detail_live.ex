@@ -113,6 +113,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   defp maybe_refresh_org(socket, _slug), do: socket
 
+  @impl true
   def handle_event("new_workspace", _params, socket) do
     {:noreply, assign(socket, :show_new_workspace, true)}
   end
@@ -293,77 +294,76 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
           Time to first finding —
           avg {if @ship_summary.average_time_to_first_finding_seconds,
             do: "#{format_number(@ship_summary.average_time_to_first_finding_seconds)}s",
-            else: "Not recorded"}
-          · median {if @ship_summary.median_time_to_first_finding_seconds,
+            else: "Not recorded"} · median {if @ship_summary.median_time_to_first_finding_seconds,
             do: "#{format_number(@ship_summary.median_time_to_first_finding_seconds)}s",
             else: "Not recorded"}
         </p>
       </section>
 
       <div class="flex items-center justify-between gap-3">
-          <p class="text-sm text-muted-foreground">
+        <p class="text-sm text-muted-foreground">
+          Workspaces group sessions, findings, and budgets under this organization.
+        </p>
+        <.button
+          variant="outline"
+          phx-click="new_workspace"
+          class="shrink-0 rounded-full px-4 py-2 text-sm font-medium"
+        >
+          <.icon name="hero-plus" class="size-4" /> New Workspace
+        </.button>
+      </div>
+
+      <%= if @workspaces == [] do %>
+        <section class="rounded-2xl border bg-card p-12 text-center shadow-card">
+          <.icon name="hero-squares-2x2" class="mx-auto size-10 text-muted-foreground" />
+          <p class="mt-4 text-base font-medium text-foreground">No workspaces yet.</p>
+          <p class="mt-1 text-sm text-muted-foreground">
             Workspaces group sessions, findings, and budgets under this organization.
           </p>
-          <.button
-            variant="outline"
-            phx-click="new_workspace"
-            class="shrink-0 rounded-full px-4 py-2 text-sm font-medium"
-          >
-            <.icon name="hero-plus" class="size-4" /> New Workspace
-          </.button>
-        </div>
-
-        <%= if @workspaces == [] do %>
-          <section class="rounded-2xl border bg-card p-12 text-center shadow-card">
-            <.icon name="hero-squares-2x2" class="mx-auto size-10 text-muted-foreground" />
-            <p class="mt-4 text-base font-medium text-foreground">No workspaces yet.</p>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Workspaces group sessions, findings, and budgets under this organization.
-            </p>
-          </section>
-        <% else %>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <%= for ws <- @workspaces do %>
-              <.link
-                href={~p"/#{@org.slug}/workspaces/#{ws.slug}"}
-                class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-info/10 text-info">
-                      <.icon name="hero-squares-2x2" class="size-4" />
-                    </span>
-                    <h3 class="truncate text-base font-semibold text-foreground transition group-hover:text-primary">
-                      {ws.name}
-                    </h3>
-                  </div>
-                  <span class={[
-                    "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                    ws.status == "active" && "bg-success/10 text-success ring-success/20",
-                    ws.status != "active" && "bg-muted text-muted-foreground ring-border"
-                  ]}>
-                    {ws.status}
+        </section>
+      <% else %>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <%= for ws <- @workspaces do %>
+            <.link
+              href={~p"/#{@org.slug}/workspaces/#{ws.slug}"}
+              class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex min-w-0 items-center gap-2">
+                  <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-info/10 text-info">
+                    <.icon name="hero-squares-2x2" class="size-4" />
                   </span>
+                  <h3 class="truncate text-base font-semibold text-foreground transition group-hover:text-primary">
+                    {ws.name}
+                  </h3>
                 </div>
-                <p class="mt-1 truncate font-mono text-xs text-muted-foreground">{ws.slug}</p>
-                <dl class="mt-4 grid grid-cols-2 gap-3 border-t pt-4">
-                  <div>
-                    <dt class="text-xs font-medium text-muted-foreground">Sessions</dt>
-                    <dd class="mt-1 text-lg font-semibold text-foreground/90">
-                      {length(ws.sessions)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-xs font-medium text-muted-foreground">Budget</dt>
-                    <dd class="mt-1 text-lg font-semibold text-foreground/90">
-                      {format_cents(ws.budget_cents)}
-                    </dd>
-                  </div>
-                </dl>
-              </.link>
-            <% end %>
-          </div>
-        <% end %>
+                <span class={[
+                  "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+                  ws.status == "active" && "bg-success/10 text-success ring-success/20",
+                  ws.status != "active" && "bg-muted text-muted-foreground ring-border"
+                ]}>
+                  {ws.status}
+                </span>
+              </div>
+              <p class="mt-1 truncate font-mono text-xs text-muted-foreground">{ws.slug}</p>
+              <dl class="mt-4 grid grid-cols-2 gap-3 border-t pt-4">
+                <div>
+                  <dt class="text-xs font-medium text-muted-foreground">Sessions</dt>
+                  <dd class="mt-1 text-lg font-semibold text-foreground/90">
+                    {length(ws.sessions)}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs font-medium text-muted-foreground">Budget</dt>
+                  <dd class="mt-1 text-lg font-semibold text-foreground/90">
+                    {format_cents(ws.budget_cents)}
+                  </dd>
+                </div>
+              </dl>
+            </.link>
+          <% end %>
+        </div>
+      <% end %>
 
       <%!-- Local-mode runtime status (retired-dashboard provider cards, re-homed):
            deployment-level, so only rendered where org == deployment. Static
@@ -392,11 +392,15 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
               </p>
               <p class="text-muted-foreground">
                 Attached agents:
-                <span class="font-semibold text-foreground">{attached_agents_copy(@provider_status)}</span>
+                <span class="font-semibold text-foreground">
+                  {attached_agents_copy(@provider_status)}
+                </span>
               </p>
               <p class="text-muted-foreground">
                 Setup scope:
-                <span class="font-semibold text-foreground">{setup_scope_copy(@provider_status)}</span>
+                <span class="font-semibold text-foreground">
+                  {setup_scope_copy(@provider_status)}
+                </span>
               </p>
             </div>
 
@@ -406,7 +410,9 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
               <p class="font-medium text-foreground">Bootstrap</p>
               <p class="text-muted-foreground">
                 Base URL:
-                <span class="font-semibold text-foreground">{selected_base_url(@provider_status)}</span>
+                <span class="font-semibold text-foreground">
+                  {selected_base_url(@provider_status)}
+                </span>
               </p>
               <p class="text-muted-foreground">
                 Auth:

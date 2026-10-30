@@ -284,7 +284,10 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
   # dropping it fires the cascade and wipes assignments, so the join table is
   # backed up and restored around the rebuild. Postgres never takes this path.
   defp rebuild_policy_sets(org_not_null: org_not_null) do
-    execute("CREATE TABLE workspace_policy_sets_backfill_backup AS SELECT * FROM workspace_policy_sets")
+    execute(
+      "CREATE TABLE workspace_policy_sets_backfill_backup AS SELECT * FROM workspace_policy_sets"
+    )
+
     execute("DROP TABLE workspace_policy_sets")
 
     execute("""

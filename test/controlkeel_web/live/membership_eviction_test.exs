@@ -219,7 +219,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
       owner = create_user!("owner")
       create_membership!(owner, org, "owner")
 
-      {:ok, view, _html} = live(conn_for(user), ~p"/#{org.slug}?tab=members")
+      {:ok, view, _html} = live(conn_for(user), ~p"/#{org.slug}/settings?tab=members")
       assert has_element?(view, "#invite-member-button")
 
       assert {:ok, %Accounts.Membership{role: "viewer"}} =
