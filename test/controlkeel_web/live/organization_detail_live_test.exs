@@ -73,18 +73,6 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "Create organization"
       assert html =~ "Joining a team?"
     end
-
-    test "owner can open Invite member from the Members tab", %{org: org, owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/#{org.slug}?tab=members")
-
-      assert has_element?(view, "#invite-member-button")
-
-      view
-      |> element("#invite-member-button")
-      |> render_click()
-
-      assert has_element?(view, "#invite-member-modal")
-    end
   end
 
   describe "admin viewer role controls" do
@@ -436,7 +424,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
   end
 
-  describe "workspaces and members tabs" do
+  describe "workspaces grid" do
     setup do
       owner = create_user!("tab-owner@example.com")
       {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Tabco", slug: "tabco"})
@@ -456,47 +444,26 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, org: org, owner: owner, workspace: ws}
     end
 
-    test "workspaces is the default tab and lists the org's workspaces", %{
+    test "org page lists the org's workspaces directly (no member UI, no tab bar)", %{
       owner: owner,
       workspace: ws
     } do
       {:ok, view, html} = live(conn_for(owner), ~p"/tabco")
 
       assert html =~ "Workspaces"
-      assert html =~ "?tab=members"
       assert render(view) =~ "core-workspace"
       # The workspace card links to its nested detail route.
       assert render(view) =~ ~s(href="/tabco/workspaces/#{ws.slug}")
       # Workspaces table shows budget and status.
       assert render(view) =~ "$123.45"
       assert render(view) =~ "active"
-      # Member management UI is not rendered on the default tab.
+      # Member management moved to the settings page: no roster UI here.
       refute render(view) =~ ~s(id="role-form-")
       refute render(view) =~ "No members yet."
+      refute html =~ "?tab=members"
     end
 
-    test "members tab lists memberships", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco?tab=members")
-
-      html = render(view)
-      assert html =~ "tab-owner@example.com"
-      refute html =~ "core-workspace"
-    end
-
-    test "clicking the Members tab switches content", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco")
-      assert render(view) =~ "core-workspace"
-
-      view
-      |> element("a[data-phx-link=\"patch\"][href=\"/tabco?tab=members\"]")
-      |> render_click()
-
-      html = render(view)
-      assert html =~ "tab-owner@example.com"
-      refute html =~ "core-workspace"
-    end
-
-    test "unknown tab value falls back to workspaces", %{owner: owner} do
+    test "query params on the org route are ignored", %{owner: owner} do
       {:ok, view, _html} = live(conn_for(owner), ~p"/tabco?tab=wat")
       assert render(view) =~ "core-workspace"
     end
@@ -687,16 +654,11 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, org: org}
     end
 
-    test "workspaces is the default tab and members shows the local-mode notice", %{org: _org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/local-org")
+    test "org overview shows no member management in local mode", %{org: _org} do
+      {:ok, view, html} = live(build_conn(), ~p"/local-org")
       assert render(view) =~ "Workspaces"
       refute render(view) =~ "Member management is not available in local mode."
-
-      {:ok, view, _html} = live(build_conn(), ~p"/local-org?tab=members")
-      html = render(view)
-
-      assert html =~ "Member management is not available in local mode."
-      assert html =~ "Switch to cloud or self-hosted mode to invite teammates and manage roles."
+      refute html =~ "?tab=members"
     end
   end
 end
