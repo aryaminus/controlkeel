@@ -26,8 +26,10 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Agent.ACPRegistry
   alias ControlKeel.Analytics
   alias ControlKeel.Mission
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
   alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.OrgAccess
@@ -51,6 +53,12 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     budget_cents = Accounts.org_budget_cents(org) || 0
     memberships = if(local_mode, do: [], else: load_memberships(org.id))
 
+    # Deployment-level runtime status (docs/retire-dashboard follow-up): only
+    # meaningful on the org page in local mode, where the single implicit org
+    # IS the deployment. ProviderBroker/ACPRegistry have no org dimension, so
+    # cloud mode leaves these nil and the render hides the section.
+    project_root = ControlKeelWeb.Endpoint.config(:project_root) || File.cwd!()
+
     {:ok,
      socket
      |> assign(:page_title, "Organization Detail — #{org.name}")
@@ -62,6 +70,11 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
      |> assign(:current_membership, membership)
      |> assign(:memberships, memberships)
      |> assign(:workspaces, load_workspaces(org.id))
+     |> assign(
+       :provider_status,
+       if(local_mode, do: ProviderBroker.status(project_root), else: nil)
+     )
+     |> assign(:registry_status, if(local_mode, do: ACPRegistry.status(), else: nil))
      |> assign(:show_new_workspace, false)
      |> assign(
        :new_workspace_form,
@@ -245,6 +258,48 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
         </div>
       </div>
 
+      <%!-- Org-scoped delivery funnel (Analytics.funnel_summary/1 with :org_id).
+           Recreated from the retired /dashboard: the steps and conversion
+           rates are computed over this org's recent sessions, so the section
+           is truthful in every runtime mode. --%>
+      <section id="org-delivery-funnel" class="rounded-2xl border bg-card p-5 shadow-card">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-foreground">Delivery Funnel</h2>
+          <span class="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+            {@ship_summary.recent_session_count} sessions
+          </span>
+        </div>
+
+        <div class="mt-4 space-y-4">
+          <%= for step <- @ship_summary.steps do %>
+            <div>
+              <div class="flex items-center justify-between gap-3 text-sm">
+                <span class="capitalize text-muted-foreground">
+                  {String.replace(step.step, "_", " ")}
+                </span>
+                <span class="font-semibold text-foreground">{step.count}</span>
+              </div>
+              <div class="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  class="h-full rounded-full bg-primary"
+                  style={"width: #{min(step.conversion_percent || 0, 100)}%"}
+                />
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <p class="mt-4 border-t pt-3 text-xs text-muted-foreground">
+          Time to first finding —
+          avg {if @ship_summary.average_time_to_first_finding_seconds,
+            do: "#{format_number(@ship_summary.average_time_to_first_finding_seconds)}s",
+            else: "Not recorded"}
+          · median {if @ship_summary.median_time_to_first_finding_seconds,
+            do: "#{format_number(@ship_summary.median_time_to_first_finding_seconds)}s",
+            else: "Not recorded"}
+        </p>
+      </section>
+
       <div class="flex items-center justify-between gap-3">
           <p class="text-sm text-muted-foreground">
             Workspaces group sessions, findings, and budgets under this organization.
@@ -309,6 +364,109 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
             <% end %>
           </div>
         <% end %>
+
+      <%!-- Local-mode runtime status (retired-dashboard provider cards, re-homed):
+           deployment-level, so only rendered where org == deployment. Static
+           resolution/autonomy copy lives at /docs/governance. --%>
+      <section :if={@local_mode} id="org-runtime-status" class="space-y-3 pt-2">
+        <div class="space-y-1">
+          <h2 class="text-lg font-semibold text-foreground">Runtime status</h2>
+          <p class="text-sm text-muted-foreground">
+            This deployment's provider resolution and agent registry. Shown in local mode only,
+            where the organization and the deployment are one and the same.
+          </p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-3 rounded-2xl border bg-card p-5 shadow-card">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-foreground">Provider snapshot</h3>
+              <span class="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                {provider_mode_label(@provider_status)}
+              </span>
+            </div>
+            <div class="space-y-1.5 text-sm">
+              <p class="text-muted-foreground">
+                Current provider:
+                <span class="font-semibold text-foreground">{provider_name(@provider_status)}</span>
+              </p>
+              <p class="text-muted-foreground">
+                Attached agents:
+                <span class="font-semibold text-foreground">{attached_agents_copy(@provider_status)}</span>
+              </p>
+              <p class="text-muted-foreground">
+                Setup scope:
+                <span class="font-semibold text-foreground">{setup_scope_copy(@provider_status)}</span>
+              </p>
+            </div>
+
+            <%!-- Bootstrap detail (from the retired "Provider and bootstrap
+                 status" panel) — deployment plumbing, local mode only. --%>
+            <div class="space-y-1.5 border-t pt-3 text-xs">
+              <p class="font-medium text-foreground">Bootstrap</p>
+              <p class="text-muted-foreground">
+                Base URL:
+                <span class="font-semibold text-foreground">{selected_base_url(@provider_status)}</span>
+              </p>
+              <p class="text-muted-foreground">
+                Auth:
+                <span class="font-semibold text-foreground">
+                  {@provider_status["selected_auth_mode"]} / {@provider_status["selected_auth_owner"]}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Mode:
+                <span class="font-semibold text-foreground">
+                  {get_in(@provider_status, ["bootstrap", "mode"]) || "unknown"}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Fallback chain:
+                <span class="font-semibold text-foreground">
+                  {Enum.join(@provider_status["fallback_chain"] || [], ", ")}
+                </span>
+              </p>
+            </div>
+
+            <p class="border-t pt-3 text-xs leading-5 text-muted-foreground">
+              {provider_guidance(@provider_status)}
+              <.link navigate={~p"/docs/governance"} class="font-medium text-primary hover:underline">
+                Resolution order and autonomy defaults →
+              </.link>
+            </p>
+          </div>
+
+          <div class="space-y-3 rounded-2xl border bg-card p-5 shadow-card">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-foreground">ACP registry cache</h3>
+              <span class={[
+                "rounded-full border px-2.5 py-1 text-xs font-semibold",
+                @registry_status["stale"] && "border-warning/20 bg-warning/10 text-warning",
+                !@registry_status["stale"] && "border-border bg-muted text-primary"
+              ]}>
+                {if @registry_status["stale"], do: "stale", else: "fresh"}
+              </span>
+            </div>
+            <div class="space-y-1.5 text-sm">
+              <p class="text-muted-foreground">
+                Entries:
+                <span class="font-semibold text-foreground">{@registry_status["entry_count"]}</span>
+                · Matched integrations:
+                <span class="font-semibold text-foreground">
+                  {@registry_status["matched_integrations"]}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Fetched at:
+                <span class="font-semibold text-foreground">
+                  {@registry_status["fetched_at"] || "never"}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <.new_workspace_modal
         :if={@show_new_workspace}
         local_mode={@local_mode}
@@ -486,6 +644,86 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
       {"Finance", "finance"}
     ]
   end
+
+  # ── Local-mode runtime status (ported from the retired DashboardLive) ──
+
+  defp provider_mode_label(%{
+         "selected_source" => "agent_bridge",
+         "selected_provider" => provider
+       }) do
+    "Bridge via attached agent (#{provider})"
+  end
+
+  defp provider_mode_label(%{
+         "selected_source" => source,
+         "selected_provider" => provider
+       })
+       when source in ["workspace_profile", "user_default_profile", "project_override"] do
+    case source do
+      "workspace_profile" -> "Workspace-managed provider (#{provider})"
+      "user_default_profile" -> "ControlKeel user profile (#{provider})"
+      "project_override" -> "Project override (#{provider})"
+    end
+  end
+
+  defp provider_mode_label(%{"selected_source" => "ollama", "selected_model" => model}) do
+    "Local Ollama (#{model || "default model"})"
+  end
+
+  defp provider_mode_label(_status), do: "Heuristic / no-LLM fallback"
+
+  defp provider_name(%{"selected_provider" => provider}) when provider in [nil, "heuristic"] do
+    "No provider selected"
+  end
+
+  defp provider_name(%{"selected_provider" => provider, "selected_model" => model}) do
+    if blank?(model), do: provider, else: "#{provider} / #{model}"
+  end
+
+  defp setup_scope_copy(%{"binding_mode" => mode}) when mode in ["project", "ephemeral"] do
+    "Project-local governance"
+  end
+
+  defp setup_scope_copy(_status), do: "User-scoped installs advised"
+
+  defp attached_agents_copy(%{"attached_agents" => agents}) when is_list(agents) do
+    case agents do
+      [] ->
+        "None yet"
+
+      agents ->
+        Enum.map_join(agents, ", ", fn agent ->
+          Map.get(agent, "label") || Map.get(agent, "id") || "Unknown"
+        end)
+    end
+  end
+
+  defp attached_agents_copy(_status), do: "None yet"
+
+  defp provider_guidance(%{"selected_source" => "agent_bridge"}) do
+    "ControlKeel is borrowing model access from an attached agent bridge, so you usually do not need a separate API key for guided compilation and advisory features."
+  end
+
+  defp provider_guidance(%{"selected_source" => source})
+       when source in ["workspace_profile", "user_default_profile", "project_override"] do
+    "ControlKeel has its own provider profile available. Guided compilation and advisory features can run directly from the configured model source."
+  end
+
+  defp provider_guidance(%{"selected_source" => "ollama"}) do
+    "ControlKeel is using a local Ollama model. This keeps setup local-first and avoids hosted API keys, but model quality depends on the local model you run."
+  end
+
+  defp provider_guidance(_status) do
+    "No bridge, API key, or local model is configured right now. ControlKeel still governs agent work, captures proofs, runs MCP tools, and benchmarks outcomes in heuristic mode."
+  end
+
+  defp blank?(value), do: String.trim(to_string(value || "")) == ""
+
+  defp selected_base_url(%{"provider_chain" => [resolution | _]}) do
+    resolution["base_url"] || "default"
+  end
+
+  defp selected_base_url(_status), do: "default"
 
   defp current_role(%{current_membership: %{role: role}}), do: role
   defp current_role(_assigns), do: nil

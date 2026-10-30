@@ -37,6 +37,48 @@
     <p class="text-sm leading-7 text-muted-foreground">
       Severity maps to expected human gates; findings stay readable in plain language. LLM advisory is optional and needs a provider. See <code class="rounded bg-muted px-1.5 py-0.5 text-foreground">docs/autonomy-and-findings.md</code>.
     </p>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>Low-risk guidance continues automatically with warnings when needed</li>
+      <li>Medium-risk findings stay visible and route the operator toward a fix</li>
+      <li>Destructive or high-risk actions are blocked or explicitly reviewed</li>
+      <li>Governed repos keep the policy trail even when model features degrade</li>
+    </ul>
+  </section>
+
+  <section class="space-y-3">
+    <.section_title>Provider resolution and capabilities</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      ControlKeel resolves model access through the same fallback chain everywhere, so governance never depends on which source wins. Setup commands live in
+      <.link navigate={~p"/docs/getting-started"} class="font-medium text-primary hover:underline">getting started</.link>.
+    </p>
+    <p class="text-sm font-medium text-foreground">Resolution order</p>
+    <ol class="space-y-2 text-sm leading-6 text-muted-foreground list-decimal ml-5">
+      <li>Attached agent bridge when supported</li>
+      <li>Workspace or service-account profile</li>
+      <li>ControlKeel user default profile</li>
+      <li>Project override</li>
+      <li>Local Ollama</li>
+      <li>Heuristic fallback</li>
+    </ol>
+    <div class="grid gap-4 pt-2 sm:grid-cols-2">
+      <div class="space-y-2 rounded-2xl border bg-card p-4">
+        <p class="text-sm font-semibold text-foreground">Works without a provider</p>
+        <ul class="space-y-1.5 text-sm leading-6 text-muted-foreground list-disc ml-5">
+          <li>Governance and policy validation on agent actions</li>
+          <li>Findings, proof bundles, and session audit trail</li>
+          <li>MCP tools, skills, and agent attachments</li>
+          <li>Benchmark runs and policy artifact management</li>
+        </ul>
+      </div>
+      <div class="space-y-2 rounded-2xl border bg-card p-4">
+        <p class="text-sm font-semibold text-foreground">Degrades without a provider</p>
+        <ul class="space-y-1.5 text-sm leading-6 text-muted-foreground list-disc ml-5">
+          <li>Execution brief compilation falls back to heuristics</li>
+          <li>Advisory scanner only runs when a provider is available</li>
+          <li>Model-backed guidance waits for a bridge, key, or Ollama model</li>
+        </ul>
+      </div>
+    </div>
   </section>
 
   <section class="space-y-3">

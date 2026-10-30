@@ -359,6 +359,8 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "Finding Density"
       assert html =~ "Sessions"
       assert html =~ "Members"
+      # The org-scoped delivery funnel recreation (retired /dashboard section).
+      assert html =~ "Delivery Funnel"
     end
 
     test "an org without sessions shows the no-data defaults", %{owner: owner, org: _org} do
@@ -460,6 +462,8 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       # Member management moved to the settings page: no roster UI here.
       refute render(view) =~ ~s(id="role-form-")
       refute render(view) =~ "No members yet."
+      # Deployment-level runtime cards are local-mode only.
+      refute render(view) =~ "Runtime status"
       refute html =~ "?tab=members"
     end
 
@@ -659,6 +663,24 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert render(view) =~ "Workspaces"
       refute render(view) =~ "Member management is not available in local mode."
       refute html =~ "?tab=members"
+    end
+
+    test "org overview shows deployment runtime status in local mode", %{org: _org} do
+      {:ok, _view, html} = live(build_conn(), ~p"/local-org")
+
+      # Local mode: the single implicit org IS the deployment, so the
+      # provider/registry cards are truthful here.
+      assert html =~ "Runtime status"
+      assert html =~ "Provider snapshot"
+      assert html =~ "ACP registry cache"
+      # Bootstrap detail rows (retired "Provider and bootstrap status" panel).
+      assert html =~ "Fallback chain"
+    end
+
+    test "org overview shows the delivery funnel in local mode", %{org: _org} do
+      {:ok, _view, html} = live(build_conn(), ~p"/local-org")
+
+      assert html =~ "Delivery Funnel"
     end
   end
 end
