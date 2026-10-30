@@ -64,7 +64,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
 
   test "memberless users are redirected to /new/org on authenticated pages" do
     assert {:error, {:redirect, %{to: "/new/org"}}} =
-             live(memberless_conn(), ~p"/dashboard")
+             live(memberless_conn(), ~p"/benchmarks")
   end
 
   test "memberless users can open organization creation" do
@@ -74,7 +74,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
 
   test "users with a membership render authenticated pages" do
     {conn, _user, _org} = member_conn()
-    {:ok, _view, html} = live(conn, ~p"/dashboard")
+    {:ok, _view, html} = live(conn, ~p"/benchmarks")
     refute html =~ "Join or create an organization"
   end
 
@@ -162,7 +162,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
 
-    {:ok, view, _html} = live(conn, ~p"/dashboard")
+    {:ok, view, _html} = live(conn, ~p"/benchmarks")
 
     assert {:ok, %Accounts.Membership{status: "revoked"}} =
              Accounts.revoke_membership(membership.id, owner.id)
@@ -172,6 +172,6 @@ defmodule ControlKeelWeb.LiveAuthTest do
   end
 
   test "unauthenticated users are still sent to login, not /new/org" do
-    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/dashboard")
+    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/benchmarks")
   end
 end

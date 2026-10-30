@@ -68,7 +68,8 @@ defmodule ControlKeel.Analytics do
 
   def funnel_summary(opts \\ []) do
     limit = Keyword.get(opts, :limit, @aggregate_session_limit)
-    sessions = recent_sessions(limit)
+    org_id = Keyword.get(opts, :org_id)
+    sessions = recent_sessions(limit, org_id)
     session_sets = session_event_sets(Enum.map(sessions, & &1.id))
     recent_sessions = ship_session_rows(sessions)
     {outcome_metrics, agent_outcomes} = outcome_metrics(sessions)
@@ -98,8 +99,22 @@ defmodule ControlKeel.Analytics do
     }
   end
 
-  defp recent_sessions(limit) do
+  # Global queries span every org in the database; with `:org_id` the recent
+  # sessions are scoped to the owning org through the workspace join. Used by
+  # the org overview dashboard (/:org_slug) so its stat cards never leak other
+  # tenants' numbers.
+  defp recent_sessions(limit, nil) do
     Session
+    |> order_by(desc: :inserted_at)
+    |> preload(:workspace)
+    |> limit(^limit)
+    |> Repo.all()
+  end
+
+  defp recent_sessions(limit, org_id) when is_integer(org_id) do
+    Session
+    |> join(:inner, [session], workspace in assoc(session, :workspace))
+    |> where([_session, workspace], workspace.org_id == ^org_id)
     |> order_by(desc: :inserted_at)
     |> preload(:workspace)
     |> limit(^limit)

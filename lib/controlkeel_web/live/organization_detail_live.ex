@@ -1,16 +1,16 @@
 defmodule ControlKeelWeb.OrganizationDetailLive do
   @moduledoc """
-  Member management for an org at `/:org_slug`.
+  Organization overview at `/:org_slug` — the org's dashboard.
 
-  Any active member (viewer+) may view. Allows:
-    - List active and pending memberships (preloaded with the user)
-    - Invite a new member by email + role (creates pending Membership;
-      raw invitation token is displayed once for copy-paste, since the
-      real mailer is deferred to P1c)
-    - Revoke a membership (last-owner protected)
-    - Change a role (last-owner protected)
+  Any active member (viewer+) may view. Renders the organization header,
+  scope metadata, the org-scoped metrics band (`Analytics.funnel_summary/1`
+  with `:org_id`, per docs/retire-dashboard-issue.md), and the workspace
+  grid with workspace creation (admin+ gated by `can_manage?`).
 
-  Invite/revoke/role change are admin+ only, gated by `can_manage`.
+  Member management (roster, invites, roles, revocation) lives on the
+  settings page's Members tab (`ControlKeelWeb.OrganizationSettingsLive`,
+  admin+ by the settings page gate). This page keeps only the member *count*
+  metric in the stats band.
 
   ## Access
 
@@ -26,12 +26,13 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Agent.ACPRegistry
+  alias ControlKeel.Analytics
   alias ControlKeel.Mission
+  alias ControlKeel.ProviderBroker
   alias ControlKeel.Repo
   alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.OrgAccess
-
-  @valid_roles ~w(owner admin member viewer)
 
   @impl true
   def mount(%{"org_slug" => slug}, _session, socket) do
@@ -50,8 +51,13 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   defp mount_ok(socket, org, membership) do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
-    member_count = Accounts.count_memberships_for_org(org.id)
     memberships = if(local_mode, do: [], else: load_memberships(org.id))
+
+    # Deployment-level runtime status (docs/retire-dashboard follow-up): only
+    # meaningful on the org page in local mode, where the single implicit org
+    # IS the deployment. ProviderBroker/ACPRegistry have no org dimension, so
+    # cloud mode leaves these nil and the render hides the section.
+    project_root = ControlKeelWeb.Endpoint.config(:project_root) || File.cwd!()
 
     {:ok,
      socket
@@ -60,11 +66,15 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
      |> assign(:nav_org, org)
      |> assign(:local_mode, local_mode)
      |> assign(:budget_cents, budget_cents)
-     |> assign(:member_count, member_count)
+     |> assign(:ship_summary, Analytics.funnel_summary(org_id: org.id))
      |> assign(:current_membership, membership)
      |> assign(:memberships, memberships)
      |> assign(:workspaces, load_workspaces(org.id))
-     |> assign(:active_tab, :workspaces)
+     |> assign(
+       :provider_status,
+       if(local_mode, do: ProviderBroker.status(project_root), else: nil)
+     )
+     |> assign(:registry_status, if(local_mode, do: ACPRegistry.status(), else: nil))
      |> assign(:show_new_workspace, false)
      |> assign(
        :new_workspace_form,
@@ -78,23 +88,12 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
          as: :workspace
        )
      )
-     |> assign(:new_workspace_error, nil)
-     |> assign(:active_owner_count, count_active_owners(memberships))
-     |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))
-     |> assign(:invite_token, nil)
-     |> assign(:invite_error, nil)
-     |> assign(:show_invite_modal, false)
-     |> assign(:show_revoke_modal, false)
-     |> assign(:revoke_target, nil)
-     |> assign(:current_user, socket.assigns[:current_user])}
+     |> assign(:new_workspace_error, nil)}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    socket =
-      socket
-      |> maybe_refresh_org(params["org_slug"])
-      |> assign(:active_tab, normalize_tab(params["tab"]))
+    socket = maybe_refresh_org(socket, params["org_slug"])
 
     {:noreply, socket}
   end
@@ -114,6 +113,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   defp maybe_refresh_org(socket, _slug), do: socket
 
+  @impl true
   def handle_event("new_workspace", _params, socket) do
     {:noreply, assign(socket, :show_new_workspace, true)}
   end
@@ -170,189 +170,6 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     end
   end
 
-  def handle_event("open_invite", _params, socket) do
-    {:noreply, assign(socket, :show_invite_modal, true)}
-  end
-
-  def handle_event("close_invite", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_invite_modal, false)
-     |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))
-     |> assign(:invite_error, nil)}
-  end
-
-  @impl true
-  def handle_event("invite", %{"invite" => %{"email" => raw_email, "role" => role}}, socket) do
-    email = raw_email |> to_string() |> String.downcase() |> String.trim()
-    role = if role in @valid_roles, do: role, else: "member"
-
-    with :ok <- validate_email(email),
-         {:ok, user} <- find_or_create_user(email),
-         {:ok, _membership, raw_token} <-
-           Accounts.invite_member(user.id, socket.assigns.org.id,
-             role: role,
-             invited_by_user_id: socket.assigns.current_user.id
-           ) do
-      # Best-effort email delivery. Token banner remains as visible fallback,
-      # so a mailer failure does not block the operator from completing the invite.
-      _ = ControlKeel.Mailer.deliver_invitation(%{email: user.email}, raw_token)
-
-      {:noreply,
-       socket
-       |> refresh_memberships(socket.assigns.org.id)
-       |> assign(:invite_token, raw_token)
-       |> assign(:invite_error, nil)
-       |> assign(:show_invite_modal, false)
-       |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))}
-    else
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> assign(:invite_error, format_error(reason))
-         |> assign(:invite_token, nil)}
-    end
-  end
-
-  def handle_event("confirm_revoke", %{"membership-id" => id}, socket) do
-    if can_manage?(socket.assigns) do
-      case Integer.parse(id) do
-        {membership_id, ""} ->
-          target = Enum.find(socket.assigns.memberships, &(&1.id == membership_id))
-
-          if is_nil(target) do
-            {:noreply, put_flash(socket, :error, "Membership not found.")}
-          else
-            is_self =
-              socket.assigns.current_user &&
-                target.user_id == socket.assigns.current_user.id
-
-            active_owners =
-              Enum.count(
-                socket.assigns.memberships,
-                &(&1.role == "owner" and &1.status == "active")
-              )
-
-            is_last_owner = is_self and target.role == "owner" and active_owners <= 1
-
-            {:noreply,
-             socket
-             |> assign(:show_revoke_modal, true)
-             |> assign(:revoke_target, target)
-             |> assign(:revoke_is_self, is_self)
-             |> assign(:revoke_is_last_owner, is_last_owner)}
-          end
-
-        _ ->
-          {:noreply, put_flash(socket, :error, "Invalid membership.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You don't have permission to revoke memberships.")}
-    end
-  end
-
-  def handle_event("execute_revoke", %{"membership-id" => id}, socket) do
-    with {membership_id, ""} <- Integer.parse(id),
-         {:ok, _} <- Accounts.revoke_membership(membership_id, socket.assigns.current_user.id) do
-      {:noreply,
-       socket
-       |> refresh_memberships(socket.assigns.org.id)
-       |> assign(:show_revoke_modal, false)
-       |> assign(:revoke_target, nil)
-       |> assign(:revoke_is_self, false)
-       |> assign(:revoke_is_last_owner, false)
-       |> put_flash(:info, "Membership revoked.")}
-    else
-      {:error, :last_owner_protected} ->
-        {:noreply,
-         socket
-         |> assign(:show_revoke_modal, false)
-         |> put_flash(:error, "Cannot revoke the last owner of this organization.")}
-
-      {:error, :unauthorized} ->
-        {:noreply,
-         socket
-         |> assign(:show_revoke_modal, false)
-         |> put_flash(:error, "You don't have permission to revoke memberships.")}
-
-      {:error, :cannot_self_revoke} ->
-        {:noreply,
-         socket
-         |> assign(:show_revoke_modal, false)
-         |> put_flash(:error, "Only owners can revoke their own membership.")}
-
-      {:error, :cannot_revoke_owner} ->
-        {:noreply,
-         socket
-         |> assign(:show_revoke_modal, false)
-         |> put_flash(:error, "Only owners can revoke other owners.")}
-
-      {:error, :cannot_revoke_admin} ->
-        {:noreply,
-         socket
-         |> assign(:show_revoke_modal, false)
-         |> put_flash(:error, "Only owners can revoke admins.")}
-
-      {:error, :not_found} ->
-        {:noreply,
-         socket
-         |> assign(:show_revoke_modal, false)
-         |> put_flash(:error, "Membership not found.")}
-
-      _ ->
-        {:noreply,
-         socket
-         |> assign(:show_revoke_modal, false)
-         |> put_flash(:error, "Could not revoke membership.")}
-    end
-  end
-
-  def handle_event("cancel_revoke", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_revoke_modal, false)
-     |> assign(:revoke_target, nil)}
-  end
-
-  def handle_event(
-        "change-role",
-        %{"membership-id" => id, "role" => new_role},
-        socket
-      ) do
-    with {membership_id, ""} <- Integer.parse(id),
-         {:ok, _} <-
-           Accounts.update_membership_role(
-             membership_id,
-             new_role,
-             socket.assigns.current_user.id
-           ) do
-      {:noreply,
-       socket
-       |> refresh_memberships(socket.assigns.org.id)
-       |> put_flash(:info, "Role updated.")}
-    else
-      {:error, :last_owner_protected} ->
-        {:noreply,
-         put_flash(socket, :error, "Cannot demote the last owner of this organization.")}
-
-      {:error, :unauthorized} ->
-        {:noreply, put_flash(socket, :error, "You don't have permission to change roles.")}
-
-      {:error, :invalid_role} ->
-        {:noreply, put_flash(socket, :error, "Invalid role.")}
-
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "Membership not found.")}
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Could not update role.")}
-    end
-  end
-
-  def handle_event("dismiss-token", _params, socket) do
-    {:noreply, assign(socket, :invite_token, nil)}
-  end
-
   # An unresolved org scope renders the shared not-found panel from the org
   # layout (see `ControlKeelWeb.OrgAccess`); this page body stays empty. The
   # assign is always present (defaulted to nil by the layout hook), so the
@@ -363,310 +180,298 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-6">
-      <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div class="space-y-2">
-          <div class="flex flex-wrap items-center gap-3">
-            <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
-              {@org.name}
-            </h1>
+      <div class="space-y-2">
+        <div class="flex flex-wrap items-center gap-3">
+          <h1 class="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+            {@org.name}
+          </h1>
 
-            <span class={[
-              "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-              @org.status == "active" && "bg-success/10 text-success ring-success/20",
-              @org.status != "active" && "bg-muted text-muted-foreground ring-border"
-            ]}>
-              {@org.status}
-            </span>
-          </div>
+          <span class={[
+            "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+            @org.status == "active" && "bg-success/10 text-success ring-success/20",
+            @org.status != "active" && "bg-muted text-muted-foreground ring-border"
+          ]}>
+            {@org.status}
+          </span>
+        </div>
 
-          <%= if @local_mode do %>
-            <p class="text-sm text-muted-foreground">
-              View organization details below. Member management is unavailable in local mode.
-            </p>
-          <% else %>
-            <p class="text-sm text-muted-foreground">
-              Invite teammates, adjust roles, and keep ownership boundaries clear.
-            </p>
+        <p class="text-sm text-muted-foreground">
+          Browse workspaces and track delivery across this organization.
+        </p>
+      </div>
+
+      <%!-- Identity metadata as plain text — no box; the numbers live in the
+           metrics band below. --%>
+      <p class="text-xs text-muted-foreground">
+        <span class="font-mono">{@org.slug}</span>
+        <span class="mx-2">·</span>
+        Budget {if @budget_cents > 0, do: "$#{Float.round(@budget_cents / 100, 2)}", else: "—"}
+        <span class="mx-2">·</span>
+        Created {Calendar.strftime(@org.inserted_at, "%b %d, %Y")}
+      </p>
+
+      <%!-- Org-scoped dashboard stats (Analytics.funnel_summary/1 with :org_id),
+           rendered as one compact band instead of per-metric cards. --%>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl border bg-card px-5 py-4 shadow-card sm:grid-cols-3 xl:grid-cols-5">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Proof Coverage
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {format_percent(@ship_summary.outcome_metrics.proof_backed_task_coverage_percent)}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Deploy Ready
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {format_percent(@ship_summary.outcome_metrics.deploy_ready_task_rate_percent)}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Finding Density
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {format_number(@ship_summary.average_findings_per_session)}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Sessions
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {@ship_summary.recent_session_count}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Members
+          </span>
+          <span class="text-lg font-semibold text-foreground/90">
+            {if @local_mode, do: "—", else: length(@memberships)}
+          </span>
+        </div>
+      </div>
+
+      <%!-- Org-scoped delivery funnel (Analytics.funnel_summary/1 with :org_id).
+           Recreated from the retired /dashboard: the steps and conversion
+           rates are computed over this org's recent sessions, so the section
+           is truthful in every runtime mode. --%>
+      <section id="org-delivery-funnel" class="rounded-2xl border bg-card p-5 shadow-card">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-semibold text-foreground">Delivery Funnel</h2>
+          <span class="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+            {@ship_summary.recent_session_count} sessions
+          </span>
+        </div>
+
+        <div class="mt-4 space-y-4">
+          <%= for step <- @ship_summary.steps do %>
+            <div>
+              <div class="flex items-center justify-between gap-3 text-sm">
+                <span class="capitalize text-muted-foreground">
+                  {String.replace(step.step, "_", " ")}
+                </span>
+                <span class="font-semibold text-foreground">{step.count}</span>
+              </div>
+              <div class="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  class="h-full rounded-full bg-primary"
+                  style={"width: #{min(step.conversion_percent || 0, 100)}%"}
+                />
+              </div>
+            </div>
           <% end %>
         </div>
 
-        <div class="flex flex-wrap gap-x-8 gap-y-3">
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Slug
-            </span>
-            <span class="font-mono text-sm text-foreground">{@org.slug}</span>
-          </div>
+        <p class="mt-4 border-t pt-3 text-xs text-muted-foreground">
+          Time to first finding —
+          avg {if @ship_summary.average_time_to_first_finding_seconds,
+            do: "#{format_number(@ship_summary.average_time_to_first_finding_seconds)}s",
+            else: "Not recorded"} · median {if @ship_summary.median_time_to_first_finding_seconds,
+            do: "#{format_number(@ship_summary.median_time_to_first_finding_seconds)}s",
+            else: "Not recorded"}
+        </p>
+      </section>
 
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Members
-            </span>
-            <span class="text-sm font-semibold text-foreground">{@member_count}</span>
-          </div>
-
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Monthly budget
-            </span>
-            <span class="text-sm font-semibold text-foreground">
-              <%= if @budget_cents > 0 do %>
-                {"$#{Float.round(@budget_cents / 100, 2)}"}
-              <% else %>
-                <span class="text-muted-foreground">—</span>
-              <% end %>
-            </span>
-          </div>
-
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Created
-            </span>
-            <span class="text-sm text-foreground">
-              {Calendar.strftime(@org.inserted_at, "%b %d, %Y")}
-            </span>
-          </div>
-        </div>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-sm text-muted-foreground">
+          Workspaces group sessions, findings, and budgets under this organization.
+        </p>
+        <.button
+          variant="outline"
+          phx-click="new_workspace"
+          class="shrink-0 rounded-full px-4 py-2 text-sm font-medium"
+        >
+          <.icon name="hero-plus" class="size-4" /> New Workspace
+        </.button>
       </div>
 
-      <%= if @invite_token do %>
-        <div class="rounded-2xl border border-primary/30 bg-primary/10 p-5">
-          <p class="text-sm font-medium text-primary">
-            Invitation token issued. Share it with the invitee — it will not be shown again.
-          </p>
-          <pre class="mt-2 overflow-x-auto rounded-xl bg-background/70 px-4 py-2 font-mono text-xs text-muted-foreground"><code id="invite-token-value">/invitations/{@invite_token}</code></pre>
-          <button
-            type="button"
-            phx-click="dismiss-token"
-            class="mt-3 text-xs font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            Dismiss
-          </button>
-        </div>
-      <% end %>
-
-      <div class="flex border-b border-border">
-        <.link
-          patch={~p"/#{@org.slug}"}
-          class={tab_class(@active_tab == :workspaces)}
-        >
-          Workspaces
-        </.link>
-        <.link
-          patch={~p"/#{@org.slug}?tab=members"}
-          class={tab_class(@active_tab == :members)}
-        >
-          Members
-        </.link>
-      </div>
-
-      <%= if @active_tab == :workspaces do %>
-        <div class="flex items-center justify-between gap-3">
-          <p class="text-sm text-muted-foreground">
+      <%= if @workspaces == [] do %>
+        <section class="rounded-2xl border bg-card p-12 text-center shadow-card">
+          <.icon name="hero-squares-2x2" class="mx-auto size-10 text-muted-foreground" />
+          <p class="mt-4 text-base font-medium text-foreground">No workspaces yet.</p>
+          <p class="mt-1 text-sm text-muted-foreground">
             Workspaces group sessions, findings, and budgets under this organization.
           </p>
-          <.button
-            variant="outline"
-            phx-click="new_workspace"
-            class="shrink-0 rounded-full px-4 py-2 text-sm font-medium"
-          >
-            <.icon name="hero-plus" class="size-4" /> New Workspace
-          </.button>
-        </div>
-
-        <%= if @workspaces == [] do %>
-          <section class="rounded-2xl border bg-card p-12 text-center shadow-card">
-            <.icon name="hero-squares-2x2" class="mx-auto size-10 text-muted-foreground" />
-            <p class="mt-4 text-base font-medium text-foreground">No workspaces yet.</p>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Workspaces group sessions, findings, and budgets under this organization.
-            </p>
-          </section>
-        <% else %>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <%= for ws <- @workspaces do %>
-              <.link
-                href={~p"/#{@org.slug}/workspaces/#{ws.slug}"}
-                class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-info/10 text-info">
-                      <.icon name="hero-squares-2x2" class="size-4" />
-                    </span>
-                    <h3 class="truncate text-base font-semibold text-foreground transition group-hover:text-primary">
-                      {ws.name}
-                    </h3>
-                  </div>
-                  <span class={[
-                    "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                    ws.status == "active" && "bg-success/10 text-success ring-success/20",
-                    ws.status != "active" && "bg-muted text-muted-foreground ring-border"
-                  ]}>
-                    {ws.status}
-                  </span>
-                </div>
-                <p class="mt-1 truncate font-mono text-xs text-muted-foreground">{ws.slug}</p>
-                <dl class="mt-4 grid grid-cols-2 gap-3 border-t pt-4">
-                  <div>
-                    <dt class="text-xs font-medium text-muted-foreground">Sessions</dt>
-                    <dd class="mt-1 text-lg font-semibold text-foreground/90">
-                      {length(ws.sessions)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-xs font-medium text-muted-foreground">Budget</dt>
-                    <dd class="mt-1 text-lg font-semibold text-foreground/90">
-                      {format_cents(ws.budget_cents)}
-                    </dd>
-                  </div>
-                </dl>
-              </.link>
-            <% end %>
-          </div>
-        <% end %>
+        </section>
       <% else %>
-        <%= if @local_mode do %>
-          <section class="rounded-2xl border bg-card p-12 text-center shadow-card">
-            <.icon name="hero-users" class="mx-auto size-10 text-muted-foreground" />
-            <p class="mt-4 text-base font-medium text-foreground">
-              Member management is not available in local mode.
-            </p>
-            <p class="mt-1 text-sm text-muted-foreground">
-              Switch to cloud or self-hosted mode to invite teammates and manage roles.
-            </p>
-          </section>
-        <% else %>
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <p class="text-sm text-muted-foreground">
-              Manage organization members and their roles.
-            </p>
-            <.button
-              :if={can_manage?(assigns)}
-              id="invite-member-button"
-              variant="outline"
-              phx-click="open_invite"
-              class="shrink-0 rounded-full px-4 py-2 text-sm font-medium"
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <%= for ws <- @workspaces do %>
+            <.link
+              href={~p"/#{@org.slug}/workspaces/#{ws.slug}"}
+              class="group block rounded-2xl border bg-card p-5 shadow-card transition hover:border-primary/40 hover:shadow-card"
             >
-              <.icon name="hero-plus" class="size-4" /> Invite member
-            </.button>
-          </div>
-          <section class="rounded-2xl border bg-card shadow-card overflow-clip">
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-border text-left text-sm">
-                <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground sticky top-0 z-10">
-                  <tr>
-                    <th class="px-5 py-3 font-semibold">Email</th>
-                    <th class="px-5 py-3 font-semibold">Role</th>
-                    <th class="px-5 py-3 font-semibold">Status</th>
-                    <th class="px-5 py-3 font-semibold w-px whitespace-nowrap"></th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                  <%= if @memberships == [] do %>
-                    <tr>
-                      <td colspan="4" class="px-5 py-12 text-center">
-                        <p class="text-base font-medium text-foreground">No members yet.</p>
-                        <p class="mt-1 text-sm text-muted-foreground">
-                          Invite teammates to collaborate on this organization.
-                        </p>
-                      </td>
-                    </tr>
-                  <% else %>
-                    <%= for m <- @memberships do %>
-                      <tr
-                        id={"membership-#{m.id}"}
-                        class={[
-                          "transition hover:bg-muted/30",
-                          @current_user && m.user_id == @current_user.id && "bg-primary/5"
-                        ]}
-                      >
-                        <td class="max-w-sm px-5 py-4 font-medium text-foreground">
-                          <div class="flex flex-wrap items-center gap-2">
-                            {(m.user && m.user.email) || "—"}
-                            <%= if @current_user && m.user_id == @current_user.id do %>
-                              <span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                                you
-                              </span>
-                            <% end %>
-                          </div>
-                        </td>
-                        <td class="px-5 py-4">
-                          <%= if can_manage?(assigns) do %>
-                            <% is_self = @current_user && m.user_id == @current_user.id %>
-                            <% state =
-                              role_select_state(
-                                current_role(assigns),
-                                m.role,
-                                is_self,
-                                @active_owner_count
-                              ) %>
-                            <form id={"role-form-#{m.id}"} phx-change="change-role">
-                              <input type="hidden" name="membership-id" value={m.id} />
-                              <select
-                                name="role"
-                                disabled={state.disabled}
-                                class={[
-                                  "rounded-lg border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1",
-                                  if(state.disabled,
-                                    do: "cursor-not-allowed text-muted-foreground opacity-60",
-                                    else: "text-foreground focus:border-primary focus:ring-primary"
-                                  )
-                                ]}
-                              >
-                                <option
-                                  :for={{value, label} <- state.options}
-                                  value={value}
-                                  selected={m.role == value}
-                                >
-                                  {label}
-                                </option>
-                              </select>
-                            </form>
-                          <% else %>
-                            <span class="text-sm text-muted-foreground">{m.role}</span>
-                          <% end %>
-                        </td>
-                        <td class="px-5 py-4">
-                          <span class={[
-                            "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
-                            m.status == "active" &&
-                              "bg-success/10 text-success ring-success/20",
-                            m.status == "pending" &&
-                              "bg-warning/10 text-warning ring-warning/20",
-                            m.status == "revoked" && "bg-muted text-muted-foreground ring-border"
-                          ]}>
-                            {m.status}
-                          </span>
-                        </td>
-                        <td class="px-4 py-4 text-right whitespace-nowrap w-px">
-                          <%= if can_revoke?(current_role(assigns), m, @current_user) do %>
-                            <button
-                              type="button"
-                              phx-click="confirm_revoke"
-                              phx-value-membership-id={m.id}
-                              class="text-sm font-medium text-destructive transition hover:text-destructive"
-                            >
-                              Revoke
-                            </button>
-                          <% end %>
-                        </td>
-                      </tr>
-                    <% end %>
-                  <% end %>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        <% end %>
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex min-w-0 items-center gap-2">
+                  <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-info/10 text-info">
+                    <.icon name="hero-squares-2x2" class="size-4" />
+                  </span>
+                  <h3 class="truncate text-base font-semibold text-foreground transition group-hover:text-primary">
+                    {ws.name}
+                  </h3>
+                </div>
+                <span class={[
+                  "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1",
+                  ws.status == "active" && "bg-success/10 text-success ring-success/20",
+                  ws.status != "active" && "bg-muted text-muted-foreground ring-border"
+                ]}>
+                  {ws.status}
+                </span>
+              </div>
+              <p class="mt-1 truncate font-mono text-xs text-muted-foreground">{ws.slug}</p>
+              <dl class="mt-4 grid grid-cols-2 gap-3 border-t pt-4">
+                <div>
+                  <dt class="text-xs font-medium text-muted-foreground">Sessions</dt>
+                  <dd class="mt-1 text-lg font-semibold text-foreground/90">
+                    {length(ws.sessions)}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs font-medium text-muted-foreground">Budget</dt>
+                  <dd class="mt-1 text-lg font-semibold text-foreground/90">
+                    {format_cents(ws.budget_cents)}
+                  </dd>
+                </div>
+              </dl>
+            </.link>
+          <% end %>
+        </div>
       <% end %>
 
-      <.invite_modal
-        :if={@show_invite_modal}
-        form={@invite_form}
-        error={@invite_error}
-        role_options={invite_role_options(current_role(assigns))}
-      />
+      <%!-- Local-mode runtime status (retired-dashboard provider cards, re-homed):
+           deployment-level, so only rendered where org == deployment. Static
+           resolution/autonomy copy lives at /docs/governance. --%>
+      <section :if={@local_mode} id="org-runtime-status" class="space-y-3 pt-2">
+        <div class="space-y-1">
+          <h2 class="text-lg font-semibold text-foreground">Runtime status</h2>
+          <p class="text-sm text-muted-foreground">
+            This deployment's provider resolution and agent registry. Shown in local mode only,
+            where the organization and the deployment are one and the same.
+          </p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-3 rounded-2xl border bg-card p-5 shadow-card">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-foreground">Provider snapshot</h3>
+              <span class="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                {provider_mode_label(@provider_status)}
+              </span>
+            </div>
+            <div class="space-y-1.5 text-sm">
+              <p class="text-muted-foreground">
+                Current provider:
+                <span class="font-semibold text-foreground">{provider_name(@provider_status)}</span>
+              </p>
+              <p class="text-muted-foreground">
+                Attached agents:
+                <span class="font-semibold text-foreground">
+                  {attached_agents_copy(@provider_status)}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Setup scope:
+                <span class="font-semibold text-foreground">
+                  {setup_scope_copy(@provider_status)}
+                </span>
+              </p>
+            </div>
+
+            <%!-- Bootstrap detail (from the retired "Provider and bootstrap
+                 status" panel) — deployment plumbing, local mode only. --%>
+            <div class="space-y-1.5 border-t pt-3 text-xs">
+              <p class="font-medium text-foreground">Bootstrap</p>
+              <p class="text-muted-foreground">
+                Base URL:
+                <span class="font-semibold text-foreground">
+                  {selected_base_url(@provider_status)}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Auth:
+                <span class="font-semibold text-foreground">
+                  {@provider_status["selected_auth_mode"]} / {@provider_status["selected_auth_owner"]}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Mode:
+                <span class="font-semibold text-foreground">
+                  {get_in(@provider_status, ["bootstrap", "mode"]) || "unknown"}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Fallback chain:
+                <span class="font-semibold text-foreground">
+                  {Enum.join(@provider_status["fallback_chain"] || [], ", ")}
+                </span>
+              </p>
+            </div>
+
+            <p class="border-t pt-3 text-xs leading-5 text-muted-foreground">
+              {provider_guidance(@provider_status)}
+              <.link navigate={~p"/docs/governance"} class="font-medium text-primary hover:underline">
+                Resolution order and autonomy defaults →
+              </.link>
+            </p>
+          </div>
+
+          <div class="space-y-3 rounded-2xl border bg-card p-5 shadow-card">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-foreground">ACP registry cache</h3>
+              <span class={[
+                "rounded-full border px-2.5 py-1 text-xs font-semibold",
+                @registry_status["stale"] && "border-warning/20 bg-warning/10 text-warning",
+                !@registry_status["stale"] && "border-border bg-muted text-primary"
+              ]}>
+                {if @registry_status["stale"], do: "stale", else: "fresh"}
+              </span>
+            </div>
+            <div class="space-y-1.5 text-sm">
+              <p class="text-muted-foreground">
+                Entries:
+                <span class="font-semibold text-foreground">{@registry_status["entry_count"]}</span>
+                · Matched integrations:
+                <span class="font-semibold text-foreground">
+                  {@registry_status["matched_integrations"]}
+                </span>
+              </p>
+              <p class="text-muted-foreground">
+                Fetched at:
+                <span class="font-semibold text-foreground">
+                  {@registry_status["fetched_at"] || "never"}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <.new_workspace_modal
         :if={@show_new_workspace}
@@ -674,166 +479,7 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
         form={@new_workspace_form}
         error={@new_workspace_error}
       />
-
-      <%= if @show_revoke_modal and @revoke_target do %>
-        <div
-          id="revoke-member-modal"
-          class="relative z-50"
-          phx-mounted={Phoenix.LiveView.JS.show(to: "#revoke-member-modal")}
-          phx-remove={Phoenix.LiveView.JS.hide(to: "#revoke-member-modal")}
-        >
-          <div
-            class="fixed inset-0 bg-overlay/70 backdrop-blur-sm transition-opacity"
-            phx-click="cancel_revoke"
-            aria-label="Close modal"
-          />
-
-          <div class="fixed inset-0 flex items-center justify-center p-4">
-            <div class="w-full max-w-md rounded-2xl border bg-card/95 p-6 shadow-card">
-              <div class="mb-5 flex items-center gap-3">
-                <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/15">
-                  <.icon name="hero-exclamation-triangle" class="size-5 text-destructive" />
-                </span>
-                <h2 class="text-lg font-semibold text-foreground">Revoke membership</h2>
-              </div>
-
-              <%= if @revoke_is_last_owner do %>
-                <div class="rounded-xl border border-[var(--ck-warning)]/30 bg-[var(--ck-warning)]/5 p-4">
-                  <p class="text-sm text-[var(--ck-warning)]">
-                    <strong>You are the only owner of this organization.</strong>
-                    You cannot revoke your own membership without transferring ownership to another member first.
-                  </p>
-                </div>
-                <div class="mt-5 flex justify-end">
-                  <button
-                    type="button"
-                    phx-click="cancel_revoke"
-                    class="rounded-full bg-muted px-5 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-                  >
-                    Close
-                  </button>
-                </div>
-              <% else %>
-                <div class="space-y-3">
-                  <%= if @revoke_is_self do %>
-                    <p class="text-sm text-muted-foreground">
-                      You are about to
-                      <strong class="text-foreground">revoke your own membership</strong>
-                      in <strong class="text-foreground">{@org.name}</strong>.
-                      You will lose access to this organization immediately.
-                    </p>
-                  <% else %>
-                    <p class="text-sm text-muted-foreground">
-                      You are about to revoke membership for <strong class="text-foreground">{@revoke_target.user && @revoke_target.user.email}</strong>.
-                      They will lose access to <strong class="text-foreground">{@org.name}</strong>
-                      immediately.
-                    </p>
-                  <% end %>
-                  <p class="text-xs text-muted-foreground">
-                    This action can be undone by re-inviting the member later.
-                  </p>
-                </div>
-
-                <div class="mt-6 flex items-center justify-end gap-3 border-t pt-4">
-                  <button
-                    type="button"
-                    phx-click="cancel_revoke"
-                    class="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="execute_revoke"
-                    phx-value-membership-id={@revoke_target.id}
-                    class="inline-flex items-center gap-2 rounded-full bg-destructive px-5 py-2 text-sm font-semibold text-foreground shadow-lg shadow-destructive/20 transition hover:-translate-y-0.5 hover:bg-destructive"
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                    {if @revoke_is_self, do: "Revoke my membership", else: "Revoke membership"}
-                  </button>
-                </div>
-              <% end %>
-            </div>
-          </div>
-        </div>
-      <% end %>
     </section>
-    """
-  end
-
-  attr :form, :map, required: true
-  attr :error, :string, default: nil
-  attr :role_options, :list, default: [{"viewer", "viewer"}, {"member", "member"}]
-
-  defp invite_modal(assigns) do
-    ~H"""
-    <div
-      id="invite-member-modal"
-      class="relative z-50"
-      phx-mounted={Phoenix.LiveView.JS.show(to: "#invite-member-modal")}
-      phx-remove={Phoenix.LiveView.JS.hide(to: "#invite-member-modal")}
-    >
-      <div
-        class="fixed inset-0 bg-overlay/70 backdrop-blur-sm transition-opacity"
-        phx-click="close_invite"
-        aria-label="Close modal"
-      />
-
-      <div class="fixed inset-0 flex items-center justify-center p-4">
-        <div class="w-full max-w-md rounded-2xl border bg-card/95 p-6 shadow-card">
-          <div class="mb-5 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-foreground">Invite member</h2>
-            <button
-              type="button"
-              phx-click="close_invite"
-              class="rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              aria-label="Close"
-            >
-              <.icon name="hero-x-mark" class="size-5" />
-            </button>
-          </div>
-
-          <.form for={@form} phx-submit="invite" id="invite-form" class="space-y-4">
-            <.input
-              field={@form[:email]}
-              type="email"
-              label="Email"
-              placeholder="teammate@example.com"
-              required
-              class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-
-            <.input
-              field={@form[:role]}
-              type="select"
-              label="Role"
-              options={@role_options}
-              class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-
-            <%= if @error do %>
-              <p class="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{@error}</p>
-            <% end %>
-
-            <div class="flex items-center justify-end gap-3 pt-4">
-              <button
-                type="button"
-                phx-click="close_invite"
-                class="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                class="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:bg-primary"
-              >
-                Send invitation
-              </button>
-            </div>
-          </.form>
-        </div>
-      </div>
-    </div>
     """
   end
 
@@ -953,6 +599,15 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
 
   # ── Private ─────────────────────────────────────────────────────────
 
+  # Stat formatting ported from the retired DashboardLive (docs/retire-dashboard-issue.md).
+  defp format_percent(nil), do: "Not recorded"
+  defp format_percent(value) when is_float(value), do: "#{Float.round(value, 1)}%"
+  defp format_percent(value), do: "#{value}%"
+
+  defp format_number(nil), do: "Not recorded"
+  defp format_number(value) when is_float(value), do: Float.round(value, 1)
+  defp format_number(value), do: value
+
   defp load_memberships(org_id) do
     Accounts.list_memberships_for_org(org_id)
     |> Repo.preload(:user)
@@ -996,146 +651,92 @@ defmodule ControlKeelWeb.OrganizationDetailLive do
     ]
   end
 
-  defp normalize_tab(tab) when tab in ["members"], do: :members
-  defp normalize_tab(_tab), do: :workspaces
+  # ── Local-mode runtime status (ported from the retired DashboardLive) ──
 
-  defp refresh_memberships(socket, org_id) do
-    memberships = load_memberships(org_id)
-
-    # The viewer's own role may have just changed (self-demotion) or their
-    # membership been revoked. Rebind the page-local membership from the
-    # refreshed list so permission-derived controls re-render without a full
-    # reload.
-    viewer_membership =
-      case socket.assigns[:current_user] do
-        %{id: uid} ->
-          Enum.find(memberships, &(&1.user_id == uid and &1.status == "active"))
-
-        _ ->
-          nil
-      end
-
-    socket
-    |> assign(:memberships, memberships)
-    |> assign(:member_count, Accounts.count_memberships_for_org(org_id))
-    |> assign(:active_owner_count, count_active_owners(memberships))
-    |> assign(:current_membership, viewer_membership)
+  defp provider_mode_label(%{
+         "selected_source" => "agent_bridge",
+         "selected_provider" => provider
+       }) do
+    "Bridge via attached agent (#{provider})"
   end
+
+  defp provider_mode_label(%{
+         "selected_source" => source,
+         "selected_provider" => provider
+       })
+       when source in ["workspace_profile", "user_default_profile", "project_override"] do
+    case source do
+      "workspace_profile" -> "Workspace-managed provider (#{provider})"
+      "user_default_profile" -> "ControlKeel user profile (#{provider})"
+      "project_override" -> "Project override (#{provider})"
+    end
+  end
+
+  defp provider_mode_label(%{"selected_source" => "ollama", "selected_model" => model}) do
+    "Local Ollama (#{model || "default model"})"
+  end
+
+  defp provider_mode_label(_status), do: "Heuristic / no-LLM fallback"
+
+  defp provider_name(%{"selected_provider" => provider}) when provider in [nil, "heuristic"] do
+    "No provider selected"
+  end
+
+  defp provider_name(%{"selected_provider" => provider, "selected_model" => model}) do
+    if blank?(model), do: provider, else: "#{provider} / #{model}"
+  end
+
+  defp setup_scope_copy(%{"binding_mode" => mode}) when mode in ["project", "ephemeral"] do
+    "Project-local governance"
+  end
+
+  defp setup_scope_copy(_status), do: "User-scoped installs advised"
+
+  defp attached_agents_copy(%{"attached_agents" => agents}) when is_list(agents) do
+    case agents do
+      [] ->
+        "None yet"
+
+      agents ->
+        Enum.map_join(agents, ", ", fn agent ->
+          Map.get(agent, "label") || Map.get(agent, "id") || "Unknown"
+        end)
+    end
+  end
+
+  defp attached_agents_copy(_status), do: "None yet"
+
+  defp provider_guidance(%{"selected_source" => "agent_bridge"}) do
+    "ControlKeel is borrowing model access from an attached agent bridge, so you usually do not need a separate API key for guided compilation and advisory features."
+  end
+
+  defp provider_guidance(%{"selected_source" => source})
+       when source in ["workspace_profile", "user_default_profile", "project_override"] do
+    "ControlKeel has its own provider profile available. Guided compilation and advisory features can run directly from the configured model source."
+  end
+
+  defp provider_guidance(%{"selected_source" => "ollama"}) do
+    "ControlKeel is using a local Ollama model. This keeps setup local-first and avoids hosted API keys, but model quality depends on the local model you run."
+  end
+
+  defp provider_guidance(_status) do
+    "No bridge, API key, or local model is configured right now. ControlKeel still governs agent work, captures proofs, runs MCP tools, and benchmarks outcomes in heuristic mode."
+  end
+
+  defp blank?(value), do: String.trim(to_string(value || "")) == ""
+
+  defp selected_base_url(%{"provider_chain" => [resolution | _]}) do
+    resolution["base_url"] || "default"
+  end
+
+  defp selected_base_url(_status), do: "default"
 
   defp current_role(%{current_membership: %{role: role}}), do: role
   defp current_role(_assigns), do: nil
 
   defp can_manage?(assigns), do: Accounts.role_at_least?(current_role(assigns) || "", "admin")
 
-  defp count_active_owners(memberships) do
-    Enum.count(memberships, &(&1.role == "owner" and &1.status == "active"))
-  end
-
-  defp tab_class(active?) do
-    base = "text-sm font-medium transition-colors px-3 py-1.5 rounded-t-lg border-b-2"
-
-    if active? do
-      "#{base} text-primary border-primary"
-    else
-      "#{base} border-transparent text-muted-foreground hover:text-foreground"
-    end
-  end
-
   defp format_cents(nil), do: "—"
   defp format_cents(0), do: "—"
   defp format_cents(cents) when is_integer(cents), do: "$#{Float.round(cents / 100, 2)}"
-
-  # Decides, per row, whether the role <select> is locked and which options it
-  # offers. Mirrors the authorization rules in
-  # `Accounts.update_membership_role/3` so the UI never offers a choice the
-  # server would reject.
-  #
-  # admin viewer:
-  #   - owner target                       -> locked
-  #   - other admin target                 -> locked
-  #   - self (admin)                       -> self-demit to member/viewer only
-  #   - member/viewer targets              -> member/viewer only
-  # owner viewer:
-  #   - self + last owner                  -> locked (last-owner protection)
-  #   - everything else                    -> all four roles
-  defp role_select_state(current_role, target_role, is_self, active_owner_count) do
-    cond do
-      current_role == "admin" ->
-        cond do
-          target_role == "owner" ->
-            %{disabled: true, options: [{"owner", "owner"}]}
-
-          target_role == "admin" and is_self ->
-            # Keep current role visible; only allow stepping down.
-            %{
-              disabled: false,
-              options: [{"admin", "admin"}, {"member", "member"}, {"viewer", "viewer"}]
-            }
-
-          target_role == "admin" ->
-            %{disabled: true, options: [{"admin", "admin"}]}
-
-          true ->
-            %{disabled: false, options: [{"member", "member"}, {"viewer", "viewer"}]}
-        end
-
-      current_role == "owner" ->
-        is_last_owner = is_self and target_role == "owner" and active_owner_count <= 1
-
-        if is_last_owner do
-          %{disabled: true, options: [{"owner", "owner"}]}
-        else
-          %{
-            disabled: false,
-            options: [
-              {"owner", "owner"},
-              {"admin", "admin"},
-              {"member", "member"},
-              {"viewer", "viewer"}
-            ]
-          }
-        end
-
-      true ->
-        # member/viewer viewers don't manage roles; lock as a safety net.
-        %{disabled: true, options: [{target_role, target_role}]}
-    end
-  end
-
-  defp can_revoke?(nil, _target, _current_user), do: false
-  defp can_revoke?(_role, %{status: "revoked"}, _current_user), do: false
-  defp can_revoke?("owner", _target, _current_user), do: true
-
-  defp can_revoke?("admin", target, %{id: uid}),
-    do: target.role in ["member", "viewer"] and target.user_id != uid
-
-  defp can_revoke?(_, _, _), do: false
-
-  defp validate_email(""), do: {:error, "Email is required"}
-
-  defp validate_email(email) do
-    if Regex.match?(~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/, email),
-      do: :ok,
-      else: {:error, "Invalid email format"}
-  end
-
-  defp find_or_create_user(email) do
-    case Accounts.get_user_by_email(email) do
-      nil -> Accounts.create_user(%{email: email})
-      user -> {:ok, user}
-    end
-  end
-
-  defp format_error(reason) when is_binary(reason), do: reason
-  defp format_error(:already_member), do: "This user is already a member or has a pending invite."
-  defp format_error(:unauthorized), do: "You don't have permission to invite at that role."
-  defp format_error(%Ecto.Changeset{}), do: "Could not invite member."
-  defp format_error(reason), do: inspect(reason)
-
-  # Owners can invite at any role; admins only member/viewer (matches the
-  # role-change matrix and the server-side guard in `invite_member/3`).
-  defp invite_role_options("owner"),
-    do: [{"viewer", "viewer"}, {"member", "member"}, {"admin", "admin"}, {"owner", "owner"}]
-
-  defp invite_role_options(_), do: [{"viewer", "viewer"}, {"member", "member"}]
 end

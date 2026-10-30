@@ -131,7 +131,6 @@ defmodule ControlKeelWeb.Router do
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults
       ] do
-      live "/dashboard", DashboardLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
@@ -150,6 +149,13 @@ defmodule ControlKeelWeb.Router do
       # the page can return under a different scope (org or workspace) later
       # instead of a global surface. GET /skills now falls through to the
       # ":org_slug" live block and the invalid-org handler.
+
+      # /dashboard removed from the router: DashboardLive was the last global
+      # operator page and its stats were computed across every org. The org
+      # overview (/:org_slug) is the dashboard now. GET /dashboard falls
+      # through to the ":org_slug" live block and the invalid-org handler —
+      # "dashboard" is reserved in Accounts.Org.@reserved_slugs, so no org
+      # can ever claim the URL. Regression-tested in router_test.exs.
     end
 
     # /new/* pages use a standalone headless layout (own
