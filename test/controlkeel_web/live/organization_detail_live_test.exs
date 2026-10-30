@@ -283,6 +283,17 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       refute html =~ ~s(href="/organizations")
     end
 
+    test "retired /dashboard falls through to the same invalid-org panel", %{owner: owner} do
+      # DashboardLive is gone; "dashboard" is a reserved slug, so the URL
+      # lands on the org overview's in-place not-found panel — never a dead
+      # route (docs/retire-dashboard-issue.md acceptance criteria).
+      assert {:ok, view, html} = live(conn_for(owner), "/dashboard")
+
+      assert has_element?(view, "#scope-not-found[data-scope-error]")
+      assert html =~ "Organization not found"
+      refute html =~ ~s(href="/dashboard")
+    end
+
     test "a resolvable org still renders the org page", %{owner: owner, org: org} do
       assert {:ok, _view, html} = live(conn_for(owner), ~p"/#{org.slug}")
 
