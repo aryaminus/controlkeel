@@ -28,10 +28,14 @@ defmodule ControlKeelWeb.RouterTest do
     # a dead route and never an org-owned page (docs/retire-dashboard-issue.md).
     info = Phoenix.Router.route_info(Router, "GET", "/dashboard", "localhost")
 
-    assert %{plug: Phoenix.LiveView.Plug} = info
+    assert %{
+             plug: Phoenix.LiveView.Plug,
+             route: "/:org_slug",
+             plug_opts: :index
+           } = info
 
     assert {OrganizationDetailLive, :index, _opts, _live_session} =
-             info.metadata.phoenix_live_view
+             info.phoenix_live_view
   end
 
   defp assert_route(path, controller, action) do
