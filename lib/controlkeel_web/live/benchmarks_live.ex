@@ -814,7 +814,11 @@ defmodule ControlKeelWeb.BenchmarksLive do
             <p class="text-xs text-muted-foreground">
               For a reproducible external comparison, start with
               <code class="font-mono text-foreground/80">controlkeel_validate,opencode_manual</code>
-              and import the OpenCode output after the awaiting-import run finishes.
+              and import the OpenCode output after the awaiting-import run finishes. The built-in
+              suite catalog — scenarios, versions, and domains per suite — lives in the
+              <.link navigate={~p"/docs/benchmarks"} class="text-primary hover:underline">
+                benchmark suite docs
+              </.link>.
             </p>
           </section>
 
@@ -879,50 +883,6 @@ defmodule ControlKeelWeb.BenchmarksLive do
           </p>
         </section>
       <% end %>
-
-      <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <div>
-          <.section_title>Built-in suites</.section_title>
-          <p class="text-xs text-muted-foreground mt-1">
-            Built-ins are reusable templates available to every workspace. External subjects appear
-            when the current project has a
-            <code class="font-mono text-foreground/80">controlkeel/benchmark_subjects.json</code>
-            file.
-          </p>
-        </div>
-
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mt-4">
-          <%= for suite <- @suites do %>
-            <article
-              class="rounded-xl border bg-muted/20 p-4 space-y-3 flex flex-col justify-between"
-              id={"suite-#{suite.slug}"}
-            >
-              <div class="space-y-2">
-                <div class="flex items-center justify-between gap-3">
-                  <.card_title>{suite.name}</.card_title>
-                  <span class="inline-flex rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary shrink-0">
-                    v{suite.version}
-                  </span>
-                </div>
-                <p class="text-xs text-muted-foreground line-clamp-2">{suite.description}</p>
-              </div>
-              <div class="space-y-2 pt-2 border-t border-border/50">
-                <div class="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{length(suite.scenarios)} scenarios</span>
-                  <span class="capitalize">{suite.status}</span>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
-                  <%= for pack <- Benchmark.domain_packs_for_suite(suite) do %>
-                    <span class="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {format_domain_pack(pack)}
-                    </span>
-                  <% end %>
-                </div>
-              </div>
-            </article>
-          <% end %>
-        </div>
-      </section>
     </section>
     """
   end

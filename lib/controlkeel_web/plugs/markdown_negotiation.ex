@@ -13,6 +13,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     "/docs/agents" => :docs_agents,
     "/docs/governance" => :docs_governance,
     "/docs/observability" => :docs_observability,
+    "/docs/benchmarks" => :docs_benchmarks,
     "/docs/skills" => :docs_skills,
     "/about" => :about,
     "/contact" => :contact,
@@ -296,6 +297,44 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     Benchmark execution is CLI-only and refuses to run without an explicit `--execute` flag — a dry-run can never silently become a real run. Promotions and memory writes follow the same human-gated pattern: evidence proposes, a person disposes.
 
     For read-only inspection, agents should call the structured `ck_observability` MCP tool to receive typed report data. Draft approval, materialization, benchmark execution, and other mutations still require their dedicated governed workflows.
+    """
+  end
+
+  defp page_to_markdown(:docs_benchmarks) do
+    suites = ControlKeel.Benchmark.list_suites([])
+
+    suites_markdown =
+      Enum.map_join(suites, "\n\n", fn suite ->
+        scenarios =
+          suite.scenarios
+          |> Enum.sort_by(& &1.position)
+          |> Enum.map_join("\n", &"- `#{&1.slug}` — #{&1.name}")
+
+        """
+        ## #{suite.name} (`#{suite.slug}`) v#{suite.version}
+
+        #{suite.description}
+
+        Scenarios: #{length(suite.scenarios)}.
+
+        #{scenarios}\
+        """
+      end)
+
+    """
+    # Benchmark suites
+
+    The built-in, versioned scenario suites that workspace benchmark runs execute. This catalog is generated from the shipped suite fixtures, so it always matches what the runner and CLI offer.
+
+    Built-in suites are reusable templates: every workspace runs the same fixtures, results stay comparable, and suites change only with ControlKeel versions. Run them from the workspace Benchmarks page or with `controlkeel obs benchmarks run --suite <slug>`. External agent hosts join through `manual_import` or `shell` subjects configured in `controlkeel/benchmark_subjects.json`.
+
+    ## Suite catalog
+
+    #{suites_markdown}
+
+    ## Reading a run
+
+    A benchmark run pairs every scenario with every selected subject and scores deterministic policy decisions: catch rate, block rate, expected-rule hit rate, and overhead. Multi-subject runs also produce a subject comparison with deltas against the baseline subject. Keep external claims bounded to the suite slug, version, scenario count, subjects, and scorer.
     """
   end
 

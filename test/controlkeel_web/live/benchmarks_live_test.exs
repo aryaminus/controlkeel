@@ -24,7 +24,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     assert has_element?(view, "#benchmark-preset-opencode")
     assert has_element?(view, "#benchmark-subjects-input")
     assert has_element?(view, "#benchmark-baseline-input")
-    assert has_element?(view, "#suite-vibe_failures_v1")
+    assert has_element?(view, "a[href='/docs/benchmarks']")
 
     render_submit(
       form(view, "#benchmark-runner",

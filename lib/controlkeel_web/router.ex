@@ -80,6 +80,7 @@ defmodule ControlKeelWeb.Router do
     get "/docs", DocsController, :index
     get "/docs/getting-started", DocsController, :getting_started
     get "/docs/agents", DocsController, :agents
+    get "/docs/benchmarks", DocsController, :benchmarks
     get "/docs/governance", DocsController, :governance
     get "/docs/observability", DocsController, :observability
     get "/docs/skills", DocsController, :skills

@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.DocsController do
   use ControlKeelWeb, :controller
 
+  alias ControlKeel.Benchmark
   alias ControlKeel.Skills
 
   plug :put_layout, html: {ControlKeelWeb.Layouts, :docs}
@@ -15,6 +16,10 @@ defmodule ControlKeelWeb.DocsController do
 
   def agents(conn, _params) do
     render(conn, :agents, agent_integrations: Skills.agent_integrations())
+  end
+
+  def benchmarks(conn, _params) do
+    render(conn, :benchmarks, suites: Benchmark.list_suites([]))
   end
 
   def governance(conn, _params) do

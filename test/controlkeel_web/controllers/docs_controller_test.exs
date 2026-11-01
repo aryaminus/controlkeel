@@ -276,6 +276,45 @@ defmodule ControlKeelWeb.DocsControllerTest do
     end
   end
 
+  describe "GET /docs/benchmarks" do
+    test "renders the generated built-in suite catalog", %{conn: conn} do
+      conn = get(conn, ~p"/docs/benchmarks")
+      body = html_response(conn, 200)
+
+      assert body =~ "Benchmark suites"
+      assert body =~ "What built-in suites are"
+      assert body =~ "Suite catalog"
+      assert body =~ "Reading a run"
+
+      # The catalog is generated from the shipped fixtures, so every suite
+      # appears with its slug, version, and scenario list.
+      for suite <- ControlKeel.Benchmark.list_suites([]) do
+        assert body =~ suite.name
+        assert body =~ suite.slug
+        assert body =~ "docs-suite-#{suite.slug}"
+      end
+
+      assert body =~ "hardcoded_api_key_python_webhook"
+      assert body =~ ~r{href="/docs/benchmarks"[^>]*aria-current="page"}
+    end
+
+    test "GET /docs/benchmarks with text/markdown returns markdown", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("accept", "text/markdown")
+        |> get(~p"/docs/benchmarks")
+
+      body = response(conn, 200)
+
+      assert body =~ "# Benchmark suites"
+      assert body =~ "## Suite catalog"
+      assert body =~ "## Reading a run"
+      assert body =~ "## Vibe Coding Failures v1 (`vibe_failures_v1`)"
+      assert body =~ "`hardcoded_api_key_python_webhook`"
+      assert response_content_type(conn, :markdown)
+    end
+  end
+
   describe "legacy guide URL" do
     test "GET /getting-started redirects to /docs/getting-started", %{conn: conn} do
       conn = get(conn, "/getting-started")
