@@ -123,41 +123,6 @@ defmodule ControlKeelWeb.Router do
       live "/invitations/:token", InvitationLive, :show
     end
 
-    # Cloud-auth gated: in cloud/self_hosted mode requires active membership.
-    # In local mode the on_mount hook is a passthrough.
-    live_session :cloud_auth,
-      layout: {ControlKeelWeb.Layouts, :dashboard},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.LayoutDefaults
-      ] do
-      live "/benchmarks", BenchmarksLive, :index
-      live "/benchmarks/runs/:id", BenchmarksLive, :show
-      live "/cloud/telemetry", CloudTelemetryLive, :index
-      live "/cloud/projects", CloudProjectsLive, :index
-      live "/cloud/projects/:ws_id", CloudProjectsLive, :show
-
-      # /policies removed from the router: PolicyStudioLive was org-unowned.
-      # Policy set management now lives under org settings
-      # (/:org_slug/settings?tab=policy_sets). PolicyStudioLive and its test
-      # were deleted together with this route (approved review #1).
-      # GET /policies survives as a redirect (declared in the sunset group
-      # above) landing on that tab — default org in local mode, the
-      # signed-in cloud user's newest org otherwise.
-
-      # /skills removed from the router: SkillsLive and its test are kept so
-      # the page can return under a different scope (org or workspace) later
-      # instead of a global surface. GET /skills now falls through to the
-      # ":org_slug" live block and the invalid-org handler.
-
-      # /dashboard removed from the router: DashboardLive was the last global
-      # operator page and its stats were computed across every org. The org
-      # overview (/:org_slug) is the dashboard now. GET /dashboard falls
-      # through to the ":org_slug" live block and the invalid-org handler —
-      # "dashboard" is reserved in Accounts.Org.@reserved_slugs, so no org
-      # can ever claim the URL. Regression-tested in router_test.exs.
-    end
-
     # /new/* pages use a standalone headless layout (own
     # NewPagesLayouts module — no sidebar/breadcrumb):
     # top bar + centered wizard column.

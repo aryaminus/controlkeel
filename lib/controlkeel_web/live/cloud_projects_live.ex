@@ -254,6 +254,7 @@ defmodule ControlKeelWeb.CloudProjectsLive do
       id="cloud-project-page"
       class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-8 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-6"
     >
+      <Layouts.flash_group flash={@flash} />
       <div class="flex items-center justify-between gap-4 mt-6 mb-4 max-[900px]:flex-col max-[900px]:items-start">
         <div>
           <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">
@@ -389,6 +390,7 @@ defmodule ControlKeelWeb.CloudProjectsLive do
       id="cloud-projects-page"
       class="mx-auto w-[min(1180px,calc(100%-2rem))] pt-8 pb-16 max-[900px]:w-[min(100%-1.25rem,1180px)] max-[900px]:pt-6"
     >
+      <Layouts.flash_group flash={@flash} />
       <div class="flex items-center justify-between gap-4 mt-6 mb-4 max-[900px]:flex-col max-[900px]:items-start">
         <div>
           <p class="uppercase tracking-[0.14em] text-xs text-primary font-semibold">Cloud</p>
