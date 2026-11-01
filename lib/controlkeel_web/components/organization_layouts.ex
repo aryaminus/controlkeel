@@ -702,6 +702,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-shield-check"
       },
       %{
+        label: "Benchmarks",
+        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/benchmarks",
+        scope: :workspace,
+        icon: "hero-chart-bar"
+      },
+      %{
         label: "Observability",
         href: observability_href,
         scope: :workspace,

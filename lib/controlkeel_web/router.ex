@@ -428,6 +428,12 @@ defmodule ControlKeelWeb.Router do
            ObservabilityBenchmarkLive,
            :index
 
+      live "/:org_slug/workspaces/:ws_slug/benchmarks", BenchmarksLive, :index
+
+      live "/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id",
+           BenchmarksLive,
+           :show
+
       live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
       live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index

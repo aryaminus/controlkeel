@@ -1,76 +1,142 @@
 defmodule ControlKeelWeb.BenchmarksLive do
+  @moduledoc """
+  Workspace benchmarks at `/:org_slug/workspaces/:ws_slug/benchmarks` with run
+  detail at `/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id`.
+
+  The comparison runner migrated from the retired global `/benchmarks` page
+  (benchmarks issue, slice 3): quick presets, built-in and external suite
+  selection, subject/baseline selection, domain-pack filtering, manual result
+  import, and run detail with matrices, comparison, exports, and metrics.
+
+  Scope resolves from the URL workspace via `WorkspaceScope.assign_scope/3`;
+  running suites and importing results are admin/owner mutations. Runs are
+  still queried globally (`Benchmark.get_run/1`) — workspace ownership on
+  benchmark runs (issue slice 1, `workspace_id` + migrations) closes the
+  cross-workspace gap; this page enforces the org/workspace membership gate
+  at the URL. The observability benchmark page (drafts, generated scenarios,
+  history, regressions) remains a separate workspace surface.
+  """
+
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Benchmark
   alias ControlKeel.Intent
+  alias ControlKeel.Mission.Workspace
+  alias ControlKeelWeb.WorkspaceAccess
+  alias ControlKeelWeb.WorkspaceScope
 
   @impl true
-  def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Benchmarks")
-     |> assign(:run, nil)
-     |> assign(:matrix, %{subjects: [], scenarios: []})
-     |> assign(:detail_metrics, %{})
-     |> assign(:eval_profile, %{})
-     |> assign(:comparison, nil)
-     |> assign(:import_slots, [])
-     |> assign(:import_form, empty_import_form())
-     |> assign(:subjects_dropdown_open, false)
-     |> assign(:active_preset, "opencode_compare")
-     |> assign(:form, to_form(default_form_params(), as: :benchmark))
-     |> assign(:domain_pack_options, domain_pack_options())
-     |> refresh_dashboard_assigns()}
-  end
+  def mount(params, _session, socket) do
+    case WorkspaceScope.assign_scope(socket, params, "Benchmarks") do
+      {:ok, socket} ->
+        {:ok, socket |> assign(:page_title, "Benchmarks") |> assign_default_state()}
 
-  @impl true
-  def handle_params(%{"id" => id}, _uri, socket) do
-    case Benchmark.get_run(id) do
-      nil ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Benchmark run not found.")
-         |> push_navigate(to: ~p"/benchmarks")}
-
-      run ->
-        {:noreply,
-         socket
-         |> assign_run_details(run)
-         |> assign(:page_title, "Benchmark Run #{run.id}")
-         |> assign(:page_action, %{
-           label: "Export CSV",
-           to: ~p"/api/v1/benchmarks/runs/#{run.id}/export?format=csv",
-           icon: "hero-document-text"
-         })}
+      {:error, socket} ->
+        {:ok, socket}
     end
   end
 
-  def handle_params(_params, _uri, socket) do
-    {:noreply,
-     socket
-     |> assign(:run, nil)
-     |> assign(:matrix, %{subjects: [], scenarios: []})
-     |> assign(:detail_metrics, %{})
-     |> assign(:eval_profile, %{})
-     |> assign(:comparison, nil)
-     |> assign(:import_slots, [])
-     |> assign(:import_form, empty_import_form())
-     |> assign(:page_title, "Benchmarks")
-     |> assign(:page_action, nil)
-     |> refresh_dashboard_assigns()}
+  @impl true
+  def handle_params(params, _url, socket) do
+    if socket.assigns[:scope_error] != nil or socket.assigns[:workspace_scope] == nil do
+      # Scope already failed in mount: the layout renders the in-place error
+      # panel and there is no resolved workspace to load data against.
+      {:noreply, socket}
+    else
+      case WorkspaceScope.refresh(socket, params) do
+        {:ok, socket, _changed?} -> {:noreply, load_workspace_page(socket, params)}
+        {:error, socket} -> {:noreply, socket}
+      end
+    end
+  end
+
+  defp load_workspace_page(%{assigns: %{live_action: :show}} = socket, params) do
+    load_run(socket, params["id"])
+  end
+
+  defp load_workspace_page(socket, _params) do
+    socket
+    |> assign(:summary, Benchmark.benchmark_summary([]))
+    |> assign(:suites, Benchmark.list_suites([]))
+    |> assign(:available_subjects, Benchmark.available_subjects())
+    |> assign_subjects_by_id()
+    |> assign(:domain_pack_options, domain_pack_options())
+  end
+
+  # Stable per-process state shared by both actions; all data loads happen in
+  # handle_params so a workspace URL change re-derives everything (and a
+  # missing run id redirects on first connect).
+  defp assign_default_state(socket) do
+    socket
+    |> assign(:run, nil)
+    |> assign(:matrix, %{subjects: [], scenarios: []})
+    |> assign(:detail_metrics, %{})
+    |> assign(:eval_profile, %{})
+    |> assign(:comparison, nil)
+    |> assign(:import_slots, [])
+    |> assign(:import_form, empty_import_form())
+    |> assign(:subjects_dropdown_open, false)
+    |> assign(:active_preset, "opencode_compare")
+    |> assign(:form, to_form(default_form_params(), as: :benchmark))
+  end
+
+  defp assign_subjects_by_id(socket) do
+    subjects = Benchmark.available_subjects()
+
+    assign(socket, :subjects_by_id, Map.new(subjects, fn s -> {s["id"], s} end))
+  end
+
+  defp require_admin(socket) do
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      {:ok, socket}
+    else
+      _ -> {:error, put_flash(socket, :error, "Admin or owner role required.")}
+    end
+  end
+
+  # Run detail lives at .../benchmarks/runs/:id. The workspace membership gate
+  # comes from the URL scope; a missing id bounces back to the workspace
+  # benchmarks index with a flash.
+  defp load_run(socket, id) do
+    socket = assign_subjects_by_id(socket)
+
+    case Benchmark.get_run(id) do
+      nil ->
+        socket
+        |> put_flash(:error, "Benchmark run not found.")
+        |> push_navigate(to: workspace_benchmarks_path(socket))
+
+      run ->
+        socket
+        |> assign(:run, run)
+        |> assign(:page_title, "Benchmark run #{run.id}")
+        |> assign_run_details(run)
+    end
+  end
+
+  defp workspace_benchmarks_path(socket) do
+    ~p"/#{socket.assigns.workspace.org.slug}/workspaces/#{socket.assigns.workspace.slug}/benchmarks"
   end
 
   @impl true
   def handle_event("run", %{"benchmark" => params}, socket) do
-    case Benchmark.run_suite(params) do
-      {:ok, run} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Benchmark run ##{run.id} completed.")
-         |> push_navigate(to: ~p"/benchmarks/runs/#{run.id}")}
+    with {:ok, socket} <- require_admin(socket) do
+      case Benchmark.run_suite(params) do
+        {:ok, run} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Benchmark run ##{run.id} completed.")
+           |> push_navigate(
+             to:
+               ~p"/#{socket.assigns.workspace.org.slug}/workspaces/#{socket.assigns.workspace.slug}/benchmarks/runs/#{run.id}"
+           )}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Benchmark run failed: #{inspect(reason)}")}
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Benchmark run failed: #{inspect(reason)}")}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
@@ -81,50 +147,54 @@ defmodule ControlKeelWeb.BenchmarksLive do
         %{assigns: %{run: run}} = socket
       )
       when is_struct(run, Benchmark.Run) do
-    %{"subject" => subject, "scenario_slug" => scenario_slug, "payload" => payload_json} =
-      import_params
+    with {:ok, socket} <- require_admin(socket) do
+      %{"subject" => subject, "scenario_slug" => scenario_slug, "payload" => payload_json} =
+        import_params
 
-    with {:ok, decoded} <- decode_import_payload(payload_json),
-         attrs = Map.put(decoded, "scenario_slug", scenario_slug),
-         {:ok, updated_run} <- Benchmark.import_result(run.id, subject, attrs) do
-      label = subject_label_by_id(socket.assigns.subjects_by_id, subject)
+      with {:ok, decoded} <- decode_import_payload(payload_json),
+           attrs = Map.put(decoded, "scenario_slug", scenario_slug),
+           {:ok, updated_run} <- Benchmark.import_result(run.id, subject, attrs) do
+        label = subject_label_by_id(socket.assigns.subjects_by_id, subject)
 
-      {:noreply,
-       socket
-       |> assign_run_details(updated_run)
-       |> put_flash(:info, "Imported #{label} result for #{scenario_slug}.")}
+        {:noreply,
+         socket
+         |> assign_run_details(updated_run)
+         |> put_flash(:info, "Imported #{label} result for #{scenario_slug}.")}
+      else
+        {:error, %Jason.DecodeError{} = error} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             "Import payload must be valid JSON: #{Exception.message(error)}"
+           )}
+
+        {:error, :invalid_payload_shape} ->
+          {:noreply, put_flash(socket, :error, "Import payload must be a JSON object.")}
+
+        {:error, :scenario_slug_required} ->
+          {:noreply, put_flash(socket, :error, "Select a scenario for the import.")}
+
+        {:error, :result_not_found} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             "No matching benchmark result slot exists for that run, subject, and scenario_slug."
+           )}
+
+        {:error, :not_found} ->
+          {:noreply, put_flash(socket, :error, "Benchmark run not found.")}
+
+        # Not redundant despite the type checker's warning: Benchmark.import_result
+        # can return unmodelled errors such as %Ecto.Changeset{} (same rationale as
+        # ApiController.import_benchmark_result). Do not remove.
+        {:error, reason} ->
+          {:noreply,
+           put_flash(socket, :error, "Failed to import benchmark output: #{inspect(reason)}")}
+      end
     else
-      {:error, %Jason.DecodeError{} = error} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Import payload must be valid JSON: #{Exception.message(error)}"
-         )}
-
-      {:error, :invalid_payload_shape} ->
-        {:noreply, put_flash(socket, :error, "Import payload must be a JSON object.")}
-
-      {:error, :scenario_slug_required} ->
-        {:noreply, put_flash(socket, :error, "Select a scenario for the import.")}
-
-      {:error, :result_not_found} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "No matching benchmark result slot exists for that run, subject, and scenario_slug."
-         )}
-
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "Benchmark run not found.")}
-
-      # Not redundant despite the type checker's warning: Benchmark.import_result
-      # can return unmodelled errors such as %Ecto.Changeset{} (same rationale as
-      # ApiController.import_benchmark_result). Do not remove.
-      {:error, reason} ->
-        {:noreply,
-         put_flash(socket, :error, "Failed to import benchmark output: #{inspect(reason)}")}
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
@@ -187,11 +257,27 @@ defmodule ControlKeelWeb.BenchmarksLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(%{live_action: :show} = assigns) do
     ~H"""
-    <div class="w-full space-y-8">
-      <%!-- Key stat cards --%>
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div id="workspace-benchmarks-run-page" class="w-full space-y-8">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <.page_title
+          title={"Benchmark run ##{@run.id}"}
+          subtitle={"Suite: #{@run.suite.name || @run.suite.slug} · #{@run.status}"}
+        />
+        <.link
+          navigate={
+            ~p"/#{@workspace.org.slug}/workspaces/#{@workspace.slug}/benchmarks"
+          }
+          class="text-sm font-medium text-primary transition hover:text-primary"
+        >
+          ← Back to benchmarks
+        </.link>
+      </div>
+
+      <section id="benchmark-run-cards" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article class="rounded-2xl border bg-card p-5 shadow-card">
           <div class="flex items-center justify-between gap-3">
             <p class="text-sm font-medium text-muted-foreground">Catch rate</p>
@@ -263,11 +349,19 @@ defmodule ControlKeelWeb.BenchmarksLive do
             Median latency {format_latency(@run.median_latency_ms)}
           </p>
         </article>
-      </div>
+      </section>
 
-      <%!-- Run metadata panel --%>
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <.section_title>Run metadata</.section_title>
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <.section_title>Run metadata</.section_title>
+          <a
+            id="benchmark-export-csv"
+            href={~p"/api/v1/benchmarks/runs/#{@run.id}/export?format=csv"}
+            class="inline-flex items-center gap-2 rounded-3xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+          >
+            <.icon name="hero-document-text" class="size-4" /> Export CSV
+          </a>
+        </div>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -313,7 +407,6 @@ defmodule ControlKeelWeb.BenchmarksLive do
         </div>
       </section>
 
-      <%!-- Promotion integrity panel --%>
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-3">
         <% integrity = get_in(@eval_profile, ["promotion_integrity"]) || %{} %>
         <div class="flex items-center justify-between gap-4">
@@ -338,7 +431,6 @@ defmodule ControlKeelWeb.BenchmarksLive do
         </p>
       </section>
 
-      <%!-- Manual import panel (awaiting-import only) --%>
       <%= if @run.status == "awaiting_import" and @import_slots != [] do %>
         <section id="import-panel" class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
           <.section_title>Manual import</.section_title>
@@ -358,6 +450,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
           </ul>
 
           <.form
+            :if={WorkspaceAccess.can_mutate?(@current_membership)}
             for={@import_form}
             id="benchmark-import-form"
             phx-submit="import_result"
@@ -431,10 +524,15 @@ defmodule ControlKeelWeb.BenchmarksLive do
               </button>
             </div>
           </.form>
+          <p
+            :if={!WorkspaceAccess.can_mutate?(@current_membership)}
+            class="text-xs text-muted-foreground"
+          >
+            Admin or owner role required to import results.
+          </p>
         </section>
       <% end %>
 
-      <%!-- Comparison panel --%>
       <section id="comparison-panel" class="rounded-2xl border bg-card p-5 shadow-card space-y-6">
         <.section_title>Subject comparison</.section_title>
 
@@ -569,7 +667,6 @@ defmodule ControlKeelWeb.BenchmarksLive do
         <% end %>
       </section>
 
-      <%!-- Scenario matrix panel --%>
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
         <div class="flex items-center justify-between gap-4">
           <.section_title>Scenario matrix</.section_title>
@@ -632,227 +729,163 @@ defmodule ControlKeelWeb.BenchmarksLive do
 
   def render(assigns) do
     ~H"""
-    <div class="w-full space-y-8">
+    <section id="workspace-benchmarks-page" class="w-full space-y-8">
       <.page_title
-        title="Benchmark engine"
-        subtitle="Compare governed subjects and external agents on the same scenario suites, then keep the results as product evidence."
+        title="Benchmarks"
+        subtitle="Compare governed subjects and external agents on the same scenario suites for this workspace, then keep the results as product evidence."
       />
 
-      <div class="grid gap-6 lg:grid-cols-3">
-        <%!-- Runner form & presets panel --%>
-        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-6 lg:col-span-2">
-          <div class="space-y-3">
-            <.section_title>Quick presets</.section_title>
-            <p class="text-sm text-muted-foreground max-w-xl leading-relaxed">
-              One-click subject and suite configurations. Pick one to populate the form below.
-            </p>
-
-            <div class="flex flex-wrap gap-2">
-              <button
-                :for={{preset_id, preset_value, preset_label} <- preset_chips()}
-                type="button"
-                id={preset_id}
-                phx-click="preset_benchmark"
-                phx-value-preset={preset_value}
-                aria-pressed={to_string(preset_value == @active_preset)}
-                class={[
-                  "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer",
-                  if(preset_value == @active_preset,
-                    do: "border-primary/40 bg-primary/10 text-primary",
-                    else: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                  )
-                ]}
-              >
-                {preset_label}
-              </button>
-            </div>
-          </div>
-
-          <.form
-            for={@form}
-            id="benchmark-runner"
-            phx-submit="run"
-            phx-change="benchmark_form_change"
-            class="space-y-4"
-          >
-            <div class="flex flex-col gap-4">
-              <.input
-                field={@form[:suite]}
-                type="select"
-                label="Suite"
-                options={Enum.map(@suites, &{"#{&1.name} (#{&1.slug})", &1.slug})}
-              />
-              <.subject_multi_select
-                field={@form[:subjects]}
-                label="Subjects"
-                options={subject_options(@available_subjects)}
-                selected={@form[:subjects].value}
-                open={@subjects_dropdown_open}
-                id="benchmark-subjects-input"
-              />
-              <.input
-                field={@form[:baseline_subject]}
-                type="select"
-                label="Baseline subject"
-                options={subject_options(@available_subjects)}
-                id="benchmark-baseline-input"
-              />
-              <.input
-                field={@form[:domain_pack]}
-                type="select"
-                label="Run only this domain"
-                prompt="All suite scenarios"
-                options={@domain_pack_options}
-              />
-            </div>
-            <div class="flex items-center justify-between gap-4 pt-2">
-              <p class="text-xs text-muted-foreground">
-                Configure the suite above, then start the run.
+      <%= if WorkspaceAccess.can_mutate?(@current_membership) do %>
+        <div class="grid gap-6 lg:grid-cols-3">
+          <section id="benchmark-runner-panel" class="rounded-2xl border bg-card p-5 shadow-card space-y-6 lg:col-span-2">
+            <div class="space-y-3">
+              <.section_title>Quick presets</.section_title>
+              <p class="text-sm text-muted-foreground max-w-xl leading-relaxed">
+                One-click subject and suite configurations. Pick one to populate the form below.
               </p>
-              <.button type="submit" class="shrink-0">
-                <.icon name="hero-play" class="size-4" /> Run benchmark
-              </.button>
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  :for={{preset_id, preset_value, preset_label} <- preset_chips()}
+                  type="button"
+                  id={preset_id}
+                  phx-click="preset_benchmark"
+                  phx-value-preset={preset_value}
+                  aria-pressed={to_string(preset_value == @active_preset)}
+                  class={[
+                    "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer",
+                    if(preset_value == @active_preset,
+                      do: "border-primary/40 bg-primary/10 text-primary",
+                      else: "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    )
+                  ]}
+                >
+                  {preset_label}
+                </button>
+              </div>
             </div>
-          </.form>
-          <p class="text-xs text-muted-foreground">
-            For a reproducible external comparison, start with
-            <code class="font-mono text-foreground/80">controlkeel_validate,opencode_manual</code>
-            and import the OpenCode output after the awaiting-import run finishes.
+
+            <.form
+              for={@form}
+              id="benchmark-runner"
+              phx-submit="run"
+              phx-change="benchmark_form_change"
+              class="space-y-4"
+            >
+              <div class="flex flex-col gap-4">
+                <.input
+                  field={@form[:suite]}
+                  type="select"
+                  label="Suite"
+                  options={Enum.map(@suites, &{"#{&1.name} (#{&1.slug})", &1.slug})}
+                />
+                <.subject_multi_select
+                  field={@form[:subjects]}
+                  label="Subjects"
+                  options={subject_options(@available_subjects)}
+                  selected={@form[:subjects].value}
+                  open={@subjects_dropdown_open}
+                  id="benchmark-subjects-input"
+                />
+                <.input
+                  field={@form[:baseline_subject]}
+                  type="select"
+                  label="Baseline subject"
+                  options={subject_options(@available_subjects)}
+                  id="benchmark-baseline-input"
+                />
+                <.input
+                  field={@form[:domain_pack]}
+                  type="select"
+                  label="Run only this domain"
+                  prompt="All suite scenarios"
+                  options={@domain_pack_options}
+                />
+              </div>
+              <div class="flex items-center justify-between gap-4 pt-2">
+                <p class="text-xs text-muted-foreground">
+                  Configure the suite above, then start the run.
+                </p>
+                <.button type="submit" class="shrink-0">
+                  <.icon name="hero-play" class="size-4" /> Run benchmark
+                </.button>
+              </div>
+            </.form>
+            <p class="text-xs text-muted-foreground">
+              For a reproducible external comparison, start with
+              <code class="font-mono text-foreground/80">controlkeel_validate,opencode_manual</code>
+              and import the OpenCode output after the awaiting-import run finishes.
+            </p>
+          </section>
+
+          <section class="rounded-2xl border bg-card p-5 shadow-card space-y-6 h-fit">
+            <div class="grid grid-cols-2 gap-4 border-b border-border pb-5">
+              <div>
+                <p class="text-xs font-medium text-muted-foreground">Suites</p>
+                <p class="mt-1 text-xl font-semibold text-foreground/90">{@summary.total_suites}</p>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-muted-foreground">Runs</p>
+                <p class="mt-1 text-xl font-semibold text-foreground/90">{@summary.total_runs}</p>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-muted-foreground">Avg Catch Rate</p>
+                <p class="mt-1 text-xl font-semibold text-foreground/90">
+                  {format_percent(@summary.average_catch_rate)}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-muted-foreground">Avg Overhead</p>
+                <p class="mt-1 text-xl font-semibold text-foreground/90">
+                  {format_percent(@summary.average_overhead_percent)}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <.section_title>OpenCode vs ControlKeel</.section_title>
+              <p class="text-sm text-muted-foreground leading-relaxed">
+                The recommended first external comparison path is OpenCode. Start with a manual import
+                subject for the quickest reproducible run, then swap to a shell-based wrapper if you
+                want fully scripted replay.
+              </p>
+              <ul class="space-y-2 pt-2 text-xs text-muted-foreground list-disc ml-4">
+                <li>
+                  Create or review
+                  <code class="font-mono text-foreground/80">controlkeel/benchmark_subjects.json</code>
+                  with the OpenCode subject you want to import.
+                </li>
+                <li>
+                  Run the suite once with
+                  <code class="font-mono text-foreground/80">opencode_manual</code>
+                  to create awaiting-import records.
+                </li>
+                <li>
+                  Import captured OpenCode output or replace the subject with a scripted shell command later.
+                </li>
+              </ul>
+            </div>
+          </section>
+        </div>
+      <% else %>
+        <section
+          id="benchmarks-viewer-notice"
+          class="rounded-2xl border border-dashed p-8 text-center space-y-2"
+        >
+          <p class="text-sm font-medium text-foreground">Admin or owner role required</p>
+          <p class="text-sm text-muted-foreground">
+            Benchmark runs are shared workspace evidence. Ask an admin or owner of this workspace to
+            launch suites or import results.
           </p>
         </section>
+      <% end %>
 
-        <%!-- Aggregate summary & blessed external path --%>
-        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-6 h-fit">
-          <div class="grid grid-cols-2 gap-4 border-b border-border pb-5">
-            <div>
-              <p class="text-xs font-medium text-muted-foreground">Suites</p>
-              <p class="mt-1 text-xl font-semibold text-foreground/90">{@summary.total_suites}</p>
-            </div>
-            <div>
-              <p class="text-xs font-medium text-muted-foreground">Runs</p>
-              <p class="mt-1 text-xl font-semibold text-foreground/90">{@summary.total_runs}</p>
-            </div>
-            <div>
-              <p class="text-xs font-medium text-muted-foreground">Avg Catch Rate</p>
-              <p class="mt-1 text-xl font-semibold text-foreground/90">
-                {format_percent(@summary.average_catch_rate)}
-              </p>
-            </div>
-            <div>
-              <p class="text-xs font-medium text-muted-foreground">Avg Overhead</p>
-              <p class="mt-1 text-xl font-semibold text-foreground/90">
-                {format_percent(@summary.average_overhead_percent)}
-              </p>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <.section_title>OpenCode vs ControlKeel</.section_title>
-            <p class="text-sm text-muted-foreground leading-relaxed">
-              The recommended first external comparison path is OpenCode. Start with a manual import
-              subject for the quickest reproducible run, then swap to a shell-based wrapper if you
-              want fully scripted replay.
-            </p>
-            <ul class="space-y-2 pt-2 text-xs text-muted-foreground list-disc ml-4">
-              <li>
-                Create or review
-                <code class="font-mono text-foreground/80">controlkeel/benchmark_subjects.json</code>
-                with the OpenCode subject you want to import.
-              </li>
-              <li>
-                Run the suite once with
-                <code class="font-mono text-foreground/80">opencode_manual</code>
-                to create awaiting-import records.
-              </li>
-              <li>
-                Import captured OpenCode output or replace the subject with a scripted shell command later.
-              </li>
-            </ul>
-          </div>
-        </section>
-      </div>
-
-      <%!-- Recent runs table --%>
-      <section class="rounded-2xl border bg-card shadow-card overflow-clip">
-        <div class="p-5 border-b border-border flex items-center justify-between gap-3">
-          <.section_title>Recent runs</.section_title>
-          <span :if={@recent_runs != []} class="text-xs text-muted-foreground">
-            {length(@recent_runs)} {if length(@recent_runs) == 1, do: "run", else: "runs"}
-          </span>
-        </div>
-        <div class="overflow-x-auto">
-          <table id="benchmark-runs" class="min-w-full divide-y divide-border text-left text-sm">
-            <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground sticky top-0 z-10">
-              <tr>
-                <th class="px-5 py-3 font-semibold">Suite</th>
-                <th class="px-5 py-3 font-semibold">Status</th>
-                <th class="px-5 py-3 font-semibold">Catch rate</th>
-                <th class="px-5 py-3 font-semibold">Baseline</th>
-                <th class="px-5 py-3 font-semibold">Domains</th>
-                <th class="px-5 py-3 font-semibold text-right">Overhead</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-              <%= if @recent_runs == [] do %>
-                <tr>
-                  <td colspan="6" class="px-5 py-12 text-center">
-                    <p class="text-base font-medium text-foreground">No benchmark runs yet.</p>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                      Pick a preset above and run your first suite to see results here.
-                    </p>
-                  </td>
-                </tr>
-              <% else %>
-                <%= for run <- @recent_runs do %>
-                  <tr id={"run-#{run.id}"} class="relative transition hover:bg-muted/30">
-                    <td class="px-5 py-4 font-semibold">
-                      <.link
-                        navigate={~p"/benchmarks/runs/#{run.id}"}
-                        class="text-foreground/90 hover:text-primary after:absolute after:inset-0"
-                      >
-                        {run.suite.name || run.suite.slug}
-                      </.link>
-                    </td>
-                    <td class="px-5 py-4">
-                      <span class={[
-                        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize border",
-                        status_badge_class(run.status)
-                      ]}>
-                        {run_status_label(run.status)}
-                      </span>
-                    </td>
-                    <td class="px-5 py-4 font-semibold text-foreground/90">
-                      {format_percent(run.catch_rate)}
-                    </td>
-                    <td class="px-5 py-4 text-muted-foreground">
-                      {subject_label_by_id(@subjects_by_id, run.baseline_subject)}
-                    </td>
-                    <td class="px-5 py-4">
-                      <div class="flex flex-wrap gap-1.5">
-                        <%= for pack <- Benchmark.domain_packs_for_run(run) do %>
-                          <span class="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                            {format_domain_pack(pack)}
-                          </span>
-                        <% end %>
-                      </div>
-                    </td>
-                    <td class="px-5 py-4 text-right text-muted-foreground font-mono">
-                      {format_percent(run.average_overhead_percent)}
-                    </td>
-                  </tr>
-                <% end %>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <%!-- Built-in suites catalog --%>
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
         <div>
           <.section_title>Built-in suites</.section_title>
           <p class="text-xs text-muted-foreground mt-1">
-            Built-ins are always present. External subjects appear when the current project has a
+            Built-ins are reusable templates available to every workspace. External subjects appear
+            when the current project has a
             <code class="font-mono text-foreground/80">controlkeel/benchmark_subjects.json</code>
             file.
           </p>
@@ -890,7 +923,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
           <% end %>
         </div>
       </section>
-    </div>
+    </section>
     """
   end
 
@@ -945,17 +978,6 @@ defmodule ControlKeelWeb.BenchmarksLive do
         "baseline_subject" => "controlkeel_validate"
       }
     }
-  end
-
-  defp refresh_dashboard_assigns(socket) do
-    subjects = Benchmark.available_subjects()
-
-    socket
-    |> assign(:summary, Benchmark.benchmark_summary([]))
-    |> assign(:suites, Benchmark.list_suites([]))
-    |> assign(:recent_runs, Benchmark.list_recent_runs([]))
-    |> assign(:available_subjects, subjects)
-    |> assign(:subjects_by_id, Map.new(subjects, fn s -> {s["id"], s} end))
   end
 
   defp format_percent(nil), do: "Not recorded"
