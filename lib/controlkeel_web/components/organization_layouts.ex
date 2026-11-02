@@ -130,6 +130,22 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                 </.link>
               <% end %>
             </div>
+
+            <div class="mt-1 border-t pt-1">
+              <.link
+                navigate={~p"/new/org"}
+                phx-click={
+                  JS.hide(to: "#sidebar-org-switcher-popover")
+                  |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+                }
+                class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-primary transition hover:bg-muted"
+              >
+                <.icon name="hero-plus" class="size-4 shrink-0" /> Create organization
+              </.link>
+              <p class="px-2.5 pb-1.5 pt-0.5 text-xs text-muted-foreground">
+                Joining a team? Open the invitation link from your email.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -885,6 +901,70 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   defp organization_nav_icon_class(false),
     do: "size-4 text-muted-foreground group-hover:text-primary"
+
+  @doc """
+  The current scope root for the saved-path handoff.
+
+  Returns `/:org`, `/:org/workspaces/:ws`, or
+  `/:org/workspaces/:ws/sessions/:id`. The organization layout uses this to
+  mark a valid page so the browser saves only scopes the server resolved.
+  """
+  def scope_root(%{
+        nav_session: %{id: id},
+        nav_workspace: %{slug: ws_slug},
+        nav_org: %{slug: org_slug}
+      })
+      when not is_nil(id) do
+    "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{id}"
+  end
+
+  def scope_root(%{nav_workspace: %{slug: ws_slug}, nav_org: %{slug: org_slug}}) do
+    "/#{org_slug}/workspaces/#{ws_slug}"
+  end
+
+  def scope_root(%{nav_org: %{slug: org_slug}}), do: "/#{org_slug}"
+  def scope_root(_assigns), do: nil
+
+  @doc """
+  In-place panel for an unresolvable or inaccessible scope.
+
+  Rendered by `organization.html.heex` when a LiveView assigns `:scope_error`.
+  The panel replaces the org chrome because an invalid scope has no sidebar to
+  render. It offers home, the parent scope, create-organization, or sign-in
+  actions depending on the error and the visitor.
+  """
+  attr :error, :map, required: true
+  attr :current_user, :any, default: nil
+
+  def scope_error_panel(assigns) do
+    ~H"""
+    <section class="mx-auto flex w-full max-w-lg flex-col items-center text-center">
+      <span class="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        <.icon name="hero-map-pin" class="size-6" />
+      </span>
+
+      <h1 class="mt-5 text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+        {@error.title}
+      </h1>
+      <p class="mt-2 text-sm text-muted-foreground">{@error.message}</p>
+
+      <div :if={@error.scope == :org} class="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <.link
+          href="/"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
+        >
+          <.icon name="hero-home" class="size-3.5" /> Back to home
+        </.link>
+        <.link
+          navigate={~p"/new/org"}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted"
+        >
+          <.icon name="hero-plus" class="size-3.5" /> Create an organization
+        </.link>
+      </div>
+    </section>
+    """
+  end
 
   attr :children, :list, required: true
   attr :current_path, :string, default: nil

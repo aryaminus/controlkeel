@@ -66,6 +66,14 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       refute html =~ "org_slug=ctaorg"
     end
 
+    test "switcher offers a create-organization entry", %{org: org, owner: owner} do
+      {:ok, _view, html} = live(conn_for(owner), ~p"/#{org.slug}")
+
+      assert html =~ ~s(href="/new/org")
+      assert html =~ "Create organization"
+      assert html =~ "Joining a team?"
+    end
+
     test "owner can open Invite member from the Members tab", %{org: org, owner: owner} do
       {:ok, view, _html} = live(conn_for(owner), ~p"/#{org.slug}?tab=members")
 
@@ -261,6 +269,40 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
   end
 
+  describe "unknown organization slug" do
+    setup do
+      owner = create_user!("missing-org@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Real Org", slug: "realorg"})
+
+      {:ok, org: org, owner: owner}
+    end
+
+    test "org page renders the in-place not-found panel instead of redirecting", %{owner: owner} do
+      assert {:ok, view, html} = live(conn_for(owner), "/no-such-org")
+
+      assert has_element?(view, "#scope-not-found[data-scope-error]")
+      assert html =~ "Organization not found"
+      assert has_element?(view, "#scope-not-found a[href='/']", "Back to home")
+      assert has_element?(view, "#scope-not-found a[href='/new/org']", "Create an organization")
+      refute html =~ ~s(href="/organizations")
+    end
+
+    test "settings route handles the same unknown slug in place", %{owner: owner} do
+      assert {:ok, view, html} = live(conn_for(owner), "/no-such-org/settings")
+
+      assert has_element?(view, "#scope-not-found[data-scope-error]")
+      assert html =~ "Organization not found"
+      refute html =~ ~s(href="/organizations")
+    end
+
+    test "a resolvable org still renders the org page", %{owner: owner, org: org} do
+      assert {:ok, _view, html} = live(conn_for(owner), ~p"/#{org.slug}")
+
+      assert html =~ "Real Org"
+      refute html =~ "Organization not found"
+    end
+  end
+
   describe "org settings modal" do
     setup do
       owner = create_user!("owner-set@example.com")
@@ -299,6 +341,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     test "admin can view settings but status and budget are owner-locked", %{admin: admin} do
       {:ok, view, html} = live(conn_for(admin), ~p"/setco/settings")
 
+      assert has_element?(view, ~s([data-scope-valid][data-scope-root="/setco"]))
       assert html =~ "Organization Settings"
       html = render(view)
 
@@ -306,9 +349,12 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "Only owners can change budget."
     end
 
-    test "non-admin members are redirected from settings", %{member: member} do
-      assert {:error, {:live_redirect, %{to: "/setco"}}} =
-               live(conn_for(member), ~p"/setco/settings")
+    test "non-admin members see an access panel on settings", %{member: member} do
+      {:ok, view, html} = live(conn_for(member), ~p"/setco/settings")
+
+      assert has_element?(view, "#scope-not-found[data-scope-error]")
+      refute has_element?(view, "[data-scope-invalid-root]")
+      assert html =~ "Organization unavailable"
     end
   end
 

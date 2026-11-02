@@ -219,90 +219,6 @@ defmodule ControlKeelWeb.Router do
     # proof browser above — old bookmarks 302 to the session-scoped URL.
     # Single-segment, so it must also stay ahead of the ":org_slug" block.
     get "/findings", PageController, :findings_redirect
-
-    # NB: keep this block last in the scope — ":org_slug" matches any single
-    # segment, so routes added below it would be silently swallowed. For the
-    # same reason, single-segment protocol GETs must stay ahead of the
-    # browser scope (see above).
-    live_session :organization,
-      layout: {ControlKeelWeb.OrganizationLayouts, :organization},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.OrganizationLayoutDefaults
-      ] do
-      live "/:org_slug", OrganizationDetailLive, :index
-      live "/:org_slug/settings", OrganizationSettingsLive, :edit
-      live "/:org_slug/workspaces/:ws_slug", WorkspaceDetailLive, :index
-      live "/:org_slug/workspaces/:ws_slug/settings", WorkspaceSettingsLive, :show
-      live "/:org_slug/workspaces/:ws_slug/repos", WorkspaceReposLive, :index
-      live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
-      live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
-
-      # Workspace-scoped observability (issue: observability-workspace-scope):
-      # same LiveViews as the former global `/observability/*` pages, mounted
-      # from the URL workspace (`ws_slug` + `org_slug`) instead of the
-      # most-recent-session heuristic.
-      live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/loop", ObservabilityLoopLive, :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/compare",
-           ObservabilityCompareLive,
-           :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/costs", ObservabilityCostsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/evals", ObservabilityEvalsLive, :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/imports",
-           ObservabilityImportsLive,
-           :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/memory-quality",
-           ObservabilityMemoryQualityLive,
-           :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/recommendations",
-           ObservabilityRecommendationsLive,
-           :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/promotions",
-           ObservabilityPromotionsLive,
-           :index
-
-      live "/:org_slug/workspaces/:ws_slug/observability/benchmark",
-           ObservabilityBenchmarkLive,
-           :index
-
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/activity", SessionActivityLive, :show
-
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/resume-packet",
-           SessionResumePacketLive,
-           :show
-
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/connect", SessionConnectLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/release", SessionReleaseLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/ship", SessionShipLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
-
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/observability",
-           SessionObservabilityLive,
-           :show
-
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs",
-           SessionProofsLive,
-           :index
-
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id",
-           ProofLive,
-           :show
-    end
   end
 
   # Session export is authenticated in cloud/self_hosted (passthrough in local mode).
@@ -316,23 +232,6 @@ defmodule ControlKeelWeb.Router do
     get "/observability/sessions/:id", PageController, :observability_session_redirect
     get "/observability/sessions/:id/timeline", PageController, :observability_session_redirect
     get "/observability/sessions/:id/memory", PageController, :observability_session_redirect
-
-    # Legacy observability benchmark sub-routes (consolidated into the stacked
-    # `/observability/benchmark` page): redirect bookmarks there, preserving
-    # the query string.
-    get "/observability/benchmarks/drafts",
-        PageController,
-        :observability_benchmarks_drafts_redirect
-
-    get "/observability/benchmarks/scenarios",
-        PageController,
-        :observability_benchmarks_scenarios_redirect
-
-    get "/observability/benchmarks/history",
-        PageController,
-        :observability_benchmarks_history_redirect
-
-    get "/observability/regressions", PageController, :observability_regressions_redirect
 
     # Legacy export paths (dual-route for backwards compat): keep functional
     # so existing `controlkeel obs export` downloads and old bookmarks still
@@ -481,6 +380,94 @@ defmodule ControlKeelWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard", metrics: ControlKeelWeb.Telemetry
+    end
+  end
+
+  # Keep org routes after global routes so their catch-all cannot shadow them.
+  # The catch-all remains last in the organization live session.
+  scope "/", ControlKeelWeb do
+    pipe_through :browser
+
+    live_session :organization,
+      layout: {ControlKeelWeb.OrganizationLayouts, :organization},
+      on_mount: [
+        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
+        ControlKeelWeb.OrganizationLayoutDefaults
+      ] do
+      live "/:org_slug", OrganizationDetailLive, :index
+      live "/:org_slug/settings", OrganizationSettingsLive, :edit
+      live "/:org_slug/workspaces/:ws_slug", WorkspaceDetailLive, :index
+      live "/:org_slug/workspaces/:ws_slug/settings", WorkspaceSettingsLive, :show
+      live "/:org_slug/workspaces/:ws_slug/repos", WorkspaceReposLive, :index
+      live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
+      live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
+
+      # Workspace-scoped observability (issue: observability-workspace-scope):
+      # same LiveViews as the former global `/observability/*` pages, mounted
+      # from the URL workspace (`ws_slug` + `org_slug`) instead of the
+      # most-recent-session heuristic.
+      live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/loop", ObservabilityLoopLive, :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/compare",
+           ObservabilityCompareLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/costs", ObservabilityCostsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/observability/evals", ObservabilityEvalsLive, :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/imports",
+           ObservabilityImportsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/memory-quality",
+           ObservabilityMemoryQualityLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/recommendations",
+           ObservabilityRecommendationsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/promotions",
+           ObservabilityPromotionsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/observability/benchmark",
+           ObservabilityBenchmarkLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/activity", SessionActivityLive, :show
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/resume-packet",
+           SessionResumePacketLive,
+           :show
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/connect", SessionConnectLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/release", SessionReleaseLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/ship", SessionShipLive, :show
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/observability",
+           SessionObservabilityLive,
+           :show
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs",
+           SessionProofsLive,
+           :index
+
+      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id",
+           ProofLive,
+           :show
+
+      live "/:org_slug/*rest", OrgCatchAllLive, :not_found
     end
   end
 
