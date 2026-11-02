@@ -314,6 +314,7 @@ defmodule ControlKeel.AnalyticsTest do
     assert summary.outcome_metrics.proof_backed_task_coverage_percent == nil
     assert summary.outcome_metrics.deploy_ready_task_rate_percent == nil
     assert summary.average_findings_per_session == nil
+
     assert summary.steps == [
              %{step: "project_initialized", count: 0, conversion_percent: 100.0},
              %{step: "agent_attached", count: 0, conversion_percent: nil},

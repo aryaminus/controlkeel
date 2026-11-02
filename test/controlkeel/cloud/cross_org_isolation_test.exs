@@ -3,14 +3,17 @@ defmodule ControlKeel.Cloud.CrossOrgIsolationTest do
   Regression test for CK-CLOUD-XORG-TEST-001.
 
   Locks in the boundary that a user in org A cannot observe enrolled
-  workspaces, run packages, mission workspaces, or telemetry events
-  belonging to org B through any of the user-facing surfaces (Accounts,
-  KeyRegistry, RuntimeContext, CloudProjectsLive).
+  workspaces, run packages, or mission workspaces belonging to org B
+  through the context surfaces an org member can reach (Accounts,
+  KeyRegistry, RuntimeContext).
+
+  The former `/cloud/projects` browser surface was removed by owner
+  directive (no cloud routes); its isolation property is the same one
+  pinned by the KeyRegistry describe below, which is the read path every
+  surviving consumer goes through.
   """
 
-  use ControlKeelWeb.ConnCase, async: false
-
-  import Phoenix.LiveViewTest
+  use ControlKeel.DataCase, async: false
 
   alias ControlKeel.Accounts
   alias ControlKeel.Cloud.RuntimeContext
@@ -86,48 +89,6 @@ defmodule ControlKeel.Cloud.CrossOrgIsolationTest do
     end
   end
 
-  describe "CloudProjectsLive :index" do
-    test "shows only org A's workspaces when signed in as user_a", %{
-      conn: conn,
-      user_a: user_a,
-      key_a: key_a,
-      key_b: key_b
-    } do
-      conn = session_conn(conn, user_a.id)
-      {:ok, _view, html} = live(conn, ~p"/cloud/projects")
-
-      assert html =~ key_a.workspace_id
-      refute html =~ key_b.workspace_id
-    end
-  end
-
-  describe "CloudProjectsLive :show" do
-    test "refuses access to org B's enrolled workspace when signed in as user_a", %{
-      conn: conn,
-      user_a: user_a,
-      key_b: key_b
-    } do
-      conn = session_conn(conn, user_a.id)
-      {:ok, _view, html} = live(conn, ~p"/cloud/projects/#{key_b.workspace_id}")
-
-      assert html =~ "Not visible"
-      refute html =~ "Cloud run packages"
-    end
-
-    test "user_a can see their own org A workspace and packages", %{
-      conn: conn,
-      user_a: user_a,
-      key_a: key_a,
-      pkg_a: pkg_a
-    } do
-      conn = session_conn(conn, user_a.id)
-      {:ok, _view, html} = live(conn, ~p"/cloud/projects/#{key_a.workspace_id}")
-
-      assert html =~ "Cloud run packages"
-      assert html =~ pkg_a.runtime_target
-    end
-  end
-
   # ─────────────── helpers ───────────────
 
   defp setup_tenant(label) do
@@ -140,10 +101,6 @@ defmodule ControlKeel.Cloud.CrossOrgIsolationTest do
     key = enroll_key(org.id, mws.id)
     pkg = create_package(mws, user.id)
     {org, user, mws, key, pkg}
-  end
-
-  defp session_conn(conn, user_id) do
-    Plug.Test.init_test_session(conn, %{"current_user_id" => user_id})
   end
 
   defp insert_org(slug) do

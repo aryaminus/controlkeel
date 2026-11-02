@@ -54,6 +54,7 @@ defmodule ControlKeelWeb.PageController do
   end
 
   defp latest_org_path(orgs, suffix \\ "")
+
   defp latest_org_path(orgs, suffix) do
     case latest_org(orgs) do
       %{slug: slug} -> "/#{slug}#{suffix}"

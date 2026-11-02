@@ -208,7 +208,8 @@ defmodule ControlKeelWeb.PageControllerTest do
         end
       end)
 
-      {:ok, user} = Accounts.create_user(%{email: "policies-legacy@example.com", name: "Policies"})
+      {:ok, user} =
+        Accounts.create_user(%{email: "policies-legacy@example.com", name: "Policies"})
 
       {:ok, user: user}
     end

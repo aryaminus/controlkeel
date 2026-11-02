@@ -30,6 +30,24 @@ defmodule ControlKeelWeb.LiveAuthTest do
     build_conn() |> Plug.Test.init_test_session(%{current_user_id: user.id})
   end
 
+  # Workspace creation is admin-gated on the org overview; a viewer pushing
+  # the event directly must be refused and nothing may be persisted.
+  defp viewer_cannot_create_workspaces(view, slug) do
+    html =
+      render_click(view, "save_workspace", %{
+        "workspace" => %{
+          "name" => "Nope",
+          "slug" => slug <> Integer.to_string(System.unique_integer([:positive]))
+        }
+      })
+
+    if html =~ "have permission to create workspaces" do
+      true
+    else
+      flunk("expected viewer save_workspace to be refused, got:\n\n" <> html)
+    end
+  end
+
   defp member_conn(role \\ "viewer") do
     {:ok, org} =
       Accounts.create_org(%{name: "Home", slug: "home-#{System.unique_integer([:positive])}"})
@@ -110,8 +128,14 @@ defmodule ControlKeelWeb.LiveAuthTest do
       build_conn()
       |> Plug.Test.init_test_session(%{current_user_id: user.id})
 
-    {:ok, view, html} = live(conn, ~p"/cloud/projects")
-    refute html =~ "+ Create workspace"
+    # The org overview is the canonical require_cloud_auth page since the
+    # /cloud/* surfaces were removed. user is a viewer in org A and an admin
+    # in org B; the page must resolve its membership from org A only. The
+    # New Workspace button renders for everyone, so the role check is
+    # asserted on the server-refused action, not on markup.
+    {:ok, view, _html} = live(conn, ~p"/#{org_a.slug}")
+
+    assert viewer_cannot_create_workspaces(view, "nope")
 
     Phoenix.PubSub.broadcast(
       ControlKeel.PubSub,
@@ -119,7 +143,11 @@ defmodule ControlKeelWeb.LiveAuthTest do
       {:membership_changed, %{user_id: user.id, org_id: org_b.id}}
     )
 
-    refute render(view) =~ "+ Create workspace"
+    # The org B (admin) change must not elevate the org A page's role.
+    assert viewer_cannot_create_workspaces(view, "still-no")
+
+    refute ControlKeel.Repo.get_by(ControlKeel.Mission.Workspace, name: "Nope")
+    refute ControlKeel.Repo.get_by(ControlKeel.Mission.Workspace, name: "Still No")
   end
 
   test "revoking the page's membership redirects to /new/org" do
@@ -127,7 +155,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
 
-    {:ok, view, _html} = live(conn, ~p"/cloud/projects")
+    {:ok, view, _html} = live(conn, ~p"/#{org.slug}")
 
     assert {:ok, %Accounts.Membership{status: "revoked"}} =
              Accounts.revoke_membership(membership.id, owner.id)
@@ -137,7 +165,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
   end
 
   test "revoking a membership in another org leaves the page in place" do
-    {conn, user, _org} = member_conn()
+    {conn, user, org} = member_conn()
 
     {:ok, other} =
       Accounts.create_org(%{
@@ -148,12 +176,12 @@ defmodule ControlKeelWeb.LiveAuthTest do
     other_membership = insert_membership(user, other, "viewer")
     owner = create_owner(other)
 
-    {:ok, view, _html} = live(conn, ~p"/cloud/projects")
+    {:ok, view, _html} = live(conn, ~p"/#{org.slug}")
 
     assert {:ok, %Accounts.Membership{status: "revoked"}} =
              Accounts.revoke_membership(other_membership.id, owner.id)
 
-    assert has_element?(view, "#cloud-projects-page")
+    assert has_element?(view, "#org-delivery-funnel")
     refute_redirected(view)
   end
 

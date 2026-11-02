@@ -133,9 +133,13 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
-      live "/cloud/telemetry", CloudTelemetryLive, :index
-      live "/cloud/projects", CloudProjectsLive, :index
-      live "/cloud/projects/:ws_id", CloudProjectsLive, :show
+
+      # /cloud/projects and /cloud/telemetry removed (owner directive, 10/22:
+      # "no cloud routes" — the cloud-project concept is stale; the org is the
+      # grouping surface and the org overview is the dashboard). The modules
+      # were deleted with the routes; the /cloud/v1/* machine APIs are
+      # unaffected — they are the self-host sync/telemetry data plane, not
+      # browser surfaces.
 
       # /policies removed from the router: PolicyStudioLive was org-unowned.
       # Policy set management now lives under org settings
