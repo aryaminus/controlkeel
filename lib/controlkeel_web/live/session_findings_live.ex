@@ -15,42 +15,22 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   @refresh_opts [tasks_limit: 0, invocations_limit: 0, reviews_limit: 0]
 
   @impl true
-  def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
-    current_user = socket.assigns[:current_user]
+  def mount(params, _session, socket) do
+    case SessionScope.resolve(socket, params) do
+      {:ok, session, socket} ->
+        if connected?(socket), do: schedule_refresh()
 
-    case SessionScope.fetch_session(id) do
-      nil ->
         {:ok,
          socket
-         |> put_flash(:error, "Session not found.")
-         |> push_navigate(to: ~p"/")}
+         |> assign(:open_ids, MapSet.new())
+         |> assign(:fixes, %{})
+         |> assign(:reject_id, nil)
+         |> assign(:reject_reason, "")
+         |> assign(:filter, "all")
+         |> assign_session(session)}
 
-      session when not is_nil(session) ->
-        cond do
-          not ControlKeel.Accounts.session_accessible?(session, current_user) ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          true ->
-            if connected?(socket), do: schedule_refresh()
-
-            {:ok,
-             socket
-             |> assign(:open_ids, MapSet.new())
-             |> assign(:fixes, %{})
-             |> assign(:reject_id, nil)
-             |> assign(:reject_reason, "")
-             |> assign(:filter, "all")
-             |> assign_session(session)}
-        end
+      {:error, socket} ->
+        {:ok, SessionScope.session_not_found(socket, params)}
     end
   end
 
@@ -74,21 +54,8 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     ])
     |> assign(:page_title, "#{session.title} — Findings")
     |> assign(:session, session)
-    |> assign(:current_membership, page_membership(workspace, socket.assigns))
     |> assign_view()
   end
-
-  # Page-local membership for eviction. Read access already went through
-  # `session_accessible?`; this keeps the org the page resolved so LiveAuth
-  # can evict it when that membership is revoked.
-  defp page_membership(%Workspace{} = workspace, assigns) do
-    case WorkspaceAccess.check_membership(workspace, assigns[:current_user]) do
-      {:ok, membership} -> membership
-      {:error, _reason} -> nil
-    end
-  end
-
-  defp page_membership(_workspace, _assigns), do: nil
 
   defp require_admin(socket) do
     with %Workspace{} = workspace <- socket.assigns.session.workspace,
@@ -266,6 +233,8 @@ defmodule ControlKeelWeb.SessionFindingsLive do
   # ---------------------------------------------------------------------------
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <div class="space-y-5">

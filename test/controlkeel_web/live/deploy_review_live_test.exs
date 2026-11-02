@@ -41,9 +41,16 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
     org_bound_session_fixture()
   end
 
-  test "redirects when the session does not exist", %{conn: conn} do
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/acme/workspaces/core/sessions/999999/deploy-review")
+  test "renders an in-place workspace error when the session does not exist", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/999999/deploy-review")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "h1", "Can't find the page")
+    assert has_element?(view, ~s(#app-sidebar a[href="/#{org.slug}/workspaces/#{ws.slug}"]))
+    refute_redirected(view)
   end
 
   test "shows unavailable notice when the project root cannot be resolved", %{conn: conn} do

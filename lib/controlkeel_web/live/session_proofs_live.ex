@@ -15,33 +15,13 @@ defmodule ControlKeelWeb.SessionProofsLive do
     ]
 
   @impl true
-  def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
-    current_user = socket.assigns[:current_user]
+  def mount(params, _session, socket) do
+    case SessionScope.resolve(socket, params) do
+      {:ok, session, socket} ->
+        {:ok, assign_scope(socket, session, params["org_slug"], params["ws_slug"])}
 
-    case SessionScope.fetch_session(id) do
-      nil ->
-        {:ok,
-         socket
-         |> put_flash(:error, "Session not found.")
-         |> push_navigate(to: ~p"/")}
-
-      session ->
-        cond do
-          not ControlKeel.Accounts.session_accessible?(session, current_user) ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
-            {:ok,
-             socket
-             |> put_flash(:error, "Session not found.")
-             |> push_navigate(to: ~p"/")}
-
-          true ->
-            {:ok, assign_scope(socket, session, org_slug, ws_slug)}
-        end
+      {:error, socket} ->
+        {:ok, SessionScope.session_not_found(socket, params)}
     end
   end
 
@@ -65,26 +45,33 @@ defmodule ControlKeelWeb.SessionProofsLive do
     )
   end
 
-  defp scoped_session(socket), do: socket.assigns[:session]
-
   @impl true
   def handle_params(params, _uri, socket) do
-    case scoped_session(socket) do
-      nil ->
-        {:noreply, socket}
+    case SessionScope.refresh(socket, params) do
+      {:ok, session, socket, true} ->
+        socket = assign_scope(socket, session, params["org_slug"], params["ws_slug"])
+        load_browser(socket, params, session)
 
-      session ->
-        params = Map.put(params, "session_id", session.id)
-        browser = Mission.browse_proof_bundles(params)
+      {:ok, session, socket, false} ->
+        load_browser(socket, params, session)
 
-        {:noreply,
-         socket
-         |> assign(:page_title, "Proof Browser")
-         |> assign(:browser, browser)}
+      {:error, socket} ->
+        {:noreply, SessionScope.session_not_found(socket, params)}
     end
   end
 
+  defp load_browser(socket, params, session) do
+    browser = Mission.browse_proof_bundles(Map.put(params, "session_id", session.id))
+
+    {:noreply,
+     socket
+     |> assign(:page_title, "Proof Browser")
+     |> assign(:browser, browser)}
+  end
+
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <div class="space-y-6">

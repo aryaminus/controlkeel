@@ -136,11 +136,17 @@ defmodule ControlKeelWeb.MissionControlLiveTest do
     assert html =~ org_session_path(org, ws, session, "/reviews")
   end
 
-  test "mission control denies mismatched slugs with a generic not-found", %{conn: conn} do
+  test "mission control renders an in-place error for a mismatched workspace slug", %{conn: conn} do
     {org, _ws, session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}")
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "h1", "Can't find the page")
+    assert has_element?(view, ~s(#app-sidebar a[href="/#{org.slug}"]))
+    refute has_element?(view, ~s(#app-sidebar a[href="/#{org.slug}/workspaces/other-ws"]))
+    refute_redirected(view)
   end
 
   test "session page shows the attach banner only after a fresh launch (issue #183)", %{

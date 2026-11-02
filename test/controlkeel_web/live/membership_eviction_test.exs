@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import ControlKeel.MissionFixtures
 
   alias ControlKeel.Accounts
   alias ControlKeel.Mission
@@ -21,6 +22,19 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
     observability/trends
     observability/promotions
     observability/benchmark
+  )
+
+  @session_surfaces ~w(
+    activity
+    findings
+    observability
+    reviews
+    tasks
+    resume-packet
+    connect
+    release
+    ship
+    proofs
   )
 
   setup do
@@ -259,6 +273,138 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
 
       assert %{"info" => "Your access to this organization changed."} =
                assert_redirect(view, "/organizations")
+    end
+  end
+
+  describe "session-scoped pages" do
+    test "review detail evicts the page membership on revocation" do
+      {org, user, membership, workspace} = org_with_workspace!("viewer")
+      other_org = create_org!("still-member")
+      create_membership!(user, other_org, "viewer")
+      session = create_session!(workspace, "Review detail eviction")
+      task = task_fixture(%{session: session, status: "queued"})
+
+      assert {:ok, review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "submission_body" => "Review detail eviction"
+               })
+
+      owner = create_user!("review-owner")
+      create_membership!(owner, org, "owner")
+
+      {:ok, view, _html} =
+        live(
+          conn_for(user),
+          "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/reviews/#{review.id}"
+        )
+
+      assert {:ok, %Accounts.Membership{status: "revoked"}} =
+               Accounts.revoke_membership(membership.id, owner.id)
+
+      assert %{"info" => "Your access to this organization changed."} =
+               assert_redirect(view, "/organizations")
+    end
+
+    test "review responses reauthorize after cloud membership is revoked" do
+      {org, user, membership, workspace} = org_with_workspace!("admin")
+      session = create_session!(workspace, "Review response authorization")
+      task = task_fixture(%{session: session, status: "queued"})
+
+      assert {:ok, review} =
+               Mission.submit_review(%{
+                 "task_id" => task.id,
+                 "review_type" => "plan",
+                 "submission_body" => "Review response authorization"
+               })
+
+      {:ok, view, _html} =
+        live(
+          conn_for(user),
+          "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/reviews/#{review.id}"
+        )
+
+      membership
+      |> Ecto.Changeset.change(status: "revoked")
+      |> Repo.update!()
+
+      render_submit(view, "respond", %{
+        "review_response" => %{"decision" => "approved", "feedback_notes" => ""}
+      })
+
+      assert Mission.get_review_with_context(review.id).status == "pending"
+      assert has_element?(view, "[data-scope-error]")
+    end
+
+    test "task mutations reauthorize after cloud membership is revoked" do
+      {org, user, membership, workspace} = org_with_workspace!("admin")
+      session = create_session!(workspace, "Task mutation authorization")
+      task = task_fixture(%{session: session, status: "in_progress"})
+
+      {:ok, view, _html} =
+        live(
+          conn_for(user),
+          "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/tasks"
+        )
+
+      # Update without broadcasting to model an action arriving before the
+      # connected LiveView processes its membership-change notification.
+      membership
+      |> Ecto.Changeset.change(status: "revoked")
+      |> Repo.update!()
+
+      render_click(view, "pause_task", %{"id" => task.id})
+
+      assert Mission.get_task!(task.id).status == "in_progress"
+      assert has_element?(view, "[data-scope-error]")
+    end
+
+    test "invalid session ids render in place with workspace navigation across session pages" do
+      for surface <- ["root" | @session_surfaces] do
+        {org, user, _membership, workspace} = org_with_workspace!("viewer")
+        _session = create_session!(workspace, "Valid session")
+
+        path =
+          if surface == "root" do
+            "/#{org.slug}/workspaces/#{workspace.slug}/sessions/invalid-session-id"
+          else
+            "/#{org.slug}/workspaces/#{workspace.slug}/sessions/invalid-session-id/#{surface}"
+          end
+
+        {:ok, view, _html} = live(conn_for(user), path)
+
+        assert has_element?(view, "[data-scope-error]"), "#{surface} omitted the scope error"
+        assert has_element?(view, "#app-sidebar"), "#{surface} lost organization navigation"
+
+        assert has_element?(
+                 view,
+                 ~s(#app-sidebar a[href="/#{org.slug}/workspaces/#{workspace.slug}"])
+               ),
+               "#{surface} lost workspace navigation"
+
+        assert has_element?(view, "h1", "Can't find the page")
+        refute_redirected(view)
+      end
+    end
+
+    test "every session page evicts the page membership immediately on revocation" do
+      for surface <- @session_surfaces do
+        {org, user, membership, workspace} = org_with_workspace!("viewer")
+        session = create_session!(workspace, "Session scope eviction")
+        owner = create_user!("session-owner")
+        create_membership!(owner, org, "owner")
+
+        path = "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/#{surface}"
+        {:ok, view, _html} = live(conn_for(user), path)
+
+        assert {:ok, %Accounts.Membership{status: "revoked"}} =
+                 Accounts.revoke_membership(membership.id, owner.id)
+
+        assert %{"info" => "Your access to this organization changed."} =
+                 assert_redirect(view, "/organizations"),
+               "#{surface} did not evict the revoked membership"
+      end
     end
   end
 

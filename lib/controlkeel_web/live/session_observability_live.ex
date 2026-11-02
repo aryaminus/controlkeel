@@ -19,28 +19,14 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
 
   use ControlKeelWeb, :live_view
 
-  alias ControlKeel.Accounts
   alias ControlKeel.Mission
   alias ControlKeel.Observability
   alias ControlKeelWeb.SessionScope
 
   @impl true
-  def mount(%{"id" => id, "org_slug" => org_slug, "ws_slug" => ws_slug}, _session, socket) do
-    current_user = socket.assigns[:current_user]
-
-    session = SessionScope.fetch_session(id)
-
-    cond do
-      is_nil(session) ->
-        {:ok, SessionScope.session_not_found(socket)}
-
-      not Accounts.session_accessible?(session, current_user) ->
-        {:ok, SessionScope.session_not_found(socket)}
-
-      SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
-        {:ok, SessionScope.session_not_found(socket)}
-
-      true ->
+  def mount(params, _session, socket) do
+    case SessionScope.resolve(socket, params) do
+      {:ok, session, socket} ->
         # Reuse the already-fetched session struct: the `%Session{}`
         # overloads skip their own `get_session_context` reloads
         # (`ensure_preloaded`/`ensure_workspace_preloaded` passthrough),
@@ -53,12 +39,15 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
         {:ok,
          socket
          |> assign(:page_title, "Observability — #{run.session.title}")
-         |> assign(:org_slug, org_slug)
-         |> assign(:ws_slug, ws_slug)
+         |> assign(:org_slug, params["org_slug"])
+         |> assign(:ws_slug, params["ws_slug"])
          |> assign(:run, run)
          |> assign(:timeline, timeline)
          |> assign(:memory_context, memory_context)
          |> assign_session_nav(session)}
+
+      {:error, socket} ->
+        {:ok, SessionScope.session_not_found(socket, params)}
     end
   end
 
@@ -90,6 +79,8 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="session-observability-page" class="w-full space-y-6">

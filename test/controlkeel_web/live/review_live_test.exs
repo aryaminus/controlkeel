@@ -214,11 +214,15 @@ defmodule ControlKeelWeb.ReviewLiveTest do
       conn
       |> Plug.Test.init_test_session(%{current_user_id: user.id})
 
-    {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Review not found."}}}} =
+    {:ok, view, _html} =
       live(
         conn,
         "/#{other_org.slug}/workspaces/#{other_workspace.slug}/sessions/#{other_session.id}/reviews/#{review.id}"
       )
+
+    assert has_element?(view, "[data-scope-error]")
+    refute has_element?(view, "#review-submission-body")
+    refute_redirected(view)
   end
 
   test "review live denies cross-org access with a user-only session (issue #141, R5)", %{
@@ -275,11 +279,66 @@ defmodule ControlKeelWeb.ReviewLiveTest do
 
     conn = conn |> Plug.Test.init_test_session(%{current_user_id: user.id})
 
-    {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Review not found."}}}} =
+    {:ok, view, _html} =
       live(
         conn,
         "/#{other_org.slug}/workspaces/#{other_workspace.slug}/sessions/#{other_session.id}/reviews/#{review.id}"
       )
+
+    assert has_element?(view, "[data-scope-error]")
+    refute has_element?(view, "#review-submission-body")
+    refute_redirected(view)
+  end
+
+  test "review detail renders in-place not-found for missing or malformed sessions", %{
+    conn: conn
+  } do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    for session_id <- ["not-a-session-id", "999999999"] do
+      {:ok, view, _html} =
+        live(
+          conn,
+          "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session_id}/reviews/1"
+        )
+
+      assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+      assert has_element?(view, "h1", "Can't find the page")
+      refute has_element?(view, "#review-submission-body")
+      refute_redirected(view)
+    end
+  end
+
+  test "malformed review id renders an in-place review not-found state", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+
+    {:ok, view, _html} =
+      live(conn, org_session_path(org, ws, session, "/reviews/not-a-review-id"))
+
+    assert has_element?(view, "#review-missing")
+    assert has_element?(view, "#app-sidebar")
+    refute_redirected(view)
+  end
+
+  test "review detail does not expose a review belonging to another session", %{conn: conn} do
+    {org, ws, session} = org_bound_session_fixture()
+    other_session = session_fixture(%{workspace: ws, title: "Other session"})
+    task = task_fixture(%{session: other_session, status: "queued"})
+
+    assert {:ok, review} =
+             Mission.submit_review(%{
+               "task_id" => task.id,
+               "review_type" => "plan",
+               "submission_body" => "Another session's private review"
+             })
+
+    {:ok, view, _html} =
+      live(conn, org_session_path(org, ws, session, "/reviews/#{review.id}"))
+
+    assert has_element?(view, "#review-missing")
+    refute render(view) =~ "Another session's private review"
+    refute_redirected(view)
   end
 
   test "review detail renders the session sidebar with Reviews active", %{conn: conn} do

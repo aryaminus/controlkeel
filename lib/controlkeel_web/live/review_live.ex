@@ -1,7 +1,6 @@
 defmodule ControlKeelWeb.ReviewLive do
   use ControlKeelWeb, :live_view
 
-  alias ControlKeel.Accounts
   alias ControlKeel.Mission
   alias ControlKeelWeb.SessionScope
 
@@ -15,45 +14,32 @@ defmodule ControlKeelWeb.ReviewLive do
      |> assign(:response_form, response_form())}
   end
 
-  # Cross-session ownership is enforced by matching review.session_id against
-  # the id path segment; org-level access is enforced via the shared
-  # Accounts.session_accessible?/2 gate (issue #83), plus a URL slug
-  # agreement check so the org/workspace segments can't be swapped.
   @impl true
   def handle_params(
-        %{"id" => sid, "rid" => rid, "org_slug" => org_slug, "ws_slug" => ws_slug},
+        %{"rid" => rid} = params,
         _uri,
         socket
       ) do
-    with {:ok, review_id} <- parse_integer(rid),
-         {:ok, session_id} <- parse_integer(sid) do
-      case Mission.get_review_with_context(review_id) do
-        nil ->
-          {:noreply, review_not_found(socket)}
+    case SessionScope.resolve(socket, params) do
+      {:error, socket} ->
+        {:noreply, SessionScope.session_not_found(socket, params)}
 
-        %{session_id: ^session_id} = review ->
-          session = review.session
+      {:ok, session, socket} ->
+        socket = assign_session_scope(socket, session)
 
-          cond do
-            not Accounts.session_accessible?(session, socket.assigns[:current_user]) ->
-              {:noreply, review_not_found(socket)}
+        case parse_integer(rid) do
+          {:ok, review_id} ->
+            case Mission.get_review_with_context(review_id) do
+              %{session_id: session_id} = review when session_id == session.id ->
+                {:noreply, assign_review(socket, review)}
 
-            SessionScope.check_scope(session, org_slug, ws_slug) != :ok ->
-              {:noreply, review_not_found(socket)}
+              _ ->
+                {:noreply, review_not_found(socket)}
+            end
 
-            true ->
-              {:noreply, assign_review(socket, review)}
-          end
-
-        _review ->
-          {:noreply, review_not_found(socket)}
-      end
-    else
-      :error ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Invalid review id.")
-         |> push_navigate(to: ~p"/")}
+          :error ->
+            {:noreply, review_not_found(socket)}
+        end
     end
   end
 
@@ -64,36 +50,15 @@ defmodule ControlKeelWeb.ReviewLive do
         {:noreply, put_flash(socket, :error, "Review not found.")}
 
       review ->
-        annotations =
-          case String.trim(params["annotation_text"] || "") do
-            "" -> %{}
-            text -> %{"browser_notes" => text}
-          end
-
-        case Mission.respond_review(review, %{
-               "decision" => params["decision"],
-               "feedback_notes" => params["feedback_notes"],
-               "annotations" => annotations,
-               "reviewed_by" => "browser"
-             }) do
-          {:ok, updated_review} ->
-            {:noreply,
-             socket
-             |> assign_review(updated_review)
-             |> put_flash(:info, "Review response saved.")}
-
-          {:error, {:invalid_arguments, message}} ->
-            {:noreply, put_flash(socket, :error, message)}
-
-          {:error, :not_found} ->
-            {:noreply, put_flash(socket, :error, "Review not found.")}
-
-          {:error, reason} ->
-            {:noreply,
-             put_flash(socket, :error, "Failed to respond to review: #{inspect(reason)}")}
+        case SessionScope.reauthorize(socket, socket.assigns.session) do
+          {:ok, _session} -> respond_to_review(socket, review, params)
+          {:error, :not_found} -> {:noreply, SessionScope.session_not_found(socket)}
         end
     end
   end
+
+  @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
 
   @impl true
   def render(assigns) do
@@ -379,7 +344,15 @@ defmodule ControlKeelWeb.ReviewLive do
   end
 
   defp assign_review(socket, review) do
-    session = review.session
+    socket
+    |> assign_session_scope(review.session)
+    |> assign(:review, review)
+    |> assign(:page_title, review.title)
+    |> assign(:diff_chunks, diff_chunks(review))
+    |> assign(:response_form, response_form(review))
+  end
+
+  defp assign_session_scope(socket, session) do
     workspace = session.workspace
     org = workspace.org
 
@@ -397,18 +370,45 @@ defmodule ControlKeelWeb.ReviewLive do
       },
       %{label: "Reviews", to: nil}
     ])
-    |> assign(:review, review)
-    |> assign(:page_title, review.title)
-    |> assign(:diff_chunks, diff_chunks(review))
-    |> assign(:response_form, response_form(review))
+    |> assign(:session, session)
   end
 
-  # No nav context without a loaded session — redirect instead of rendering
-  # the layout with nil assigns (which would crash the sidebar).
   defp review_not_found(socket) do
     socket
-    |> put_flash(:error, "Review not found.")
-    |> push_navigate(to: ~p"/")
+    |> assign(:review, nil)
+    |> assign(:page_title, "Review not found")
+    |> assign(:diff_chunks, [])
+    |> assign(:response_form, response_form())
+  end
+
+  defp respond_to_review(socket, review, params) do
+    annotations =
+      case String.trim(params["annotation_text"] || "") do
+        "" -> %{}
+        text -> %{"browser_notes" => text}
+      end
+
+    case Mission.respond_review(review, %{
+           "decision" => params["decision"],
+           "feedback_notes" => params["feedback_notes"],
+           "annotations" => annotations,
+           "reviewed_by" => "browser"
+         }) do
+      {:ok, updated_review} ->
+        {:noreply,
+         socket
+         |> assign_review(updated_review)
+         |> put_flash(:info, "Review response saved.")}
+
+      {:error, {:invalid_arguments, message}} ->
+        {:noreply, put_flash(socket, :error, message)}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Review not found.")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to respond to review: #{inspect(reason)}")}
+    end
   end
 
   defp response_form(review \\ nil) do

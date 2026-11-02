@@ -82,11 +82,16 @@ defmodule ControlKeelWeb.SessionObservabilityLiveTest do
     assert has_element?(view, "#observability-memory-proof")
   end
 
-  test "stacked observability page redirects missing sessions", %{conn: conn} do
+  test "stacked observability page shows an in-place error for missing sessions", %{conn: conn} do
     {org, ws, _session} = org_bound_session_fixture()
-    # use a non-existent id
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/999999/observability")
+
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/999999/observability")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
   test "observability export route returns local telemetry envelope via new path", %{conn: conn} do
@@ -206,21 +211,39 @@ defmodule ControlKeelWeb.SessionObservabilityLiveTest do
     end
   end
 
-  test "stacked observability page redirects for scope-mismatched slugs", %{conn: conn} do
+  test "stacked observability page shows in-place errors for scope-mismatched slugs", %{
+    conn: conn
+  } do
     {org, ws, session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/observability")
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/observability")
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/other-org/workspaces/#{ws.slug}/sessions/#{session.id}/observability")
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
+
+    {:ok, view, _html} =
+      live(conn, "/other-org/workspaces/#{ws.slug}/sessions/#{session.id}/observability")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "h1", "Organization not found")
+    refute_redirected(view)
   end
 
-  test "stacked observability page redirects for non-numeric ids", %{conn: conn} do
+  test "stacked observability page shows an in-place error for non-numeric ids", %{
+    conn: conn
+  } do
     {org, ws, _session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/abc/observability")
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/abc/observability")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
   test "audit-log export works via new org-scoped path", %{conn: conn} do

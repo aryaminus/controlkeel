@@ -62,22 +62,44 @@ defmodule ControlKeelWeb.SessionResumePacketLiveTest do
     assert html =~ ~s(href="#{resume_href}")
   end
 
-  test "session resume packet redirects when the session does not exist", %{conn: conn} do
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => "Session not found."}}}} =
-             live(conn, "/acme/workspaces/core/sessions/999999/resume-packet")
+  test "session resume packet shows an in-place error when the session does not exist", %{
+    conn: conn
+  } do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/#{ws.slug}/sessions/999999/resume-packet")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
-  test "session resume packet redirects when the workspace slug disagrees", %{conn: conn} do
+  test "session resume packet shows an in-place error when the workspace slug disagrees", %{
+    conn: conn
+  } do
     {org, _ws, session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => _}}}} =
-             live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/resume-packet")
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/other-ws/sessions/#{session.id}/resume-packet")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
   end
 
-  test "session resume packet redirects when the org slug disagrees", %{conn: conn} do
+  test "session resume packet shows an in-place error when the org slug disagrees", %{
+    conn: conn
+  } do
     {_org, ws, session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/", flash: %{"error" => _}}}} =
-             live(conn, "/other-org/workspaces/#{ws.slug}/sessions/#{session.id}/resume-packet")
+    {:ok, view, _html} =
+      live(conn, "/other-org/workspaces/#{ws.slug}/sessions/#{session.id}/resume-packet")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "h1", "Organization not found")
+    refute_redirected(view)
   end
 end

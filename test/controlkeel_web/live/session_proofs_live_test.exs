@@ -44,6 +44,27 @@ defmodule ControlKeelWeb.SessionProofsLiveTest do
     assert html =~ "No proof bundles found."
   end
 
+  test "patching the proofs index to another session reloads that session's bundles", %{
+    conn: conn
+  } do
+    {org, ws, session} = org_bound_session_fixture()
+    other_session = session_fixture(%{workspace: ws, title: "Other mission"})
+    current_task = task_fixture(%{session: session, status: "done", title: "Current proof"})
+    other_task = task_fixture(%{session: other_session, status: "done", title: "Other proof"})
+    proof_bundle_fixture(%{task: current_task})
+    proof_bundle_fixture(%{task: other_task})
+
+    {:ok, view, html} = live(conn, org_session_path(org, ws, session, "/proofs"))
+
+    assert html =~ "Current proof"
+    refute html =~ "Other proof"
+
+    html = render_patch(view, org_session_path(org, ws, other_session, "/proofs"))
+
+    assert html =~ "Other proof"
+    refute html =~ "Current proof"
+  end
+
   test "pagination links preserve filters and change only the page", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
     base = org_session_path(org, ws, session, "/proofs")
@@ -106,14 +127,45 @@ defmodule ControlKeelWeb.SessionProofsLiveTest do
     assert html =~ "No proof bundle exists with this identifier."
   end
 
-  test "scope-mismatched org or workspace slugs redirect with not-found", %{conn: conn} do
+  test "proof detail renders in-place errors for missing or malformed sessions", %{
+    conn: conn
+  } do
+    {org, ws, session} = org_bound_session_fixture()
+    task = task_fixture(%{session: session, status: "done", title: "Scoped proof"})
+    proof = proof_bundle_fixture(%{task: task})
+
+    for session_id <- ["not-a-session-id", "999999999"] do
+      {:ok, view, _html} =
+        live(
+          conn,
+          "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session_id}/proofs/#{proof.id}"
+        )
+
+      assert has_element?(view, "[data-scope-error]")
+      assert has_element?(view, "#app-sidebar")
+      assert has_element?(view, "h1", "Can't find the page")
+      refute has_element?(view, "Proof not found")
+      refute_redirected(view)
+    end
+  end
+
+  test "scope-mismatched org or workspace slugs show in-place errors", %{conn: conn} do
     {org, ws, session} = org_bound_session_fixture()
 
-    assert {:error, {:live_redirect, %{to: "/"}}} =
-             live(conn, "/#{org.slug}/workspaces/not-the-workspace/sessions/#{session.id}/proofs")
+    {:ok, view, _html} =
+      live(conn, "/#{org.slug}/workspaces/not-the-workspace/sessions/#{session.id}/proofs")
 
-    assert {:error, {:live_redirect, %{to: "/"}}} =
-             live(conn, "/not-the-org/workspaces/#{ws.slug}/sessions/#{session.id}/proofs")
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "h1", "Can't find the page")
+    refute_redirected(view)
+
+    {:ok, view, _html} =
+      live(conn, "/not-the-org/workspaces/#{ws.slug}/sessions/#{session.id}/proofs")
+
+    assert has_element?(view, "[data-scope-error]")
+    assert has_element?(view, "h1", "Organization not found")
+    refute_redirected(view)
   end
 
   describe "legacy /proofs redirects" do
