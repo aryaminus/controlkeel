@@ -49,10 +49,44 @@ defmodule ControlKeelWeb.PageController do
     end
   end
 
-  defp latest_org_path(orgs) do
-    case Enum.max_by(orgs, &{DateTime.to_unix(&1.inserted_at, :microsecond), &1.id}, fn -> nil end) do
-      %{slug: slug} -> "/#{slug}"
+  defp latest_org(orgs) do
+    Enum.max_by(orgs, &{DateTime.to_unix(&1.inserted_at, :microsecond), &1.id}, fn -> nil end)
+  end
+
+  defp latest_org_path(orgs, suffix \\ "")
+  defp latest_org_path(orgs, suffix) do
+    case latest_org(orgs) do
+      %{slug: slug} -> "/#{slug}#{suffix}"
       nil -> ~p"/new/org"
+    end
+  end
+
+  # Legacy /policies URL (Policy Studio): policy sets became org-owned and
+  # management lives on the org settings "Policy sets" tab. Target org
+  # mirrors the root handoff above — local mode lands on the provisioned
+  # default org, cloud/self-hosted users on their most recently created
+  # active org (falling back to /new/org when they have none); anonymous
+  # cloud visitors go to the login page. All targets are enumerated,
+  # same-origin paths, so this is not an open-redirect surface.
+  def policies_legacy_redirect(conn, _params) do
+    cond do
+      Mode.current() == :local ->
+        {:ok, _defaults} = LocalDefaults.ensure()
+
+        redirect(conn, to: "/#{LocalDefaults.default_org_slug()}/settings?tab=policy_sets")
+
+      user = conn.assigns[:current_user] ->
+        fallback_path =
+          user.id
+          |> Accounts.list_orgs_for_user()
+          |> Enum.map(& &1.org)
+          |> Enum.filter(&(&1.status == "active"))
+          |> latest_org_path("/settings?tab=policy_sets")
+
+        redirect(conn, to: fallback_path)
+
+      true ->
+        redirect(conn, to: ~p"/auth/login")
     end
   end
 

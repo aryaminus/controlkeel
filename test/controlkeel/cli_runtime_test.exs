@@ -1259,7 +1259,8 @@ defmodule ControlKeel.CLIRuntimeTest do
       end
     end)
 
-    workspace = workspace_fixture()
+    org = ControlKeel.AccountsFixtures.org_fixture()
+    workspace = workspace_fixture(%{org_id: org.id})
     session = session_fixture(%{workspace: workspace})
 
     _arch =
@@ -1363,7 +1364,7 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert audit_output =~ "Artifact:"
 
-    policy_set = policy_set_fixture()
+    policy_set = policy_set_fixture(%{org_id: org.id})
 
     apply_output =
       capture_io(fn ->

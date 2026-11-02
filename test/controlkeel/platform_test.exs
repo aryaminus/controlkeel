@@ -44,9 +44,11 @@ defmodule ControlKeel.PlatformTest do
   end
 
   test "assignment listings split display from evaluation on disabled rows" do
-    session = session_fixture()
-    set_a = policy_set_fixture(%{name: "Enabled Set"})
-    set_b = policy_set_fixture(%{name: "Disabled Set"})
+    org = ControlKeel.AccountsFixtures.org_fixture()
+    session = session_fixture(workspace: workspace_fixture(org_id: org.id))
+
+    set_a = policy_set_fixture(%{name: "Enabled Set", org_id: org.id})
+    set_b = policy_set_fixture(%{name: "Disabled Set", org_id: org.id})
 
     {:ok, _} = Platform.apply_policy_set(session.workspace_id, set_a.id, %{"precedence" => 10})
     {:ok, _} = Platform.apply_policy_set(session.workspace_id, set_b.id, %{"enabled" => false})
@@ -76,8 +78,9 @@ defmodule ControlKeel.PlatformTest do
   end
 
   test "applied workspace policy sets participate in fast path scanning" do
-    session = session_fixture()
-    policy_set = policy_set_fixture()
+    org = ControlKeel.AccountsFixtures.org_fixture()
+    session = session_fixture(workspace: workspace_fixture(org_id: org.id))
+    policy_set = policy_set_fixture(%{org_id: org.id})
 
     assert {:ok, _assignment} =
              Platform.apply_policy_set(session.workspace_id, policy_set.id, %{"precedence" => 10})
@@ -92,6 +95,36 @@ defmodule ControlKeel.PlatformTest do
 
     assert result.decision == "block"
     assert Enum.any?(result.findings, &(&1.rule_id == "workspace.no_payroll_exports"))
+  end
+
+  test "policy sets are org-owned: listings are org-scoped and cross-org apply is rejected" do
+    org = ControlKeel.AccountsFixtures.org_fixture()
+    other_org = ControlKeel.AccountsFixtures.org_fixture()
+
+    set = policy_set_fixture(%{org_id: org.id, name: "Org Search"})
+    _foreign = policy_set_fixture(%{org_id: other_org.id, name: "Foreign Search"})
+
+    assert Enum.map(Platform.list_policy_sets(org.id), & &1.id) == [set.id]
+    # Legacy org-less rows are invisible until the deferred data backfill.
+    assert Platform.list_policy_sets(nil) == []
+
+    foreign_workspace = workspace_fixture(org_id: other_org.id)
+
+    assert {:error, %Ecto.Changeset{} = changeset} =
+             Platform.apply_policy_set(foreign_workspace.id, set.id, %{})
+
+    assert {"must belong to the workspace's organization", _} = changeset.errors[:policy_set_id]
+
+    assert Platform.list_org_policy_assignments(other_org.id) == []
+
+    # Same-org workspaces share the org's sets.
+    org_workspace = workspace_fixture(org_id: org.id)
+    {:ok, _} = Platform.apply_policy_set(org_workspace.id, set.id, %{"precedence" => 3})
+
+    assignments = Platform.list_org_policy_assignments(org.id)
+    assert [%{policy_set_id: set_id, workspace: workspace}] = assignments
+    assert set_id == set.id
+    assert workspace.org_id == org.id
   end
 
   test "materializes task graph and supports claim/check/report flows" do

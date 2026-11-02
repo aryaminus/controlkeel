@@ -135,7 +135,6 @@ defmodule ControlKeelWeb.Layouts do
   defp nav_items do
     [
       %{label: "Dashboard", href: ~p"/dashboard", icon: "hero-squares-2x2"},
-      %{label: "Policy Studio", href: ~p"/policies", icon: "hero-adjustments-horizontal"},
       %{label: "Benchmarks", href: ~p"/benchmarks", icon: "hero-chart-bar-square"}
     ]
   end
@@ -449,7 +448,6 @@ defmodule ControlKeelWeb.Layouts do
     "reviews" => "Reviews",
     "organizations" => "Organizations",
     "workspaces" => "Workspaces",
-    "policies" => "Policy Studio",
     "skills" => "Skills",
     "cloud" => "Cloud",
     "observability" => "Observability",

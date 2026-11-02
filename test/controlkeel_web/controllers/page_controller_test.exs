@@ -185,6 +185,73 @@ defmodule ControlKeelWeb.PageControllerTest do
     end
   end
 
+  describe "legacy /policies redirect (local mode)" do
+    test "redirects to the default org's Policy sets tab", %{conn: conn} do
+      assert {:ok, _defaults} = LocalDefaults.ensure()
+      conn = get(conn, "/policies")
+
+      assert redirected_to(conn, 302) ==
+               "/#{LocalDefaults.default_org_slug()}/settings?tab=policy_sets"
+    end
+  end
+
+  describe "legacy /policies redirect (cloud mode)" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      {:ok, user} = Accounts.create_user(%{email: "policies-legacy@example.com", name: "Policies"})
+
+      {:ok, user: user}
+    end
+
+    test "signed-in users land on their newest org's Policy sets tab", %{conn: conn, user: user} do
+      {:ok, _first_org} =
+        Accounts.create_org_with_owner(user.id, %{name: "Acme Corp", slug: "acme-corp"})
+
+      {:ok, newest_org} =
+        Accounts.create_org_with_owner(user.id, %{name: "Newest Corp", slug: "newest-corp"})
+
+      {:ok, other_user} = Accounts.create_user(%{email: "policies-other@example.com"})
+
+      {:ok, _other_org} =
+        Accounts.create_org_with_owner(other_user.id, %{name: "Other Corp", slug: "other-corp"})
+
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get("/policies")
+
+      assert redirected_to(conn, 302) == "/#{newest_org.slug}/settings?tab=policy_sets"
+    end
+
+    test "signed-in users without an organization fall back to /new/org", %{
+      conn: conn,
+      user: user
+    } do
+      conn =
+        conn
+        |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+        |> get("/policies")
+
+      assert redirected_to(conn, 302) == "/new/org"
+    end
+
+    test "anonymous visitors get sent to the login page", %{conn: conn} do
+      conn = get(conn, "/policies")
+
+      assert redirected_to(conn, 302) == "/auth/login"
+    end
+  end
+
   describe "workspace observability resolvers (local mode)" do
     setup do
       original = Application.get_env(:controlkeel, :runtime_mode)

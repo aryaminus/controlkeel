@@ -1153,7 +1153,11 @@ defmodule ControlKeelWeb.ApiController do
             Platform.list_workspace_policy_sets(workspace_id),
             &policy_assignment_summary/1
           ),
-        available_policy_sets: Enum.map(Platform.list_policy_sets(), &policy_set_summary/1)
+        available_policy_sets:
+          Enum.map(
+            Platform.list_policy_sets(workspace_org_id(workspace_id)),
+            &policy_set_summary/1
+          )
       })
     else
       {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
@@ -1162,7 +1166,9 @@ defmodule ControlKeelWeb.ApiController do
 
   def create_policy_set(conn, %{"id" => workspace_id} = params) do
     with :ok <- authorize_workspace_access(conn, workspace_id, "policy_sets:write") do
-      case Platform.create_policy_set(params) do
+      attrs = Map.put(params, "org_id", workspace_org_id(String.to_integer(workspace_id)))
+
+      case Platform.create_policy_set(attrs) do
         {:ok, policy_set} ->
           conn |> put_status(:created) |> json(%{policy_set: policy_set_summary(policy_set)})
 
@@ -2061,12 +2067,23 @@ defmodule ControlKeelWeb.ApiController do
     %{
       id: policy_set.id,
       name: policy_set.name,
-      scope: policy_set.scope,
+      org_id: policy_set.org_id,
       description: policy_set.description,
       status: policy_set.status,
       rules_count: length(ControlKeel.Platform.PolicySet.rule_entries(policy_set)),
       metadata: policy_set.metadata
     }
+  end
+
+  # Policy sets are org-owned; policy endpoints resolve the owning org from
+  # the workspace the caller was authorized against. An unknown workspace
+  # (or org-less solo workspace) resolves to nil, which yields an empty
+  # availability list and a rejected create.
+  defp workspace_org_id(workspace_id) do
+    case Repo.get(Mission.Workspace, workspace_id) do
+      nil -> nil
+      %Mission.Workspace{org_id: org_id} -> org_id
+    end
   end
 
   defp policy_assignment_summary(assignment) do

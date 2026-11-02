@@ -99,6 +99,11 @@ defmodule ControlKeelWeb.Router do
     get "/organizations", PageController, :legacy_global_index_redirect
     get "/sessions", PageController, :legacy_global_index_redirect
 
+    # /policies (Policy Studio) removed when policy sets became org-owned:
+    # redirects to the org settings "Policy sets" tab (single-segment, so it
+    # must stay ahead of the ":org_slug" catch-all like the sunsets above).
+    get "/policies", PageController, :policies_legacy_redirect
+
     # Public in all modes
     live "/auth/login", AuthLive, :index
 
@@ -133,7 +138,13 @@ defmodule ControlKeelWeb.Router do
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
 
-      live "/policies", PolicyStudioLive, :index
+      # /policies removed from the router: PolicyStudioLive was org-unowned.
+      # Policy set management now lives under org settings
+      # (/:org_slug/settings?tab=policy_sets). PolicyStudioLive and its test
+      # were deleted together with this route (approved review #1).
+      # GET /policies survives as a redirect (declared in the sunset group
+      # above) landing on that tab — default org in local mode, the
+      # signed-in cloud user's newest org otherwise.
 
       # /skills removed from the router: SkillsLive and its test are kept so
       # the page can return under a different scope (org or workspace) later

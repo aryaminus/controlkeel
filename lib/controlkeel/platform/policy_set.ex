@@ -2,17 +2,18 @@ defmodule ControlKeel.Platform.PolicySet do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias ControlKeel.Accounts.Org
   alias ControlKeel.Platform.WorkspacePolicySet
   alias ControlKeel.Utils
 
   schema "policy_sets" do
     field :name, :string
-    field :scope, :string, default: "workspace"
     field :description, :string
     field :rules, :map, default: %{"entries" => []}
     field :status, :string, default: "active"
     field :metadata, :map, default: %{}
 
+    belongs_to :org, Org
     has_many :workspace_policy_sets, WorkspacePolicySet
 
     timestamps(type: :utc_datetime)
@@ -25,9 +26,9 @@ defmodule ControlKeel.Platform.PolicySet do
       |> normalize_rules()
 
     policy_set
-    |> cast(attrs, [:name, :scope, :description, :rules, :status, :metadata])
-    |> validate_required([:name, :scope, :rules, :status, :metadata])
-    |> validate_inclusion(:scope, ["workspace", "global"])
+    |> cast(attrs, [:org_id, :name, :description, :rules, :status, :metadata])
+    |> validate_required([:org_id, :name, :rules, :status, :metadata])
+    |> foreign_key_constraint(:org_id)
     |> validate_inclusion(:status, ["active", "disabled", "archived"])
     |> validate_rule_entries()
   end

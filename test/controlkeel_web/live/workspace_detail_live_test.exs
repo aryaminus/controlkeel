@@ -96,6 +96,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       {:ok, set} =
         ControlKeel.Platform.create_policy_set(%{
+          "org_id" => org.id,
           "name" => "no-rm-rf",
           "description" => "Block destructive deletes",
           "rules" => [
@@ -125,7 +126,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       ws = create_workspace(%{name: "Dis", slug: "dis", industry: "web", org_id: org.id})
 
       set =
-        ControlKeel.PlatformFixtures.policy_set_fixture(%{name: "paused-set"})
+        ControlKeel.PlatformFixtures.policy_set_fixture(%{name: "paused-set", org_id: org.id})
 
       {:ok, _} =
         ControlKeel.Platform.apply_policy_set(ws.id, set.id, %{

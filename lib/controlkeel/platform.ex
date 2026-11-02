@@ -128,14 +128,18 @@ defmodule ControlKeel.Platform do
     end)
   end
 
-  def list_policy_sets(opts \\ %{}) do
-    scope = Map.get(opts, :scope) || Map.get(opts, "scope")
+  def list_policy_sets(org_id)
 
+  def list_policy_sets(org_id) when is_integer(org_id) do
     PolicySet
-    |> maybe_filter(:scope, scope)
+    |> where([policy_set], policy_set.org_id == ^org_id)
     |> order_by([policy_set], asc: policy_set.name, asc: policy_set.id)
     |> Repo.all()
   end
+
+  # Transitional: legacy org-less sets (pre org-ownership migration) are
+  # invisible to listings until the deferred data migration backfills them.
+  def list_policy_sets(nil), do: []
 
   def create_policy_set(attrs) do
     attrs =
@@ -173,6 +177,25 @@ defmodule ControlKeel.Platform do
       when is_nil(workspace_id) or is_integer(workspace_id) do
     workspace_id
     |> workspace_policy_set_query()
+    |> Repo.all()
+  end
+
+  @doc """
+  All assignments (including disabled ones) for workspaces of `org_id`,
+  ordered by workspace id then precedence. Display counterpart used by the
+  org policy sets tab to show where an org's sets are applied.
+  """
+  def list_org_policy_assignments(org_id) when is_integer(org_id) do
+    WorkspacePolicySet
+    |> join(:inner, [assignment], workspace in assoc(assignment, :workspace))
+    |> where([_assignment, workspace], workspace.org_id == ^org_id)
+    |> order_by([assignment, workspace],
+      asc: workspace.id,
+      asc: assignment.precedence,
+      asc: assignment.id
+    )
+    |> preload(:policy_set)
+    |> preload(:workspace)
     |> Repo.all()
   end
 

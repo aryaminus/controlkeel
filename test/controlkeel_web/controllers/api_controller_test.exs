@@ -1501,7 +1501,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
   describe "platform API" do
     test "creates service accounts, policy sets, and webhooks for a workspace", %{conn: conn} do
-      workspace = workspace_fixture()
+      org = ControlKeel.AccountsFixtures.org_fixture()
+      workspace = workspace_fixture(org_id: org.id)
 
       conn =
         post(conn, ~p"/api/v1/workspaces/#{workspace.id}/service-accounts", %{
@@ -1522,7 +1523,6 @@ defmodule ControlKeelWeb.ApiControllerTest do
         build_conn()
         |> post(~p"/api/v1/workspaces/#{workspace.id}/policy-sets", %{
           name: "Workspace Guard",
-          scope: "workspace",
           rules: [
             %{
               id: "workspace.no_exports",
@@ -1536,6 +1536,14 @@ defmodule ControlKeelWeb.ApiControllerTest do
         })
 
       assert %{"policy_set" => policy_set} = json_response(conn, 201)
+      assert policy_set["org_id"] == org.id
+
+      conn =
+        build_conn() |> get(~p"/api/v1/workspaces/#{workspace.id}/policy-sets")
+
+      assert %{"available_policy_sets" => [available]} = json_response(conn, 200)
+      assert available["id"] == policy_set["id"]
+      assert available["org_id"] == org.id
 
       conn =
         build_conn()

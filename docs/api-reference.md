@@ -28,7 +28,7 @@ Cloud-auth gated dashboard routes:
 - `/org/:slug/members`, `/org/:slug/settings/auth`, `/org/:slug/settings/general`
 - `/workspaces/:id/repos`, `/workspaces/:id/service-accounts`, `/workspaces/:id/webhooks`, `/workspaces/:id/tool-policy`
 - `/observability` and the observability subroutes for loop, costs, evals, imports, memory quality, recommendations, regressions, trends, promotions, sessions, and benchmark history/drafts/scenarios
-- `/policies`, `/skills`, `/deploy`
+- `/skills`, `/deploy` (`/policies` removed — policy sets are org-owned and managed under org settings)
 
 ## JSON API (`/api/v1`)
 

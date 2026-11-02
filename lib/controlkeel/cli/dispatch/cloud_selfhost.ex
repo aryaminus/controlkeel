@@ -4,6 +4,7 @@ defmodule ControlKeel.CLI.Dispatch.CloudSelfhost do
   alias ControlKeel.Mission
   alias ControlKeel.Accounts
   alias ControlKeel.Platform
+  alias ControlKeel.Repo
   alias ControlKeel.Mcp.ProtocolAccess
   import ControlKeel.CLI, except: [run_command: 2]
 
@@ -499,12 +500,13 @@ defmodule ControlKeel.CLI.Dispatch.CloudSelfhost do
   end
 
   def run_command(%{command: :policy_set_create, options: options}, _project_root) do
-    with {:ok, name} <- require_string_option(options[:name], "name"),
+    with {:ok, org_id} <- require_integer_option(options[:org_id], "org-id"),
+         {:ok, name} <- require_string_option(options[:name], "name"),
          {:ok, rules} <- load_rules_payload(options[:rules_file]),
          {:ok, policy_set} <-
            Platform.create_policy_set(%{
+             "org_id" => org_id,
              "name" => name,
-             "scope" => options[:scope] || "workspace",
              "description" => options[:description],
              "rules" => rules
            }) do
@@ -524,26 +526,34 @@ defmodule ControlKeel.CLI.Dispatch.CloudSelfhost do
   end
 
   def run_command(%{command: :policy_set_list, options: options}, _project_root) do
-    workspace_id = options[:workspace_id]
-    policy_sets = Platform.list_policy_sets()
+    org_id = options[:org_id]
 
-    assignment_lines =
-      if workspace_id do
-        ["", "Assignments:"] ++
-          Enum.map(Platform.list_workspace_policy_sets(workspace_id), fn assignment ->
-            "  workspace ##{workspace_id} -> ##{assignment.policy_set_id} #{assignment.policy_set.name} precedence #{assignment.precedence}"
-          end)
-      else
-        []
-      end
+    case resolve_policy_set_org(org_id, options[:workspace_id]) do
+      {:ok, org_id} ->
+        workspace_id = options[:workspace_id]
+        policy_sets = Platform.list_policy_sets(org_id)
 
-    {:ok,
-     [
-       "Policy sets:"
-       | Enum.map(policy_sets, fn policy_set ->
-           "  ##{policy_set.id} #{policy_set.name} [#{policy_set.status}] #{length(ControlKeel.Platform.PolicySet.rule_entries(policy_set))} rules"
-         end)
-     ] ++ assignment_lines}
+        assignment_lines =
+          if workspace_id do
+            ["", "Assignments:"] ++
+              Enum.map(Platform.list_workspace_policy_sets(workspace_id), fn assignment ->
+                "  workspace ##{workspace_id} -> ##{assignment.policy_set_id} #{assignment.policy_set.name} precedence #{assignment.precedence}"
+              end)
+          else
+            []
+          end
+
+        {:ok,
+         [
+           "Policy sets:"
+           | Enum.map(policy_sets, fn policy_set ->
+               "  ##{policy_set.id} #{policy_set.name} [#{policy_set.status}] #{length(ControlKeel.Platform.PolicySet.rule_entries(policy_set))} rules"
+             end)
+         ] ++ assignment_lines}
+
+      {:error, message} ->
+        {:error, message}
+    end
   end
 
   def run_command(
@@ -856,5 +866,20 @@ defmodule ControlKeel.CLI.Dispatch.CloudSelfhost do
     |> String.graphemes()
     |> Enum.take_random(n)
     |> Enum.join()
+  end
+
+  # Policy sets are org-owned: listing requires an org resolved either
+  # directly via --org-id or from the --workspace-id the caller passes.
+  defp resolve_policy_set_org(nil, nil),
+    do: {:error, "Policy sets are org-owned: pass --org-id or --workspace-id."}
+
+  defp resolve_policy_set_org(org_id, _workspace_id) when is_integer(org_id),
+    do: {:ok, org_id}
+
+  defp resolve_policy_set_org(nil, workspace_id) when is_integer(workspace_id) do
+    case Repo.get(Mission.Workspace, workspace_id) do
+      nil -> {:error, "Workspace not found."}
+      workspace -> {:ok, workspace.org_id}
+    end
   end
 end
