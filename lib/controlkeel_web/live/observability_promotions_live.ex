@@ -1,74 +1,31 @@
 defmodule ControlKeelWeb.ObservabilityPromotionsLive do
   use ControlKeelWeb, :live_view
 
-  alias ControlKeel.Accounts
-  alias ControlKeel.Accounts.Org
-  alias ControlKeel.Mission
-  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Observability
-  alias ControlKeel.Repo
-  alias ControlKeelWeb.WorkspaceAccess
+  alias ControlKeelWeb.WorkspaceScope
 
   @impl true
-  def mount(%{"ws_slug" => ws_slug, "org_slug" => slug} = _params, _session, socket) do
-    with %Workspace{} = workspace <-
-           Mission.get_workspace_by_slug(ws_slug) |> Repo.preload(:org),
-         :ok <- check_org_slug(workspace, %{slug: slug}),
-         :ok <- check_workspace_access(workspace, socket.assigns) do
-      opts = [workspace_id: workspace.id]
-      promotions = Observability.promotion_candidates(opts)
+  def mount(params, _session, socket) do
+    case WorkspaceScope.assign_scope(socket, params, "Promotions") do
+      {:ok, socket} ->
+        {:ok,
+         socket
+         |> assign(:page_title, "Observability Promotion Candidates")
+         |> load_page(params)}
 
-      {:ok,
-       socket
-       |> assign(:page_title, "Observability Promotion Candidates")
-       |> assign(:workspace, workspace)
-       |> assign(:nav_org, workspace.org)
-       |> assign(:nav_workspace, workspace)
-       |> assign(
-         :breadcrumbs,
-         [
-           %{label: workspace.org.name, to: ~p"/#{workspace.org.slug}"},
-           %{
-             label: workspace.name,
-             to: ~p"/#{workspace.org.slug}/workspaces/#{workspace.slug}"
-           },
-           %{label: "Promotions", to: nil}
-         ]
-       )
-       |> assign(:promotions, promotions)}
-    else
-      nil ->
-        {:ok, redirect_with_flash(socket, :error, "Workspace not found.", ~p"/organizations")}
-
-      {:error, reason} ->
-        {:ok, redirect_with_flash(socket, :error, reason, ~p"/organizations")}
+      {:redirect, socket} ->
+        {:ok, socket}
     end
   end
 
-  defp check_org_slug(%Workspace{org_id: org_id}, %{slug: slug}) when is_integer(org_id) do
-    case Accounts.get_org_by_slug(slug) do
-      %Org{id: ^org_id} -> :ok
-      _ -> {:error, "Workspace does not belong to this organization."}
-    end
+  @impl true
+  def handle_params(params, _url, socket) do
+    WorkspaceScope.on_params(socket, params, &load_page/2)
   end
 
-  defp check_org_slug(_, _), do: {:error, "Workspace does not belong to this organization."}
-
-  defp check_workspace_access(workspace, assigns) do
-    case WorkspaceAccess.check(workspace, assigns[:current_user]) do
-      :ok -> :ok
-      {:error, :unbound} -> {:error, "Workspace is not bound to an org."}
-      {:error, :forbidden} -> {:error, "Workspace belongs to a different organization."}
-      # Unreachable with the default "viewer" role (viewer >= viewer), kept
-      # for exhaustiveness over WorkspaceAccess.check/3's spec.
-      {:error, :needs_admin} -> {:error, "This workspace requires an active membership."}
-    end
-  end
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
+  defp load_page(socket, _params) do
+    promotions = Observability.promotion_candidates(workspace_id: socket.assigns.workspace.id)
+    assign(socket, :promotions, promotions)
   end
 
   @impl true

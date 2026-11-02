@@ -7,6 +7,22 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
   alias ControlKeel.Mission
   alias ControlKeel.Repo
 
+  # Every workspace-scoped observability route; all are viewer-readable and
+  # mounted through ControlKeelWeb.WorkspaceScope.
+  @observability_surfaces ~w(
+    observability
+    observability/loop
+    observability/compare
+    observability/costs
+    observability/evals
+    observability/imports
+    observability/memory-quality
+    observability/recommendations
+    observability/trends
+    observability/promotions
+    observability/benchmark
+  )
+
   setup do
     original = Application.get_env(:controlkeel, :runtime_mode)
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
@@ -53,6 +69,10 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
     user = create_user!("evict")
     membership = create_membership!(user, org, role)
 
+    {org, user, membership, create_workspace!(org)}
+  end
+
+  defp create_workspace!(org) do
     {:ok, workspace} =
       Mission.create_workspace(%{
         name: "Workspace #{System.unique_integer([:positive])}",
@@ -64,7 +84,22 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
         org_id: org.id
       })
 
-    {org, user, membership, workspace}
+    workspace
+  end
+
+  defp create_session!(workspace, title) do
+    {:ok, session} =
+      Mission.create_session(%{
+        title: title,
+        objective: "Check observability scope",
+        risk_tier: "low",
+        status: "active",
+        budget_cents: 1_000,
+        spent_cents: 0,
+        workspace_id: workspace.id
+      })
+
+    session
   end
 
   defp conn_for(user) do
@@ -201,6 +236,143 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
 
       assert %{"info" => "Your access to this organization changed."} =
                assert_redirect(view, "/organizations")
+    end
+  end
+
+  describe "observability pages" do
+    test "every observability surface evicts the page membership on revocation" do
+      for surface <- @observability_surfaces do
+        {org, user, membership, workspace} = org_with_workspace!("viewer")
+        owner = create_user!("owner")
+        create_membership!(owner, org, "owner")
+
+        {:ok, view, html} =
+          live(
+            conn_for(user),
+            "/#{org.slug}/workspaces/#{workspace.slug}/#{surface}"
+          )
+
+        assert html =~ workspace.name, "#{surface} did not render the workspace chrome"
+
+        assert {:ok, %Accounts.Membership{status: "revoked"}} =
+                 Accounts.revoke_membership(membership.id, owner.id)
+
+        assert %{"info" => "Your access to this organization changed."} =
+                 assert_redirect(view, "/organizations"),
+               "#{surface} did not evict the revoked membership"
+      end
+    end
+
+    test "revoking the page's membership redirects while other memberships remain" do
+      {org, user, membership, workspace} = org_with_workspace!("viewer")
+
+      # The user keeps an active membership elsewhere; the redirect must not
+      # become a sign-out.
+      other_org = create_org!("elsewhere")
+      create_membership!(user, other_org, "viewer")
+
+      owner = create_user!("owner")
+      create_membership!(owner, org, "owner")
+
+      {:ok, view, _html} =
+        live(conn_for(user), ~p"/#{org.slug}/workspaces/#{workspace.slug}/observability")
+
+      assert {:ok, %Accounts.Membership{status: "revoked"}} =
+               Accounts.revoke_membership(membership.id, owner.id)
+
+      assert %{"info" => "Your access to this organization changed."} =
+               assert_redirect(view, "/organizations")
+    end
+
+    test "demoting an admin hides observability mutation controls without a redirect" do
+      {org, user, membership, workspace} = org_with_workspace!("admin")
+      owner = create_user!("owner")
+      create_membership!(owner, org, "owner")
+
+      {:ok, view, _html} =
+        live(
+          conn_for(user),
+          ~p"/#{org.slug}/workspaces/#{workspace.slug}/observability/benchmark"
+        )
+
+      assert has_element?(view, "#observability-benchmark-drafts-generate")
+
+      assert {:ok, %Accounts.Membership{role: "viewer"}} =
+               Accounts.update_membership_role(membership.id, "viewer", owner.id)
+
+      refute_redirected(view)
+      refute has_element?(view, "#observability-benchmark-drafts-generate")
+
+      # The event stays denied after the demotion, not just hidden.
+      assert render_click(view, "generate-drafts") =~ "Admin or owner role required."
+    end
+
+    test "role changes in another org leave the observability page in place" do
+      {org, user, _membership, workspace} = org_with_workspace!("viewer")
+
+      other_org = create_org!("other")
+      other_membership = create_membership!(user, other_org, "viewer")
+      other_owner = create_user!("other-owner")
+      create_membership!(other_owner, other_org, "owner")
+
+      {:ok, view, html} =
+        live(conn_for(user), ~p"/#{org.slug}/workspaces/#{workspace.slug}/observability")
+
+      assert html =~ workspace.name
+
+      assert {:ok, %Accounts.Membership{role: "admin"}} =
+               Accounts.update_membership_role(other_membership.id, "admin", other_owner.id)
+
+      refute_redirected(view)
+      assert render(view) =~ workspace.name
+    end
+
+    test "patching to another workspace in the same org reloads the page" do
+      {org, user, _membership, workspace} = org_with_workspace!("viewer")
+      other_workspace = create_workspace!(org)
+      create_session!(workspace, "First workspace run")
+      create_session!(other_workspace, "Second workspace run A")
+      create_session!(other_workspace, "Second workspace run B")
+
+      {:ok, view, html} =
+        live(conn_for(user), ~p"/#{org.slug}/workspaces/#{workspace.slug}/observability")
+
+      assert html =~ workspace.name
+      assert element(view, "#observability-overview-runs") |> render() =~ "1 recent"
+
+      assert render_patch(view, ~p"/#{org.slug}/workspaces/#{other_workspace.slug}/observability") =~
+               other_workspace.name
+
+      refute_redirected(view)
+      assert render(view) =~ other_workspace.name
+      assert element(view, "#observability-overview-runs") |> render() =~ "2 recent"
+    end
+
+    test "patching to an inaccessible organization's workspace redirects" do
+      {org, user, _membership, workspace} = org_with_workspace!("viewer")
+
+      other_org = create_org!("no-membership")
+      other_workspace = create_workspace!(other_org)
+
+      {:ok, view, html} =
+        live(conn_for(user), ~p"/#{org.slug}/workspaces/#{workspace.slug}/observability")
+
+      assert html =~ workspace.name
+
+      render_patch(view, ~p"/#{other_org.slug}/workspaces/#{other_workspace.slug}/observability")
+
+      assert %{"error" => "Workspace belongs to a different organization."} =
+               assert_redirect(view, "/organizations")
+    end
+
+    test "local mode renders without a membership" do
+      Application.put_env(:controlkeel, :runtime_mode, :local)
+      {org, _user, _membership, workspace} = org_with_workspace!()
+
+      {:ok, _view, html} =
+        live(build_conn(), ~p"/#{org.slug}/workspaces/#{workspace.slug}/observability")
+
+      assert html =~ workspace.name
     end
   end
 end
