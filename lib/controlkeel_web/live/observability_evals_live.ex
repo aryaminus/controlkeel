@@ -12,7 +12,7 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
       {:ok, socket} ->
         {:ok, socket |> assign(:page_title, "Observability Eval Candidates") |> load_page(params)}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:ok, socket}
     end
   end
@@ -50,6 +50,8 @@ defmodule ControlKeelWeb.ObservabilityEvalsLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-evals-page" class="w-full space-y-5">

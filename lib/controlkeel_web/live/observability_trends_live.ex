@@ -10,7 +10,7 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
       {:ok, socket} ->
         {:ok, socket |> assign(:page_title, "Observability trends") |> assign_workspace_opts()}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:ok, socket}
     end
   end
@@ -30,7 +30,7 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
       {:ok, socket, _changed?} ->
         {:noreply, socket |> assign_workspace_opts() |> load_trends(parse_days(params["days"]))}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:noreply, socket}
     end
   end
@@ -47,6 +47,8 @@ defmodule ControlKeelWeb.ObservabilityTrendsLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-trends" class="w-full space-y-5">

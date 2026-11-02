@@ -8,7 +8,7 @@ defmodule ControlKeelWeb.ObservabilityMemoryQualityLive do
   def mount(params, _session, socket) do
     case WorkspaceScope.assign_scope(socket, params, "Memory quality") do
       {:ok, socket} -> {:ok, assign(socket, :page_title, "Memory quality")}
-      {:redirect, socket} -> {:ok, socket}
+      {:error, socket} -> {:ok, socket}
     end
   end
 
@@ -16,7 +16,7 @@ defmodule ControlKeelWeb.ObservabilityMemoryQualityLive do
   def handle_params(params, _url, %{assigns: %{workspace_scope: _}} = socket) do
     case WorkspaceScope.refresh(socket, params) do
       {:ok, socket, _changed?} -> {:noreply, load_page(socket, params)}
-      {:redirect, socket} -> {:noreply, socket}
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
@@ -33,6 +33,8 @@ defmodule ControlKeelWeb.ObservabilityMemoryQualityLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-memory-quality" class="w-full space-y-5">

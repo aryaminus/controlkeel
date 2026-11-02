@@ -52,22 +52,21 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLiveTest do
     assert html =~ "aria-current=\"page\""
   end
 
-  test "wrong org slug redirects to organizations" do
+  test "wrong org slug renders an in-place scope error" do
     {_org, ws, owner} = org_workspace!()
     org = %{id: -1, slug: "whco"}
 
-    assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-             live(conn_for(owner, org), ~p"/other/workspaces/#{ws.slug}/webhooks")
+    {:ok, view, _html} = live(conn_for(owner, org), ~p"/other/workspaces/#{ws.slug}/webhooks")
 
-    assert msg =~ "does not belong to this organization"
+    assert has_element?(view, "[data-scope-error]")
   end
 
-  test "unknown workspace slug redirects to organizations" do
+  test "unknown workspace slug renders an in-place scope error" do
     {org, _ws, owner} = org_workspace!()
 
-    assert {:error, {:live_redirect, %{to: "/organizations", flash: %{"error" => msg}}}} =
-             live(conn_for(owner, org), ~p"/whco/workspaces/no-such-ws/webhooks")
+    {:ok, view, _html} =
+      live(conn_for(owner, org), ~p"/whco/workspaces/no-such-ws/webhooks")
 
-    assert msg =~ "Workspace not found."
+    assert has_element?(view, "[data-scope-error]")
   end
 end

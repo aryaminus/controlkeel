@@ -58,4 +58,16 @@ defmodule ControlKeelWeb.ObservabilityOverviewLiveTest do
     assert html_one =~ "1 recent"
     assert html_two =~ "1 recent"
   end
+
+  test "an org/workspace mismatch renders the scope error without loading page data", %{
+    conn: conn
+  } do
+    {_org, ws, _session} = org_bound_session_fixture()
+    path = "/wrong-org/workspaces/#{ws.slug}/observability"
+
+    {:ok, view, _html} = live(conn, path)
+
+    assert has_element?(view, "[data-scope-error]")
+    refute has_element?(view, "#observability-overview-page")
+  end
 end

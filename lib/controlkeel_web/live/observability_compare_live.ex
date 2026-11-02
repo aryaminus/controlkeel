@@ -12,7 +12,7 @@ defmodule ControlKeelWeb.ObservabilityCompareLive do
       {:ok, socket} ->
         {:ok, socket |> assign(:page_title, "Observability Compare") |> load_page(params)}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:ok, socket}
     end
   end
@@ -38,6 +38,8 @@ defmodule ControlKeelWeb.ObservabilityCompareLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-compare" class="w-full space-y-5">

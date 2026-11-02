@@ -10,7 +10,7 @@ defmodule ControlKeelWeb.ObservabilityImportsLive do
       {:ok, socket} ->
         {:ok, socket |> assign(:page_title, "Observability imports") |> load_page(params)}
 
-      {:redirect, socket} ->
+      {:error, socket} ->
         {:ok, socket}
     end
   end
@@ -26,6 +26,8 @@ defmodule ControlKeelWeb.ObservabilityImportsLive do
   end
 
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(assigns) do
     ~H"""
     <section id="observability-imports" class="w-full space-y-5">
