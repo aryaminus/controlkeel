@@ -90,11 +90,10 @@ defmodule ControlKeel.Cloud.CrossOrgIsolationTest do
     test "shows only org A's workspaces when signed in as user_a", %{
       conn: conn,
       user_a: user_a,
-      org_a: org_a,
       key_a: key_a,
       key_b: key_b
     } do
-      conn = session_conn(conn, user_a.id, org_a.id)
+      conn = session_conn(conn, user_a.id)
       {:ok, _view, html} = live(conn, ~p"/cloud/projects")
 
       assert html =~ key_a.workspace_id
@@ -106,10 +105,9 @@ defmodule ControlKeel.Cloud.CrossOrgIsolationTest do
     test "refuses access to org B's enrolled workspace when signed in as user_a", %{
       conn: conn,
       user_a: user_a,
-      org_a: org_a,
       key_b: key_b
     } do
-      conn = session_conn(conn, user_a.id, org_a.id)
+      conn = session_conn(conn, user_a.id)
       {:ok, _view, html} = live(conn, ~p"/cloud/projects/#{key_b.workspace_id}")
 
       assert html =~ "Not visible"
@@ -119,11 +117,10 @@ defmodule ControlKeel.Cloud.CrossOrgIsolationTest do
     test "user_a can see their own org A workspace and packages", %{
       conn: conn,
       user_a: user_a,
-      org_a: org_a,
       key_a: key_a,
       pkg_a: pkg_a
     } do
-      conn = session_conn(conn, user_a.id, org_a.id)
+      conn = session_conn(conn, user_a.id)
       {:ok, _view, html} = live(conn, ~p"/cloud/projects/#{key_a.workspace_id}")
 
       assert html =~ "Cloud run packages"
@@ -145,11 +142,8 @@ defmodule ControlKeel.Cloud.CrossOrgIsolationTest do
     {org, user, mws, key, pkg}
   end
 
-  defp session_conn(conn, user_id, org_id) do
-    Plug.Test.init_test_session(conn, %{
-      "current_user_id" => user_id,
-      "current_org_id" => org_id
-    })
+  defp session_conn(conn, user_id) do
+    Plug.Test.init_test_session(conn, %{"current_user_id" => user_id})
   end
 
   defp insert_org(slug) do

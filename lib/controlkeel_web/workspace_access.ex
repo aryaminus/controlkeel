@@ -3,8 +3,8 @@ defmodule ControlKeelWeb.WorkspaceAccess do
   Shared org-access gate for workspace-scoped LiveViews (issues #83, #141 R1).
 
   Collapses the per-view `check_workspace_access` copies into one decision
-  point. Authority resolves from `(user, workspace org)` — never from the
-  ambient `current_org_id` cookie, which production never writes:
+  point. Authority resolves from `(user, workspace org)` — never from ambient
+  session state:
 
     * local mode → `:ok` (single-user deployment; also fixes the tab pages,
       which previously denied every local request);

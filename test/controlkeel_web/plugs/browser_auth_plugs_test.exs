@@ -5,31 +5,18 @@ defmodule ControlKeelWeb.Plugs.BrowserAuthPlugsTest do
   alias ControlKeelWeb.Plugs.{LoadCurrentUser, RequireCloudMode}
 
   setup %{conn: conn} do
-    {:ok, org} = Accounts.create_org(%{name: "Acme", slug: "acme"})
     {:ok, user, _created} = Accounts.find_or_create_user("user@example.com", "Test User")
 
-    {:ok, membership} =
-      %ControlKeel.Accounts.Membership{}
-      |> ControlKeel.Accounts.Membership.changeset(%{
-        user_id: user.id,
-        org_id: org.id,
-        role: "admin",
-        status: "active"
-      })
-      |> ControlKeel.Repo.insert()
-
-    conn = init_test_session(conn, %{current_user_id: user.id, current_org_id: org.id})
-    {:ok, conn: conn, org: org, user: user, membership: membership}
+    conn = init_test_session(conn, %{current_user_id: user.id})
+    {:ok, conn: conn, user: user}
   end
 
-  test "LoadCurrentUser assigns user and active membership", %{
+  test "LoadCurrentUser assigns the signed-in user", %{
     conn: conn,
-    user: user,
-    membership: membership
+    user: user
   } do
     conn = LoadCurrentUser.call(conn, [])
     assert conn.assigns.current_user.id == user.id
-    assert conn.assigns.current_membership.id == membership.id
   end
 
   test "RequireCloudMode redirects signed-in visitors away from /auth/login", %{conn: conn} do

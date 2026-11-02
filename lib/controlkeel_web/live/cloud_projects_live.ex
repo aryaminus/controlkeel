@@ -35,9 +35,15 @@ defmodule ControlKeelWeb.CloudProjectsLive do
   def mount(params, session, socket) do
     if connected?(socket), do: Process.send_after(self(), :refresh, @refresh_ms)
 
-    user_id = Map.get(session, "current_user_id")
-    org_id = Map.get(session, "current_org_id")
-    user = if is_integer(user_id), do: Accounts.get_user(user_id)
+    user_id = Map.get(session, "current_user_id") || Map.get(session, :current_user_id)
+
+    user =
+      socket.assigns[:current_user] || if(is_integer(user_id), do: Accounts.get_user(user_id))
+
+    # Legacy global page: it has no org in the URL, so it resolves the
+    # visitor's default org once at mount. Org-scoped pages resolve from
+    # their `:org_slug` instead and never consult this.
+    org_id = if user, do: Accounts.default_org_for_user(user.id)
 
     membership =
       if user && is_integer(org_id), do: Accounts.get_active_membership(user.id, org_id)
@@ -46,7 +52,7 @@ defmodule ControlKeelWeb.CloudProjectsLive do
       socket
       |> assign(:page_title, "Cloud projects")
       |> assign(:current_user, user)
-      |> assign(:current_org_id, org_id)
+      |> assign(:org_id, org_id)
       |> assign(:current_membership, membership)
 
     case socket.assigns.live_action || :index do
@@ -59,7 +65,7 @@ defmodule ControlKeelWeb.CloudProjectsLive do
     keys =
       cond do
         socket.assigns.current_membership ->
-          socket.assigns.current_org_id
+          socket.assigns.org_id
           |> KeyRegistry.list_for_org()
           |> Repo.preload(:mission_workspace)
 
@@ -93,7 +99,7 @@ defmodule ControlKeelWeb.CloudProjectsLive do
         key = Repo.preload(key, :mission_workspace)
 
         cond do
-          socket.assigns.current_membership && key.org_id == socket.assigns.current_org_id ->
+          socket.assigns.current_membership && key.org_id == socket.assigns.org_id ->
             {:ok, assign_show_state(socket, key)}
 
           # Allow operators to inspect unbound (org_id: nil) registrations from
@@ -155,7 +161,7 @@ defmodule ControlKeelWeb.CloudProjectsLive do
         _ ->
           keys =
             if socket.assigns.current_membership do
-              socket.assigns.current_org_id
+              socket.assigns.org_id
               |> KeyRegistry.list_for_org()
               |> Repo.preload(:mission_workspace)
             else
@@ -185,14 +191,14 @@ defmodule ControlKeelWeb.CloudProjectsLive do
          assign(socket, :create_error, "Admin or owner role required to create workspaces.")}
 
       true ->
-        attrs = normalize_workspace_attrs(params, socket.assigns.current_org_id)
+        attrs = normalize_workspace_attrs(params, socket.assigns.org_id)
 
         case Mission.create_workspace(attrs) do
           {:ok, workspace} ->
-            _ = Accounts.assign_workspace_to_org(workspace.id, socket.assigns.current_org_id)
+            _ = Accounts.assign_workspace_to_org(workspace.id, socket.assigns.org_id)
 
             keys =
-              socket.assigns.current_org_id
+              socket.assigns.org_id
               |> KeyRegistry.list_for_org()
               |> Repo.preload(:mission_workspace)
 

@@ -499,8 +499,9 @@ defmodule ControlKeel.Accounts do
 
   @doc """
   PubSub topic for membership changes affecting a specific user. LiveViews
-  subscribe to this topic in `LiveAuth.on_mount/4` so a revoke or role-change
-  evicts the user across all open tabs within a single PubSub roundtrip.
+  subscribe to this topic in `LiveAuth.on_mount/4`; a change to the org a page
+  resolved sends that page to `/organizations` so its access check re-runs.
+  Changes for other orgs leave the page untouched.
   """
   @spec membership_topic(integer()) :: String.t()
   def membership_topic(user_id) when is_integer(user_id), do: "membership:user:#{user_id}"
@@ -676,10 +677,11 @@ defmodule ControlKeel.Accounts do
   @doc """
   First active membership's org id for a user, or `nil`.
 
-  Used as the default-org hint where the browser session never recorded one
-  (production never writes `current_org_id` — issue #141). Access decisions
-  must not rely on this; the shared gates above resolve authority from
-  `(user, resource)` instead.
+  Used by the remaining global surfaces that have no org in the URL
+  (`/cloud/projects`, `/cloud/telemetry`, and the legacy `/observability`
+  redirects). Org-scoped pages resolve the org from their `:org_slug`
+  instead. Access decisions must not rely on this; the shared gates resolve
+  authority from `(user, resource)`.
   """
   @spec default_org_for_user(integer()) :: integer() | nil
   def default_org_for_user(user_id) when is_integer(user_id) do

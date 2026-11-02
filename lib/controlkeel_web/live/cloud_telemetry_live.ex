@@ -57,20 +57,19 @@ defmodule ControlKeelWeb.CloudTelemetryLive do
   defp admin?(_), do: false
 
   defp resolve_membership(socket, session) do
-    # Prefer pre-loaded assign from LoadCurrentUser plug (production),
-    # fall back to session-based resolution (test / edge cases).
-    case socket.assigns[:current_membership] do
-      %ControlKeel.Accounts.Membership{} = m ->
-        m
-
-      nil ->
-        user_id = Map.get(session, "current_user_id") || Map.get(session, :current_user_id)
-        org_id = Map.get(session, "current_org_id") || Map.get(session, :current_org_id)
-
-        if is_integer(user_id) and is_integer(org_id) do
-          Accounts.get_active_membership(user_id, org_id)
+    user =
+      socket.assigns[:current_user] ||
+        case Map.get(session, "current_user_id") || Map.get(session, :current_user_id) do
+          user_id when is_integer(user_id) -> Accounts.get_user(user_id)
+          _ -> nil
         end
-    end
+
+    # Legacy global page: it has no org in the URL, so it resolves the
+    # visitor's default org once at mount. Org-scoped pages resolve from
+    # their `:org_slug` instead and never consult this.
+    org_id = if user, do: Accounts.default_org_for_user(user.id)
+
+    if user && is_integer(org_id), do: Accounts.get_active_membership(user.id, org_id)
   end
 
   @impl true

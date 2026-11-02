@@ -18,7 +18,7 @@ defmodule ControlKeelWeb.Plugs.RequireSessionAuth do
   authentication check.
 
   Expected to run inside the `:browser` pipeline so `LoadCurrentUser` has
-  already populated `current_user` / `current_org_id`.
+  already populated `current_user`.
   """
 
   import Plug.Conn

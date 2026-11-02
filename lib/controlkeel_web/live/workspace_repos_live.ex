@@ -3,8 +3,8 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
   Workspace GitHub repository bindings at `/:org_slug/workspaces/:ws_slug/repos`.
 
   Admin+owner of the workspace's org can bind / unbind / list
-  `WorkspaceGithubRepo` records. The page rejects access if the workspace
-  belongs to a different org than the visitor's current_org_id.
+  `WorkspaceGithubRepo` records. Access is gated by `WorkspaceAccess` on the
+  workspace's own org, so a workspace belonging to another org is rejected.
   """
 
   use ControlKeelWeb, :live_view

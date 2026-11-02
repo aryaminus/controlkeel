@@ -108,21 +108,19 @@ defmodule ControlKeelWeb.OrganizationsLiveTest do
       refute html =~ ~s(id="organization-create-modal")
     end
 
-    test "default org is active and switching redirects to the signed switch URL", %{
+    test "lists every org as a plain link, with no ambient switch affordance", %{
       conn: conn,
       user: user
     } do
-      {:ok, first} = Accounts.create_org_with_owner(user.id, %{name: "First", slug: "first"})
-      {:ok, second} = Accounts.create_org_with_owner(user.id, %{name: "Second", slug: "second"})
+      {:ok, _first} = Accounts.create_org_with_owner(user.id, %{name: "First", slug: "first"})
+      {:ok, _second} = Accounts.create_org_with_owner(user.id, %{name: "Second", slug: "second"})
 
-      {:ok, view, html} = live(conn, ~p"/organizations")
+      {:ok, view, _html} = live(conn, ~p"/organizations")
 
-      # Default = first active membership; the other row offers a switch.
-      assert html =~ "org-active-#{first.id}"
-      assert has_element?(view, "#org-switch-#{second.id}")
-
-      assert {:error, {:redirect, %{to: "/auth/org/" <> _}}} =
-               view |> element("#org-switch-#{second.id}") |> render_click()
+      assert has_element?(view, ~s(a[href="/first"]))
+      assert has_element?(view, ~s(a[href="/second"]))
+      refute has_element?(view, ~s([id^="org-active-"]))
+      refute has_element?(view, ~s([id^="org-switch-"]))
     end
 
     test "index redirects to login when there is no signed-in user" do
