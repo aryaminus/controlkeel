@@ -18,6 +18,15 @@ defmodule ControlKeelWeb.LayoutsTest do
     assert anchor_for(html, "/benchmarks") =~ "aria-current=\"page\""
   end
 
+  test "global organization and session index links are absent" do
+    html = render_component(&Layouts.sidebar/1, current_path: "/dashboard")
+
+    refute html =~ ~s(href="/organizations")
+    refute html =~ ~s(href="/sessions")
+    refute html =~ ">Organizations<"
+    refute html =~ ">Sessions<"
+  end
+
   defp anchor_for(html, href) do
     case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>.*?</a>|s, html) do
       nil -> ""

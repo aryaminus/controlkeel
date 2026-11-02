@@ -7,7 +7,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
   alias ControlKeel.Repo
 
   # Issue #141, R3: in cloud mode every authenticated surface except the
-  # /organizations onboarding page requires at least one active membership.
+  # organization and session creation pages requires an active membership.
   setup do
     original = Application.get_env(:controlkeel, :runtime_mode)
     Application.put_env(:controlkeel, :runtime_mode, :cloud)
@@ -62,19 +62,19 @@ defmodule ControlKeelWeb.LiveAuthTest do
     owner
   end
 
-  test "memberless users are redirected to /organizations on authenticated pages" do
-    assert {:error, {:redirect, %{to: "/organizations"}}} =
-             live(memberless_conn(), ~p"/sessions")
+  test "memberless users are redirected to /new/org on authenticated pages" do
+    assert {:error, {:redirect, %{to: "/new/org"}}} =
+             live(memberless_conn(), ~p"/dashboard")
   end
 
-  test "memberless users can open /organizations (onboarding surface)" do
-    {:ok, _view, html} = live(memberless_conn(), ~p"/organizations")
-    assert html =~ "Organizations"
+  test "memberless users can open organization creation" do
+    {:ok, _view, html} = live(memberless_conn(), ~p"/new/org")
+    assert html =~ "Create organization"
   end
 
   test "users with a membership render authenticated pages" do
     {conn, _user, _org} = member_conn()
-    {:ok, _view, html} = live(conn, ~p"/sessions")
+    {:ok, _view, html} = live(conn, ~p"/dashboard")
     refute html =~ "Join or create an organization"
   end
 
@@ -122,7 +122,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
     refute render(view) =~ "+ Create workspace"
   end
 
-  test "revoking the page's membership redirects to /organizations" do
+  test "revoking the page's membership redirects to /new/org" do
     {conn, user, org} = member_conn()
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
@@ -133,7 +133,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
              Accounts.revoke_membership(membership.id, owner.id)
 
     assert %{"info" => "Your access to this organization changed."} =
-             assert_redirect(view, "/organizations")
+             assert_redirect(view, "/new/org")
   end
 
   test "revoking a membership in another org leaves the page in place" do
@@ -157,21 +157,21 @@ defmodule ControlKeelWeb.LiveAuthTest do
     refute_redirected(view)
   end
 
-  test "revoking the last membership returns to /organizations, not the login screen" do
+  test "revoking the last membership returns to /new/org, not the login screen" do
     {conn, user, org} = member_conn()
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
 
-    {:ok, view, _html} = live(conn, ~p"/organizations")
+    {:ok, view, _html} = live(conn, ~p"/dashboard")
 
     assert {:ok, %Accounts.Membership{status: "revoked"}} =
              Accounts.revoke_membership(membership.id, owner.id)
 
     assert %{"info" => "You no longer have access to any organization."} =
-             assert_redirect(view, "/organizations")
+             assert_redirect(view, "/new/org")
   end
 
-  test "unauthenticated users are still sent to login, not /organizations" do
-    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/sessions")
+  test "unauthenticated users are still sent to login, not /new/org" do
+    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/dashboard")
   end
 end

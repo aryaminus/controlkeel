@@ -361,6 +361,7 @@ defmodule ControlKeelWeb.NewSessionLiveTest do
 
       assert html =~ "Organization and workspace"
       assert html =~ "admin or owner of at least one organization"
+      assert has_element?(view, ~s(a[href="/new/org"]), "Create an organization")
       refute html =~ "Owned Org"
       refute html =~ ">Core<"
       refute has_element?(view, "#onboarding-workspace-select option[value=\"#{ws.id}\"]")
@@ -374,10 +375,6 @@ defmodule ControlKeelWeb.NewSessionLiveTest do
 
       refute html =~ "Owned Org"
       assert html =~ "Choose the domain and primary agent"
-
-      # The /organizations index still lists the org for the member.
-      assert {:ok, _orgs_view, orgs_html} = live(cloud_conn(member, org.id), ~p"/organizations")
-      assert orgs_html =~ "Owned Org"
     end
 
     test "org picker lists only orgs with an active owner or admin membership", %{} do

@@ -94,6 +94,10 @@ defmodule ControlKeelWeb.Router do
     get "/llms.txt", LlmsTxtController, :index
     get "/sitemap.xml", SitemapController, :index
 
+    # Sunset the removed global indexes without letting /:org_slug capture them.
+    get "/organizations", PageController, :legacy_global_index_redirect
+    get "/sessions", PageController, :legacy_global_index_redirect
+
     # Public in all modes
     live "/auth/login", AuthLive, :index
 
@@ -122,13 +126,11 @@ defmodule ControlKeelWeb.Router do
         ControlKeelWeb.LayoutDefaults
       ] do
       live "/dashboard", DashboardLive, :index
-      live "/sessions", MissionsLive, :index
       live "/benchmarks", BenchmarksLive, :index
       live "/benchmarks/runs/:id", BenchmarksLive, :show
       live "/cloud/telemetry", CloudTelemetryLive, :index
       live "/cloud/projects", CloudProjectsLive, :index
       live "/cloud/projects/:ws_id", CloudProjectsLive, :show
-      live "/organizations", OrganizationsLive, :index
 
       live "/policies", PolicyStudioLive, :index
       live "/skills", SkillsLive, :index

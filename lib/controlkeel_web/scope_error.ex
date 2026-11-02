@@ -2,9 +2,20 @@ defmodule ControlKeelWeb.ScopeError do
   @moduledoc """
   Shared error payload for URL-scoped pages.
 
-  A scoped URL can fail at one of three levels: organization, workspace, or
-  session. The organization layout renders one panel for all of them, and the
-  browser uses the `:invalid_root` field to clear a stale `ck.lastPath` value.
+  Invalid routes retain the deepest scope that resolves and is accessible:
+
+    * `/:org_slug` — global organization not-found page.
+    * `/:org_slug/typo` and `/:org_slug/workspaces/:unknown_ws` — organization
+      navigation.
+    * `/:org_slug/workspaces/:ws_slug/typo` and
+      `/:org_slug/workspaces/:ws_slug/sessions/:unknown_id` — workspace
+      navigation.
+    * `/:org_slug/workspaces/:ws_slug/sessions/:id/typo` — session navigation,
+      but only when that session resolves and is accessible.
+
+  Missing and inaccessible resources use the same public not-found response.
+  The organization layout renders the error panel in place, and the browser
+  uses `:invalid_root` to clear a stale `ck.lastPath` value.
 
   `:needs_admin` deliberately leaves `:invalid_root` empty: the visitor is a
   member and can still use the parent scope, so the saved scope root remains

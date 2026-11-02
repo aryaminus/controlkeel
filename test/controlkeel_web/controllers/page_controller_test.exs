@@ -138,6 +138,12 @@ defmodule ControlKeelWeb.PageControllerTest do
   end
 
   describe "legacy org redirects" do
+    test "GET /organizations sunsets to the root handoff", %{conn: conn} do
+      conn = get(conn, "/organizations")
+
+      assert redirected_to(conn, 302) == "/"
+    end
+
     test "GET /organizations/:slug redirects to /:slug", %{conn: conn} do
       conn = get(conn, "/organizations/acme-corp")
 
@@ -152,6 +158,12 @@ defmodule ControlKeelWeb.PageControllerTest do
   end
 
   describe "legacy session launcher redirect" do
+    test "GET /sessions sunsets to the root handoff", %{conn: conn} do
+      conn = get(conn, "/sessions")
+
+      assert redirected_to(conn, 302) == "/"
+    end
+
     test "GET /sessions/start redirects to /new/session (issue #277 rename)", %{conn: conn} do
       conn = get(conn, "/sessions/start")
 
@@ -230,7 +242,7 @@ defmodule ControlKeelWeb.PageControllerTest do
       assert redirected_to(conn, 302) == "/auth/login"
     end
 
-    test "signed-in users without memberships land on /organizations", %{conn: conn} do
+    test "signed-in users without memberships land on /new/org", %{conn: conn} do
       {:ok, user} = Accounts.create_user(%{email: "orgless@example.com"})
 
       conn =
@@ -238,7 +250,7 @@ defmodule ControlKeelWeb.PageControllerTest do
         |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
         |> get("/observability/loop")
 
-      assert redirected_to(conn, 302) == "/organizations"
+      assert redirected_to(conn, 302) == "/new/org"
       assert conn.assigns.flash["info"] =~ "Join or create an organization"
     end
 
@@ -259,7 +271,7 @@ defmodule ControlKeelWeb.PageControllerTest do
                "/new-org/workspaces/new-workspace/observability/loop"
     end
 
-    test "members with no workspaces anywhere still land on /organizations", %{conn: conn} do
+    test "members with no workspaces anywhere return to the root handoff", %{conn: conn} do
       {:ok, user} = Accounts.create_user(%{email: "noworkspace@example.com"})
 
       {:ok, _} =
@@ -270,7 +282,7 @@ defmodule ControlKeelWeb.PageControllerTest do
         |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
         |> get("/observability/loop")
 
-      assert redirected_to(conn, 302) == "/organizations"
+      assert redirected_to(conn, 302) == "/"
     end
 
     test "cloud resolution selects the newest accessible workspace", %{conn: conn} do

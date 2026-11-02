@@ -997,9 +997,9 @@ defmodule ControlKeelWeb.NewSessionLive do
       assigns.org_options == [] ->
         %{
           text:
-            "You need to be an admin or owner of at least one organization to start a session here. Organizations where you are only a member or viewer are not shown for onboarding.",
-          link: ~p"/organizations",
-          link_text: "View organizations"
+            "You need to be an admin or owner of at least one organization to start a session here. Create an organization or ask an organization owner for access.",
+          link: ~p"/new/org",
+          link_text: "Create an organization"
         }
 
       assigns.workspace_options == [] ->

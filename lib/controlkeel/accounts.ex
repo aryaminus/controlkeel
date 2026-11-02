@@ -118,7 +118,7 @@ defmodule ControlKeel.Accounts do
   Create an org and an active owner membership for `user_id` in one transaction.
 
   Atomic: if either insert fails, both roll back. Used by the web
-  `/organizations/new` flow so a signed-in user becomes the owner of the org
+  `/new/org` flow so a signed-in user becomes the owner of the org
   they create without going through the invite-token lifecycle.
   """
   @spec create_org_with_owner(integer(), map()) ::
@@ -148,9 +148,9 @@ defmodule ControlKeel.Accounts do
   List orgs where `user_id` has an active membership, with the user's role.
 
   Returns `[%{org: Org.t(), role: String.t()}]` ordered by org name.
-  Used by the `/organizations` index in cloud/self_hosted mode so the UI can
-  render a role badge per row. In local mode there is no user, so callers
-  wrap `list_orgs/1` results with `role: nil` instead.
+  Used by organization-scoped UI in cloud/self_hosted mode. In local mode
+  there is no user, so callers wrap `list_orgs/1` results with `role: nil`
+  instead.
 
   Pass `min_role` to keep only orgs where the user holds at least that role
   (e.g. `"admin"` for admin-or-owner surfaces such as the mission onboarding
@@ -500,7 +500,7 @@ defmodule ControlKeel.Accounts do
   @doc """
   PubSub topic for membership changes affecting a specific user. LiveViews
   subscribe to this topic in `LiveAuth.on_mount/4`; a change to the org a page
-  resolved sends that page to `/organizations` so its access check re-runs.
+  resolved sends that page to `/new/org` so its access check re-runs.
   Changes for other orgs leave the page untouched.
   """
   @spec membership_topic(integer()) :: String.t()
