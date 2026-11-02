@@ -1023,7 +1023,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :id, :string, required: true
   attr :current_user, :any, required: true
   attr :compact, :boolean, default: false
-  attr :show_dashboard, :boolean, default: false
   attr :class, :string, default: ""
   attr :popover_class, :string, default: "right-0 top-full mt-2"
   attr :rest, :global
@@ -1091,18 +1090,16 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         </p>
         <p class="mt-0.5 text-xs text-muted-foreground">{@current_user.email}</p>
         <div class="my-2 border-t"></div>
-        <%= if @show_dashboard do %>
-          <.link
-            navigate={~p"/"}
-            phx-click={
-              JS.hide(to: "##{@id}-popover")
-              |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
-            }
-            class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <.icon name="hero-home" class="size-4" /> Home
-          </.link>
-        <% end %>
+        <.link
+          navigate={~p"/"}
+          phx-click={
+            JS.hide(to: "##{@id}-popover")
+            |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
+          }
+          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <.icon name="hero-home" class="size-4" /> Home
+        </.link>
 
         <a
           href={~p"/docs"}

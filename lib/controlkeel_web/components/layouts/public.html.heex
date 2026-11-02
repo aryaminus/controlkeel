@@ -22,14 +22,9 @@
         >
           GitHub
         </a>
-        <%= if ControlKeel.Runtime.Mode.current() == :local do %>
-          <a href={~p"/dashboard"} class="text-muted-foreground transition hover:text-foreground">
-            Dashboard
-          </a>
-        <% end %>
         <%= if ControlKeel.Runtime.Mode.current() != :local do %>
           <%= if @current_user do %>
-            <.user_menu id="public-user-menu" current_user={@current_user} compact show_dashboard />
+            <.user_menu id="public-user-menu" current_user={@current_user} compact />
           <% else %>
             <a
               href={~p"/auth/login"}

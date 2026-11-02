@@ -38,7 +38,7 @@ defmodule ControlKeelWeb.Layouts do
       id="app-sidebar"
       class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
     >
-      <.link navigate={~p"/dashboard"} class="flex items-center gap-3 px-3 py-4">
+      <.link navigate={~p"/"} class="flex items-center gap-3 px-3 py-4">
         <span class="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
           <.icon name="hero-bolt-solid" class="size-5" />
         </span>
@@ -134,7 +134,6 @@ defmodule ControlKeelWeb.Layouts do
 
   defp nav_items do
     [
-      %{label: "Dashboard", href: ~p"/dashboard", icon: "hero-squares-2x2"},
       %{label: "Benchmarks", href: ~p"/benchmarks", icon: "hero-chart-bar-square"}
     ]
   end
@@ -205,7 +204,6 @@ defmodule ControlKeelWeb.Layouts do
   attr :id, :string, required: true
   attr :current_user, :any, required: true
   attr :compact, :boolean, default: false
-  attr :show_dashboard, :boolean, default: false
   attr :class, :string, default: ""
   attr :popover_class, :string, default: "right-0 top-full mt-2"
   attr :rest, :global
@@ -259,18 +257,6 @@ defmodule ControlKeelWeb.Layouts do
         </p>
         <p class="mt-0.5 text-xs text-muted-foreground">{@current_user.email}</p>
         <div class="my-2 border-t"></div>
-        <%= if @show_dashboard do %>
-          <a
-            href={~p"/dashboard"}
-            phx-click={
-              JS.hide(to: "##{@id}-popover")
-              |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
-            }
-            class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <.icon name="hero-squares-2x2" class="size-4" /> Dashboard
-          </a>
-        <% end %>
         <%!-- TODO: Settings button disabled — it was a no-op that only closed the
              popover. Re-enable and wire to a user settings modal/dialog when functional.
         <button
@@ -340,7 +326,7 @@ defmodule ControlKeelWeb.Layouts do
   Renders a breadcrumb trail derived from the current path.
 
   Automatically maps URL segments to human-readable labels.
-  The root always shows a home icon linking to `/dashboard`.
+  The root always shows a home icon linking to `/`.
   Intermediate segments are clickable links; the final segment is plain text.
 
   ## Examples
@@ -382,8 +368,8 @@ defmodule ControlKeelWeb.Layouts do
         <ol class="flex items-center gap-1.5 text-sm">
           <li>
             <.link
-              navigate={~p"/dashboard"}
-              aria-label="Dashboard home"
+              navigate={~p"/"}
+              aria-label="Home"
               class="flex items-center gap-1 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
             >
               <.icon name="hero-home" class="size-3.5" />
@@ -440,7 +426,6 @@ defmodule ControlKeelWeb.Layouts do
   end
 
   @label_map %{
-    "dashboard" => "Dashboard",
     "sessions" => "Sessions",
     "findings" => "Findings",
     "benchmarks" => "Benchmarks",

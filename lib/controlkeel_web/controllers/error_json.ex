@@ -23,7 +23,7 @@ defmodule ControlKeelWeb.ErrorJSON do
         code: "unauthorized",
         message: "Authentication required. Provide a valid API key.",
         resolution:
-          "Include an Authorization header: `Authorization: Bearer <your-api-key>`. Generate keys at /dashboard under Workspaces > Service Accounts."
+          "Include an Authorization header: `Authorization: Bearer <your-api-key>`. Generate keys under an organization workspace at /:org_slug/workspaces/:workspace_slug/service-accounts."
       }
     }
   end

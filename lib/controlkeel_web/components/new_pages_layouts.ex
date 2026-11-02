@@ -58,7 +58,6 @@ defmodule ControlKeelWeb.NewPagesLayouts do
             id="new-pages-user-menu"
             current_user={@current_user}
             compact
-            show_dashboard
           />
         </div>
       </div>

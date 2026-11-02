@@ -278,4 +278,47 @@ defmodule ControlKeel.AnalyticsTest do
 
     assert blocked_finding.status == "blocked"
   end
+
+  test "funnel_summary/1 with :org_id scopes counts to that org" do
+    import ControlKeel.AccountsFixtures, only: [org_fixture: 1]
+
+    org = org_fixture(%{name: "Scoped Org"})
+    other_org = org_fixture(%{name: "Other Org"})
+
+    ws = workspace_fixture(%{org_id: org.id, name: "Scoped Workspace"})
+    other_ws = workspace_fixture(%{org_id: other_org.id, name: "Other Workspace"})
+
+    session_fixture(%{workspace: ws, title: "Scoped A"})
+    session_fixture(%{workspace: ws, title: "Scoped B"})
+    # A session under the other org and an org-less (solo) workspace session
+    # must both stay out of the scoped counts.
+    session_fixture(%{workspace: other_ws, title: "Foreign"})
+    session_fixture(%{title: "Solo"})
+
+    summary = Analytics.funnel_summary(org_id: org.id)
+
+    assert summary.recent_session_count == 2
+    assert summary.outcome_metrics.proof_backed_task_coverage_percent == nil
+    assert summary.outcome_metrics.deploy_ready_task_rate_percent == nil
+  end
+
+  test "funnel_summary/1 with :org_id on an empty org returns no-data defaults" do
+    import ControlKeel.AccountsFixtures, only: [org_fixture: 1]
+
+    org = org_fixture(%{name: "Empty Org"})
+
+    summary = Analytics.funnel_summary(org_id: org.id)
+
+    assert summary.recent_session_count == 0
+
+    assert summary.outcome_metrics.proof_backed_task_coverage_percent == nil
+    assert summary.outcome_metrics.deploy_ready_task_rate_percent == nil
+    assert summary.average_findings_per_session == nil
+    assert summary.steps == [
+             %{step: "project_initialized", count: 0, conversion_percent: 100.0},
+             %{step: "agent_attached", count: 0, conversion_percent: nil},
+             %{step: "mission_created", count: 0, conversion_percent: nil},
+             %{step: "first_finding_recorded", count: 0, conversion_percent: nil}
+           ]
+  end
 end

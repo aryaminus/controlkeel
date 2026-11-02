@@ -113,10 +113,10 @@ defmodule ControlKeelWeb.InvitationLive do
                 <.icon name="hero-check" class="size-5" /> Accept invitation
               </button>
               <a
-                href={~p"/dashboard"}
+                href={~p"/"}
                 class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border bg-muted px-5 py-3 text-sm font-semibold text-foreground transition duration-200 hover:-translate-y-0.5 hover:bg-muted"
               >
-                <.icon name="hero-arrow-left" class="size-4" /> Back to dashboard
+                <.icon name="hero-arrow-left" class="size-4" /> Back to home
               </a>
             <% @current_user && !@email_matches -> %>
               <div class="mb-6 flex items-center gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
@@ -135,10 +135,10 @@ defmodule ControlKeelWeb.InvitationLive do
               </div>
               <div class="mt-4 flex gap-3">
                 <a
-                  href={~p"/dashboard"}
+                  href={~p"/"}
                   class="flex flex-1 items-center justify-center gap-2 rounded-2xl border bg-muted px-5 py-3 text-sm font-semibold text-foreground transition duration-200 hover:-translate-y-0.5 hover:bg-muted"
                 >
-                  <.icon name="hero-arrow-left" class="size-4" /> Dashboard
+                  <.icon name="hero-arrow-left" class="size-4" /> Home
                 </a>
                 <a
                   href={~p"/auth/logout"}
@@ -227,11 +227,11 @@ defmodule ControlKeelWeb.InvitationLive do
             This invitation has already been used. If you didn't accept it, contact the org owner.
           </p>
           <a
-            href={if @current_user, do: ~p"/dashboard", else: ~p"/"}
+            href={~p"/"}
             class="mt-6 inline-flex items-center gap-2 rounded-2xl border bg-muted px-5 py-3 text-sm font-semibold text-foreground transition duration-200 hover:-translate-y-0.5 hover:bg-muted"
           >
             <.icon name="hero-arrow-left" class="size-4" />
-            {if @current_user, do: "Back to dashboard", else: "Back to home"}
+            {if @current_user, do: "Back to your organization", else: "Back to home"}
           </a>
         </div>
       </section>
@@ -256,11 +256,11 @@ defmodule ControlKeelWeb.InvitationLive do
             This invitation link is no longer valid. Ask the org owner to issue a new invitation.
           </p>
           <a
-            href={if @current_user, do: ~p"/dashboard", else: ~p"/"}
+            href={~p"/"}
             class="mt-6 inline-flex items-center gap-2 rounded-2xl border bg-muted px-5 py-3 text-sm font-semibold text-foreground transition duration-200 hover:-translate-y-0.5 hover:bg-muted"
           >
             <.icon name="hero-arrow-left" class="size-4" />
-            {if @current_user, do: "Back to dashboard", else: "Back to home"}
+            {if @current_user, do: "Back to your organization", else: "Back to home"}
           </a>
         </div>
       </section>
@@ -285,11 +285,11 @@ defmodule ControlKeelWeb.InvitationLive do
             Could not accept the invitation. Please try again or contact the org owner.
           </p>
           <a
-            href={if @current_user, do: ~p"/dashboard", else: ~p"/"}
+            href={~p"/"}
             class="mt-6 inline-flex items-center gap-2 rounded-2xl border bg-muted px-5 py-3 text-sm font-semibold text-foreground transition duration-200 hover:-translate-y-0.5 hover:bg-muted"
           >
             <.icon name="hero-arrow-left" class="size-4" />
-            {if @current_user, do: "Back to dashboard", else: "Back to home"}
+            {if @current_user, do: "Back to your organization", else: "Back to home"}
           </a>
         </div>
       </section>
