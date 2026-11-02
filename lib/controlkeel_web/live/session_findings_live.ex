@@ -74,18 +74,29 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     ])
     |> assign(:page_title, "#{session.title} — Findings")
     |> assign(:session, session)
-    |> assign(:can_mutate, can_mutate?(workspace, socket.assigns))
+    |> assign(:current_membership, page_membership(workspace, socket.assigns))
     |> assign_view()
   end
+
+  # Page-local membership for eviction. Read access already went through
+  # `session_accessible?`; this keeps the org the page resolved so LiveAuth
+  # can evict it when that membership is revoked.
+  defp page_membership(%Workspace{} = workspace, assigns) do
+    case WorkspaceAccess.check_membership(workspace, assigns[:current_user]) do
+      {:ok, membership} -> membership
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp page_membership(_workspace, _assigns), do: nil
 
   # Mutation gate (viewer reads stay open): action buttons render and the
   # approve/escalate/reject events run only for admin/owner. Local mode
   # always passes.
-  defp can_mutate?(%Workspace{} = workspace, assigns) do
-    WorkspaceAccess.check(workspace, assigns[:current_user], "admin") == :ok
-  end
+  defp can_mutate?(%ControlKeel.Accounts.Membership{role: role}),
+    do: ControlKeel.Accounts.role_at_least?(role, "admin")
 
-  defp can_mutate?(_workspace, _assigns), do: false
+  defp can_mutate?(_membership), do: ControlKeel.Runtime.Mode.current() == :local
 
   defp require_admin(socket) do
     with %Workspace{} = workspace <- socket.assigns.session.workspace,
@@ -321,7 +332,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
               finding={finding}
               open?={MapSet.member?(@open_ids, finding.id)}
               fix={Map.get(@fixes, finding.id)}
-              can_mutate={@can_mutate}
+              can_mutate={can_mutate?(@current_membership)}
             />
           </ul>
 

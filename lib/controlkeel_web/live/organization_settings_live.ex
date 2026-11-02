@@ -47,7 +47,6 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   defp mount_ok(socket, org, membership) do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
-    is_owner = local_mode || (membership && membership.role == "owner")
 
     {:ok,
      socket
@@ -55,7 +54,6 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:org, org)
      |> assign(:nav_org, org)
      |> assign(:local_mode, local_mode)
-     |> assign(:is_owner, !!is_owner)
      |> assign(:current_membership, membership)
      |> assign(:settings_form, settings_form(org, budget_cents))
      |> assign(:settings_error, nil)}
@@ -63,8 +61,17 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def handle_event("save_settings", %{"settings" => params}, socket) do
+    if can_manage?(socket.assigns) do
+      do_save_settings(socket, params)
+    else
+      {:noreply,
+       put_flash(socket, :error, "You don't have permission to change organization settings.")}
+    end
+  end
+
+  defp do_save_settings(socket, params) do
     org = socket.assigns.org
-    is_owner = socket.assigns.is_owner
+    is_owner = is_owner?(socket.assigns)
 
     org_attrs =
       %{name: params["name"]}
@@ -94,6 +101,17 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
         {:noreply, assign(socket, :settings_error, inspect(reason))}
     end
   end
+
+  defp is_owner?(%{local_mode: true}), do: true
+  defp is_owner?(%{current_membership: %{role: "owner"}}), do: true
+  defp is_owner?(_assigns), do: false
+
+  defp can_manage?(%{local_mode: true}), do: true
+
+  defp can_manage?(%{current_membership: %{role: role}}),
+    do: Accounts.role_at_least?(role, "admin")
+
+  defp can_manage?(_assigns), do: false
 
   defp settings_form(org, budget_cents) do
     to_form(
@@ -167,10 +185,10 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
               type="select"
               label="Status"
               options={[{"active", "active"}, {"disabled", "disabled"}]}
-              disabled={!@is_owner}
+              disabled={!is_owner?(assigns)}
               class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <%= unless @is_owner do %>
+            <%= unless is_owner?(assigns) do %>
               <p class="mt-1 text-xs text-muted-foreground">Only owners can change status.</p>
             <% end %>
           </div>
@@ -180,10 +198,10 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
               field={@settings_form[:budget_cents]}
               type="number"
               label="Monthly budget (cents)"
-              disabled={!@is_owner}
+              disabled={!is_owner?(assigns)}
               class="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
-            <%= unless @is_owner do %>
+            <%= unless is_owner?(assigns) do %>
               <p class="mt-1 text-xs text-muted-foreground">Only owners can change budget.</p>
             <% end %>
           </div>

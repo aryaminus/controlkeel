@@ -31,11 +31,10 @@ defmodule ControlKeelWeb.WorkspaceWebhooksLiveTest do
     {org, ws, owner}
   end
 
-  defp conn_for(user, org) do
+  defp conn_for(user, _org) do
     build_conn()
     |> Plug.Test.init_test_session(%{
-      "current_user_id" => user.id,
-      "current_org_id" => org.id
+      "current_user_id" => user.id
     })
   end
 
