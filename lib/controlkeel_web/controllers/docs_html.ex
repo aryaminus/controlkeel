@@ -7,6 +7,11 @@ defmodule ControlKeelWeb.DocsHTML do
   defp format_targets(nil), do: "none"
   defp format_targets(values), do: Enum.join(values, ", ")
 
+  defp human_skill_scope(%{scope: "builtin"}), do: "Built-in"
+  defp human_skill_scope(%{scope: "user"}), do: "User"
+  defp human_skill_scope(%{scope: "project"}), do: "Project"
+  defp human_skill_scope(_skill), do: "Built-in"
+
   defp format_install_channels([]), do: "none"
   defp format_install_channels(nil), do: "none"
 

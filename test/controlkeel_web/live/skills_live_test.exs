@@ -3,6 +3,12 @@ defmodule ControlKeelWeb.SkillsLiveTest do
 
   import Phoenix.LiveViewTest
 
+  # The /skills route is removed from the router; SkillsLive is kept so the
+  # page can return under a different scope (org or workspace) later. Skipped
+  # (not deleted) so these flows are preserved until that surface ships —
+  # re-enable by removing this tag and the route point.
+  @moduletag skip: "global /skills route removed — pending org/workspace-scoped Skills page"
+
   test "skills studio renders the catalog and can export and install bundles", %{conn: conn} do
     tmp_dir =
       Path.join(

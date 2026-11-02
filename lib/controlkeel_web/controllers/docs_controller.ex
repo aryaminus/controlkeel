@@ -25,6 +25,10 @@ defmodule ControlKeelWeb.DocsController do
     render(conn, :observability)
   end
 
+  def skills(conn, _params) do
+    render(conn, :skills, skill_catalog: Skills.catalog())
+  end
+
   # Legacy guide URL (removed when the guide moved under /docs).
   def legacy_redirect(conn, _params) do
     redirect(conn, to: ~p"/docs/getting-started")

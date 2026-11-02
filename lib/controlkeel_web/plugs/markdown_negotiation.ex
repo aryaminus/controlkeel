@@ -13,6 +13,7 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     "/docs/agents" => :docs_agents,
     "/docs/governance" => :docs_governance,
     "/docs/observability" => :docs_observability,
+    "/docs/skills" => :docs_skills,
     "/about" => :about,
     "/contact" => :contact,
     "/developers" => :developers
@@ -298,6 +299,58 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     """
   end
 
+  defp page_to_markdown(:docs_skills) do
+    """
+    # Skills
+
+    Portable workflow guidance that keeps every attached agent operating inside ControlKeel's governed loop.
+
+    ## What skills are
+
+    A ControlKeel skill is a plain `SKILL.md` bundle in the [AgentSkills format](https://agentskills.io/specification): a name, a description, and a governed workflow body — how to align on a goal, validate before an edit, bundle proof, or ship.
+
+    The agent sees each skill's description with the task at hand and activates the one whose trigger conditions match. Once loaded, the skill's body steers the session: which CK calls to make, when to stop for a human, and what evidence to leave behind.
+
+    Skills live in three scopes:
+
+    - **Built-in** — shipped with ControlKeel, always available.
+    - **User** — installed under your home directory (`~/.agents/skills`, `~/.codex/skills`, `~/.claude/skills`, and other host paths); travel with you across projects.
+    - **Project** — inside a governed repository (`.agents/skills` and host peers). Only surfaced for trusted bindings, so one repo cannot inject instructions into another.
+
+    When the same skill appears in several scopes with identical content, one definition wins — preferencing built-ins — and duplicates can be pruned automatically.
+
+    ## Available skills
+
+    Generated from the same registry as the HTML page and the CLI.
+
+    #{Enum.map_join(ControlKeel.Skills.catalog(), "\n", &skill_markdown/1)}
+
+    ## CLI reference
+
+    Run these commands from a project with ControlKeel set up. Exports and installs write under `controlkeel/dist/<target>` and record a manifest.
+
+    | Command | Purpose |
+    |---|---|
+    | `controlkeel skills list` | List the registry with diagnostics; `--json` for machine output, `--target <target>` to filter. |
+    | `controlkeel skills validate` | Check every skill's frontmatter and structure; report warnings and errors with codes. |
+    | `controlkeel skills export --target <target>` | Write a host-format skill bundle; defaults to open-standard. |
+    | `controlkeel skills install --target <target>` | Install the bundle into the host's expected skills directory. |
+    | `controlkeel token audit --mode skills` | Measure the token cost of your skill surface; modes: full, rules, skills, tools. |
+    | `controlkeel skills doctor` | Diagnose catalog health, install manifests, attach clients, runtimes, and provider status. |
+
+    ## How agents use skills
+
+    Attaching a host writes skills to that host's native directory and registers them: a session-start hook surfaces the registry, and the host's skill mechanism makes each trigger available.
+
+    - **Trigger.** The agent decides from the description; no one re-reads the whole catalog per task.
+    - **Load.** The loaded body changes session behavior — align before building, validate before editing, bundle proof before shipping.
+    - **Query over MCP.** `ck_skill_list`, `ck_skill_load`, `ck_skill_validate`, and `ck_token_audit` expose the same registry as typed tools.
+    - **Manage over API.** REST endpoints at `/api/v1/skills` list, fetch, export, install, and prune duplicates. See https://controlkeel.com/developers
+
+    Trust is scoped: project-level skills only load for a bound, trusted project — `CONTROLKEEL_TRUST_PROJECT_SKILLS` flips opt-in scoping explicitly.
+    """
+  end
+
   defp page_to_markdown(:about) do
     """
     # About ControlKeel
@@ -422,6 +475,14 @@ defmodule ControlKeelWeb.Plugs.MarkdownNegotiation do
     ```
     #{channel.command}
     ```
+    """
+  end
+
+  defp skill_markdown(skill) do
+    """
+    ### `#{skill.name}` (#{skill.scope})
+
+    #{skill.description}
     """
   end
 

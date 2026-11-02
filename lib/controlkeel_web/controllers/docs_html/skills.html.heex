@@ -1,0 +1,284 @@
+<.page_title
+  title="Skills"
+  subtitle="Portable workflow guidance that keeps every attached agent operating inside ControlKeel's governed loop."
+/>
+
+<div class="mt-10 space-y-10">
+  <section class="space-y-4">
+    <.section_title>What skills are</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      A ControlKeel skill is a portable instruction bundle in the <a
+        href="https://agentskills.io/specification"
+        target="_blank"
+        rel="noopener"
+        class="text-primary underline-offset-2 hover:underline"
+      >
+        AgentSkills format
+      </a>:
+      a plain <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">SKILL.md</code>
+      with a name, a description, and a governed workflow body — how to align on a goal, validate
+      before an edit, bundle proof, or ship. Skills are how ControlKeel teaches an agent
+      <em>how</em>
+      to work under governance, while MCP tools and hooks give it the machinery to
+      do so.
+    </p>
+    <p class="text-sm leading-7 text-muted-foreground">
+      The agent never loads the full catalog. It sees each skill's description with the task at
+      hand, and activates the one whose trigger conditions match. Once loaded, the skill's body
+      steers the session — which CK calls to make, when to stop for a human, and what evidence to
+      leave behind. Activation is deliberate: skills carry workflow discipline, not chat trivia.
+    </p>
+
+    <div class="bg-card border rounded-2xl shadow-card">
+      <div class="grid gap-6 p-6 md:grid-cols-3">
+        <div class="space-y-1.5">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Built-in
+          </p>
+          <p class="text-sm leading-6 text-muted-foreground">
+            Shipped with ControlKeel and always available, even on a fresh machine with no
+            agent-specific installs.
+          </p>
+        </div>
+        <div class="space-y-1.5">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            User
+          </p>
+          <p class="text-sm leading-6 text-muted-foreground">
+            Installed under your home directory (<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.agents/skills</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.codex/skills</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">~/.claude/skills</code>,
+            and other host paths) so they travel with you across projects.
+          </p>
+        </div>
+        <div class="space-y-1.5">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Project
+          </p>
+          <p class="text-sm leading-6 text-muted-foreground">
+            Inside a governed repository (<code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">.agents/skills</code> and host peers). Project skills are only surfaced for trusted bindings, so one repo
+            cannot inject instructions into another.
+          </p>
+        </div>
+      </div>
+    </div>
+    <p class="text-sm leading-7 text-muted-foreground">
+      When the same skill appears in several scopes with identical content, one definition wins —
+      preferencing built-ins — and duplicate copies can be pruned automatically. This keeps a
+      project install, a user install, and the built-in upgrade from fighting each other.
+    </p>
+  </section>
+
+  <section class="space-y-4">
+    <.section_title>Available skills</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      {length(@skill_catalog)} skills are visible to CK in this session. The built-in catalog
+      ships with every install; user and project skills appear here when they are present. Each
+      row's description is the trigger the agent weighs against its current task.
+    </p>
+    <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+      <table class="min-w-full divide-y divide-border text-left text-sm">
+        <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          <tr>
+            <th class="w-52 px-5 py-3 font-semibold">Skill</th>
+            <th class="px-5 py-3 font-semibold">Use when</th>
+            <th class="w-32 px-5 py-3 font-semibold">Scope</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <%= for skill <- @skill_catalog do %>
+            <tr class="transition hover:bg-muted/30">
+              <td class="px-5 py-4 font-medium text-foreground font-mono text-xs">
+                {skill.name}
+              </td>
+              <td class="px-5 py-4 leading-6 text-muted-foreground">
+                {skill.description}
+              </td>
+              <td class="w-32 px-5 py-4 whitespace-nowrap">
+                <span class="inline-block rounded-full bg-muted px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {human_skill_scope(skill)}
+                </span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <.section_title>What you can do from the CLI</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Every skill operation works from a terminal with
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--project-root</code>
+      selecting the governed project. Exports and installs write under
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        controlkeel/dist/&lt;target&gt;
+      </code>
+      and record a manifest so
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">skills doctor</code>
+      can audit what was placed, where, and when.
+    </p>
+    <div class="bg-card border rounded-2xl shadow-card overflow-clip">
+      <table class="min-w-full divide-y divide-border text-left text-sm">
+        <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground">
+          <tr>
+            <th class="px-5 py-3 font-semibold">Command</th>
+            <th class="px-5 py-3 font-semibold">Purpose</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills list
+              </code>
+            </td>
+            <td class="px-5 py-4 text-muted-foreground">
+              List the registry with diagnostics.
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">--json</code>
+              for machine output;
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                --target &lt;target&gt;
+              </code>
+              filters by install target.
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills validate
+              </code>
+            </td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Check every skill's frontmatter and structure; report warnings and errors with codes.
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills export --target &lt;target&gt;
+              </code>
+            </td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Write a host-format skill bundle (targets include open-standard, claude-plugin,
+              codex, github-repo, and host-native shapes). Defaults to open-standard.
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills install --target &lt;target&gt;
+              </code>
+            </td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Install the bundle straight into the host's expected skills directory and report the
+              destination.
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel token audit --mode skills
+              </code>
+            </td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Measure the token cost of your skill surface. Modes: full, rules, skills, and tools.
+            </td>
+          </tr>
+          <tr class="transition hover:bg-muted/30">
+            <td class="px-5 py-4">
+              <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+                controlkeel skills doctor
+              </code>
+            </td>
+            <td class="px-5 py-4 text-muted-foreground">
+              Diagnose the whole skills surface: catalog health, install manifests, attach
+              clients, runtimes, and provider status.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <.section_title>How agents use skills</.section_title>
+    <p class="text-sm leading-7 text-muted-foreground">
+      The moment a host is attached, CK writes skills to that host's native directory and
+      registers them: a session-start hook surfaces the registry, and the host's skill mechanism
+      makes each trigger available. Host commands come from
+      <.link navigate="/docs/agents" class="text-primary underline-offset-2 hover:underline">
+        the agents page
+      </.link>
+      —
+      for example
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        controlkeel attach opencode
+      </code>
+      prepares OpenCode skills plus MCP config, and the AgentSkills-standard
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance
+      </code>
+      flow reaches any skills.sh-compatible host.
+    </p>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>
+        <strong>Trigger.</strong> The agent decides from the description; no one re-reads the
+        whole catalog per task.
+      </li>
+      <li>
+        <strong>Load.</strong> The loaded body changes session behavior — align before building,
+        validate before editing, bundle proof before shipping.
+      </li>
+      <li>
+        <strong>Query over MCP.</strong>
+        The same registry is exposed as typed tools: <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_list</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_load</code>, <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_skill_validate</code>,
+        and <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">ck_token_audit</code>.
+      </li>
+      <li>
+        <strong>Manage over API.</strong>
+        REST endpoints at
+        <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">/api/v1/skills</code>
+        list, fetch, export, install, and prune duplicates; see the developer portal.
+      </li>
+    </ul>
+    <p class="text-sm leading-7 text-muted-foreground">
+      Trust is scoped: project-level skills only load for a bound, trusted project — untrusted
+      project directories are ignored, and
+      <code class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground">
+        CONTROLKEEL_TRUST_PROJECT_SKILLS
+      </code>
+      flips opt-in scoping explicitly. A repo you just cloned cannot push instructions into your
+      agent sessions until you trust it.
+    </p>
+  </section>
+
+  <section class="space-y-4">
+    <.section_title>Keep reading</.section_title>
+    <ul class="space-y-2 text-sm leading-6 text-muted-foreground list-disc ml-5">
+      <li>
+        Getting started connects the first host: <.link
+          navigate="/docs/getting-started"
+          class="text-primary underline-offset-2 hover:underline"
+        >
+          install to first finding
+        </.link>.
+      </li>
+      <li>
+        The governance loop these skills operate inside: <.link
+          navigate="/docs/governance"
+          class="text-primary underline-offset-2 hover:underline"
+        >
+          how it governs
+        </.link>.
+      </li>
+      <li>
+        Host-by-host attach commands and what each agent gets: <.link
+          navigate="/docs/agents"
+          class="text-primary underline-offset-2 hover:underline"
+        >
+          how agents use CK
+        </.link>.
+      </li>
+    </ul>
+  </section>
+</div>

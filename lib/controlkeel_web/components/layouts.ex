@@ -135,7 +135,6 @@ defmodule ControlKeelWeb.Layouts do
   defp nav_items do
     [
       %{label: "Dashboard", href: ~p"/dashboard", icon: "hero-squares-2x2"},
-      %{label: "Skills", href: ~p"/skills", icon: "hero-puzzle-piece"},
       %{label: "Policy Studio", href: ~p"/policies", icon: "hero-adjustments-horizontal"},
       %{label: "Benchmarks", href: ~p"/benchmarks", icon: "hero-chart-bar-square"}
     ]
