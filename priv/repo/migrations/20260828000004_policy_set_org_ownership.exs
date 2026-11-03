@@ -19,6 +19,7 @@ defmodule ControlKeel.Repo.Migrations.PolicySetOrgOwnership do
     create index(:policy_sets, [:org_id])
 
     drop index(:policy_sets, [:scope])
+
     alter table(:policy_sets) do
       remove :scope
     end
@@ -32,6 +33,7 @@ defmodule ControlKeel.Repo.Migrations.PolicySetOrgOwnership do
     create index(:policy_sets, [:scope])
 
     drop index(:policy_sets, [:org_id])
+
     alter table(:policy_sets) do
       remove :org_id
     end

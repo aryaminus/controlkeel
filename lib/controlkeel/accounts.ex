@@ -678,10 +678,10 @@ defmodule ControlKeel.Accounts do
   First active membership's org id for a user, or `nil`.
 
   Used by the remaining global surfaces that have no org in the URL
-  (`/cloud/projects`, `/cloud/telemetry`, and the legacy `/observability`
-  redirects). Org-scoped pages resolve the org from their `:org_slug`
-  instead. Access decisions must not rely on this; the shared gates resolve
-  authority from `(user, resource)`.
+  (the legacy `/observability` redirects and the `/` handoff fallback).
+  Org-scoped pages resolve the org from their `:org_slug` instead. Access
+  decisions must not rely on this; the shared gates resolve authority from
+  `(user, resource)`.
   """
   @spec default_org_for_user(integer()) :: integer() | nil
   def default_org_for_user(user_id) when is_integer(user_id) do
