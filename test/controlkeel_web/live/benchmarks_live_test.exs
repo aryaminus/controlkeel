@@ -2,12 +2,16 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import ControlKeel.BenchmarkFixtures
+  import ControlKeel.MissionFixtures
   import Phoenix.LiveViewTest
+
+  defp benchmarks_path(org, ws), do: "/#{org.slug}/workspaces/#{ws.slug}/benchmarks"
 
   test "index renders suites, recent runs, and launches a benchmark run", %{conn: conn} do
     existing_run = benchmark_run_fixture()
+    {org, ws, _session} = org_bound_session_fixture()
 
-    {:ok, view, html} = live(conn, ~p"/benchmarks")
+    {:ok, view, html} = live(conn, benchmarks_path(org, ws))
 
     assert has_element?(view, "h1", "Benchmark engine")
     assert has_element?(view, "#benchmark-runner button[type='submit']")
@@ -35,7 +39,9 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "index preset buttons fill subject fields", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
 
     view |> element("#benchmark-preset-proxy") |> render_click()
 
@@ -85,7 +91,9 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
 
     on_exit(fn -> File.cd!(original_cwd) end)
 
-    {:ok, _view, html} = live(conn, ~p"/benchmarks")
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, _view, html} = live(conn, benchmarks_path(org, ws))
 
     assert html =~ "OpenCode Manual Import (external)"
   end
@@ -221,7 +229,9 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "importing without an open run flashes an error instead of crashing", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
 
     html =
       render_submit(view, "import_result", %{
@@ -237,7 +247,9 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "index preset buttons fill multi-host subject fields", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
 
     view |> element("#benchmark-preset-copilot-vs-opencode") |> render_click()
     html = render(view)
@@ -253,7 +265,9 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "multi-select subject dropdown toggles subjects on and off", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
 
     refute has_element?(view, "#benchmark-subjects-input [role='listbox']")
 
@@ -287,7 +301,9 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "manually toggling a subject clears the active preset", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
 
     assert has_element?(view, "#benchmark-preset-opencode[aria-pressed='true']")
 
@@ -308,16 +324,118 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "index renders an empty state when there are no runs", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/benchmarks")
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, _view, html} = live(conn, benchmarks_path(org, ws))
 
     assert html =~ "No benchmark runs yet"
   end
 
-  test "show redirects to index when the run is not found", %{conn: conn} do
-    assert {:error, {:live_redirect, %{to: "/benchmarks", flash: flash}}} =
+  test "show redirects home when the run is not found", %{conn: conn} do
+    assert {:error, {:live_redirect, %{to: "/", flash: flash}}} =
              live(conn, ~p"/benchmarks/runs/999999")
 
     assert flash["error"] == "Benchmark run not found."
+  end
+
+  test "unknown workspace renders the scope error panel", %{conn: conn} do
+    {:ok, view, _html} = live(conn, "/no-such-org/workspaces/nope/benchmarks")
+
+    assert has_element?(view, "[data-scope-error]")
+    refute has_element?(view, "#benchmark-runner")
+  end
+
+  test "workspace sidebar lists Benchmarks as the active nav item", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
+    {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
+
+    assert has_element?(
+             view,
+             "#sidebar-org-nav a[href='#{benchmarks_path(org, ws)}'][aria-current='page']"
+           )
+  end
+
+  # Running a suite spends money, so the runner is admin/owner only on the
+  # workspace page (mirrors the observability benchmark page's gate).
+  describe "cloud-mode mutation gating" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      :ok
+    end
+
+    defp cloud_member_conn(org, role) do
+      {:ok, user} =
+        ControlKeel.Accounts.create_user(%{
+          email: "bench-#{role}-#{System.unique_integer([:positive])}@example.com"
+        })
+
+      %ControlKeel.Accounts.Membership{}
+      |> ControlKeel.Accounts.Membership.changeset(%{
+        user_id: user.id,
+        org_id: org.id,
+        role: role,
+        status: "active"
+      })
+      |> ControlKeel.Repo.insert!()
+
+      build_conn() |> Plug.Test.init_test_session(%{current_user_id: user.id})
+    end
+
+    test "viewer cannot see the runner form and crafted run events are refused" do
+      {org, ws, _session} = org_bound_session_fixture()
+      conn = cloud_member_conn(org, "viewer")
+
+      {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
+
+      # Read-only page: no runner, no presets.
+      refute has_element?(view, "#benchmark-runner")
+      refute has_element?(view, "#benchmark-preset-opencode")
+
+      html =
+        render_click(view, "run", %{
+          "benchmark" => %{
+            "suite" => "vibe_failures_v1",
+            "subjects" => ["controlkeel_validate"],
+            "baseline_subject" => "controlkeel_validate"
+          }
+        })
+
+      assert html =~ "Admin or owner role required."
+      assert ControlKeel.Repo.aggregate(ControlKeel.Benchmark.Run, :count, :id) == 0
+    end
+
+    test "owner sees the runner form and executing a run lands on the global run page" do
+      {org, ws, _session} = org_bound_session_fixture()
+      conn = cloud_member_conn(org, "owner")
+
+      {:ok, view, _html} = live(conn, benchmarks_path(org, ws))
+
+      assert has_element?(view, "#benchmark-runner")
+
+      render_submit(
+        form(view, "#benchmark-runner",
+          benchmark: %{
+            "suite" => "vibe_failures_v1",
+            "subjects" => ["controlkeel_validate"],
+            "baseline_subject" => "controlkeel_validate"
+          }
+        )
+      )
+
+      {path, _flash} = assert_redirect(view)
+      assert path =~ "/benchmarks/runs/"
+    end
   end
 
   defp awaiting_import_run_fixture do
