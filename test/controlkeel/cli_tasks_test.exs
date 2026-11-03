@@ -486,7 +486,9 @@ defmodule ControlKeel.CLITasksTest do
             "--baseline-subject",
             "controlkeel_validate",
             "--scenario-slugs",
-            "hardcoded_api_key_python_webhook"
+            "hardcoded_api_key_python_webhook",
+            "--workspace-id",
+            Integer.to_string(ControlKeel.BenchmarkFixtures.benchmark_workspace_id())
           ])
         end)
       end)
@@ -506,7 +508,7 @@ defmodule ControlKeel.CLITasksTest do
 
     assert output =~ "ControlKeel Benchmark"
     assert output =~ "BENCHMARK RESULTS"
-    assert output =~ "/benchmarks/runs/"
+    assert output =~ "/default-organization/workspaces/default-workspace/benchmarks/runs/"
     assert Repo.aggregate(Session, :count, :id) == session_count
   end
 

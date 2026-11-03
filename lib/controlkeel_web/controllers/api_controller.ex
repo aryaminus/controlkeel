@@ -7,6 +7,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Agent.Execution
   alias ControlKeel.Agent.Router
   alias ControlKeel.Agent.AutonomyLoop
+  alias ControlKeel.Accounts
   alias ControlKeel.Benchmark
   alias ControlKeel.Budget
   alias ControlKeel.Ops.Distribution
@@ -15,6 +16,7 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Project.Local
   alias ControlKeel.Memory
   alias ControlKeel.Mission.Decomposition
+  alias ControlKeel.Mission.Workspace
   alias ControlKeel.MCP.Arguments
   alias ControlKeel.MCP.Tools.CkContext
   alias ControlKeel.MCP.Tools.CkTokenAudit
@@ -246,7 +248,9 @@ defmodule ControlKeelWeb.ApiController do
       end
 
     sessions = Mission.list_recent_sessions(limit, current_workspace_id(conn))
-    benchmark_summary = Benchmark.benchmark_summary()
+
+    benchmark_summary =
+      Benchmark.benchmark_summary(workspace_id: current_workspace_id(conn))
 
     json(conn, %{
       summary: AutonomyLoop.workspace_improvement_summary(sessions),
@@ -485,31 +489,61 @@ defmodule ControlKeelWeb.ApiController do
 
   # ─── Benchmarks ───────────────────────────────────────────────────────────────
 
+  # Workspace-scoped API surfaces follow the same auth model as every other
+  # workspace resource here: bootstrap tokens pass, service accounts are
+  # bounded to their own workspace + scope, and local (unauthenticated)
+  # callers are unaffected. Reads require `workspace:read`; run creation and
+  # imports are mutations and require `workspace:write`.
+
   def list_benchmarks(conn, params) do
-    domain_pack = Map.get(params, "domain_pack")
-    opts = benchmark_filter_opts(domain_pack)
-    suites = Benchmark.list_suites(opts)
-    runs = Benchmark.list_recent_runs(opts)
-    summary = Benchmark.benchmark_summary(opts)
+    with {:ok, workspace} <- resolve_benchmark_workspace(params),
+         :ok <- authorize_workspace_for_conn(conn, workspace.id, "workspace:read") do
+      domain_pack = Map.get(params, "domain_pack")
+      opts = benchmark_filter_opts(domain_pack, workspace_id: workspace.id)
+      suites = Benchmark.list_suites(opts)
+      runs = Benchmark.list_recent_runs(opts)
+      summary = Benchmark.benchmark_summary(opts)
 
-    summary =
-      Map.update(summary, :latest_run, nil, fn
-        nil -> nil
-        run -> benchmark_run_summary(run)
-      end)
+      summary =
+        Map.update(summary, :latest_run, nil, fn
+          nil -> nil
+          run -> benchmark_run_summary(run)
+        end)
 
-    json(conn, %{
-      selected_domain_pack: domain_pack,
-      summary: summary,
-      suites: Enum.map(suites, &benchmark_suite_summary/1),
-      runs: Enum.map(runs, &benchmark_run_summary/1)
-    })
+      json(conn, %{
+        selected_domain_pack: domain_pack,
+        summary: summary,
+        suites: Enum.map(suites, &benchmark_suite_summary/1),
+        runs: Enum.map(runs, &benchmark_run_summary/1)
+      })
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, :workspace_not_found} ->
+        benchmark_workspace_not_found(conn)
+    end
   end
 
   def create_benchmark_run(conn, params) do
-    attrs =
-      Map.take(params, ~w(suite subjects baseline_subject scenario_slugs domain_pack))
+    with {:ok, workspace} <- resolve_benchmark_workspace(params),
+         :ok <- authorize_workspace_for_conn(conn, workspace.id, "workspace:write") do
+      attrs =
+        params
+        |> Map.take(~w(suite subjects baseline_subject scenario_slugs domain_pack))
+        |> Map.put("workspace_id", workspace.id)
 
+      create_benchmark_run_with_workspace(conn, attrs)
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, :workspace_not_found} ->
+        benchmark_workspace_not_found(conn)
+    end
+  end
+
+  defp create_benchmark_run_with_workspace(conn, attrs) do
     case Benchmark.run_suite(attrs) do
       {:ok, run} ->
         conn
@@ -518,6 +552,16 @@ defmodule ControlKeelWeb.ApiController do
 
       {:error, :suite_not_found} ->
         conn |> put_status(:not_found) |> json(%{error: "benchmark suite not found"})
+
+      {:error, :workspace_required} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "workspace_id is required to create a benchmark run"})
+
+      {:error, :workspace_not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "benchmark workspace not found"})
 
       {:error, :no_scenarios} ->
         conn
@@ -529,33 +573,53 @@ defmodule ControlKeelWeb.ApiController do
     end
   end
 
-  def get_benchmark_run(conn, %{"id" => id}) do
-    case Benchmark.get_run(id) do
-      nil ->
-        conn |> put_status(:not_found) |> json(%{error: "benchmark run not found"})
+  def get_benchmark_run(conn, %{"id" => id} = params) do
+    with {:ok, workspace} <- resolve_benchmark_workspace(params),
+         :ok <- authorize_workspace_for_conn(conn, workspace.id, "workspace:read"),
+         %{} = run <- Benchmark.get_run(workspace.id, id) do
+      json(conn, %{run: benchmark_run_detail(run)})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
 
-      run ->
-        json(conn, %{run: benchmark_run_detail(run)})
+      {:error, :workspace_not_found} ->
+        benchmark_workspace_not_found(conn)
+
+      _ ->
+        benchmark_run_not_found(conn)
     end
   end
 
-  def compare_benchmark_run(conn, %{"id" => id}) do
-    case Benchmark.compare_run(id) do
-      {:ok, comparison} ->
-        json(conn, %{comparison: comparison})
+  def compare_benchmark_run(conn, %{"id" => id} = params) do
+    with {:ok, workspace} <- resolve_benchmark_workspace(params),
+         :ok <- authorize_workspace_for_conn(conn, workspace.id, "workspace:read"),
+         %{} = run <- Benchmark.get_run(workspace.id, id) do
+      json(conn, %{comparison: Benchmark.compare_run(run)})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
 
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "benchmark run not found"})
+      {:error, :workspace_not_found} ->
+        benchmark_workspace_not_found(conn)
+
+      _ ->
+        benchmark_run_not_found(conn)
     end
   end
 
   def import_benchmark_result(conn, %{"id" => id, "subject" => subject} = params) do
     attrs = Map.take(params, ~w(scenario_slug content path kind duration_ms metadata))
 
-    with {:ok, run_id} <- parse_integer_param(id),
-         {:ok, run} <- Benchmark.import_result(run_id, subject, attrs) do
+    with {:ok, workspace} <- resolve_benchmark_workspace(params),
+         :ok <- authorize_workspace_for_conn(conn, workspace.id, "workspace:write"),
+         %{} <- Benchmark.get_run(workspace.id, id),
+         {:ok, run_id} <- parse_integer_param(id),
+         {:ok, run} <- Benchmark.import_result(workspace.id, run_id, subject, attrs) do
       json(conn, %{run: benchmark_run_detail(run)})
     else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
       {:error, :invalid_integer} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: "invalid benchmark run id"})
 
@@ -588,12 +652,7 @@ defmodule ControlKeelWeb.ApiController do
   def export_benchmark_run(conn, %{"id" => id} = params) do
     format = Map.get(params, "format", "json")
 
-    # `--format openeval` (aryaminus/controlkeel#121) is CLI-only for now:
-    # this endpoint group has no workspace scoping yet (#142), and wiring the
-    # flag here is deliberately deferred until that lands rather than
-    # shipping tests now that would need redoing once it's scoped. Reject
-    # explicitly instead of silently emitting the bundle over an unscoped
-    # HTTP endpoint.
+    # `--format openeval` (aryaminus/controlkeel#121) is CLI-only for now.
     if format in ["openeval", :openeval] do
       conn
       |> put_status(:not_implemented)
@@ -603,13 +662,49 @@ defmodule ControlKeelWeb.ApiController do
             "use `controlkeel benchmark export <run-id> --format openeval` instead"
       })
     else
-      do_export_benchmark_run(conn, id, format)
+      with {:ok, workspace} <- resolve_benchmark_workspace(params),
+           :ok <- authorize_workspace_for_conn(conn, workspace.id, "workspace:read"),
+           %{} <- Benchmark.get_run(workspace.id, id) do
+        do_export_benchmark_run(conn, workspace.id, id, format)
+      else
+        {:error, :forbidden} ->
+          conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+        {:error, :workspace_not_found} ->
+          benchmark_workspace_not_found(conn)
+
+        _ ->
+          benchmark_run_not_found(conn)
+      end
     end
   end
 
-  defp do_export_benchmark_run(conn, id, format) do
+  defp resolve_benchmark_workspace(params) do
+    with %{} = org <- Accounts.get_org_by_slug(params["org_slug"]),
+         %Workspace{} = workspace <-
+           Repo.get_by(Workspace,
+             slug: String.downcase(String.trim(params["ws_slug"])),
+             org_id: org.id
+           ) do
+      {:ok, workspace}
+    else
+      _ -> {:error, :workspace_not_found}
+    end
+  end
+
+  defp benchmark_workspace_not_found(conn) do
+    conn
+    |> put_status(:not_found)
+    |> json(%{error: "benchmark workspace not found"})
+  end
+
+  defp benchmark_run_not_found(conn) do
+    conn |> put_status(:not_found) |> json(%{error: "benchmark run not found"})
+  end
+
+  defp do_export_benchmark_run(conn, workspace_id, id, format) do
     with {:ok, run_id} <- parse_integer_param(id),
-         {:ok, output} <- Benchmark.export_run(run_id, format) do
+         {:ok, output} <- Benchmark.export_run(workspace_id, run_id, format) do
       case format do
         "csv" ->
           conn
@@ -1967,6 +2062,7 @@ defmodule ControlKeelWeb.ApiController do
 
     %{
       id: run.id,
+      workspace_id: run.workspace_id,
       suite_slug: run.suite.slug,
       suite_name: run.suite.name,
       status: run.status,
@@ -2264,9 +2360,13 @@ defmodule ControlKeelWeb.ApiController do
     authorize_session_access(conn, session_id, "tasks:execute")
   end
 
-  defp benchmark_filter_opts(nil), do: []
-  defp benchmark_filter_opts(""), do: []
-  defp benchmark_filter_opts(domain_pack), do: [domain_pack: domain_pack]
+  defp benchmark_filter_opts(domain_pack, extra_opts)
+
+  defp benchmark_filter_opts(nil, extra_opts), do: extra_opts
+  defp benchmark_filter_opts("", extra_opts), do: extra_opts
+
+  defp benchmark_filter_opts(domain_pack, extra_opts),
+    do: Keyword.put(extra_opts, :domain_pack, domain_pack)
 
   defp current_service_account(conn) do
     case conn.assigns[:api_auth] do

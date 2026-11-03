@@ -1169,7 +1169,9 @@ defmodule ControlKeel.CLIRuntimeTest do
                "--baseline-subject",
                "controlkeel_validate",
                "--domain-pack",
-               "sales"
+               "sales",
+               "--workspace-id",
+               Integer.to_string(ControlKeel.BenchmarkFixtures.benchmark_workspace_id())
              ])
 
     run_output =
@@ -1207,6 +1209,7 @@ defmodule ControlKeel.CLIRuntimeTest do
     {:ok, manual_run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => ControlKeel.BenchmarkFixtures.benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "manual_subject",
           "baseline_subject" => "manual_subject",

@@ -1141,10 +1141,15 @@ defmodule ControlKeelWeb.ApiControllerTest do
   end
 
   describe "benchmark API" do
+    setup do
+      {:ok, {_org, workspace}} = ControlKeel.Bootstrap.LocalDefaults.ensure()
+      %{benchmark_workspace: workspace}
+    end
+
     test "lists suites and recent runs", %{conn: conn} do
       run = benchmark_run_fixture()
 
-      conn = get(conn, ~p"/api/v1/benchmarks")
+      conn = get(conn, ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks")
       body = json_response(conn, 200)
 
       assert body["summary"]["total_suites"] >= 1
@@ -1153,7 +1158,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
 
     test "filters suites by domain pack", %{conn: conn} do
-      conn = get(conn, ~p"/api/v1/benchmarks?domain_pack=hr")
+      conn =
+        get(
+          conn,
+          ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks?domain_pack=hr"
+        )
+
       body = json_response(conn, 200)
 
       assert body["selected_domain_pack"] == "hr"
@@ -1163,24 +1173,51 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
     test "creates and fetches a benchmark run", %{conn: conn} do
       conn =
-        post(conn, ~p"/api/v1/benchmarks/runs", %{
-          suite: "domain_expansion_v1",
-          subjects: "controlkeel_validate",
-          baseline_subject: "controlkeel_validate",
-          domain_pack: "sales"
-        })
+        post(
+          conn,
+          ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks/runs",
+          %{
+            suite: "domain_expansion_v1",
+            subjects: "controlkeel_validate",
+            baseline_subject: "controlkeel_validate",
+            domain_pack: "sales",
+            workspace_id: benchmark_workspace_id()
+          }
+        )
 
       assert %{"run" => run} = json_response(conn, 201)
       assert run["suite_slug"] == "domain_expansion_v1"
       assert run["subjects"] == ["controlkeel_validate"]
+      assert run["workspace_id"] == benchmark_workspace_id()
       assert length(run["scenarios"]) == 1
       assert run["domain_packs"] == ["sales"]
       assert hd(run["scenarios"])["scenario"]["metadata"]["domain_pack"] == "sales"
 
-      conn = build_conn() |> get(~p"/api/v1/benchmarks/runs/#{run["id"]}")
+      conn =
+        build_conn()
+        |> get(
+          ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks/runs/#{run["id"]}"
+        )
+
       assert %{"run" => fetched} = json_response(conn, 200)
       assert fetched["id"] == run["id"]
       assert length(fetched["scenarios"]) == 1
+    end
+
+    test "creating a run for an unknown workspace returns 404", %{conn: conn} do
+      conn =
+        post(
+          conn,
+          ~p"/api/v1/default-organization/workspaces/unknown-workspace/benchmarks/runs",
+          %{
+            suite: "vibe_failures_v1",
+            subjects: "controlkeel_validate",
+            baseline_subject: "controlkeel_validate",
+            workspace_id: 987_654_321
+          }
+        )
+
+      assert %{"error" => "benchmark workspace not found"} = json_response(conn, 404)
     end
 
     test "compares subjects for a multi-subject run", %{conn: conn} do
@@ -1190,7 +1227,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
           "baseline_subject" => "null_policy_baseline"
         })
 
-      conn = get(conn, ~p"/api/v1/benchmarks/runs/#{run.id}/compare")
+      conn =
+        get(
+          conn,
+          ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks/runs/#{run.id}/compare"
+        )
+
       assert %{"comparison" => comparison} = json_response(conn, 200)
 
       assert comparison["run"]["id"] == run.id
@@ -1212,7 +1254,11 @@ defmodule ControlKeelWeb.ApiControllerTest do
     end
 
     test "returns 404 comparing an unknown run" do
-      conn = build_conn() |> get(~p"/api/v1/benchmarks/runs/999999/compare")
+      conn =
+        build_conn()
+        |> get(
+          ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks/runs/999999/compare"
+        )
 
       assert %{"error" => "benchmark run not found"} = json_response(conn, 404)
     end
@@ -1238,20 +1284,25 @@ defmodule ControlKeelWeb.ApiControllerTest do
             "suite" => "vibe_failures_v1",
             "subjects" => "manual_subject",
             "baseline_subject" => "manual_subject",
-            "scenario_slugs" => "hardcoded_api_key_python_webhook"
+            "scenario_slugs" => "hardcoded_api_key_python_webhook",
+            "workspace_id" => benchmark_workspace_id()
           },
           tmp_dir
         )
 
       conn =
-        post(conn, ~p"/api/v1/benchmarks/runs/#{run.id}/import", %{
-          subject: "manual_subject",
-          scenario_slug: "hardcoded_api_key_python_webhook",
-          content: "OPENAI_KEY = \"AKIAIOSFODNN7EXAMPLE\"",
-          path: "app/intake_handler.py",
-          kind: "code",
-          duration_ms: 12
-        })
+        post(
+          conn,
+          ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks/runs/#{run.id}/import",
+          %{
+            subject: "manual_subject",
+            scenario_slug: "hardcoded_api_key_python_webhook",
+            content: "OPENAI_KEY = \"AKIAIOSFODNN7EXAMPLE\"",
+            path: "app/intake_handler.py",
+            kind: "code",
+            duration_ms: 12
+          }
+        )
 
       assert %{"run" => updated_run} = json_response(conn, 200)
 
@@ -1266,8 +1317,48 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert result["decision"] == "block"
       assert result["matched_expected"] == true
 
-      conn = build_conn() |> get(~p"/api/v1/benchmarks/runs/#{run.id}/export?format=csv")
+      conn =
+        build_conn()
+        |> get(
+          ~p"/api/v1/default-organization/workspaces/default-workspace/benchmarks/runs/#{run.id}/export?format=csv"
+        )
+
       assert response(conn, 200) =~ "run_id,suite_slug,scenario_slug"
+    end
+
+    test "service accounts are bounded to their own workspace", %{conn: conn} do
+      {:ok, {org, workspace}} = ControlKeel.Bootstrap.LocalDefaults.ensure()
+      run = benchmark_run_fixture(%{"workspace_id" => workspace.id})
+
+      # Same org, different workspace: isolation is workspace-level, and even
+      # the admin super-scope must not read or mutate another workspace's
+      # benchmark surfaces.
+      other = workspace_fixture(%{org_id: org.id})
+
+      %{token: token} =
+        service_account_fixture(%{workspace_id: other.id, scopes: "admin"})
+
+      authed_conn = put_req_header(build_conn(), "authorization", "Bearer #{token}")
+
+      conn = get(authed_conn, ~p"/api/v1/#{org.slug}/workspaces/#{workspace.slug}/benchmarks")
+      assert %{"error" => "forbidden"} = json_response(conn, 403)
+
+      conn =
+        get(
+          authed_conn,
+          ~p"/api/v1/#{org.slug}/workspaces/#{workspace.slug}/benchmarks/runs/#{run.id}"
+        )
+
+      assert %{"error" => "forbidden"} = json_response(conn, 403)
+
+      conn =
+        build_conn()
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/#{org.slug}/workspaces/#{workspace.slug}/benchmarks/runs", %{
+          "suite" => "vibe_failures_v1"
+        })
+
+      assert %{"error" => "forbidden"} = json_response(conn, 403)
     end
   end
 
