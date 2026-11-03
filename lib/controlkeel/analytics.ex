@@ -68,8 +68,7 @@ defmodule ControlKeel.Analytics do
 
   def funnel_summary(opts \\ []) do
     limit = Keyword.get(opts, :limit, @aggregate_session_limit)
-    org_id = Keyword.get(opts, :org_id)
-    sessions = recent_sessions(limit, org_id)
+    sessions = scoped_recent_sessions(opts, limit)
     session_sets = session_event_sets(Enum.map(sessions, & &1.id))
     recent_sessions = ship_session_rows(sessions)
     {outcome_metrics, agent_outcomes} = outcome_metrics(sessions)
@@ -99,27 +98,55 @@ defmodule ControlKeel.Analytics do
     }
   end
 
-  # Global queries span every org in the database; with `:org_id` the recent
-  # sessions are scoped to the owning org through the workspace join. Used by
-  # the org overview dashboard (/:org_slug) so its stat cards never leak other
-  # tenants' numbers.
-  defp recent_sessions(limit, nil) do
+  # The funnel is tenant-facing data (time-to-first-finding, findings per
+  # session, agent outcomes), so scope resolution is explicit and ordered:
+  # `:org_id` (the org overview), `:workspace_ids`, then `:user` (resolved to
+  # that user's accessible workspaces). With NO scope, local single-user mode
+  # keeps the historical global behavior; cloud/self_hosted fails closed —
+  # an absent scope yields no rows rather than a cross-tenant aggregate.
+  defp scoped_recent_sessions(opts, limit) do
+    scope = resolve_scope(opts)
+
     Session
+    |> scope_workspaces(scope)
     |> order_by(desc: :inserted_at)
     |> preload(:workspace)
     |> limit(^limit)
     |> Repo.all()
   end
 
-  defp recent_sessions(limit, org_id) when is_integer(org_id) do
-    Session
+  defp resolve_scope(opts) do
+    cond do
+      org_id = Keyword.get(opts, :org_id) ->
+        {:org, org_id}
+
+      ws_ids = Keyword.get(opts, :workspace_ids) ->
+        {:workspaces, List.wrap(ws_ids)}
+
+      user = Keyword.get(opts, :user) ->
+        {:workspaces, ControlKeel.Mission.accessible_workspace_ids(user.id)}
+
+      ControlKeel.Runtime.Mode.current() == :local ->
+        :unscoped
+
+      true ->
+        # No caller identity in hosted mode: fail closed, never aggregate
+        # across tenants.
+        {:workspaces, []}
+    end
+  end
+
+  defp scope_workspaces(query, {:org, org_id}) do
+    query
     |> join(:inner, [session], workspace in assoc(session, :workspace))
     |> where([_session, workspace], workspace.org_id == ^org_id)
-    |> order_by(desc: :inserted_at)
-    |> preload(:workspace)
-    |> limit(^limit)
-    |> Repo.all()
   end
+
+  defp scope_workspaces(query, {:workspaces, ids}) do
+    ControlKeel.Cloud.Scope.scope_workspaces(query, ids)
+  end
+
+  defp scope_workspaces(query, :unscoped), do: query
 
   defp ship_session_rows(sessions) do
     Enum.map(sessions, fn session ->
