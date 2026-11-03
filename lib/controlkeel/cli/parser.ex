@@ -129,11 +129,19 @@ defmodule ControlKeel.CLI.Parser do
     baseline_subject: :string,
     scenario_slugs: :string,
     domain_pack: :string,
+    workspace_id: :integer,
     json: :boolean
   ]
-  @benchmark_list_switches [domain_pack: :string, format: :string, json: :boolean]
-  @benchmark_compare_switches [format: :string, json: :boolean]
-  @benchmark_export_switches [format: :string, json: :boolean]
+  @benchmark_list_switches [
+    workspace_id: :integer,
+    domain_pack: :string,
+    format: :string,
+    json: :boolean
+  ]
+  @benchmark_show_switches [workspace_id: :integer]
+  @benchmark_compare_switches [workspace_id: :integer, format: :string, json: :boolean]
+  @benchmark_import_switches [workspace_id: :integer]
+  @benchmark_export_switches [workspace_id: :integer, format: :string, json: :boolean]
   @watch_switches [interval: :integer, status: :boolean, json: :boolean]
   @obs_switches [
     by: :string,
@@ -827,14 +835,14 @@ defmodule ControlKeel.CLI.Parser do
       ["benchmark", "run" | rest] ->
         parse_with_switches(:benchmark_run, rest, @benchmark_run_switches)
 
-      ["benchmark", "show", id] ->
-        {:ok, %{command: :benchmark_show, options: %{}, args: [id]}}
+      ["benchmark", "show", id | rest] ->
+        parse_benchmark_show(id, rest)
 
       ["benchmark", "compare", run_id | rest] ->
         parse_benchmark_compare(run_id, rest)
 
-      ["benchmark", "import", run_id, subject, file_path] ->
-        {:ok, %{command: :benchmark_import, options: %{}, args: [run_id, subject, file_path]}}
+      ["benchmark", "import", run_id, subject, file_path | rest] ->
+        parse_benchmark_import([run_id, subject, file_path], rest)
 
       ["benchmark", "export", run_id | rest] ->
         parse_benchmark_export(run_id, rest)
@@ -1117,6 +1125,36 @@ defmodule ControlKeel.CLI.Parser do
 
       _ ->
         {:error, ControlKeel.CLI.usage_text()}
+    end
+  end
+
+  defp parse_benchmark_show(run_id, argv) do
+    {options, remainder, invalid} = OptionParser.parse(argv, strict: @benchmark_show_switches)
+
+    cond do
+      invalid != [] ->
+        {:error, ControlKeel.CLI.usage_text()}
+
+      remainder != [] ->
+        {:error, ControlKeel.CLI.usage_text()}
+
+      true ->
+        {:ok, %{command: :benchmark_show, options: options, args: [run_id]}}
+    end
+  end
+
+  defp parse_benchmark_import([run_id, subject, file_path], argv) do
+    {options, remainder, invalid} = OptionParser.parse(argv, strict: @benchmark_import_switches)
+
+    cond do
+      invalid != [] ->
+        {:error, ControlKeel.CLI.usage_text()}
+
+      remainder != [] ->
+        {:error, ControlKeel.CLI.usage_text()}
+
+      true ->
+        {:ok, %{command: :benchmark_import, options: options, args: [run_id, subject, file_path]}}
     end
   end
 

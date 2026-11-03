@@ -2,6 +2,7 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
   @moduledoc false
 
   alias ControlKeel.Benchmark
+  alias ControlKeel.Mission
   import ControlKeel.CLI, except: [run_command: 2]
 
   def run_command(%{command: :eval_list, options: _options}, _project_root) do
@@ -69,8 +70,13 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
   end
 
   def run_command(%{command: :benchmark_list, options: options}, project_root) do
-    with {:ok, format} <- effective_cli_format(options) do
-      filter_opts = benchmark_filter_opts(options[:domain_pack])
+    with {:ok, workspace_id} <- resolve_run_workspace_id(options, project_root),
+         {:ok, format} <- effective_cli_format(options) do
+      filter_opts =
+        options[:domain_pack]
+        |> benchmark_filter_opts()
+        |> Keyword.put(:workspace_id, workspace_id)
+
       suites = Benchmark.list_suites(filter_opts)
       runs = Benchmark.list_recent_runs(filter_opts)
       subjects = Benchmark.available_subjects(project_root)
@@ -165,48 +171,66 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
     else
       {:error, {:invalid_output_format, message}} ->
         {:error, message}
+
+      {:error, _message} = error ->
+        error
     end
   end
 
   def run_command(%{command: :benchmark_run, options: options}, project_root) do
-    attrs = %{
-      "suite" => options[:suite] || "vibe_failures_v1",
-      "subjects" => options[:subjects],
-      "baseline_subject" => options[:baseline_subject],
-      "scenario_slugs" => options[:scenario_slugs],
-      "domain_pack" => options[:domain_pack]
-    }
+    with {:ok, workspace_id} <- resolve_run_workspace_id(options, project_root) do
+      attrs = %{
+        "suite" => options[:suite] || "vibe_failures_v1",
+        "subjects" => options[:subjects],
+        "baseline_subject" => options[:baseline_subject],
+        "scenario_slugs" => options[:scenario_slugs],
+        "domain_pack" => options[:domain_pack],
+        "workspace_id" => workspace_id
+      }
 
-    case Benchmark.run_suite(attrs, project_root) do
-      {:ok, run} ->
-        ControlKeel.Observability.close_eval_candidate_lifecycle_from_run!(run)
+      case Benchmark.run_suite(attrs, project_root) do
+        {:ok, run} ->
+          ControlKeel.Observability.close_eval_candidate_lifecycle_from_run!(run)
 
-        detail = Benchmark.run_detail_metrics(run)
+          detail = Benchmark.run_detail_metrics(run)
 
-        {:ok,
-         [
-           "Benchmark run ##{run.id} completed.",
-           "Suite: #{run.suite.slug}",
-           "Domains: #{format_domain_packs(Benchmark.domain_packs_for_run(run))}",
-           "Subjects: #{Enum.join(run.subjects, ", ")}",
-           "Status: #{run.status}",
-           "Catch rate: #{run.catch_rate}%",
-           "Block rate: #{detail.block_rate}%",
-           "Expected rule hit rate: #{detail.expected_rule_hit_rate}%",
-           "Average overhead: #{format_percent(run.average_overhead_percent)}"
-         ]}
+          {:ok,
+           [
+             "Benchmark run ##{run.id} completed.",
+             "Suite: #{run.suite.slug}",
+             "Domains: #{format_domain_packs(Benchmark.domain_packs_for_run(run))}",
+             "Subjects: #{Enum.join(run.subjects, ", ")}",
+             "Status: #{run.status}",
+             "Catch rate: #{run.catch_rate}%",
+             "Block rate: #{detail.block_rate}%",
+             "Expected rule hit rate: #{detail.expected_rule_hit_rate}%",
+             "Average overhead: #{format_percent(run.average_overhead_percent)}",
+             "Workspace: ##{run.workspace_id}"
+           ]}
 
-      {:error, :suite_not_found} ->
-        {:error, "Benchmark suite was not found."}
+        {:error, :workspace_required} ->
+          {:error,
+           "This machine has no workspace to attach benchmark runs to. Run controlkeel once to provision one."}
 
-      {:error, reason} ->
-        {:error, "Failed to run benchmark: #{inspect(reason)}"}
+        {:error, :workspace_not_found} ->
+          {:error,
+           "Workspace was not found. Pass `--workspace-id <id>` with an existing workspace id."}
+
+        {:error, :suite_not_found} ->
+          {:error, "Benchmark suite was not found."}
+
+        {:error, reason} ->
+          {:error, "Failed to run benchmark: #{inspect(reason)}"}
+      end
+    else
+      {:error, _message} = error -> error
     end
   end
 
-  def run_command(%{command: :benchmark_show, args: [id]}, _project_root) do
-    with {:ok, run_id} <- parse_id(id),
-         %{} = run <- Benchmark.get_run(run_id) do
+  def run_command(%{command: :benchmark_show, args: [id], options: options}, project_root) do
+    with {:ok, workspace_id} <- resolve_run_workspace_id(options, project_root),
+         {:ok, run_id} <- parse_id(id),
+         %{} = run <- Benchmark.get_run(workspace_id, run_id) do
       detail = Benchmark.run_detail_metrics(run)
 
       subject_lines =
@@ -239,13 +263,17 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
 
       nil ->
         {:error, "Benchmark run not found."}
+
+      {:error, message} when is_binary(message) ->
+        {:error, message}
     end
   end
 
-  def run_command(%{command: :benchmark_compare, args: [id], options: options}, _project_root) do
-    with {:ok, format} <- effective_cli_format(options),
+  def run_command(%{command: :benchmark_compare, args: [id], options: options}, project_root) do
+    with {:ok, workspace_id} <- resolve_run_workspace_id(options, project_root),
+         {:ok, format} <- effective_cli_format(options),
          {:ok, run_id} <- parse_id(id),
-         {:ok, comparison} <- Benchmark.compare_run(run_id) do
+         {:ok, comparison} <- Benchmark.compare_run(workspace_id, run_id) do
       render_format(format, comparison, &benchmark_compare_lines/1)
     else
       {:error, {:invalid_output_format, message}} ->
@@ -256,17 +284,21 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
 
       {:error, :not_found} ->
         {:error, "Benchmark run not found."}
+
+      {:error, _message} = error ->
+        error
     end
   end
 
   def run_command(
-        %{command: :benchmark_import, args: [run_id, subject, file_path]},
-        _project_root
+        %{command: :benchmark_import, args: [run_id, subject, file_path], options: options},
+        project_root
       ) do
-    with {:ok, parsed_id} <- parse_id(run_id),
+    with {:ok, workspace_id} <- resolve_run_workspace_id(options, project_root),
+         {:ok, parsed_id} <- parse_id(run_id),
          {:ok, contents} <- File.read(file_path),
          {:ok, payload} <- Jason.decode(contents),
-         {:ok, run} <- Benchmark.import_result(parsed_id, subject, payload) do
+         {:ok, run} <- Benchmark.import_result(workspace_id, parsed_id, subject, payload) do
       {:ok,
        [
          "Imported benchmark output for #{subject} into run ##{run.id}.",
@@ -293,14 +325,19 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
       {:error, :not_found} ->
         {:error, "Benchmark run was not found."}
 
+      {:error, message} when is_binary(message) ->
+        {:error, message}
+
       {:error, reason} ->
         {:error, "Failed to import benchmark output: #{inspect(reason)}"}
     end
   end
 
-  def run_command(%{command: :benchmark_export, args: [run_id], options: options}, _project_root) do
-    with {:ok, parsed_id} <- parse_id(run_id),
-         {:ok, output} <- Benchmark.export_run(parsed_id, options[:format] || "json") do
+  def run_command(%{command: :benchmark_export, args: [run_id], options: options}, project_root) do
+    with {:ok, workspace_id} <- resolve_run_workspace_id(options, project_root),
+         {:ok, parsed_id} <- parse_id(run_id),
+         {:ok, output} <-
+           Benchmark.export_run(workspace_id, parsed_id, options[:format] || "json") do
       {:ok, [output]}
     else
       {:error, :invalid_id} ->
@@ -314,6 +351,9 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
          "Unknown --format #{inspect(options[:format])}. Supported formats: json, csv, openeval " <>
            "(openeval emits a bundle {\"suite\": <EvalSuite>, \"result_set\": <ResultSet>} conforming " <>
            "to https://github.com/adhabnr-ux/evalport spec/SPEC.md)."}
+
+      {:error, _message} = error ->
+        error
     end
   end
 
@@ -396,4 +436,44 @@ defmodule ControlKeel.CLI.Dispatch.BenchmarksHarness do
   defp format_number(nil), do: "n/a"
   defp format_number(value) when is_integer(value), do: Integer.to_string(value)
   defp format_number(value) when is_float(value), do: :erlang.float_to_binary(value, decimals: 1)
+
+  defp resolve_run_workspace_id(options, project_root) do
+    case options[:workspace_id] do
+      workspace_id when is_integer(workspace_id) ->
+        resolve_workspace_by_id(workspace_id)
+
+      nil ->
+        workspace_from_local_project(project_root)
+
+      _ ->
+        {:error, "Invalid --workspace-id value. Expected an integer workspace id."}
+    end
+  end
+
+  # Benchmark commands resolve a workspace the same way sessions do: the local
+  # project's binding (default workspace) unless `--workspace-id` overrides it.
+  # Every error is normalized to a printable message so each command's `else`
+  # can surface it without a CaseClauseError.
+  defp workspace_from_local_project(project_root) do
+    case ensure_attach_project(project_root, %{}) do
+      {:ok, _binding, session, _mode} when is_integer(session.workspace_id) ->
+        {:ok, session.workspace_id}
+
+      {:ok, _binding, _session, _mode} ->
+        {:error, "The local project has no workspace. Run controlkeel once to provision one."}
+
+      {:error, reason} ->
+        {:error, "Could not resolve the local project workspace: #{inspect(reason)}"}
+
+      other ->
+        {:error, "Could not resolve the local project workspace: #{inspect(other)}"}
+    end
+  end
+
+  defp resolve_workspace_by_id(workspace_id) do
+    %Mission.Workspace{} = workspace = Mission.get_workspace!(workspace_id)
+    {:ok, workspace.id}
+  rescue
+    _e in Ecto.NoResultsError -> {:error, "Workspace was not found: ##{workspace_id}"}
+  end
 end

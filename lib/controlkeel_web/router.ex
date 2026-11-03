@@ -131,9 +131,6 @@ defmodule ControlKeelWeb.Router do
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults
       ] do
-      live "/benchmarks", BenchmarksLive, :index
-      live "/benchmarks/runs/:id", BenchmarksLive, :show
-
       # /cloud/projects and /cloud/telemetry removed (owner directive, 10/22:
       # "no cloud routes" — the cloud-project concept is stale; the org is the
       # grouping surface and the org overview is the dashboard). The modules
@@ -335,12 +332,22 @@ defmodule ControlKeelWeb.Router do
     post "/findings/:id/action", API.FindingController, :finding_action
     get "/proofs", ApiController, :list_proofs
     get "/proofs/:id", ApiController, :get_proof
-    get "/benchmarks", ApiController, :list_benchmarks
-    post "/benchmarks/runs", ApiController, :create_benchmark_run
-    get "/benchmarks/runs/:id", ApiController, :get_benchmark_run
-    get "/benchmarks/runs/:id/compare", ApiController, :compare_benchmark_run
-    post "/benchmarks/runs/:id/import", ApiController, :import_benchmark_result
-    get "/benchmarks/runs/:id/export", ApiController, :export_benchmark_run
+    get "/:org_slug/workspaces/:ws_slug/benchmarks", ApiController, :list_benchmarks
+    post "/:org_slug/workspaces/:ws_slug/benchmarks/runs", ApiController, :create_benchmark_run
+    get "/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id", ApiController, :get_benchmark_run
+
+    get "/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id/compare",
+        ApiController,
+        :compare_benchmark_run
+
+    post "/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id/import",
+         ApiController,
+         :import_benchmark_result
+
+    get "/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id/export",
+        ApiController,
+        :export_benchmark_run
+
     get "/budget", ApiController, :get_budget
     get "/proof/:task_id", ApiController, :proof_bundle
     get "/memory/search", ApiController, :search_memory

@@ -2168,6 +2168,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
     baseline =
       %ControlKeel.Benchmark.Run{}
       |> ControlKeel.Benchmark.Run.changeset(%{
+        workspace_id: session.workspace_id,
         suite_id: suite.id,
         status: "completed",
         baseline_subject: "controlkeel_validate",
@@ -2247,6 +2248,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
     _baseline =
       %ControlKeel.Benchmark.Run{}
       |> ControlKeel.Benchmark.Run.changeset(%{
+        workspace_id: session.workspace_id,
         suite_id: suite.id,
         status: "completed",
         baseline_subject: "controlkeel_validate",

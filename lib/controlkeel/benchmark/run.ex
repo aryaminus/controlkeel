@@ -20,6 +20,7 @@ defmodule ControlKeel.Benchmark.Run do
     field :metadata, :map, default: %{}
 
     belongs_to :suite, Suite
+    belongs_to :workspace, ControlKeel.Mission.Workspace
     has_many :results, Result
 
     timestamps(type: :utc_datetime)
@@ -29,6 +30,7 @@ defmodule ControlKeel.Benchmark.Run do
     run
     |> cast(attrs, [
       :suite_id,
+      :workspace_id,
       :status,
       :baseline_subject,
       :subjects,
@@ -44,6 +46,7 @@ defmodule ControlKeel.Benchmark.Run do
     ])
     |> validate_required([
       :suite_id,
+      :workspace_id,
       :status,
       :baseline_subject,
       :subjects,
@@ -58,5 +61,6 @@ defmodule ControlKeel.Benchmark.Run do
     |> validate_number(:caught_count, greater_than_or_equal_to: 0)
     |> validate_number(:blocked_count, greater_than_or_equal_to: 0)
     |> assoc_constraint(:suite)
+    |> assoc_constraint(:workspace)
   end
 end

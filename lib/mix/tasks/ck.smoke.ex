@@ -17,6 +17,26 @@ defmodule Mix.Tasks.Ck.Smoke do
   """
 
   alias ControlKeel.Benchmark
+  alias ControlKeel.Mission
+  alias ControlKeel.Repo
+
+  # Smoke runs are workspace-owned like every CLI/API run (benchmarks issue,
+  # slice 1). The smoke check targets the default workspace, provisioning it
+  # via LocalDefaults (find-or-create, boot-seed source of truth) so a fresh
+  # local database never dead-ends the smoke check.
+  defp smoke_workspace_id do
+    case ControlKeel.Bootstrap.LocalDefaults.ensure() do
+      {:ok, {_org, workspace}} when workspace != nil ->
+        workspace.id
+
+      {:ok, nil} ->
+        raise ArgumentError,
+              "mix ck.smoke runs only in local mode — remote modes have no default workspace."
+
+      {:error, reason} ->
+        raise ArgumentError, "Could not provision the default workspace: #{inspect(reason)}"
+    end
+  end
 
   @impl true
   def run(args) do
@@ -53,7 +73,8 @@ defmodule Mix.Tasks.Ck.Smoke do
              "suite" => "vibe_failures_v1",
              "subjects" => "controlkeel_validate",
              "baseline_subject" => "controlkeel_validate",
-             "scenario_slugs" => scenario_slugs
+             "scenario_slugs" => scenario_slugs,
+             "workspace_id" => smoke_workspace_id()
            }) do
       report_benchmark(shell, run, host)
     else
@@ -95,11 +116,21 @@ defmodule Mix.Tasks.Ck.Smoke do
     shell.info(String.duplicate("─", 64))
     shell.info("REVIEW IN MISSION CONTROL")
     shell.info("")
-    shell.info("  #{host}/benchmarks/runs/#{run.id}")
-    shell.info("  #{host}/benchmarks")
+    workspace = Mission.get_workspace!(run.workspace_id)
+    workspace = Repo.preload(workspace, :org)
+
+    shell.info(
+      "  #{host}/#{workspace.org.slug}/workspaces/#{workspace.slug}/benchmarks/runs/#{run.id}"
+    )
+
+    shell.info("  #{host}/#{workspace.org.slug}/workspaces/#{workspace.slug}/benchmarks")
     shell.info("")
     shell.info("  Export JSON:")
-    shell.info("    #{host}/api/v1/benchmarks/runs/#{run.id}")
+
+    shell.info(
+      "    #{host}/api/v1/#{workspace.org.slug}/workspaces/#{workspace.slug}/benchmarks/runs/#{run.id}"
+    )
+
     shell.info("")
   end
 end

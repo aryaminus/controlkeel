@@ -15,6 +15,7 @@ defmodule ControlKeel.Benchmark do
   }
 
   alias ControlKeel.Intent.Domains
+  alias ControlKeel.Mission
   alias ControlKeel.Repo
   alias ControlKeel.Repo.Retry, as: RepoRetry
   alias ControlKeel.Utils
@@ -60,6 +61,7 @@ defmodule ControlKeel.Benchmark do
     query_limit = if domain_pack, do: max(limit * 5, 50), else: limit
 
     Run
+    |> maybe_scope_by_workspace(Keyword.get(opts, :workspace_id))
     |> order_by([run], desc: run.inserted_at)
     |> limit(^query_limit)
     |> preload([:suite, results: [scenario: []]])
@@ -100,20 +102,40 @@ defmodule ControlKeel.Benchmark do
     |> Repo.preload(:scenarios)
   end
 
-  def get_run(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {parsed, ""} -> get_run(parsed)
-      _error -> nil
+  @doc """
+  Fetches a run by id, scoped to `workspace_id`.
+
+  Benchmarks issue, slice 2: every benchmark read is workspace-owned, so there
+  is deliberately no public unscoped lookup. A run that belongs to another
+  workspace is indistinguishable from a missing run and returns `nil`.
+  """
+  def get_run(workspace_id, id) when is_integer(workspace_id) do
+    case parse_run_id(id) do
+      {:ok, run_id} ->
+        Run
+        |> Repo.get_by(id: run_id, workspace_id: workspace_id)
+        |> preload_run()
+
+      :error ->
+        nil
     end
   end
 
-  def get_run(id) when is_integer(id) do
-    Run
-    |> Repo.get(id)
-    |> preload_run()
+  defp parse_run_id(id) when is_integer(id), do: {:ok, id}
+
+  defp parse_run_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {parsed, ""} -> {:ok, parsed}
+      _ -> :error
+    end
   end
 
-  defp get_run!(id) when is_integer(id) do
+  defp parse_run_id(_id), do: :error
+
+  # Internal, post-authorization lookups: callers already resolved the run
+  # through its workspace, so recalculating it by id cannot cross a workspace
+  # boundary. Public callers must use `get_run/2`.
+  defp get_run_by_id!(id) when is_integer(id) do
     Run
     |> Repo.get!(id)
     |> preload_run()
@@ -126,7 +148,13 @@ defmodule ControlKeel.Benchmark do
   """
   def latest_completed_run(suite_slug, subject)
       when is_binary(suite_slug) and is_binary(subject) do
+    latest_completed_run(suite_slug, subject, [])
+  end
+
+  def latest_completed_run(suite_slug, subject, opts)
+      when is_binary(suite_slug) and is_binary(subject) do
     Run
+    |> maybe_scope_by_workspace(Keyword.get(opts, :workspace_id))
     |> join(:inner, [run], suite in assoc(run, :suite))
     |> where([run, suite], suite.slug == ^suite_slug and run.status == "completed")
     |> order_by([run], desc: run.inserted_at, desc: run.id)
@@ -135,11 +163,34 @@ defmodule ControlKeel.Benchmark do
     |> Enum.find(fn run -> subject in (run.subjects || []) end)
   end
 
+  # Workspace scoping (benchmarks issue, slice 1): runs reached through a
+  # workspace surface always filter directly on `workspace_id` — workspace
+  # membership is never inferred from suite or scenario relationships.
+  # The `nil` fallback survives only for callers with no workspace scope
+  # (local/bootstrap-token API summaries and tests); every production
+  # surface resolves a workspace before querying.
+  defp maybe_scope_by_workspace(query, nil), do: query
+
+  defp maybe_scope_by_workspace(query, workspace_id) when is_integer(workspace_id) do
+    where(query, [run], run.workspace_id == ^workspace_id)
+  end
+
   def available_subjects(project_root \\ File.cwd!()) do
     SubjectLoader.builtin_subjects() ++ SubjectLoader.external_subjects(project_root)
   end
 
   def run_suite(attrs, project_root \\ File.cwd!()) when is_map(attrs) do
+    ensure_builtin_suites()
+
+    with {:ok, workspace_id} <- require_workspace(attrs) do
+      run_workspace_suite(attrs, workspace_id, project_root)
+    end
+  end
+
+  # Workspace-bound run path (benchmarks issue, slice 1): every creation
+  # resolves through an already-validated workspace, so `workspace_id`
+  # ends up on the persisted run without relying on the URL-specific gate.
+  defp run_workspace_suite(attrs, workspace_id, project_root) do
     ensure_builtin_suites()
 
     suite_slug = Map.get(attrs, "suite") || Map.get(attrs, :suite) || "vibe_failures_v1"
@@ -171,10 +222,17 @@ defmodule ControlKeel.Benchmark do
 
       with true <- scenarios != [] || {:error, :no_scenarios},
            {:ok, run} <-
-             create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata),
+             create_run_record(
+               suite,
+               scenarios,
+               subject_ids,
+               baseline_subject,
+               metadata,
+               workspace_id
+             ),
            result_attrs <- Runner.execute(scenarios, subjects, project_root: project_root),
            {:ok, _results} <- insert_results(run, result_attrs),
-           {:ok, updated_run} <- recalculate_run(run.id) do
+           {:ok, updated_run} <- recalculate_run(run) do
         {:ok, updated_run}
       end
     else
@@ -183,8 +241,40 @@ defmodule ControlKeel.Benchmark do
     end
   end
 
-  def import_result(run_id, subject, attrs) when is_binary(subject) do
-    with %Run{} = run <- get_run(run_id) || {:error, :not_found},
+  # Workspace resolution happens up front in `run_suite/2`, so neither the
+  # LiveView nor the API can create a run that is not workspace-owned
+  # (benchmarks issue, slice 1: "require and persist workspace_id").
+  defp require_workspace(attrs) do
+    case normalize_workspace_id(Map.get(attrs, "workspace_id") || Map.get(attrs, :workspace_id)) do
+      {:ok, workspace_id} ->
+        case Repo.get(Mission.Workspace, workspace_id) do
+          %Mission.Workspace{} -> {:ok, workspace_id}
+          nil -> {:error, :workspace_not_found}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp normalize_workspace_id(nil), do: {:error, :workspace_required}
+  defp normalize_workspace_id(""), do: {:error, :workspace_required}
+
+  defp normalize_workspace_id(workspace_id) when is_integer(workspace_id), do: {:ok, workspace_id}
+
+  defp normalize_workspace_id(workspace_id) when is_binary(workspace_id) do
+    case Integer.parse(workspace_id) do
+      {parsed, ""} -> {:ok, parsed}
+      _error -> {:error, :workspace_required}
+    end
+  end
+
+  @doc """
+  Imports captured subject output into an existing run, scoped to
+  `workspace_id` (benchmarks issue, slice 2).
+  """
+  def import_result(workspace_id, run_id, subject, attrs) when is_binary(subject) do
+    with %Run{} = run <- get_run(workspace_id, run_id) || {:error, :not_found},
          scenario_slug when is_binary(scenario_slug) <-
            Map.get(attrs, "scenario_slug") || {:error, :scenario_slug_required},
          %Result{} = result <-
@@ -192,7 +282,7 @@ defmodule ControlKeel.Benchmark do
          %Scenario{} = scenario <- result.scenario,
          outcome <- Runner.import_subject_result(scenario, attrs),
          {:ok, _updated_result} <- update_result_from_outcome(result, outcome),
-         {:ok, updated_run} <- recalculate_run(run.id) do
+         {:ok, updated_run} <- recalculate_run(run) do
       {:ok, updated_run}
     else
       {:error, :scenario_slug_required} -> {:error, :scenario_slug_required}
@@ -202,10 +292,11 @@ defmodule ControlKeel.Benchmark do
     end
   end
 
-  def export_run(run_id, format \\ "json")
+  def export_run(workspace_id, run_id, format \\ "json")
 
-  def export_run(run_id, format) when is_integer(run_id) or is_binary(run_id) do
-    case get_run(run_id) do
+  def export_run(workspace_id, run_id, format)
+      when is_integer(run_id) or is_binary(run_id) do
+    case get_run(workspace_id, run_id) do
       nil ->
         {:error, :not_found}
 
@@ -343,8 +434,8 @@ defmodule ControlKeel.Benchmark do
 
   defp maybe_comparison(_run), do: nil
 
-  def compare_run(id) when is_integer(id) or is_binary(id) do
-    case get_run(id) do
+  def compare_run(workspace_id, id) when is_integer(id) or is_binary(id) do
+    case get_run(workspace_id, id) do
       nil -> {:error, :not_found}
       %Run{} = run -> {:ok, compare_run(run)}
     end
@@ -1082,10 +1173,11 @@ defmodule ControlKeel.Benchmark do
     |> Repo.delete_all()
   end
 
-  defp create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata) do
+  defp create_run_record(suite, scenarios, subject_ids, baseline_subject, metadata, workspace_id) do
     %Run{}
     |> Run.changeset(%{
       suite_id: suite.id,
+      workspace_id: workspace_id,
       status: "running",
       baseline_subject: baseline_subject,
       subjects: subject_ids,
@@ -1203,8 +1295,14 @@ defmodule ControlKeel.Benchmark do
     end)
   end
 
-  defp recalculate_run(run_id) do
-    run = get_run(run_id)
+  defp recalculate_run(%Run{} = run) do
+    # Always recalculate from the persisted run: `run_suite` hands us the
+    # freshly inserted struct whose `results` association is NotLoaded (the
+    # import path arrives preloaded via `get_run/2`). Refetching here keeps
+    # both callers — and any future one — on the loaded, aggregate-fresh
+    # shape `main` guaranteed through `recalculate_run(run_id)`.
+    run = get_run_by_id!(run.id)
+
     overheads = calculate_overheads(run)
 
     Enum.each(run.results, fn result ->
@@ -1219,7 +1317,7 @@ defmodule ControlKeel.Benchmark do
       end
     end)
 
-    refreshed = get_run!(run_id)
+    refreshed = get_run_by_id!(run.id)
     aggregates = aggregate_run(refreshed)
 
     result =

@@ -177,6 +177,7 @@ defmodule ControlKeel.BenchmarkTest do
   test "classification metrics return TPR 1.0 for vulnerable-only suites" do
     {:ok, run} =
       Benchmark.run_suite(%{
+        "workspace_id" => benchmark_workspace_id(),
         "suite" => "vibe_failures_v1",
         "subjects" => "controlkeel_validate",
         "baseline_subject" => "controlkeel_validate",
@@ -198,6 +199,7 @@ defmodule ControlKeel.BenchmarkTest do
   test "classification metrics return FPR near 0.0 for benign suite" do
     {:ok, run} =
       Benchmark.run_suite(%{
+        "workspace_id" => benchmark_workspace_id(),
         "suite" => "benign_baseline_v1",
         "subjects" => "controlkeel_validate",
         "baseline_subject" => "controlkeel_validate"
@@ -223,6 +225,7 @@ defmodule ControlKeel.BenchmarkTest do
 
     {:ok, run} =
       Benchmark.run_suite(%{
+        "workspace_id" => benchmark_workspace_id(),
         "suite" => "vibe_failures_v1",
         "subjects" => "controlkeel_validate,controlkeel_proxy",
         "baseline_subject" => "controlkeel_validate",
@@ -244,13 +247,14 @@ defmodule ControlKeel.BenchmarkTest do
   test "compares with and without ControlKeel policy gate" do
     {:ok, run} =
       Benchmark.run_suite(%{
+        "workspace_id" => benchmark_workspace_id(),
         "suite" => "vibe_failures_v1",
         "subjects" => "null_policy_baseline,controlkeel_validate",
         "baseline_subject" => "null_policy_baseline",
         "scenario_slugs" => "hardcoded_api_key_python_webhook,client_side_auth_bypass"
       })
 
-    assert {:ok, comparison} = Benchmark.compare_run(run.id)
+    assert {:ok, comparison} = Benchmark.compare_run(run.workspace_id, run.id)
 
     assert get_in(comparison, ["run", "baseline_subject"]) == "null_policy_baseline"
     assert get_in(comparison, ["summary", "max_catch_rate_lift_points"]) > 0.0
@@ -283,6 +287,7 @@ defmodule ControlKeel.BenchmarkTest do
 
     {:ok, run} =
       Benchmark.run_suite(%{
+        "workspace_id" => benchmark_workspace_id(),
         "suite" => "domain_expansion_v1",
         "subjects" => "controlkeel_validate",
         "baseline_subject" => "controlkeel_validate",
@@ -294,6 +299,44 @@ defmodule ControlKeel.BenchmarkTest do
 
     filtered_runs = Benchmark.list_recent_runs(domain_pack: "sales")
     assert Enum.any?(filtered_runs, &(&1.id == run.id))
+  end
+
+  test "list_recent_runs and benchmark_summary scope to a workspace" do
+    workspace_a = ControlKeel.MissionFixtures.workspace_fixture(%{agent: "claude"})
+    workspace_b = ControlKeel.MissionFixtures.workspace_fixture(%{agent: "claude"})
+
+    assert {:error, :workspace_required} = Benchmark.run_suite(%{"suite" => "vibe_failures_v1"})
+
+    assert {:error, :workspace_not_found} =
+             Benchmark.run_suite(%{"suite" => "vibe_failures_v1", "workspace_id" => 987_654_321})
+
+    {:ok, run_a} =
+      Benchmark.run_suite(%{
+        "workspace_id" => workspace_a.id,
+        "suite" => "vibe_failures_v1",
+        "subjects" => "controlkeel_validate",
+        "baseline_subject" => "controlkeel_validate",
+        "scenario_slugs" => "hardcoded_api_key_python_webhook"
+      })
+
+    assert run_a.workspace_id == workspace_a.id
+
+    scoped = Benchmark.list_recent_runs(workspace_id: workspace_a.id)
+    assert Enum.any?(scoped, &(&1.id == run_a.id))
+    assert Enum.all?(scoped, &(&1.workspace_id == workspace_a.id))
+
+    other = Benchmark.list_recent_runs(workspace_id: workspace_b.id)
+    refute Enum.any?(other, &(&1.id == run_a.id))
+
+    # Slice 2: run lookups are workspace-scoped — another workspace cannot
+    # read, compare, or export a run it does not own.
+    assert Benchmark.get_run(workspace_a.id, run_a.id).id == run_a.id
+    assert Benchmark.get_run(workspace_b.id, run_a.id) == nil
+    assert {:error, :not_found} = Benchmark.compare_run(workspace_b.id, run_a.id)
+    assert {:error, :not_found} = Benchmark.export_run(workspace_b.id, run_a.id, "json")
+
+    summary = Benchmark.benchmark_summary(workspace_id: workspace_a.id)
+    assert summary.latest_run && summary.latest_run.id == run_a.id
   end
 
   test "benchmark summary reads builtin suite metadata without seeding persisted suites" do
@@ -444,6 +487,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "shell_stub",
           "baseline_subject" => "shell_stub",
@@ -487,6 +531,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "shell_metrics_stub",
           "baseline_subject" => "shell_metrics_stub",
@@ -510,7 +555,7 @@ defmodule ControlKeel.BenchmarkTest do
              Path.basename(path) == ".controlkeel_metrics.json"
            end)
 
-    assert {:ok, comparison} = Benchmark.compare_run(run.id)
+    assert {:ok, comparison} = Benchmark.compare_run(run.workspace_id, run.id)
     metrics = Enum.find(comparison["subjects"], &(&1["subject"] == "shell_metrics_stub"))
     assert metrics["tool_call_count"] == 2
     assert metrics["ck_tool_call_count"] == 1
@@ -559,6 +604,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "pure_host,ck_host",
           "baseline_subject" => "pure_host",
@@ -567,7 +613,7 @@ defmodule ControlKeel.BenchmarkTest do
         tmp_dir
       )
 
-    assert {:ok, comparison} = Benchmark.compare_run(run.id)
+    assert {:ok, comparison} = Benchmark.compare_run(run.workspace_id, run.id)
 
     ck = Enum.find(comparison["subjects"], &(&1["subject"] == "ck_host"))
     delta = ck["delta_vs_baseline"]
@@ -622,6 +668,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "relative_shell",
           "baseline_subject" => "relative_shell",
@@ -652,6 +699,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, timed_out_run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "slow_shell",
           "baseline_subject" => "slow_shell",
@@ -666,6 +714,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, skipped_run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "missing_subject",
           "baseline_subject" => "missing_subject",
@@ -691,6 +740,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "vibe_failures_v1",
           "subjects" => "manual_subject",
           "baseline_subject" => "manual_subject",
@@ -703,7 +753,7 @@ defmodule ControlKeel.BenchmarkTest do
     assert pending_result.status == "awaiting_import"
 
     {:ok, updated_run} =
-      Benchmark.import_result(run.id, "manual_subject", %{
+      Benchmark.import_result(run.workspace_id, run.id, "manual_subject", %{
         "scenario_slug" => "hardcoded_api_key_python_webhook",
         "content" => "OPENAI_KEY = \"AKIAIOSFODNN7EXAMPLE\"",
         "path" => "app/intake_handler.py",
@@ -758,8 +808,8 @@ defmodule ControlKeel.BenchmarkTest do
         "scenario_slugs" => "hardcoded_api_key_python_webhook,client_side_auth_bypass"
       })
 
-    assert {:ok, json} = Benchmark.export_run(run.id, "json")
-    assert {:ok, csv} = Benchmark.export_run(run.id, "csv")
+    assert {:ok, json} = Benchmark.export_run(run.workspace_id, run.id, "json")
+    assert {:ok, csv} = Benchmark.export_run(run.workspace_id, run.id, "csv")
 
     decoded = Jason.decode!(json)
 
@@ -780,12 +830,12 @@ defmodule ControlKeel.BenchmarkTest do
         "scenario_slugs" => "hardcoded_api_key_python_webhook"
       })
 
-    assert {:ok, json} = Benchmark.export_run(run.id, "json")
+    assert {:ok, json} = Benchmark.export_run(run.workspace_id, run.id, "json")
     decoded = Jason.decode!(json)
 
     assert is_nil(decoded["run"]["comparison"])
     # The explicit compare command still computes one on demand.
-    assert {:ok, comparison} = Benchmark.compare_run(run.id)
+    assert {:ok, comparison} = Benchmark.compare_run(run.workspace_id, run.id)
     assert comparison["summary"]["best_subject"] == "controlkeel_validate"
   end
 
@@ -799,7 +849,7 @@ defmodule ControlKeel.BenchmarkTest do
           "scenario_slugs" => "copilot_inline_stripe_key,opencode_jwt_none_algorithm"
         })
 
-      assert {:ok, output} = Benchmark.export_run(run.id, "openeval")
+      assert {:ok, output} = Benchmark.export_run(run.workspace_id, run.id, "openeval")
       assert {:ok, bundle} = Jason.decode(output)
 
       # One bundle document, not a bare ResultSet -- see the "bundle vs split"
@@ -910,11 +960,11 @@ defmodule ControlKeel.BenchmarkTest do
           "scenario_slugs" => "hardcoded_api_key_python_webhook"
         })
 
-      assert {:error, :unknown_format} = Benchmark.export_run(run.id, "openevals")
-      assert {:error, :unknown_format} = Benchmark.export_run(run.id, "yaml")
-      assert {:ok, _} = Benchmark.export_run(run.id, "openeval")
-      assert {:ok, _} = Benchmark.export_run(run.id, "json")
-      assert {:ok, _} = Benchmark.export_run(run.id, "csv")
+      assert {:error, :unknown_format} = Benchmark.export_run(run.workspace_id, run.id, "openevals")
+      assert {:error, :unknown_format} = Benchmark.export_run(run.workspace_id, run.id, "yaml")
+      assert {:ok, _} = Benchmark.export_run(run.workspace_id, run.id, "openeval")
+      assert {:ok, _} = Benchmark.export_run(run.workspace_id, run.id, "json")
+      assert {:ok, _} = Benchmark.export_run(run.workspace_id, run.id, "csv")
     end
 
     test "excludes results still awaiting manual import so a pending case isn't reported as a failure",
@@ -930,6 +980,7 @@ defmodule ControlKeel.BenchmarkTest do
       {:ok, run} =
         Benchmark.run_suite(
           %{
+            "workspace_id" => benchmark_workspace_id(),
             "suite" => "vibe_failures_v1",
             "subjects" => "manual_subject",
             "baseline_subject" => "manual_subject",
@@ -941,7 +992,7 @@ defmodule ControlKeel.BenchmarkTest do
       [pending_result] = run.results
       assert pending_result.status == "awaiting_import"
 
-      assert {:ok, output} = Benchmark.export_run(run.id, "openeval")
+      assert {:ok, output} = Benchmark.export_run(run.workspace_id, run.id, "openeval")
       assert {:ok, bundle} = Jason.decode(output)
 
       # The suite (the full built-in suite, not just the scenarios this run
@@ -972,6 +1023,7 @@ defmodule ControlKeel.BenchmarkTest do
       {:ok, run} =
         Benchmark.run_suite(
           %{
+            "workspace_id" => benchmark_workspace_id(),
             "suite" => "vibe_failures_v1",
             "subjects" => "controlkeel_validate,manual_subject",
             "baseline_subject" => "controlkeel_validate",
@@ -984,7 +1036,7 @@ defmodule ControlKeel.BenchmarkTest do
       assert statuses["controlkeel_validate"] == "completed"
       assert statuses["manual_subject"] == "awaiting_import"
 
-      assert {:ok, output} = Benchmark.export_run(run.id, "openeval")
+      assert {:ok, output} = Benchmark.export_run(run.workspace_id, run.id, "openeval")
       assert {:ok, bundle} = Jason.decode(output)
 
       # Regression guard alongside the exclusion test above: filtering out an
@@ -1072,6 +1124,7 @@ defmodule ControlKeel.BenchmarkTest do
     {:ok, run} =
       Benchmark.run_suite(
         %{
+          "workspace_id" => benchmark_workspace_id(),
           "suite" => "host_comparison_v1",
           "subjects" => "controlkeel_validate,copilot_manual",
           "baseline_subject" => "controlkeel_validate",

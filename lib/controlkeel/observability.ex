@@ -497,7 +497,8 @@ defmodule ControlKeel.Observability do
           "suite" => preview.suite,
           "subjects" => preview.subjects,
           "baseline_subject" => Keyword.get(opts, :baseline_subject) || preview.subjects,
-          "scenario_slugs" => Enum.join(preview.scenario_slugs, ",")
+          "scenario_slugs" => Enum.join(preview.scenario_slugs, ","),
+          "workspace_id" => Keyword.get(opts, :workspace_id)
         }
 
         case Benchmark.run_suite(attrs, project_root) do
@@ -870,10 +871,11 @@ defmodule ControlKeel.Observability do
     limit = Keyword.get(opts, :limit)
     problem_summary = problems(Keyword.delete(opts, :limit))
     session_link = session_link_builder(opts)
+    benchmark_link = benchmark_link_builder(opts)
 
     all_candidates =
       problem_summary.problems
-      |> Enum.map(&eval_candidate_from_problem(&1, session_link))
+      |> Enum.map(&eval_candidate_from_problem(&1, session_link, benchmark_link))
       |> Enum.sort_by(&{priority_rank(&1.priority), &1.rule_id})
 
     %{
@@ -899,6 +901,16 @@ defmodule ControlKeel.Observability do
       &"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{&1}/observability"
     else
       _ -> &"/observability/sessions/#{&1}"
+    end
+  end
+
+  defp benchmark_link_builder(opts) do
+    with workspace_id when not is_nil(workspace_id) <- Keyword.get(opts, :workspace_id),
+         %Mission.Workspace{} = workspace <- Repo.get(Mission.Workspace, workspace_id),
+         %{slug: ws_slug, org: %{slug: org_slug}} <- Repo.preload(workspace, :org) do
+      fn -> "/#{org_slug}/workspaces/#{ws_slug}/benchmarks" end
+    else
+      _ -> nil
     end
   end
 
@@ -3216,7 +3228,7 @@ defmodule ControlKeel.Observability do
     end
   end
 
-  defp eval_candidate_from_problem(problem, session_link) do
+  defp eval_candidate_from_problem(problem, session_link, benchmark_link) do
     feedback = problem.feedback_loop
 
     %{
@@ -3237,7 +3249,7 @@ defmodule ControlKeel.Observability do
       human_gate_required: feedback.human_gate_required,
       links: %{
         problems: "/observability",
-        benchmarks: "/benchmarks",
+        benchmarks: benchmark_link && benchmark_link.(),
         example_session: feedback.example_session_id && session_link.(feedback.example_session_id)
       }
     }

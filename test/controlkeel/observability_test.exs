@@ -448,7 +448,8 @@ defmodule ControlKeel.ObservabilityTest do
     assert candidate.example_session_id == session.id
     assert candidate.human_gate_required == true
     assert candidate.links.problems == "/observability"
-    assert candidate.links.benchmarks == "/benchmarks"
+    assert candidate.links.benchmarks ==
+             "/#{org.slug}/workspaces/#{ws.slug}/benchmarks"
 
     assert candidate.links.example_session ==
              "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability"
@@ -1539,6 +1540,7 @@ defmodule ControlKeel.ObservabilityTest do
       {:ok, run} =
         %Run{}
         |> Run.changeset(%{
+          workspace_id: session.workspace_id,
           suite_id: suite.id,
           status: "completed",
           baseline_subject: "controlkeel_validate",
@@ -1676,6 +1678,7 @@ defmodule ControlKeel.ObservabilityTest do
       {:ok, run2} =
         %Run{}
         |> Run.changeset(%{
+          workspace_id: run.workspace_id,
           suite_id: run.suite_id,
           status: "completed",
           baseline_subject: "controlkeel_validate",
@@ -1752,7 +1755,7 @@ defmodule ControlKeel.ObservabilityTest do
     end
 
     test "ignores runs with no eval-candidate-linked scenarios" do
-      _session = session_fixture()
+      session = session_fixture()
       suite = benchmark_suite_fixture()
 
       {:ok, plain_scenario} =
@@ -1775,6 +1778,7 @@ defmodule ControlKeel.ObservabilityTest do
       {:ok, run} =
         %Run{}
         |> Run.changeset(%{
+          workspace_id: session.workspace_id,
           suite_id: suite.id,
           status: "completed",
           baseline_subject: "controlkeel_validate",

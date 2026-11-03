@@ -2218,16 +2218,22 @@ defmodule ControlKeel.Mission do
     end
   end
 
-  defp validate_regression(_session, domain_pack, project_root) do
+  defp validate_regression(session, domain_pack, project_root) do
     suite_slug = "vibe_failures_v1"
     subject = "controlkeel_validate"
 
-    baseline = ControlKeel.Benchmark.latest_completed_run(suite_slug, subject)
+    baseline =
+      ControlKeel.Benchmark.latest_completed_run(
+        suite_slug,
+        subject,
+        workspace_id: session.workspace_id
+      )
 
     attrs = %{
       "suite" => suite_slug,
       "subjects" => [subject],
-      "domain_pack" => domain_pack
+      "domain_pack" => domain_pack,
+      "workspace_id" => session.workspace_id
     }
 
     case ControlKeel.Benchmark.run_suite(attrs, project_root) do
