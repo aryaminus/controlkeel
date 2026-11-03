@@ -34,7 +34,7 @@ defmodule ControlKeelWeb.WorkspaceAccess do
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Runtime.Mode
 
-  @type denial :: :unbound | :forbidden | :needs_admin
+  @type denial :: :unbound | :suspended | :forbidden | :needs_admin
   @type membership_result ::
           {:ok, Accounts.Membership.t() | nil} | {:error, denial()}
 
@@ -55,6 +55,23 @@ defmodule ControlKeelWeb.WorkspaceAccess do
     end
   end
 
+  # Org-suspension leg of the kill switch (#245): a workspace under a
+  # suspended org denies every visitor before membership seniority is even
+  # consulted. Local mode has no operator and never reaches this check.
+  defp resolve_membership(workspace, user, required_role) do
+    with :ok <- org_active?(workspace.org_id) do
+      authorize_membership(workspace, user, required_role)
+    end
+  end
+
+  defp org_active?(org_id) do
+    case Accounts.get_org(org_id) do
+      %ControlKeel.Accounts.Org{status: "active"} -> :ok
+      %ControlKeel.Accounts.Org{} -> {:error, :suspended}
+      nil -> {:error, :unbound}
+    end
+  end
+
   @doc """
   Whether a page that already resolved its membership may show and run
   mutations. Admin/owner memberships pass; local mode (no membership) passes;
@@ -64,7 +81,7 @@ defmodule ControlKeelWeb.WorkspaceAccess do
   def can_mutate?(%Accounts.Membership{role: role}), do: Accounts.role_at_least?(role, "admin")
   def can_mutate?(nil), do: Mode.current() == :local
 
-  defp resolve_membership(%Workspace{org_id: ws_org}, %{id: user_id}, required_role)
+  defp authorize_membership(%Workspace{org_id: ws_org}, %{id: user_id}, required_role)
        when is_integer(ws_org) and is_integer(user_id) do
     case Accounts.get_active_membership(user_id, ws_org) do
       nil ->
@@ -77,5 +94,5 @@ defmodule ControlKeelWeb.WorkspaceAccess do
     end
   end
 
-  defp resolve_membership(_workspace, _user, _required_role), do: {:error, :forbidden}
+  defp authorize_membership(_workspace, _user, _required_role), do: {:error, :forbidden}
 end

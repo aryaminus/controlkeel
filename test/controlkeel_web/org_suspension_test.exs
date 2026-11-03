@@ -4,10 +4,13 @@ defmodule ControlKeelWeb.OrgSuspensionTest do
   authorization must fail closed when no credential was established.
 
   Before this change, `Accounts.authorize_cloud_execution/2` (API) refused a
-  non-active org, but `OrgAccess.check/3` and `WorkspaceAccess.check/3` (used
-  by every LiveView) did not — so disabling an org left its entire browser
-  surface reachable. Separately, `APIHelpers.authorize_workspace_for_conn/3`
-  returned `:ok` for any conn without an `:api_auth` assign.
+  non-active org, but the browser gates — `OrgAccess.resolve/3` for org URLs
+  and `WorkspaceAccess.check_membership/3` for workspace pages — did not, so
+  disabling an org left its entire browser surface reachable. A suspended org
+  resolves like a missing one (`:forbidden` with `:not_found` copy) so its
+  lifecycle state is not enumerable. Separately,
+  `APIHelpers.authorize_workspace_for_conn/3` returned `:ok` for any conn
+  without an `:api_auth` assign.
   """
   use ControlKeelWeb.ConnCase, async: false
 
@@ -47,12 +50,22 @@ defmodule ControlKeelWeb.OrgSuspensionTest do
 
     test "OrgAccess denies a member when the org is suspended" do
       %{owner: owner, org: org} = org_with_owner()
-      assert {:ok, _membership} = OrgAccess.check(org, owner)
+      assert {:ok, ^org, _membership} = OrgAccess.resolve(org.slug, owner)
 
       {:ok, _} = Accounts.update_org(org, %{status: "disabled"})
-      reloaded = Accounts.get_org(org.id)
 
-      assert OrgAccess.check(reloaded, owner) == {:error, :suspended}
+      assert {:error, %{kind: :forbidden}} = OrgAccess.resolve(org.slug, owner)
+    end
+
+    test "a suspended org reads exactly like a missing one" do
+      %{owner: owner, org: org} = org_with_owner()
+      {:ok, _} = Accounts.update_org(org, %{status: "disabled"})
+
+      {:error, suspended} = OrgAccess.resolve(org.slug, owner)
+      {:error, missing} = OrgAccess.resolve("no-such-org-#{System.unique_integer()}", owner)
+
+      assert suspended.message == missing.message
+      assert suspended.title == missing.title
     end
 
     test "suspension does not affect local mode" do
@@ -62,7 +75,7 @@ defmodule ControlKeelWeb.OrgSuspensionTest do
       Application.put_env(:controlkeel, :runtime_mode, :local)
 
       assert WorkspaceAccess.check(workspace, owner) == :ok
-      assert {:ok, nil} = OrgAccess.check(org, owner)
+      assert {:ok, _org, nil} = OrgAccess.resolve(org.slug, owner)
     end
   end
 
