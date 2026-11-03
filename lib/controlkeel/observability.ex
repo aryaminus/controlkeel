@@ -869,11 +869,11 @@ defmodule ControlKeel.Observability do
   def eval_candidates(opts \\ []) do
     limit = Keyword.get(opts, :limit)
     problem_summary = problems(Keyword.delete(opts, :limit))
-    session_link = session_link_builder(opts)
+    {session_link, benchmarks_link} = scope_links(opts)
 
     all_candidates =
       problem_summary.problems
-      |> Enum.map(&eval_candidate_from_problem(&1, session_link))
+      |> Enum.map(&eval_candidate_from_problem(&1, session_link, benchmarks_link))
       |> Enum.sort_by(&{priority_rank(&1.priority), &1.rule_id})
 
     %{
@@ -887,18 +887,25 @@ defmodule ControlKeel.Observability do
   defp maybe_take(candidates, nil), do: candidates
   defp maybe_take(candidates, limit), do: Enum.take(candidates, limit)
 
-  # Org-scoped session URLs need slugs the problem structs don't carry;
-  # resolve once per call from the workspace all groups share. Falls back
-  # to the legacy global shape (still 302s in one hop) when no workspace is
-  # in scope. The legacy shape has no /observability suffix route, so the
-  # fallback links to /observability/sessions/:id directly.
-  defp session_link_builder(opts) do
+  # Org-scoped session/benchmark URLs need slugs the problem structs don't
+  # carry; resolve once per call from the workspace all groups share. Session
+  # links fall back to the legacy global shape (still 302s in one hop) when
+  # no workspace is in scope — the legacy shape has no /observability suffix
+  # route, so the fallback links to /observability/sessions/:id directly.
+  # Benchmarks moved into the workspace scope without a legacy redirect
+  # (issue: benchmarks-workspace-scope), so the benchmarks link is nil when
+  # no workspace is in scope.
+  defp scope_links(opts) do
     with workspace_id when not is_nil(workspace_id) <- Keyword.get(opts, :workspace_id),
          %Mission.Workspace{} = workspace <- Repo.get(Mission.Workspace, workspace_id),
          %{slug: ws_slug, org: %{slug: org_slug}} <- Repo.preload(workspace, :org) do
-      &"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{&1}/observability"
+      session_link = &"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{&1}/observability"
+      benchmarks_link = "/#{org_slug}/workspaces/#{ws_slug}/benchmarks"
+      {session_link, benchmarks_link}
     else
-      _ -> &"/observability/sessions/#{&1}"
+      _ ->
+        session_link = &"/observability/sessions/#{&1}"
+        {session_link, nil}
     end
   end
 
@@ -3216,7 +3223,7 @@ defmodule ControlKeel.Observability do
     end
   end
 
-  defp eval_candidate_from_problem(problem, session_link) do
+  defp eval_candidate_from_problem(problem, session_link, benchmarks_link) do
     feedback = problem.feedback_loop
 
     %{
@@ -3237,7 +3244,7 @@ defmodule ControlKeel.Observability do
       human_gate_required: feedback.human_gate_required,
       links: %{
         problems: "/observability",
-        benchmarks: "/benchmarks",
+        benchmarks: benchmarks_link,
         example_session: feedback.example_session_id && session_link.(feedback.example_session_id)
       }
     }

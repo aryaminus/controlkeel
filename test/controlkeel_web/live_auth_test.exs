@@ -1,6 +1,7 @@
 defmodule ControlKeelWeb.LiveAuthTest do
   use ControlKeelWeb.ConnCase, async: false
 
+  import ControlKeel.BenchmarkFixtures
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
@@ -80,9 +81,12 @@ defmodule ControlKeelWeb.LiveAuthTest do
     owner
   end
 
+  # The global benchmark run page (/benchmarks/runs/:id) is the retained
+  # require_cloud_auth surface without page-local membership, so it exercises
+  # the same gates the old global /benchmarks index did.
   test "memberless users are redirected to /new/org on authenticated pages" do
     assert {:error, {:redirect, %{to: "/new/org"}}} =
-             live(memberless_conn(), ~p"/benchmarks")
+             live(memberless_conn(), ~p"/benchmarks/runs/999999")
   end
 
   test "memberless users can open organization creation" do
@@ -92,7 +96,10 @@ defmodule ControlKeelWeb.LiveAuthTest do
 
   test "users with a membership render authenticated pages" do
     {conn, _user, _org} = member_conn()
-    {:ok, _view, html} = live(conn, ~p"/benchmarks")
+    run = benchmark_run_fixture()
+
+    {:ok, _view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+
     refute html =~ "Join or create an organization"
   end
 
@@ -189,8 +196,9 @@ defmodule ControlKeelWeb.LiveAuthTest do
     {conn, user, org} = member_conn()
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
+    run = benchmark_run_fixture()
 
-    {:ok, view, _html} = live(conn, ~p"/benchmarks")
+    {:ok, view, _html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
 
     assert {:ok, %Accounts.Membership{status: "revoked"}} =
              Accounts.revoke_membership(membership.id, owner.id)
@@ -200,6 +208,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
   end
 
   test "unauthenticated users are still sent to login, not /new/org" do
-    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/benchmarks")
+    assert {:error, {:redirect, %{to: "/auth/login"}}} =
+             live(build_conn(), ~p"/benchmarks/runs/999999")
   end
 end

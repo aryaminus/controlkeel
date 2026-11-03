@@ -102,7 +102,7 @@ Web:
 - `/missions/:id` — governed session
 - `/proofs` — proof bundles
 - `/deploy` — deployment guidance and generated config previews
-- `/benchmarks` — benchmark evidence
+- `/:org_slug/workspaces/:ws_slug/benchmarks` — benchmark evidence
 
 ## Notes
 

@@ -132,11 +132,11 @@ defmodule ControlKeelWeb.Layouts do
     """
   end
 
-  defp nav_items do
-    [
-      %{label: "Benchmarks", href: ~p"/benchmarks", icon: "hero-chart-bar-square"}
-    ]
-  end
+  # Intentionally empty: the last global surface (Benchmarks) moved to the
+  # workspace scope (/:org_slug/workspaces/:ws_slug/benchmarks). Kept as a
+  # seam in case a global page ever returns; the nav element still renders
+  # (Docs/GitHub/user menu live below it).
+  defp nav_items, do: []
 
   defp nav_active?(current_path, path, exact \\ false)
 

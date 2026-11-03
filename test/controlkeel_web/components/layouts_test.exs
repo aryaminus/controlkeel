@@ -5,32 +5,31 @@ defmodule ControlKeelWeb.LayoutsTest do
 
   alias ControlKeelWeb.Layouts
 
-  test "sidebar links carry expected keyboard focus styles" do
-    html = render_component(&Layouts.sidebar/1, current_path: "/dashboard")
+  # The global nav is empty since Benchmarks moved to the workspace scope, so
+  # the remaining focusable sidebar control is the user menu (renders in cloud
+  # mode with a signed-in user).
+  test "sidebar controls carry expected keyboard focus styles" do
+    html =
+      render_component(&Layouts.sidebar/1, %{
+        current_path: "/dashboard",
+        mode: :cloud,
+        current_user: %{id: 1, name: "Test User", email: "test@example.com"}
+      })
 
     assert html =~ "focus-visible:ring-offset-2"
     assert html =~ "focus-visible:ring-offset-background"
   end
 
-  test "top-level links carry aria-current on their own active page" do
-    html = render_component(&Layouts.sidebar/1, current_path: "/benchmarks")
-
-    assert anchor_for(html, "/benchmarks") =~ "aria-current=\"page\""
-  end
-
-  test "global organization and session index links are absent" do
+  # The global sidebar is intentionally empty since Benchmarks moved to the
+  # workspace scope (/:org_slug/workspaces/:ws_slug/benchmarks).
+  test "global index links are absent" do
     html = render_component(&Layouts.sidebar/1, current_path: "/dashboard")
 
     refute html =~ ~s(href="/organizations")
     refute html =~ ~s(href="/sessions")
+    refute html =~ ~s(href="/benchmarks")
     refute html =~ ">Organizations<"
     refute html =~ ">Sessions<"
-  end
-
-  defp anchor_for(html, href) do
-    case Regex.run(~r|<a\b[^>]*href="#{href}"[^>]*>.*?</a>|s, html) do
-      nil -> ""
-      [match] -> match
-    end
+    refute html =~ ">Benchmarks<"
   end
 end

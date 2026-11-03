@@ -387,7 +387,7 @@ For minority or experimental model integrations, route enough traffic to reach d
 
 ## Web UI quick presets
 
-On `/benchmarks`, Quick presets can fill subject and baseline fields for common runs such as OpenCode comparison, ControlKeel validate only, or validate plus governed proxy. The subjects field still accepts a comma-separated list and browser autocomplete from Available subjects.
+On `/:org_slug/workspaces/:ws_slug/benchmarks`, Quick presets fill subject and baseline fields for common runs such as OpenCode comparison, ControlKeel validate only, or validate plus governed proxy. The subjects field is a multi-select over the available subjects; the CLI and API still accept comma-separated subject lists. Running a suite is admin/owner only on the workspace page — viewers get a read-only view of the summary, suites catalog, and run history. Completed runs open on `/benchmarks/runs/:id`.
 
 ## Interpretation
 

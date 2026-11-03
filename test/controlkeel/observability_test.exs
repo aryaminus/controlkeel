@@ -448,10 +448,36 @@ defmodule ControlKeel.ObservabilityTest do
     assert candidate.example_session_id == session.id
     assert candidate.human_gate_required == true
     assert candidate.links.problems == "/observability"
-    assert candidate.links.benchmarks == "/benchmarks"
+    assert candidate.links.benchmarks == "/#{org.slug}/workspaces/#{ws.slug}/benchmarks"
 
     assert candidate.links.example_session ==
              "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/observability"
+  end
+
+  test "eval_candidates/1 without a workspace scope offers no benchmarks link" do
+    session = session_fixture()
+
+    finding_fixture(%{
+      session: session,
+      title: "Eval candidate finding",
+      severity: "critical",
+      status: "blocked",
+      category: "security",
+      rule_id: "security.eval_candidate"
+    })
+
+    eval_candidates = Observability.eval_candidates([])
+
+    assert eval_candidates.count == 1
+    assert [candidate] = eval_candidates.candidates
+
+    # Benchmarks moved into the workspace scope without a legacy redirect, so
+    # there is no URL to offer when no workspace is in scope (the session link
+    # keeps its legacy shape, which still 302s).
+    assert candidate.links.benchmarks == nil
+    assert candidate.links.problems == "/observability"
+
+    assert candidate.links.example_session == "/observability/sessions/#{session.id}"
   end
 
   test "problems/1 groups active findings by rule and category" do
