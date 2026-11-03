@@ -252,10 +252,4 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
       _ -> "web:unknown"
     end
   end
-
-  defp redirect_with_flash(socket, kind, msg, path) do
-    socket
-    |> Phoenix.LiveView.put_flash(kind, msg)
-    |> Phoenix.LiveView.push_navigate(to: path)
-  end
 end
