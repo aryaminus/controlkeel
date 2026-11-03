@@ -1,36 +1,72 @@
 defmodule ControlKeelWeb.BenchmarksLive do
+  @moduledoc """
+  Benchmark engine with two mounts:
+
+  - Workspace index at `/:org_slug/workspaces/:ws_slug/benchmarks` — the
+    canonical surface, admitted through `ControlKeelWeb.WorkspaceScope` like
+    the other workspace pages (viewer+ to view).
+  - Legacy global run page at `/benchmarks/runs/:id` — kept for backward
+    compatibility. Runs executed anywhere still navigate here.
+
+  Running a suite spends money, so the workspace page hides the runner from
+  viewers and refuses `run` events without an admin/owner membership (same
+  gate as the observability benchmark page; local mode is single-user and
+  always passes). The legacy global run page keeps its backward-compatible
+  behavior, including its import panel.
+
+  Suites, subjects, and runs are global rows, so both mounts derive the same
+  engine state; only the scope chrome differs.
+  """
+
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Benchmark
   alias ControlKeel.Intent
+  alias ControlKeel.Mission.Workspace
+  alias ControlKeelWeb.WorkspaceAccess
+  alias ControlKeelWeb.WorkspaceScope
 
+  @impl true
+  def mount(%{"org_slug" => _, "ws_slug" => _} = params, _session, socket) do
+    case WorkspaceScope.assign_scope(socket, params, "Benchmarks") do
+      {:ok, socket} ->
+        {:ok,
+         socket
+         |> assign(:page_title, "Benchmarks — #{socket.assigns.workspace.name}")
+         |> assign_engine_state()}
+
+      {:error, socket} ->
+        {:ok, socket}
+    end
+  end
+
+  # Legacy global mount (backward-compatible /benchmarks/runs/:id page).
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
      |> assign(:page_title, "Benchmarks")
-     |> assign(:run, nil)
-     |> assign(:matrix, %{subjects: [], scenarios: []})
-     |> assign(:detail_metrics, %{})
-     |> assign(:eval_profile, %{})
-     |> assign(:comparison, nil)
-     |> assign(:import_slots, [])
-     |> assign(:import_form, empty_import_form())
-     |> assign(:subjects_dropdown_open, false)
-     |> assign(:active_preset, "opencode_compare")
-     |> assign(:form, to_form(default_form_params(), as: :benchmark))
-     |> assign(:domain_pack_options, domain_pack_options())
-     |> refresh_dashboard_assigns()}
+     |> assign_engine_state()}
   end
 
   @impl true
+  def handle_params(%{"org_slug" => _, "ws_slug" => _} = params, _uri, socket) do
+    WorkspaceScope.on_params(socket, params, fn socket, _params ->
+      socket
+      |> assign(:page_title, "Benchmarks — #{socket.assigns.workspace.name}")
+      |> assign_engine_state()
+    end)
+  end
+
   def handle_params(%{"id" => id}, _uri, socket) do
     case Benchmark.get_run(id) do
       nil ->
+        # The global index this page used to fall back to moved into the
+        # workspace scope, so an unknown run goes home instead.
         {:noreply,
          socket
          |> put_flash(:error, "Benchmark run not found.")
-         |> push_navigate(to: ~p"/benchmarks")}
+         |> push_navigate(to: ~p"/")}
 
       run ->
         {:noreply,
@@ -45,32 +81,24 @@ defmodule ControlKeelWeb.BenchmarksLive do
     end
   end
 
-  def handle_params(_params, _uri, socket) do
-    {:noreply,
-     socket
-     |> assign(:run, nil)
-     |> assign(:matrix, %{subjects: [], scenarios: []})
-     |> assign(:detail_metrics, %{})
-     |> assign(:eval_profile, %{})
-     |> assign(:comparison, nil)
-     |> assign(:import_slots, [])
-     |> assign(:import_form, empty_import_form())
-     |> assign(:page_title, "Benchmarks")
-     |> assign(:page_action, nil)
-     |> refresh_dashboard_assigns()}
-  end
-
   @impl true
   def handle_event("run", %{"benchmark" => params}, socket) do
-    case Benchmark.run_suite(params) do
-      {:ok, run} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Benchmark run ##{run.id} completed.")
-         |> push_navigate(to: ~p"/benchmarks/runs/#{run.id}")}
+    with {:ok, socket} <- require_admin(socket) do
+      case Benchmark.run_suite(params) do
+        {:ok, run} ->
+          # Intentionally the global run page: the run detail remains a global
+          # backward-compatibility surface even when the run starts from the
+          # workspace-scoped benchmarks page (issue: benchmarks-workspace-scope).
+          {:noreply,
+           socket
+           |> put_flash(:info, "Benchmark run ##{run.id} completed.")
+           |> push_navigate(to: ~p"/benchmarks/runs/#{run.id}")}
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Benchmark run failed: #{inspect(reason)}")}
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Benchmark run failed: #{inspect(reason)}")}
+      end
+    else
+      {:error, socket} -> {:noreply, socket}
     end
   end
 
@@ -186,7 +214,12 @@ defmodule ControlKeelWeb.BenchmarksLive do
      |> assign(:active_preset, nil)}
   end
 
+  # The organization layout renders the in-place scope-error panel; the
+  # LiveView itself renders nothing (same shape as WorkspaceReposLive). The
+  # legacy global run page has no scope_error assign and never matches.
   @impl true
+  def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
+
   def render(%{live_action: :show} = assigns) do
     ~H"""
     <div class="w-full space-y-8">
@@ -639,8 +672,12 @@ defmodule ControlKeelWeb.BenchmarksLive do
       />
 
       <div class="grid gap-6 lg:grid-cols-3">
-        <%!-- Runner form & presets panel --%>
-        <section class="rounded-2xl border bg-card p-5 shadow-card space-y-6 lg:col-span-2">
+        <%!-- Runner form & presets panel (admin/owner only; viewers get the
+             read-only catalog and history below) --%>
+        <section
+          :if={WorkspaceAccess.can_mutate?(@current_membership)}
+          class="rounded-2xl border bg-card p-5 shadow-card space-y-6 lg:col-span-2"
+        >
           <div class="space-y-3">
             <.section_title>Quick presets</.section_title>
             <p class="text-sm text-muted-foreground max-w-xl leading-relaxed">
@@ -945,6 +982,38 @@ defmodule ControlKeelWeb.BenchmarksLive do
         "baseline_subject" => "controlkeel_validate"
       }
     }
+  end
+
+  # Running a suite spends money, so workspace mutations are admin/owner only
+  # (same gate and message as the observability benchmark page). Local mode has
+  # no membership and passes through WorkspaceAccess.check/3.
+  defp require_admin(socket) do
+    with %Workspace{} = workspace <- socket.assigns[:workspace],
+         :ok <- WorkspaceAccess.check(workspace, socket.assigns[:current_user], "admin") do
+      {:ok, socket}
+    else
+      _ -> {:error, put_flash(socket, :error, "Admin or owner role required.")}
+    end
+  end
+
+  # Shared engine state for both mounts: runner form, presets, import panel,
+  # and the dashboard aggregates. Suites/subjects/runs are global rows, so
+  # the workspace-scoped index and the legacy global run page derive the
+  # same assigns.
+  defp assign_engine_state(socket) do
+    socket
+    |> assign(:run, nil)
+    |> assign(:matrix, %{subjects: [], scenarios: []})
+    |> assign(:detail_metrics, %{})
+    |> assign(:eval_profile, %{})
+    |> assign(:comparison, nil)
+    |> assign(:import_slots, [])
+    |> assign(:import_form, empty_import_form())
+    |> assign(:subjects_dropdown_open, false)
+    |> assign(:active_preset, "opencode_compare")
+    |> assign(:form, to_form(default_form_params(), as: :benchmark))
+    |> assign(:domain_pack_options, domain_pack_options())
+    |> refresh_dashboard_assigns()
   end
 
   defp refresh_dashboard_assigns(socket) do

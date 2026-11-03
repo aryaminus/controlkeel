@@ -131,7 +131,13 @@ defmodule ControlKeelWeb.Router do
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults
       ] do
-      live "/benchmarks", BenchmarksLive, :index
+      # /benchmarks (index) moved to the workspace scope
+      # (/:org_slug/workspaces/:ws_slug/benchmarks, declared in the
+      # :organization session below). Only the run-detail page stays global
+      # for backward compatibility. GET /benchmarks now falls through to the
+      # ":org_slug" live block and the invalid-org handler — "benchmarks" is
+      # reserved in Accounts.Org.@reserved_slugs, so no org can ever claim
+      # the URL. Regression-tested in router_test.exs.
       live "/benchmarks/runs/:id", BenchmarksLive, :show
 
       # /cloud/projects and /cloud/telemetry removed (owner directive, 10/22:
@@ -430,6 +436,13 @@ defmodule ControlKeelWeb.Router do
       live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
       live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
       live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
+
+      # Workspace-scoped benchmark engine (issue: benchmarks-workspace-scope):
+      # the former global /benchmarks page, mounted from the URL workspace
+      # with the standard WorkspaceScope access checks like the other
+      # workspace pages. Executing a run still lands on the global
+      # /benchmarks/runs/:id page above for backward compatibility.
+      live "/:org_slug/workspaces/:ws_slug/benchmarks", BenchmarksLive, :index
 
       # Workspace-scoped observability (issue: observability-workspace-scope):
       # same LiveViews as the former global `/observability/*` pages, mounted
