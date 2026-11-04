@@ -19,16 +19,32 @@ defmodule ControlKeelWeb.LegacyController do
   alias ControlKeelWeb.FallbackController
 
   # Valid workspace subpages, then and now.
-  @subpaths ~w(settings repos service-accounts webhooks tool-policy)
+  @subpaths ~w(settings repos service-accounts webhooks tool-policy sessions)
 
   def workspace(conn, %{"id" => id} = params) do
     with %Workspace{} = workspace <- fetch_workspace(id),
          workspace = Repo.preload(workspace, :org),
          {:ok, suffix} <- subpath(params, conn) do
-      redirect(conn, to: "/#{workspace.org.slug}/workspaces/#{workspace.slug}#{suffix}")
+      redirect(conn, to: "/#{workspace.org.slug}/workspace/#{workspace.slug}#{suffix}")
     else
       _ -> FallbackController.not_found(conn, params)
     end
+  end
+
+  def plural_workspace(conn, %{"org_slug" => org_slug, "ws_slug" => ws_slug} = params) do
+    suffix =
+      case params["rest"] do
+        rest when is_list(rest) and rest != [] -> "/" <> Enum.join(rest, "/")
+        _ -> ""
+      end
+
+    query =
+      case conn.query_string do
+        "" -> ""
+        query -> "?#{query}"
+      end
+
+    redirect(conn, to: "/#{org_slug}/workspace/#{ws_slug}#{suffix}#{query}")
   end
 
   # `/workspaces/:id/*rest` carries the subpage as a glob; anything outside
@@ -89,7 +105,7 @@ defmodule ControlKeelWeb.LegacyController do
     redirect(
       conn,
       to:
-        "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}#{session_subpath(params, conn)}#{query}"
+        "/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}#{session_subpath(params, conn)}#{query}"
     )
   end
 

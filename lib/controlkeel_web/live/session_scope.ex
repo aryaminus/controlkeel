@@ -160,7 +160,7 @@ defmodule ControlKeelWeb.SessionScope do
             |> assign(:current_membership, workspace_membership || membership)
             |> assign(:breadcrumbs, [
               %{label: org.name, to: "/#{org.slug}"},
-              %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"}
+              %{label: workspace.name, to: "/#{org.slug}/workspace/#{workspace.slug}"}
             ])
 
           :error ->

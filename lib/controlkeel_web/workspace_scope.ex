@@ -139,7 +139,7 @@ defmodule ControlKeelWeb.WorkspaceScope do
   defp breadcrumbs(workspace, label) do
     workspace_breadcrumb = %{
       label: workspace.name,
-      to: if(is_nil(label), do: nil, else: "/#{workspace.org.slug}/workspaces/#{workspace.slug}")
+      to: if(is_nil(label), do: nil, else: "/#{workspace.org.slug}/workspace/#{workspace.slug}")
     }
 
     [

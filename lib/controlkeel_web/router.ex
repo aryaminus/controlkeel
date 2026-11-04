@@ -207,6 +207,11 @@ defmodule ControlKeelWeb.Router do
     get "/organizations/:slug/workspaces/:id/settings", LegacyController, :workspace
     get "/workspaces/:id/*rest", LegacyController, :workspace
 
+    # Transitional plural workspace URLs (pre-/:org_slug/workspace/:ws_slug):
+    # redirect /:org_slug/workspaces/:ws_slug/* to /:org_slug/workspace/:ws_slug/*
+    get "/:org_slug/workspaces/:ws_slug", LegacyController, :plural_workspace
+    get "/:org_slug/workspaces/:ws_slug/*rest", LegacyController, :plural_workspace
+
     # Legacy launcher URL (pre-/new/* rename): the session wizard moved from
     # /sessions/start to /new/session, which accepts the same org_slug/ws_slug
     # scoping params, so the query string is preserved verbatim. Static path,
@@ -286,7 +291,15 @@ defmodule ControlKeelWeb.Router do
         ObservabilityController,
         :export_audit_log
 
-    # New org-scoped export paths for the stacked observability page.
+    # Org-scoped export paths (supports both canonical singular and legacy plural workspace).
+    get "/:org_slug/workspace/:ws_slug/sessions/:id/observability/export.json",
+        ObservabilityController,
+        :export_session
+
+    get "/:org_slug/workspace/:ws_slug/sessions/:id/observability/audit-log/:format",
+        ObservabilityController,
+        :export_audit_log
+
     get "/:org_slug/workspaces/:ws_slug/sessions/:id/observability/export.json",
         ObservabilityController,
         :export_session
@@ -448,19 +461,22 @@ defmodule ControlKeelWeb.Router do
         ControlKeelWeb.OrganizationLayoutDefaults
       ] do
       live "/:org_slug", OrganizationDetailLive, :index
+      live "/:org_slug/workspaces", OrganizationWorkspacesLive, :index
+      live "/:org_slug/sessions", OrganizationSessionsLive, :index
       live "/:org_slug/settings", OrganizationSettingsLive, :edit
-      live "/:org_slug/workspaces/:ws_slug", WorkspaceDetailLive, :index
-      live "/:org_slug/workspaces/:ws_slug/settings", WorkspaceSettingsLive, :show
-      live "/:org_slug/workspaces/:ws_slug/repos", WorkspaceReposLive, :index
-      live "/:org_slug/workspaces/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
-      live "/:org_slug/workspaces/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
+      live "/:org_slug/workspace/:ws_slug", WorkspaceDetailLive, :index
+      live "/:org_slug/workspace/:ws_slug/sessions", WorkspaceSessionsLive, :index
+      live "/:org_slug/workspace/:ws_slug/settings", WorkspaceSettingsLive, :show
+      live "/:org_slug/workspace/:ws_slug/repos", WorkspaceReposLive, :index
+      live "/:org_slug/workspace/:ws_slug/service-accounts", WorkspaceServiceAccountsLive, :index
+      live "/:org_slug/workspace/:ws_slug/webhooks", WorkspaceWebhooksLive, :index
+      live "/:org_slug/workspace/:ws_slug/tool-policy", WorkspaceToolPolicyLive, :edit
 
       # Workspace-scoped benchmark engine (issue: benchmarks-workspace-scope):
       # the former global /benchmarks page, mounted from the URL workspace
       # with the standard WorkspaceScope access checks like the other
       # workspace pages.
-      live "/:org_slug/workspaces/:ws_slug/benchmarks", BenchmarksLive, :index
+      live "/:org_slug/workspace/:ws_slug/benchmarks", BenchmarksLive, :index
 
       # Workspace-scoped benchmark run detail (issue: benchmarks-run-scope):
       # the former global /benchmarks/runs/:id page, scoped to the URL
@@ -470,69 +486,69 @@ defmodule ControlKeelWeb.Router do
       # global index — falls through to the ":org_slug" live block and the
       # invalid-org handler ("benchmarks" is reserved, so no org can claim
       # the path).
-      live "/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id", BenchmarksLive, :show
+      live "/:org_slug/workspace/:ws_slug/benchmarks/runs/:id", BenchmarksLive, :show
 
       # Workspace-scoped observability (issue: observability-workspace-scope):
       # same LiveViews as the former global `/observability/*` pages, mounted
       # from the URL workspace (`ws_slug` + `org_slug`) instead of the
       # most-recent-session heuristic.
-      live "/:org_slug/workspaces/:ws_slug/observability", ObservabilityOverviewLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/loop", ObservabilityLoopLive, :index
+      live "/:org_slug/workspace/:ws_slug/observability", ObservabilityOverviewLive, :index
+      live "/:org_slug/workspace/:ws_slug/observability/loop", ObservabilityLoopLive, :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/compare",
+      live "/:org_slug/workspace/:ws_slug/observability/compare",
            ObservabilityCompareLive,
            :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/costs", ObservabilityCostsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/observability/evals", ObservabilityEvalsLive, :index
+      live "/:org_slug/workspace/:ws_slug/observability/costs", ObservabilityCostsLive, :index
+      live "/:org_slug/workspace/:ws_slug/observability/evals", ObservabilityEvalsLive, :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/imports",
+      live "/:org_slug/workspace/:ws_slug/observability/imports",
            ObservabilityImportsLive,
            :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/memory-quality",
+      live "/:org_slug/workspace/:ws_slug/observability/memory-quality",
            ObservabilityMemoryQualityLive,
            :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/recommendations",
+      live "/:org_slug/workspace/:ws_slug/observability/recommendations",
            ObservabilityRecommendationsLive,
            :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
+      live "/:org_slug/workspace/:ws_slug/observability/trends", ObservabilityTrendsLive, :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/promotions",
+      live "/:org_slug/workspace/:ws_slug/observability/promotions",
            ObservabilityPromotionsLive,
            :index
 
-      live "/:org_slug/workspaces/:ws_slug/observability/benchmark",
+      live "/:org_slug/workspace/:ws_slug/observability/benchmark",
            ObservabilityBenchmarkLive,
            :index
 
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id", MissionControlLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/activity", SessionActivityLive, :show
+      live "/:org_slug/workspace/:ws_slug/sessions/:id", MissionControlLive, :show
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/tasks", SessionTasksLive, :index
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/findings", SessionFindingsLive, :index
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/reviews", SessionReviewsLive, :index
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/deploy-review", DeployReviewLive, :show
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/activity", SessionActivityLive, :show
 
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/resume-packet",
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/resume-packet",
            SessionResumePacketLive,
            :show
 
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/connect", SessionConnectLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/release", SessionReleaseLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/ship", SessionShipLive, :show
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/connect", SessionConnectLive, :show
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/release", SessionReleaseLive, :show
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/ship", SessionShipLive, :show
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/reviews/:rid", ReviewLive, :show
 
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/observability",
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/observability",
            SessionObservabilityLive,
            :show
 
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs",
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/proofs",
            SessionProofsLive,
            :index
 
-      live "/:org_slug/workspaces/:ws_slug/sessions/:id/proofs/:proof_id",
+      live "/:org_slug/workspace/:ws_slug/sessions/:id/proofs/:proof_id",
            ProofLive,
            :show
 

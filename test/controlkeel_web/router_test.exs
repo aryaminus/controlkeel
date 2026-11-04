@@ -4,6 +4,8 @@ defmodule ControlKeelWeb.RouterTest do
   alias ControlKeelWeb.ApiController
   alias ControlKeelWeb.BenchmarksLive
   alias ControlKeelWeb.OrganizationDetailLive
+  alias ControlKeelWeb.OrganizationSessionsLive
+  alias ControlKeelWeb.OrganizationWorkspacesLive
   alias ControlKeelWeb.ObservabilityController
   alias ControlKeelWeb.Router
 
@@ -20,6 +22,26 @@ defmodule ControlKeelWeb.RouterTest do
       "/acme/workspaces/default/sessions/123/observability/export.json",
       ObservabilityController,
       :export_session
+    )
+
+    assert_route(
+      "/acme/workspace/default/sessions/123/observability/export.json",
+      ObservabilityController,
+      :export_session
+    )
+  end
+
+  test "transitional plural workspace routes redirect to singular workspace" do
+    assert_route(
+      "/acme/workspaces/default",
+      ControlKeelWeb.LegacyController,
+      :plural_workspace
+    )
+
+    assert_route(
+      "/acme/workspaces/default/sessions/123",
+      ControlKeelWeb.LegacyController,
+      :plural_workspace
     )
   end
 
@@ -41,11 +63,30 @@ defmodule ControlKeelWeb.RouterTest do
 
   test "benchmarks index lives in the workspace scope" do
     info =
-      Phoenix.Router.route_info(Router, "GET", "/acme/workspaces/default/benchmarks", "localhost")
+      Phoenix.Router.route_info(Router, "GET", "/acme/workspace/default/benchmarks", "localhost")
 
     assert %{plug: Phoenix.LiveView.Plug, plug_opts: :index} = info
 
     assert {BenchmarksLive, :index, _opts, %{name: :organization}} =
+             info.phoenix_live_view
+  end
+
+  test "organization workspaces index lives in the organization scope" do
+    info =
+      Phoenix.Router.route_info(Router, "GET", "/acme/workspaces", "localhost")
+
+    assert %{plug: Phoenix.LiveView.Plug, plug_opts: :index} = info
+
+    assert {OrganizationWorkspacesLive, :index, _opts, %{name: :organization}} =
+             info.phoenix_live_view
+  end
+
+  test "organization sessions index lives in the organization scope" do
+    info = Phoenix.Router.route_info(Router, "GET", "/acme/sessions", "localhost")
+
+    assert %{plug: Phoenix.LiveView.Plug, plug_opts: :index} = info
+
+    assert {OrganizationSessionsLive, :index, _opts, %{name: :organization}} =
              info.phoenix_live_view
   end
 
@@ -54,7 +95,7 @@ defmodule ControlKeelWeb.RouterTest do
       Phoenix.Router.route_info(
         Router,
         "GET",
-        "/acme/workspaces/default/benchmarks/runs/99",
+        "/acme/workspace/default/benchmarks/runs/99",
         "localhost"
       )
 
