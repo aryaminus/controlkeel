@@ -1229,6 +1229,30 @@ defmodule ControlKeel.Mission do
     |> Repo.all()
   end
 
+  @doc """
+  Sessions the viewer may filter findings by.
+
+  Cloud mode scopes to the viewer's accessible workspaces; an empty accessible
+  set yields no rows rather than every session in the database. Local
+  single-user mode stays unscoped.
+  """
+  def list_findings_browser_sessions_for_user(user, limit \\ 30) do
+    if ControlKeel.Runtime.Mode.current() == :local do
+      list_findings_browser_sessions()
+    else
+      case user do
+        %{id: user_id} ->
+          user_id
+          |> accessible_workspace_ids()
+          |> list_recent_sessions_in_workspaces(limit)
+          |> Enum.map(&Map.put(&1, :workspace, &1.workspace))
+
+        _ ->
+          []
+      end
+    end
+  end
+
   def list_finding_categories do
     Finding
     |> group_by([f], f.category)
@@ -6701,11 +6725,16 @@ defmodule ControlKeel.Mission do
   end
 
   defp normalize_ids_filter(nil), do: nil
-  defp normalize_ids_filter([]), do: nil
+
+  # A present-but-empty list is meaningful: it means the caller injected
+  # "you can reach no workspaces", which must fail closed in the query layer.
+  # Only a genuinely absent (nil) or non-list value collapses to nil ("no
+  # filter"). Keep [] intact.
+  defp normalize_ids_filter([]), do: []
 
   defp normalize_ids_filter(ids) when is_list(ids) do
     result = Enum.filter(ids, &is_integer/1)
-    if result == [], do: nil, else: result
+    if result == [], do: [], else: result
   end
 
   defp normalize_ids_filter(_), do: nil
@@ -6837,7 +6866,14 @@ defmodule ControlKeel.Mission do
   end
 
   defp maybe_filter_finding_workspace(query, nil), do: query
-  defp maybe_filter_finding_workspace(query, []), do: query
+
+  # An explicitly empty workspace list means "caller can reach no workspace",
+  # not "no filter". Returning the query unfiltered here would turn a
+  # fail-closed caller into a cross-tenant read (matches Cloud.Scope, where an
+  # empty id list yields no rows).
+  defp maybe_filter_finding_workspace(query, [] = _ids) do
+    from([_f, _s, _w] in query, where: false)
+  end
 
   defp maybe_filter_finding_workspace(query, workspace_id) when is_integer(workspace_id) do
     from([_f, s, _w] in query, where: s.workspace_id == ^workspace_id)
@@ -6848,7 +6884,10 @@ defmodule ControlKeel.Mission do
   end
 
   defp maybe_filter_proof_workspace(query, nil), do: query
-  defp maybe_filter_proof_workspace(query, []), do: query
+
+  defp maybe_filter_proof_workspace(query, [] = _ids) do
+    from([_proof, _task, _session, _workspace] in query, where: false)
+  end
 
   defp maybe_filter_proof_workspace(query, workspace_id) when is_integer(workspace_id) do
     from([_proof, _task, session, _workspace] in query,
