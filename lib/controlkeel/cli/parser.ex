@@ -263,6 +263,9 @@ defmodule ControlKeel.CLI.Parser do
   @detach_switches [project_root: :string, json: :boolean, force: :boolean]
   @agents_doctor_switches [project_root: :string, json: :boolean]
   @cloud_doctor_switches [project_root: :string, json: :boolean]
+  @login_switches [server: :string, json: :boolean]
+  @logout_switches [json: :boolean]
+  @whoami_switches [server: :string, json: :boolean]
   @cloud_connect_switches [
     project_root: :string,
     rotate: :boolean,
@@ -505,6 +508,15 @@ defmodule ControlKeel.CLI.Parser do
 
       ["cloud", "connect" | rest] ->
         parse_with_switches(:cloud_connect, rest, @cloud_connect_switches)
+
+      ["login" | rest] ->
+        parse_with_switches(:login, rest, @login_switches)
+
+      ["logout" | rest] ->
+        parse_with_switches(:logout, rest, @logout_switches)
+
+      ["whoami" | rest] ->
+        parse_with_switches(:whoami, rest, @whoami_switches)
 
       ["cloud", "push" | rest] ->
         parse_with_switches(:cloud_sync_push, rest, @cloud_sync_push_switches)
