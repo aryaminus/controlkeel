@@ -140,6 +140,24 @@ if token = System.get_env("CONTROLKEEL_API_TOKEN") do
   config :controlkeel, :api_token, token
 end
 
+# Break-glass access for the /api/v1 bootstrap token.
+#
+# The bootstrap token is an emergency credential, not a platform superuser. In
+# cloud/self_hosted mode it authorizes NOTHING unless it is explicitly enabled
+# here AND scoped to a single workspace. Both values are required: an enabled
+# but unscoped credential would still be a cross-tenant superuser, which is the
+# failure mode this replaces.
+#
+# Deliberately opt-in per environment so a leaked CONTROLKEEL_API_TOKEN is not,
+# by itself, a full compromise of every tenant.
+if System.get_env("CONTROLKEEL_BREAK_GLASS_ENABLED") in ["true", "1"] do
+  config :controlkeel, :break_glass_enabled, true
+
+  config :controlkeel,
+         :break_glass_workspace_id,
+         System.get_env("CONTROLKEEL_BREAK_GLASS_WORKSPACE_ID")
+end
+
 if webhook = System.get_env("CONTROLKEEL_WEBHOOK_URL") do
   config :controlkeel, :webhook_url, webhook
 end
