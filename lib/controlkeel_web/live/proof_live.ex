@@ -96,7 +96,7 @@ defmodule ControlKeelWeb.ProofLive do
                 [
                   %{
                     label: "Proofs",
-                    to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}/proofs"
+                    to: "/#{org.slug}/workspace/#{workspace.slug}/sessions/#{session.id}/proofs"
                   },
                   %{label: proof.task.title, to: nil}
                 ]
@@ -123,7 +123,7 @@ defmodule ControlKeelWeb.ProofLive do
 
       <.link
         :if={!@proof}
-        navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs"}
+        navigate={~p"/#{@org_slug}/workspace/#{@ws_slug}/sessions/#{@session.id}/proofs"}
         class="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-primary"
       >
         <.icon name="hero-arrow-left" class="size-3" /> Back to proofs

@@ -49,7 +49,7 @@ defmodule ControlKeelWeb.DeployReviewLiveTest do
 
     assert has_element?(view, "[data-scope-error]")
     assert has_element?(view, "h1", "Can't find the page")
-    assert has_element?(view, ~s(#app-sidebar a[href="/#{org.slug}/workspaces/#{ws.slug}"]))
+    assert has_element?(view, ~s(#app-sidebar a[href="/#{org.slug}/workspace/#{ws.slug}"]))
     refute_redirected(view)
   end
 

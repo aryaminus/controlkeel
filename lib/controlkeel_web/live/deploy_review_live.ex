@@ -50,10 +50,10 @@ defmodule ControlKeelWeb.DeployReviewLive do
     |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
     |> assign(:breadcrumbs, [
       %{label: org.name, to: "/#{org.slug}"},
-      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+      %{label: workspace.name, to: "/#{org.slug}/workspace/#{workspace.slug}"},
       %{
         label: session.title,
-        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+        to: "/#{org.slug}/workspace/#{workspace.slug}/sessions/#{session.id}"
       },
       %{label: "Deploy review", to: nil}
     ])

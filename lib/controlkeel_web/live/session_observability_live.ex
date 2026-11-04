@@ -59,10 +59,10 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
       if org && workspace do
         [
           %{label: org.name, to: "/#{org.slug}"},
-          %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+          %{label: workspace.name, to: "/#{org.slug}/workspace/#{workspace.slug}"},
           %{
             label: session.title,
-            to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+            to: "/#{org.slug}/workspace/#{workspace.slug}/sessions/#{session.id}"
           },
           %{label: "Observability", to: nil}
         ]
@@ -97,7 +97,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
         <div id="observability-telemetry-export" class="shrink-0 space-y-2 sm:text-right">
           <.link
             href={
-              ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@run.session.id}/observability/export.json"
+              ~p"/#{@org_slug}/workspace/#{@ws_slug}/sessions/#{@run.session.id}/observability/export.json"
             }
             target="_blank"
             rel="noopener"
@@ -229,7 +229,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
             <p class="mt-1 text-xs text-muted-foreground">
               <.link
                 navigate={
-                  ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@run.session.id}/activity"
+                  ~p"/#{@org_slug}/workspace/#{@ws_slug}/sessions/#{@run.session.id}/activity"
                 }
                 class="font-medium text-primary transition hover:underline"
               >
@@ -255,7 +255,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
                   </div>
                   <.link
                     navigate={
-                      ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@run.session.id}/proofs/#{event.proof_id}"
+                      ~p"/#{@org_slug}/workspace/#{@ws_slug}/sessions/#{@run.session.id}/proofs/#{event.proof_id}"
                     }
                     class="text-xs font-semibold text-primary transition hover:underline"
                   >
@@ -327,7 +327,7 @@ defmodule ControlKeelWeb.SessionObservabilityLive do
           <div class="flex items-center justify-between gap-4">
             <.section_title>Recent notes</.section_title>
             <.link
-              navigate={~p"/#{@org_slug}/workspaces/#{@ws_slug}/observability/memory-quality"}
+              navigate={~p"/#{@org_slug}/workspace/#{@ws_slug}/observability/memory-quality"}
               class="text-sm font-medium text-primary transition hover:underline"
             >
               Memory quality →

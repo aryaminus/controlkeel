@@ -71,7 +71,7 @@ defmodule ControlKeel.MissionFixtures do
   plus optional suffix such as `"/reviews"`).
   """
   def org_session_path(org, ws, session, extra \\ "") do
-    "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}#{extra}"
+    "/#{org.slug}/workspace/#{ws.slug}/sessions/#{session.id}#{extra}"
   end
 
   def session_fixture(attrs \\ %{}) do

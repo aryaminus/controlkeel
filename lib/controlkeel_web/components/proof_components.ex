@@ -40,10 +40,10 @@ defmodule ControlKeelWeb.ProofComponents do
   def session_breadcrumb_base(org, workspace, session) do
     [
       %{label: org.name, to: "/#{org.slug}"},
-      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+      %{label: workspace.name, to: "/#{org.slug}/workspace/#{workspace.slug}"},
       %{
         label: session.title,
-        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+        to: "/#{org.slug}/workspace/#{workspace.slug}/sessions/#{session.id}"
       }
     ]
   end

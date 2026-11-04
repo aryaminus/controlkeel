@@ -910,8 +910,8 @@ defmodule ControlKeel.Observability do
     with workspace_id when not is_nil(workspace_id) <- Keyword.get(opts, :workspace_id),
          %Mission.Workspace{} = workspace <- Repo.get(Mission.Workspace, workspace_id),
          %{slug: ws_slug, org: %{slug: org_slug}} <- Repo.preload(workspace, :org) do
-      session_link = &"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{&1}/observability"
-      benchmarks_link = "/#{org_slug}/workspaces/#{ws_slug}/benchmarks"
+      session_link = &"/#{org_slug}/workspace/#{ws_slug}/sessions/#{&1}/observability"
+      benchmarks_link = "/#{org_slug}/workspace/#{ws_slug}/benchmarks"
       {session_link, benchmarks_link}
     else
       _ ->

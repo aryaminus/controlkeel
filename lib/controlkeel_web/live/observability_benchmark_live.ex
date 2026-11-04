@@ -525,7 +525,7 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
                     </p>
                     <.link
                       navigate={
-                        ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/benchmarks/runs/#{run.id}"
+                        ~p"/#{@nav_org.slug}/workspace/#{@nav_workspace.slug}/benchmarks/runs/#{run.id}"
                       }
                       class="text-sm font-medium text-primary transition hover:text-primary"
                     >

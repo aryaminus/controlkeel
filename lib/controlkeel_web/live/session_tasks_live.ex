@@ -41,10 +41,10 @@ defmodule ControlKeelWeb.SessionTasksLive do
     |> assign(:sibling_sessions, Mission.list_sibling_sessions(workspace.id))
     |> assign(:breadcrumbs, [
       %{label: org.name, to: "/#{org.slug}"},
-      %{label: workspace.name, to: "/#{org.slug}/workspaces/#{workspace.slug}"},
+      %{label: workspace.name, to: "/#{org.slug}/workspace/#{workspace.slug}"},
       %{
         label: session.title,
-        to: "/#{org.slug}/workspaces/#{workspace.slug}/sessions/#{session.id}"
+        to: "/#{org.slug}/workspace/#{workspace.slug}/sessions/#{session.id}"
       },
       %{label: "Tasks", to: nil}
     ])
@@ -498,7 +498,7 @@ defmodule ControlKeelWeb.SessionTasksLive do
                       <.link
                         :if={Map.get(@latest_proofs, task.id)}
                         navigate={
-                          ~p"/#{@org_slug}/workspaces/#{@ws_slug}/sessions/#{@session.id}/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"
+                          ~p"/#{@org_slug}/workspace/#{@ws_slug}/sessions/#{@session.id}/proofs/#{Map.fetch!(@latest_proofs, task.id).id}"
                         }
                         class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition hover:bg-muted"
                         phx-click={

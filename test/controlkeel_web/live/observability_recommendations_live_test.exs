@@ -38,7 +38,7 @@ defmodule ControlKeelWeb.ObservabilityRecommendationsLiveTest do
     {:ok, _view, html} =
       live(conn, "/#{org.slug}/workspaces/#{ws.slug}/observability/recommendations")
 
-    prefix = "/#{org.slug}/workspaces/#{ws.slug}"
+    prefix = "/#{org.slug}/workspace/#{ws.slug}"
 
     # <.link navigate> renders as href.
     assert html =~ ~s(href="#{prefix}/observability/problems")
