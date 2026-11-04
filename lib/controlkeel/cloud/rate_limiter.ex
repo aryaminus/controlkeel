@@ -47,9 +47,10 @@ defmodule ControlKeel.Cloud.RateLimiter do
   Hit the bucket for an arbitrary key (not just a workspace id).
 
   Same token-bucket semantics as `hit/2`, but accepts any term. Used for
-  per-IP throttling on unauthenticated surfaces and per-secret throttling on
-  short-lived codes, where there is no workspace to key on yet. Callers
-  namespace their keys so they cannot collide with workspace buckets.
+  per-IP throttling on unauthenticated surfaces, per-secret throttling on
+  short-lived codes, and other token-consuming flows where there is no
+  workspace to key on yet. Callers namespace their keys so they cannot
+  collide with workspace buckets.
   """
   @spec hit_key(term(), keyword()) :: result()
   def hit_key(key, opts \\ []) when not is_nil(key) do
@@ -75,25 +76,6 @@ defmodule ControlKeel.Cloud.RateLimiter do
 
     now_ms = System.monotonic_time(:millisecond)
     do_hit(workspace_id, burst, refill, now_ms)
-  end
-
-  @doc """
-  Hit the bucket for an arbitrary key (not just a workspace id).
-
-  Same token-bucket semantics as `hit/2`, but accepts any term. Used for
-  per-IP throttling on unauthenticated token-consuming surfaces, where there is
-  no workspace to key on yet. Keys are namespaced by the caller to avoid
-  colliding with workspace-id buckets.
-  """
-  @spec hit_key(term(), keyword()) :: result()
-  def hit_key(key, opts \\ []) when not is_nil(key) do
-    burst = Keyword.get(opts, :burst, configured(:burst, @default_burst))
-
-    refill =
-      Keyword.get(opts, :refill_per_sec, configured(:refill_per_sec, @default_refill_per_sec))
-
-    now_ms = System.monotonic_time(:millisecond)
-    do_hit(key, burst, refill, now_ms)
   end
 
   @doc "Reset all buckets. Useful in tests."
