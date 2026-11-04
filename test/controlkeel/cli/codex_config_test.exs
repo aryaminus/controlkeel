@@ -61,6 +61,7 @@ defmodule ControlKeel.CLI.CodexConfigTest do
     assert second_write =~ "codex_hooks = true"
     assert second_write =~ ~s(args = ["mcp", "--project-root", "/repo/two"])
     refute second_write =~ ~s(args = ["mcp", "--project-root", "/repo/one"])
-    assert length(String.split(second_write, "[mcp_servers.controlkeel]")) == 2
+    # ⚡ Bolt: Use :binary.matches/2 to avoid intermediate list allocations
+    assert length(:binary.matches(second_write, "[mcp_servers.controlkeel]")) + 1 == 2
   end
 end
