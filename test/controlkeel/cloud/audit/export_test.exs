@@ -26,11 +26,11 @@ defmodule ControlKeel.Cloud.Audit.ExportTest do
 
   describe "build/1 workspace scope" do
     setup do
-      workspace = MissionFixtures.workspace_fixture()
+      {workspace, user, _org} = MissionFixtures.org_bound_workspace_fixture()
       session = MissionFixtures.session_fixture(%{workspace: workspace})
       finding = MissionFixtures.finding_fixture(%{session: session, severity: "high"})
       review = MissionFixtures.review_fixture(%{session: session, title: "Plan review"})
-      {:ok, workspace: workspace, session: session, finding: finding, review: review}
+      {:ok, workspace: workspace, session: session, finding: finding, review: review, user: user}
     end
 
     test "captures findings and reviews", %{
@@ -57,10 +57,11 @@ defmodule ControlKeel.Cloud.Audit.ExportTest do
       assert bundle["reviews"] == []
     end
 
-    test "captures run package lifecycle data", %{workspace: workspace} do
+    test "captures run package lifecycle data", %{workspace: workspace, user: user} do
       {:ok, pkg, _token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           runtime_target: "devin",
           budget_cents_allocated: 100
         })

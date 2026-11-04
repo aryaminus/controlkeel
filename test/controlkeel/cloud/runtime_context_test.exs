@@ -6,19 +6,22 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
   alias ControlKeel.MissionFixtures
 
   setup do
-    workspace = MissionFixtures.workspace_fixture()
-    session = MissionFixtures.session_fixture(%{workspace: workspace})
-    {:ok, workspace: workspace, session: session}
+    {workspace, user, _org} = MissionFixtures.org_bound_workspace_fixture()
+    session = MissionFixtures.session_fixture(%{workspace: workspace, user: user})
+    {:ok, workspace: workspace, session: session, user: user}
   end
 
   describe "create_package/1" do
     test "creates a pending package and returns the raw callback token", %{
       workspace: workspace,
+      user: user,
       session: session
     } do
       assert {:ok, package, raw_token} =
                RuntimeContext.create_package(%{
                  workspace_id: workspace.id,
+                 user_id: user.id,
+                 user_id: user.id,
                  session_id: session.id,
                  runtime_target: "devin",
                  budget_cents_allocated: 500,
@@ -36,10 +39,12 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
       refute package.callback_token_hash == raw_token
     end
 
-    test "rejects unknown runtime targets", %{workspace: workspace} do
+    test "rejects unknown runtime targets", %{workspace: workspace, user: user} do
       assert {:error, changeset} =
                RuntimeContext.create_package(%{
                  workspace_id: workspace.id,
+                 user_id: user.id,
+                 user_id: user.id,
                  runtime_target: "made-up-runtime",
                  budget_cents_allocated: 0
                })
@@ -47,10 +52,12 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
       assert "is invalid" in errors_on(changeset).runtime_target
     end
 
-    test "rejects negative budget", %{workspace: workspace} do
+    test "rejects negative budget", %{workspace: workspace, user: user} do
       assert {:error, changeset} =
                RuntimeContext.create_package(%{
                  workspace_id: workspace.id,
+                 user_id: user.id,
+                 user_id: user.id,
                  runtime_target: "open-swe",
                  budget_cents_allocated: -100
                })
@@ -60,10 +67,11 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
   end
 
   describe "authenticate_callback/1" do
-    test "returns the package for a valid token", %{workspace: workspace} do
+    test "returns the package for a valid token", %{workspace: workspace, user: user} do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           runtime_target: "executor",
           budget_cents_allocated: 100
         })
@@ -75,10 +83,11 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
       assert :not_found = RuntimeContext.authenticate_callback("garbage-token-value")
     end
 
-    test "returns {:terminal, _} for completed packages", %{workspace: workspace} do
+    test "returns {:terminal, _} for completed packages", %{workspace: workspace, user: user} do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           runtime_target: "open-swe",
           budget_cents_allocated: 0
         })
@@ -91,10 +100,11 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
   end
 
   describe "transition_status/3" do
-    setup %{workspace: workspace} do
+    setup %{workspace: workspace, user: user} do
       {:ok, package, raw_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           runtime_target: "warp-oz",
           budget_cents_allocated: 200
         })
@@ -137,11 +147,12 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
   end
 
   describe "list_for_workspace/2 + status_counts/1" do
-    setup %{workspace: workspace} do
+    setup %{workspace: workspace, user: user} do
       for runtime <- ~w(devin open-swe executor) do
         {:ok, _pkg, _token} =
           RuntimeContext.create_package(%{
             workspace_id: workspace.id,
+            user_id: user.id,
             runtime_target: runtime,
             budget_cents_allocated: 100
           })
@@ -150,6 +161,7 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
       {:ok, replit_pkg, _replit_token} =
         RuntimeContext.create_package(%{
           workspace_id: workspace.id,
+          user_id: user.id,
           runtime_target: "replit-agent",
           budget_cents_allocated: 0
         })
@@ -158,18 +170,18 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
       :ok
     end
 
-    test "lists newest-first capped to limit", %{workspace: workspace} do
+    test "lists newest-first capped to limit", %{workspace: workspace, user: user} do
       packages = RuntimeContext.list_for_workspace(workspace.id, limit: 2)
       assert length(packages) == 2
     end
 
-    test "filters by status", %{workspace: workspace} do
+    test "filters by status", %{workspace: workspace, user: user} do
       pending = RuntimeContext.list_for_workspace(workspace.id, status: "pending")
       assert length(pending) == 3
       assert Enum.all?(pending, &(&1.status == "pending"))
     end
 
-    test "status_counts/1 aggregates", %{workspace: workspace} do
+    test "status_counts/1 aggregates", %{workspace: workspace, user: user} do
       counts = RuntimeContext.status_counts(workspace.id)
       assert counts["pending"] == 3
       assert counts["completed"] == 1
@@ -190,20 +202,20 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
 
   describe "tenant isolation for scoped lookups" do
     test "get_by_external_id/2 returns nil for different workspace" do
-      ws_a = insert_workspace("rt-iso-a")
-      ws_b = insert_workspace("rt-iso-b")
+      {ws_a, user_a} = insert_workspace("rt-iso-a")
+      {ws_b, _user_b} = insert_workspace("rt-iso-b")
 
-      {:ok, pkg, _token} = insert_package(ws_a)
+      {:ok, pkg, _token} = insert_package({ws_a, user_a})
 
       assert RuntimeContext.get_by_external_id(pkg.external_id, ws_a.id) != nil
       assert RuntimeContext.get_by_external_id(pkg.external_id, ws_b.id) == nil
     end
 
     test "get_package/2 returns nil for different workspace" do
-      ws_a = insert_workspace("rt-iso-c")
-      ws_b = insert_workspace("rt-iso-d")
+      {ws_a, user_a} = insert_workspace("rt-iso-c")
+      {ws_b, _user_b} = insert_workspace("rt-iso-d")
 
-      {:ok, pkg, _token} = insert_package(ws_a)
+      {:ok, pkg, _token} = insert_package({ws_a, user_a})
 
       assert RuntimeContext.get_package(pkg.id, ws_a.id) != nil
       assert RuntimeContext.get_package(pkg.id, ws_b.id) == nil
@@ -211,14 +223,16 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
   end
 
   defp insert_workspace(seed) do
-    MissionFixtures.workspace_fixture(%{name: "RT-ISO-#{seed}"})
+    {ws, user, _org} = MissionFixtures.org_bound_workspace_fixture(%{name: "RT-ISO-#{seed}"})
+    {ws, user}
   end
 
-  defp insert_package(ws) do
+  defp insert_package({ws, user}) do
     session = MissionFixtures.session_fixture(%{workspace: ws})
 
     RuntimeContext.create_package(%{
       workspace_id: ws.id,
+      user_id: user.id,
       session_id: session.id,
       runtime_target: "executor",
       budget_cents_allocated: 1000,
