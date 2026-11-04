@@ -156,7 +156,7 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
           <%= if @bind_error do %>
             <p class="text-muted-foreground">{@bind_error}</p>
           <% end %>
-          <button type="submit" class="self-start">Bind repository</button>
+          <.button type="submit" class="self-start">Bind repository</.button>
         </.form>
       </div>
 
@@ -183,15 +183,16 @@ defmodule ControlKeelWeb.WorkspaceReposLive do
                   <td>{r.installation_id || "—"}</td>
                   <td>{format_dt(r.inserted_at)}</td>
                   <td>
-                    <button
+                    <.button
                       type="button"
+                      variant="destructive"
                       phx-click="unbind"
                       phx-value-owner={r.owner}
                       phx-value-repo={r.repo}
                       data-confirm={"Unbind #{r.owner}/#{r.repo}?"}
                     >
                       Unbind
-                    </button>
+                    </.button>
                   </td>
                 </tr>
               <% end %>

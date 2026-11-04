@@ -129,9 +129,9 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
             <strong>Token for {@new_token_for}.</strong> Copy it now — it will not be shown again.
           </p>
           <pre><code id="new-token-value">{@new_token}</code></pre>
-          <button type="button" phx-click="dismiss-token">
+          <.button type="button" variant="secondary" phx-click="dismiss-token">
             Dismiss
-          </button>
+          </.button>
         </div>
       <% end %>
 
@@ -166,7 +166,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
           <%= if @create_error do %>
             <p class="text-muted-foreground">{@create_error}</p>
           <% end %>
-          <button type="submit" class="self-start">Create</button>
+          <.button type="submit" class="self-start">Create</.button>
         </.form>
       </div>
 
@@ -194,21 +194,23 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
                   <td>{format_dt(sa.last_used_at)}</td>
                   <td>
                     <%= if sa.status == "active" do %>
-                      <button
+                      <.button
                         type="button"
+                        variant="secondary"
                         phx-click="rotate"
                         phx-value-id={sa.id}
                       >
                         Rotate
-                      </button>
-                      <button
+                      </.button>
+                      <.button
                         type="button"
+                        variant="destructive"
                         phx-click="revoke"
                         phx-value-id={sa.id}
                         data-confirm={"Revoke #{sa.name}?"}
                       >
                         Revoke
-                      </button>
+                      </.button>
                     <% end %>
                   </td>
                 </tr>
