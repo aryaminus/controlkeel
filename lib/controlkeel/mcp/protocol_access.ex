@@ -213,7 +213,9 @@ defmodule ControlKeel.Mcp.ProtocolAccess do
   defp verify_active_service_account(%{"service_account_id" => id}) when is_integer(id) do
     case Platform.get_service_account(id) do
       %ServiceAccount{} = account ->
-        if ServiceAccount.active?(account) do
+        # Re-checked on every request, so this is where a service account
+        # expiry actually cuts off outstanding access tokens.
+        if ServiceAccount.usable?(account) do
           {:ok, account}
         else
           {:error, :unauthorized}

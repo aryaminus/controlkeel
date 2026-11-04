@@ -4,6 +4,7 @@ defmodule ControlKeel.MCP.Server do
   use GenServer
 
   alias ControlKeel.MCP.Protocol
+  alias ControlKeel.Mcp.StdioAuthorization
 
   @doc false
   def stdio_registered_name, do: :controlkeel_mcp_stdio
@@ -39,9 +40,7 @@ defmodule ControlKeel.MCP.Server do
   @impl true
   def handle_call({:dispatch, request}, _from, state) do
     try do
-      # Include project_root in opts for adaptive tool group behavior
-      opts = [project_root: stdio_project_root()]
-      {:reply, Protocol.handle_request(request, opts), state}
+      {:reply, Protocol.handle_request(request, stdio_opts()), state}
     rescue
       e ->
         require Logger
@@ -63,11 +62,8 @@ defmodule ControlKeel.MCP.Server do
   @impl true
   def handle_info({:mcp_payload, payload}, state) do
     try do
-      # Include project_root in opts for adaptive tool group behavior
-      opts = [project_root: stdio_project_root()]
-
       payload
-      |> Protocol.handle_json(opts)
+      |> Protocol.handle_json(stdio_opts())
       |> maybe_write_frame(state.output)
 
       {:noreply, state}
@@ -178,6 +174,18 @@ defmodule ControlKeel.MCP.Server do
       :ok -> :ok
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  # project_root drives adaptive tool-group selection; authorize applies the
+  # stdio authorization chain (workspace tool policy, guardrails, audit trail)
+  # so a local agent cannot run tools ungoverned. See StdioAuthorization.
+  defp stdio_opts do
+    project_root = stdio_project_root()
+
+    [
+      project_root: project_root,
+      authorize: StdioAuthorization.authorize_fun(project_root)
+    ]
   end
 
   defp stdio_project_root do
