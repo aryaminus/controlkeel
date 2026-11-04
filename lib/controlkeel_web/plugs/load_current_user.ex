@@ -24,7 +24,15 @@ defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
       |> assign(:current_user, nil)
     else
       user_id = get_session(conn, :current_user_id)
-      user = if is_integer(user_id), do: Accounts.get_user(user_id)
+      # A disabled account loses access immediately, even mid-session: loading
+      # the user is the single point every authenticated surface flows through.
+      user =
+        if is_integer(user_id) do
+          case Accounts.get_user(user_id) do
+            %{} = found -> if Accounts.user_active?(found), do: found, else: nil
+            _ -> nil
+          end
+        end
 
       conn
       |> maybe_refresh_session_last_active(user)

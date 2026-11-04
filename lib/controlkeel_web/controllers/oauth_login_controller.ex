@@ -91,6 +91,12 @@ defmodule ControlKeelWeb.OAuthLoginController do
         )
         |> redirect(to: ~p"/auth/login")
 
+      {:error, :account_disabled} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "This account has been disabled. Contact your administrator.")
+        |> redirect(to: ~p"/auth/login")
+
       {:error, %Ecto.Changeset{}} ->
         conn
         |> clear_oauth_session()
