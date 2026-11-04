@@ -2,6 +2,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import ControlKeel.BenchmarkFixtures
+  import ControlKeel.MissionFixtures
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
@@ -62,6 +63,14 @@ defmodule ControlKeelWeb.LiveAuthTest do
     {conn, user, org}
   end
 
+  # Runs are workspace-scoped on the retained global run page (#259): bind the
+  # fixture run to a workspace the member can reach, or the page correctly
+  # reports it missing.
+  defp member_run(%{id: org_id}) do
+    workspace = workspace_fixture(%{org_id: org_id})
+    benchmark_run_fixture(%{workspace_id: workspace.id})
+  end
+
   defp insert_membership(user, org, role) do
     %Accounts.Membership{}
     |> Accounts.Membership.changeset(%{
@@ -95,8 +104,8 @@ defmodule ControlKeelWeb.LiveAuthTest do
   end
 
   test "users with a membership render authenticated pages" do
-    {conn, _user, _org} = member_conn()
-    run = benchmark_run_fixture()
+    {conn, _user, org} = member_conn()
+    run = member_run(org)
 
     {:ok, _view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
 
@@ -196,7 +205,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
     {conn, user, org} = member_conn()
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
-    run = benchmark_run_fixture()
+    run = member_run(org)
 
     {:ok, view, _html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
 
