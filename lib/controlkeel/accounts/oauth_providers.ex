@@ -35,7 +35,11 @@ defmodule ControlKeel.Accounts.OAuthProviders do
   """
 
   @type provider :: :google | :github
-  @type claims :: %{email: String.t(), name: String.t() | nil}
+  @type claims :: %{
+          email: String.t(),
+          name: String.t() | nil,
+          email_verified: boolean()
+        }
   @type session_params :: map()
 
   @callback authorize_url(provider(), map(), keyword()) ::
