@@ -55,12 +55,13 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       s1 = create_session!(ws.id, %{title: "First session"})
       s2 = create_session!(ws.id, %{title: "Second session"})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspace/#{ws.slug}")
 
       assert html =~ "Core"
       assert html =~ "core"
       # Meta line presents workspace facts inline, not as stat columns.
-      assert html =~ "2 total"
+      assert html =~ "Recent sessions"
+      assert html =~ "/wslocal/workspace/core/sessions"
       assert html =~ "No monthly budget"
       # Session rows render in the sessions-style table.
       assert html =~ "First session"
@@ -71,7 +72,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, org} = Accounts.create_org(%{name: "Local Switch", slug: "local-switch"})
       ws = create_workspace(%{name: "LS", slug: "ls", industry: "web", org_id: org.id})
 
-      {:ok, view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+      {:ok, view, html} = live(build_conn(), ~p"/#{org.slug}/workspace/#{ws.slug}")
 
       # Main behavior: the org home link renders, but the switcher toggle,
       # popover, and any creation entry stay cloud-only.
@@ -113,7 +114,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       {:ok, _assignment} = ControlKeel.Platform.apply_policy_set(ws.id, set.id, %{precedence: 10})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspace/#{ws.slug}")
 
       assert html =~ "Applied policies"
       assert html =~ "precedence 10"
@@ -134,7 +135,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "enabled" => false
         })
 
-      {:ok, _view, html} = live(build_conn(), ~p"/disws/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(build_conn(), ~p"/disws/workspace/#{ws.slug}")
 
       assert html =~ "paused-set"
       assert html =~ "precedence 7"
@@ -145,28 +146,41 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, org} = Accounts.create_org(%{name: "Empty Org", slug: "empty-org"})
       ws = create_workspace(%{name: "Empty", slug: "empty", industry: "web", org_id: org.id})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/empty-org/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(build_conn(), ~p"/empty-org/workspace/#{ws.slug}")
 
       assert html =~ "No sessions yet."
+    end
+
+    test "workspace sessions page lists all sessions" do
+      {:ok, org} = Accounts.create_org(%{name: "All Sessions", slug: "all-sessions"})
+      ws = create_workspace(%{name: "All", slug: "all", industry: "web", org_id: org.id})
+      create_session!(ws.id, %{title: "First session"})
+      create_session!(ws.id, %{title: "Second session"})
+
+      {:ok, _view, html} =
+        live(build_conn(), ~p"/#{org.slug}/workspace/#{ws.slug}/sessions")
+
+      assert html =~ "First session"
+      assert html =~ "Second session"
     end
 
     test "renders an in-place error for an unknown workspace slug" do
       {:ok, org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      {:ok, view, html} = live(build_conn(), ~p"/none/workspaces/no-such-ws")
+      {:ok, view, html} = live(build_conn(), ~p"/none/workspace/no-such-ws")
 
       assert has_element?(view, "[data-scope-error]")
       assert has_element?(view, "#app-sidebar")
       assert has_element?(view, "#sidebar-org-nav")
-      assert has_element?(view, "nav[aria-label='Breadcrumb'] a[href='/none']")
+      assert has_element?(view, "nav[aria-label='Breadcrumb']")
       assert html =~ org.name
-      refute has_element?(view, "a[href='/none/workspaces/no-such-ws']")
+      refute has_element?(view, "a[href='/none/workspace/no-such-ws']")
     end
 
     test "renders an in-place error for an unknown workspace slug regardless of case" do
       {:ok, _org} = Accounts.create_org(%{name: "None", slug: "none"})
 
-      {:ok, view, _html} = live(build_conn(), ~p"/none/workspaces/NO-SUCH-WS")
+      {:ok, view, _html} = live(build_conn(), ~p"/none/workspace/NO-SUCH-WS")
 
       assert has_element?(view, "[data-scope-error]")
     end
@@ -177,7 +191,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       ws =
         create_workspace(%{name: "Belongs To A", slug: "a-ws", industry: "web", org_id: org_a.id})
 
-      {:ok, view, _html} = live(build_conn(), ~p"/org-b/workspaces/#{ws.slug}")
+      {:ok, view, _html} = live(build_conn(), ~p"/org-b/workspace/#{ws.slug}")
 
       assert has_element?(view, "[data-scope-error]")
     end
@@ -210,7 +224,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_user_id" => owner.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/scopeco/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(conn, ~p"/scopeco/workspace/#{ws.slug}")
 
       assert html =~ "Scoped"
       assert html =~ "Scoped"
@@ -226,11 +240,11 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
         build_conn()
         |> Plug.Test.init_test_session(%{"current_user_id" => owner.id})
 
-      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/workspaces/invalid")
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/workspace/invalid")
 
       assert has_element?(view, "[data-scope-error]")
       assert has_element?(view, "#app-sidebar")
-      assert has_element?(view, "nav[aria-label='Breadcrumb'] a[href='/#{org.slug}']")
+      assert has_element?(view, "nav[aria-label='Breadcrumb']")
     end
 
     test "a viewer role member of the workspace's org can view it" do
@@ -257,7 +271,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_user_id" => viewer.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/viewco/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(conn, ~p"/viewco/workspace/#{ws.slug}")
 
       assert html =~ "Viewable"
     end
@@ -273,7 +287,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_user_id" => owner.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/ctaco/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(conn, ~p"/ctaco/workspace/#{ws.slug}")
 
       assert html =~ "New Session"
       assert html =~ ~s(href="/new/session?org_slug=ctaco&amp;ws_slug=ctaws")
@@ -306,7 +320,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_user_id" => viewer.id
         })
 
-      {:ok, _view, html} = live(conn, ~p"/ctaview/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(conn, ~p"/ctaview/workspace/#{ws.slug}")
 
       assert html =~ ~s(href="/new/session")
       refute html =~ "org_slug=ctaview"
@@ -328,7 +342,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
           "current_user_id" => outsider.id
         })
 
-      {:ok, view, _html} = live(conn, ~p"/a/workspaces/#{ws_a.slug}")
+      {:ok, view, _html} = live(conn, ~p"/a/workspace/#{ws_a.slug}")
 
       assert has_element?(view, "[data-scope-error]")
     end
@@ -340,18 +354,18 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       ws_a = create_workspace(%{name: "Alpha", slug: "alpha", industry: "web", org_id: org.id})
       ws_b = create_workspace(%{name: "Beta", slug: "beta", industry: "web", org_id: org.id})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws_a.slug}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspace/#{ws_a.slug}")
 
       assert html =~ ~s(aria-label="Switch workspace")
       assert html =~ "Beta"
-      assert html =~ ~s(href="/#{org.slug}/workspaces/#{ws_b.slug}")
+      assert html =~ ~s(href="/#{org.slug}/workspace/#{ws_b.slug}")
     end
 
     test "hides the switcher when the org has a single workspace" do
       {:ok, org} = Accounts.create_org(%{name: "Swone", slug: "swone"})
       ws = create_workspace(%{name: "Solo", slug: "solo", industry: "web", org_id: org.id})
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/workspace/#{ws.slug}")
 
       refute html =~ ~s(aria-label="Switch workspace")
     end

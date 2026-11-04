@@ -212,13 +212,17 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
       </div>
 
       <div>
-        <div class="flex items-center gap-2 mb-4">
-          <.section_title>Sessions</.section_title>
-          <span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-            {length(@sessions)} total
-          </span>
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-2">
+            <.section_title>Recent sessions</.section_title>
+          </div>
+          <.link
+            navigate={~p"/#{@workspace.org.slug}/workspace/#{@workspace.slug}/sessions"}
+            class="text-sm font-medium text-primary hover:underline"
+          >
+            View all sessions
+          </.link>
         </div>
-
         <div class="bg-card border rounded-2xl shadow-card max-h-[32rem] overflow-y-auto">
           <table class="min-w-full divide-y divide-border text-left text-sm">
             <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground sticky top-0 z-10">
@@ -241,7 +245,7 @@ defmodule ControlKeelWeb.WorkspaceDetailLive do
                   </td>
                 </tr>
               <% else %>
-                <%= for session <- @sessions do %>
+                <%= for session <- Enum.take(@sessions, 5) do %>
                   <tr class="transition hover:bg-muted/30">
                     <td class="max-w-sm px-5 py-4">
                       <.link
