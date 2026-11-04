@@ -63,7 +63,7 @@ defmodule ControlKeelWeb.OrgCatchAllLiveTest do
   test "unmatched routes retain their deepest accessible scope" do
     {org, workspace, session, user} = scope_fixture()
     org_path = "/#{org.slug}"
-    workspace_path = "#{org_path}/workspaces/#{workspace.slug}"
+    workspace_path = "#{org_path}/workspace/#{workspace.slug}"
     session_path = "#{workspace_path}/sessions/#{session.id}"
 
     routes = [
@@ -86,7 +86,7 @@ defmodule ControlKeelWeb.OrgCatchAllLiveTest do
   test "an invalid session below a valid workspace retains workspace navigation" do
     {org, workspace, _session, user} = scope_fixture()
     org_path = "/#{org.slug}"
-    workspace_path = "#{org_path}/workspaces/#{workspace.slug}"
+    workspace_path = "#{org_path}/workspace/#{workspace.slug}"
     path = "#{workspace_path}/sessions/invalid-session-id/unknown-child"
 
     {:ok, view, _html} = live(conn_for(user), path)

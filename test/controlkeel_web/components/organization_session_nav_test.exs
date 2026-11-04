@@ -32,11 +32,11 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
 
   defp session_crumbs(session_id, session_title, subpage) do
     session_to =
-      if subpage, do: "/acme/workspaces/core/sessions/#{session_id}", else: nil
+      if subpage, do: "/acme/workspace/core/sessions/#{session_id}", else: nil
 
     base = [
       %{label: "Acme", to: "/acme"},
-      %{label: "Core", to: "/acme/workspaces/core"},
+      %{label: "Core", to: "/acme/workspace/core"},
       %{label: session_title, to: session_to}
     ]
 
@@ -47,13 +47,13 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     html =
       render_component(
         &OrganizationLayouts.organization_sidebar/1,
-        nav_assigns("/acme/workspaces/core/sessions/42")
+        nav_assigns("/acme/workspace/core/sessions/42")
       )
 
     assert html =~ "sidebar-org-nav"
     assert html =~ "Deploy review"
-    assert html =~ "/acme/workspaces/core/sessions/42/reviews"
-    assert html =~ "/acme/workspaces/core/sessions/42/deploy-review"
+    assert html =~ "/acme/workspace/core/sessions/42/reviews"
+    assert html =~ "/acme/workspace/core/sessions/42/deploy-review"
     refute html =~ "Service accounts"
     refute html =~ "Tool policy"
     refute html =~ "Repositories"
@@ -77,28 +77,28 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     html =
       render_component(
         &OrganizationLayouts.organization_sidebar/1,
-        nav_assigns("/acme/workspaces/core/sessions/42")
+        nav_assigns("/acme/workspace/core/sessions/42")
       )
 
-    assert anchor_for(html, "/acme/workspaces/core/sessions/42") =~ "aria-current=\"page\""
-    refute anchor_for(html, "/acme/workspaces/core/sessions/42/reviews") =~ "aria-current"
+    assert anchor_for(html, "/acme/workspace/core/sessions/42") =~ "aria-current=\"page\""
+    refute anchor_for(html, "/acme/workspace/core/sessions/42/reviews") =~ "aria-current"
   end
 
   test "reviews stays active on a review detail page" do
     html =
       render_component(
         &OrganizationLayouts.organization_sidebar/1,
-        nav_assigns("/acme/workspaces/core/sessions/42/reviews/7")
+        nav_assigns("/acme/workspace/core/sessions/42/reviews/7")
       )
 
-    assert anchor_for(html, "/acme/workspaces/core/sessions/42/reviews") =~
+    assert anchor_for(html, "/acme/workspace/core/sessions/42/reviews") =~
              "aria-current=\"page\""
 
-    refute anchor_for(html, "/acme/workspaces/core/sessions/42") =~ "aria-current"
+    refute anchor_for(html, "/acme/workspace/core/sessions/42") =~ "aria-current"
   end
 
   test "workspace pages still render workspace nav when no session is set" do
-    assigns = nav_assigns("/acme/workspaces/core") |> Map.put(:nav_session, nil)
+    assigns = nav_assigns("/acme/workspace/core") |> Map.put(:nav_session, nil)
 
     html = render_component(&OrganizationLayouts.organization_sidebar/1, assigns)
 
@@ -113,7 +113,7 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
       render_component(
         &OrganizationLayouts.breadcrumbs_header/1,
         header_assigns(
-          "/acme/workspaces/core/sessions/42/reviews",
+          "/acme/workspace/core/sessions/42/reviews",
           session_crumbs(42, "Session A", "Reviews"),
           siblings
         )
@@ -122,7 +122,7 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     assert html =~ "breadcrumb-session-switcher-button"
     assert html =~ "Session B"
     # Switching keeps the subpage.
-    assert html =~ "/acme/workspaces/core/sessions/43/reviews"
+    assert html =~ "/acme/workspace/core/sessions/43/reviews"
     # Current session is marked active.
     assert html =~ "Session A"
   end
@@ -134,14 +134,14 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
       render_component(
         &OrganizationLayouts.breadcrumbs_header/1,
         header_assigns(
-          "/acme/workspaces/core/sessions/42",
+          "/acme/workspace/core/sessions/42",
           session_crumbs(42, "Session A", nil),
           siblings
         )
       )
 
     assert html =~ "breadcrumb-session-switcher-button"
-    assert html =~ "/acme/workspaces/core/sessions/43"
+    assert html =~ "/acme/workspace/core/sessions/43"
   end
 
   test "no session switcher when there is a single session" do
@@ -149,7 +149,7 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
       render_component(
         &OrganizationLayouts.breadcrumbs_header/1,
         header_assigns(
-          "/acme/workspaces/core/sessions/42/reviews",
+          "/acme/workspace/core/sessions/42/reviews",
           session_crumbs(42, "Session A", "Reviews"),
           [%{id: 42, title: "Session A"}]
         )
@@ -165,7 +165,7 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
       render_component(
         &OrganizationLayouts.breadcrumbs_header/1,
         header_assigns(
-          "/acme/workspaces/core/sessions/42/reviews",
+          "/acme/workspace/core/sessions/42/reviews",
           session_crumbs(42, "Session A", "Reviews"),
           [%{id: 42, title: "Session A"}]
         )
@@ -176,8 +176,8 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
       )
 
     assert html =~ "breadcrumb-ws-switcher-button"
-    assert html =~ "/acme/workspaces/edge"
-    refute html =~ "/acme/workspaces/edge/sessions/42"
+    assert html =~ "/acme/workspace/edge"
+    refute html =~ "/acme/workspace/edge/sessions/42"
   end
 
   test "switching sessions drops the launched flag but keeps other params" do
@@ -185,7 +185,7 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
 
     assigns =
       header_assigns(
-        "/acme/workspaces/core/sessions/42",
+        "/acme/workspace/core/sessions/42",
         session_crumbs(42, "Session A", nil),
         siblings
       )
@@ -194,9 +194,9 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     html = render_component(&OrganizationLayouts.breadcrumbs_header/1, assigns)
 
     # The other session keeps remaining params but loses the launch banner.
-    assert html =~ "/acme/workspaces/core/sessions/43?foo=bar"
-    refute html =~ "/acme/workspaces/core/sessions/43?launched=1"
-    refute html =~ "/acme/workspaces/core/sessions/43?foo=bar&amp;launched=1"
+    assert html =~ "/acme/workspace/core/sessions/43?foo=bar"
+    refute html =~ "/acme/workspace/core/sessions/43?launched=1"
+    refute html =~ "/acme/workspace/core/sessions/43?foo=bar&amp;launched=1"
   end
 
   defp anchor_for(html, href) do

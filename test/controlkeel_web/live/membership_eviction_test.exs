@@ -121,7 +121,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
   end
 
   defp workspace_path(org, workspace) do
-    ~p"/#{org.slug}/workspaces/#{workspace.slug}"
+    ~p"/#{org.slug}/workspace/#{workspace.slug}"
   end
 
   describe "WorkspaceDetailLive" do
@@ -379,7 +379,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
 
         assert has_element?(
                  view,
-                 ~s(#app-sidebar a[href="/#{org.slug}/workspaces/#{workspace.slug}"])
+                 ~s(#app-sidebar a[href="/#{org.slug}/workspace/#{workspace.slug}"])
                ),
                "#{surface} lost workspace navigation"
 

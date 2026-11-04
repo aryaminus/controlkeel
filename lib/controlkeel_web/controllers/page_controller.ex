@@ -152,12 +152,12 @@ defmodule ControlKeelWeb.PageController do
         if timeline? do
           redirect(
             conn,
-            to: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/activity"
+            to: "/#{org_slug}/workspace/#{ws_slug}/sessions/#{session.id}/activity"
           )
         else
           redirect(
             conn,
-            to: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
+            to: "/#{org_slug}/workspace/#{ws_slug}/sessions/#{session.id}/observability#{anchor}"
           )
         end
 
@@ -249,7 +249,7 @@ defmodule ControlKeelWeb.PageController do
       {:ok, {org_slug, ws_slug}} ->
         redirect(
           conn,
-          to: "/#{org_slug}/workspaces/#{ws_slug}/observability#{suffix}#{query_suffix(conn)}"
+          to: "/#{org_slug}/workspace/#{ws_slug}/observability#{suffix}#{query_suffix(conn)}"
         )
 
       :login ->
@@ -445,7 +445,7 @@ defmodule ControlKeelWeb.PageController do
           redirect(
             conn,
             to:
-              "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session.id}/#{page}#{suffix}#{query}"
+              "/#{org_slug}/workspace/#{ws_slug}/sessions/#{session.id}/#{page}#{suffix}#{query}"
           )
         else
           FallbackController.not_found(conn, params)
@@ -467,13 +467,13 @@ defmodule ControlKeelWeb.PageController do
         [] ->
           case LocalDefaults.ensure() do
             {:ok, {%{slug: org_slug}, %{slug: ws_slug}}} ->
-              redirect(conn, to: "/#{org_slug}/workspaces/#{ws_slug}")
+              redirect(conn, to: "/#{org_slug}/workspace/#{ws_slug}")
 
             _ ->
               redirect(
                 conn,
                 to:
-                  "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}"
+                  "/#{LocalDefaults.default_org_slug()}/workspace/#{LocalDefaults.default_workspace_slug()}"
               )
           end
       end

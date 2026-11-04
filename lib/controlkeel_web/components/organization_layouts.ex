@@ -462,6 +462,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     "reviews" => "Reviews",
     "organizations" => "Organizations",
     "workspaces" => "Workspaces",
+    "workspace" => "Workspace",
     "skills" => "Skills",
     "cloud" => "Cloud",
     "observability" => "Observability",
@@ -491,7 +492,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   defp workspace_root_path(%{slug: org_slug}, %{slug: ws_slug}),
-    do: "/#{org_slug}/workspaces/#{ws_slug}"
+    do: "/#{org_slug}/workspace/#{ws_slug}"
 
   defp workspace_root_path(_, _), do: nil
 
@@ -508,7 +509,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   end
 
   defp session_root_path(%{slug: org_slug}, %{slug: ws_slug}, %{id: session_id}),
-    do: "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}"
+    do: "/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}"
 
   defp session_root_path(_, _, _), do: nil
 
@@ -543,15 +544,15 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   defp sibling_workspace_path(current_path, current_query, org_slug, ws_slug) do
     {base, from_session?} =
       case String.split(current_path || "", "/", trim: true) do
-        [^org_slug, "workspaces", _current_ws | rest] ->
+        [^org_slug, prefix, _current_ws | rest] when prefix in ~w(workspace workspaces) ->
           if "sessions" in rest do
-            {"/#{org_slug}/workspaces/#{ws_slug}", true}
+            {"/#{org_slug}/workspace/#{ws_slug}", true}
           else
-            {"/" <> Enum.join([org_slug, "workspaces", ws_slug | rest], "/"), false}
+            {"/" <> Enum.join([org_slug, "workspace", ws_slug | rest], "/"), false}
           end
 
         _ ->
-          {"/#{org_slug}/workspaces/#{ws_slug}", false}
+          {"/#{org_slug}/workspace/#{ws_slug}", false}
       end
 
     query = if from_session?, do: strip_launched(current_query), else: current_query
@@ -566,21 +567,22 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   # Session URL replacer: swaps the session id segment, keeping the
   # subpage and query string, so e.g. reviews stays on reviews. Falls back
   # to the session overview when the current path is outside
-  # `:org_slug/workspaces/:ws_slug/sessions/:id/*`. Like its workspace
+  # `:org_slug/workspace/:ws_slug/sessions/:id/*`. Like its workspace
   # counterpart this builds a plain string (no `~p` verification); only the
   # id segment is ever rewritten.
   defp sibling_session_path(current_path, current_query, org_slug, ws_slug, session_id) do
     {base, switching?} =
       case String.split(current_path || "", "/", trim: true) do
-        [^org_slug, "workspaces", ^ws_slug, "sessions", current_id | rest] ->
+        [^org_slug, prefix, ^ws_slug, "sessions", current_id | rest]
+        when prefix in ~w(workspace workspaces) ->
           {"/" <>
              Enum.join(
-               [org_slug, "workspaces", ws_slug, "sessions", to_string(session_id) | rest],
+               [org_slug, "workspace", ws_slug, "sessions", to_string(session_id) | rest],
                "/"
              ), to_string(session_id) != current_id}
 
         _ ->
-          {"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}", true}
+          {"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}", true}
       end
 
     # `?launched=1` celebrates a fresh launch — it must not follow the user
@@ -639,6 +641,18 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         icon: "hero-squares-2x2"
       },
       %{
+        label: "Workspaces",
+        href: ~p"/#{org.slug}/workspaces",
+        tab: "workspaces",
+        icon: "hero-rectangle-stack"
+      },
+      %{
+        label: "Sessions",
+        href: ~p"/#{org.slug}/sessions",
+        tab: "sessions",
+        icon: "hero-play-circle"
+      },
+      %{
         label: "Settings",
         href: ~p"/#{org.slug}/settings",
         tab: "settings",
@@ -662,48 +676,54 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     do: workspace_nav_items(assigns.nav_org.slug, workspace.slug)
 
   defp workspace_nav_items(org_slug, ws_slug) do
-    observability_href = ~p"/#{org_slug}/workspaces/#{ws_slug}/observability"
+    observability_href = ~p"/#{org_slug}/workspace/#{ws_slug}/observability"
 
     [
       %{
         label: "Overview",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}",
         scope: :workspace,
         icon: "hero-squares-2x2"
       },
       %{
+        label: "Sessions",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions",
+        scope: :workspace,
+        icon: "hero-play-circle"
+      },
+      %{
         label: "Settings",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/settings",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/settings",
         scope: :workspace,
         icon: "hero-cog-6-tooth"
       },
       %{
         label: "Repositories",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/repos",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/repos",
         scope: :workspace,
         icon: "hero-code-bracket"
       },
       %{
         label: "Service accounts",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/service-accounts",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/service-accounts",
         scope: :workspace,
         icon: "hero-key"
       },
       %{
         label: "Webhooks",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/webhooks",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/webhooks",
         scope: :workspace,
         icon: "hero-bolt"
       },
       %{
         label: "Tool policy",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/tool-policy",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/tool-policy",
         scope: :workspace,
         icon: "hero-shield-check"
       },
       %{
         label: "Benchmarks",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/benchmarks",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/benchmarks",
         scope: :workspace,
         icon: "hero-chart-bar-square"
       },
@@ -717,54 +737,54 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           %{label: "Overview", href: observability_href, icon: "hero-signal"},
           %{
             label: "Learning loop",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/loop",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/loop",
             icon: "hero-arrow-path"
           },
           %{
             label: "Memory quality",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/memory-quality",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/memory-quality",
             icon: "hero-cpu-chip"
           },
           %{
             label: "Trends",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/trends",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/trends",
             icon: "hero-arrow-trending-up"
           },
           %{
             label: "Recommendations",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/recommendations",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/recommendations",
             icon: "hero-light-bulb"
           },
           %{
             label: "Evals",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/evals",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/evals",
             icon: "hero-chart-pie"
           },
           %{group: "Benchmarks"},
           %{
             label: "Benchmark",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/benchmark",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/benchmark",
             icon: "hero-beaker"
           },
           %{group: "Delivery & data"},
           %{
             label: "Costs",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/costs",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/costs",
             icon: "hero-currency-dollar"
           },
           %{
             label: "Imports",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/imports",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/imports",
             icon: "hero-arrow-down-tray"
           },
           %{
             label: "Compare",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/compare",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/compare",
             icon: "hero-scale"
           },
           %{
             label: "Promotions",
-            href: ~p"/#{org_slug}/workspaces/#{ws_slug}/observability/promotions",
+            href: ~p"/#{org_slug}/workspace/#{ws_slug}/observability/promotions",
             icon: "hero-trophy"
           }
         ]
@@ -780,73 +800,73 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     [
       %{
         label: "Overview",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}",
         scope: :session_overview,
         icon: "hero-squares-2x2"
       },
       %{
         label: "Tasks",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/tasks",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/tasks",
         scope: :session_section,
         icon: "hero-list-bullet"
       },
       %{
         label: "Findings",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/findings",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/findings",
         scope: :session_section,
         icon: "hero-exclamation-triangle"
       },
       %{
         label: "Reviews",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/reviews",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/reviews",
         scope: :session_section,
         icon: "hero-document-check"
       },
       %{
         label: "Ship",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/ship",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/ship",
         scope: :session_section,
         icon: "hero-check-badge"
       },
       %{
         label: "Release",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/release",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/release",
         scope: :session_section,
         icon: "hero-rocket-launch"
       },
       %{
         label: "Activity",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/activity",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/activity",
         scope: :session_section,
         icon: "hero-clock"
       },
       %{
         label: "Resume packet",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/resume-packet",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/resume-packet",
         scope: :session_section,
         icon: "hero-play"
       },
       %{
         label: "Deploy review",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/deploy-review",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/deploy-review",
         scope: :session_section,
         icon: "hero-cloud-arrow-up"
       },
       %{
         label: "Connect",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/connect",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/connect",
         scope: :session_section,
         icon: "hero-link"
       },
       %{
         label: "Observability",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/observability",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/observability",
         scope: :session_section,
         icon: "hero-chart-bar-square"
       },
       %{
         label: "Proofs",
-        href: ~p"/#{org_slug}/workspaces/#{ws_slug}/sessions/#{session_id}/proofs",
+        href: ~p"/#{org_slug}/workspace/#{ws_slug}/sessions/#{session_id}/proofs",
         scope: :session_section,
         icon: "hero-shield-check"
       }
@@ -883,7 +903,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     query_tab = current_query && URI.decode_query(current_query)["tab"]
 
     cond do
-      item.tab == "settings" ->
+      item.tab in ["settings", "workspaces", "sessions"] ->
         is_binary(current_path) && current_path == item.href
 
       item.tab == nil ->
@@ -920,11 +940,11 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         nav_org: %{slug: org_slug}
       })
       when not is_nil(id) do
-    "/#{org_slug}/workspaces/#{ws_slug}/sessions/#{id}"
+    "/#{org_slug}/workspace/#{ws_slug}/sessions/#{id}"
   end
 
   def scope_root(%{nav_workspace: %{slug: ws_slug}, nav_org: %{slug: org_slug}}) do
-    "/#{org_slug}/workspaces/#{ws_slug}"
+    "/#{org_slug}/workspace/#{ws_slug}"
   end
 
   def scope_root(%{nav_org: %{slug: org_slug}}), do: "/#{org_slug}"
