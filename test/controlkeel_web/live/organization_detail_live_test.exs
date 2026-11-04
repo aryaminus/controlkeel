@@ -275,16 +275,16 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, org: org, owner: owner, workspace: ws}
     end
 
-    test "org page lists the org's workspaces directly (no member UI, no tab bar)", %{
+    test "workspaces page lists the org's workspaces directly (no member UI, no tab bar)", %{
       owner: owner,
       workspace: ws
     } do
-      {:ok, view, html} = live(conn_for(owner), ~p"/tabco")
+      {:ok, view, html} = live(conn_for(owner), ~p"/tabco/workspaces")
 
       assert html =~ "Workspaces"
       assert render(view) =~ "core-workspace"
       # The workspace card links to its nested detail route.
-      assert render(view) =~ ~s(href="/tabco/workspaces/#{ws.slug}")
+      assert render(view) =~ ~s(href="/tabco/workspace/#{ws.slug}")
       # Workspaces table shows budget and status.
       assert render(view) =~ "$123.45"
       assert render(view) =~ "active"
@@ -297,7 +297,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "query params on the org route are ignored", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco?tab=wat")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco/workspaces")
       assert render(view) =~ "core-workspace"
     end
 
@@ -332,7 +332,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "cloud mode opens the create form", %{owner: owner} do
-      {:ok, view, html} = live(conn_for(owner), ~p"/wsco")
+      {:ok, view, html} = live(conn_for(owner), ~p"/wsco/workspaces")
 
       refute html =~ "new-workspace-modal"
 
@@ -346,7 +346,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "cloud mode creates a workspace and lists it", %{org: org, owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco/workspaces")
 
       view |> render_click("new_workspace")
 
@@ -371,7 +371,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "blank slug is auto-generated from the name", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco/workspaces")
 
       view |> render_click("new_workspace")
 
@@ -403,7 +403,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
           org_id: org.id
         })
 
-      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco/workspaces")
 
       view |> render_click("new_workspace")
 
@@ -441,7 +441,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "modal shows the local-mode notice instead of the form", %{org: _org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org")
+      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org/workspaces")
 
       view |> render_click("new_workspace")
       modal = render(view)
@@ -453,7 +453,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "forged save_workspace event is rejected in local mode", %{org: org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org")
+      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org/workspaces")
 
       view
       |> render_click("save_workspace", %{
