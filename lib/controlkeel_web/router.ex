@@ -146,14 +146,6 @@ defmodule ControlKeelWeb.Router do
         {ControlKeelWeb.LiveAuth, :require_cloud_auth},
         ControlKeelWeb.LayoutDefaults
       ] do
-      # /benchmarks (index) moved to the workspace scope
-      # (/:org_slug/workspaces/:ws_slug/benchmarks, declared in the
-      # :organization session below). Only the run-detail page stays global
-      # for backward compatibility. GET /benchmarks now falls through to the
-      # ":org_slug" live block and the invalid-org handler — "benchmarks" is
-      # reserved in Accounts.Org.@reserved_slugs, so no org can ever claim
-      # the URL. Regression-tested in router_test.exs.
-      live "/benchmarks/runs/:id", BenchmarksLive, :show
       # RFC 8628 device approval page (auth-gated: only a signed-in user can
       # authorize a device against their own account).
       live "/device", DeviceAuthLive, :index
@@ -467,9 +459,18 @@ defmodule ControlKeelWeb.Router do
       # Workspace-scoped benchmark engine (issue: benchmarks-workspace-scope):
       # the former global /benchmarks page, mounted from the URL workspace
       # with the standard WorkspaceScope access checks like the other
-      # workspace pages. Executing a run still lands on the global
-      # /benchmarks/runs/:id page above for backward compatibility.
+      # workspace pages.
       live "/:org_slug/workspaces/:ws_slug/benchmarks", BenchmarksLive, :index
+
+      # Workspace-scoped benchmark run detail (issue: benchmarks-run-scope):
+      # the former global /benchmarks/runs/:id page, scoped to the URL
+      # workspace like the index. Runs are workspace-bound tenant data
+      # (benchmark tenancy), so the page enforces run.workspace_id against
+      # the URL workspace. The retired global run URL — like the retired
+      # global index — falls through to the ":org_slug" live block and the
+      # invalid-org handler ("benchmarks" is reserved, so no org can claim
+      # the path).
+      live "/:org_slug/workspaces/:ws_slug/benchmarks/runs/:id", BenchmarksLive, :show
 
       # Workspace-scoped observability (issue: observability-workspace-scope):
       # same LiveViews as the former global `/observability/*` pages, mounted

@@ -7,9 +7,11 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
 
   defp benchmarks_path(org, ws), do: "/#{org.slug}/workspaces/#{ws.slug}/benchmarks"
 
+  defp run_path(org, ws, run_id), do: "#{benchmarks_path(org, ws)}/runs/#{run_id}"
+
   test "index renders suites, recent runs, and launches a benchmark run", %{conn: conn} do
-    existing_run = benchmark_run_fixture()
     {org, ws, _session} = org_bound_session_fixture()
+    existing_run = benchmark_run_fixture(%{"workspace_id" => ws.id})
 
     {:ok, view, html} = live(conn, benchmarks_path(org, ws))
 
@@ -22,7 +24,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     assert has_element?(view, "#benchmark-baseline-input")
     assert has_element?(view, "#benchmark-runs")
 
-    assert has_element?(view, "a[href=\"/benchmarks/runs/#{existing_run.id}\"]")
+    assert has_element?(view, "a[href=\"#{run_path(org, ws, existing_run.id)}\"]")
 
     render_submit(
       form(view, "#benchmark-runner",
@@ -35,7 +37,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     )
 
     {path, _flash} = assert_redirect(view)
-    assert path =~ "/benchmarks/runs/"
+    assert path =~ "#{benchmarks_path(org, ws)}/runs/"
   end
 
   test "index preset buttons fill subject fields", %{conn: conn} do
@@ -99,15 +101,18 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "show renders the persisted scenario matrix", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
     run =
       benchmark_run_fixture(%{
+        "workspace_id" => ws.id,
         "suite" => "domain_expansion_v1",
         "subjects" => "controlkeel_validate,controlkeel_proxy",
         "baseline_subject" => "controlkeel_validate",
         "scenario_slugs" => "hr_discriminatory_candidate_filter,legal_privileged_memo_logging"
       })
 
-    {:ok, view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    {:ok, view, html} = live(conn, run_path(org, ws, run.id))
 
     assert html =~ "Scenario matrix"
     assert html =~ "Catch rate"
@@ -132,15 +137,18 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "show renders the comparison panel for a multi-subject run", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+
     run =
       benchmark_run_fixture(%{
+        "workspace_id" => ws.id,
         "suite" => "domain_expansion_v1",
         "subjects" => "controlkeel_validate,controlkeel_proxy",
         "baseline_subject" => "controlkeel_validate",
         "scenario_slugs" => "hr_discriminatory_candidate_filter,legal_privileged_memo_logging"
       })
 
-    {:ok, view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    {:ok, view, html} = live(conn, run_path(org, ws, run.id))
 
     assert has_element?(view, "#comparison-panel")
     assert html =~ "Subject comparison"
@@ -160,9 +168,10 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "show renders empty comparison state for a single-subject run", %{conn: conn} do
-    run = benchmark_run_fixture()
+    {org, ws, _session} = org_bound_session_fixture()
+    run = benchmark_run_fixture(%{"workspace_id" => ws.id})
 
-    {:ok, view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    {:ok, view, html} = live(conn, run_path(org, ws, run.id))
 
     assert has_element?(view, "#comparison-panel")
     assert html =~ "No comparable subjects"
@@ -171,9 +180,10 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "show renders the import panel for an awaiting-import run", %{conn: conn} do
-    run = awaiting_import_run_fixture()
+    {org, ws, _session} = org_bound_session_fixture()
+    run = awaiting_import_run_fixture(ws)
 
-    {:ok, view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    {:ok, view, html} = live(conn, run_path(org, ws, run.id))
 
     assert has_element?(view, "#import-panel")
     assert has_element?(view, "#import-slots")
@@ -183,9 +193,10 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "show completes a run through the import panel", %{conn: conn} do
-    run = awaiting_import_run_fixture()
+    {org, ws, _session} = org_bound_session_fixture()
+    run = awaiting_import_run_fixture(ws)
 
-    {:ok, view, _html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    {:ok, view, _html} = live(conn, run_path(org, ws, run.id))
 
     html =
       view
@@ -208,9 +219,10 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
   end
 
   test "show import panel flashes an error for invalid JSON without navigating", %{conn: conn} do
-    run = awaiting_import_run_fixture()
+    {org, ws, _session} = org_bound_session_fixture()
+    run = awaiting_import_run_fixture(ws)
 
-    {:ok, view, _html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    {:ok, view, _html} = live(conn, run_path(org, ws, run.id))
 
     html =
       view
@@ -331,9 +343,24 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
     assert html =~ "No benchmark runs yet"
   end
 
-  test "show redirects home when the run is not found", %{conn: conn} do
-    assert {:error, {:live_redirect, %{to: "/", flash: flash}}} =
-             live(conn, ~p"/benchmarks/runs/999999")
+  test "show redirects to the workspace index when the run is not found", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+    index_path = benchmarks_path(org, ws)
+
+    assert {:error, {:live_redirect, %{to: ^index_path, flash: flash}}} =
+             live(conn, run_path(org, ws, 999_999))
+
+    assert flash["error"] == "Benchmark run not found."
+  end
+
+  test "another workspace's run is not found on this workspace's run page", %{conn: conn} do
+    {org, ws, _session} = org_bound_session_fixture()
+    other = workspace_fixture(org_id: org.id)
+    run = benchmark_run_fixture(%{"workspace_id" => ws.id})
+    other_index_path = benchmarks_path(org, other)
+
+    assert {:error, {:live_redirect, %{to: ^other_index_path, flash: flash}}} =
+             live(conn, run_path(org, other, run.id))
 
     assert flash["error"] == "Benchmark run not found."
   end
@@ -415,7 +442,7 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
       assert ControlKeel.Repo.aggregate(ControlKeel.Benchmark.Run, :count, :id) == 0
     end
 
-    test "owner sees the runner form and executing a run lands on the global run page" do
+    test "owner sees the runner form and executing a run lands on the workspace run page" do
       {org, ws, _session} = org_bound_session_fixture()
       conn = cloud_member_conn(org, "owner")
 
@@ -434,11 +461,11 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
       )
 
       {path, _flash} = assert_redirect(view)
-      assert path =~ "/benchmarks/runs/"
+      assert path =~ "#{benchmarks_path(org, ws)}/runs/"
     end
   end
 
-  defp awaiting_import_run_fixture do
+  defp awaiting_import_run_fixture(ws) do
     tmp_dir = benchmark_tmp_dir()
 
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
@@ -457,7 +484,8 @@ defmodule ControlKeelWeb.BenchmarksLiveTest do
           "suite" => "vibe_failures_v1",
           "subjects" => "manual_subject",
           "baseline_subject" => "manual_subject",
-          "scenario_slugs" => "hardcoded_api_key_python_webhook"
+          "scenario_slugs" => "hardcoded_api_key_python_webhook",
+          "workspace_id" => ws.id
         },
         tmp_dir
       )

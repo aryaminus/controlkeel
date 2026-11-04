@@ -23,7 +23,7 @@ Cloud-auth gated dashboard routes:
 - `/findings`
 - `/proofs`, `/proofs/:id`
 - `/reviews/:id`
-- `/benchmarks`, `/benchmarks/runs/:id`
+- `/:org_slug/workspaces/:ws_slug/benchmarks` and `/.../benchmarks/runs/:id`
 - `/cloud/telemetry`, `/cloud/projects`, `/cloud/projects/:ws_id`
 - `/org/:slug/members`, `/org/:slug/settings/auth`, `/org/:slug/settings/general`
 - `/workspaces/:id/repos`, `/workspaces/:id/service-accounts`, `/workspaces/:id/webhooks`, `/workspaces/:id/tool-policy`

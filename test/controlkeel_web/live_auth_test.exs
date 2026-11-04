@@ -1,8 +1,6 @@
 defmodule ControlKeelWeb.LiveAuthTest do
   use ControlKeelWeb.ConnCase, async: false
 
-  import ControlKeel.BenchmarkFixtures
-  import ControlKeel.MissionFixtures
   import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
@@ -63,14 +61,6 @@ defmodule ControlKeelWeb.LiveAuthTest do
     {conn, user, org}
   end
 
-  # Runs are workspace-scoped on the retained global run page (#259): bind the
-  # fixture run to a workspace the member can reach, or the page correctly
-  # reports it missing.
-  defp member_run(%{id: org_id}) do
-    workspace = workspace_fixture(%{org_id: org_id})
-    benchmark_run_fixture(%{workspace_id: workspace.id})
-  end
-
   defp insert_membership(user, org, role) do
     %Accounts.Membership{}
     |> Accounts.Membership.changeset(%{
@@ -90,12 +80,12 @@ defmodule ControlKeelWeb.LiveAuthTest do
     owner
   end
 
-  # The global benchmark run page (/benchmarks/runs/:id) is the retained
-  # require_cloud_auth surface without page-local membership, so it exercises
-  # the same gates the old global /benchmarks index did.
+  # The global benchmark run page is gone (benchmarks-run-scope): the org
+  # overview and the /new/* launcher now stand in as the require_cloud_auth
+  # surfaces for these gate tests.
   test "memberless users are redirected to /new/org on authenticated pages" do
     assert {:error, {:redirect, %{to: "/new/org"}}} =
-             live(memberless_conn(), ~p"/benchmarks/runs/999999")
+             live(memberless_conn(), ~p"/no-such-org")
   end
 
   test "memberless users can open organization creation" do
@@ -105,9 +95,8 @@ defmodule ControlKeelWeb.LiveAuthTest do
 
   test "users with a membership render authenticated pages" do
     {conn, _user, org} = member_conn()
-    run = member_run(org)
 
-    {:ok, _view, html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    {:ok, _view, html} = live(conn, ~p"/#{org.slug}")
 
     refute html =~ "Join or create an organization"
   end
@@ -205,9 +194,11 @@ defmodule ControlKeelWeb.LiveAuthTest do
     {conn, user, org} = member_conn()
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
-    run = member_run(org)
 
-    {:ok, view, _html} = live(conn, ~p"/benchmarks/runs/#{run.id}")
+    # /new/session is exempt from the membership requirement and keeps no
+    # page-local membership, so a revocation here exercises the
+    # last-membership fallback instead of the page-local eviction branch.
+    {:ok, view, _html} = live(conn, ~p"/new/session")
 
     assert {:ok, %Accounts.Membership{status: "revoked"}} =
              Accounts.revoke_membership(membership.id, owner.id)
@@ -217,7 +208,6 @@ defmodule ControlKeelWeb.LiveAuthTest do
   end
 
   test "unauthenticated users are still sent to login, not /new/org" do
-    assert {:error, {:redirect, %{to: "/auth/login"}}} =
-             live(build_conn(), ~p"/benchmarks/runs/999999")
+    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/no-such-org")
   end
 end
