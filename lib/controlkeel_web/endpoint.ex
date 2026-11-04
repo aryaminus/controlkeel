@@ -14,6 +14,11 @@ defmodule ControlKeelWeb.Endpoint do
                      store: :cookie,
                      key: "_controlkeel_key",
                      signing_salt: "0M+fMgUN",
+                     # Encrypt (not merely sign) the cookie. The payload carries
+                     # current_user_id and pending_invitation_token; without this
+                     # anyone who can read the cookie can base64-decode raw
+                     # invitation tokens (issue #247).
+                     encryption_salt: "9kZ2r7Wp",
                      same_site: "Lax"
                    ] ++ if(session_max_age, do: [max_age: session_max_age], else: [])
 
