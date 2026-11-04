@@ -23,8 +23,11 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
           # No token configured (local default). The API is still reachable,
           # but only from this machine — a server bound to a non-loopback
           # interface without a configured token must not serve remote peers.
+          # The credential is recorded explicitly as `:local` so downstream
+          # authorization can distinguish "authenticated loopback caller" from
+          # "no credential was ever established" and fail closed on the latter.
           if loopback_peer?(conn) do
-            conn
+            assign(conn, :api_auth, %{type: :local})
           else
             forbidden_nonlocal_peer(conn)
           end

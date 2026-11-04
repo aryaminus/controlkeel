@@ -48,7 +48,13 @@ defmodule ControlKeelWeb.OrgAccess do
   Why the URL cannot be used.
 
     * `:not_found` — the slug resolves to no org
-    * `:forbidden` — the org exists but the visitor has no active membership
+    * `:forbidden` — the org exists but the visitor has no active membership,
+      **or the org is suspended** (`status != "active"`). Suspension is the
+      operator kill switch: every browser surface of a suspended org resolves
+      to this denial, sharing `:not_found`'s public copy so the state of an
+      org's lifecycle is not enumerable from outside. Members see the same
+      panel — a suspended org is, by design, indistinguishable from a deleted
+      one to anyone visiting its URLs.
     * `:needs_admin` — the visitor is a member below the required role
   """
   @type kind :: ScopeError.kind()
@@ -78,6 +84,7 @@ defmodule ControlKeelWeb.OrgAccess do
       %Org{} = org ->
         case check(org, user, required_role) do
           {:ok, membership} -> {:ok, org, membership}
+          {:error, :suspended} -> {:error, forbidden(slug)}
           {:error, :forbidden} -> {:error, forbidden(slug)}
           {:error, :needs_admin} -> {:error, needs_admin(slug)}
         end
@@ -95,6 +102,7 @@ defmodule ControlKeelWeb.OrgAccess do
     cond do
       Mode.current() == :local -> {:ok, nil}
       is_nil(user) -> {:error, :forbidden}
+      org.status != "active" -> {:error, :suspended}
       true -> check_membership(org, user, required_role)
     end
   end
