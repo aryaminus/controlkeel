@@ -1,5 +1,5 @@
-# BinWrapperTest isolates its System.cmd subprocess by copying the SQLite DB
-# file — that approach doesn't apply to Postgres (server-based, not file-based).
+# BinWrapperTest isolates its System.cmd subprocess with a SQLite snapshot.
+# That approach doesn't apply to Postgres (server-based, not file-based).
 # The wrapper itself is adapter-agnostic; the SQLite lane fully validates it.
 excludes =
   [:performance] ++

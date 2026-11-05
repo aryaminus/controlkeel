@@ -1,38 +1,30 @@
 defmodule ControlKeel.BinWrapperTest do
   use ExUnit.Case, async: false
 
-  # The wrapper subprocess is isolated by copying the SQLite DB file, which is
-  # inherently SQLite-only. The shell script itself is adapter-agnostic.
+  # The wrapper subprocess is isolated by a SQLite snapshot. The shell script
+  # itself is adapter-agnostic.
   @moduletag :sqlite_only
 
-  alias ControlKeel.Repo
+  alias ControlKeel.Repo.Local
   alias Ecto.Adapters.SQL.Sandbox
 
   @wrapper Path.expand("../../bin/controlkeel", __DIR__)
 
-  # The wrapper runs as a *subprocess* (System.cmd), so its DB writes are
-  # outside the Ecto sandbox and would leak into the shared test DB.
-  # Copy the already-migrated test DB to a throwaway path and point the
-  # subprocess at it via CK_TEST_DB so any auto-bootstrap it triggers stays
-  # fully isolated. Copying the migrated DB (rather than relying on the
-  # subprocess to auto-migrate) avoids a migration-timing race on CI.
+  # The wrapper runs as a subprocess, so its writes must stay outside the
+  # shared sandbox. VACUUM INTO creates a consistent SQLite snapshot while
+  # other tests write, unlike checkpointing and copying the shared DB file.
   setup do
-    source_db = Repo.config() |> Keyword.fetch!(:database)
-
     tmp_db =
       Path.join(
         System.tmp_dir!(),
         "controlkeel-bin-wrapper-#{System.unique_integer([:positive])}.db"
       )
 
-    # Checkpoint the WAL into the main DB file so the copy is self-contained,
-    # then copy the main file (schema is committed data, independent of any
-    # open sandbox transaction).
-    Sandbox.unboxed_run(ControlKeel.Repo.Local, fn ->
-      Repo.query!("PRAGMA wal_checkpoint(TRUNCATE)")
-    end)
+    escaped_tmp_db = String.replace(tmp_db, "'", "''")
 
-    File.cp!(source_db, tmp_db)
+    Sandbox.unboxed_run(Local, fn ->
+      Local.query!("VACUUM INTO '#{escaped_tmp_db}'")
+    end)
 
     on_exit(fn ->
       File.rm(tmp_db)
