@@ -89,9 +89,9 @@ defmodule ControlKeelWeb.DeviceAuthLive do
       <div :if={is_nil(@pending)} class="mt-6">
         <.form for={@form} phx-submit="lookup">
           <.input field={@form[:user_code]} label="Device code" autocomplete="off" />
-          <button type="submit" class="mt-3 rounded bg-primary px-4 py-2 text-primary-foreground">
+          <.button type="submit" class="mt-3">
             Continue
-          </button>
+          </.button>
         </.form>
       </div>
 
@@ -101,16 +101,15 @@ defmodule ControlKeelWeb.DeviceAuthLive do
           to access your account?
         </p>
         <div class="mt-4 flex gap-2">
-          <button
+          <.button
             type="button"
             phx-click="approve"
-            class="rounded bg-primary px-4 py-2 text-primary-foreground"
           >
             Allow
-          </button>
-          <button type="button" phx-click="deny" class="rounded border border-border px-4 py-2">
+          </.button>
+          <.button type="button" variant="outline" phx-click="deny">
             Deny
-          </button>
+          </.button>
         </div>
       </div>
     </div>
