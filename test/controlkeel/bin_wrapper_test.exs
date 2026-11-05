@@ -52,6 +52,32 @@ defmodule ControlKeel.BinWrapperTest do
     assert Map.has_key?(payload, "session_id")
   end
 
+  test "bin/controlkeel context --json bootstraps an empty SQLite database" do
+    tmp_db =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-bin-wrapper-fresh-#{System.unique_integer([:positive])}.db"
+      )
+
+    on_exit(fn ->
+      File.rm(tmp_db)
+      File.rm(tmp_db <> "-wal")
+      File.rm(tmp_db <> "-shm")
+    end)
+
+    env = [
+      {"CK_PROJECT_ROOT", File.cwd!()},
+      {"LOGGER_LEVEL", "error"},
+      {"DATABASE_PATH", tmp_db},
+      {"CK_TEST_DB", tmp_db}
+    ]
+
+    {output, 0} = System.cmd(@wrapper, ["context", "--session-id", "1", "--json"], env: env)
+
+    assert {:ok, payload} = Jason.decode(output)
+    assert is_map(payload)
+  end
+
   test "bin/controlkeel validate --json emits parseable JSON on stdout", %{env: env} do
     {output, 0} =
       System.cmd(@wrapper, ["validate", "--content", "echo hello", "--kind", "shell", "--json"],

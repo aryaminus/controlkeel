@@ -234,7 +234,11 @@ defmodule ControlKeel.Application do
   end
 
   defp skip_migrations?() do
-    not release_runtime?()
+    not (release_runtime?() or cli_runtime?() or mcp_stdio_mode?())
+  end
+
+  defp cli_runtime? do
+    System.get_env("CK_CLI_MODE") in ~w(1 true TRUE yes YES)
   end
 
   defp release_runtime? do

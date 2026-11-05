@@ -5,6 +5,8 @@ defmodule ControlKeel.MCP.ServerTest do
 
   import ControlKeel.MissionFixtures
 
+  @launcher Path.expand("../../../bin/controlkeel-mcp", __DIR__)
+
   test "server processes framed ck_validate requests over stdio" do
     session = session_fixture()
 
@@ -48,7 +50,7 @@ defmodule ControlKeel.MCP.ServerTest do
   end
 
   @tag :capture_log
-  test "mix ck.mcp emits only one JSONL response on real stdout" do
+  test "MCP launcher emits only one JSONL response on real stdout" do
     request =
       Jason.encode!(%{
         "jsonrpc" => "2.0",
@@ -58,12 +60,17 @@ defmodule ControlKeel.MCP.ServerTest do
       })
 
     shell =
-      ~S(printf '%s\n' "$MCP_REQUEST" | MIX_ENV=test mix ck.mcp --project-root "$CK_PROJECT_ROOT")
+      ~S(printf '%s\n' "$MCP_REQUEST" | "$MCP_LAUNCHER" --project-root "$CK_PROJECT_ROOT")
 
     assert {stdout, 0} =
              System.cmd("/bin/sh", ["-c", shell],
                cd: File.cwd!(),
-               env: [{"MCP_REQUEST", request}, {"CK_PROJECT_ROOT", File.cwd!()}]
+               env: [
+                 {"MCP_REQUEST", request},
+                 {"MCP_LAUNCHER", @launcher},
+                 {"CK_PROJECT_ROOT", File.cwd!()},
+                 {"MIX_ENV", "test"}
+               ]
              )
 
     assert [line] = String.split(stdout, "\n", trim: true)

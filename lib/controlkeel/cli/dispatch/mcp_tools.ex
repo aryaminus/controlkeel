@@ -127,9 +127,9 @@ defmodule ControlKeel.CLI.Dispatch.McpTools do
   def run_command(%{command: :mcp, options: options}, project_root) do
     root = Path.expand(options[:project_root] || project_root)
 
-    # MCP.Server is supervised first when CK_MCP_MODE (see Application); stdin reads
-    # run while Repo boots. ensure_local_project stays async so binding/skills work
-    # does not block the Mix process here. Skip AttachedSync during bootstrap.
+    # MCP.Server is supervised first when CK_MCP_MODE (see Application). Keep
+    # binding/skills bootstrap async, but wait for the deferred backend to start
+    # the Repo before it touches persistent project state.
     File.cd!(root, fn ->
       case ensure_stdio_server_running(2_000) do
         pid when is_pid(pid) ->
@@ -137,14 +137,20 @@ defmodule ControlKeel.CLI.Dispatch.McpTools do
 
           _ =
             Task.start(fn ->
-              case ensure_local_project(root, %{}, sync_attached_agents: false) do
-                {:ok, _, _, _} ->
-                  :ok
+              case await_mcp_backend_ready() do
+                :ready ->
+                  case ensure_local_project(root, %{}, sync_attached_agents: false) do
+                    {:ok, _, _, _} ->
+                      :ok
 
-                {:error, reason} ->
-                  Logger.error(
-                    "[MCP] bootstrap failed (some tools may fail until fixed): #{inspect(reason)}"
-                  )
+                    {:error, reason} ->
+                      Logger.error(
+                        "[MCP] bootstrap failed (some tools may fail until fixed): #{inspect(reason)}"
+                      )
+                  end
+
+                reason ->
+                  Logger.error("[MCP] bootstrap skipped: backend #{inspect(reason)}")
               end
             end)
 
@@ -164,5 +170,31 @@ defmodule ControlKeel.CLI.Dispatch.McpTools do
            "ControlKeel MCP stdio server is not running. Ensure CK_MCP_MODE is set before the application starts (see mix ck.mcp and bin/controlkeel-mcp)."}
       end
     end)
+  end
+
+  defp await_mcp_backend_ready do
+    deadline = System.monotonic_time(:millisecond) + 2_000
+    wait_for_mcp_backend(deadline)
+  end
+
+  defp wait_for_mcp_backend(deadline) do
+    case ControlKeel.Application.mcp_backend_boot_status() do
+      :ready ->
+        :ready
+
+      :booting ->
+        if System.monotonic_time(:millisecond) < deadline do
+          Process.sleep(25)
+          wait_for_mcp_backend(deadline)
+        else
+          :booting
+        end
+
+      {:failed, _reason} = status ->
+        status
+
+      _ ->
+        :ready
+    end
   end
 end
