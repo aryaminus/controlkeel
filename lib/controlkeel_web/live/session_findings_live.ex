@@ -641,7 +641,10 @@ defmodule ControlKeelWeb.SessionFindingsLive do
     Enum.reduce(findings, %{all: 0, blocked: 0, open: 0, resolved: 0}, fn finding, acc ->
       acc
       |> Map.put(:all, acc.all + 1)
-      |> Map.put(:blocked, if(finding.status == "blocked", do: acc.blocked + 1, else: acc.blocked))
+      |> Map.put(
+        :blocked,
+        if(finding.status == "blocked", do: acc.blocked + 1, else: acc.blocked)
+      )
       |> Map.put(:open, if(finding.status == "open", do: acc.open + 1, else: acc.open))
       |> Map.put(:resolved, if(resolved?(finding), do: acc.resolved + 1, else: acc.resolved))
     end)
