@@ -49,12 +49,37 @@ defmodule ControlKeelWeb.RouterTest do
              info.phoenix_live_view
   end
 
-  test "global benchmark run route remains for backward compatibility" do
-    info = Phoenix.Router.route_info(Router, "GET", "/benchmarks/runs/99", "localhost")
+  test "benchmarks run detail lives in the workspace scope" do
+    info =
+      Phoenix.Router.route_info(
+        Router,
+        "GET",
+        "/acme/workspaces/default/benchmarks/runs/99",
+        "localhost"
+      )
 
     assert %{plug: Phoenix.LiveView.Plug, plug_opts: :show} = info
 
-    assert {BenchmarksLive, :show, _opts, %{name: :cloud_auth}} =
+    assert {BenchmarksLive, :show, _opts, %{name: :organization}} =
+             info.phoenix_live_view
+  end
+
+  test "retired /benchmarks/runs/:id falls through to the invalid-org panel" do
+    # BenchmarksLive run detail moved to the workspace scope and no redirect
+    # was kept (owner decision): "/benchmarks/runs/..." matches the
+    # "/:org_slug/*rest" wide catch under the reserved "benchmarks" org slug
+    # and renders the invalid-org panel — never a dead route and never an
+    # org-owned page.
+    info = Phoenix.Router.route_info(Router, "GET", "/benchmarks/runs/99", "localhost")
+
+    assert %{
+             plug: Phoenix.LiveView.Plug,
+             route: "/:org_slug/*rest",
+             plug_opts: :not_found,
+             path_params: %{"org_slug" => "benchmarks", "rest" => ["runs", "99"]}
+           } = info
+
+    assert {ControlKeelWeb.OrgCatchAllLive, :not_found, _opts, %{name: :organization}} =
              info.phoenix_live_view
   end
 

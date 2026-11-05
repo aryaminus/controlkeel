@@ -17,6 +17,7 @@ defmodule Mix.Tasks.Ck.Smoke do
   """
 
   alias ControlKeel.Benchmark
+  alias ControlKeel.Bootstrap.LocalDefaults
 
   @impl true
   def run(args) do
@@ -95,8 +96,12 @@ defmodule Mix.Tasks.Ck.Smoke do
     shell.info(String.duplicate("─", 64))
     shell.info("REVIEW IN MISSION CONTROL")
     shell.info("")
-    shell.info("  #{host}/benchmarks/runs/#{run.id}")
-    shell.info("  #{host}/benchmarks")
+
+    org_slug = LocalDefaults.default_org_slug()
+    ws_slug = LocalDefaults.default_workspace_slug()
+
+    shell.info("  #{host}/#{org_slug}/workspaces/#{ws_slug}/benchmarks/runs/#{run.id}")
+    shell.info("  #{host}/#{org_slug}/workspaces/#{ws_slug}/benchmarks")
     shell.info("")
     shell.info("  Export JSON:")
     shell.info("    #{host}/api/v1/benchmarks/runs/#{run.id}")

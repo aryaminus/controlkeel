@@ -506,7 +506,12 @@ defmodule ControlKeel.CLITasksTest do
 
     assert output =~ "ControlKeel Benchmark"
     assert output =~ "BENCHMARK RESULTS"
-    assert output =~ "/benchmarks/runs/"
+
+    # The run URL printed to the terminal is the workspace-scoped benchmark
+    # run page (benchmarks-run-scope), prefilled with the local defaults.
+    assert output =~
+             "/default-organization/workspaces/default-workspace/benchmarks/runs/"
+
     assert Repo.aggregate(Session, :count, :id) == session_count
   end
 

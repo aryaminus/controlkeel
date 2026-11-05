@@ -1,21 +1,23 @@
 defmodule ControlKeelWeb.BenchmarksLive do
   @moduledoc """
-  Benchmark engine with two mounts:
+  Benchmark engine, workspace-scoped at
+  `/:org_slug/workspaces/:ws_slug/benchmarks[/runs/:id]`:
 
-  - Workspace index at `/:org_slug/workspaces/:ws_slug/benchmarks` — the
-    canonical surface, admitted through `ControlKeelWeb.WorkspaceScope` like
-    the other workspace pages (viewer+ to view).
-  - Legacy global run page at `/benchmarks/runs/:id` — kept for backward
-    compatibility. Runs executed anywhere still navigate here.
+  - **Index** — suites, subjects, quick presets, and run history, admitted
+    through `ControlKeelWeb.WorkspaceScope` like the other workspace pages
+    (viewer+ to view).
+  - **Run detail** — `.../benchmarks/runs/:id`, scoped to the URL workspace:
+    another workspace's run (or an unknown id) is not found here. The retired
+    global `/benchmarks/runs/:id` URL — like the retired global index — falls
+    through to the `:org_slug` catch-all and the invalid-org panel.
 
-  Running a suite spends money, so the workspace page hides the runner from
-  viewers and refuses `run` events without an admin/owner membership (same
-  gate as the observability benchmark page; local mode is single-user and
-  always passes). The legacy global run page keeps its backward-compatible
-  behavior, including its import panel.
-
-  Suites, subjects, and runs are global rows, so both mounts derive the same
-  engine state; only the scope chrome differs.
+  Running a suite spends money, so the page hides the runner from viewers and
+  refuses `run` events without an admin/owner membership (same gate as the
+  observability benchmark page; local mode is single-user and always passes).
+  Runs are workspace-bound tenant data (benchmark tenancy): the runner stamps
+  the URL workspace, listings show only the URL workspace's runs, and suites
+  resolve as platform content plus the workspace's own. The retired global
+  run page keeps backward compatibility only through the redirect.
   """
 
   use ControlKeelWeb, :live_view
@@ -40,16 +42,14 @@ defmodule ControlKeelWeb.BenchmarksLive do
     end
   end
 
-  # Legacy global mount (backward-compatible /benchmarks/runs/:id page).
   @impl true
-  def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Benchmarks")
-     |> assign_engine_state()}
+  def handle_params(%{"org_slug" => _, "ws_slug" => _, "id" => id} = params, _uri, socket) do
+    case WorkspaceScope.refresh(socket, params) do
+      {:ok, socket, _changed?} -> load_run(socket, id)
+      {:error, socket} -> {:noreply, socket}
+    end
   end
 
-  @impl true
   def handle_params(%{"org_slug" => _, "ws_slug" => _} = params, _uri, socket) do
     WorkspaceScope.on_params(socket, params, fn socket, _params ->
       socket
@@ -58,41 +58,15 @@ defmodule ControlKeelWeb.BenchmarksLive do
     end)
   end
 
-  def handle_params(%{"id" => id}, _uri, socket) do
-    case fetch_run(id, socket) do
-      nil ->
-        # The global index this page used to fall back to moved into the
-        # workspace scope, so an unknown run goes home instead.
-        {:noreply,
-         socket
-         |> put_flash(:error, "Benchmark run not found.")
-         |> push_navigate(to: ~p"/")}
-
-      run ->
-        {:noreply,
-         socket
-         |> assign_run_details(run)
-         |> assign(:page_title, "Benchmark Run #{run.id}")
-         |> assign(:page_action, %{
-           label: "Export CSV",
-           to: ~p"/api/v1/benchmarks/runs/#{run.id}/export?format=csv",
-           icon: "hero-document-text"
-         })}
-    end
-  end
-
   @impl true
   def handle_event("run", %{"benchmark" => params}, socket) do
     with {:ok, socket} <- require_admin(socket) do
       case Benchmark.run_suite(stamp_workspace(socket, params)) do
         {:ok, run} ->
-          # Intentionally the global run page: the run detail remains a global
-          # backward-compatibility surface even when the run starts from the
-          # workspace-scoped benchmarks page (issue: benchmarks-workspace-scope).
           {:noreply,
            socket
            |> put_flash(:info, "Benchmark run ##{run.id} completed.")
-           |> push_navigate(to: ~p"/benchmarks/runs/#{run.id}")}
+           |> push_navigate(to: run_path(socket, run.id))}
 
         {:error, reason} ->
           {:noreply, put_flash(socket, :error, "Benchmark run failed: #{inspect(reason)}")}
@@ -217,6 +191,33 @@ defmodule ControlKeelWeb.BenchmarksLive do
   # The organization layout renders the in-place scope-error panel; the
   # LiveView itself renders nothing (same shape as WorkspaceReposLive). The
   # legacy global run page has no scope_error assign and never matches.
+  # Run-detail load under the URL workspace: another workspace's run (or an
+  # unknown id) is not found here, and the page falls back to the workspace
+  # index instead of a dead URL.
+  defp load_run(socket, id) do
+    case fetch_run(id, socket) do
+      nil ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Benchmark run not found.")
+         |> push_navigate(to: benchmarks_index_path(socket))}
+
+      run ->
+        {:noreply,
+         socket
+         |> assign_run_details(run)
+         |> assign(:page_title, "Benchmark Run #{run.id} — #{socket.assigns.workspace.name}")}
+    end
+  end
+
+  defp benchmarks_index_path(socket) do
+    ~p"/#{socket.assigns.nav_org.slug}/workspaces/#{socket.assigns.nav_workspace.slug}/benchmarks"
+  end
+
+  defp run_path(socket, run_id) do
+    ~p"/#{socket.assigns.nav_org.slug}/workspaces/#{socket.assigns.nav_workspace.slug}/benchmarks/runs/#{run_id}"
+  end
+
   @impl true
   def render(%{scope_error: error} = assigns) when not is_nil(error), do: ~H""
 
@@ -300,7 +301,15 @@ defmodule ControlKeelWeb.BenchmarksLive do
 
       <%!-- Run metadata panel --%>
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
-        <.section_title>Run metadata</.section_title>
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <.section_title>Run metadata</.section_title>
+          <.link
+            href={~p"/api/v1/benchmarks/runs/#{@run.id}/export?format=csv"}
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+          >
+            <.icon name="hero-document-text" class="size-3.5" /> Export CSV
+          </.link>
+        </div>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p class="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -844,7 +853,9 @@ defmodule ControlKeelWeb.BenchmarksLive do
                   <tr id={"run-#{run.id}"} class="relative transition hover:bg-muted/30">
                     <td class="px-5 py-4 font-semibold">
                       <.link
-                        navigate={~p"/benchmarks/runs/#{run.id}"}
+                        navigate={
+                          ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/benchmarks/runs/#{run.id}"
+                        }
                         class="text-foreground/90 hover:text-primary after:absolute after:inset-0"
                       >
                         {run.suite.name || run.suite.slug}
@@ -1018,51 +1029,51 @@ defmodule ControlKeelWeb.BenchmarksLive do
 
   defp refresh_dashboard_assigns(socket) do
     subjects = Benchmark.available_subjects()
-    workspace_ids = accessible_workspace_ids(socket)
 
     socket
-    |> assign(:summary, Benchmark.benchmark_summary(workspace_ids: workspace_ids))
-    |> assign(:suites, Benchmark.list_suites(workspace_ids: workspace_ids))
-    |> assign(:recent_runs, Benchmark.list_recent_runs(workspace_ids: workspace_ids))
+    |> assign(:summary, Benchmark.benchmark_summary(workspace_ids: url_workspace_ids(socket)))
+    |> assign(:suites, Benchmark.list_suites(workspace_ids: url_workspace_ids(socket)))
+    |> assign(:recent_runs, Benchmark.list_recent_runs(workspace_ids: url_workspace_ids(socket)))
     |> assign(:available_subjects, subjects)
     |> assign(:subjects_by_id, Map.new(subjects, fn s -> {s["id"], s} end))
   end
 
-  # Stamp the run with the viewer's workspace so the resulting run is tenant
-  # scoped. The workspace comes from the server-resolved binding, never from
-  # user-supplied form params.
-  defp stamp_workspace(socket, params) do
-    workspace_id =
-      case accessible_workspace_ids(socket) do
-        [single | _] -> single
-        _ -> nil
-      end
-
-    if workspace_id, do: Map.put(params, "workspace_id", workspace_id), else: params
-  end
-
-  # The viewer's accessible workspaces, or nil in local single-user mode where
-  # benchmarks stay unscoped by design.
-  defp accessible_workspace_ids(socket) do
-    case socket.assigns[:current_user] do
-      %{id: user_id} -> ControlKeel.Mission.accessible_workspace_ids(user_id)
+  # The workspace page lists only the URL workspace's runs (plus platform
+  # suites): runs are tenant data bound to the workspace they were created
+  # in, so showing the viewer's other workspaces' runs here would defeat the
+  # scoping the URL promises.
+  defp url_workspace_ids(socket) do
+    case socket.assigns[:workspace] do
+      %Workspace{id: workspace_id} -> [workspace_id]
       _ -> nil
     end
   end
 
-  # Fetch a run the viewer is allowed to see. In cloud mode this is scoped to
-  # their workspaces so an IDOR cannot pull another tenant's benchmark results;
-  # local mode keeps the unscoped behaviour.
-  defp fetch_run(id, socket) do
-    case accessible_workspace_ids(socket) do
-      nil ->
-        Benchmark.get_run(id)
+  # Stamp the run with the workspace the run was started from (the URL
+  # workspace), so the run is owned by — and only visible on — that
+  # workspace. The workspace comes from the server-resolved binding, never
+  # from user-supplied form params.
+  defp stamp_workspace(socket, params) do
+    case socket.assigns[:workspace] do
+      %Workspace{id: workspace_id} -> Map.put(params, "workspace_id", workspace_id)
+      _ -> params
+    end
+  end
 
-      workspace_ids ->
+  # Run reads scope to the URL workspace: another workspace's run is not
+  # found here even when the viewer could access it elsewhere, so a
+  # workspace page never renders foreign runs. An unscoped read only exists
+  # as a defensive fallback for a page without a resolved workspace.
+  defp fetch_run(id, socket) do
+    case socket.assigns[:workspace] do
+      %Workspace{} = workspace ->
         case Integer.parse(to_string(id)) do
-          {parsed, ""} -> Benchmark.get_run_for_user(parsed, workspace_ids)
+          {parsed, ""} -> Benchmark.get_run_for_user(parsed, [workspace.id])
           _ -> nil
         end
+
+      _ ->
+        Benchmark.get_run(id)
     end
   end
 

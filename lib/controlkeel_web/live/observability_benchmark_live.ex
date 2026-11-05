@@ -524,7 +524,9 @@ defmodule ControlKeelWeb.ObservabilityBenchmarkLive do
                       {format_datetime(run.inserted_at, "unknown")}
                     </p>
                     <.link
-                      navigate={~p"/benchmarks/runs/#{run.id}"}
+                      navigate={
+                        ~p"/#{@nav_org.slug}/workspaces/#{@nav_workspace.slug}/benchmarks/runs/#{run.id}"
+                      }
                       class="text-sm font-medium text-primary transition hover:text-primary"
                     >
                       Open run →
