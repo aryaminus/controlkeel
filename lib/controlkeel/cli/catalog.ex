@@ -33,9 +33,8 @@ defmodule ControlKeel.CLI.Catalog do
 
   def families do
     all()
-    |> Enum.group_by(& &1.family)
-    |> Enum.map(fn {family, entries} -> {family, Enum.map(entries, & &1.command)} end)
-    |> Map.new()
+    # Avoids allocating intermediate lists of full structs
+    |> Enum.group_by(& &1.family, & &1.command)
   end
 
   def for_command(command) when is_atom(command) do
