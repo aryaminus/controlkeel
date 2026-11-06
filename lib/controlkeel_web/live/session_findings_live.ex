@@ -367,8 +367,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
           aria-hidden="true"
           style="position:absolute;top:0;bottom:0;left:0;width:4px;"
           class={severity_bar(@finding)}
-        >
-        </span>
+        ></span>
 
         <div class="flex w-full items-center gap-4 px-4">
           <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -391,8 +390,7 @@ defmodule ControlKeelWeb.SessionFindingsLive do
                   :if={index > 0}
                   aria-hidden="true"
                   class="size-1 shrink-0 rounded-full bg-secondary"
-                >
-                </span>
+                ></span>
                 <span
                   :if={kind == :path}
                   title={value}

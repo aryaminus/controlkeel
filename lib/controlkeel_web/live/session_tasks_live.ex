@@ -335,8 +335,7 @@ defmodule ControlKeelWeb.SessionTasksLive do
                       task.status == "queued" && "bg-warning",
                       task.status == "paused" && "bg-info",
                       task.status == "blocked" && "bg-destructive"
-                    ]}>
-                    </span>
+                    ]}></span>
                     <span class="font-medium text-foreground">{task.title}</span>
                     <span
                       :if={@current_task && @current_task.id == task.id}
