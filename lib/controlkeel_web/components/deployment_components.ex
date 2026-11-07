@@ -22,7 +22,7 @@ defmodule ControlKeelWeb.DeploymentComponents do
       phx-click="set_tab"
       phx-value-tab={@name}
       class={[
-        "rounded-full px-4 py-1.5 text-sm font-semibold capitalize transition cursor-pointer",
+        "rounded-full px-4 py-1.5 text-sm font-semibold capitalize transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         @tab == @name && "bg-primary/15 text-primary ring-1 ring-primary/30",
         @tab != @name && "text-muted-foreground hover:bg-muted hover:text-foreground"
       ]}
