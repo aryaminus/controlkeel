@@ -65,6 +65,11 @@ defmodule ControlKeel.MCP.ServerTest do
         "controlkeel-mcp-server-#{System.unique_integer([:positive])}.db"
       )
 
+    src_db = ControlKeel.Repo.Local.config()[:database]
+    File.cp!(src_db, tmp_db)
+    if File.exists?(src_db <> "-wal"), do: File.cp!(src_db <> "-wal", tmp_db <> "-wal")
+    if File.exists?(src_db <> "-shm"), do: File.cp!(src_db <> "-shm", tmp_db <> "-shm")
+
     on_exit(fn ->
       File.rm(tmp_db)
       File.rm(tmp_db <> "-wal")
