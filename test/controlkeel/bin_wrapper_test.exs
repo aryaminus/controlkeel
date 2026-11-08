@@ -37,7 +37,8 @@ defmodule ControlKeel.BinWrapperTest do
       {"CK_CLI_MODE", "1"},
       {"LOGGER_LEVEL", "error"},
       {"DATABASE_PATH", tmp_db},
-      {"CK_TEST_DB", tmp_db}
+      {"CK_TEST_DB", tmp_db},
+      {"CK_TEST_SUBPROCESS", "1"}
     ]
 
     %{env: env}
@@ -69,7 +70,8 @@ defmodule ControlKeel.BinWrapperTest do
       {"CK_PROJECT_ROOT", File.cwd!()},
       {"LOGGER_LEVEL", "error"},
       {"DATABASE_PATH", tmp_db},
-      {"CK_TEST_DB", tmp_db}
+      {"CK_TEST_DB", tmp_db},
+      {"CK_TEST_SUBPROCESS", "1"}
     ]
 
     {output, 0} = System.cmd(@wrapper, ["context", "--session-id", "1", "--json"], env: env)

@@ -23,14 +23,24 @@ else
     System.get_env("CK_TEST_DB") ||
       Path.expand("../priv/repo/controlkeel_test.db", __DIR__)
 
+  pool_opts =
+    if System.get_env("CK_TEST_SUBPROCESS") do
+      [pool_size: 10]
+    else
+      [
+        # SQLite-backed tests are more stable with a single pooled connection because
+        # LiveView and benchmark flows can otherwise compete for overlapping write locks.
+        pool_size: 1,
+        pool: Ecto.Adapters.SQL.Sandbox
+      ]
+    end
+
   config :controlkeel, ControlKeel.Repo.Local,
-    database: test_database,
-    busy_timeout: 15_000,
-    # SQLite-backed tests are more stable with a single pooled connection because
-    # LiveView and benchmark flows can otherwise compete for overlapping write locks.
-    pool_size: 1,
-    pool: Ecto.Adapters.SQL.Sandbox,
-    journal_mode: :wal
+    [
+      database: test_database,
+      busy_timeout: 15_000,
+      journal_mode: :wal
+    ] ++ pool_opts
 end
 
 # We don't run a server during test. If one is required,

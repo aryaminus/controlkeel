@@ -59,6 +59,23 @@ defmodule ControlKeel.MCP.ServerTest do
         "params" => %{"protocolVersion" => "2024-11-05"}
       })
 
+    tmp_db =
+      Path.join(
+        System.tmp_dir!(),
+        "controlkeel-mcp-server-#{System.unique_integer([:positive])}.db"
+      )
+
+    src_db = ControlKeel.Repo.Local.config()[:database]
+    File.cp!(src_db, tmp_db)
+    if File.exists?(src_db <> "-wal"), do: File.cp!(src_db <> "-wal", tmp_db <> "-wal")
+    if File.exists?(src_db <> "-shm"), do: File.cp!(src_db <> "-shm", tmp_db <> "-shm")
+
+    on_exit(fn ->
+      File.rm(tmp_db)
+      File.rm(tmp_db <> "-wal")
+      File.rm(tmp_db <> "-shm")
+    end)
+
     shell =
       ~S(printf '%s\n' "$MCP_REQUEST" | "$MCP_LAUNCHER" --project-root "$CK_PROJECT_ROOT")
 
@@ -69,7 +86,10 @@ defmodule ControlKeel.MCP.ServerTest do
                  {"MCP_REQUEST", request},
                  {"MCP_LAUNCHER", @launcher},
                  {"CK_PROJECT_ROOT", File.cwd!()},
-                 {"MIX_ENV", "test"}
+                 {"MIX_ENV", "test"},
+                 {"DATABASE_PATH", tmp_db},
+                 {"CK_TEST_DB", tmp_db},
+                 {"CK_TEST_SUBPROCESS", "1"}
                ]
              )
 

@@ -197,7 +197,7 @@ defmodule ControlKeelWeb.ProtocolControllerTest do
       assert %{"result" => %{"tools" => _}} = json_response(conn, 200)
     end
 
-    test "DELETE without a session header yields 404", %{conn: conn} do
+    test "DELETE without a session header yields 404" do
       conn = build_conn() |> delete("/mcp")
       assert %{"error" => "session_not_found"} = json_response(conn, 404)
     end
