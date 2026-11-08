@@ -530,7 +530,7 @@ defmodule ControlKeelWeb.NewSessionLiveTest do
       {:ok, org_b} = Accounts.create_org_with_owner(user.id, %{name: "Param B", slug: "param-b"})
       ws_a1 = workspace_fixture(%{org_id: org_a.id, name: "A One", slug: "a-one"})
       ws_a2 = workspace_fixture(%{org_id: org_a.id, name: "A Two", slug: "a-two"})
-      ws_b = workspace_fixture(%{org_id: org_b.id, name: "Bee", slug: "bee"})
+      _ws_b = workspace_fixture(%{org_id: org_b.id, name: "Bee", slug: "bee"})
 
       # No params: defaults — first admin org + its first workspace.
       {:ok, view, html} = live(cloud_conn(user, nil), ~p"/new/session")

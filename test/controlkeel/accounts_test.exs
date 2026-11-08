@@ -286,7 +286,7 @@ defmodule ControlKeel.AccountsTest do
       {:ok, owner: owner, admin: admin, invitee: invitee, org: org}
     end
 
-    test "owner can invite at any role", %{owner: owner, invitee: invitee, org: org} do
+    test "owner can invite at any role", %{owner: owner, org: org} do
       for role <- ["owner", "admin", "member", "viewer"] do
         # Fresh invitee per role to avoid already_member collisions.
         {:ok, u} = Accounts.create_user(%{email: "invitee-#{role}@example.com"})
@@ -298,7 +298,7 @@ defmodule ControlKeel.AccountsTest do
       end
     end
 
-    test "admin can invite member/viewer", %{admin: admin, invitee: invitee, org: org} do
+    test "admin can invite member/viewer", %{admin: admin, org: org} do
       for role <- ["member", "viewer"] do
         {:ok, u} = Accounts.create_user(%{email: "invitee-#{role}-a@example.com"})
 
@@ -559,7 +559,7 @@ defmodule ControlKeel.AccountsTest do
       assert {:error, :unauthorized} = Accounts.revoke_membership(m.id, member.id)
     end
 
-    test "admin can revoke others but not self", %{owner: owner, org: org} do
+    test "admin can revoke others but not self", %{org: org} do
       {:ok, admin} = Accounts.create_user(%{email: "admin@example.com"})
       {:ok, _, raw} = Accounts.invite_member(admin.id, org.id, role: "admin")
       {:ok, _} = Accounts.accept_invitation(raw, admin.id)
@@ -571,7 +571,7 @@ defmodule ControlKeel.AccountsTest do
     test "non-admin cannot revoke", %{membership: m} do
       {:ok, outsider} = Accounts.create_user(%{email: "out@example.com"})
 
-      {:ok, org2} =
+      {:ok, _org2} =
         Accounts.create_org_with_owner(outsider.id, %{
           name: "O2",
           slug: "o2-#{System.unique_integer([:positive])}"
@@ -580,7 +580,7 @@ defmodule ControlKeel.AccountsTest do
       assert {:error, :unauthorized} = Accounts.revoke_membership(m.id, outsider.id)
     end
 
-    test "admin cannot revoke an owner", %{owner: owner, org: org} do
+    test "admin cannot revoke an owner", %{org: org} do
       {:ok, admin} = Accounts.create_user(%{email: "admin@example.com"})
       {:ok, _, raw} = Accounts.invite_member(admin.id, org.id, role: "admin")
       {:ok, _} = Accounts.accept_invitation(raw, admin.id)
@@ -594,7 +594,7 @@ defmodule ControlKeel.AccountsTest do
       assert {:error, :cannot_revoke_owner} = Accounts.revoke_membership(owner2_m.id, admin.id)
     end
 
-    test "admin cannot revoke another admin", %{owner: owner, org: org} do
+    test "admin cannot revoke another admin", %{org: org} do
       {:ok, admin1} = Accounts.create_user(%{email: "admin1@example.com"})
       {:ok, _, raw1} = Accounts.invite_member(admin1.id, org.id, role: "admin")
       {:ok, _} = Accounts.accept_invitation(raw1, admin1.id)
@@ -724,7 +724,7 @@ defmodule ControlKeel.AccountsTest do
     test "outsider cannot change roles", %{membership: m} do
       {:ok, outsider} = Accounts.create_user(%{email: "out@example.com"})
 
-      {:ok, org2} =
+      {:ok, _org2} =
         Accounts.create_org_with_owner(outsider.id, %{
           name: "O2",
           slug: "o2-#{System.unique_integer([:positive])}"

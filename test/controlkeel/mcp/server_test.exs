@@ -65,12 +65,6 @@ defmodule ControlKeel.MCP.ServerTest do
         "controlkeel-mcp-server-#{System.unique_integer([:positive])}.db"
       )
 
-    escaped_tmp_db = String.replace(tmp_db, "'", "''")
-
-    Ecto.Adapters.SQL.Sandbox.unboxed_run(ControlKeel.Repo.Local, fn ->
-      ControlKeel.Repo.Local.query!("VACUUM INTO '#{escaped_tmp_db}'")
-    end)
-
     on_exit(fn ->
       File.rm(tmp_db)
       File.rm(tmp_db <> "-wal")

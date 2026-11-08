@@ -1,5 +1,5 @@
 defmodule ControlKeel.Accounts.DataLifecycleTest do
-  @modagedoc """
+  @moduledoc """
   User/org erasure (issue #266).
 
   The contract under test: identity is purged, the audit *record* survives with

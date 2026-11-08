@@ -1,7 +1,6 @@
 defmodule ControlKeelWeb.SessionReleaseLiveTest do
   use ControlKeelWeb.ConnCase, async: false
 
-  import ControlKeel.IntentFixtures
   import Phoenix.LiveViewTest
   import ControlKeel.MissionFixtures
   import Ecto.Query
