@@ -271,7 +271,8 @@ defmodule ControlKeel.Repo.Migrations.BackfillPolicySetOrgOwnership do
         "policy_sets org backfill: #{mismatched} workspace assignment(s) reference a " <>
           "workspace whose organization does not match the set's organization. They still " <>
           "evaluate, but must be re-applied from the matching org to change. Assignments " <>
-          "on org-less workspaces cannot be toggled (see WorkspacePolicySet.validate_same_org)."
+          "on workspaces with mismatched organization ownership cannot be toggled " <>
+          "(see WorkspacePolicySet.validate_same_org)."
       )
     end
   end

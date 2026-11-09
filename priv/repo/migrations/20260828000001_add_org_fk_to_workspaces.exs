@@ -2,11 +2,9 @@ defmodule ControlKeel.Repo.Migrations.AddOrgFkToWorkspaces do
   @moduledoc """
   Enforces referential integrity for `workspaces.org_id`.
 
-  Solo workspaces (org_id NULL) remain a first-class product concept —
-  cloud execution authz authorizes them without org membership. This
-  migration only guarantees that a non-null org_id always references an
-  existing org row, closing the dangling-reference gap. Org deletion
-  detaches its workspaces back to solo rather than cascading.
+  Every workspace must belong to an org. This migration guarantees that a
+  non-null org_id references an existing org row; a later migration backfills
+  legacy nulls and adds the NOT NULL constraint.
   """
   use Ecto.Migration
 
