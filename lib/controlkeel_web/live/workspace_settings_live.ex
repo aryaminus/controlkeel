@@ -462,8 +462,7 @@ defmodule ControlKeelWeb.WorkspaceSettingsLive do
     # Display list includes disabled assignments; the dropdown excludes any
     # set with an assignment row so re-applying never silently flips a
     # disabled assignment back to enabled via the upsert. Availability is
-    # org-scoped: only sets owned by the workspace's org are shown (org-nil
-    # solo workspaces see an empty picker).
+    # org-scoped: only sets owned by the workspace's org are shown.
     workspace = socket.assigns.workspace
     assignments = Platform.list_workspace_policy_assignments(workspace.id)
     assigned_ids = Enum.map(assignments, & &1.policy_set_id)

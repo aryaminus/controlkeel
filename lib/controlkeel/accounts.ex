@@ -731,20 +731,23 @@ defmodule ControlKeel.Accounts do
   # ──────────────── Workspace linkage ──────
 
   @doc """
-  Link a workspace to an org. Pass `org_id: nil` to detach.
+  Link a workspace to an org. Workspaces cannot be detached from their org.
 
-  Returns `{:error, :not_found}` when the workspace doesn't exist.
+  Returns `{:error, :not_found}` when the workspace doesn't exist and
+  `{:error, :org_required}` when asked to detach it.
   """
-  @spec assign_workspace_to_org(integer(), integer() | nil) ::
-          {:ok, Workspace.t()} | {:error, :not_found | Ecto.Changeset.t()}
-  def assign_workspace_to_org(workspace_id, org_id) do
+  @spec assign_workspace_to_org(integer(), integer()) ::
+          {:ok, Workspace.t()} | {:error, :not_found | :org_required | Ecto.Changeset.t()}
+  def assign_workspace_to_org(_workspace_id, nil), do: {:error, :org_required}
+
+  def assign_workspace_to_org(workspace_id, org_id) when is_integer(org_id) do
     case Repo.get(Workspace, workspace_id) do
       nil ->
         {:error, :not_found}
 
       workspace ->
         workspace
-        |> Ecto.Changeset.change(%{org_id: org_id})
+        |> Workspace.changeset(%{org_id: org_id})
         |> Repo.update()
     end
   end
@@ -758,7 +761,7 @@ defmodule ControlKeel.Accounts do
     |> Repo.all()
   end
 
-  @doc "List unaffiliated workspaces (no org assigned)."
+  @doc "List legacy workspaces with no org assigned (should be empty after migration)."
   @spec list_unaffiliated_workspaces() :: [Workspace.t()]
   def list_unaffiliated_workspaces do
     Workspace
@@ -777,8 +780,8 @@ defmodule ControlKeel.Accounts do
     * local mode → `true` (single-user deployment, no user model);
     * cloud/self_hosted → the session's workspace must be org-bound and
       must authorize `user` via `authorize_cloud_execution/2` (viewer+,
-      active org+membership). A missing user, a missing workspace, or an
-      unaffiliated workspace (no owner to authorize against) **denies**.
+      active org+membership). A missing user, a missing workspace, or a
+      legacy workspace without an org **denies**.
 
   Callers pass `socket.assigns[:current_user]` / `conn.assigns[:current_user]`.
   """
@@ -1019,9 +1022,8 @@ defmodule ControlKeel.Accounts do
   @doc """
   Assign a review to a user.
 
-  The assignee must be an active member of the workspace's org. If the review's
-  workspace has no org (solo workspace), assignment is rejected — solo
-  workspaces use the existing single-user approve flow.
+  The assignee must be an active member of the workspace's org. A legacy
+  workspace without an org cannot be assigned.
 
   Pass `required_role:` (e.g. "admin") to require that the eventual decider
   hold at least that role. The assignee themselves does not need that role;
@@ -1359,15 +1361,14 @@ defmodule ControlKeel.Accounts do
   @doc """
   Authorize a cloud execution request for a workspace.
 
-  When the workspace belongs to an org, the caller must present a user_id with
-  an active membership at or above `required_role` (default `"member"`). Solo
-  workspaces (no org) are always authorized — the local-first trust anchor
-  applies.
+  The caller must present a user_id with an active membership at or above
+  `required_role` (default `"member"`). Workspaces without an org are rejected.
 
   Returns `{:ok, :authorized}` or `{:error, reason}`.
   """
   @spec authorize_cloud_execution(integer(), keyword()) ::
-          {:ok, :authorized} | {:error, :not_found | :unauthorized | :org_suspended}
+          {:ok, :authorized}
+          | {:error, :not_found | :unbound_workspace | :unauthorized | :org_suspended}
   def authorize_cloud_execution(workspace_id, opts \\ []) when is_integer(workspace_id) do
     required_role = Keyword.get(opts, :required_role, "member")
     user_id = Keyword.get(opts, :user_id)
@@ -1376,15 +1377,7 @@ defmodule ControlKeel.Accounts do
       nil ->
         {:error, :not_found}
 
-      # NOTE: an org-less workspace currently authorizes unconditionally here, which
-      # is a real gap (no owner can vouch for it, and even the caller's identity
-      # is unchecked). Tracked separately for a focused fix with fixture
-      # migration; see the cloud execution authz follow-up.
       %Workspace{org_id: nil} ->
-        # Fail closed. A workspace with no org has no tenant to authorize
-        # against, so treating it as authorized let any caller (or no caller)
-        # execute cloud work against an unowned workspace. Org-less workspaces
-        # are a local-dev/test artifact and must never authorize cloud runs.
         {:error, :unbound_workspace}
 
       %Workspace{org_id: org_id} ->

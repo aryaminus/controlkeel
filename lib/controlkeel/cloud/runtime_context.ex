@@ -9,8 +9,8 @@ defmodule ControlKeel.Cloud.RuntimeContext do
 
   **Authorization gate (CK-CLOUD-AUTHZ-001):** `create_package/1` now checks
   whether the workspace's org authorizes the caller before creating a run
-  package. Solo workspaces (no org) are always authorized. Org workspaces
-  require an active membership with role >= member, passed via `user_id` key.
+  package. Workspaces must belong to an org and require an active membership
+  with role >= member, passed via the `user_id` key.
 
   Per architectural decision D2, runtime authorization continues to flow
   through service-account-style tokens. The callback token issued here is
@@ -48,7 +48,12 @@ defmodule ControlKeel.Cloud.RuntimeContext do
   """
   @spec create_package(map()) ::
           {:ok, RunPackage.t(), String.t()}
-          | {:error, Ecto.Changeset.t() | :unauthorized | :not_found | :org_suspended}
+          | {:error,
+             Ecto.Changeset.t()
+             | :unbound_workspace
+             | :unauthorized
+             | :not_found
+             | :org_suspended}
   def create_package(attrs) when is_map(attrs) do
     workspace_id = Arguments.parse_integer(attrs[:workspace_id] || attrs["workspace_id"])
 

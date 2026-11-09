@@ -51,11 +51,13 @@ defmodule ControlKeel.Mission.Workspace do
       :agent,
       :budget_cents,
       :compliance_profile,
-      :status
+      :status,
+      :org_id
     ])
     |> validate_number(:budget_cents, greater_than_or_equal_to: 0)
     |> update_change(:slug, &normalize_slug/1)
     |> validate_inclusion(:status, @valid_statuses)
+    |> assoc_constraint(:org)
     |> unique_constraint(:slug)
   end
 

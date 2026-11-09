@@ -2080,8 +2080,8 @@ defmodule ControlKeelWeb.ApiController do
 
   # Policy sets are org-owned; policy endpoints resolve the owning org from
   # the workspace the caller was authorized against. An unknown workspace
-  # (or org-less solo workspace) resolves to nil, which yields an empty
-  # availability list and a rejected create.
+  # resolves to nil, which yields an empty availability list and a rejected
+  # create.
   defp workspace_org_id(workspace_id) do
     case Repo.get(Mission.Workspace, workspace_id) do
       nil -> nil
