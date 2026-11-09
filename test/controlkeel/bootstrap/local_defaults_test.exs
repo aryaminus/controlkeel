@@ -27,16 +27,6 @@ defmodule ControlKeel.Bootstrap.LocalDefaultsTest do
       assert ws1.id == ws2.id
     end
 
-    test "backfills org_id onto a pre-existing orphan default workspace" do
-      force_default_workspace(org_id: nil)
-
-      assert {:ok, {_org, workspace}} = LocalDefaults.ensure()
-
-      assert workspace.org_id
-      reloaded = Repo.get_by(Workspace, slug: LocalDefaults.default_workspace_slug())
-      assert reloaded.org_id == workspace.org_id
-    end
-
     test "errors when the default workspace belongs to a different org" do
       {:ok, other_org} = Accounts.create_org(%{name: "Other Org", slug: "other-org"})
       force_default_workspace(org_id: other_org.id)

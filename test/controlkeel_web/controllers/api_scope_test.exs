@@ -24,7 +24,8 @@ defmodule ControlKeelWeb.ApiScopeTest do
         agent: "claude-code",
         budget_cents: 5_000,
         compliance_profile: "baseline",
-        status: "active"
+        status: "active",
+        org_id: ControlKeel.AccountsFixtures.org_fixture().id
       })
 
     ws

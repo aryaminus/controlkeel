@@ -63,15 +63,19 @@ defmodule ControlKeel.AccountsReviewTest do
                Accounts.assign_review(review.id, outsider.id, actor_user_id: alice.id)
     end
 
-    test "rejects assignment when workspace has no org", %{alice: alice, bob: bob} do
-      solo_ws =
-        MissionFixtures.workspace_fixture(%{slug: "solo-#{System.unique_integer([:positive])}"})
+    test "rejects creating a workspace without an org" do
+      assert {:error, changeset} =
+               Mission.create_workspace(%{
+                 name: "Unbound",
+                 slug: "unbound-#{System.unique_integer([:positive])}",
+                 industry: "web",
+                 agent: "claude",
+                 budget_cents: 0,
+                 compliance_profile: "general",
+                 status: "active"
+               })
 
-      solo_session = MissionFixtures.session_fixture(%{workspace: solo_ws})
-      solo_review = MissionFixtures.review_fixture(%{session: solo_session, title: "Solo"})
-
-      assert {:error, :workspace_unaffiliated} =
-               Accounts.assign_review(solo_review.id, bob.id, actor_user_id: alice.id)
+      assert "can't be blank" in errors_on(changeset).org_id
     end
 
     test "reassignment records a 'reassigned' event", %{

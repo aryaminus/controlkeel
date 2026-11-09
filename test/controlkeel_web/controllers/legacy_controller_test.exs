@@ -110,18 +110,15 @@ defmodule ControlKeelWeb.LegacyControllerTest do
       assert get(conn, "/sessions/abc").status == 404
     end
 
-    test "session without org binding falls back to default nesting in local mode", %{
-      conn: conn
-    } do
-      alias ControlKeel.Bootstrap.LocalDefaults
-
+    test "session redirects using its workspace's organization", %{conn: conn} do
       ws = workspace_fixture()
+      org = Accounts.get_org(ws.org_id)
       session = session_fixture(%{workspace: ws})
 
       conn = get(conn, "/sessions/#{session.id}/reviews")
 
       assert redirected_to(conn, 302) ==
-               "/#{LocalDefaults.default_org_slug()}/workspaces/#{LocalDefaults.default_workspace_slug()}/sessions/#{session.id}/reviews"
+               "/#{org.slug}/workspaces/#{ws.slug}/sessions/#{session.id}/reviews"
     end
   end
 end

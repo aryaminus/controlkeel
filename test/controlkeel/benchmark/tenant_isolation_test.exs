@@ -30,7 +30,8 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
         budget_cents: 1000,
         compliance_profile: "OWASP",
         industry: "web",
-        status: "active"
+        status: "active",
+        org_id: ControlKeel.AccountsFixtures.org_fixture().id
       })
 
     ws

@@ -31,7 +31,8 @@ defmodule ControlKeel.Mission.WorkspaceCheckpointTest do
       agent: "test",
       budget_cents: 0,
       compliance_profile: "none",
-      status: "active"
+      status: "active",
+      org_id: ControlKeel.AccountsFixtures.org_fixture().id
     }
 
     assert {:ok, workspace} = Mission.create_workspace(workspace_attrs)

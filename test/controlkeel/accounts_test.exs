@@ -419,28 +419,31 @@ defmodule ControlKeel.AccountsTest do
       {:ok, org_a} = Accounts.create_org(%{name: "Org A", slug: "org-a"})
       {:ok, org_b} = Accounts.create_org(%{name: "Org B", slug: "org-b"})
 
-      ws_a = ControlKeel.MissionFixtures.workspace_fixture(%{name: "WS A", slug: "ws-a"})
-      ws_b = ControlKeel.MissionFixtures.workspace_fixture(%{name: "WS B", slug: "ws-b"})
+      ws_a =
+        ControlKeel.MissionFixtures.workspace_fixture(%{
+          name: "WS A",
+          slug: "ws-a",
+          org_id: org_a.id
+        })
 
-      ws_unaffiliated =
-        ControlKeel.MissionFixtures.workspace_fixture(%{name: "WS Solo", slug: "ws-solo"})
+      ws_b =
+        ControlKeel.MissionFixtures.workspace_fixture(%{
+          name: "WS B",
+          slug: "ws-b",
+          org_id: org_b.id
+        })
 
-      {:ok,
-       alice: alice,
-       bob: bob,
-       org_a: org_a,
-       org_b: org_b,
-       ws_a: ws_a,
-       ws_b: ws_b,
-       ws_unaffiliated: ws_unaffiliated}
+      {:ok, alice: alice, bob: bob, org_a: org_a, org_b: org_b, ws_a: ws_a, ws_b: ws_b}
     end
 
-    test "assign_workspace_to_org/2 links and unlinks", %{ws_a: ws, org_a: org} do
+    test "assign_workspace_to_org/2 links workspaces but does not detach them", %{
+      ws_a: ws,
+      org_b: org
+    } do
       assert {:ok, linked} = Accounts.assign_workspace_to_org(ws.id, org.id)
       assert linked.org_id == org.id
 
-      assert {:ok, unlinked} = Accounts.assign_workspace_to_org(ws.id, nil)
-      assert unlinked.org_id == nil
+      assert {:error, :org_required} = Accounts.assign_workspace_to_org(ws.id, nil)
     end
 
     test "assign_workspace_to_org/2 returns :not_found for unknown workspace" do
@@ -460,15 +463,8 @@ defmodule ControlKeel.AccountsTest do
       assert id == ws_a.id
     end
 
-    test "list_unaffiliated_workspaces/0 excludes linked workspaces", %{
-      ws_a: ws_a,
-      ws_unaffiliated: solo,
-      org_a: org_a
-    } do
-      {:ok, _} = Accounts.assign_workspace_to_org(ws_a.id, org_a.id)
-
+    test "list_unaffiliated_workspaces/0 returns no valid workspaces", %{ws_a: ws_a} do
       ids = Enum.map(Accounts.list_unaffiliated_workspaces(), & &1.id)
-      assert solo.id in ids
       refute ws_a.id in ids
     end
 
@@ -518,18 +514,6 @@ defmodule ControlKeel.AccountsTest do
       {:ok, _} = Accounts.revoke_membership(m.id, owner.id)
 
       assert Accounts.list_workspaces_for_user(alice.id) == []
-    end
-
-    test "list_workspaces_for_user/1 excludes unaffiliated workspaces", %{
-      alice: alice,
-      ws_unaffiliated: solo,
-      org_a: org_a
-    } do
-      {:ok, _, raw} = Accounts.invite_member(alice.id, org_a.id)
-      {:ok, _} = Accounts.accept_invitation(raw, alice.id)
-
-      ids = Enum.map(Accounts.list_workspaces_for_user(alice.id), & &1.id)
-      refute solo.id in ids
     end
   end
 

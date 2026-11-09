@@ -6,17 +6,12 @@ defmodule ControlKeel.Accounts.CloudExecutionAuthzTest do
   alias ControlKeel.Repo
 
   describe "authorize_cloud_execution/2" do
-    test "rejects a workspace with no org, with or without a user_id" do
-      # An org-less workspace has no tenant to authorize against. Treating it
-      # as authorized (the pre-#269 behavior) let any caller, or no caller,
-      # execute cloud work against an unowned workspace.
-      workspace = MissionFixtures.workspace_fixture(%{org_id: nil})
+    test "workspace changesets reject a missing org_id" do
+      workspace = MissionFixtures.workspace_fixture()
 
-      assert {:error, :unbound_workspace} =
-               Accounts.authorize_cloud_execution(workspace.id)
+      changeset = ControlKeel.Mission.Workspace.changeset(workspace, %{org_id: nil})
 
-      assert {:error, :unbound_workspace} =
-               Accounts.authorize_cloud_execution(workspace.id, user_id: 999)
+      assert "can't be blank" in errors_on(changeset).org_id
     end
 
     test "rejects org workspace without user_id" do

@@ -26,8 +26,8 @@ defmodule ControlKeel.Bootstrap.LocalMigrationTest do
       session_a = session_fixture(%{workspace: ws_a})
       session_b = session_fixture(%{workspace: ws_b})
 
-      assert is_nil(ws_a.org_id)
-      assert is_nil(ws_b.org_id)
+      assert is_integer(ws_a.org_id)
+      assert is_integer(ws_b.org_id)
       sessions_before = Repo.aggregate(Session, :count)
 
       assert {:ok, summary} = LocalMigration.run()
@@ -46,16 +46,16 @@ defmodule ControlKeel.Bootstrap.LocalMigrationTest do
       # the oldest workspace (ws_a) was repurposed into the default
       assert Repo.get(Workspace, ws_a.id).slug == "default-workspace"
 
-      # the leftover workspace is kept as an orphan — NOT deleted
+      # the leftover workspace and its org are kept — NOT deleted
       assert Repo.get(Workspace, ws_b.id)
       assert Repo.aggregate(Workspace, :count) == 2
-      assert Repo.aggregate(Org, :count) == 1
+      assert Repo.aggregate(Org, :count) == 2
 
       # zero sessions lost
       assert Repo.aggregate(Session, :count) == sessions_before
       assert summary.sessions_moved == 1
       assert summary.orphan_workspaces == 1
-      assert summary.orphan_orgs == 0
+      assert summary.orphan_orgs == 1
       assert Map.get(summary, :removed_workspaces, 0) == 0
       assert Map.get(summary, :removed_orgs, 0) == 0
     end
@@ -174,7 +174,7 @@ defmodule ControlKeel.Bootstrap.LocalMigrationTest do
       assert {:ok, summary} = LocalMigration.run(cleanup: :keep)
 
       assert summary.orphan_workspaces == 1
-      assert summary.orphan_orgs == 0
+      assert summary.orphan_orgs == 1
       assert Map.get(summary, :removed_workspaces, 0) == 0
       assert Repo.aggregate(Workspace, :count) == 2
     end
@@ -223,7 +223,7 @@ defmodule ControlKeel.Bootstrap.LocalMigrationTest do
           assert is_nil(Mission.get_workspace_by_slug(LocalDefaults.default_workspace_slug()))
           refute Accounts.get_org_by_slug(LocalDefaults.default_org_slug())
           assert counts.orphan_workspaces == 1
-          assert counts.orphan_orgs == 0
+          assert counts.orphan_orgs == 1
           :delete
         end
 

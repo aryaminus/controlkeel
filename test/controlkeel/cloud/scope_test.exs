@@ -157,7 +157,8 @@ defmodule ControlKeel.Cloud.ScopeTest do
         agent: "claude-code",
         budget_cents: 10_000,
         compliance_profile: "baseline",
-        status: "active"
+        status: "active",
+        org_id: ControlKeel.AccountsFixtures.org_fixture().id
       })
 
     ws

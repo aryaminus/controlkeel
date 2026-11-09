@@ -27,6 +27,15 @@ defmodule ControlKeel.MissionFixtures do
   end
 
   def workspace_fixture(attrs \\ %{}) do
+    attrs = Map.new(attrs)
+
+    attrs =
+      if Map.has_key?(attrs, :org_id) do
+        attrs
+      else
+        Map.put(attrs, :org_id, ControlKeel.AccountsFixtures.org_fixture().id)
+      end
+
     {:ok, workspace} =
       attrs
       |> Enum.into(%{

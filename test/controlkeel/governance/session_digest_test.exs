@@ -14,7 +14,8 @@ defmodule ControlKeel.Governance.SessionDigestTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, session} =
@@ -44,7 +45,8 @@ defmodule ControlKeel.Governance.SessionDigestTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, session} =
@@ -73,7 +75,8 @@ defmodule ControlKeel.Governance.SessionDigestTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, session} =
@@ -122,7 +125,8 @@ defmodule ControlKeel.Governance.SessionDigestTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, session} =
@@ -152,7 +156,8 @@ defmodule ControlKeel.Governance.SessionDigestTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, session} =

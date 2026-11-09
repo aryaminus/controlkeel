@@ -4,6 +4,7 @@ defmodule ControlKeelWeb.WorkspaceAccessTest do
   import ControlKeel.MissionFixtures
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Mission.Workspace
   alias ControlKeel.Repo
   alias ControlKeelWeb.WorkspaceAccess
 
@@ -20,9 +21,6 @@ defmodule ControlKeelWeb.WorkspaceAccessTest do
 
     {:ok, org} =
       Accounts.create_org(%{name: "Acme", slug: "acme-#{System.unique_integer([:positive])}"})
-
-    {:ok, other_org} =
-      Accounts.create_org(%{name: "Other", slug: "other-#{System.unique_integer([:positive])}"})
 
     {:ok, admin} =
       Accounts.create_user(%{email: "admin-#{System.unique_integer([:positive])}@example.com"})
@@ -45,7 +43,7 @@ defmodule ControlKeelWeb.WorkspaceAccessTest do
     end
 
     workspace = workspace_fixture(%{org_id: org.id})
-    unbound = workspace_fixture(%{})
+    unbound = %Workspace{}
 
     {:ok,
      admin: admin, viewer: viewer, outsider: outsider, workspace: workspace, unbound: unbound}

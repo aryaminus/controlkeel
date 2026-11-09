@@ -14,7 +14,8 @@ defmodule ControlKeel.Governance.WorkspaceAgentTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       assert {:ok, agent} =
@@ -39,7 +40,8 @@ defmodule ControlKeel.Governance.WorkspaceAgentTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       assert {:ok, agent} =
@@ -62,7 +64,8 @@ defmodule ControlKeel.Governance.WorkspaceAgentTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       assert {:ok, _a} =
@@ -91,7 +94,8 @@ defmodule ControlKeel.Governance.WorkspaceAgentTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, _first} =
@@ -122,7 +126,8 @@ defmodule ControlKeel.Governance.WorkspaceAgentTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, agent} =
@@ -150,7 +155,8 @@ defmodule ControlKeel.Governance.WorkspaceAgentTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, agent} =
@@ -174,7 +180,8 @@ defmodule ControlKeel.Governance.WorkspaceAgentTest do
           agent: "claude-code",
           budget_cents: 10_000,
           compliance_profile: "baseline",
-          status: "active"
+          status: "active",
+          org_id: ControlKeel.AccountsFixtures.org_fixture().id
         })
 
       {:ok, agent} =
