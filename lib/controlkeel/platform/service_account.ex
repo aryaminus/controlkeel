@@ -14,6 +14,11 @@ defmodule ControlKeel.Platform.ServiceAccount do
     field :last_used_at, :utc_datetime
     field :expires_at, :utc_datetime
     field :rotated_at, :utc_datetime
+    # Trusted ownership, set ONLY by Platform.create_service_account/3 from the
+    # authenticated caller (the context function overwrites any client-supplied
+    # value). Used by DataLifecycle to revoke credentials when their creator is
+    # erased. Never derive ownership from `metadata` - it is client-castable.
+    field :created_by_user_id, :integer
     field :metadata, :map, default: %{}
 
     belongs_to :workspace, Workspace
@@ -38,6 +43,7 @@ defmodule ControlKeel.Platform.ServiceAccount do
       :last_used_at,
       :expires_at,
       :rotated_at,
+      :created_by_user_id,
       :metadata
     ])
     |> validate_required([:workspace_id, :name, :token_hash, :scopes, :status, :metadata])

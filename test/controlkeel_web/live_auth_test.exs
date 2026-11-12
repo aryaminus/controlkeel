@@ -207,6 +207,35 @@ defmodule ControlKeelWeb.LiveAuthTest do
              assert_redirect(view, "/new/org")
   end
 
+  test "sign-out-everywhere sends the mounted page to the login screen" do
+    {conn, user, _org} = member_conn()
+
+    {:ok, view, _html} = live(conn, ~p"/new/session")
+
+    Accounts.sign_out_everywhere(user.id)
+
+    assert %{"info" => "You have been signed out from all sessions."} =
+             assert_redirect(view, "/auth/login")
+  end
+
+  test "erasure eviction is attached in local mode too" do
+    # Slice 2 (dsar-erasure-plan): DataLifecycle erasure works on the local
+    # database, so the require_cloud_auth passthrough must still attach the
+    # sign-out/membership eviction hook — otherwise a mounted local-mode page
+    # keeps serving an erased user.
+    Application.put_env(:controlkeel, :runtime_mode, :local)
+    on_exit(fn -> Application.put_env(:controlkeel, :runtime_mode, :cloud) end)
+
+    {conn, user, _org} = member_conn()
+
+    {:ok, view, _html} = live(conn, ~p"/new/session")
+
+    Accounts.sign_out_everywhere(user.id)
+
+    assert %{"info" => "You have been signed out from all sessions."} =
+             assert_redirect(view, "/auth/login")
+  end
+
   test "unauthenticated users are still sent to login, not /new/org" do
     assert {:error, {:redirect, %{to: "/auth/login"}}} = live(build_conn(), ~p"/no-such-org")
   end

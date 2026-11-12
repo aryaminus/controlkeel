@@ -607,4 +607,91 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       assert html =~ "Switch to cloud or self-hosted mode to invite teammates and manage roles."
     end
   end
+
+  # --- Organization deletion (docs/dsar-erasure-plan.md, Slice 3) ----------
+
+  describe "organization deletion surface in local mode" do
+    test "hides the danger zone on the general tab" do
+      Application.put_env(:controlkeel, :runtime_mode, :local)
+      org = create_org!()
+
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
+
+      assert html =~ "Organization settings sections"
+      refute html =~ "org-delete-danger-zone"
+      refute html =~ "Delete organization"
+    end
+
+    test "refuses delete_org events and keeps the org" do
+      Application.put_env(:controlkeel, :runtime_mode, :local)
+      org = create_org!()
+
+      {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/settings")
+
+      # The danger zone is not rendered; a crafted event must be refused
+      # server-side without touching data.
+      render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => org.slug}})
+
+      assert Repo.get(Accounts.Org, org.id)
+    end
+  end
+
+  describe "organization deletion in cloud mode" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      owner = create_user!("owner@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Doomed", slug: "doomed"})
+
+      admin = create_user!("admin@example.com")
+      admin_m = add_active_membership(admin.id, org.id, "admin")
+
+      member = create_user!("member@example.com")
+      add_active_membership(member.id, org.id, "member")
+
+      owner_conn =
+        build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => owner.id})
+
+      {:ok, org: org, admin_conn: conn_for(admin), admin_m: admin_m, owner_conn: owner_conn}
+    end
+
+    test "danger zone is hidden from non-owners", %{admin_conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/doomed/settings")
+
+      refute html =~ "org-delete-danger-zone"
+      assert html =~ "Doomed"
+    end
+
+    test "refuses non-owners server-side", %{admin_conn: conn, admin_m: admin_m} do
+      assert admin_m.role == "admin"
+
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+
+      # Even a crafted event from a non-owner hits the server-side gate.
+      html = render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
+
+      assert html =~ "Only organization owners can delete the organization."
+      assert Repo.get(Accounts.Org, org_id_from_admin_m(admin_m))
+    end
+
+    test "owner deletes the organization and lands on /new/org", %{owner_conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+
+      render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
+
+      assert_redirect(view, "/new/org")
+      assert Repo.get(Accounts.Org, org.id) == nil
+    end
+  end
+
+  defp org_id_from_admin_m(m), do: m.org_id
 end

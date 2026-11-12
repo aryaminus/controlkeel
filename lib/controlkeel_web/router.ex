@@ -286,6 +286,15 @@ defmodule ControlKeelWeb.Router do
         ObservabilityController,
         :export_audit_log
 
+    # Account settings endpoints (docs/dsar-erasure-plan.md, Slice 3): the
+    # user-menu dialog posts erasure and links export here. Backing endpoints
+    # only — there is no /account page. Gated by RequireSessionAuth plus the
+    # user check inside the controller (the data is inherently per-user);
+    # local mode never has a signed-in user, so the feature is cloud-only by
+    # construction (RequireCloudMode also blocks /me/* there).
+    get "/me/export.json", AccountController, :export_data
+    post "/me/erase", AccountController, :erase
+
     # New org-scoped export paths for the stacked observability page.
     get "/:org_slug/workspaces/:ws_slug/sessions/:id/observability/export.json",
         ObservabilityController,
