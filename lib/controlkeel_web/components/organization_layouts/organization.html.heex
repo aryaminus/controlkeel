@@ -11,6 +11,9 @@
       nav_org={@nav_org}
       nav_workspace={@nav_workspace}
       nav_session={@nav_session}
+      settings_nav={assigns[:settings_nav] || false}
+      settings_tabs={assigns[:tabs] || []}
+      settings_active_tab={assigns[:active_tab]}
     />
 
     <div class="flex flex-1 flex-col overflow-hidden">
@@ -65,20 +68,25 @@
         nav_org={@nav_org}
         nav_workspace={@nav_workspace}
         nav_session={@nav_session}
+        settings_nav={assigns[:settings_nav] || false}
+        settings_tabs={assigns[:tabs] || []}
+        settings_active_tab={assigns[:active_tab]}
       />
 
       <div class="flex flex-1 flex-col overflow-hidden">
-        <.breadcrumbs_header
-          current_path={@current_path}
-          current_query={@current_query}
-          nav_org_admin?={@nav_org_admin?}
-          breadcrumbs={@breadcrumbs}
-          nav_org={@nav_org}
-          nav_workspace={@nav_workspace}
-          nav_session={@nav_session}
-          sibling_workspaces={@sibling_workspaces}
-          sibling_sessions={@sibling_sessions}
-        />
+        <%= if !assigns[:settings_nav] do %>
+          <.breadcrumbs_header
+            current_path={@current_path}
+            current_query={@current_query}
+            nav_org_admin?={@nav_org_admin?}
+            breadcrumbs={@breadcrumbs}
+            nav_org={@nav_org}
+            nav_workspace={@nav_workspace}
+            nav_session={@nav_session}
+            sibling_workspaces={@sibling_workspaces}
+            sibling_sessions={@sibling_sessions}
+          />
+        <% end %>
 
         <main class="flex-1 overflow-y-auto">
           <div class="px-4 pt-6 pb-12 sm:px-8 lg:px-8 container mx-auto">
