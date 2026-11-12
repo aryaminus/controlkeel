@@ -160,8 +160,7 @@ defmodule ControlKeel.Accounts.DataLifecycle do
     record_erasure_event("user_erased", anonymize, %{
       memberships_deleted: deleted,
       credentials_revoked: credentials,
-      audit_events_anonymized:
-        audit.review_events + audit.finding_events + audit.nhi_events
+      audit_events_anonymized: audit.review_events + audit.finding_events + audit.nhi_events
     })
 
     Map.merge(audit, %{

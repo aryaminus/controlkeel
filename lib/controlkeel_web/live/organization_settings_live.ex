@@ -110,7 +110,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
              )}
         end
       else
-        {:noreply, assign(socket, :delete_org_error, "Type the slug exactly to confirm deletion.")}
+        {:noreply,
+         assign(socket, :delete_org_error, "Type the slug exactly to confirm deletion.")}
       end
     else
       # Server-side gate: only owners may erase a tenant, regardless of what
