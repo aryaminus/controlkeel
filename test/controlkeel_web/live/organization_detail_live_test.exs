@@ -246,12 +246,12 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "Only owners can change budget."
     end
 
-    test "non-admin members see an access panel on settings", %{member: member} do
-      {:ok, view, html} = live(conn_for(member), ~p"/setco/settings")
-
-      assert has_element?(view, "#scope-not-found[data-scope-error]")
-      refute has_element?(view, "[data-scope-invalid-root]")
-      assert html =~ "Organization unavailable"
+    test "members land on the account tab on settings", %{member: member} do
+      # The settings page resolves at the member floor now: the account
+      # surface (export + erasure) is usable by every member, so instead of
+      # the access panel they are pushed to the Account tab.
+      assert {:error, {:live_redirect, %{to: "/setco/settings?tab=account"}}} =
+               live(conn_for(member), ~p"/setco/settings")
     end
   end
 

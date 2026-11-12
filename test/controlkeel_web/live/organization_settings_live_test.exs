@@ -52,8 +52,22 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
     {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
 
-    assert html =~ "Organization settings sections"
+    assert html =~ "Settings sections"
     assert html =~ "org-settings-form"
+  end
+
+  test "settings sidebar has no org switcher header" do
+    org = create_org!()
+
+    {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
+
+    # The settings variant replaces the header with the back row and skips
+    # the breadcrumbs header; the user menu stays (it holds the account
+    # chrome), only the org switcher is org-page-only.
+    refute html =~ "sidebar-org-switcher"
+    refute html =~ "breadcrumbs-header"
+    assert html =~ "sidebar-user-menu"
+    assert html =~ "Settings sections"
   end
 
   test "unknown tab params fall back to the general tab" do
@@ -608,6 +622,86 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     end
   end
 
+  # --- Account tab (docs/dsar-erasure-plan.md, Slice 3) --------------------
+
+  describe "account tab" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      owner = create_user!("owner@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Acme", slug: "acme"})
+      conn = build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => owner.id})
+
+      {:ok, conn: conn, org: org}
+    end
+
+    test "account tab is first in the sidebar and renders export + erasure in cloud mode", %{
+      conn: conn
+    } do
+      {:ok, _view, html} = live(conn, ~p"/acme/settings?tab=account")
+
+      assert html =~ "Settings sections"
+      # Account sits under the Personal group; the org sections follow in
+      # the Organization group (button order proves the grouping).
+      assert html =~ "Personal"
+      assert html =~ "Organization"
+      assert :binary.match(html, ~s(phx-value-tab="account")) |> elem(0) <
+               :binary.match(html, ~s(phx-value-tab="general")) |> elem(0)
+      assert :binary.match(html, ~s(phx-value-tab="account")) |> elem(0) <
+               :binary.match(html, ~s(phx-value-tab="general")) |> elem(0)
+
+      assert html =~ "Download my data"
+      assert html =~ ~s(/me/export.json)
+      assert html =~ "account-erasure-danger-zone"
+      assert html =~ "Erase my account"
+    end
+
+    test "member role lands on the account tab and cannot open org sections", %{
+      org: org
+    } do
+      member = create_user!("member-#{System.unique_integer([:positive])}@example.com")
+      add_active_membership(member.id, org.id, "member")
+
+      conn = build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => member.id})
+
+      assert {:error, {:live_redirect, %{to: "/acme/settings?tab=account"}}} =
+               live(conn, ~p"/acme/settings")
+
+      {:ok, _view, html} = live(conn, ~p"/acme/settings?tab=account")
+
+      assert html =~ "Erase my account"
+      # Org sections are admin+: the member's sidebar offers only the
+      # Personal group — no org section buttons at all.
+      assert html =~ "Personal"
+      assert html =~ ~s(phx-value-tab="account")
+      refute html =~ ~s(phx-value-tab="general")
+      refute html =~ ~s(phx-value-tab="members")
+    end
+  end
+
+  test "account tab shows the migrate notice in local mode" do
+    Application.put_env(:controlkeel, :runtime_mode, :local)
+    org = create_org!()
+
+    {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=account")
+
+    # Local mode has no user records and /me/* is blocked: the tab renders a
+    # migrate-to-cloud notice instead of export/erasure.
+    assert html =~ "You need to migrate to cloud mode to use these settings."
+    assert html =~ ~s(phx-value-tab="account")
+    refute html =~ "Erase my account"
+    refute html =~ "account-erasure-danger-zone"
+  end
+
   # --- Organization deletion (docs/dsar-erasure-plan.md, Slice 3) ----------
 
   describe "organization deletion surface in local mode" do
@@ -617,7 +711,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
       {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
 
-      assert html =~ "Organization settings sections"
+      assert html =~ "Settings sections"
       refute html =~ "org-delete-danger-zone"
       refute html =~ "Delete organization"
     end

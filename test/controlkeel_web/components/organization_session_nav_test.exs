@@ -59,18 +59,24 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
     refute html =~ "Repositories"
   end
 
-  test "local mode hides the org switcher and creation controls" do
+  test "local mode org menu shows settings and switch-org, without sign out" do
     html =
       render_component(
         &OrganizationLayouts.organization_sidebar/1,
         nav_assigns("/acme")
       )
 
-    # Element-id assertions: the switcher wrapper's phx-click-away JSON also
+    # No mode checks in the header menu except Sign out: switching and
+    # creating orgs render in local mode too (its flyout lists the single
+    # implicit org), but Sign out is a cloud concept — local has no session
+    # to end. Element-id assertions: the wrapper's phx-click-away JSON also
     # mentions the ids, so a bare =~ would false-positive.
-    refute html =~ ~s(id="org-switcher-button")
-    refute html =~ ~s(id="sidebar-org-switcher-popover")
-    refute html =~ "Create organization"
+    assert html =~ ~s(id="org-switcher-button")
+    assert html =~ ~s(id="sidebar-org-switcher-popover")
+    assert html =~ "Settings"
+    assert html =~ "Switch organization"
+    assert html =~ "Create organization"
+    refute html =~ "Sign out"
   end
 
   test "session overview is active on the session page" do
