@@ -1129,17 +1129,20 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
         <div class="my-2 border-t"></div>
 
-        <%!-- TODO: Settings button disabled — it was a no-op that only closed the
-             popover. Re-enable and wire to a user settings modal/dialog when functional.
+        <%!-- Settings opens the account dialog (Art.15 export + Art.17 erasure,
+             docs/dsar-erasure-plan.md Slice 3). Shared component from Layouts. --%>
         <button
           type="button"
-          phx-click={JS.hide(to: "##{@id}-popover")}
+          phx-click={
+            JS.hide(to: "##{@id}-popover")
+            |> JS.show(to: "##{@id}-account-dialog", display: "block")
+          }
           class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
         </button>
-         <hr class="my-2 border-t" />
-        --%>
+        <hr class="my-2 border-t" />
+
         <a
           href={~p"/auth/logout"}
           class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-[var(--ck-danger)]"
@@ -1147,6 +1150,8 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Sign out
         </a>
       </div>
+
+      <Layouts.account_dialog id={"#{@id}-account-dialog"} user={@current_user} />
     </div>
     """
   end
