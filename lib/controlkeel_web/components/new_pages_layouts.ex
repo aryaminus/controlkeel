@@ -7,7 +7,8 @@ defmodule ControlKeelWeb.NewPagesLayouts do
   `ControlKeelWeb.OrganizationLayouts`: no sidebar, no breadcrumb header,
   no shared chrome — just a minimal top bar, a centered wizard column, and
   flashes. Shared primitives (`<.flash>`, `<.icon>`, `<.link>`) come from
-  the `html_helpers` imports, not from the other layout modules.
+  the `html_helpers` imports; the account chip is the shared
+  `ControlKeelWeb.UserMenu` component.
   """
 
   use ControlKeelWeb, :html
@@ -53,12 +54,19 @@ defmodule ControlKeelWeb.NewPagesLayouts do
         </span>
 
         <div class="flex shrink-0 items-center gap-2">
-          <ControlKeelWeb.Layouts.user_menu
-            :if={@current_user != nil and @mode != :local}
-            id="new-pages-user-menu"
-            current_user={@current_user}
-            compact
-          />
+          <%= if @mode == :local do %>
+            <ControlKeelWeb.UserMenu.user_menu
+              id="new-pages-user-menu"
+              placeholder_label="Local mode"
+            />
+          <% else %>
+            <ControlKeelWeb.UserMenu.user_menu
+              :if={@current_user != nil}
+              id="new-pages-user-menu"
+              current_user={@current_user}
+              sign_out
+            />
+          <% end %>
         </div>
       </div>
     </header>
