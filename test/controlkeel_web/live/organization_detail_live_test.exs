@@ -215,7 +215,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "settings page renders at the organization settings route", %{owner: owner} do
-      {:ok, _view, html} = live(conn_for(owner), ~p"/setco/settings")
+      {:ok, _view, html} = live(conn_for(owner), ~p"/setco/settings?tab=general")
 
       assert html =~ "Organization Settings"
       assert html =~ "Organization name"
@@ -223,7 +223,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "owner saves the org name from the settings page", %{org: org, owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/setco/settings")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/setco/settings?tab=general")
 
       view
       |> element("#org-settings-form")
@@ -236,7 +236,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "admin can view settings but status and budget are owner-locked", %{admin: admin} do
-      {:ok, view, html} = live(conn_for(admin), ~p"/setco/settings")
+      {:ok, view, html} = live(conn_for(admin), ~p"/setco/settings?tab=general")
 
       assert has_element?(view, ~s([data-scope-valid][data-scope-root="/setco"]))
       assert html =~ "Organization Settings"
@@ -248,10 +248,11 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
 
     test "members land on the account tab on settings", %{member: member} do
       # The settings page resolves at the member floor now: the account
-      # surface (export + erasure) is usable by every member, so instead of
-      # the access panel they are pushed to the Account tab.
-      assert {:error, {:live_redirect, %{to: "/setco/settings?tab=account"}}} =
-               live(conn_for(member), ~p"/setco/settings")
+      # surface (export + erasure) is usable by every member, and Account is
+      # the default tab, so members render it directly.
+      {:ok, _view, html} = live(conn_for(member), ~p"/setco/settings")
+
+      assert html =~ "Erase my account"
     end
   end
 

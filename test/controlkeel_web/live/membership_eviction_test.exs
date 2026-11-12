@@ -234,7 +234,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
       other_owner = create_user!("other-owner")
       create_membership!(other_owner, org, "owner")
 
-      {:ok, view, _html} = live(conn_for(user), ~p"/#{org.slug}/settings")
+      {:ok, view, _html} = live(conn_for(user), ~p"/#{org.slug}/settings?tab=general")
       refute render(view) =~ "Only owners can change status."
 
       assert {:ok, %Accounts.Membership{role: "admin"}} =

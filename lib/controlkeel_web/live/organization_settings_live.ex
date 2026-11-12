@@ -76,9 +76,9 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     active_tab = normalize_tab(params["tab"])
     tabs = socket.assigns[:tabs]
 
-    # Account is every member's home in settings; org sections stay admin+.
-    # A role (or stale link) asking for a section this visitor cannot use
-    # lands on the Account tab.
+    # Account is the default tab for every visitor, and every member's home
+    # in settings; org sections stay admin+. A role (or stale link) asking
+    # for a section this visitor cannot use lands on the Account tab too.
     if tabs && active_tab not in tabs do
       {:noreply,
        push_navigate(socket, to: ~p"/#{socket.assigns.org.slug}/settings?tab=account")}
@@ -92,7 +92,9 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   defp normalize_tab("policy_sets"), do: "policy_sets"
   defp normalize_tab("members"), do: "members"
   defp normalize_tab("account"), do: "account"
-  defp normalize_tab(_tab), do: "general"
+  defp normalize_tab("general"), do: "general"
+  # No tab param, garbage params: Account is the default surface.
+  defp normalize_tab(_tab), do: "account"
 
   # Account (Art.15 export + Art.17 erasure) is usable by every member — and
   # unconditionally in local mode, which has no roles; the org sections stay
