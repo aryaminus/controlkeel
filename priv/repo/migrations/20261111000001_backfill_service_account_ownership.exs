@@ -80,8 +80,9 @@ defmodule ControlKeel.Repo.Migrations.BackfillServiceAccountOwnership do
 
   defp provisioned_actor(service_account_id) do
     from(e in "nhi_audit_events",
-      where: e.service_account_id == ^service_account_id and e.event_type == "provisioned" and
-               not is_nil(e.actor),
+      where:
+        e.service_account_id == ^service_account_id and e.event_type == "provisioned" and
+          not is_nil(e.actor),
       order_by: [asc: e.occurred_at, asc: e.id],
       limit: 1,
       select: e.actor
@@ -106,7 +107,9 @@ defmodule ControlKeel.Repo.Migrations.BackfillServiceAccountOwnership do
 
   defp strip_prefixes(actor) do
     Enum.reduce(@actor_prefixes, actor, fn prefix, acc ->
-      if String.starts_with?(acc, prefix), do: String.slice(acc, byte_size(prefix)..-1//1), else: acc
+      if String.starts_with?(acc, prefix),
+        do: String.slice(acc, byte_size(prefix)..-1//1),
+        else: acc
     end)
     |> String.trim()
   end
