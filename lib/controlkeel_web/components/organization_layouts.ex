@@ -17,6 +17,11 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :nav_org, :map, required: true
   attr :nav_workspace, :any, default: nil
   attr :nav_session, :any, default: nil
+  attr :settings_nav, :boolean, default: false,
+    doc: "render the settings sidebar (back row + section nav) instead of the org nav"
+  attr :settings_tabs, :list, default: [],
+    doc: "section tab keys for the settings sidebar (see OrganizationSettingsLive)"
+  attr :settings_active_tab, :string, default: nil
 
   def organization_sidebar(assigns) do
     mode = ControlKeel.Runtime.Mode.current()
@@ -48,13 +53,12 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       id="app-sidebar"
       class="hidden h-screen w-64 flex-col border-r bg-sidebar shadow-2xl shadow-black/30 lg:flex"
     >
-      <div class="p-3">
+      <%!-- The settings variant has no sidebar header: its back row (to the
+           org overview) is the top of the nav. --%>
+      <div class="p-3" :if={not @settings_nav}>
         <div
           id="sidebar-org-switcher"
-          class={[
-            "relative flex items-center gap-3 rounded-xl p-1.5",
-            (@current_user != nil and @mode != :local) && "justify-between"
-          ]}
+          class="relative flex items-center justify-between gap-3 rounded-xl p-1.5"
           phx-click-away={
             JS.hide(to: "#sidebar-org-switcher-popover")
             |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
@@ -79,10 +83,9 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           </.link>
 
           <button
-            :if={@current_user != nil and @mode != :local}
             type="button"
             id="org-switcher-button"
-            aria-label="Switch organization"
+            aria-label="Organization menu"
             aria-haspopup="menu"
             aria-expanded="false"
             aria-controls="sidebar-org-switcher-popover"
@@ -99,54 +102,105 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           </button>
 
           <div
-            :if={@current_user != nil and @mode != :local}
             id="sidebar-org-switcher-popover"
             class="hidden absolute left-0 right-0 top-full z-50 mt-1.5 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
           >
-            <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
-              Organizations
-            </div>
-            <div class="max-h-60 space-y-0.5 overflow-y-auto">
-              <%= for org <- @user_orgs do %>
-                <% active = org.id == @nav_org.id %>
-                <.link
-                  navigate={~p"/#{org.slug}"}
-                  phx-click={
-                    JS.hide(to: "#sidebar-org-switcher-popover")
-                    |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
-                  }
-                  class={[
-                    "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
-                    active && "bg-muted font-medium text-foreground",
-                    !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  ]}
+            <%!-- Settings, Switch organization (hover flyout with the org list +
+                 create) and Sign out render in both modes; local mode has a
+                 single implicit org, so its flyout lists just that org. --%>
+            <.link
+              navigate={~p"/#{@nav_org.slug}/settings"}
+              phx-click={
+                JS.hide(to: "#sidebar-org-switcher-popover")
+                |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+              }
+              class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <.icon name="hero-cog-6-tooth" class="size-4 shrink-0" /> Settings
+            </.link>
+
+            <div
+              id="switch-org-wrapper"
+              class="group/switch relative -mr-1.5 pr-1.5"
+            >
+              <button
+                id="switch-org-button"
+                type="button"
+                aria-haspopup="menu"
+                class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <.icon name="hero-building-office-2" class="size-4 shrink-0" />
+                <span>Switch organization</span>
+                <.icon
+                  name="hero-chevron-right"
+                  class="ml-auto size-3.5 shrink-0 text-muted-foreground/70 transition group-hover/switch:text-foreground"
+                />
+              </button>
+
+              <div
+                id="switch-org-flyout"
+                class="invisible absolute left-full top-0 z-50 p-1.5 opacity-0 transition group-hover/switch:visible group-hover/switch:opacity-100 group-focus-within/switch:visible group-focus-within/switch:opacity-100"
+              >
+                <div
+                  class="w-56 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
                 >
-                  <div class="flex min-w-0 items-center gap-2">
-                    <.icon
-                      name="hero-building-office-2"
-                      class="size-4 shrink-0 text-muted-foreground"
-                    />
-                    <span class="truncate">{org.name}</span>
+                  <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
+                    Organizations
                   </div>
-                  <.icon :if={active} name="hero-check" class="size-4 shrink-0 text-primary" />
-                </.link>
-              <% end %>
+                  <div class="max-h-60 space-y-0.5 overflow-y-auto">
+                    <%= for org <- @user_orgs do %>
+                      <% active = org.id == @nav_org.id %>
+                      <.link
+                        navigate={~p"/#{org.slug}"}
+                        phx-click={
+                          JS.hide(to: "#sidebar-org-switcher-popover")
+                          |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+                        }
+                        class={[
+                          "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition",
+                          active && "bg-muted font-medium text-foreground",
+                          !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ]}
+                      >
+                        <div class="flex min-w-0 items-center gap-2">
+                          <.icon
+                            name="hero-building-office-2"
+                            class="size-4 shrink-0 text-muted-foreground"
+                          />
+                          <span class="truncate">{org.name}</span>
+                        </div>
+                        <.icon :if={active} name="hero-check" class="size-4 shrink-0 text-primary" />
+                      </.link>
+                    <% end %>
+                  </div>
+
+                  <div class="mt-1 border-t pt-1">
+                    <.link
+                      navigate={~p"/new/org"}
+                      phx-click={
+                        JS.hide(to: "#sidebar-org-switcher-popover")
+                        |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
+                      }
+                      class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-primary transition hover:bg-muted"
+                    >
+                      <.icon name="hero-plus" class="size-4 shrink-0" /> Create organization
+                    </.link>
+                    <p class="px-2.5 pb-1.5 pt-0.5 text-xs text-muted-foreground">
+                      Joining a team? Open the invitation link from your email.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="mt-1 border-t pt-1">
-              <.link
-                navigate={~p"/new/org"}
-                phx-click={
-                  JS.hide(to: "#sidebar-org-switcher-popover")
-                  |> JS.set_attribute({"aria-expanded", "false"}, to: "#org-switcher-button")
-                }
-                class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-primary transition hover:bg-muted"
+            <%!-- Sign out is a cloud concept: local mode has no session to end. --%>
+            <div class="mt-1 border-t pt-1" :if={@mode != :local}>
+              <a
+                href={~p"/auth/logout"}
+                class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-[var(--ck-danger)]"
               >
-                <.icon name="hero-plus" class="size-4 shrink-0" /> Create organization
-              </.link>
-              <p class="px-2.5 pb-1.5 pt-0.5 text-xs text-muted-foreground">
-                Joining a team? Open the invitation link from your email.
-              </p>
+                <.icon name="hero-arrow-right-on-rectangle" class="size-4 shrink-0" /> Sign out
+              </a>
             </div>
           </div>
         </div>
@@ -155,8 +209,79 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       <nav
         id="sidebar-org-nav"
         phx-hook="SidebarNav"
-        class="mt-4 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 overscroll-contain text-sm"
+        aria-label={if @settings_nav, do: "Settings sections", else: "Organization navigation"}
+        class={[
+          "flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 overscroll-contain text-sm",
+          if(@settings_nav, do: "mt-3", else: "mt-4")
+        ]}
       >
+        <%= if @settings_nav do %>
+          <.link
+            navigate={~p"/#{@nav_org.slug}"}
+            aria-label={"Back to #{@nav_org.name}"}
+            class="group flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            <.icon
+              name="hero-arrow-left"
+              class="size-4 shrink-0 text-muted-foreground transition group-hover:text-foreground"
+            />
+            <span class="truncate">{@nav_org.name}</span>
+          </.link>
+          <div class="my-1 border-t"></div>
+          <%!-- Grouped sections: Account is the per-user surface (any member),
+               the rest are organization sections (admin+). Labels are
+               text-only; items carry icons. --%>
+          <% {personal_tabs, org_tabs} =
+               Enum.split_with(@settings_tabs, fn tab -> tab == "account" end) %>
+
+          <%= if personal_tabs != [] do %>
+            <div class="px-2.5 pb-1 pt-1 text-xs font-semibold text-muted-foreground">
+              Personal
+            </div>
+            <%= for tab <- personal_tabs do %>
+              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "general" %>
+              <% icon = settings_tab_icon(tab) %>
+              <button
+                type="button"
+                phx-click="set_tab"
+                phx-value-tab={tab}
+                aria-current={active && "page"}
+                class={[
+                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition",
+                  active && "bg-primary/10 font-semibold text-primary",
+                  !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ]}
+              >
+                <.icon name={icon} class="size-4 shrink-0" />
+                {Phoenix.Naming.humanize(tab)}
+              </button>
+            <% end %>
+          <% end %>
+
+          <%= if org_tabs != [] do %>
+            <div class="mt-3 px-2.5 pb-1 pt-1 text-xs font-semibold text-muted-foreground">
+              Organization
+            </div>
+            <%= for tab <- org_tabs do %>
+              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "general" %>
+              <% icon = settings_tab_icon(tab) %>
+              <button
+                type="button"
+                phx-click="set_tab"
+                phx-value-tab={tab}
+                aria-current={active && "page"}
+                class={[
+                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition",
+                  active && "bg-primary/10 font-semibold text-primary",
+                  !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ]}
+              >
+                <.icon name={icon} class="size-4 shrink-0" />
+                {Phoenix.Naming.humanize(tab)}
+              </button>
+            <% end %>
+          <% end %>
+        <% else %>
         <%= for item <- @nav_items do %>
           <% active = sidebar_item_active?(@current_path, @current_query, item) %>
           <% label_id = Phoenix.Naming.underscore(item.label) %>
@@ -204,34 +329,15 @@ defmodule ControlKeelWeb.OrganizationLayouts do
             </.link>
           <% end %>
         <% end %>
+        <% end %>
       </nav>
 
-      <div
-        :if={@mode == :local or @current_user == nil}
-        class="flex flex-col justify-end border-t mt-2 px-3 py-2"
-      >
-        <a
-          href={~p"/docs"}
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-book-open" class="size-4" /> Docs
-        </a>
-        <a
-          href="https://github.com/aryaminus/controlkeel"
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-code-bracket" class="size-4" /> GitHub
-        </a>
-      </div>
-
-      <.user_menu
-        :if={@current_user != nil and @mode != :local}
+      <ControlKeelWeb.UserMenu.user_menu
+        :if={@mode == :local or @current_user != nil}
         id="sidebar-user-menu"
         current_user={@current_user}
+        placeholder_label={if @mode == :local, do: "Local mode"}
+        org_slug={@nav_org.slug}
         class="border-t p-3"
         popover_class="bottom-20 right-4"
       />
@@ -321,7 +427,10 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       |> assign(:session_items, session_items)
 
     ~H"""
-    <div class="flex min-h-[68px] w-full items-center justify-between border-b p-4">
+    <div
+      id="breadcrumbs-header"
+      class="flex min-h-[68px] w-full items-center justify-between border-b p-4"
+    >
       <nav :if={@current_path && @current_path != "/"} aria-label="Breadcrumb">
         <ol class="flex items-center gap-1.5 text-sm">
           <li>
@@ -639,12 +748,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org.slug}",
         tab: nil,
         icon: "hero-squares-2x2"
-      },
-      %{
-        label: "Settings",
-        href: ~p"/#{org.slug}/settings",
-        tab: "settings",
-        icon: "hero-cog-6-tooth"
       }
     ]
   end
@@ -977,7 +1080,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :current_path, :string, default: nil
   attr :parent_href, :string, required: true
 
-  def organization_sidebar_children(assigns) do
+  defp organization_sidebar_children(assigns) do
     ~H"""
     <div data-sidebar-subnav class="mt-1 flex flex-col gap-0.5 pl-4 border-l border-border ml-4">
       <%= for child <- @children do %>
@@ -1011,6 +1114,16 @@ defmodule ControlKeelWeb.OrganizationLayouts do
       end
   end
 
+  # Icons for the settings sidebar section items (group labels are
+  # text-only). NOTE: kept clear of any `attr` block — a defp placed
+  # between an attr declaration and its component def steals the attrs
+  # and HEEx then compiles it as a component.
+  defp settings_tab_icon("account"), do: "hero-user-circle"
+  defp settings_tab_icon("general"), do: "hero-cog-6-tooth"
+  defp settings_tab_icon("members"), do: "hero-users"
+  defp settings_tab_icon("policy_sets"), do: "hero-shield-check"
+  defp settings_tab_icon(_tab), do: "hero-squares-2x2"
+
   defp organization_subnav_link_class(true) do
     "group flex items-center gap-2.5 rounded-lg bg-muted px-2.5 py-1.5 text-sm font-medium text-foreground shadow-sm ring-1 ring-border transition hover:bg-muted #{@focus_ring}"
   end
@@ -1024,137 +1137,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   defp organization_subnav_icon_class(false),
     do: "size-3.5 shrink-0 text-muted-foreground/70 group-hover:text-primary"
 
-  # NOTE: `user_menu/1` and `flash_group/1` are intentionally duplicated here
-  # (forked from `ControlKeelWeb.Layouts` on 2026-09-11) so organization pages
-  # stay self-contained with no import from `Layouts`. Apply future fixes in
-  # both modules.
-  attr :id, :string, required: true
-  attr :current_user, :any, required: true
-  attr :compact, :boolean, default: false
-  attr :class, :string, default: ""
-  attr :popover_class, :string, default: "right-0 top-full mt-2"
-  attr :rest, :global
-
-  def user_menu(assigns) do
-    ~H"""
-    <div
-      {@rest}
-      class={"relative #{@class}"}
-      id={@id}
-      phx-click-away={
-        JS.hide(to: "##{@id}-popover")
-        |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
-      }
-    >
-      <%= if @compact do %>
-        <button
-          type="button"
-          aria-label="User menu"
-          aria-haspopup="menu"
-          aria-expanded="false"
-          aria-controls={"#{@id}-popover"}
-          phx-click={
-            JS.toggle(to: "##{@id}-popover")
-            |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{@id} button")
-          }
-          class="flex cursor-pointer size-9 shrink-0 items-center justify-center rounded-full bg-primary/20 px-1 py-1 text-sm font-semibold text-primary ring-1 ring-primary/30 transition hover:bg-primary/30 hover:ring-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-        >
-          {String.at(@current_user.name || @current_user.email, 0) |> String.upcase()}
-        </button>
-      <% else %>
-        <div class="flex items-center gap-2 rounded-xl px-2 py-1.5">
-          <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary ring-1 ring-primary/30">
-            {String.at(@current_user.name || @current_user.email, 0) |> String.upcase()}
-          </span>
-
-          <span class="min-w-0 flex-1 leading-tight">
-            <span class="block truncate text-sm font-semibold text-foreground">
-              {@current_user.name || @current_user.email}
-            </span>
-          </span>
-          <button
-            type="button"
-            aria-label="User menu"
-            aria-haspopup="menu"
-            aria-expanded="false"
-            aria-controls={"#{@id}-popover"}
-            phx-click={
-              JS.toggle(to: "##{@id}-popover")
-              |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{@id} button")
-            }
-            class="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            <.icon name="hero-ellipsis-horizontal" class="size-4" />
-          </button>
-        </div>
-      <% end %>
-
-      <div
-        id={"#{@id}-popover"}
-        class={"hidden absolute #{@popover_class} z-50 w-56 rounded-xl border bg-card p-3 shadow-2xl shadow-black/50 backdrop-blur-md"}
-      >
-        <p class="text-sm font-semibold text-foreground">
-          {@current_user.name || @current_user.email}
-        </p>
-        <p class="mt-0.5 text-xs text-muted-foreground">{@current_user.email}</p>
-        <div class="my-2 border-t"></div>
-        <.link
-          navigate={~p"/"}
-          phx-click={
-            JS.hide(to: "##{@id}-popover")
-            |> JS.set_attribute({"aria-expanded", "false"}, to: "##{@id} button")
-          }
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-home" class="size-4" /> Home
-        </.link>
-
-        <a
-          href={~p"/docs"}
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-book-open" class="size-4" /> Docs
-        </a>
-
-        <a
-          href="https://github.com/aryaminus/controlkeel"
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-code-bracket" class="size-4" /> GitHub
-        </a>
-
-        <div class="my-2 border-t"></div>
-
-        <%!-- Settings opens the account dialog (Art.15 export + Art.17 erasure,
-             docs/dsar-erasure-plan.md Slice 3). Shared component from Layouts. --%>
-        <button
-          type="button"
-          phx-click={
-            JS.hide(to: "##{@id}-popover")
-            |> JS.show(to: "##{@id}-account-dialog", display: "block")
-          }
-          class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
-        </button>
-        <hr class="my-2 border-t" />
-
-        <a
-          href={~p"/auth/logout"}
-          class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-[var(--ck-danger)]"
-        >
-          <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Sign out
-        </a>
-      </div>
-
-      <Layouts.account_dialog id={"#{@id}-account-dialog"} user={@current_user} />
-    </div>
-    """
-  end
 
   @doc """
   Shows the flash group with standard titles and content.

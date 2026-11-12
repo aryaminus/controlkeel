@@ -22,17 +22,13 @@
         >
           GitHub
         </a>
-        <%= if ControlKeel.Runtime.Mode.current() != :local do %>
-          <%= if @current_user do %>
-            <.user_menu id="public-user-menu" current_user={@current_user} compact />
-          <% else %>
-            <a
-              href={~p"/auth/login"}
-              class="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-            >
-              Sign in
-            </a>
-          <% end %>
+        <%= if ControlKeel.Runtime.Mode.current() != :local and !@current_user do %>
+          <a
+            href={~p"/auth/login"}
+            class="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+          >
+            Sign in
+          </a>
         <% end %>
       </nav>
     </div>
