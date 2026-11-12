@@ -7,8 +7,8 @@ defmodule ControlKeelWeb.Plugs.RequireCloudMode do
       to avoid re-login loops (any mode).
     * In local mode (no OAuth/SSO), any `/auth/*` path is a dead end and
       redirects to `/` with an informational flash.
-    * In local mode, `/invitations/*` paths are cloud-only features and
-      redirect to `/`.
+    * In local mode, `/invitations/*` and `/me/*` paths are cloud-only
+      features and redirect to `/`.
   """
 
   import Plug.Conn
@@ -18,6 +18,7 @@ defmodule ControlKeelWeb.Plugs.RequireCloudMode do
 
   @auth_prefix "/auth/"
   @invitations_prefix "/invitations/"
+  @me_prefix "/me/"
   @login_path "/auth/login"
 
   def init(opts), do: opts
@@ -47,6 +48,7 @@ defmodule ControlKeelWeb.Plugs.RequireCloudMode do
   defp local_mode_blocked_path?(conn) do
     Mode.current() == :local and
       (String.starts_with?(conn.request_path, @auth_prefix) or
-         String.starts_with?(conn.request_path, @invitations_prefix))
+         String.starts_with?(conn.request_path, @invitations_prefix) or
+         String.starts_with?(conn.request_path, @me_prefix))
   end
 end

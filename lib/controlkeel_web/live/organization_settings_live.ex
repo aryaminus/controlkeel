@@ -17,6 +17,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Accounts.DataLifecycle
   alias ControlKeel.Intent
   alias ControlKeel.Platform
   alias ControlKeel.Platform.PolicySet
@@ -76,6 +77,51 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   end
 
   def handle_event("set_tab", _params, socket), do: {:noreply, socket}
+
+  # ── Organization deletion (docs/dsar-erasure-plan.md, Slice 3) ──────────
+
+  # Cloud-only surface: the danger zone is not rendered in local mode, and a
+  # crafted event is refused here. `DataLifecycle.delete_org/1` itself stays
+  # mode-agnostic (it runs against whichever database is configured); local
+  # single-user deployments just have no tenant-deletion UI.
+  def handle_event("delete_org", _params, %{assigns: %{local_mode: true}} = socket) do
+    {:noreply, put_flash(socket, :error, "Organization deletion is not available in local mode.")}
+  end
+
+  def handle_event("delete_org", %{"delete_org" => %{"confirm_slug" => text}}, socket) do
+    if panel_owner?(socket.assigns.current_membership, socket.assigns.local_mode) do
+      if String.trim(text) == socket.assigns.org.slug do
+        case DataLifecycle.delete_org(socket.assigns.org.id) do
+          {:ok, _stats} ->
+            # The deleted org's members (this caller included) also receive
+            # the Slice 2 membership-revoked broadcast; both navigations land
+            # on /new/org.
+            {:noreply,
+             socket
+             |> put_flash(:info, "Organization #{socket.assigns.org.name} deleted.")
+             |> push_navigate(to: ~p"/new/org")}
+
+          {:error, reason} ->
+            {:noreply,
+             assign(
+               socket,
+               :delete_org_error,
+               "Deletion failed: #{inspect(reason)}. No data was changed."
+             )}
+        end
+      else
+        {:noreply,
+         assign(socket, :delete_org_error, "Type the slug exactly to confirm deletion.")}
+      end
+    else
+      # Server-side gate: only owners may erase a tenant, regardless of what
+      # the template chose to render.
+      {:noreply,
+       socket
+       |> assign(:delete_org_error, "Only organization owners can delete the organization.")
+       |> put_flash(:error, "Only organization owners can delete the organization.")}
+    end
+  end
 
   @impl true
   def handle_event("open_invite", _params, socket) do
@@ -401,6 +447,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:revoke_target, nil)
      |> assign(:settings_form, settings_form(org, budget_cents))
      |> assign(:settings_error, nil)
+     |> assign(:delete_org_form, to_form(%{"confirm_slug" => ""}, as: :delete_org))
+     |> assign(:delete_org_error, nil)
      |> assign(:tabs, @tabs)
      |> assign(:active_tab, active_tab || "general")
      |> assign(:open_packs, MapSet.new())
@@ -821,6 +869,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
               org={@org}
               settings_form={@settings_form}
               settings_error={@settings_error}
+              delete_org_form={@delete_org_form}
+              delete_org_error={@delete_org_error}
               local_mode={@local_mode}
               current_membership={@current_membership}
             />
@@ -1147,6 +1197,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   attr :org, :map, required: true
   attr :settings_form, :map, required: true
   attr :settings_error, :string, default: nil
+  attr :delete_org_form, :any, required: true
+  attr :delete_org_error, :string, default: nil
   attr :current_membership, :map, default: nil
   attr :local_mode, :boolean, default: false
 
@@ -1310,6 +1362,55 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
           </button>
         </div>
       </.form>
+
+      <%= if not @local_mode and panel_owner?(@current_membership, @local_mode) do %>
+        <div
+          id="org-delete-danger-zone"
+          class="mt-10 rounded-2xl border border-[var(--ck-danger)]/30 bg-[var(--ck-danger)]/5 p-6"
+        >
+          <div class="mb-3 flex items-center gap-3">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--ck-danger)]/15">
+              <.icon name="hero-exclamation-triangle" class="size-5 text-[var(--ck-danger)]" />
+            </span>
+            <.card_title class="text-[var(--ck-danger)]">Danger zone</.card_title>
+          </div>
+          <p class="text-sm text-foreground">
+            <strong>Delete this organization permanently.</strong> Every workspace, session,
+            finding, proof, and enrolled cloud key under <strong>{@org.name}</strong> is erased,
+            and active members are pushed off the organization's pages. Audit records of the
+            deletion survive with identities replaced by non-reversible markers.
+          </p>
+          <.form
+            id="delete-org-form"
+            for={@delete_org_form}
+            phx-submit="delete_org"
+            class="mt-4"
+          >
+            <.input
+              field={@delete_org_form[:confirm_slug]}
+              label={"Type \"" <> @org.slug <> "\" to confirm deletion"}
+              autocomplete="off"
+            />
+            <div class="mt-3">
+              <button
+                type="submit"
+                id="delete-org-button"
+                class="rounded-full bg-[var(--ck-danger)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-danger)]"
+              >
+                Delete organization
+              </button>
+            </div>
+          </.form>
+          <p
+            :if={@delete_org_error}
+            id="delete-org-error"
+            class="mt-3 text-sm text-[var(--ck-danger)]"
+            role="alert"
+          >
+            {@delete_org_error}
+          </p>
+        </div>
+      <% end %>
     </section>
     """
   end

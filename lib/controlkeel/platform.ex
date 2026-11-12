@@ -70,13 +70,23 @@ defmodule ControlKeel.Platform do
   `expires_at` `nil`, meaning the credential never expires — the behavior of
   every account provisioned before expiry existed.
 
+  Options:
+
+    * `:created_by_user_id` — id of the authenticated user minting the
+      credential, recorded as trusted ownership. Always overrides any
+      `created_by_user_id` present in `attrs`. Omitted (nil) for
+      system/CLI-minted accounts, which user erasure must not revoke.
+
   Returns `{:error, %Ecto.Changeset{}}` when either key is malformed or when
   an explicit expiry is not in the future, so a credential can never be
   created already dead.
   """
-  def create_service_account(workspace_id, attrs) do
+  def create_service_account(workspace_id, attrs, opts \\ []) do
     token = generate_token()
     {expiry_opts, attrs} = pop_expiry_opts(attrs)
+    # Trusted ownership: always overwritten here from the authenticated caller
+    # (via opts), never taken from client attrs. `nil` means system/CLI-minted.
+    created_by = Keyword.get(opts, :created_by_user_id)
 
     attrs =
       attrs
@@ -85,6 +95,7 @@ defmodule ControlKeel.Platform do
       |> Map.put("token_hash", token_hash(token))
       |> Map.put_new("status", "active")
       |> Map.put_new("metadata", %{})
+      |> Map.put("created_by_user_id", created_by)
 
     with {:ok, expires_at} <- parse_expiry(expiry_opts),
          :ok <- ensure_future_expiry(expires_at),
@@ -1342,9 +1353,10 @@ defmodule ControlKeel.Platform do
           | {:error, term()}
   def provision_agent_identity(workspace_id, attrs, opts \\ []) do
     actor = Keyword.get(opts, :actor)
+    created_by_user_id = Keyword.get(opts, :created_by_user_id)
 
     with {:ok, %{service_account: account, token: token}} <-
-           create_service_account(workspace_id, attrs) do
+           create_service_account(workspace_id, attrs, created_by_user_id: created_by_user_id) do
       record_nhi_event(account.id, "provisioned",
         actor: actor,
         metadata: %{

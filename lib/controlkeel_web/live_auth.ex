@@ -43,7 +43,12 @@ defmodule ControlKeelWeb.LiveAuth do
     mode = Mode.current()
 
     if mode == :local do
-      {:cont, load_auth(socket, session)}
+      # Local mode keeps the auth-gate passthrough but still attaches the
+      # membership/sign-out eviction hook: erasure (DataLifecycle) works on
+      # the local database too, and a mounted page must not keep serving a
+      # user whose account was just erased. The attach is a no-op when
+      # nobody is signed in.
+      {:cont, socket |> load_auth(session) |> attach_membership_eviction()}
     else
       socket = load_auth(socket, session)
 

@@ -257,23 +257,190 @@ defmodule ControlKeelWeb.Layouts do
         </p>
         <p class="mt-0.5 text-xs text-muted-foreground">{@current_user.email}</p>
         <div class="my-2 border-t"></div>
-        <%!-- TODO: Settings button disabled — it was a no-op that only closed the
-             popover. Re-enable and wire to a user settings modal/dialog when functional.
+        <%!-- Settings opens the account dialog (Art.15 export + Art.17 erasure,
+             docs/dsar-erasure-plan.md Slice 3). Cloud UI only — the menu is
+             hidden in local mode. --%>
         <button
           type="button"
-          phx-click={JS.hide(to: "##{@id}-popover")}
+          phx-click={
+            JS.hide(to: "##{@id}-popover")
+            |> JS.show(to: "##{@id}-account-dialog", display: "block")
+          }
           class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
         </button>
-         <hr class="my-2 border-t" />
-        --%>
+        <hr class="my-2 border-t" />
         <a
           href={~p"/auth/logout"}
           class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-[var(--ck-danger)]"
         >
           <.icon name="hero-arrow-right-on-rectangle" class="size-4" /> Sign out
         </a>
+      </div>
+
+      <.account_dialog id={"#{@id}-account-dialog"} user={@current_user} />
+    </div>
+    """
+  end
+
+  @doc """
+  Account settings dialog (docs/dsar-erasure-plan.md, Slice 3): Art.15 data
+  export + Art.17 erasure, opened from the user menu's Settings entry.
+
+  Sidebar-over-content layout (mirrors the org settings tabs) so more
+  sections can slot in later. Section switching is pure client-side
+  `JS.show`/`JS.hide` — no LiveView events, so it works over any page's
+  layout. Erasure posts to `AccountController.erase/2`; export links to
+  `AccountController.export_data/2`. Rendered only in cloud mode (the user
+  menu is hidden locally); the controller and `RequireCloudMode` enforce
+  cloud-onlyness server-side.
+
+  Adding a section: append a nav button (unique `*-nav-*` id) and a panel
+  (unique `*-panel-*` id), and extend each button's toggle chain to show
+  its own panel and hide the others.
+  """
+  attr :id, :string, required: true
+  attr :user, :any, required: true
+
+  def account_dialog(assigns) do
+    assigns = assign(assigns, :erase_form, to_form(%{"confirm_email" => ""}, as: :erase))
+
+    ~H"""
+    <div
+      id={@id}
+      class="hidden relative z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={"#{@id}-title"}
+    >
+      <div
+        class="fixed inset-0 bg-overlay/70 backdrop-blur-sm transition-opacity"
+        phx-click={JS.hide(to: "##{@id}")}
+        aria-label="Close account settings dialog"
+      />
+
+      <div class="fixed inset-0 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+          <div class="w-full max-w-2xl overflow-hidden rounded-2xl border bg-card/95 shadow-card">
+            <div class="flex items-start justify-between gap-4 border-b border-border/60 px-6 py-4">
+              <div>
+                <h2 id={"#{@id}-title"} class="text-lg font-semibold text-foreground">
+                  Account settings
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  Signed in as <strong class="text-foreground">{@user.email}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                phx-click={JS.hide(to: "##{@id}")}
+                aria-label="Close"
+                class="rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <.icon name="hero-x-mark" class="size-5" />
+              </button>
+            </div>
+
+            <div class="grid sm:grid-cols-[190px_minmax(0,1fr)]">
+              <nav
+                aria-label="Account settings sections"
+                class="flex gap-1 overflow-x-auto border-b border-border/60 p-2 sm:flex-col sm:border-b-0 sm:border-r sm:p-3"
+              >
+                <button
+                  id={"#{@id}-nav-data"}
+                  type="button"
+                  aria-current="true"
+                  phx-click={
+                    JS.set_attribute({"aria-current", "true"}, to: "##{@id}-nav-data")
+                    |> JS.remove_attribute("aria-current", to: "##{@id}-nav-danger")
+                    |> JS.show(to: "##{@id}-panel-data")
+                    |> JS.hide(to: "##{@id}-panel-danger")
+                  }
+                  class="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground aria-[current=true]:bg-primary/10 aria-[current=true]:font-semibold aria-[current=true]:text-primary"
+                >
+                  <.icon name="hero-arrow-down-tray" class="size-4" /> My data
+                </button>
+                <button
+                  id={"#{@id}-nav-danger"}
+                  type="button"
+                  phx-click={
+                    JS.set_attribute({"aria-current", "true"}, to: "##{@id}-nav-danger")
+                    |> JS.remove_attribute("aria-current", to: "##{@id}-nav-data")
+                    |> JS.show(to: "##{@id}-panel-danger")
+                    |> JS.hide(to: "##{@id}-panel-data")
+                  }
+                  class="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground aria-[current=true]:bg-[var(--ck-danger)]/10 aria-[current=true]:font-semibold aria-[current=true]:text-[var(--ck-danger)]"
+                >
+                  <.icon name="hero-exclamation-triangle" class="size-4" /> Danger zone
+                </button>
+              </nav>
+
+              <div class="p-6">
+                <div id={"#{@id}-panel-data"} role="tabpanel" aria-labelledby={"#{@id}-nav-data"}>
+                  <.card_title>Download my data</.card_title>
+                  <p class="mt-2 text-sm text-muted-foreground">
+                    A JSON export of everything ControlKeel holds about your
+                    account: your profile, your organization memberships, and
+                    the audit trail that references you.
+                  </p>
+                  <a
+                    href={~p"/me/export.json"}
+                    class="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+                  >
+                    <.icon name="hero-arrow-down-tray" class="size-4" /> Download JSON
+                  </a>
+                </div>
+
+                <div
+                  id={"#{@id}-panel-danger"}
+                  role="tabpanel"
+                  aria-labelledby={"#{@id}-nav-danger"}
+                  class="hidden"
+                >
+                  <div class="rounded-xl border border-[var(--ck-danger)]/30 bg-[var(--ck-danger)]/5 p-4">
+                    <p class="text-sm text-foreground">
+                      <strong>Erasing your account is permanent.</strong> Your
+                      account and memberships are deleted immediately. Audit
+                      records survive with your identity replaced by a
+                      non-reversible marker, and your organizations'
+                      governance data is untouched. Service accounts you
+                      created are revoked.
+                    </p>
+                    <p class="mt-2 text-sm text-muted-foreground">
+                      If you are the last active owner of an organization,
+                      erasure is refused — promote another owner or delete the
+                      organization first.
+                    </p>
+                  </div>
+
+                  <.form
+                    id={"#{@id}-erase-form"}
+                    for={@erase_form}
+                    action={~p"/me/erase"}
+                    method="post"
+                    class="mt-4"
+                  >
+                    <.input
+                      field={@erase_form[:confirm_email]}
+                      label="Type your email to confirm erasure"
+                      autocomplete="off"
+                    />
+                    <div class="mt-3">
+                      <button
+                        type="submit"
+                        id={"#{@id}-erase-button"}
+                        class="rounded-full bg-[var(--ck-danger)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-danger)]"
+                      >
+                        Erase my account
+                      </button>
+                    </div>
+                  </.form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     """

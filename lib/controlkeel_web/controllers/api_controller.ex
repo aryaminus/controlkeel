@@ -1006,9 +1006,11 @@ defmodule ControlKeelWeb.ApiController do
   def create_service_account(conn, %{"id" => workspace_id} = params) do
     with :ok <- authorize_workspace_access(conn, workspace_id, "service_accounts:write") do
       actor = get_in(conn.assigns, [:current_user, :email])
+      created_by_user_id = get_in(conn.assigns, [:current_user, :id])
 
       case Platform.provision_agent_identity(String.to_integer(workspace_id), params,
-             actor: actor
+             actor: actor,
+             created_by_user_id: created_by_user_id
            ) do
         {:ok, %{service_account: account, token: token}} ->
           conn
