@@ -47,13 +47,16 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
   # --- Tab layout ---------------------------------------------------------
 
-  test "renders the general tab with the settings form by default" do
+  test "renders the account tab by default" do
     org = create_org!()
 
     {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
 
+    # Local mode has no user records: the default Account tab shows the
+    # migrate-to-cloud notice instead of export/erasure.
     assert html =~ "Settings sections"
-    assert html =~ "org-settings-form"
+    assert html =~ "You need to migrate to cloud mode to use these settings."
+    refute html =~ "org-settings-form"
   end
 
   test "settings sidebar has no org switcher header" do
@@ -70,12 +73,13 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     assert html =~ "Settings sections"
   end
 
-  test "unknown tab params fall back to the general tab" do
+  test "unknown tab params fall back to the account tab" do
     org = create_org!()
 
     {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=nonsense")
 
-    assert html =~ "org-settings-form"
+    assert html =~ "You need to migrate to cloud mode to use these settings."
+    refute html =~ "org-settings-form"
     refute html =~ "New policy set"
   end
 
@@ -91,7 +95,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
   test "set_tab patches the URL and switches panels" do
     org = create_org!()
 
-    {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/settings")
+    {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=general")
 
     view
     |> element("button[phx-value-tab='policy_sets']")
@@ -673,10 +677,9 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
       conn = build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => member.id})
 
-      assert {:error, {:live_redirect, %{to: "/acme/settings?tab=account"}}} =
-               live(conn, ~p"/acme/settings")
-
-      {:ok, _view, html} = live(conn, ~p"/acme/settings?tab=account")
+      # Account is the default tab: the member renders it directly, with no
+      # redirect needed.
+      {:ok, _view, html} = live(conn, ~p"/acme/settings")
 
       assert html =~ "Erase my account"
       # Org sections are admin+: the member's sidebar offers only the
@@ -709,7 +712,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       Application.put_env(:controlkeel, :runtime_mode, :local)
       org = create_org!()
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=general")
 
       assert html =~ "Settings sections"
       refute html =~ "org-delete-danger-zone"
@@ -720,7 +723,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       Application.put_env(:controlkeel, :runtime_mode, :local)
       org = create_org!()
 
-      {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/settings")
+      {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=general")
 
       # The danger zone is not rendered; a crafted event must be refused
       # server-side without touching data.
@@ -759,7 +762,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     end
 
     test "danger zone is hidden from non-owners", %{admin_conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/doomed/settings")
+      {:ok, _view, html} = live(conn, ~p"/doomed/settings?tab=general")
 
       refute html =~ "org-delete-danger-zone"
       assert html =~ "Doomed"
@@ -768,7 +771,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     test "refuses non-owners server-side", %{admin_conn: conn, admin_m: admin_m} do
       assert admin_m.role == "admin"
 
-      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings?tab=general")
 
       # Even a crafted event from a non-owner hits the server-side gate.
       html = render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
@@ -778,7 +781,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     end
 
     test "owner deletes the organization and lands on /new/org", %{owner_conn: conn, org: org} do
-      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings?tab=general")
 
       render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
 

@@ -239,7 +239,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
               Personal
             </div>
             <%= for tab <- personal_tabs do %>
-              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "general" %>
+              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "account" %>
               <% icon = settings_tab_icon(tab) %>
               <button
                 type="button"
@@ -263,7 +263,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
               Organization
             </div>
             <%= for tab <- org_tabs do %>
-              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "general" %>
+              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "account" %>
               <% icon = settings_tab_icon(tab) %>
               <button
                 type="button"
