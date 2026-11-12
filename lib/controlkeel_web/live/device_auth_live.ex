@@ -17,7 +17,8 @@ defmodule ControlKeelWeb.DeviceAuthLive do
     {:ok,
      assign(socket,
        page_title: "Authorize device",
-       form: to_form(%{"user_code" => ""}, as: :device)
+       form: to_form(%{"user_code" => ""}, as: :device),
+       pending: nil
      )}
   end
 
