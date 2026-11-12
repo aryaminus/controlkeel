@@ -2,11 +2,22 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   @moduledoc """
   Organization settings at `/:org_slug/settings`.
 
-  Secondary navigation over setting groups, mirroring the workspace settings
-  pattern (`?tab=` query param + `push_patch`). Three groups today: General
-  (name, status, budget), Members (roster, roles, invites — admin+ by the
-  page-wide gate) and Policy sets (org-owned policy sets — the former global
-  Policy Studio, now scoped to the organization).
+  Section navigation lives in the **org sidebar** (not in the page body):
+  the LiveView assigns `settings_nav`/`tabs`/`active_tab` and the shared
+  organization sidebar renders a settings variant — a back row to the org
+  overview plus the section buttons (`?tab=` query param + `push_patch`
+  via the `set_tab` event, mirroring the workspace settings pattern).
+  Four groups: **Account** (Art.15 export + Art.17 erasure — the first
+  sidebar item, usable by every member regardless of role; in local mode it
+  renders a migrate-to-cloud notice since `/me/*` endpoints are blocked and
+  no user records exist), General (name, status, budget), Members (roster,
+  roles, invites — admin+ by the page-wide gate) and Policy sets (org-owned
+  policy sets — the former global Policy Studio, now scoped to the
+  organization).
+
+  The page resolves at the `"viewer"` floor so every member can reach the
+  Account tab; the org sections stay admin+ — a visitor whose role cannot
+  use a requested section is pushed to `?tab=account`.
 
   Member management lives here (moved from the org overview page when the
   overview became the org dashboard): invite by email, role changes, and
@@ -26,13 +37,13 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.OrgAccess
 
-  @tabs ["general", "members", "policy_sets"]
+  @tabs ["account", "general", "members", "policy_sets"]
 
   @valid_roles ~w(owner admin member viewer)
 
   @impl true
   def mount(%{"org_slug" => slug} = params, _session, socket) do
-    case OrgAccess.resolve(slug, socket.assigns[:current_user], "admin") do
+    case OrgAccess.resolve(slug, socket.assigns[:current_user], "viewer") do
       {:ok, org, membership} ->
         mount_ok(socket, org, membership, normalize_tab(params["tab"]))
 
@@ -52,7 +63,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
           socket
 
         _ ->
-          case OrgAccess.resolve(slug, socket.assigns[:current_user], "admin") do
+          case OrgAccess.resolve(slug, socket.assigns[:current_user], "viewer") do
             {:ok, org, membership} ->
               {:ok, socket} = mount_ok(socket, org, membership, nil)
               assign(socket, :scope_error, nil)
@@ -62,14 +73,37 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
           end
       end
 
-    {:noreply, assign(socket, :active_tab, normalize_tab(params["tab"]))}
+    active_tab = normalize_tab(params["tab"])
+    tabs = socket.assigns[:tabs]
+
+    # Account is every member's home in settings; org sections stay admin+.
+    # A role (or stale link) asking for a section this visitor cannot use
+    # lands on the Account tab.
+    if tabs && active_tab not in tabs do
+      {:noreply,
+       push_navigate(socket, to: ~p"/#{socket.assigns.org.slug}/settings?tab=account")}
+    else
+      {:noreply, assign(socket, :active_tab, active_tab)}
+    end
   end
 
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   defp normalize_tab("policy_sets"), do: "policy_sets"
   defp normalize_tab("members"), do: "members"
+  defp normalize_tab("account"), do: "account"
   defp normalize_tab(_tab), do: "general"
+
+  # Account (Art.15 export + Art.17 erasure) is usable by every member — and
+  # unconditionally in local mode, which has no roles; the org sections stay
+  # admin+.
+  defp allowed_tabs(_membership, true), do: @tabs
+
+  defp allowed_tabs(%Accounts.Membership{role: role}, _local_mode) do
+    if Accounts.role_at_least?(role, "admin"), do: @tabs, else: ["account"]
+  end
+
+  defp allowed_tabs(nil, _local_mode), do: @tabs
 
   @impl true
   def handle_event("set_tab", %{"tab" => tab}, socket) when tab in @tabs do
@@ -428,6 +462,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
     memberships = if(local_mode, do: [], else: load_memberships(org.id))
+    tabs = allowed_tabs(membership, local_mode)
 
     {:ok,
      socket
@@ -449,8 +484,10 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:settings_error, nil)
      |> assign(:delete_org_form, to_form(%{"confirm_slug" => ""}, as: :delete_org))
      |> assign(:delete_org_error, nil)
-     |> assign(:tabs, @tabs)
+     |> assign(:erase_form, to_form(%{"confirm_email" => ""}, as: :erase))
+     |> assign(:tabs, tabs)
      |> assign(:active_tab, active_tab || "general")
+     |> assign(:settings_nav, true)
      |> assign(:open_packs, MapSet.new())
      |> assign(:show_packs_dialog, false)
      |> assign(:show_create_modal, false)
@@ -817,65 +854,42 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-8">
-      <div class="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <nav
-          class="rounded-2xl border bg-card shadow-card lg:self-start lg:p-3"
-          aria-label="Organization settings sections"
-        >
-          <ul class="flex gap-1 list-none m-0 overflow-x-auto p-2 lg:flex-col lg:gap-1 lg:p-0">
-            <%= for tab <- @tabs do %>
-              <li class="shrink-0">
-                <button
-                  type="button"
-                  phx-click="set_tab"
-                  phx-value-tab={tab}
-                  aria-current={@active_tab == tab && "page"}
-                  class={[
-                    "w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition",
-                    @active_tab == tab &&
-                      "bg-primary/10 font-semibold text-primary",
-                    @active_tab != tab &&
-                      "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  ]}
-                >
-                  {tab_label(tab)}
-                </button>
-              </li>
-            <% end %>
-          </ul>
-        </nav>
-
-        <%= case @active_tab do %>
-          <% "policy_sets" -> %>
-            <.policy_sets_panel
-              org={@org}
-              policy_sets={@policy_sets}
-              pack_count={@pack_count}
-              rule_count={@rule_count}
-              block_count={@block_count}
-            />
-          <% "members" -> %>
-            <.members_panel
-              memberships={@memberships}
-              local_mode={@local_mode}
-              invite_token={@invite_token}
-              current_user={@current_user}
-              active_owner_count={@active_owner_count}
-              can_manage={can_manage?(assigns)}
-              current_role={current_role(assigns)}
-            />
-          <% _ -> %>
-            <.general_panel
-              org={@org}
-              settings_form={@settings_form}
-              settings_error={@settings_error}
-              delete_org_form={@delete_org_form}
-              delete_org_error={@delete_org_error}
-              local_mode={@local_mode}
-              current_membership={@current_membership}
-            />
-        <% end %>
-      </div>
+      <%= case @active_tab do %>
+        <% "policy_sets" -> %>
+          <.policy_sets_panel
+            org={@org}
+            policy_sets={@policy_sets}
+            pack_count={@pack_count}
+            rule_count={@rule_count}
+            block_count={@block_count}
+          />
+        <% "members" -> %>
+          <.members_panel
+            memberships={@memberships}
+            local_mode={@local_mode}
+            invite_token={@invite_token}
+            current_user={@current_user}
+            active_owner_count={@active_owner_count}
+            can_manage={can_manage?(assigns)}
+            current_role={current_role(assigns)}
+          />
+        <% "account" -> %>
+          <.account_panel
+            user={@current_user}
+            erase_form={@erase_form}
+            local_mode={@local_mode}
+          />
+        <% _ -> %>
+          <.general_panel
+            org={@org}
+            settings_form={@settings_form}
+            settings_error={@settings_error}
+            delete_org_form={@delete_org_form}
+            delete_org_error={@delete_org_error}
+            local_mode={@local_mode}
+            current_membership={@current_membership}
+          />
+      <% end %>
     </section>
 
     <.invite_modal
@@ -905,9 +919,100 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     """
   end
 
-  defp tab_label("general"), do: "General"
-  defp tab_label("members"), do: "Members"
-  defp tab_label("policy_sets"), do: "Policy sets"
+  # ── Account panel (cloud-only tab) -------------------------------------
+
+  # docs/dsar-erasure-plan.md, Slice 3: Art.15 export + Art.17 erasure. The
+  # erasure form is a plain POST to `AccountController.erase/2` (no phx
+  # events) so the controller owns the redirect flow; the server re-checks
+  # the typed email, so this markup is friction, not the boundary.
+  attr :user, :any, required: true
+  attr :erase_form, :any, required: true
+  attr :local_mode, :boolean, required: true
+
+  defp account_panel(assigns) do
+    ~H"""
+    <section>
+      <div class="space-y-1 mb-8">
+        <.section_title>
+          Account
+        </.section_title>
+        <p :if={@user} class="text-sm text-muted-foreground">
+          Signed in as <strong class="text-foreground">{@user.email}</strong>.
+          Your data and your account's lifecycle.
+        </p>
+      </div>
+
+      <%= if @local_mode do %>
+        <div class="rounded-2xl border border-border/80 bg-card shadow-card p-6">
+          <p class="text-sm text-muted-foreground">
+            You need to migrate to cloud mode to use these settings.
+          </p>
+        </div>
+      <% else %>
+        <div class="rounded-2xl border border-border/80 bg-card shadow-card p-6">
+          <.card_title>Download my data</.card_title>
+          <p class="mt-2 text-sm text-muted-foreground">
+            A JSON export of everything ControlKeel holds about your account:
+            your profile, your organization memberships, and the audit trail
+            that references you.
+          </p>
+          <a
+            href={~p"/me/export.json"}
+            class="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+          >
+            <.icon name="hero-arrow-down-tray" class="size-4" /> Download JSON
+          </a>
+        </div>
+
+        <div
+          id="account-erasure-danger-zone"
+          class="mt-6 rounded-2xl border border-[var(--ck-danger)]/30 bg-[var(--ck-danger)]/5 p-6"
+        >
+          <div class="mb-3 flex items-center gap-3">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--ck-danger)]/15">
+              <.icon name="hero-exclamation-triangle" class="size-5 text-[var(--ck-danger)]" />
+            </span>
+            <.card_title class="text-[var(--ck-danger)]">Danger zone</.card_title>
+          </div>
+          <p class="text-sm text-foreground">
+            <strong>Erasing your account is permanent.</strong> Your account and
+            memberships are deleted immediately. Audit records survive with your
+            identity replaced by a non-reversible marker, and this organization's
+            governance data is untouched. Service accounts you created are
+            revoked.
+          </p>
+          <p class="mt-2 text-sm text-muted-foreground">
+            If you are the last active owner of an organization, erasure is
+            refused — promote another owner or delete the organization first.
+          </p>
+
+          <.form
+            id="account-erase-form"
+            for={@erase_form}
+            action={~p"/me/erase"}
+            method="post"
+            class="mt-4"
+          >
+            <.input
+              field={@erase_form[:confirm_email]}
+              label="Type your email to confirm erasure"
+              autocomplete="off"
+            />
+            <div class="mt-3">
+              <button
+                type="submit"
+                id="account-erase-button"
+                class="rounded-full bg-[var(--ck-danger)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-danger)]"
+              >
+                Erase my account
+              </button>
+            </div>
+          </.form>
+        </div>
+      <% end %>
+    </section>
+    """
+  end
 
   # ── Members panel & modals --------------------------------------------
 
