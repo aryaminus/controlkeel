@@ -31,6 +31,10 @@ defmodule ControlKeelWeb.UserMenu do
     default: false,
     doc: "render the Sign out entry (cloud-only surfaces opt in; local mode has no session)"
 
+  attr :flash, :map,
+    default: %{},
+    doc: "rendered-scope flash (root assign); read for :account_delete"
+
   attr :class, :string, default: ""
   attr :popover_class, :string, default: "right-0 top-full mt-2"
   attr :rest, :global
@@ -144,6 +148,7 @@ defmodule ControlKeelWeb.UserMenu do
         id={"#{@id}-account-dialog"}
         user={@current_user}
         restricted={not is_nil(@placeholder_label)}
+        flash={@flash}
       />
     </div>
     """
@@ -172,18 +177,36 @@ defmodule ControlKeelWeb.UserMenu do
   Adding a section: append a nav button (unique `*-nav-*` id) and a panel
   (unique `*-panel-*` id), and extend each button's toggle chain to show
   its own panel and hide the others.
+
+  ## Delete-error flow
+
+  A refused `POST /me/erase` redirects to `/` with a dedicated
+  `:account_delete` flash (not `:error`, so the layouts' `flash_group`
+  doesn't also render it as page chrome). When that flash is present the
+  dialog renders **already open** with the message inside the danger zone
+  as a dismissible banner (cross icon), so the user never leaves the modal
+  to read what went wrong.
   """
   attr :id, :string, required: true
   attr :user, :any, required: true
   attr :restricted, :boolean, default: false
+  attr :flash, :map, default: %{}
 
   def account_dialog(assigns) do
-    assigns = assign(assigns, :erase_form, to_form(%{"confirm_email" => ""}, as: :erase))
+    assigns =
+      assigns
+      |> assign_new(:flash, fn -> %{} end)
+      |> assign(:erase_form, to_form(%{"confirm_email" => ""}, as: :erase))
+
+    # Flash keys arrive as atoms from live renders and strings from dead
+    # ones (Phoenix.Flash keeps whatever the controller put).
+    delete_error = assigns.flash[:account_delete] || assigns.flash["account_delete"]
+    assigns = assign(assigns, :delete_error, delete_error)
 
     ~H"""
     <div
       id={@id}
-      class="hidden relative z-50"
+      class={if(@delete_error, do: "relative z-50", else: "hidden relative z-50")}
       role="dialog"
       aria-modal="true"
       aria-labelledby={"#{@id}-title"}
@@ -305,6 +328,28 @@ defmodule ControlKeelWeb.UserMenu do
                         deletion is refused — promote another owner or delete the
                         organization first.
                       </p>
+
+                      <%!-- Server-refused deletion: the controller redirects back
+                           here with the `:account_delete` flash, which opens the
+                           dialog and renders the reason in place. The cross
+                           dismisses the banner without closing the dialog. --%>
+                      <%= if @delete_error do %>
+                        <div
+                          id={"#{@id}-delete-error"}
+                          role="alert"
+                          class="mt-3 flex items-start justify-between gap-3 rounded-xl border border-[var(--ck-danger)]/30 bg-[var(--ck-danger)]/10 p-3"
+                        >
+                          <p class="text-sm text-foreground">{@delete_error}</p>
+                          <button
+                            type="button"
+                            phx-click={JS.hide(to: "##{@id}-delete-error")}
+                            aria-label="Dismiss error"
+                            class="shrink-0 rounded-md p-1 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-danger)]"
+                          >
+                            <.icon name="hero-x-mark" class="size-4" />
+                          </button>
+                        </div>
+                      <% end %>
 
                       <.form
                         id={"#{@id}-erase-form"}
