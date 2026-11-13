@@ -58,6 +58,38 @@ defmodule ControlKeelWeb.UserMenuTest do
     end
   end
 
+  describe "account delete error flow" do
+    test "the :account_delete flash opens the dialog with a dismissible in-section banner" do
+      user = %{name: "Ada Lovelace", email: "ada@example.com"}
+
+      html =
+        render_component(&UserMenu.user_menu/1,
+          id: "menu",
+          current_user: user,
+          flash: %{account_delete: "You are the last active owner of Last Standing."}
+        )
+
+      # Dialog auto-opens: the `hidden` class is dropped when the flash is set.
+      refute html =~ ~s(class="hidden relative z-50")
+      # Banner carries the server message inside the danger zone.
+      assert html =~ ~s(id="menu-account-dialog-delete-error")
+      assert html =~ "You are the last active owner of Last Standing."
+      assert html =~ ~s(role="alert")
+      # Dismissible via the cross icon (JS.hide on the banner only).
+      assert html =~ ~s(aria-label="Dismiss error")
+    end
+
+    test "without the flash the dialog stays hidden with no banner" do
+      user = %{name: "Ada Lovelace", email: "ada@example.com"}
+
+      html = render_component(&UserMenu.user_menu/1, id: "menu", current_user: user)
+
+      assert html =~ ~s(class="hidden relative z-50")
+      refute html =~ "Dismiss error"
+      refute html =~ ~s(role="alert")
+    end
+  end
+
   describe "placeholder menu (local mode)" do
     test "renders the restricted dialog: notices instead of identity, export, erasure" do
       html =

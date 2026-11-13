@@ -54,6 +54,11 @@ defmodule ControlKeelWeb.AccountController do
     end
   end
 
+  # A refused erasure redirects to `/` with a dedicated `:account_delete`
+  # flash (not `:error`, so the layouts' `flash_group` doesn't duplicate it
+  # as page chrome). The user-menu dialog consumes that flash: it renders
+  # already open with the message inside its danger zone, so the user sees
+  # the error without the modal ever closing.
   def erase(conn, %{"erase" => %{"confirm_email" => text}}) do
     case conn.assigns[:current_user] do
       nil ->
@@ -93,7 +98,7 @@ defmodule ControlKeelWeb.AccountController do
 
   defp refused(conn, message) do
     conn
-    |> put_flash(:error, message)
+    |> put_flash(:account_delete, message)
     |> redirect(to: ~p"/")
   end
 
