@@ -228,58 +228,25 @@ defmodule ControlKeelWeb.OrganizationLayouts do
             <span class="truncate">{@nav_org.name}</span>
           </.link>
           <div class="my-1 border-t"></div>
-          <%!-- Grouped sections: Account is the per-user surface (any member),
-               the rest are organization sections (admin+). Labels are
-               text-only; items carry icons. --%>
-          <% {personal_tabs, org_tabs} =
-               Enum.split_with(@settings_tabs, fn tab -> tab == "account" end) %>
-
-          <%= if personal_tabs != [] do %>
-            <div class="px-2.5 pb-1 pt-1 text-xs font-semibold text-muted-foreground">
-              Personal
-            </div>
-            <%= for tab <- personal_tabs do %>
-              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "account" %>
-              <% icon = settings_tab_icon(tab) %>
-              <button
-                type="button"
-                phx-click="set_tab"
-                phx-value-tab={tab}
-                aria-current={active && "page"}
-                class={[
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition",
-                  active && "bg-primary/10 font-semibold text-primary",
-                  !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
-                ]}
-              >
-                <.icon name={icon} class="size-4 shrink-0" />
-                {Phoenix.Naming.humanize(tab)}
-              </button>
-            <% end %>
-          <% end %>
-
-          <%= if org_tabs != [] do %>
-            <div class="mt-3 px-2.5 pb-1 pt-1 text-xs font-semibold text-muted-foreground">
-              Organization
-            </div>
-            <%= for tab <- org_tabs do %>
-              <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "account" %>
-              <% icon = settings_tab_icon(tab) %>
-              <button
-                type="button"
-                phx-click="set_tab"
-                phx-value-tab={tab}
-                aria-current={active && "page"}
-                class={[
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition",
-                  active && "bg-primary/10 font-semibold text-primary",
-                  !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
-                ]}
-              >
-                <.icon name={icon} class="size-4 shrink-0" />
-                {Phoenix.Naming.humanize(tab)}
-              </button>
-            <% end %>
+          <%!-- Admin-only org sections: the per-user account surface lives in
+               the user menu's account dialog, not in this sidebar. --%>
+          <%= for tab <- @settings_tabs do %>
+            <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "general" %>
+            <% icon = settings_tab_icon(tab) %>
+            <button
+              type="button"
+              phx-click="set_tab"
+              phx-value-tab={tab}
+              aria-current={active && "page"}
+              class={[
+                "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition",
+                active && "bg-primary/10 font-semibold text-primary",
+                !active && "text-muted-foreground hover:bg-muted hover:text-foreground"
+              ]}
+            >
+              <.icon name={icon} class="size-4 shrink-0" />
+              {Phoenix.Naming.humanize(tab)}
+            </button>
           <% end %>
         <% else %>
         <%= for item <- @nav_items do %>
@@ -337,7 +304,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         id="sidebar-user-menu"
         current_user={@current_user}
         placeholder_label={if @mode == :local, do: "Local mode"}
-        org_slug={@nav_org.slug}
         class="border-t p-3"
         popover_class="bottom-20 right-4"
       />
@@ -1118,7 +1084,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   # text-only). NOTE: kept clear of any `attr` block — a defp placed
   # between an attr declaration and its component def steals the attrs
   # and HEEx then compiles it as a component.
-  defp settings_tab_icon("account"), do: "hero-user-circle"
   defp settings_tab_icon("general"), do: "hero-cog-6-tooth"
   defp settings_tab_icon("members"), do: "hero-users"
   defp settings_tab_icon("policy_sets"), do: "hero-shield-check"

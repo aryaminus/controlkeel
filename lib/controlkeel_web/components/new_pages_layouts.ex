@@ -36,7 +36,11 @@ defmodule ControlKeelWeb.NewPagesLayouts do
       end)
 
     ~H"""
-    <header class="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
+    <%!-- No backdrop-blur here: backdrop-filter makes this header the
+         containing block for `fixed` descendants, which would trap the
+         user menu's account dialog (fixed inset-0) inside the header bar.
+         The near-opaque background keeps the sticky-bar readability. --%>
+    <header class="sticky top-0 z-50 border-b bg-background/95">
       <div class="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
         <.link
           :if={@show_back}
