@@ -132,6 +132,20 @@ defmodule ControlKeel.Mission do
       )
 
   @doc """
+  All sessions across the organization's workspaces, newest first, with the
+  owning workspace preloaded for display.
+  """
+  def list_sessions_for_org(org_id) do
+    Repo.all(
+      from s in Session,
+        join: w in assoc(s, :workspace),
+        where: w.org_id == ^org_id,
+        order_by: [desc: s.inserted_at, desc: s.id],
+        preload: [workspace: w]
+    )
+  end
+
+  @doc """
   Returns true when a session (mission) already uses `name` as its title,
   case-insensitively. Used by the onboarding wizard to prevent duplicate
   project names before compile.

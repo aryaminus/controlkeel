@@ -67,18 +67,22 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       assert html =~ "Second session"
     end
 
-    test "org switcher stays cloud-only in local mode" do
+    test "local mode org menu shows the full cloud menu minus sign out" do
       {:ok, org} = Accounts.create_org(%{name: "Local Switch", slug: "local-switch"})
       ws = create_workspace(%{name: "LS", slug: "ls", industry: "web", org_id: org.id})
 
       {:ok, view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
 
-      # Main behavior: the org home link renders, but the switcher toggle,
-      # popover, and any creation entry stay cloud-only.
+      # No mode checks in the header menu: local mode gets the same entries
+      # as cloud (its flyout lists the single implicit org). Sign out lives
+      # in the sidebar's user menu, gated on cloud mode there.
       assert html =~ org.name
-      refute has_element?(view, "#org-switcher-button")
-      refute html =~ "Organizations"
-      refute html =~ "Create organization"
+      assert has_element?(view, "#org-switcher-button")
+      assert html =~ "Settings"
+      assert html =~ "Switch organization"
+      assert html =~ "Organizations"
+      assert html =~ "Create organization"
+      refute html =~ "Sign out"
     end
 
     test "resolves the workspace slug case-insensitively" do
@@ -213,7 +217,9 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, _view, html} = live(conn, ~p"/scopeco/workspaces/#{ws.slug}")
 
       assert html =~ "Scoped"
-      assert html =~ "Scoped"
+      # Sign out moved from the org-switcher dropdown to the sidebar's
+      # user menu (cloud mode there).
+      assert html =~ "Sign out"
     end
 
     test "a member sees the org scope when the workspace slug is unknown" do

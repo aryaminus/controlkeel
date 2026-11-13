@@ -215,7 +215,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "settings page renders at the organization settings route", %{owner: owner} do
-      {:ok, _view, html} = live(conn_for(owner), ~p"/setco/settings")
+      {:ok, _view, html} = live(conn_for(owner), ~p"/setco/settings?tab=general")
 
       assert html =~ "Organization Settings"
       assert html =~ "Organization name"
@@ -223,7 +223,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "owner saves the org name from the settings page", %{org: org, owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/setco/settings")
+      {:ok, view, _html} = live(conn_for(owner), ~p"/setco/settings?tab=general")
 
       view
       |> element("#org-settings-form")
@@ -236,7 +236,7 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
     end
 
     test "admin can view settings but status and budget are owner-locked", %{admin: admin} do
-      {:ok, view, html} = live(conn_for(admin), ~p"/setco/settings")
+      {:ok, view, html} = live(conn_for(admin), ~p"/setco/settings?tab=general")
 
       assert has_element?(view, ~s([data-scope-valid][data-scope-root="/setco"]))
       assert html =~ "Organization Settings"
@@ -275,30 +275,18 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, org: org, owner: owner, workspace: ws}
     end
 
-    test "org page lists the org's workspaces directly (no member UI, no tab bar)", %{
+    test "org page no longer hosts the workspace grid (it moved to /workspaces)", %{
       owner: owner,
       workspace: ws
     } do
       {:ok, view, html} = live(conn_for(owner), ~p"/tabco")
 
-      assert html =~ "Workspaces"
-      assert render(view) =~ "core-workspace"
-      # The workspace card links to its nested detail route.
-      assert render(view) =~ ~s(href="/tabco/workspaces/#{ws.slug}")
-      # Workspaces table shows budget and status.
-      assert render(view) =~ "$123.45"
-      assert render(view) =~ "active"
-      # Member management moved to the settings page: no roster UI here.
-      refute render(view) =~ ~s(id="role-form-")
-      refute render(view) =~ "No members yet."
+      refute render(view) =~ ws.slug
+      refute html =~ ~s(href="/tabco/workspaces/#{ws.slug}")
+      # The sidebar links to the dedicated workspaces index instead.
+      assert html =~ ~s(href="/tabco/workspaces")
       # Deployment-level runtime cards are local-mode only.
       refute render(view) =~ "Runtime status"
-      refute html =~ "?tab=members"
-    end
-
-    test "query params on the org route are ignored", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/tabco?tab=wat")
-      assert render(view) =~ "core-workspace"
     end
 
     test "sidebar renders the org nav on the org page", %{owner: owner} do
@@ -306,6 +294,8 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
 
       assert html =~ "sidebar-org-nav"
       assert html =~ "Tabco"
+      assert html =~ ~s(href="/tabco/workspaces")
+      assert html =~ ~s(href="/tabco/sessions")
       refute html =~ ~s(href="/tabco?tab=sessions")
       assert html =~ ~s(href="/tabco/settings")
     end
@@ -320,153 +310,6 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ ~s(href="/tabco")
       assert html =~ ~s(href="/second-org")
       refute html =~ ~s(href="/organizations")
-    end
-  end
-
-  describe "new workspace modal" do
-    setup do
-      owner = create_user!("ws-owner@example.com")
-      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Wsco", slug: "wsco"})
-
-      {:ok, org: org, owner: owner}
-    end
-
-    test "cloud mode opens the create form", %{owner: owner} do
-      {:ok, view, html} = live(conn_for(owner), ~p"/wsco")
-
-      refute html =~ "new-workspace-modal"
-
-      view |> render_click("new_workspace")
-      modal = render(view)
-
-      assert modal =~ "new-workspace-modal"
-      assert modal =~ "Workspace name"
-      assert modal =~ "Monthly budget"
-      refute modal =~ "Only the default workspace is available in local mode."
-    end
-
-    test "cloud mode creates a workspace and lists it", %{org: org, owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
-
-      view |> render_click("new_workspace")
-
-      view
-      |> element("#new-workspace-form")
-      |> render_submit(%{
-        "workspace" => %{
-          "name" => "Data Pipeline",
-          "slug" => "data-pipeline",
-          "industry" => "web",
-          "budget_cents" => "5000"
-        }
-      })
-
-      html = render(view)
-      assert html =~ "Workspace Data Pipeline created."
-      assert html =~ "data-pipeline"
-
-      workspace = ControlKeel.Mission.get_workspace_by_slug("data-pipeline")
-      assert workspace.org_id == org.id
-      assert workspace.status == "active"
-    end
-
-    test "blank slug is auto-generated from the name", %{owner: owner} do
-      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
-
-      view |> render_click("new_workspace")
-
-      view
-      |> element("#new-workspace-form")
-      |> render_submit(%{
-        "workspace" => %{
-          "name" => "Payments Core",
-          "slug" => "",
-          "industry" => "finance",
-          "budget_cents" => "0"
-        }
-      })
-
-      assert render(view) =~ "payments-core"
-      assert ControlKeel.Mission.get_workspace_by_slug("payments-core")
-    end
-
-    test "slug collision surfaces a validation error", %{owner: owner, org: org} do
-      {:ok, _ws} =
-        ControlKeel.Mission.create_workspace(%{
-          name: "Existing",
-          slug: "taken",
-          industry: "web",
-          agent: "claude",
-          budget_cents: 0,
-          compliance_profile: "general",
-          status: "active",
-          org_id: org.id
-        })
-
-      {:ok, view, _html} = live(conn_for(owner), ~p"/wsco")
-
-      view |> render_click("new_workspace")
-
-      view
-      |> element("#new-workspace-form")
-      |> render_submit(%{
-        "workspace" => %{
-          "name" => "Other",
-          "slug" => "taken",
-          "industry" => "web",
-          "budget_cents" => "0"
-        }
-      })
-
-      assert render(view) =~ "has already been taken"
-      refute render(view) =~ "Workspace Other created."
-    end
-  end
-
-  describe "new workspace modal in local mode" do
-    setup do
-      original = Application.get_env(:controlkeel, :runtime_mode)
-      Application.put_env(:controlkeel, :runtime_mode, :local)
-
-      on_exit(fn ->
-        if is_nil(original) do
-          Application.delete_env(:controlkeel, :runtime_mode)
-        else
-          Application.put_env(:controlkeel, :runtime_mode, original)
-        end
-      end)
-
-      {:ok, org} = Accounts.create_org(%{name: "Local WS Org", slug: "local-ws-org"})
-      {:ok, org: org}
-    end
-
-    test "modal shows the local-mode notice instead of the form", %{org: _org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org")
-
-      view |> render_click("new_workspace")
-      modal = render(view)
-
-      assert modal =~ "new-workspace-modal"
-      assert modal =~ "Only the default workspace is available in local mode."
-      assert modal =~ "Upgrade to cloud mode to create additional workspaces."
-      refute modal =~ "new-workspace-form"
-    end
-
-    test "forged save_workspace event is rejected in local mode", %{org: org} do
-      {:ok, view, _html} = live(build_conn(), ~p"/local-ws-org")
-
-      view
-      |> render_click("save_workspace", %{
-        "workspace" => %{
-          "name" => "Sneaky",
-          "slug" => "sneaky",
-          "industry" => "web",
-          "budget_cents" => "0"
-        }
-      })
-
-      refute render(view) =~ "Workspace Sneaky created."
-      assert ControlKeel.Mission.list_workspaces_for_org(org.id) == []
     end
   end
 
@@ -498,8 +341,9 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       {:ok, _view, html} = live(build_conn(), ~p"/local-org")
 
       # Local mode: the single implicit org IS the deployment, so the
-      # provider/registry cards are truthful here.
-      assert html =~ "Runtime status"
+      # provider/registry cards are truthful here. The cards carry their own
+      # headings (no section heading since the funnel sits beside them).
+      assert html =~ ~s(id="org-runtime-status")
       assert html =~ "Provider snapshot"
       assert html =~ "ACP registry cache"
       # Bootstrap detail rows (retired "Provider and bootstrap status" panel).

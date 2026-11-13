@@ -54,6 +54,11 @@ defmodule ControlKeelWeb.AccountController do
     end
   end
 
+  # A refused erasure redirects to `/` with a dedicated `:account_delete`
+  # flash (not `:error`, so the layouts' `flash_group` doesn't duplicate it
+  # as page chrome). The user-menu dialog consumes that flash: it renders
+  # already open with the message inside its danger zone, so the user sees
+  # the error without the modal ever closing.
   def erase(conn, %{"erase" => %{"confirm_email" => text}}) do
     case conn.assigns[:current_user] do
       nil ->
@@ -64,12 +69,12 @@ defmodule ControlKeelWeb.AccountController do
         if String.trim(text) == user.email do
           run_erasure(conn, user)
         else
-          refused(conn, "Type your email exactly to confirm erasure.")
+          refused(conn, "Type your email exactly to confirm deletion.")
         end
     end
   end
 
-  def erase(conn, _params), do: refused(conn, "Type your email exactly to confirm erasure.")
+  def erase(conn, _params), do: refused(conn, "Type your email exactly to confirm deletion.")
 
   # Erasure succeeded: the Slice 2 post-commit work (sign_out_everywhere
   # broadcast + membership revocations) already fired inside delete_user/1;
@@ -80,20 +85,20 @@ defmodule ControlKeelWeb.AccountController do
         conn
         |> delete_session(:current_user_id)
         |> delete_session(:session_last_active)
-        |> put_flash(:info, "Your account has been erased.")
+        |> put_flash(:info, "Your account has been deleted.")
         |> redirect(to: ~p"/auth/login")
 
       {:error, :sole_owner} ->
         refused(conn, sole_owner_copy(user.id))
 
       {:error, _reason} ->
-        refused(conn, "Erasure failed. Please try again or contact support.")
+        refused(conn, "Deletion failed. Please try again or contact support.")
     end
   end
 
   defp refused(conn, message) do
     conn
-    |> put_flash(:error, message)
+    |> put_flash(:account_delete, message)
     |> redirect(to: ~p"/")
   end
 

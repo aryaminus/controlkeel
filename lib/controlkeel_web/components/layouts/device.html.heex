@@ -1,0 +1,9 @@
+<%!-- Standalone layout for the /device approval page: a centered card
+     column with no app chrome. Flash group is placed above the content so
+     lookup/approve feedback is visible at the top of the card. --%>
+<div class="flex min-h-screen flex-col">
+  <div class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">
+    <.flash_group flash={@flash} />
+    {@inner_content}
+  </div>
+</div>
