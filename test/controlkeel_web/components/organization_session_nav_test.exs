@@ -66,11 +66,12 @@ defmodule ControlKeelWeb.OrganizationSessionNavTest do
         nav_assigns("/acme")
       )
 
-    # No mode checks in the header menu except Sign out: switching and
-    # creating orgs render in local mode too (its flyout lists the single
-    # implicit org), but Sign out is a cloud concept — local has no session
-    # to end. Element-id assertions: the wrapper's phx-click-away JSON also
-    # mentions the ids, so a bare =~ would false-positive.
+    # No mode checks in the header menu: switching and creating orgs render
+    # in local mode too (its flyout lists the single implicit org). Sign
+    # out lives in the sidebar's user menu, gated on cloud mode there —
+    # local has no session to end. Element-id assertions: the wrapper's
+    # phx-click-away JSON also mentions the ids, so a bare =~ would
+    # false-positive.
     assert html =~ ~s(id="org-switcher-button")
     assert html =~ ~s(id="sidebar-org-switcher-popover")
     assert html =~ "Settings"

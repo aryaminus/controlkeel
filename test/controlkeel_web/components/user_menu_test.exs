@@ -37,9 +37,9 @@ defmodule ControlKeelWeb.UserMenuTest do
       assert html =~ "ada@example.com"
       assert html =~ "Ada Lovelace"
       # Erasure danger zone lives inside the Account tab.
-      assert html =~ "Erasing your account is permanent."
+      assert html =~ "Deleting your account is permanent."
       assert html =~ ~s(action="/me/erase")
-      assert html =~ "Erase my account"
+      assert html =~ "Delete my account"
       # Data tab: Art.15 export.
       assert html =~ "Download my data"
       assert html =~ ~s(href="/me/export.json")
@@ -48,7 +48,9 @@ defmodule ControlKeelWeb.UserMenuTest do
     test "sign out opt-in renders the sign out entry" do
       user = %{name: "Ada Lovelace", email: "ada@example.com"}
 
-      with_sign_out = render_component(&UserMenu.user_menu/1, id: "menu", current_user: user, sign_out: true)
+      with_sign_out =
+        render_component(&UserMenu.user_menu/1, id: "menu", current_user: user, sign_out: true)
+
       without = render_component(&UserMenu.user_menu/1, id: "menu", current_user: user)
 
       assert with_sign_out =~ "Sign out"
@@ -68,7 +70,7 @@ defmodule ControlKeelWeb.UserMenuTest do
       # Both tabs render the migrate-to-cloud notice.
       assert html =~ "You need to migrate to cloud mode to use these settings."
       refute html =~ "Signed in as"
-      refute html =~ "Erase my account"
+      refute html =~ "Delete my account"
       refute html =~ "/me/export.json"
       refute html =~ "Download my data"
     end

@@ -17,10 +17,15 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   attr :nav_org, :map, required: true
   attr :nav_workspace, :any, default: nil
   attr :nav_session, :any, default: nil
-  attr :settings_nav, :boolean, default: false,
+
+  attr :settings_nav, :boolean,
+    default: false,
     doc: "render the settings sidebar (back row + section nav) instead of the org nav"
-  attr :settings_tabs, :list, default: [],
+
+  attr :settings_tabs, :list,
+    default: [],
     doc: "section tab keys for the settings sidebar (see OrganizationSettingsLive)"
+
   attr :settings_active_tab, :string, default: nil
 
   def organization_sidebar(assigns) do
@@ -55,7 +60,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
     >
       <%!-- The settings variant has no sidebar header: its back row (to the
            org overview) is the top of the nav. --%>
-      <div class="p-3" :if={not @settings_nav}>
+      <div :if={not @settings_nav} class="p-3">
         <div
           id="sidebar-org-switcher"
           class="relative flex items-center justify-between gap-3 rounded-xl p-1.5"
@@ -141,9 +146,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                 id="switch-org-flyout"
                 class="invisible absolute left-full top-0 z-50 p-1.5 opacity-0 transition group-hover/switch:visible group-hover/switch:opacity-100 group-focus-within/switch:visible group-focus-within/switch:opacity-100"
               >
-                <div
-                  class="w-56 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md"
-                >
+                <div class="w-56 rounded-xl border bg-card p-1.5 shadow-2xl shadow-black/50 backdrop-blur-md">
                   <div class="px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
                     Organizations
                   </div>
@@ -192,16 +195,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
                 </div>
               </div>
             </div>
-
-            <%!-- Sign out is a cloud concept: local mode has no session to end. --%>
-            <div class="mt-1 border-t pt-1" :if={@mode != :local}>
-              <a
-                href={~p"/auth/logout"}
-                class="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-[var(--ck-danger)]"
-              >
-                <.icon name="hero-arrow-right-on-rectangle" class="size-4 shrink-0" /> Sign out
-              </a>
-            </div>
           </div>
         </div>
       </div>
@@ -231,7 +224,8 @@ defmodule ControlKeelWeb.OrganizationLayouts do
           <%!-- Admin-only org sections: the per-user account surface lives in
                the user menu's account dialog, not in this sidebar. --%>
           <%= for tab <- @settings_tabs do %>
-            <% active = @settings_active_tab == tab or is_nil(@settings_active_tab) && tab == "general" %>
+            <% active =
+              @settings_active_tab == tab or (is_nil(@settings_active_tab) && tab == "general") %>
             <% icon = settings_tab_icon(tab) %>
             <button
               type="button"
@@ -249,53 +243,53 @@ defmodule ControlKeelWeb.OrganizationLayouts do
             </button>
           <% end %>
         <% else %>
-        <%= for item <- @nav_items do %>
-          <% active = sidebar_item_active?(@current_path, @current_query, item) %>
-          <% label_id = Phoenix.Naming.underscore(item.label) %>
-          <%= if item[:children] do %>
-            <% opened = active %>
-            <% collapse_id = "sidebar-collapse-#{label_id}" %>
-            <% chevron_id = "sidebar-chevron-#{label_id}" %>
-            <div class="flex flex-col gap-1">
-              <button
-                type="button"
-                id={"sidebar-toggle-#{label_id}"}
-                data-sidebar-toggle
-                aria-expanded={(opened && "true") || "false"}
-                aria-controls={collapse_id}
-                aria-label={"Toggle #{item.label} menu"}
-                class={["w-full text-left cursor-pointer", organization_nav_link_class(active)]}
-              >
-                <.icon name={item.icon} class={organization_nav_icon_class(active)} />
-                <span class="flex-1">{item.label}</span>
-                <span
-                  id={chevron_id}
-                  class={[
-                    "inline-flex shrink-0 transition-transform duration-200 text-muted-foreground",
-                    opened && "rotate-90"
-                  ]}
+          <%= for item <- @nav_items do %>
+            <% active = sidebar_item_active?(@current_path, @current_query, item) %>
+            <% label_id = Phoenix.Naming.underscore(item.label) %>
+            <%= if item[:children] do %>
+              <% opened = active %>
+              <% collapse_id = "sidebar-collapse-#{label_id}" %>
+              <% chevron_id = "sidebar-chevron-#{label_id}" %>
+              <div class="flex flex-col gap-1">
+                <button
+                  type="button"
+                  id={"sidebar-toggle-#{label_id}"}
+                  data-sidebar-toggle
+                  aria-expanded={(opened && "true") || "false"}
+                  aria-controls={collapse_id}
+                  aria-label={"Toggle #{item.label} menu"}
+                  class={["w-full text-left cursor-pointer", organization_nav_link_class(active)]}
                 >
-                  <.icon name="hero-chevron-right" class="size-4 shrink-0" />
-                </span>
-              </button>
-              <div id={collapse_id} class={unless opened, do: "hidden"}>
-                <.organization_sidebar_children
-                  children={item.children}
-                  current_path={@current_path}
-                  parent_href={item.href}
-                />
+                  <.icon name={item.icon} class={organization_nav_icon_class(active)} />
+                  <span class="flex-1">{item.label}</span>
+                  <span
+                    id={chevron_id}
+                    class={[
+                      "inline-flex shrink-0 transition-transform duration-200 text-muted-foreground",
+                      opened && "rotate-90"
+                    ]}
+                  >
+                    <.icon name="hero-chevron-right" class="size-4 shrink-0" />
+                  </span>
+                </button>
+                <div id={collapse_id} class={unless opened, do: "hidden"}>
+                  <.organization_sidebar_children
+                    children={item.children}
+                    current_path={@current_path}
+                    parent_href={item.href}
+                  />
+                </div>
               </div>
-            </div>
-          <% else %>
-            <.link
-              navigate={item.href}
-              aria-current={active && "page"}
-              class={organization_nav_link_class(active)}
-            >
-              <.icon name={item.icon} class={organization_nav_icon_class(active)} /> {item.label}
-            </.link>
+            <% else %>
+              <.link
+                navigate={item.href}
+                aria-current={active && "page"}
+                class={organization_nav_link_class(active)}
+              >
+                <.icon name={item.icon} class={organization_nav_icon_class(active)} /> {item.label}
+              </.link>
+            <% end %>
           <% end %>
-        <% end %>
         <% end %>
       </nav>
 
@@ -304,6 +298,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         id="sidebar-user-menu"
         current_user={@current_user}
         placeholder_label={if @mode == :local, do: "Local mode"}
+        sign_out={@mode != :local}
         class="border-t p-3"
         popover_class="bottom-20 right-4"
       />
@@ -1113,7 +1108,6 @@ defmodule ControlKeelWeb.OrganizationLayouts do
 
   defp organization_subnav_icon_class(false),
     do: "size-3.5 shrink-0 text-muted-foreground/70 group-hover:text-primary"
-
 
   @doc """
   Shows the flash group with standard titles and content.
