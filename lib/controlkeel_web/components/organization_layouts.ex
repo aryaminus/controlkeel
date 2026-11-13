@@ -714,6 +714,18 @@ defmodule ControlKeelWeb.OrganizationLayouts do
         href: ~p"/#{org.slug}",
         tab: nil,
         icon: "hero-squares-2x2"
+      },
+      %{
+        label: "Workspaces",
+        href: ~p"/#{org.slug}/workspaces",
+        tab: nil,
+        icon: "hero-square-3-stack-3d"
+      },
+      %{
+        label: "Sessions",
+        href: ~p"/#{org.slug}/sessions",
+        tab: nil,
+        icon: "hero-chat-bubble-left-right"
       }
     ]
   end

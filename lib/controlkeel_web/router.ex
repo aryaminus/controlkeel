@@ -453,6 +453,14 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/:org_slug", OrganizationDetailLive, :index
       live "/:org_slug/settings", OrganizationSettingsLive, :edit
+
+      # Org-level Workspaces index and Sessions index: the org page keeps the
+      # dashboard, while the workspace grid (creation + cards) and the org's
+      # cross-workspace session list live on their own routes. Both slugs are
+      # in Accounts.Org.@reserved_slugs, so no org can claim these paths.
+      live "/:org_slug/workspaces", WorkspaceIndexLive, :index
+      live "/:org_slug/sessions", OrgSessionsLive, :index
+
       live "/:org_slug/workspaces/:ws_slug", WorkspaceDetailLive, :index
       live "/:org_slug/workspaces/:ws_slug/settings", WorkspaceSettingsLive, :show
       live "/:org_slug/workspaces/:ws_slug/repos", WorkspaceReposLive, :index
