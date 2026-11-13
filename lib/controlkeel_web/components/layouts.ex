@@ -60,5 +60,4 @@ defmodule ControlKeelWeb.Layouts do
     </div>
     """
   end
-
 end
