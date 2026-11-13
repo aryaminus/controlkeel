@@ -293,7 +293,7 @@ defmodule ControlKeelWeb.UserMenu do
                         <.card_title class="text-[var(--ck-danger)]">Danger zone</.card_title>
                       </div>
                       <p class="text-sm text-foreground">
-                        <strong>Erasing your account is permanent.</strong> Your
+                        <strong>Deleting your account is permanent.</strong> Your
                         account and memberships are deleted immediately. Audit
                         records survive with your identity replaced by a
                         non-reversible marker, and your organizations'
@@ -302,7 +302,7 @@ defmodule ControlKeelWeb.UserMenu do
                       </p>
                       <p class="mt-2 text-sm text-muted-foreground">
                         If you are the last active owner of an organization,
-                        erasure is refused — promote another owner or delete the
+                        deletion is refused — promote another owner or delete the
                         organization first.
                       </p>
 
@@ -315,7 +315,7 @@ defmodule ControlKeelWeb.UserMenu do
                       >
                         <.input
                           field={@erase_form[:confirm_email]}
-                          label="Type your email to confirm erasure"
+                          label="Type your email to confirm deletion"
                           autocomplete="off"
                         />
                         <div class="mt-3">
@@ -324,7 +324,7 @@ defmodule ControlKeelWeb.UserMenu do
                             id={"#{@id}-erase-button"}
                             class="rounded-full bg-[var(--ck-danger)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-danger)]"
                           >
-                            Erase my account
+                            Delete my account
                           </button>
                         </div>
                       </.form>

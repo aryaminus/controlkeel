@@ -73,9 +73,9 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
 
       {:ok, view, html} = live(build_conn(), ~p"/#{org.slug}/workspaces/#{ws.slug}")
 
-      # No mode checks in the header menu except Sign out: local mode gets
-      # the same entries as cloud (its flyout lists the single implicit org),
-      # but Sign out is cloud-only.
+      # No mode checks in the header menu: local mode gets the same entries
+      # as cloud (its flyout lists the single implicit org). Sign out lives
+      # in the sidebar's user menu, gated on cloud mode there.
       assert html =~ org.name
       assert has_element?(view, "#org-switcher-button")
       assert html =~ "Settings"
@@ -217,7 +217,9 @@ defmodule ControlKeelWeb.WorkspaceDetailLiveTest do
       {:ok, _view, html} = live(conn, ~p"/scopeco/workspaces/#{ws.slug}")
 
       assert html =~ "Scoped"
-      assert html =~ "Scoped"
+      # Sign out moved from the org-switcher dropdown to the sidebar's
+      # user menu (cloud mode there).
+      assert html =~ "Sign out"
     end
 
     test "a member sees the org scope when the workspace slug is unknown" do
