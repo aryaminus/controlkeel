@@ -1355,7 +1355,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
           </div>
           <p class="text-sm text-foreground">
             <strong>Delete this organization permanently.</strong> Every workspace, session,
-            finding, proof, and enrolled cloud key under <strong>{@org.name}</strong> is erased,
+            finding, proof, and enrolled cloud key under <strong>{@org.name}</strong> is deleted,
             and active members are pushed off the organization's pages. Audit records of the
             deletion survive with identities replaced by non-reversible markers.
           </p>

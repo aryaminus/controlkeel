@@ -79,7 +79,7 @@ defmodule ControlKeelWeb.AccountControllerTest do
       |> post(~p"/me/erase", %{"erase" => %{"confirm_email" => email}})
 
     assert redirected_to(conn) == "/auth/login"
-    assert %{"info" => "Your account has been erased."} = conn.assigns.flash
+    assert %{"info" => "Your account has been deleted."} = conn.assigns.flash
     assert get_session(conn, "current_user_id") == nil
     assert Repo.get(Accounts.User, user.id) == nil
   end
@@ -92,7 +92,7 @@ defmodule ControlKeelWeb.AccountControllerTest do
       |> post(~p"/me/erase", %{"erase" => %{"confirm_email" => "wrong@example.com"}})
 
     assert redirected_to(conn) == "/"
-    assert %{"error" => "Type your email exactly to confirm erasure."} = conn.assigns.flash
+    assert %{"error" => "Type your email exactly to confirm deletion."} = conn.assigns.flash
     assert Repo.get(Accounts.User, user.id)
   end
 
