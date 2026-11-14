@@ -29,6 +29,14 @@ end
 # CLI commands also need quiet mode to avoid debug SQL and build friction.
 if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) or
      System.get_env("CK_CLI_MODE") in ~w(1 true TRUE yes YES) do
+  if config_env() == :test and System.get_env("CK_DB_ADAPTER") != "postgres" and
+       System.get_env("CK_TEST_DB") not in [nil, ""] do
+    config :controlkeel, ControlKeel.Repo.Local,
+      database: System.fetch_env!("CK_TEST_DB"),
+      pool: DBConnection.ConnectionPool,
+      pool_size: 2
+  end
+
   config :controlkeel, ControlKeelWeb.Endpoint,
     watchers: [],
     server: false,
