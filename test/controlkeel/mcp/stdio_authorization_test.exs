@@ -2,11 +2,14 @@ defmodule ControlKeel.Mcp.StdioAuthorizationTest do
   use ControlKeel.DataCase, async: false
 
   import ControlKeel.MissionFixtures
+  import ControlKeel.PlatformFixtures
 
   alias ControlKeel.Accounts
   alias ControlKeel.Cloud.Mcp.ToolCall
   alias ControlKeel.MCP.Server
+  alias ControlKeel.MCP.Protocol
   alias ControlKeel.Mcp.StdioAuthorization
+  alias ControlKeel.Mcp.ProtocolInterop
   alias ControlKeel.Project.Binding
 
   setup do
@@ -19,6 +22,59 @@ defmodule ControlKeel.Mcp.StdioAuthorizationTest do
     end)
 
     :ok
+  end
+
+  test "tool dispatch denies missing or invalid authorization callbacks" do
+    request = %{
+      "jsonrpc" => "2.0",
+      "id" => 1,
+      "method" => "tools/call",
+      "params" => %{"name" => "ck_validate", "arguments" => %{"content" => "hello"}}
+    }
+
+    for opts <- [[], [authorize: :invalid]] do
+      assert %{"error" => %{"code" => -32001}} = Protocol.handle_request(request, opts)
+    end
+  end
+
+  test "hosted and stdio both enforce workspace policy and argument guardrails" do
+    workspace = workspace_fixture()
+    session = session_fixture(workspace: workspace)
+    root = bound_root(workspace, session)
+    %{service_account: account} = service_account_fixture(%{workspace_id: workspace.id})
+
+    auth = %{
+      service_account: account,
+      scopes: ["mcp:access", "validate:run"],
+      resource_access_id: "mcp"
+    }
+
+    previous_policy = Application.get_env(:controlkeel, :cloud_mcp_policy)
+    Application.delete_env(:controlkeel, :cloud_mcp_policy)
+    on_exit(fn -> restore_env(:cloud_mcp_policy, previous_policy) end)
+
+    {:ok, _} = Accounts.set_workspace_tool_policy(workspace.id, "denylist", ["ck_validate"])
+
+    assert {:error, {:forbidden, _}} =
+             StdioAuthorization.authorize_tool_call(root, "ck_validate", %{})
+
+    assert {:error, {:policy, :tool_in_workspace_denylist}} =
+             ProtocolInterop.authorize_hosted_tool_call(auth, "ck_validate", %{}, "mcp")
+
+    {:ok, _} = Accounts.set_workspace_tool_policy(workspace.id, "inherit", [])
+
+    Application.put_env(:controlkeel, :cloud_mcp_guardrails, %{
+      enabled: true,
+      patterns: [:openai_api_key]
+    })
+
+    args = %{"content" => "sk-abcdefghijklmnopqrstuvwxyz"}
+
+    assert {:error, {:forbidden, _}} =
+             StdioAuthorization.authorize_tool_call(root, "ck_validate", args)
+
+    assert {:error, {:guardrail, :openai_api_key}} =
+             ProtocolInterop.authorize_hosted_tool_call(auth, "ck_validate", args, "mcp")
   end
 
   describe "workspace tool policy" do
@@ -119,6 +175,27 @@ defmodule ControlKeel.Mcp.StdioAuthorizationTest do
   end
 
   describe "audit trail" do
+    test "denies dispatch when the required audit record cannot be stored" do
+      root = tmp_root()
+
+      {:ok, _} =
+        Binding.write(
+          %{
+            "workspace_id" => 999_999_999,
+            "session_id" => 999_999_999,
+            "agent" => "codex",
+            "attached_agents" => %{}
+          },
+          root
+        )
+
+      assert {:error, {:forbidden, message}} =
+               StdioAuthorization.authorize_tool_call(root, "ck_context", %{})
+
+      assert message =~ "required audit record"
+      assert Repo.all(ToolCall) == []
+    end
+
     test "records an allowed stdio call with its workspace" do
       workspace = workspace_fixture()
       session = session_fixture(workspace: workspace)
@@ -178,6 +255,36 @@ defmodule ControlKeel.Mcp.StdioAuthorizationTest do
   end
 
   describe "local single-user mode" do
+    test "an unbound project inherits the configured global denylist" do
+      previous = Application.get_env(:controlkeel, :cloud_mcp_policy)
+      Application.put_env(:controlkeel, :cloud_mcp_policy, %{deny: ["ck_git_commit"]})
+      on_exit(fn -> restore_env(:cloud_mcp_policy, previous) end)
+
+      assert {:error, {:forbidden, message}} =
+               StdioAuthorization.authorize_tool_call(tmp_root(), "ck_git_commit", %{})
+
+      assert message =~ "policy"
+      assert [%{outcome: "denied", denial_reason: "policy:tool_denied"}] = Repo.all(ToolCall)
+    end
+
+    test "global rate limits use the unbound audit bucket" do
+      previous = Application.get_env(:controlkeel, :cloud_mcp_policy)
+
+      Application.put_env(:controlkeel, :cloud_mcp_policy, %{
+        rate_limits: [%{tool: "ck_context", per_minute: 1}]
+      })
+
+      on_exit(fn -> restore_env(:cloud_mcp_policy, previous) end)
+      root = tmp_root()
+
+      assert :ok = StdioAuthorization.authorize_tool_call(root, "ck_context", %{})
+
+      assert {:error, {:forbidden, _}} =
+               StdioAuthorization.authorize_tool_call(root, "ck_context", %{})
+
+      assert Enum.sort(Enum.map(Repo.all(ToolCall), & &1.outcome)) == ["allowed", "denied"]
+    end
+
     test "allows a tool call when no workspace is bound to the project root" do
       root = tmp_root()
 

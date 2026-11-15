@@ -2198,9 +2198,8 @@ defmodule ControlKeel.MCP.Protocol do
 
   defp authorize_tool(name, arguments, opts) do
     case Keyword.get(opts, :authorize) do
-      nil -> :ok
       fun when is_function(fun, 2) -> fun.(name, arguments)
-      _ -> :ok
+      _ -> {:error, {:forbidden, "MCP tool authorization is unavailable."}}
     end
   end
 

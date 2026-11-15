@@ -4,7 +4,7 @@ defmodule ControlKeel.MCP.OutputSchemasTest do
   import ControlKeel.MissionFixtures
 
   alias ControlKeel.MCP.OutputSchemas
-  alias ControlKeel.MCP.Protocol
+  alias ControlKeel.TestSupport.AuthorizedProtocol, as: Protocol
   alias ControlKeel.MCP.ToolGroups
 
   describe "schema_for/1" do
