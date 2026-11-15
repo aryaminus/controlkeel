@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.4.22 — 2026-11-15
+
+### What's changed
+
+- fix: preserve MCP stdin in POSIX shells
+- chore: update cowboy and cowlib
+- fix: isolate CLI and MCP test databases
+- style: format HEEx templates
+- fix: harden local runtime bootstrap
+- chore: update compatible dependencies
+- chore: update cowlib
+- test: isolate bin wrapper SQLite snapshots
+- style: format LiveView source
+- Merge pull request #325 from aryaminus/palette/device-auth-components-5969288852976217450
+- 🎨 Palette: Replace raw HTML buttons with CoreComponents in Device Auth
+- style: add missing trailing newlines
+- Merge pull request #319 from aryaminus/feat/benchmark-runs-workspace-scope
+- Merge pull request #280 from aryaminus/palette/benchmarks-subjects-dropdown-aria-label-16423497967685959090
+- Merge pull request #278 from aryaminus/palette/dismiss-buttons-focus-2926315416923486012
+- Add aria-label to benchmark subjects dropdown
+- 🎨 Palette: Add focus visible styles to dismiss buttons
+- Merge pull request #301 from aryaminus/fix-org-nav-focus-17723309449576617365
+- Merge pull request #293 from aryaminus/bolt-optimize-governance-counts-3002162380032131457
+- Merge pull request #282 from aryaminus/bolt-optimize-counts-16603506271054139276
+- Merge pull request #279 from aryaminus/bolt/optimize-line-counting-2698932305475645751
+- Merge pull request #264 from aryaminus/palette-add-focus-styles-10588573026364693017
+- feat/benchmark-runs-workspace-scope: scope benchmark runs to workspace and retire global routes
+- a11y(web): focus-visible ring on workspace slug copy button
+- 🎨 Palette: Add complete focus visible ring styles to interactive components
+
 ## v0.4.21 — 2026-09-25
 
 ### What's changed
