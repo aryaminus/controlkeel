@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.27 — 2026-11-15
+
+### What's changed
+
+- ⚡ Bolt: Use Enum.group_by/3 in Catalog.families/0 to avoid intermediate list allocations (#334)
+- Add keyboard focus styles to deployment tab links (#327)
+
 ## v0.4.26 — 2026-11-15
 
 ### What's changed
