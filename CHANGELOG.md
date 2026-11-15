@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.24 — 2026-11-15
+
+### What's changed
+
+- fix: require governed and audited MCP dispatch
+
 ## v0.4.23 — 2026-11-15
 
 ### What's changed
