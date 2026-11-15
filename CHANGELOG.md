@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.25 — 2026-11-15
+
+### What's changed
+
+- fix: report Codex validation and attachment status accurately
+
 ## v0.4.24 — 2026-11-15
 
 ### What's changed
