@@ -28,6 +28,9 @@ defmodule ControlKeelWeb.ApiController do
   alias ControlKeel.Skills.Registry
   alias ControlKeel.Skills.SkillTarget
 
+  @local_actions ~w(list_providers provider_status set_default_provider bootstrap_project review_diff review_pr install_github_governance list_skills get_skill list_skill_targets list_agents export_skills install_skills prune_skill_duplicates token_audit download_skill_bundle run_task run_session)a
+  @numeric_path_params ~w(id session_id task_id policy_set_id)
+
   def action(conn, _opts) do
     agent_json? = agent_json_requested?(conn)
 
@@ -38,7 +41,19 @@ defmodule ControlKeelWeb.ApiController do
         conn
       end
 
-    apply(__MODULE__, action_name(conn), [conn, conn.params])
+    cond do
+      ControlKeel.Runtime.Mode.current() != :local and action_name(conn) in @local_actions ->
+        conn |> put_status(:forbidden) |> json(%{error: "local mode required"})
+
+      Enum.any?(@numeric_path_params, fn key ->
+        Map.has_key?(conn.path_params, key) and
+            match?({:error, :invalid_integer}, parse_path_id(conn.path_params[key]))
+      end) ->
+        conn |> put_status(:not_found) |> json(%{error: "not found"})
+
+      true ->
+        apply(__MODULE__, action_name(conn), [conn, conn.params])
+    end
   end
 
   # ─── Sessions ────────────────────────────────────────────────────────────────
@@ -229,14 +244,31 @@ defmodule ControlKeelWeb.ApiController do
   def context(conn, params) do
     context_params = Map.take(params, ~w(session_id task_id))
 
-    case CkContext.call(context_params) do
-      {:ok, payload} ->
-        json(conn, %{context: payload})
+    with :ok <- authorize_context(conn, context_params),
+         {:ok, payload} <- CkContext.call(context_params) do
+      json(conn, %{context: payload})
+    else
+      {:error, :forbidden} ->
+        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+
+      {:error, :not_found} ->
+        conn |> put_status(:not_found) |> json(%{error: "session not found"})
 
       {:error, {:invalid_arguments, message}} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: message})
     end
   end
+
+  defp authorize_context(conn, %{"session_id" => session_id}) do
+    authorize_session_access(conn, session_id, "sessions:read")
+  end
+
+  defp authorize_context(%{assigns: %{api_auth: %{type: type}}}, _params)
+       when type in [:local, :bootstrap] do
+    if ControlKeel.Runtime.Mode.current() == :local, do: :ok, else: {:error, :forbidden}
+  end
+
+  defp authorize_context(_conn, _params), do: {:error, :forbidden}
 
   def improvement_summary(conn, params) do
     limit =
@@ -832,59 +864,74 @@ defmodule ControlKeelWeb.ApiController do
   # ─── Complete Task ─────────────────────────────────────────────────────────────
 
   def complete_task(conn, %{"id" => task_id}) do
-    case Mission.complete_task(String.to_integer(task_id)) do
-      {:ok, task} ->
-        json(conn, %{task: task_summary(task)})
+    with :ok <- authorize_task_access(conn, task_id, "tasks:execute") do
+      case Mission.complete_task(String.to_integer(task_id)) do
+        {:ok, task} ->
+          json(conn, %{task: task_summary(task)})
 
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "task not found"})
 
-      {:error, :unresolved_findings, findings} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{
-          error: "task has unresolved findings",
-          message:
-            "#{length(findings)} finding(s) must be approved or resolved before marking this task done.",
-          findings: Enum.map(findings, &finding_summary/1)
-        })
+        {:error, :unresolved_findings, findings} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{
+            error: "task has unresolved findings",
+            message:
+              "#{length(findings)} finding(s) must be approved or resolved before marking this task done.",
+            findings: Enum.map(findings, &finding_summary/1)
+          })
 
-      {:error, :proof_not_ready, reason} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "proof_not_ready", message: reason})
+        {:error, :proof_not_ready, reason} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "proof_not_ready", message: reason})
 
-      {:error, :budget_exhausted} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: "budget_exhausted"})
+        {:error, :budget_exhausted} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: "budget_exhausted"})
 
-      {:error, reason} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "task not found"})
     end
   end
 
   def pause_task(conn, %{"id" => task_id}) do
-    case Mission.pause_task(String.to_integer(task_id), "api") do
-      {:ok, %{task: task, resume_packet: packet}} ->
-        json(conn, %{task: task_summary(task), resume_packet: packet})
+    with :ok <- authorize_task_access(conn, task_id, "tasks:execute") do
+      case Mission.pause_task(String.to_integer(task_id), "api") do
+        {:ok, %{task: task, resume_packet: packet}} ->
+          json(conn, %{task: task_summary(task), resume_packet: packet})
 
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "task not found"})
 
-      {:error, reason} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "task not found"})
     end
   end
 
   def resume_task(conn, %{"id" => task_id}) do
-    case Mission.resume_task(String.to_integer(task_id), "api") do
-      {:ok, %{task: task, resume_packet: packet}} ->
-        json(conn, %{task: task_summary(task), resume_packet: packet})
+    with :ok <- authorize_task_access(conn, task_id, "tasks:execute") do
+      case Mission.resume_task(String.to_integer(task_id), "api") do
+        {:ok, %{task: task, resume_packet: packet}} ->
+          json(conn, %{task: task_summary(task), resume_packet: packet})
 
-      {:error, :not_found} ->
-        conn |> put_status(:not_found) |> json(%{error: "task not found"})
+        {:error, :not_found} ->
+          conn |> put_status(:not_found) |> json(%{error: "task not found"})
 
-      {:error, reason} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+        {:error, reason} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
+      end
+    else
+      {:error, :forbidden} -> conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
+      {:error, :not_found} -> conn |> put_status(:not_found) |> json(%{error: "task not found"})
     end
   end
 
@@ -2321,6 +2368,9 @@ defmodule ControlKeelWeb.ApiController do
 
       session_id = Arguments.parse_integer(attrs["session_id"] || attrs[:session_id]) ->
         authorize_session_access(conn, session_id, "reviews:write")
+
+      match?(%{type: :service_account}, conn.assigns[:api_auth]) ->
+        {:error, :forbidden}
 
       true ->
         :ok

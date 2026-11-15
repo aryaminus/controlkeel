@@ -45,6 +45,18 @@ defmodule ControlKeel.Cloud.Mcp.AuditLog do
       :ok
   end
 
+  @doc "Record a decision whose persistence is required before dispatch."
+  def record_required(outcome, attrs) when outcome in [:allowed, :denied] and is_map(attrs) do
+    case do_record(outcome, attrs) do
+      {:ok, _row} -> :ok
+      {:error, _reason} -> {:error, :audit_unavailable}
+    end
+  rescue
+    _ -> {:error, :audit_unavailable}
+  catch
+    _, _ -> {:error, :audit_unavailable}
+  end
+
   defp do_record(outcome, attrs) do
     %ToolCall{}
     |> ToolCall.changeset(%{

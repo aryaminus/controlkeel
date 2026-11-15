@@ -42,11 +42,9 @@ defmodule ControlKeel.Mcp.StdioAuthorization do
 
   ## Fail-open and fail-closed
 
-    * **No binding** (`{:error, :not_found}`) → local single-user mode. There is
-      no workspace, so there is no workspace tool policy to enforce;
-      `Accounts.check_workspace_tool_policy(nil, _)` is `:ok` by definition.
-      Calls are allowed and still audited with a `NULL` workspace, so a project
-      that was never bootstrapped keeps working and stays observable.
+    * **No binding** (`{:error, :not_found}`) → local single-user mode. Global
+      policy and guardrails still apply, and decisions are audited without a
+      workspace attribution.
     * **Unreadable or tampered binding** (any other read error) → denied. A
       corrupt binding is not proof that the project is unbound, so it must not
       silently downgrade a governed project into local mode.
@@ -61,6 +59,7 @@ defmodule ControlKeel.Mcp.StdioAuthorization do
   alias ControlKeel.Accounts
   alias ControlKeel.Cloud.Guardrails
   alias ControlKeel.Cloud.Mcp.AuditLog
+  alias ControlKeel.Cloud.Mcp.Policy
   alias ControlKeel.Project.Binding
 
   @resource "mcp-stdio"
@@ -101,8 +100,13 @@ defmodule ControlKeel.Mcp.StdioAuthorization do
   defp gate_and_audit(workspace_id, tool_name, arguments) do
     case gate(workspace_id, tool_name, arguments) do
       :ok ->
-        audit_record(:allowed, workspace_id, tool_name, arguments, nil)
-        :ok
+        case audit_record(:allowed, workspace_id, tool_name, arguments, nil) do
+          :ok ->
+            :ok
+
+          {:error, _} ->
+            {:error, {:forbidden, "ControlKeel could not store the required audit record."}}
+        end
 
       {:denied, token, message} ->
         audit_record(:denied, workspace_id, tool_name, arguments, token)
@@ -119,13 +123,24 @@ defmodule ControlKeel.Mcp.StdioAuthorization do
   end
 
   defp gate(workspace_id, tool_name, arguments) do
-    with :ok <- tool_policy_verdict(workspace_id, tool_name),
+    with :ok <- global_policy_verdict(workspace_id, tool_name),
+         :ok <- tool_policy_verdict(workspace_id, tool_name),
          :ok <- guardrails_verdict(tool_name, arguments),
          do: :ok
   rescue
     error -> unavailable(tool_name, Exception.message(error))
   catch
     kind, _value -> unavailable(tool_name, inspect(kind))
+  end
+
+  defp global_policy_verdict(workspace_id, tool_name) do
+    case Policy.check(%{workspace_id: workspace_id}, tool_name, @resource) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        deny("policy:" <> policy_token(reason), policy_message(tool_name, reason))
+    end
   end
 
   defp tool_policy_verdict(workspace_id, tool_name) do
@@ -178,7 +193,7 @@ defmodule ControlKeel.Mcp.StdioAuthorization do
   defp binding_token(reason), do: reason |> inspect() |> String.slice(0, 80)
 
   defp audit_record(outcome, workspace_id, tool_name, arguments, denial_reason) do
-    AuditLog.record(outcome, %{
+    AuditLog.record_required(outcome, %{
       workspace_id: workspace_id,
       tool_name: tool_name,
       resource: @resource,

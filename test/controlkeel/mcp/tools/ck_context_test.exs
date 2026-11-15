@@ -359,6 +359,7 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
 
       advisory = result["attach_advisory"]
       assert advisory["status"] in ["mcp_only", "unbound"]
+      refute advisory["guidance"] =~ "no host-specific hooks or skills installed"
       assert advisory["guidance"] =~ "ck_attach" or advisory["guidance"] =~ "controlkeel attach"
     end
   end

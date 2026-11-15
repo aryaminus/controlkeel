@@ -51,6 +51,13 @@ defmodule ControlKeel.MCP.ServerTest do
 
   @tag :capture_log
   test "MCP launcher emits only one JSONL response on real stdout" do
+    tmp_db =
+      Path.join(System.tmp_dir!(), "controlkeel-mcp-#{System.unique_integer([:positive])}.db")
+
+    on_exit(fn ->
+      Enum.each([tmp_db, tmp_db <> "-wal", tmp_db <> "-shm"], &File.rm/1)
+    end)
+
     request =
       Jason.encode!(%{
         "jsonrpc" => "2.0",
@@ -60,7 +67,7 @@ defmodule ControlKeel.MCP.ServerTest do
       })
 
     shell =
-      ~S(printf '%s\n' "$MCP_REQUEST" | "$MCP_LAUNCHER" --project-root "$CK_PROJECT_ROOT")
+      ~S(printf '%s\n' "$MCP_REQUEST" | "$MCP_SHELL" "$MCP_LAUNCHER" --project-root "$CK_PROJECT_ROOT")
 
     assert {stdout, 0} =
              System.cmd("/bin/sh", ["-c", shell],
@@ -68,8 +75,10 @@ defmodule ControlKeel.MCP.ServerTest do
                env: [
                  {"MCP_REQUEST", request},
                  {"MCP_LAUNCHER", @launcher},
+                 {"MCP_SHELL", System.find_executable("dash") || "/bin/sh"},
                  {"CK_PROJECT_ROOT", File.cwd!()},
-                 {"MIX_ENV", "test"}
+                 {"MIX_ENV", "test"},
+                 {"CK_TEST_DB", tmp_db}
                ]
              )
 

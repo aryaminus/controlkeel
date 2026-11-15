@@ -88,6 +88,7 @@ defmodule ControlKeelWeb.OrgSuspensionTest do
     end
 
     test "authorize_workspace_for_conn allows an explicit local caller" do
+      Application.put_env(:controlkeel, :runtime_mode, :local)
       conn = build_conn() |> Plug.Conn.assign(:api_auth, %{type: :local})
 
       assert ControlKeelWeb.APIHelpers.authorize_workspace_for_conn(conn, 1, "read") == :ok

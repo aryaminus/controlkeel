@@ -2,7 +2,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
   use ControlKeel.DataCase
 
   alias ControlKeel.Accounts
-  alias ControlKeel.MCP.Protocol
+  alias ControlKeel.TestSupport.AuthorizedProtocol, as: Protocol
   alias ControlKeel.Memory
   alias ControlKeel.Mission
   alias ControlKeel.Mission.Invocation
