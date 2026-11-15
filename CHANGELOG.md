@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.26 — 2026-11-15
+
+### What's changed
+
+- fix: exclude migration filenames from entropy findings
+
 ## v0.4.25 — 2026-11-15
 
 ### What's changed
