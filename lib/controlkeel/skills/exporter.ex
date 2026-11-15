@@ -2356,7 +2356,8 @@ defmodule ControlKeel.Skills.Exporter do
       exit 0
     fi
 
-    result=$(ck_run validate --content "$command_text" --kind shell --json 2>/dev/null || true)
+    result=$(ck_run validate --content "$command_text" --kind shell --json 2>/dev/null)
+    validation_status=$?
     if [ -n "$result" ]; then
       if printf '%s' "$result" | grep -q '"decision":"block"'; then
         printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"ControlKeel blocked this Bash command. Review ck_validate findings before retrying."}}'
@@ -2369,6 +2370,9 @@ defmodule ControlKeel.Skills.Exporter do
       fi
     fi
 
+    if [ "$validation_status" -ne 0 ] || ! printf '%s' "$result" | grep -q '"decision":"allow"'; then
+      printf '%s\\n' '{"systemMessage":"ControlKeel could not complete shell validation. This command has not been validated; check ControlKeel availability before continuing."}'
+    fi
     exit 0
     """
   end

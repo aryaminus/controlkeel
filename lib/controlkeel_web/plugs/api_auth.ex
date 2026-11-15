@@ -2,22 +2,20 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
   @moduledoc false
 
   alias ControlKeel.Platform
+  alias ControlKeel.Runtime.Mode
 
   import Plug.Conn
 
   @doc """
-  Checks for a Bearer token when `CONTROLKEEL_API_TOKEN` is set.
-  When the env var is not set (local dev default), unauthenticated requests
-  are only accepted from loopback peers; anything else gets a 403. Bound
-  tokens are validated as bootstrap or service-account credentials.
-  Returns 401 JSON on token mismatch.
+  Authenticates service accounts in every mode. Bootstrap tokens and
+  unauthenticated loopback access are available only in local mode.
   """
   def init(opts), do: opts
 
   def call(conn, _opts) do
     case bearer_token(conn) do
       nil ->
-        if configured_token() do
+        if Mode.current() != :local or configured_token() do
           unauthorized(conn)
         else
           # No token configured (local default). The API is still reachable,
@@ -35,7 +33,8 @@ defmodule ControlKeelWeb.Plugs.ApiAuth do
 
       provided ->
         cond do
-          configured_token() && token_matches?(provided, configured_token()) ->
+          Mode.current() == :local && configured_token() &&
+              token_matches?(provided, configured_token()) ->
             assign(conn, :api_auth, %{type: :bootstrap})
 
           true ->

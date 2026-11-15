@@ -305,7 +305,8 @@ defmodule ControlKeel.MCP.Tools.CkContext do
         %{
           "status" => "attached",
           "hosts" => Map.keys(attached),
-          "guidance" => "Hooks, skills, and host-native commands are installed."
+          "guidance" =>
+            "Host attachment is recorded as installed. Runtime hook execution has not been verified by this advisory."
         }
 
       auto_bootstrapped ->
@@ -313,8 +314,8 @@ defmodule ControlKeel.MCP.Tools.CkContext do
           "status" => "mcp_only",
           "hosts" => [],
           "guidance" =>
-            "This project has MCP tools wired but no host-specific hooks or skills " <>
-              "installed. To enable SessionStart auto-context, PreToolUse auto-validate, " <>
+            "This project has MCP tools wired but no host attachment recorded in its binding. " <>
+              "Host files may already exist; inspect them before refreshing attachment. To configure SessionStart auto-context, PreToolUse auto-validate, " <>
               "completion-review slash command, and AGENTS.md governance preamble, call " <>
               "the `ck_attach` tool with the host you're running in " <>
               "(e.g. {\"host\":\"claude-code\"}), or run `controlkeel attach <host>` " <>

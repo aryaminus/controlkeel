@@ -9,8 +9,21 @@ defmodule ControlKeelWeb.Plugs.ApiAuthTest do
   @token "api-auth-constant-time-token"
 
   setup do
+    previous_mode = System.get_env("CONTROLKEEL_RUNTIME_MODE")
+    previous_token = Application.get_env(:controlkeel, :api_token)
+    System.put_env("CONTROLKEEL_RUNTIME_MODE", "local")
     Application.put_env(:controlkeel, :api_token, @token)
-    on_exit(fn -> Application.delete_env(:controlkeel, :api_token) end)
+
+    on_exit(fn ->
+      if previous_mode,
+        do: System.put_env("CONTROLKEEL_RUNTIME_MODE", previous_mode),
+        else: System.delete_env("CONTROLKEEL_RUNTIME_MODE")
+
+      if previous_token,
+        do: Application.put_env(:controlkeel, :api_token, previous_token),
+        else: Application.delete_env(:controlkeel, :api_token)
+    end)
+
     :ok
   end
 
@@ -73,5 +86,44 @@ defmodule ControlKeelWeb.Plugs.ApiAuthTest do
       assert conn.halted
       assert conn.status == 401
     end
+  end
+
+  for mode <- ["cloud", "self_hosted"] do
+    test "#{mode} rejects missing credentials even from loopback" do
+      System.put_env("CONTROLKEEL_RUNTIME_MODE", unquote(mode))
+      Application.delete_env(:controlkeel, :api_token)
+
+      conn = :get |> conn("/api/v1/sessions") |> ApiAuth.call([])
+
+      assert conn.halted
+      assert conn.status == 401
+    end
+
+    test "#{mode} rejects the configured bootstrap token" do
+      System.put_env("CONTROLKEEL_RUNTIME_MODE", unquote(mode))
+
+      conn = conn_with_bearer(@token) |> ApiAuth.call([])
+
+      assert conn.halted
+      assert conn.status == 401
+    end
+
+    test "#{mode} rejects missing credentials when a bootstrap token is configured" do
+      System.put_env("CONTROLKEEL_RUNTIME_MODE", unquote(mode))
+
+      conn = :get |> conn("/api/v1/sessions") |> ApiAuth.call([])
+
+      assert conn.halted
+      assert conn.status == 401
+    end
+  end
+
+  test "local mode permits an unauthenticated loopback caller when no token is configured" do
+    Application.delete_env(:controlkeel, :api_token)
+
+    conn = :get |> conn("/api/v1/sessions") |> ApiAuth.call([])
+
+    refute conn.halted
+    assert conn.assigns.api_auth == %{type: :local}
   end
 end

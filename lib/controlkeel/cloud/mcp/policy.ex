@@ -114,9 +114,17 @@ defmodule ControlKeel.Cloud.Mcp.Policy do
   end
 
   defp workspace_id_from(%{service_account: %ServiceAccount{workspace_id: id}}), do: id
+  defp workspace_id_from(%{workspace_id: id}) when is_integer(id), do: id
   defp workspace_id_from(_), do: nil
 
-  defp count_recent_allowed(nil, _tool_name, _cutoff), do: 0
+  defp count_recent_allowed(nil, tool_name, cutoff) do
+    ToolCall
+    |> where([c], is_nil(c.workspace_id))
+    |> where([c], c.tool_name == ^tool_name and c.outcome == "allowed")
+    |> where([c], c.requested_at >= ^cutoff)
+    |> select([c], count(c.id))
+    |> Repo.one() || 0
+  end
 
   defp count_recent_allowed(workspace_id, tool_name, cutoff) do
     ToolCall

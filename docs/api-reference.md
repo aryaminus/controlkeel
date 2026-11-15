@@ -34,6 +34,14 @@ Cloud-auth gated dashboard routes:
 
 The JSON API backs local and hosted automation. The main resource groups are:
 
+Cloud and self-hosted requests require a workspace-bound service-account token.
+The bootstrap API token and unauthenticated loopback access are local-only;
+the former hosted break-glass settings do not grant API access. The context
+endpoint requires service accounts to supply a session in their workspace.
+Provider and skill management, repository reviews, project bootstrap, and
+task/session runner endpoints operate on server files and are available only in
+local mode.
+
 - Sessions and tasks: `/sessions`, `/sessions/:id`, `/sessions/:id/run`, `/sessions/:session_id/tasks`, `/tasks/:id/*`
 - Reviews: `/reviews`, `/reviews/:id`, `/reviews/:id/respond`, `/review/diff`, `/review/pr`
 - Governance: `/validate`, `/findings`, `/findings/:id/action`, `/release/readiness`, `/governance/install/github`

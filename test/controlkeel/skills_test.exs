@@ -994,6 +994,39 @@ defmodule ControlKeel.SkillsTest do
     assert failure_output =~ "test-oriented shell step"
   end
 
+  test "codex validation hook reports validator failure", %{tmp_dir: tmp_dir} do
+    assert {:ok, _} = Skills.install("codex", tmp_dir, scope: "project")
+    stub = Path.join(tmp_dir, "validator")
+    File.write!(stub, "#!/bin/sh\nexit 1\n")
+    File.chmod!(stub, 0o755)
+    hook = Path.join(tmp_dir, ".codex/hooks/ck-validate-shell.sh")
+
+    {output, 0} =
+      System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
+        env: [
+          {"CK_TEST_INPUT", Jason.encode!(%{"tool_input" => %{"command" => "echo hello"}})},
+          {"CK_HOOK_PATH", hook},
+          {"CONTROLKEEL_BIN", stub},
+          {"CK_PROJECT_ROOT", tmp_dir}
+        ]
+      )
+
+    assert Jason.decode!(output)["systemMessage"] =~ "has not been validated"
+    File.write!(stub, "#!/bin/sh\nprintf '%s' '{\"decision\":\"block\"}'\nexit 1\n")
+
+    {denial, 0} =
+      System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
+        env: [
+          {"CK_TEST_INPUT", Jason.encode!(%{"tool_input" => %{"command" => "echo hello"}})},
+          {"CK_HOOK_PATH", hook},
+          {"CONTROLKEEL_BIN", stub},
+          {"CK_PROJECT_ROOT", tmp_dir}
+        ]
+      )
+
+    assert get_in(Jason.decode!(denial), ["hookSpecificOutput", "permissionDecision"]) == "deny"
+  end
+
   test "codex stop hook warns instead of blocking when blocked findings exist", %{
     tmp_dir: tmp_dir
   } do

@@ -5256,15 +5256,23 @@ defmodule ControlKeel.Mission do
     do: {:error, {:invalid_arguments, "`session_id` is required"}}
 
   defp infer_review_target(task_id, session_id, runtime_context) do
+    explicit_target? = is_integer(task_id) or is_integer(session_id)
+
     with {:ok, inferred_task_id} <-
-           optional_integer(task_id || runtime_context["task_id"], "task_id"),
+           optional_integer(
+             if(explicit_target?, do: task_id, else: runtime_context["task_id"]),
+             "task_id"
+           ),
          {:ok, inferred_session_id} <-
-           optional_integer(session_id || runtime_context["session_id"], "session_id") do
+           optional_integer(
+             if(explicit_target?, do: session_id, else: runtime_context["session_id"]),
+             "session_id"
+           ) do
       cond do
         is_integer(inferred_task_id) ->
           case get_task(inferred_task_id) do
             nil -> {:error, :not_found}
-            task -> {:ok, %{task_id: task.id, session_id: task.session_id}}
+            task -> {:ok, %{task_id: task.id, session_id: inferred_session_id || task.session_id}}
           end
 
         is_integer(inferred_session_id) ->

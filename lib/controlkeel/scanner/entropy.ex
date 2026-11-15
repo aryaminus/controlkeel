@@ -51,7 +51,16 @@ defmodule ControlKeel.Scanner.Entropy do
 
   defp benign_code_or_path_token?(content, candidate) do
     identifier_with_optional_arity?(candidate) or
+      migration_path?(content, candidate) or
       url_path_fragment?(content, candidate)
+  end
+
+  defp migration_path?(content, candidate) do
+    Regex.match?(
+      ~r/^(?:[A-Za-z0-9_-]+\/)*priv\/repo\/migrations\/[0-9]{14}_[a-z0-9_]+$/,
+      candidate
+    ) and
+      String.contains?(content, candidate <> ".exs")
   end
 
   defp identifier_with_optional_arity?(candidate) do
