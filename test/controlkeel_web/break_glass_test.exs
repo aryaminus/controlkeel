@@ -1,13 +1,6 @@
 defmodule ControlKeelWeb.BreakGlassTest do
   @moduledoc """
-  The `/api/v1` bootstrap token is a break-glass credential, not a platform
-  superuser.
-
-  Previously `%{type: :bootstrap} -> :ok` authorized every workspace
-  unconditionally, so one leaked `CONTROLKEEL_API_TOKEN` was a silent, total
-  cross-tenant compromise. Break-glass best practice (OWASP, CyberArk,
-  Microsoft Zero Trust) is: no standing privilege, least privilege for the task,
-  explicit activation, and auditing of every use.
+  Bootstrap and local credentials authorize only in local runtime mode.
   """
   use ControlKeelWeb.ConnCase, async: false
 
@@ -54,18 +47,20 @@ defmodule ControlKeelWeb.BreakGlassTest do
                {:error, :forbidden}
     end
 
-    test "bootstrap is allowed for its single scoped workspace when enabled" do
+    test "bootstrap remains denied for its scoped workspace when enabled" do
       Application.put_env(:controlkeel, :break_glass_enabled, true)
       Application.put_env(:controlkeel, :break_glass_workspace_id, 7)
 
-      assert APIHelpers.authorize_workspace_for_conn(bootstrap_conn(), 7, "read") == :ok
+      assert APIHelpers.authorize_workspace_for_conn(bootstrap_conn(), 7, "read") ==
+               {:error, :forbidden}
     end
 
-    test "a string workspace id from config is parsed" do
+    test "a string workspace id does not enable hosted bootstrap" do
       Application.put_env(:controlkeel, :break_glass_enabled, true)
       Application.put_env(:controlkeel, :break_glass_workspace_id, "7")
 
-      assert APIHelpers.authorize_workspace_for_conn(bootstrap_conn(), 7, "read") == :ok
+      assert APIHelpers.authorize_workspace_for_conn(bootstrap_conn(), 7, "read") ==
+               {:error, :forbidden}
     end
   end
 
@@ -78,9 +73,9 @@ defmodule ControlKeelWeb.BreakGlassTest do
   end
 
   describe "other credential types are unaffected" do
-    test "an explicit local caller is still allowed in cloud mode" do
+    test "an explicit local caller is denied in cloud mode" do
       conn = build_conn() |> Plug.Conn.assign(:api_auth, %{type: :local})
-      assert APIHelpers.authorize_workspace_for_conn(conn, 1, "read") == :ok
+      assert APIHelpers.authorize_workspace_for_conn(conn, 1, "read") == {:error, :forbidden}
     end
 
     test "an unassigned credential still fails closed" do

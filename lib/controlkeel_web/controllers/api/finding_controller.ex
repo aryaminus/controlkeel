@@ -34,7 +34,12 @@ defmodule ControlKeelWeb.API.FindingController do
   end
 
   def finding_action(conn, %{"id" => id, "action" => action} = params) do
-    case Mission.get_finding(id) do
+    finding = with {:ok, parsed_id} <- parse_path_id(id), do: Mission.get_finding(parsed_id)
+
+    case finding do
+      {:error, :invalid_integer} ->
+        conn |> put_status(:not_found) |> json(%{error: "finding not found"})
+
       nil ->
         conn |> put_status(:not_found) |> json(%{error: "finding not found"})
 
