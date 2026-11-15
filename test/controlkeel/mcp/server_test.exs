@@ -67,7 +67,7 @@ defmodule ControlKeel.MCP.ServerTest do
       })
 
     shell =
-      ~S(printf '%s\n' "$MCP_REQUEST" | "$MCP_LAUNCHER" --project-root "$CK_PROJECT_ROOT")
+      ~S(printf '%s\n' "$MCP_REQUEST" | "$MCP_SHELL" "$MCP_LAUNCHER" --project-root "$CK_PROJECT_ROOT")
 
     assert {stdout, 0} =
              System.cmd("/bin/sh", ["-c", shell],
@@ -75,6 +75,7 @@ defmodule ControlKeel.MCP.ServerTest do
                env: [
                  {"MCP_REQUEST", request},
                  {"MCP_LAUNCHER", @launcher},
+                 {"MCP_SHELL", System.find_executable("dash") || "/bin/sh"},
                  {"CK_PROJECT_ROOT", File.cwd!()},
                  {"MIX_ENV", "test"},
                  {"CK_TEST_DB", tmp_db}
