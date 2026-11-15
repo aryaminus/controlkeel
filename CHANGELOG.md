@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.23 — 2026-11-15
+
+### What's changed
+
+- fix: fail closed on hosted API access
+
 ## v0.4.22 — 2026-11-15
 
 ### What's changed
