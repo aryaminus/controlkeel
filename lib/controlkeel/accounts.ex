@@ -657,6 +657,27 @@ defmodule ControlKeel.Accounts do
     :ok
   end
 
+  @doc """
+  Broadcast a membership-revoked event for a membership that was removed
+  outright — e.g. by `DataLifecycle.delete_user/1` erasing its user, or
+  `delete_org/1` erasing its org — where no persisted row survives to
+  broadcast. Subscribers in `ControlKeelWeb.LiveAuth` treat it exactly like a
+  revocation: the affected member's page navigates away and re-runs its
+  access check.
+  """
+  @spec broadcast_membership_removed(Membership.t()) :: :ok
+  def broadcast_membership_removed(%Membership{} = m) when is_integer(m.user_id) do
+    Phoenix.PubSub.broadcast(
+      ControlKeel.PubSub,
+      membership_topic(m.user_id),
+      {:membership_changed, %{m | status: "revoked"}}
+    )
+
+    :ok
+  end
+
+  def broadcast_membership_removed(_), do: :ok
+
   defp broadcast_membership_change(%Membership{user_id: user_id} = m)
        when is_integer(user_id) do
     Phoenix.PubSub.broadcast(

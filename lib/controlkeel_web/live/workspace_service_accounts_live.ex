@@ -49,7 +49,8 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
                "name" => name,
                "scopes" => scopes
              },
-             actor: nhi_actor(socket)
+             actor: nhi_actor(socket),
+             created_by_user_id: created_by_user_id(socket)
            ) do
         {:ok, %{service_account: sa, token: token}} ->
           {:noreply,
@@ -250,6 +251,13 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
     case socket.assigns[:current_user] do
       %{email: email} -> "web:#{email}"
       _ -> "web:unknown"
+    end
+  end
+
+  defp created_by_user_id(socket) do
+    case socket.assigns[:current_user] do
+      %{id: id} -> id
+      _ -> nil
     end
   end
 end

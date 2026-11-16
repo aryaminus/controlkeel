@@ -45,9 +45,13 @@ defmodule ControlKeel.Accounts.DataLifecycle do
 
   import Ecto.Query, warn: false
 
+  alias ControlKeel.Accounts
   alias ControlKeel.Accounts.{Membership, Org, User}
+  alias ControlKeel.Accounts.DataLifecycleEvent
   alias ControlKeel.Accounts.OrgIdentityProvider
   alias ControlKeel.Accounts.ReviewAuditEvent
+  alias ControlKeel.Cloud.Mcp.ToolCall
+  alias ControlKeel.Cloud.Workspace.Key
   alias ControlKeel.Mission.FindingAuditEvent
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform.NhiAuditEvent
@@ -118,8 +122,18 @@ defmodule ControlKeel.Accounts.DataLifecycle do
           stats = Repo.transaction(fn -> erase_user(user) end)
 
           case stats do
-            {:ok, result} -> {:ok, result}
-            {:error, reason} -> {:error, reason}
+            {:ok, result} ->
+              # Post-commit eviction: the erased user's connected LiveViews
+              # (subscribed in ControlKeelWeb.LiveAuth) are pushed to the
+              # login screen, and each removed membership is broadcast as a
+              # revocation so pages resolved from it re-run their access
+              # check. Deletion alone leaves mounted pages live — the browser
+              # session is only cleared on the *next* full request.
+              evict_erased_user(user.id, result.removed_memberships)
+              {:ok, result}
+
+            {:error, reason} ->
+              {:error, reason}
           end
         end
     end
@@ -137,34 +151,60 @@ defmodule ControlKeel.Accounts.DataLifecycle do
 
     credentials = revoke_credentials(user)
 
+    # Captured before the delete so the post-commit eviction can broadcast
+    # each membership as a revocation to the erased user's connected pages.
+    removed_memberships = Repo.all(from(m in Membership, where: m.user_id == ^user.id))
+
     # Memberships cascade; the user row goes last so the cascades have a parent.
     {deleted, _} = Repo.delete_all(from(m in Membership, where: m.user_id == ^user.id))
     Repo.delete!(user)
 
+    record_erasure_event("user_erased", anonymize, %{
+      memberships_deleted: deleted,
+      credentials_revoked: credentials,
+      audit_events_anonymized: audit.review_events + audit.finding_events + audit.nhi_events
+    })
+
     Map.merge(audit, %{
       memberships_deleted: deleted,
+      removed_memberships: removed_memberships,
       credentials_revoked: credentials,
       user_deleted: true
     })
   end
 
+  @doc """
+  Orgs where the user is the **last active owner** — the ones whose refusal
+  blocks `delete_user/1`. Powers the actionable sole-owner copy in the
+  account-erasure UI ("promote another owner or delete these orgs first").
+  """
+  @spec sole_owner_orgs(integer()) :: [Org.t()]
+  def sole_owner_orgs(user_id) when is_integer(user_id) do
+    org_ids = sole_owner_org_ids(user_id)
+
+    Org
+    |> where([o], o.id in ^org_ids)
+    |> order_by([o], asc: o.name)
+    |> Repo.all()
+  end
+
+  defp sole_owner_org_ids(user_id) do
+    Membership
+    |> where([m], m.user_id == ^user_id and m.role == "owner" and m.status == "active")
+    |> select([m], m.org_id)
+    |> Repo.all()
+    |> Enum.filter(fn org_id ->
+      Repo.aggregate(
+        from(m in Membership,
+          where: m.org_id == ^org_id and m.role == "owner" and m.status == "active"
+        ),
+        :count
+      ) <= 1
+    end)
+  end
+
   defp refuse_if_sole_owner(user) do
-    owned =
-      Membership
-      |> where([m], m.user_id == ^user.id and m.role == "owner" and m.status == "active")
-      |> Repo.all()
-
-    blocked =
-      Enum.any?(owned, fn membership ->
-        Repo.aggregate(
-          from(m in Membership,
-            where: m.org_id == ^membership.org_id and m.role == "owner" and m.status == "active"
-          ),
-          :count
-        ) <= 1
-      end)
-
-    if blocked, do: {:error, :sole_owner}, else: :ok
+    if sole_owner_org_ids(user.id) == [], do: :ok, else: {:error, :sole_owner}
   end
 
   # ── Anonymization ────────────────────────────────────────────────────────
@@ -172,20 +212,24 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   # The event survives; the identity does not.
 
   defp anonymize_review_events(user, marker) do
-    {n, _} =
+    # Actor-matched rows: the erased user performed the action - null their FK
+    # and stamp the pseudonymous marker.
+    {actors, _} =
       Repo.update_all(
-        from(e in ReviewAuditEvent,
-          where: e.actor_user_id == ^user.id or e.target_user_id == ^user.id
-        ),
-        set: [
-          actor_user_id: nil,
-          target_user_id: nil,
-          actor_identifier: marker,
-          note: nil
-        ]
+        from(e in ReviewAuditEvent, where: e.actor_user_id == ^user.id),
+        set: [actor_user_id: nil, actor_identifier: marker]
       )
 
-    n
+    # Target-matched rows: the erased user was the *subject* of someone else's
+    # action. Only the FK goes - overwriting actor_identifier here would
+    # re-attribute a surviving user's decision to the erased user's marker.
+    {targets, _} =
+      Repo.update_all(
+        from(e in ReviewAuditEvent, where: e.target_user_id == ^user.id),
+        set: [target_user_id: nil]
+      )
+
+    actors + targets
   end
 
   defp anonymize_finding_events(user, marker) do
@@ -210,9 +254,12 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   end
 
   defp revoke_credentials(user) do
+    # Matches the trusted `created_by_user_id` column set server-side by
+    # Platform.create_service_account/3 (backfilled for pre-existing rows).
+    # System/CLI-minted accounts have a nil creator and are not revoked here.
     {n, _} =
       Repo.update_all(
-        from(s in ServiceAccount, where: s.metadata["created_by_user_id"] == ^user.id),
+        from(s in ServiceAccount, where: s.created_by_user_id == ^user.id),
         set: [status: "revoked"]
       )
 
@@ -245,8 +292,35 @@ defmodule ControlKeel.Accounts.DataLifecycle do
     @erased_prefix <> binary_part(digest, 0, 16)
   end
 
+  # Durable record of the erasure itself, inserted inside the erasure
+  # transaction: a rolled-back erase leaves no event, and "who/what was
+  # erased, when, with what counts" stays answerable after the subject is gone.
+  # The subject of a user_erased event is the pseudonymous marker; for
+  # org_erased it is the org id as a string.
+  defp record_erasure_event(event_type, subject, details) do
+    %DataLifecycleEvent{}
+    |> DataLifecycleEvent.changeset(%{
+      event_type: event_type,
+      subject: subject,
+      details: details
+    })
+    |> Repo.insert!()
+  end
+
   defp deployment_salt do
     ControlKeelWeb.Endpoint.config(:secret_key_base) || "controlkeel"
+  end
+
+  # ── Post-commit eviction ────────────────────────────────────────────────
+
+  # The erased user's own sockets get the sign-out broadcast (redirect to the
+  # login screen); each removed membership is also broadcast as a revocation
+  # so the LiveAuth eviction hook's org-specific branch runs deterministically
+  # on pages resolved from those orgs.
+  defp evict_erased_user(user_id, removed_memberships) do
+    Accounts.sign_out_everywhere(user_id)
+
+    Enum.each(removed_memberships, &Accounts.broadcast_membership_removed/1)
   end
 
   @doc """
@@ -257,6 +331,19 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   because they reference users rather than orgs are left intact with their
   org references nulled - the audit *record* of what happened to the tenant is
   itself compliance evidence.
+
+  Enrolled cloud keys (`workspace_keys`) and hosted MCP tool-call records
+  (`cloud_mcp_tool_calls`) are purged explicitly (issue #335 B4): their
+  workspace/org foreign keys are `ON DELETE SET NULL`, so the FK machinery
+  would otherwise strand them — the tenant's enrollment keys would stay
+  valid telemetry credentials and the tool-call audit rows would survive
+  with dangling references. Received telemetry itself needs no separate
+  decision: it lands in workspace-scoped tables (sessions, findings,
+  observability events), which the workspace delete purges via cascade.
+
+  After the transaction commits, every active member's connected LiveViews
+  receive a membership-revoked broadcast (`ControlKeelWeb.LiveAuth` eviction
+  hook), so no open page keeps serving a deleted tenant.
   """
   @spec delete_org(integer()) :: {:ok, map()} | {:error, :not_found | term()}
   def delete_org(org_id) when is_integer(org_id) do
@@ -269,12 +356,32 @@ defmodule ControlKeel.Accounts.DataLifecycle do
           Repo.transaction(fn ->
             ws_ids = workspace_ids(org.id)
 
+            # Captured before the deletes so the post-commit eviction can
+            # broadcast a revocation to every active member's connected
+            # pages - the org (and its workspaces) is gone under them.
+            affected_memberships =
+              Repo.all(from(m in Membership, where: m.org_id == ^org.id and m.status == "active"))
+
             # `workspaces.org_id` is `on_delete: :nilify_all`, NOT a cascade
             # (see migration 20260524142342), so deleting the org does **not**
             # remove its workspaces - it would silently orphan every one of
             # them. Delete the workspace rows explicitly so their own cascades
             # (sessions -> findings, proofs, memory, credentials) fire.
             purge_orphaned_by_workspace(ws_ids)
+
+            # B4 (issue #335): the FKs on `workspace_keys.org_id` /
+            # `workspace_keys.mission_workspace_id` and
+            # `cloud_mcp_tool_calls.workspace_id` are `ON DELETE SET NULL`,
+            # so the org/workspace deletes would strand these rows instead of
+            # erasing them. Purge this org's rows explicitly, scoped to the
+            # org and its workspaces so another tenant's data is untouched.
+            {keys_deleted, _} =
+              Repo.delete_all(
+                from(k in Key, where: k.org_id == ^org.id or k.mission_workspace_id in ^ws_ids)
+              )
+
+            {tool_calls_deleted, _} =
+              Repo.delete_all(from(c in ToolCall, where: c.workspace_id in ^ws_ids))
 
             {workspaces_deleted, _} =
               Repo.delete_all(from(w in Workspace, where: w.org_id == ^org.id))
@@ -284,16 +391,32 @@ defmodule ControlKeel.Accounts.DataLifecycle do
 
             Repo.delete!(org)
 
+            record_erasure_event("org_erased", Integer.to_string(org.id), %{
+              org_slug: org.slug,
+              workspaces: workspaces_deleted,
+              workspace_keys: keys_deleted,
+              cloud_mcp_tool_calls: tool_calls_deleted
+            })
+
             %{
               org_deleted: true,
               workspaces: workspaces_deleted,
-              identity_providers_deleted: providers
+              workspace_keys_deleted: keys_deleted,
+              cloud_mcp_tool_calls_deleted: tool_calls_deleted,
+              identity_providers_deleted: providers,
+              memberships_affected: length(affected_memberships),
+              affected_memberships: affected_memberships
             }
           end)
 
         case stats do
-          {:ok, result} -> {:ok, result}
-          {:error, reason} -> {:error, reason}
+          {:ok, result} ->
+            Enum.each(result.affected_memberships, &Accounts.broadcast_membership_removed/1)
+
+            {:ok, result}
+
+          {:error, reason} ->
+            {:error, reason}
         end
     end
   end

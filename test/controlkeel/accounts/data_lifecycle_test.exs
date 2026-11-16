@@ -1,5 +1,5 @@
 defmodule ControlKeel.Accounts.DataLifecycleTest do
-  @modagedoc """
+  @moduledoc """
   User/org erasure (issue #266).
 
   The contract under test: identity is purged, the audit *record* survives with
@@ -10,9 +10,14 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.DataLifecycle
+  alias ControlKeel.Accounts.DataLifecycleEvent
   alias ControlKeel.Accounts.Membership
   alias ControlKeel.Accounts.ReviewAuditEvent
   alias ControlKeel.Mission.FindingAuditEvent
+  alias ControlKeel.Cloud.Mcp.ToolCall
+  alias ControlKeel.Cloud.Workspace.Key
+  alias ControlKeel.Platform
+  alias ControlKeel.Platform.ServiceAccount
 
   defp org_with_owner(slug) do
     n = System.unique_integer([:positive])
@@ -93,7 +98,7 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
       event =
         Repo.insert!(%ReviewAuditEvent{
           review_id: review.id,
-          event_type: "finding_approved",
+          event_type: "approved",
           required_role: "admin",
           actor_role: "member",
           actor_source: "web",
@@ -112,6 +117,71 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
       assert kept.actor_user_id == nil
       refute kept.actor_identifier == member.email
       assert kept.actor_identifier =~ "erased-user-"
+      # ...while the retained decision note survives the erasure (1b).
+      assert kept.note == "ship it"
+    end
+
+    test "keeps the decider's identity when the erased user was only the target" do
+      %{org: org, owner: owner} = org_with_owner("decider-org")
+      member = member_of(org, owner, "member")
+
+      review = ControlKeel.MissionFixtures.review_fixture()
+
+      event =
+        Repo.insert!(%ReviewAuditEvent{
+          review_id: review.id,
+          event_type: "approved",
+          actor_user_id: owner.id,
+          actor_identifier: Integer.to_string(owner.id),
+          target_user_id: member.id,
+          note: "approved by owner, assignee later erased",
+          recorded_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert {:ok, _} = DataLifecycle.delete_user(member.id)
+
+      kept = Repo.get(ReviewAuditEvent, event.id)
+      # The surviving decider keeps their identity...
+      assert kept.actor_user_id == owner.id
+      assert kept.actor_identifier == Integer.to_string(owner.id)
+      # ...only the FK to the erased assignee is nulled...
+      assert kept.target_user_id == nil
+      # ...and the note survives.
+      assert kept.note == "approved by owner, assignee later erased"
+    end
+
+    test "records a durable user_erased audit event" do
+      %{org: org, owner: owner} = org_with_owner("erased-event-org")
+      member = member_of(org, owner, "member")
+
+      assert {:ok, _} = DataLifecycle.delete_user(member.id)
+
+      event = Repo.get_by!(DataLifecycleEvent, event_type: "user_erased")
+      assert event.subject =~ "erased-user-"
+      assert event.details["memberships_deleted"] == 1
+      assert event.details["credentials_revoked"] == 0
+      assert event.details["audit_events_anonymized"] >= 0
+    end
+
+    test "evicts the erased user's sessions and broadcasts the membership removal" do
+      %{org: org, owner: owner} = org_with_owner("evict-org")
+      member = member_of(org, owner, "member")
+
+      Phoenix.PubSub.subscribe(ControlKeel.PubSub, Accounts.signout_topic(member.id))
+      Phoenix.PubSub.subscribe(ControlKeel.PubSub, Accounts.membership_topic(member.id))
+
+      assert {:ok, _} = DataLifecycle.delete_user(member.id)
+
+      # Every connected LiveView of the erased user is pushed to the login
+      # screen...
+      assert_receive :sign_out_everywhere
+
+      # ...and each removed membership is broadcast as a revocation so the
+      # LiveAuth eviction hook re-runs access checks on their pages.
+      assert_receive {:membership_changed, %{user_id: user_id, org_id: org_id, status: "revoked"}}
+      assert user_id == member.id
+      assert org_id == org.id
+      _ = owner
     end
 
     test "does not destroy tenant-owned governance data on user delete" do
@@ -129,6 +199,33 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
       assert Repo.get(ControlKeel.Mission.Session, session.id)
       _ = owner
     end
+
+    test "revokes service accounts the user minted" do
+      %{org: org, owner: owner} = org_with_owner("cred-org")
+      member = member_of(org, owner, "member")
+
+      workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
+
+      {:ok, %{service_account: account}} =
+        Platform.create_service_account(
+          workspace.id,
+          %{"name" => "minted-by-member", "scopes" => ["findings:read"]},
+          created_by_user_id: member.id
+        )
+
+      # A system-minted account with no creator must NOT be revoked.
+      {:ok, %{service_account: system_account}} =
+        Platform.create_service_account(workspace.id, %{
+          "name" => "system-minted",
+          "scopes" => ["findings:read"]
+        })
+
+      assert {:ok, result} = DataLifecycle.delete_user(member.id)
+      assert result.credentials_revoked == 1
+
+      assert Repo.get!(ServiceAccount, account.id).status == "revoked"
+      assert Repo.get!(ServiceAccount, system_account.id).status == "active"
+    end
   end
 
   describe "delete_org/1" do
@@ -144,6 +241,36 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
       assert Repo.get(ControlKeel.Mission.Workspace, workspace.id) == nil
     end
 
+    test "records a durable org_erased audit event" do
+      %{org: org} = org_with_owner("erased-event-org")
+
+      assert {:ok, _} = DataLifecycle.delete_org(org.id)
+
+      event = Repo.get_by!(DataLifecycleEvent, event_type: "org_erased")
+      assert event.subject == Integer.to_string(org.id)
+      assert event.details["org_slug"] == org.slug
+      assert event.details["workspaces"] == 0
+    end
+
+    test "broadcasts membership removal to the org's active members" do
+      %{org: org, owner: owner} = org_with_owner("org-evict-org")
+      member = member_of(org, owner, "member")
+
+      for uid <- [owner.id, member.id] do
+        Phoenix.PubSub.subscribe(ControlKeel.PubSub, Accounts.membership_topic(uid))
+      end
+
+      assert {:ok, result} = DataLifecycle.delete_org(org.id)
+      assert result.memberships_affected == 2
+
+      # Both members receive the revocation (order across topics is not
+      # deterministic; the org pins identify the org's own broadcast).
+      assert_receive {:membership_changed, %{status: "revoked", org_id: org_id}}
+      assert org_id == org.id
+
+      assert_receive {:membership_changed, %{status: "revoked", org_id: ^org_id}}
+    end
+
     test "purges sessions and findings under the org" do
       %{org: org} = org_with_owner("cascade-org")
       workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
@@ -152,6 +279,102 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
       assert {:ok, _} = DataLifecycle.delete_org(org.id)
 
       assert Repo.get(ControlKeel.Mission.Session, session.id) == nil
+    end
+
+    # Issue #335 B4. The `workspace_keys` and `cloud_mcp_tool_calls` FKs are
+    # `ON DELETE SET NULL`, so the workspace/org deletes alone would strand
+    # the tenant's enrolled cloud keys (still-valid telemetry credentials)
+    # and tool-call audit rows. Populated two-tenant data proves the purge
+    # is scoped to the deleted org.
+    test "purges enrolled workspace keys and MCP tool calls of the deleted org only" do
+      %{org: doomed} = org_with_owner("purge-keys-org")
+      %{org: surviving} = org_with_owner("survivor-keys-org")
+
+      doomed_ws = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: doomed.id})
+      surviving_ws = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: surviving.id})
+
+      n = System.unique_integer([:positive])
+
+      doomed_key =
+        Repo.insert!(%Key{
+          workspace_id: "ws_doomed#{n}",
+          public_key: "pk-doomed-#{n}",
+          fingerprint: "fp-doomed-#{n}",
+          org_id: doomed.id,
+          mission_workspace_id: doomed_ws.id
+        })
+
+      surviving_key =
+        Repo.insert!(%Key{
+          workspace_id: "ws_survivor#{n}",
+          public_key: "pk-survivor-#{n}",
+          fingerprint: "fp-survivor-#{n}",
+          org_id: surviving.id,
+          mission_workspace_id: surviving_ws.id
+        })
+
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      doomed_call =
+        Repo.insert!(%ToolCall{
+          workspace_id: doomed_ws.id,
+          resource: "mcp",
+          tool_name: "ck_validate",
+          outcome: "allowed",
+          requested_at: now
+        })
+
+      surviving_call =
+        Repo.insert!(%ToolCall{
+          workspace_id: surviving_ws.id,
+          resource: "mcp",
+          tool_name: "ck_validate",
+          outcome: "allowed",
+          requested_at: now
+        })
+
+      assert {:ok, result} = DataLifecycle.delete_org(doomed.id)
+      assert result.workspace_keys_deleted == 1
+      assert result.cloud_mcp_tool_calls_deleted == 1
+
+      # The deleted tenant's credentials and tool-call audit rows are gone...
+      assert Repo.get(Key, doomed_key.id) == nil
+      assert Repo.get(ToolCall, doomed_call.id) == nil
+
+      # ...and the other tenant's are untouched.
+      assert Repo.get(Key, surviving_key.id)
+      assert Repo.get(ToolCall, surviving_call.id)
+    end
+
+    test "the org_erased audit event records the cloud-key and tool-call purge" do
+      %{org: org} = org_with_owner("purge-event-org")
+      workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
+      n = System.unique_integer([:positive])
+
+      Repo.insert!(%Key{
+        workspace_id: "ws_event#{n}",
+        public_key: "pk-event-#{n}",
+        fingerprint: "fp-event-#{n}",
+        org_id: org.id,
+        mission_workspace_id: workspace.id
+      })
+
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      Repo.insert!(%ToolCall{
+        workspace_id: workspace.id,
+        resource: "mcp",
+        tool_name: "ck_route",
+        outcome: "denied",
+        denial_reason: "test",
+        requested_at: now
+      })
+
+      assert {:ok, _} = DataLifecycle.delete_org(org.id)
+
+      event = Repo.get_by!(DataLifecycleEvent, event_type: "org_erased")
+      assert event.details["workspace_keys"] == 1
+      assert event.details["cloud_mcp_tool_calls"] == 1
     end
 
     test "unknown org is not found" do
