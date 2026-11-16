@@ -123,19 +123,6 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     end
   end
 
-  # The mount-time `current_membership` assign is a snapshot: a PubSub
-  # demotion or revocation broadcast after render leaves the stale assign,
-  # so a destructive write must not trust it. Re-resolve authorization from
-  # the URL slug and the authenticated user at the mutation boundary — the
-  # same resolution the page mounts with, tightened to require an active
-  # owner membership (and refusing a suspended or deleted org).
-  defp mutation_owner?(socket) do
-    case OrgAccess.resolve(socket.assigns.org.slug, socket.assigns[:current_user], "owner") do
-      {:ok, _org, %Accounts.Membership{role: "owner"}} -> true
-      _ -> false
-    end
-  end
-
   @impl true
   def handle_event("open_invite", _params, socket) do
     {:noreply, assign(socket, :show_invite_modal, true)}
@@ -1432,6 +1419,19 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   defp panel_owner?(_membership, true), do: true
   defp panel_owner?(%Accounts.Membership{role: "owner"}, _local_mode), do: true
   defp panel_owner?(_membership, _local_mode), do: false
+
+  # The mount-time `current_membership` assign is a snapshot: a PubSub
+  # demotion or revocation broadcast after render leaves the stale assign,
+  # so a destructive write must not trust it. Re-resolve authorization from
+  # the URL slug and the authenticated user at the mutation boundary — the
+  # same resolution the page mounts with, tightened to require an active
+  # owner membership (and refusing a suspended or deleted org).
+  defp mutation_owner?(socket) do
+    case OrgAccess.resolve(socket.assigns.org.slug, socket.assigns[:current_user], "owner") do
+      {:ok, _org, %Accounts.Membership{role: "owner"}} -> true
+      _ -> false
+    end
+  end
 
   attr :org, :map, required: true
   attr :policy_sets, :list, required: true
