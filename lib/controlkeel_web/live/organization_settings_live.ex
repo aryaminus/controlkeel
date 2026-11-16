@@ -89,7 +89,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   end
 
   def handle_event("delete_org", %{"delete_org" => %{"confirm_slug" => text}}, socket) do
-    if panel_owner?(socket.assigns.current_membership, socket.assigns.local_mode) do
+    if mutation_owner?(socket) do
       if String.trim(text) == socket.assigns.org.slug do
         case DataLifecycle.delete_org(socket.assigns.org.id) do
           {:ok, _stats} ->
@@ -120,6 +120,19 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
        socket
        |> assign(:delete_org_error, "Only organization owners can delete the organization.")
        |> put_flash(:error, "Only organization owners can delete the organization.")}
+    end
+  end
+
+  # The mount-time `current_membership` assign is a snapshot: a PubSub
+  # demotion or revocation broadcast after render leaves the stale assign,
+  # so a destructive write must not trust it. Re-resolve authorization from
+  # the URL slug and the authenticated user at the mutation boundary — the
+  # same resolution the page mounts with, tightened to require an active
+  # owner membership (and refusing a suspended or deleted org).
+  defp mutation_owner?(socket) do
+    case OrgAccess.resolve(socket.assigns.org.slug, socket.assigns[:current_user], "owner") do
+      {:ok, _org, %Accounts.Membership{role: "owner"}} -> true
+      _ -> false
     end
   end
 

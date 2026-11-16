@@ -691,6 +691,34 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       assert_redirect(view, "/new/org")
       assert Repo.get(Accounts.Org, org.id) == nil
     end
+
+    # The page gates rendering on a mount-time snapshot, but the destructive
+    # write re-checks the database. These cover the stale-snapshot window:
+    # the browser still shows the danger zone, yet the membership row has
+    # changed underneath the mounted LiveView.
+    test "refuses an owner demoted after mount", %{owner_conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+
+      owner_m = Repo.get_by!(Membership, org_id: org.id, role: "owner", status: "active")
+      owner_m |> Membership.changeset(%{role: "member"}) |> Repo.update!()
+
+      html = render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
+
+      assert html =~ "Only organization owners can delete the organization."
+      assert Repo.get(Accounts.Org, org.id)
+    end
+
+    test "refuses an owner revoked after mount", %{owner_conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+
+      owner_m = Repo.get_by!(Membership, org_id: org.id, role: "owner", status: "active")
+      owner_m |> Membership.changeset(%{status: "revoked"}) |> Repo.update!()
+
+      html = render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
+
+      assert html =~ "Only organization owners can delete the organization."
+      assert Repo.get(Accounts.Org, org.id)
+    end
   end
 
   defp org_id_from_admin_m(m), do: m.org_id
