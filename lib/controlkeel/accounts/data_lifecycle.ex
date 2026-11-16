@@ -50,6 +50,8 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   alias ControlKeel.Accounts.DataLifecycleEvent
   alias ControlKeel.Accounts.OrgIdentityProvider
   alias ControlKeel.Accounts.ReviewAuditEvent
+  alias ControlKeel.Cloud.Mcp.ToolCall
+  alias ControlKeel.Cloud.Workspace.Key
   alias ControlKeel.Mission.FindingAuditEvent
   alias ControlKeel.Mission.Workspace
   alias ControlKeel.Platform.NhiAuditEvent
@@ -330,6 +332,15 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   org references nulled - the audit *record* of what happened to the tenant is
   itself compliance evidence.
 
+  Enrolled cloud keys (`workspace_keys`) and hosted MCP tool-call records
+  (`cloud_mcp_tool_calls`) are purged explicitly (issue #335 B4): their
+  workspace/org foreign keys are `ON DELETE SET NULL`, so the FK machinery
+  would otherwise strand them — the tenant's enrollment keys would stay
+  valid telemetry credentials and the tool-call audit rows would survive
+  with dangling references. Received telemetry itself needs no separate
+  decision: it lands in workspace-scoped tables (sessions, findings,
+  observability events), which the workspace delete purges via cascade.
+
   After the transaction commits, every active member's connected LiveViews
   receive a membership-revoked broadcast (`ControlKeelWeb.LiveAuth` eviction
   hook), so no open page keeps serving a deleted tenant.
@@ -358,6 +369,20 @@ defmodule ControlKeel.Accounts.DataLifecycle do
             # (sessions -> findings, proofs, memory, credentials) fire.
             purge_orphaned_by_workspace(ws_ids)
 
+            # B4 (issue #335): the FKs on `workspace_keys.org_id` /
+            # `workspace_keys.mission_workspace_id` and
+            # `cloud_mcp_tool_calls.workspace_id` are `ON DELETE SET NULL`,
+            # so the org/workspace deletes would strand these rows instead of
+            # erasing them. Purge this org's rows explicitly, scoped to the
+            # org and its workspaces so another tenant's data is untouched.
+            {keys_deleted, _} =
+              Repo.delete_all(
+                from(k in Key, where: k.org_id == ^org.id or k.mission_workspace_id in ^ws_ids)
+              )
+
+            {tool_calls_deleted, _} =
+              Repo.delete_all(from(c in ToolCall, where: c.workspace_id in ^ws_ids))
+
             {workspaces_deleted, _} =
               Repo.delete_all(from(w in Workspace, where: w.org_id == ^org.id))
 
@@ -368,12 +393,16 @@ defmodule ControlKeel.Accounts.DataLifecycle do
 
             record_erasure_event("org_erased", Integer.to_string(org.id), %{
               org_slug: org.slug,
-              workspaces: workspaces_deleted
+              workspaces: workspaces_deleted,
+              workspace_keys: keys_deleted,
+              cloud_mcp_tool_calls: tool_calls_deleted
             })
 
             %{
               org_deleted: true,
               workspaces: workspaces_deleted,
+              workspace_keys_deleted: keys_deleted,
+              cloud_mcp_tool_calls_deleted: tool_calls_deleted,
               identity_providers_deleted: providers,
               memberships_affected: length(affected_memberships),
               affected_memberships: affected_memberships

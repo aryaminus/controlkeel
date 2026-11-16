@@ -14,6 +14,8 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
   alias ControlKeel.Accounts.Membership
   alias ControlKeel.Accounts.ReviewAuditEvent
   alias ControlKeel.Mission.FindingAuditEvent
+  alias ControlKeel.Cloud.Mcp.ToolCall
+  alias ControlKeel.Cloud.Workspace.Key
   alias ControlKeel.Platform
   alias ControlKeel.Platform.ServiceAccount
 
@@ -277,6 +279,102 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
       assert {:ok, _} = DataLifecycle.delete_org(org.id)
 
       assert Repo.get(ControlKeel.Mission.Session, session.id) == nil
+    end
+
+    # Issue #335 B4. The `workspace_keys` and `cloud_mcp_tool_calls` FKs are
+    # `ON DELETE SET NULL`, so the workspace/org deletes alone would strand
+    # the tenant's enrolled cloud keys (still-valid telemetry credentials)
+    # and tool-call audit rows. Populated two-tenant data proves the purge
+    # is scoped to the deleted org.
+    test "purges enrolled workspace keys and MCP tool calls of the deleted org only" do
+      %{org: doomed} = org_with_owner("purge-keys-org")
+      %{org: surviving} = org_with_owner("survivor-keys-org")
+
+      doomed_ws = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: doomed.id})
+      surviving_ws = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: surviving.id})
+
+      n = System.unique_integer([:positive])
+
+      doomed_key =
+        Repo.insert!(%Key{
+          workspace_id: "ws_doomed#{n}",
+          public_key: "pk-doomed-#{n}",
+          fingerprint: "fp-doomed-#{n}",
+          org_id: doomed.id,
+          mission_workspace_id: doomed_ws.id
+        })
+
+      surviving_key =
+        Repo.insert!(%Key{
+          workspace_id: "ws_survivor#{n}",
+          public_key: "pk-survivor-#{n}",
+          fingerprint: "fp-survivor-#{n}",
+          org_id: surviving.id,
+          mission_workspace_id: surviving_ws.id
+        })
+
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      doomed_call =
+        Repo.insert!(%ToolCall{
+          workspace_id: doomed_ws.id,
+          resource: "mcp",
+          tool_name: "ck_validate",
+          outcome: "allowed",
+          requested_at: now
+        })
+
+      surviving_call =
+        Repo.insert!(%ToolCall{
+          workspace_id: surviving_ws.id,
+          resource: "mcp",
+          tool_name: "ck_validate",
+          outcome: "allowed",
+          requested_at: now
+        })
+
+      assert {:ok, result} = DataLifecycle.delete_org(doomed.id)
+      assert result.workspace_keys_deleted == 1
+      assert result.cloud_mcp_tool_calls_deleted == 1
+
+      # The deleted tenant's credentials and tool-call audit rows are gone...
+      assert Repo.get(Key, doomed_key.id) == nil
+      assert Repo.get(ToolCall, doomed_call.id) == nil
+
+      # ...and the other tenant's are untouched.
+      assert Repo.get(Key, surviving_key.id)
+      assert Repo.get(ToolCall, surviving_call.id)
+    end
+
+    test "the org_erased audit event records the cloud-key and tool-call purge" do
+      %{org: org} = org_with_owner("purge-event-org")
+      workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
+      n = System.unique_integer([:positive])
+
+      Repo.insert!(%Key{
+        workspace_id: "ws_event#{n}",
+        public_key: "pk-event-#{n}",
+        fingerprint: "fp-event-#{n}",
+        org_id: org.id,
+        mission_workspace_id: workspace.id
+      })
+
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      Repo.insert!(%ToolCall{
+        workspace_id: workspace.id,
+        resource: "mcp",
+        tool_name: "ck_route",
+        outcome: "denied",
+        denial_reason: "test",
+        requested_at: now
+      })
+
+      assert {:ok, _} = DataLifecycle.delete_org(org.id)
+
+      event = Repo.get_by!(DataLifecycleEvent, event_type: "org_erased")
+      assert event.details["workspace_keys"] == 1
+      assert event.details["cloud_mcp_tool_calls"] == 1
     end
 
     test "unknown org is not found" do
