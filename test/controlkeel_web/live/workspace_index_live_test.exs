@@ -81,6 +81,24 @@ defmodule ControlKeelWeb.WorkspaceIndexLiveTest do
       {:ok, view, _html} = live(conn_for(owner), ~p"/tabco/workspaces?tab=wat")
       assert render(view) =~ ws.slug
     end
+
+    # Tenant isolation: a member of a different org must not see this org's
+    # workspaces — the org layout renders the shared in-place not-found
+    # panel instead of the index.
+    test "a member of another org does not see this org's workspaces (tenant isolation)", %{
+      workspace: ws
+    } do
+      other_owner = create_user!("other-tab-owner@example.com")
+
+      {:ok, _other_org} =
+        Accounts.create_org_with_owner(other_owner.id, %{name: "Otherco", slug: "otherco"})
+
+      {:ok, _view, html} = live(conn_for(other_owner), ~p"/tabco/workspaces")
+
+      refute html =~ ws.slug
+      refute html =~ "Core Workspace"
+      assert html =~ "Organization not found"
+    end
   end
 
   describe "new workspace modal" do
