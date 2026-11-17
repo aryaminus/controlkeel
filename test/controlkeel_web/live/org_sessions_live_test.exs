@@ -131,7 +131,81 @@ defmodule ControlKeelWeb.OrgSessionsLiveTest do
     } do
       outsider = create_user!("outsider@example.com")
 
-      assert {:error, {:redirect, %{to: "/new/org"}}} = live(conn_for(outsider), ~p"/sessco/sessions")
+      assert {:error, {:redirect, %{to: "/new/org"}}} =
+               live(conn_for(outsider), ~p"/sessco/sessions")
+    end
+
+    # Tenant isolation: a member of a different org must not see this org's
+    # sessions — the shared in-place not-found panel renders instead, and
+    # deliberately shares its copy with the genuinely-missing case.
+    test "a member of another org sees this org's sessions (tenant isolation)", %{
+      ws_a: ws_a
+    } do
+      create_session(ws_a, "Alpha one")
+
+      other_owner = create_user!("other-sess-owner@example.com")
+
+      {:ok, _other_org} =
+        Accounts.create_org_with_owner(other_owner.id, %{name: "Otherco", slug: "otherco"})
+
+      {:ok, _view, html} = live(conn_for(other_owner), ~p"/sessco/sessions")
+
+      refute html =~ "Alpha one"
+      assert html =~ "Organization not found"
+      assert html =~ "No organization exists at this address"
+    end
+
+    # Membership revocation kills access at resolve time: a revoked member
+    # (status no longer active) is treated like any non-member.
+    test "a revoked member loses access to the org's sessions", %{
+      org: org,
+      owner: owner,
+      ws_a: ws_a
+    } do
+      create_session(ws_a, "Alpha one")
+
+      member = create_user!("sess-revoked@example.com")
+      member_m = add_active_membership(member.id, org.id, "member")
+      assert live(conn_for(member), ~p"/sessco/sessions") |> elem(2) =~ "Alpha one"
+
+      member_m |> Membership.changeset(%{status: "revoked"}) |> Repo.update!()
+
+      # The auth hook bounces a revoked member to the org picker, exactly
+      # like a signed-in user with no membership.
+      assert {:error, {:redirect, %{to: "/new/org"}}} =
+               live(conn_for(member), ~p"/sessco/sessions")
+    end
+
+    # The index streams a bounded page (@page_size 50) and "Load more"
+    # keyset-paginates; this also exercises the (inserted_at, id) tie-break
+    # since all rows share the same second.
+    test "streams a bounded first page and loads the remainder on demand", %{
+      org: org,
+      owner: owner
+    } do
+      ws = create_workspace(org, "Gamma", "gamma")
+
+      for i <- 1..51 do
+        title = "Session " <> String.pad_leading(Integer.to_string(i), 3, "0")
+        create_session(ws, title)
+      end
+
+      {:ok, view, html} = live(conn_for(owner), ~p"/sessco/sessions")
+
+      # First page: newest 50 rows, oldest session withheld.
+      assert html =~ "Session 051"
+      assert html =~ "Session 002"
+      refute html =~ "Session 001"
+      assert has_element?(view, "#org-sessions-load-more")
+
+      view |> element("#org-sessions-load-more") |> render_click()
+
+      html = render(view)
+      # The oldest row streams in after the button; the keyset cursor makes
+      # it land in its position (no re-fetch of rows already rendered).
+      assert html =~ "Session 001"
+      # One row left, fewer than the page size: no further page.
+      refute has_element?(view, "#org-sessions-load-more")
     end
   end
 end
