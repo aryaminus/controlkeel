@@ -53,9 +53,13 @@ defmodule ControlKeelWeb.UserMenu do
         )
       }
     >
-      <span
-        role="button"
-        tabindex="0"
+      <%!-- Native `button`, not a `span role="button"`: a span only exposes
+           phx-click, so Enter/Space would never activate it — the browser
+           fires click for those keys on real buttons only (the UA behavior
+           that makes keyboard activation work). The `data-user-menu-trigger`
+           attribute stays for the JS wiring (focus/aria toggles). --%>
+      <button
+        type="button"
         aria-label="User menu"
         aria-haspopup="menu"
         aria-expanded="false"
@@ -82,7 +86,7 @@ defmodule ControlKeelWeb.UserMenu do
         <% else %>
           {String.at(@current_user.name || @current_user.email, 0) |> String.upcase()}
         <% end %>
-      </span>
+      </button>
 
       <div
         id={"#{@id}-popover"}

@@ -27,6 +27,20 @@ defmodule ControlKeelWeb.UserMenuTest do
       assert html =~ "menu-account-dialog"
     end
 
+    # The trigger must be a native `<button type="button">`: a span with
+    # `role="button"` exposes phx-click alone, and browsers fire click on
+    # Enter/Space only for real buttons. That UA behavior is the keyboard
+    # activation contract — no extra JS handler needed or present.
+    test "trigger is a native button, keyboard-activatable by default" do
+      user = %{name: "Ada Lovelace", email: "ada@example.com"}
+
+      html = render_component(&UserMenu.user_menu/1, id: "menu", current_user: user)
+
+      assert html =~ ~s(<button type="button" aria-label="User menu")
+      refute html =~ ~s(role="button")
+      refute html =~ ~s(tabindex="0")
+    end
+
     test "account dialog renders Account (info + danger zone) and Data (export)" do
       user = %{name: "Ada Lovelace", email: "ada@example.com"}
 
