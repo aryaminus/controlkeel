@@ -799,4 +799,98 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
              ]
     end
   end
+
+  # --- Non-admin members can open settings read-only -------------------------
+
+  # The page mounts at the viewer floor: every active member may open all
+  # three tabs, but below admin the tabs render static — management controls
+  # are hidden and every mutation event is refused server-side.
+  describe "non-admin members can open every settings tab read-only" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      n = System.unique_integer([:positive])
+
+      owner = create_user!("owner-#{n}@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Acme", slug: "acme-#{n}"})
+
+      viewer = create_user!("viewer-#{n}@example.com")
+      add_active_membership(viewer.id, org.id, "viewer")
+
+      {:ok, org: org, owner: owner, viewer: viewer, conn: conn_for(viewer)}
+    end
+
+    test "general tab renders with the form disabled and no save button", %{
+      conn: conn,
+      org: org
+    } do
+      {:ok, view, html} = live(conn, ~p"/#{org.slug}/settings?tab=general")
+
+      assert html =~ "Organization identity, status, and spend limits."
+      assert has_element?(
+               view,
+               "#org-settings-form input[name='settings[name]'][disabled]"
+             )
+
+      assert render(view) =~ "Settings are read-only for your role."
+      refute render(view) =~ "Save changes"
+
+      # The owner-only danger zone stays hidden below owner.
+      refute render(view) =~ "Delete this organization permanently."
+    end
+
+    test "members tab renders the roster without management controls", %{
+      conn: conn,
+      org: org
+    } do
+      {:ok, view, html} = live(conn, ~p"/#{org.slug}/settings?tab=members")
+
+      assert html =~ "Manage organization members and their roles."
+      refute has_element?(view, "#invite-member-button")
+      refute has_element?(view, "select[name='role']")
+      refute has_element?(view, "button[phx-click='confirm_revoke']")
+    end
+
+    test "policy sets tab renders without the create button", %{
+      conn: conn,
+      org: org
+    } do
+      {:ok, view, html} = live(conn, ~p"/#{org.slug}/settings?tab=policy_sets")
+
+      assert html =~ "Every agent action passes through these policy packs"
+      assert has_element?(view, "button", "View packs")
+      refute html =~ "+ New policy set"
+    end
+
+    test "crafted save_settings is refused server-side", %{conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/settings?tab=general")
+
+      html = render_submit(view, "save_settings", %{"settings" => %{"name" => "Hacked"}})
+
+      # The assertion matches the HTML-escaped apostrophe the flash renders with.
+      assert html =~ "You don&#39;t have permission to change organization settings."
+      assert Accounts.get_org_by_slug(org.slug).name == "Acme"
+    end
+
+    test "crafted save_policy_set is refused server-side", %{conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/settings?tab=policy_sets")
+
+      html =
+        render_submit(view, "save_policy_set", %{
+          "policy_set" => %{"name" => "nope", "rules_json" => ""}
+        })
+
+      assert html =~ "You don&#39;t have permission to manage policy sets."
+      assert Enum.empty?(Platform.list_policy_sets(org.id))
+    end
+  end
 end

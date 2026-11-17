@@ -1,6 +1,6 @@
 # GitHub Issue — Part A (web service, features, UI/UX)
 
-**Suggested title:** `web(offboarding): smooth org switch on revocation + disabled-user session/eviction UX (pre-launch, Part A)`
+**Suggested title:** `web(offboarding): smooth org switch on revocation, disabled-user session/eviction UX, member-readable settings (pre-launch, Part A)`
 
 **Suggested labels:** `bug`, `security`, `pre-launch`, `web`
 
@@ -88,11 +88,23 @@ New requirement — **smooth switch on revocation**: a revoked user must not dea
 
 Revocation broadcasts fire post-commit, so the remaining-org lookup inside the handler already excludes the just-revoked membership.
 
+## Update — settings route opened to every member (read-only below admin)
+
+Follow-up requirement: `/:org_slug/settings` resolved at the `"admin"` floor, so members below admin who opened the page (or the sidebar Settings link) hit the shared access panel: *"You don't have permission to access this part of the organization."* The tabs are informational for every member — org identity, roster, policy sets — so the all-or-nothing gate read as an error instead of a role boundary. The page now:
+
+- resolves `OrganizationSettingsLive` at the **`"viewer"` floor**: every active member can open all three tabs; non-members and suspended-org visitors still get the shared access panel;
+- renders the tabs **static below admin**: invite button, role `<select>`s, revoke buttons, and "+ New policy set" are hidden; the General form's name input is disabled; the Save button is replaced by "Settings are read-only for your role."; status/budget keep their owner lock and the danger zone stays owner-only;
+- keeps every mutation gated **server-side**: `save_settings`, invites, role changes, and revocation already checked `can_manage?` / `mutation_owner?`; `save_policy_set` did **not** — it relied on the admin-floor mount, so opening the page to viewers would have allowed a crafted event to create org policy sets. It now refuses below-admin callers with a flash (the security fix that fell out of this change);
+- local mode is unchanged (single-user deployments stay unrestricted).
+
+Tests: viewer opens all three tabs read-only (markup assertions), crafted `save_settings` / `save_policy_set` are refused with the org unchanged; the former "non-admin members see an access panel on settings" test now asserts the read-only page instead.
+
 ## Acceptance criteria
 
 - [ ] There is **no** org-scoped disable/enable UI: org admins/owners cannot flip global account status from `OrganizationSettingsLive` (or anywhere else); the members tab offers invite, role changes, and revocation only.
 - [ ] Revoking a membership smoothly switches the affected user to their first remaining organization (`/<org_slug>`); if none remain they land on `/new/org` — never a dead end, never a sign-out.
 - [ ] Disabled users (account-level action, future platform-admin surface) still see an explanatory message, not a silent logout, and mounted LiveViews drop immediately (Problem 2 machinery stays).
 - [ ] Invite flow uses the Accounts-level function and surfaces a clear error for disabled accounts; no raw atoms in UI error text.
+- [ ] Every active member can open all `/:org_slug/settings` tabs; below admin they render read-only (management controls hidden, no save) and crafted mutation events (`save_settings`, `save_policy_set`) are refused server-side with the org unchanged.
 - [ ] Local mode unaffected: web flows in local mode behave as before for active users.
 - [ ] `mix test test/controlkeel/accounts/user_offboarding_test.exs test/controlkeel_web/load_current_user_disabled_test.exs` extended to cover the offboarding behavior; `mix precommit` clean.
