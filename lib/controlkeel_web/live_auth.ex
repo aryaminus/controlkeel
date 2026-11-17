@@ -95,8 +95,10 @@ defmodule ControlKeelWeb.LiveAuth do
   #
   # There is no ambient "current org": each page resolves its own org from the
   # URL and keeps the membership in a page-local `:current_membership` assign.
-  # A revocation of that membership sends the visitor to `/new/org` — the
-  # available organization setup surface — so the next page's own
+  # A revocation of that membership switches the visitor to their first
+  # remaining organization — accounts are global and may hold memberships in
+  # several orgs — and only a user with no organization left lands on
+  # `/new/org`, the organization setup surface, where the next page's own
   # access check decides what they may see. A role change refreshes the assign
   # so pages that derive permissions from it re-render in place. Changes to
   # other orgs are ignored; this page is unaffected. We do not sign the user
@@ -123,12 +125,10 @@ defmodule ControlKeelWeb.LiveAuth do
     case socket.assigns[:current_membership] do
       %Accounts.Membership{org_id: ^org_id} ->
         if Map.get(change, :status) == "revoked" do
-          # The page's own membership is gone. Leave the page and let the next
-          # page's access check decide what the visitor may see.
-          {:halt,
-           socket
-           |> put_flash(:info, "Your access to this organization changed.")
-           |> push_navigate(to: "/new/org")}
+          # The page's own membership is gone. Switch smoothly to another
+          # organization the user still belongs to; only a user with no
+          # organization left is parked on /new/org.
+          revoked_handoff(socket, uid)
         else
           # Role change: refresh the page-local membership in place so pages
           # that derive permissions from it re-render without a reload.
@@ -160,7 +160,39 @@ defmodule ControlKeelWeb.LiveAuth do
      |> push_navigate(to: "/auth/login")}
   end
 
+  # Accounts.disable_user/1 evicts mounted pages with an explanation rather
+  # than the generic sign-out flash: the logout should read as offboarding,
+  # not as a random drop.
+  defp handle_membership_event(:account_disabled, %{assigns: %{current_user: _user}} = socket) do
+    {:halt,
+     socket
+     |> put_flash(:error, "Your account has been disabled. Contact your administrator.")
+     |> push_navigate(to: "/auth/login")}
+  end
+
   defp handle_membership_event(_msg, socket), do: {:cont, socket}
+
+  # A revoked membership is a context switch, not a dead end: accounts are
+  # global and may hold active memberships in other organizations. The first
+  # remaining organization (ordered by name) becomes the landing spot; only a
+  # user with no organization left is sent to /new/org, the organization
+  # creation surface. Revocation broadcasts fire post-commit, so the lookup
+  # here already excludes the just-revoked membership.
+  defp revoked_handoff(socket, uid) do
+    case Accounts.list_orgs_for_user(uid) do
+      [%{org: org} | _] ->
+        {:halt,
+         socket
+         |> put_flash(:info, "Your access to this organization changed.")
+         |> push_navigate(to: "/" <> org.slug)}
+
+      [] ->
+        {:halt,
+         socket
+         |> put_flash(:info, "You no longer have access to any organization.")
+         |> push_navigate(to: "/new/org")}
+    end
+  end
 
   # --- Private ---
 
@@ -174,6 +206,11 @@ defmodule ControlKeelWeb.LiveAuth do
         Map.get(session, :current_user_id)
 
     user = if is_integer(user_id), do: Accounts.get_user(user_id)
+
+    # Parity with LoadCurrentUser: a disabled account never resolves to a
+    # current_user, including on WebSocket reconnects that bypass the plug.
+    # (Erased users already fail the lookup; this covers a disabled row.)
+    user = if user && Accounts.user_active?(user), do: user, else: nil
 
     # Session idle timeout — check last_active timestamp from session.
     # When idle exceeds the configured threshold, redirect to login.

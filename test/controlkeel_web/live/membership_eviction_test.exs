@@ -125,7 +125,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
   end
 
   describe "WorkspaceDetailLive" do
-    test "revoking membership from a missing-workspace page redirects" do
+    test "revoking membership from a missing-workspace page switches to the remaining org" do
       org = create_org!("missing-workspace")
       user = create_user!("missing-workspace")
       membership = create_membership!(user, org, "viewer")
@@ -145,14 +145,14 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/new/org")
+               assert_redirect(view, "/#{other_org.slug}")
     end
 
-    test "revoking the page's membership redirects while other memberships remain" do
+    test "revoking the page's membership switches to the remaining organization" do
       {org, user, membership, workspace} = org_with_workspace!()
 
-      # The user keeps an active membership elsewhere; the redirect must not
-      # become a sign-out.
+      # The user keeps an active membership elsewhere; the revocation must
+      # switch them there, not sign them out or dead-end on /new/org.
       other_org = create_org!("elsewhere")
       create_membership!(user, other_org, "viewer")
 
@@ -165,7 +165,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/new/org")
+               assert_redirect(view, "/#{other_org.slug}")
     end
 
     test "role changes in another org leave the page in place" do
@@ -208,7 +208,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
       assert {:ok, %Accounts.Membership{status: "revoked"}} =
                Accounts.revoke_membership(membership.id, owner.id)
 
-      assert %{"info" => "Your access to this organization changed."} =
+      assert %{"info" => "You no longer have access to any organization."} =
                assert_redirect(view, "/new/org")
     end
   end
@@ -271,7 +271,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
       assert {:ok, %Accounts.Membership{status: "revoked"}} =
                Accounts.revoke_membership(membership.id, owner.id)
 
-      assert %{"info" => "Your access to this organization changed."} =
+      assert %{"info" => "You no longer have access to any organization."} =
                assert_redirect(view, "/new/org")
     end
   end
@@ -304,7 +304,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/new/org")
+               assert_redirect(view, "/#{other_org.slug}")
     end
 
     test "review responses reauthorize after cloud membership is revoked" do
@@ -401,7 +401,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
         assert {:ok, %Accounts.Membership{status: "revoked"}} =
                  Accounts.revoke_membership(membership.id, owner.id)
 
-        assert %{"info" => "Your access to this organization changed."} =
+        assert %{"info" => "You no longer have access to any organization."} =
                  assert_redirect(view, "/new/org"),
                "#{surface} did not evict the revoked membership"
       end
@@ -426,17 +426,17 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
         assert {:ok, %Accounts.Membership{status: "revoked"}} =
                  Accounts.revoke_membership(membership.id, owner.id)
 
-        assert %{"info" => "Your access to this organization changed."} =
+        assert %{"info" => "You no longer have access to any organization."} =
                  assert_redirect(view, "/new/org"),
                "#{surface} did not evict the revoked membership"
       end
     end
 
-    test "revoking the page's membership redirects while other memberships remain" do
+    test "revoking the page's membership switches to the remaining organization" do
       {org, user, membership, workspace} = org_with_workspace!("viewer")
 
-      # The user keeps an active membership elsewhere; the redirect must not
-      # become a sign-out.
+      # The user keeps an active membership elsewhere; the revocation must
+      # switch them there, not sign them out or dead-end on /new/org.
       other_org = create_org!("elsewhere")
       create_membership!(user, other_org, "viewer")
 
@@ -450,7 +450,7 @@ defmodule ControlKeelWeb.MembershipEvictionTest do
                Accounts.revoke_membership(membership.id, owner.id)
 
       assert %{"info" => "Your access to this organization changed."} =
-               assert_redirect(view, "/new/org")
+               assert_redirect(view, "/#{other_org.slug}")
     end
 
     test "demoting an admin hides observability mutation controls without a redirect" do

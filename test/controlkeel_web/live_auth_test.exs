@@ -159,7 +159,7 @@ defmodule ControlKeelWeb.LiveAuthTest do
     refute ControlKeel.Repo.get_by(ControlKeel.Mission.Workspace, name: "Still No")
   end
 
-  test "revoking the page's membership redirects to /new/org" do
+  test "revoking the user's last membership redirects to /new/org" do
     {conn, user, org} = member_conn()
     membership = Accounts.get_active_membership(user.id, org.id)
     owner = create_owner(org)
@@ -169,8 +169,27 @@ defmodule ControlKeelWeb.LiveAuthTest do
     assert {:ok, %Accounts.Membership{status: "revoked"}} =
              Accounts.revoke_membership(membership.id, owner.id)
 
-    assert %{"info" => "Your access to this organization changed."} =
+    assert %{"info" => "You no longer have access to any organization."} =
              assert_redirect(view, "/new/org")
+  end
+
+  test "revoking one membership switches the page to the remaining organization" do
+    {conn, user, org} = member_conn()
+    membership = Accounts.get_active_membership(user.id, org.id)
+    owner = create_owner(org)
+
+    {:ok, other_org} =
+      Accounts.create_org(%{name: "Other", slug: "other-#{System.unique_integer([:positive])}"})
+
+    insert_membership(user, other_org, "viewer")
+
+    {:ok, view, _html} = live(conn, ~p"/#{org.slug}")
+
+    assert {:ok, %Accounts.Membership{status: "revoked"}} =
+             Accounts.revoke_membership(membership.id, owner.id)
+
+    assert %{"info" => "Your access to this organization changed."} =
+             assert_redirect(view, "/#{other_org.slug}")
   end
 
   test "revoking a membership in another org leaves the page in place" do
