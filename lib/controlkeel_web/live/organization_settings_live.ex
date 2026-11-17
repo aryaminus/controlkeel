@@ -2,11 +2,20 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   @moduledoc """
   Organization settings at `/:org_slug/settings`.
 
-  Secondary navigation over setting groups, mirroring the workspace settings
-  pattern (`?tab=` query param + `push_patch`). Three groups today: General
-  (name, status, budget), Members (roster, roles, invites — admin+ by the
-  page-wide gate) and Policy sets (org-owned policy sets — the former global
-  Policy Studio, now scoped to the organization).
+  Section navigation lives in the **org sidebar** (not in the page body):
+  the LiveView assigns `settings_nav`/`tabs`/`active_tab` and the shared
+  organization sidebar renders a settings variant — a back row to the org
+  overview plus the section buttons (`?tab=` query param + `push_patch`
+  via the `set_tab` event, mirroring the workspace settings pattern).
+  Three groups, all admin+: General (name, status, budget), Members
+  (roster, roles, invites) and Policy sets (org-owned policy sets — the
+  former global Policy Studio, now scoped to the organization).
+
+  Per-user account management (identity info, Art.15 export, Art.17
+  erasure) does **not** live here — it lives in the account dialog opened
+  from the shared user menu (`ControlKeelWeb.UserMenu.account_dialog/1`),
+  which works over any page in both modes. The page resolves at the
+  `"admin"` floor; non-admin members see the shared access panel.
 
   Member management lives here (moved from the org overview page when the
   overview became the org dashboard): invite by email, role changes, and
@@ -69,6 +78,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   defp normalize_tab("policy_sets"), do: "policy_sets"
   defp normalize_tab("members"), do: "members"
+  # No tab param, garbage params: General is the default section.
   defp normalize_tab(_tab), do: "general"
 
   @impl true
@@ -428,6 +438,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
     memberships = if(local_mode, do: [], else: load_memberships(org.id))
+    tabs = @tabs
 
     {:ok,
      socket
@@ -449,8 +460,9 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:settings_error, nil)
      |> assign(:delete_org_form, to_form(%{"confirm_slug" => ""}, as: :delete_org))
      |> assign(:delete_org_error, nil)
-     |> assign(:tabs, @tabs)
+     |> assign(:tabs, tabs)
      |> assign(:active_tab, active_tab || "general")
+     |> assign(:settings_nav, true)
      |> assign(:open_packs, MapSet.new())
      |> assign(:show_packs_dialog, false)
      |> assign(:show_create_modal, false)
@@ -817,65 +829,36 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   def render(assigns) do
     ~H"""
     <section class="w-full space-y-8">
-      <div class="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <nav
-          class="rounded-2xl border bg-card shadow-card lg:self-start lg:p-3"
-          aria-label="Organization settings sections"
-        >
-          <ul class="flex gap-1 list-none m-0 overflow-x-auto p-2 lg:flex-col lg:gap-1 lg:p-0">
-            <%= for tab <- @tabs do %>
-              <li class="shrink-0">
-                <button
-                  type="button"
-                  phx-click="set_tab"
-                  phx-value-tab={tab}
-                  aria-current={@active_tab == tab && "page"}
-                  class={[
-                    "w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition",
-                    @active_tab == tab &&
-                      "bg-primary/10 font-semibold text-primary",
-                    @active_tab != tab &&
-                      "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  ]}
-                >
-                  {tab_label(tab)}
-                </button>
-              </li>
-            <% end %>
-          </ul>
-        </nav>
-
-        <%= case @active_tab do %>
-          <% "policy_sets" -> %>
-            <.policy_sets_panel
-              org={@org}
-              policy_sets={@policy_sets}
-              pack_count={@pack_count}
-              rule_count={@rule_count}
-              block_count={@block_count}
-            />
-          <% "members" -> %>
-            <.members_panel
-              memberships={@memberships}
-              local_mode={@local_mode}
-              invite_token={@invite_token}
-              current_user={@current_user}
-              active_owner_count={@active_owner_count}
-              can_manage={can_manage?(assigns)}
-              current_role={current_role(assigns)}
-            />
-          <% _ -> %>
-            <.general_panel
-              org={@org}
-              settings_form={@settings_form}
-              settings_error={@settings_error}
-              delete_org_form={@delete_org_form}
-              delete_org_error={@delete_org_error}
-              local_mode={@local_mode}
-              current_membership={@current_membership}
-            />
-        <% end %>
-      </div>
+      <%= case @active_tab do %>
+        <% "policy_sets" -> %>
+          <.policy_sets_panel
+            org={@org}
+            policy_sets={@policy_sets}
+            pack_count={@pack_count}
+            rule_count={@rule_count}
+            block_count={@block_count}
+          />
+        <% "members" -> %>
+          <.members_panel
+            memberships={@memberships}
+            local_mode={@local_mode}
+            invite_token={@invite_token}
+            current_user={@current_user}
+            active_owner_count={@active_owner_count}
+            can_manage={can_manage?(assigns)}
+            current_role={current_role(assigns)}
+          />
+        <% _ -> %>
+          <.general_panel
+            org={@org}
+            settings_form={@settings_form}
+            settings_error={@settings_error}
+            delete_org_form={@delete_org_form}
+            delete_org_error={@delete_org_error}
+            local_mode={@local_mode}
+            current_membership={@current_membership}
+          />
+      <% end %>
     </section>
 
     <.invite_modal
@@ -904,10 +887,6 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     />
     """
   end
-
-  defp tab_label("general"), do: "General"
-  defp tab_label("members"), do: "Members"
-  defp tab_label("policy_sets"), do: "Policy sets"
 
   # ── Members panel & modals --------------------------------------------
 
@@ -1376,7 +1355,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
           </div>
           <p class="text-sm text-foreground">
             <strong>Delete this organization permanently.</strong> Every workspace, session,
-            finding, proof, and enrolled cloud key under <strong>{@org.name}</strong> is erased,
+            finding, proof, and enrolled cloud key under <strong>{@org.name}</strong> is deleted,
             and active members are pushed off the organization's pages. Audit records of the
             deletion survive with identities replaced by non-reversible markers.
           </p>

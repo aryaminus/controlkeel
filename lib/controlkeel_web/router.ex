@@ -138,45 +138,40 @@ defmodule ControlKeelWeb.Router do
       live "/invitations/:token", InvitationLive, :show
     end
 
-    # Cloud-auth gated: in cloud/self_hosted mode requires active membership.
-    # In local mode the on_mount hook is a passthrough.
-    live_session :cloud_auth,
-      layout: {ControlKeelWeb.Layouts, :dashboard},
-      on_mount: [
-        {ControlKeelWeb.LiveAuth, :require_cloud_auth},
-        ControlKeelWeb.LayoutDefaults
-      ] do
-      # RFC 8628 device approval page (auth-gated: only a signed-in user can
-      # authorize a device against their own account).
+    # RFC 8628 device approval page (auth-gated: only a signed-in user can
+    # authorize a device against their own account). Standalone surface: no
+    # app chrome (sidebar/breadcrumbs) — a centered card layout.
+    live_session :device_auth,
+      layout: {ControlKeelWeb.Layouts, :device},
+      on_mount: [{ControlKeelWeb.LiveAuth, :require_cloud_auth}] do
       live "/device", DeviceAuthLive, :index
-
-      # /cloud/projects and /cloud/telemetry removed (owner directive, 10/22:
-      # "no cloud routes" — the cloud-project concept is stale; the org is the
-      # grouping surface and the org overview is the dashboard). The modules
-      # were deleted with the routes; the /cloud/v1/* machine APIs are
-      # unaffected — they are the self-host sync/telemetry data plane, not
-      # browser surfaces.
-
-      # /policies removed from the router: PolicyStudioLive was org-unowned.
-      # Policy set management now lives under org settings
-      # (/:org_slug/settings?tab=policy_sets). PolicyStudioLive and its test
-      # were deleted together with this route (approved review #1).
-      # GET /policies survives as a redirect (declared in the sunset group
-      # above) landing on that tab — default org in local mode, the
-      # signed-in cloud user's newest org otherwise.
-
-      # /skills removed from the router: SkillsLive and its test are kept so
-      # the page can return under a different scope (org or workspace) later
-      # instead of a global surface. GET /skills now falls through to the
-      # ":org_slug" live block and the invalid-org handler.
-
-      # /dashboard removed from the router: DashboardLive was the last global
-      # operator page and its stats were computed across every org. The org
-      # overview (/:org_slug) is the dashboard now. GET /dashboard falls
-      # through to the ":org_slug" live block and the invalid-org handler —
-      # "dashboard" is reserved in Accounts.Org.@reserved_slugs, so no org
-      # can ever claim the URL. Regression-tested in router_test.exs.
     end
+
+    # History of removed global routes (kept here because their GET paths
+    # survive as redirects or fall through to the ":org_slug" block):
+    # /cloud/projects and /cloud/telemetry removed (owner directive, 10/22:
+    # "no cloud routes" — the cloud-project concept is stale; the org is the
+    # grouping surface and the org overview is the dashboard). The modules
+    # were deleted with the routes; the /cloud/v1/* machine APIs are
+    # unaffected — they are the self-host sync/telemetry data plane, not
+    # browser surfaces.
+    # /policies removed from the router: PolicyStudioLive was org-unowned.
+    # Policy set management now lives under org settings
+    # (/:org_slug/settings?tab=policy_sets). PolicyStudioLive and its test
+    # were deleted together with this route (approved review #1).
+    # GET /policies survives as a redirect (declared in the sunset group
+    # above) landing on that tab — default org in local mode, the
+    # signed-in cloud user's newest org otherwise.
+    # /skills removed from the router: SkillsLive and its test are kept so
+    # the page can return under a different scope (org or workspace) later
+    # instead of a global surface. GET /skills now falls through to the
+    # ":org_slug" live block and the invalid-org handler.
+    # /dashboard removed from the router: DashboardLive was the last global
+    # operator page and its stats were computed across every org. The org
+    # overview (/:org_slug) is the dashboard now. GET /dashboard falls
+    # through to the ":org_slug" live block and the invalid-org handler —
+    # "dashboard" is reserved in Accounts.Org.@reserved_slugs, so no org
+    # can ever claim the URL. Regression-tested in router_test.exs.
 
     # /new/* pages use a standalone headless layout (own
     # NewPagesLayouts module — no sidebar/breadcrumb):
@@ -458,6 +453,14 @@ defmodule ControlKeelWeb.Router do
       ] do
       live "/:org_slug", OrganizationDetailLive, :index
       live "/:org_slug/settings", OrganizationSettingsLive, :edit
+
+      # Org-level Workspaces index and Sessions index: the org page keeps the
+      # dashboard, while the workspace grid (creation + cards) and the org's
+      # cross-workspace session list live on their own routes. Both slugs are
+      # in Accounts.Org.@reserved_slugs, so no org can claim these paths.
+      live "/:org_slug/workspaces", WorkspaceIndexLive, :index
+      live "/:org_slug/sessions", OrgSessionsLive, :index
+
       live "/:org_slug/workspaces/:ws_slug", WorkspaceDetailLive, :index
       live "/:org_slug/workspaces/:ws_slug/settings", WorkspaceSettingsLive, :show
       live "/:org_slug/workspaces/:ws_slug/repos", WorkspaceReposLive, :index
