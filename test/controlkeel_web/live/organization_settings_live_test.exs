@@ -765,11 +765,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       member = create_user!("member-#{n}@example.com")
       member_m = add_active_membership(member.id, org.id, "member")
 
-      {:ok,
-       org: org,
-       member: member,
-       member_m: member_m,
-       conn: conn_for(owner)}
+      {:ok, org: org, member: member, member_m: member_m, conn: conn_for(owner)}
     end
 
     test "invite flow refuses a disabled account with a clear message and issues no token", %{
@@ -836,6 +832,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       {:ok, view, html} = live(conn, ~p"/#{org.slug}/settings?tab=general")
 
       assert html =~ "Organization identity, status, and spend limits."
+
       assert has_element?(
                view,
                "#org-settings-form input[name='settings[name]'][disabled]"
