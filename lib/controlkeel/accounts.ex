@@ -93,11 +93,37 @@ defmodule ControlKeel.Accounts do
     |> Repo.all()
   end
 
+  # ⚠️ No product call site yet. Account-level disable/enable is deliberately
+  # NOT exposed to org admins/owners: accounts are global, and a user may hold
+  # memberships in several organizations, so one org's admin must not be able
+  # to flip global account status. These context functions are reserved for a
+  # future platform-admin surface — if you wire them up, use them carefully:
+  # the effect is account-wide (sign-out everywhere + login refusal), not
+  # org-scoped. Org-scoped offboarding is `revoke_membership/2`.
+  @doc """
+  Disable a user account: the account cannot sign in again and loses access
+  immediately.
+
+  On success the change is broadcast (`broadcast_account_disabled/1`) so the
+  user's mounted LiveViews drop to the login screen at once — the same
+  post-commit eviction `DataLifecycle.delete_user/1` performs, because a flag
+  flip alone leaves mounted pages live until the next navigation.
+  """
   @spec disable_user(integer()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t() | :not_found}
   def disable_user(user_id) do
     case Repo.get(User, user_id) do
-      nil -> {:error, :not_found}
-      user -> user |> User.changeset(%{status: "disabled"}) |> Repo.update()
+      nil ->
+        {:error, :not_found}
+
+      user ->
+        case user |> User.changeset(%{status: "disabled"}) |> Repo.update() do
+          {:ok, disabled} ->
+            broadcast_account_disabled(user_id)
+            {:ok, disabled}
+
+          {:error, _} = err ->
+            err
+        end
     end
   end
 
@@ -654,6 +680,20 @@ defmodule ControlKeel.Accounts do
   @spec sign_out_everywhere(integer()) :: :ok
   def sign_out_everywhere(user_id) when is_integer(user_id) do
     Phoenix.PubSub.broadcast(ControlKeel.PubSub, signout_topic(user_id), :sign_out_everywhere)
+    :ok
+  end
+
+  @doc """
+  Broadcast an account-disabled event on the sign-out topic of the given user.
+
+  Parity with the `DataLifecycle.delete_user/1` post-commit eviction: mounted
+  LiveViews of the disabled user are pushed to the login screen immediately
+  with an explanatory message, instead of staying live until their next
+  navigation. `ControlKeelWeb.LiveAuth` handles this message.
+  """
+  @spec broadcast_account_disabled(integer()) :: :ok
+  def broadcast_account_disabled(user_id) when is_integer(user_id) do
+    Phoenix.PubSub.broadcast(ControlKeel.PubSub, signout_topic(user_id), :account_disabled)
     :ok
   end
 

@@ -20,7 +20,10 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   Member management lives here (moved from the org overview page when the
   overview became the org dashboard): invite by email, role changes, and
   revocation are admin+ gated by `can_manage?`, with the same last-owner
-  protections as before.
+  protections as before. Account-level disable/enable is intentionally not
+  offered here — accounts are global across organizations, so flipping
+  `users.status` is reserved for a future platform-admin surface; revoking
+  the membership is the org-scoped offboarding action.
   """
 
   use ControlKeelWeb, :live_view
@@ -151,7 +154,10 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     role = if role in @valid_roles, do: role, else: "member"
 
     with :ok <- validate_email(email),
-         {:ok, user} <- find_or_create_user(email),
+         # Accounts-level find-or-create carries the one status policy: a
+         # disabled account is refused (its invitation token could never be
+         # redeemed, because login is blocked).
+         {:ok, user, _created?} <- Accounts.find_or_create_user(email),
          {:ok, _membership, raw_token} <-
            Accounts.invite_member(user.id, socket.assigns.org.id,
              role: role,
@@ -592,18 +598,14 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       else: {:error, "Invalid email format"}
   end
 
-  defp find_or_create_user(email) do
-    case Accounts.get_user_by_email(email) do
-      nil -> Accounts.create_user(%{email: email})
-      user -> {:ok, user}
-    end
-  end
-
   defp format_error(reason) when is_binary(reason), do: reason
+  defp format_error(:account_disabled), do: "This account is disabled and cannot be invited."
   defp format_error(:already_member), do: "This user is already a member or has a pending invite."
   defp format_error(:unauthorized), do: "You don't have permission to invite at that role."
   defp format_error(%Ecto.Changeset{}), do: "Could not invite member."
-  defp format_error(reason), do: inspect(reason)
+
+  # No inspect/1 fallback: raw atoms must never surface in the UI.
+  defp format_error(_reason), do: "Could not invite member. Please try again."
 
   # Owners can invite at any role; admins only member/viewer (matches the
   # role-change matrix and the server-side guard in `invite_member/3`).
@@ -1030,16 +1032,18 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
                         </span>
                       </td>
                       <td class="px-4 py-4 text-right whitespace-nowrap w-px">
-                        <%= if can_revoke?(@current_role, m, @current_user) do %>
-                          <button
-                            type="button"
-                            phx-click="confirm_revoke"
-                            phx-value-membership-id={m.id}
-                            class="text-sm font-medium text-destructive transition hover:text-destructive"
-                          >
-                            Revoke
-                          </button>
-                        <% end %>
+                        <div class="flex items-center justify-end gap-3">
+                          <%= if can_revoke?(@current_role, m, @current_user) do %>
+                            <button
+                              type="button"
+                              phx-click="confirm_revoke"
+                              phx-value-membership-id={m.id}
+                              class="text-sm font-medium text-destructive transition hover:text-destructive"
+                            >
+                              Revoke
+                            </button>
+                          <% end %>
+                        </div>
                       </td>
                     </tr>
                   <% end %>

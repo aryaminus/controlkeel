@@ -736,4 +736,67 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
   end
 
   defp org_id_from_admin_m(m), do: m.org_id
+
+  # --- Invite flow vs. disabled accounts ------------------------------------
+
+  # There is no org-scoped disable/enable UI: accounts are global across
+  # organizations, so account-level disable/enable is reserved for a future
+  # platform-admin surface. The invite flow still must refuse a disabled
+  # account (its invitation token could never be redeemed), so this test
+  # disables the account directly through the Accounts context.
+  describe "invite flow refuses disabled accounts in cloud mode" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      n = System.unique_integer([:positive])
+
+      owner = create_user!("owner-#{n}@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Acme", slug: "acme-#{n}"})
+
+      member = create_user!("member-#{n}@example.com")
+      member_m = add_active_membership(member.id, org.id, "member")
+
+      {:ok,
+       org: org,
+       member: member,
+       member_m: member_m,
+       conn: conn_for(owner)}
+    end
+
+    test "invite flow refuses a disabled account with a clear message and issues no token", %{
+      conn: conn,
+      org: org,
+      member: member,
+      member_m: member_m
+    } do
+      {:ok, _} = Accounts.disable_user(member.id)
+
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/settings?tab=members")
+
+      view
+      |> element("#invite-member-button")
+      |> render_click()
+
+      render_submit(view, "invite", %{"invite" => %{"email" => member.email, "role" => "member"}})
+
+      html = render(view)
+
+      assert html =~ "This account is disabled and cannot be invited."
+      refute html =~ "Invitation token issued"
+
+      # No new membership row was created for the disabled user.
+      assert Accounts.list_memberships_for_user(member.id) |> Enum.map(& &1.id) == [
+               member_m.id
+             ]
+    end
+  end
 end

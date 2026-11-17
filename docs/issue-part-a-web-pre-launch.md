@@ -1,6 +1,6 @@
 # GitHub Issue — Part A (web service, features, UI/UX)
 
-**Suggested title:** `web(offboarding): usable offboarding surface + disabled-user session/eviction UX (pre-launch, Part A)`
+**Suggested title:** `web(offboarding): smooth org switch on revocation + disabled-user session/eviction UX (pre-launch, Part A)`
 
 **Suggested labels:** `bug`, `security`, `pre-launch`, `web`
 
@@ -30,10 +30,9 @@ grep -rn "disable_user\|enable_user" lib/   → only lib/controlkeel/accounts.ex
 
 **Why it matters:** A multi-tenant SaaS cannot answer "who still has access?" if offboarding is not reachable. Blocking for cloud launch.
 
-**Fix:**
-- Add disable/enable to an admin surface — org-scoped member management in `OrganizationSettingsLive` at minimum; platform-admin surface if global offboarding is intended.
-- Confirmation step, flash feedback, and the eviction behavior from Problem 2.
-- Tests: disable via UI → login rejected (`{:error, :account_disabled}` path already covered by `test/controlkeel/accounts/user_offboarding_test.exs`), re-enable works.
+**Fix (revised — see "Update — requirement revision" below):**
+- Account-level disable/enable is **not** an org-scoped surface. `Accounts.disable_user/1` / `enable_user/1` remain context-level functions with no product call site until a future **platform-admin** surface exists; org admins/owners must not be able to flip global account status.
+- The eviction behavior from Problem 2 is implemented regardless: when an account *is* disabled (future platform-admin or support action), the user is signed out everywhere immediately and refused at login with an explanation.
 
 ## Problem 2 (High): Disabled users are silently logged out; no eviction parity with `delete_user`
 
@@ -74,10 +73,26 @@ grep -rn "disable_user\|enable_user" lib/   → only lib/controlkeel/accounts.ex
 - Unchanged-field updates are safe (`validate_inclusion` skips fields with no change).
 - Optional: one-time normalization check / smoke query before launch.
 
+## Update — requirement revision (no org-scoped disable/enable; smooth org switch)
+
+The original Problem 1 fix proposed wiring disable/enable into `OrganizationSettingsLive`'s members tab. That surface is **dropped**:
+
+- Accounts are global, not org-scoped. A user may hold memberships in several organizations at once; disabling the account from one org's settings would sign them out everywhere and break organizations the acting admin has no authority over.
+- Org admins/owners therefore get **no** disable/enable UI. `Accounts.disable_user/1` / `enable_user/1` stay in the `Accounts` context (exercised by tests, no UI call site) and are reserved for a future **platform-admin** surface.
+- The org-scoped offboarding action remains **membership revocation**, which was already admin+ gated with last-owner protections.
+
+New requirement — **smooth switch on revocation**: a revoked user must not dead-end on `/new/org` while they still belong to other organizations. `LiveAuth`'s revocation handler now:
+
+- navigates to the user's first remaining organization (`/<org_slug>`, ordered by name) with the existing "Your access to this organization changed." flash when any active membership remains; and
+- lands on `/new/org` with "You no longer have access to any organization." only when the revoked membership was the user's last one.
+
+Revocation broadcasts fire post-commit, so the remaining-org lookup inside the handler already excludes the just-revoked membership.
+
 ## Acceptance criteria
 
-- [ ] An operator can disable and re-enable a user from the web UI; disabled users cannot sign in again and lose access immediately (including mounted LiveViews).
-- [ ] Disabled users see an explanatory message, not a silent logout.
+- [ ] There is **no** org-scoped disable/enable UI: org admins/owners cannot flip global account status from `OrganizationSettingsLive` (or anywhere else); the members tab offers invite, role changes, and revocation only.
+- [ ] Revoking a membership smoothly switches the affected user to their first remaining organization (`/<org_slug>`); if none remain they land on `/new/org` — never a dead end, never a sign-out.
+- [ ] Disabled users (account-level action, future platform-admin surface) still see an explanatory message, not a silent logout, and mounted LiveViews drop immediately (Problem 2 machinery stays).
 - [ ] Invite flow uses the Accounts-level function and surfaces a clear error for disabled accounts; no raw atoms in UI error text.
 - [ ] Local mode unaffected: web flows in local mode behave as before for active users.
-- [ ] `mix test test/controlkeel/accounts/user_offboarding_test.exs test/controlkeel_web/load_current_user_disabled_test.exs` extended to cover the new surface; `mix precommit` clean.
+- [ ] `mix test test/controlkeel/accounts/user_offboarding_test.exs test/controlkeel_web/load_current_user_disabled_test.exs` extended to cover the offboarding behavior; `mix precommit` clean.

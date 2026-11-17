@@ -60,4 +60,30 @@ defmodule ControlKeel.Accounts.UserOffboardingTest do
                Accounts.find_or_create_user("brand-new-#{n}@example.com", "New")
     end
   end
+
+  describe "disable_user/1 eviction (parity with delete_user)" do
+    test "disabling broadcasts so the user's mounted LiveViews drop immediately" do
+      user = user_fixture()
+
+      Phoenix.PubSub.subscribe(ControlKeel.PubSub, Accounts.signout_topic(user.id))
+
+      assert {:ok, _} = Accounts.disable_user(user.id)
+
+      # LiveAuth handles this message by pushing every mounted page of the
+      # disabled user to the login screen with an explanatory flash — the
+      # same post-commit eviction DataLifecycle.delete_user/1 performs.
+      assert_receive :account_disabled
+    end
+
+    test "enabling does not broadcast an eviction" do
+      user = user_fixture()
+      {:ok, _} = Accounts.disable_user(user.id)
+
+      Phoenix.PubSub.subscribe(ControlKeel.PubSub, Accounts.signout_topic(user.id))
+
+      assert {:ok, _} = Accounts.enable_user(user.id)
+
+      refute_receive :account_disabled
+    end
+  end
 end
