@@ -508,7 +508,11 @@ defmodule ControlKeel.Observability do
           "suite" => preview.suite,
           "subjects" => preview.subjects,
           "baseline_subject" => Keyword.get(opts, :baseline_subject) || preview.subjects,
-          "scenario_slugs" => Enum.join(preview.scenario_slugs, ",")
+          "scenario_slugs" => Enum.join(preview.scenario_slugs, ","),
+          # Stamp the run with the caller's workspace (benchmark tenancy,
+          # #259 follow-up) so workspace-scoped readers can see it; nil keeps
+          # the local unscoped behavior.
+          "workspace_id" => Keyword.get(opts, :workspace_id)
         }
 
         case Benchmark.run_suite(attrs, project_root) do
