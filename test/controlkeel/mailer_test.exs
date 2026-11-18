@@ -29,6 +29,25 @@ defmodule ControlKeel.MailerTest do
     test "find_by_email/1 returns nil when no match" do
       assert TestInbox.find_by_email("nobody@x") == nil
     end
+
+    test "includes the invitation expiry when supplied" do
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.add(14 * 24 * 60 * 60, :second)
+        |> DateTime.truncate(:second)
+
+      assert :ok =
+               Mailer.deliver_invitation(%{email: "exp@x"}, "tok", expires_at: expires_at)
+
+      assert {:invitation, payload, _} = TestInbox.find_by_email("exp@x")
+      assert payload.expires_at == DateTime.to_iso8601(expires_at)
+    end
+
+    test "omits the expiry key when not supplied" do
+      assert :ok = Mailer.deliver_invitation(%{email: "noexp@x"}, "tok")
+      assert {:invitation, payload, _} = TestInbox.find_by_email("noexp@x")
+      refute Map.has_key?(payload, :expires_at)
+    end
   end
 
   describe "deliver_invitation/2 input validation" do

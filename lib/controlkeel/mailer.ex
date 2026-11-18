@@ -31,20 +31,32 @@ defmodule ControlKeel.Mailer do
   `recipient` is anything that has an `:email` field (a `User` struct or a
   plain map). `raw_token` is the invitation token returned from
   `Accounts.invite_member/3`.
+
+  Pass `expires_at:` when the invitation has a deadline so the payload (and
+  any future real email template) can tell the recipient when the link dies.
   """
-  @spec deliver_invitation(map(), String.t()) :: :ok | {:error, term()}
-  def deliver_invitation(%{email: email}, raw_token)
+  @spec deliver_invitation(map(), String.t(), keyword()) :: :ok | {:error, term()}
+  def deliver_invitation(recipient, raw_token, opts \\ [])
+
+  def deliver_invitation(%{email: email}, raw_token, opts)
       when is_binary(email) and is_binary(raw_token) do
-    payload = %{
-      to: email,
-      token: raw_token,
-      url: "/invitations/" <> raw_token
-    }
+    payload =
+      %{
+        to: email,
+        token: raw_token,
+        url: "/invitations/" <> raw_token
+      }
+      |> put_expires_at(Keyword.get(opts, :expires_at))
 
     deliver(adapter(), :invitation, payload)
   end
 
-  def deliver_invitation(_recipient, _token), do: {:error, :invalid_recipient}
+  def deliver_invitation(_recipient, _token, _opts), do: {:error, :invalid_recipient}
+
+  defp put_expires_at(payload, %DateTime{} = expires_at),
+    do: Map.put(payload, :expires_at, DateTime.to_iso8601(expires_at))
+
+  defp put_expires_at(payload, _expires_at), do: payload
 
   defp adapter, do: Application.get_env(:controlkeel, :mailer_adapter, :log)
 
