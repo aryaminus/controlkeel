@@ -508,7 +508,11 @@ defmodule ControlKeel.Observability do
           "suite" => preview.suite,
           "subjects" => preview.subjects,
           "baseline_subject" => Keyword.get(opts, :baseline_subject) || preview.subjects,
-          "scenario_slugs" => Enum.join(preview.scenario_slugs, ",")
+          "scenario_slugs" => Enum.join(preview.scenario_slugs, ","),
+          # Stamp the run with the caller's workspace (benchmark tenancy,
+          # #259 follow-up) so workspace-scoped readers can see it; nil keeps
+          # the local unscoped behavior.
+          "workspace_id" => Keyword.get(opts, :workspace_id)
         }
 
         case Benchmark.run_suite(attrs, project_root) do
@@ -2299,7 +2303,11 @@ defmodule ControlKeel.Observability do
   defp ensure_observability_suite(%BenchmarkDraft{} = draft) do
     slug = "observability-#{draft.suite_slug}"
 
-    case Repo.get_by(Suite, slug: slug) do
+    # Suites materialized from drafts are tenant data: resolve within the
+    # draft's workspace (nil matches the NULL workspace_id platform rows in
+    # local unscoped mode) so two tenants deriving the same suite_slug get
+    # independent suites instead of sharing one (benchmark tenancy, #259).
+    case Repo.get_by(Suite, slug: slug, workspace_id: draft.workspace_id) do
       %Suite{} = suite ->
         suite
 
@@ -2312,6 +2320,7 @@ defmodule ControlKeel.Observability do
             "Local generated suite from approved ControlKeel observability benchmark drafts.",
           version: 1,
           status: "active",
+          workspace_id: draft.workspace_id,
           metadata: %{
             "source" => "observability_benchmark_drafts",
             "human_gate_required" => true,

@@ -12,12 +12,9 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
   alias ControlKeel.Benchmark
   alias ControlKeel.Benchmark.{Run, Suite}
 
-  setup do
-    previous = Application.get_env(:controlkeel, :runtime_mode, :local)
-    Application.put_env(:controlkeel, :runtime_mode, :cloud)
-    on_exit(fn -> Application.put_env(:controlkeel, :runtime_mode, previous) end)
-    :ok
-  end
+  # Scoping is opt-driven (explicit workspace_ids / workspace_id attrs), not
+  # runtime-mode-driven, so these tests deliberately avoid mutating
+  # Application env: every scope boundary below is exercised directly.
 
   defp workspace do
     slug = "bmws-#{System.unique_integer([:positive])}"
@@ -47,20 +44,20 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
         version: 1,
         status: "active",
         metadata: %{},
-        workspace_id: ws && ws.id
+        workspace_id: ws.id
       })
       |> Repo.insert()
 
     s
   end
 
-  defp run(suite, ws) do
+  defp run(suite, workspace_id) do
     n = System.unique_integer([:positive])
 
     {:ok, r} =
       Run.changeset(%Run{}, %{
         suite_id: suite.id,
-        workspace_id: ws && ws.id,
+        workspace_id: workspace_id,
         status: "completed",
         subjects: ["subject-#{n}"],
         baseline_subject: "subject-#{n}",
@@ -80,8 +77,8 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
     test "returns only the caller's runs" do
       ws_a = workspace()
       ws_b = workspace()
-      run(suite(ws_a), ws_a)
-      run_b = run(suite(ws_b), ws_b)
+      run(suite(ws_a), ws_a.id)
+      run_b = run(suite(ws_b), ws_b.id)
 
       ids = Benchmark.list_recent_runs(workspace_ids: [ws_a.id]) |> Enum.map(& &1.id)
       refute run_b.id in ids
@@ -89,7 +86,7 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
 
     test "an empty accessible set yields no runs (fail closed)" do
       ws_a = workspace()
-      run(suite(ws_a), ws_a)
+      run(suite(ws_a), ws_a.id)
 
       assert Benchmark.list_recent_runs(workspace_ids: []) == []
     end
@@ -99,14 +96,14 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
     test "does not leak another tenant's run by id" do
       ws_a = workspace()
       ws_b = workspace()
-      run_b = run(suite(ws_b), ws_b)
+      run_b = run(suite(ws_b), ws_b.id)
 
       assert Benchmark.get_run_for_user(run_b.id, [ws_a.id]) == nil
     end
 
     test "returns the caller's own run" do
       ws_a = workspace()
-      run_a = run(suite(ws_a), ws_a)
+      run_a = run(suite(ws_a), ws_a.id)
 
       found = Benchmark.get_run_for_user(run_a.id, [ws_a.id])
       assert found.id == run_a.id
@@ -130,7 +127,65 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
       # Built-in platform suites are loaded by ensure_builtin_suites and remain
       # visible to everyone; tenant-created suites are not.
       slugs = Benchmark.list_suites(workspace_ids: []) |> Enum.map(& &1.slug)
-      assert is_list(slugs)
+      assert "vibe_failures_v1" in slugs
+    end
+
+    test "a platform (NULL workspace) run is invisible to workspace-scoped readers" do
+      # Legacy/unscoped rows must not resurface through scoped reads.
+      ws_a = workspace()
+      orphan = run(suite(ws_a), nil)
+
+      assert Benchmark.get_run_for_user(orphan.id, [ws_a.id]) == nil
+      assert Benchmark.list_recent_runs(workspace_ids: [ws_a.id]) == []
+    end
+  end
+
+  describe "run_suite/2 suite eligibility" do
+    # The run path is guarded server-side (benchmark tenancy, #259 follow-up):
+    # a workspace-stamped caller may execute platform suites or their own.
+    test "rejects another tenant's suite with :suite_not_found and executes nothing" do
+      ws_a = workspace()
+      ws_b = workspace()
+      theirs = suite(ws_b)
+
+      assert {:error, :suite_not_found} =
+               Benchmark.run_suite(%{
+                 "suite" => theirs.slug,
+                 "workspace_id" => ws_a.id,
+                 "subjects" => "controlkeel_validate"
+               })
+
+      # Rejected before any run record (or scenario work) is created.
+      assert Repo.aggregate(Run, :count, :id) == 0
+    end
+
+    test "allows the caller's own suite" do
+      ws_a = workspace()
+      mine = suite(ws_a)
+
+      # The fixture suite has no scenarios, so a passing guard is observable
+      # as the next pipeline error rather than :suite_not_found.
+      assert {:error, :no_scenarios} =
+               Benchmark.run_suite(%{
+                 "suite" => mine.slug,
+                 "workspace_id" => ws_a.id,
+                 "subjects" => "controlkeel_validate"
+               })
+    end
+
+    test "platform suites stay runnable from any workspace" do
+      ws_a = workspace()
+
+      # An unknown scenario filter proves the guard passed (NULL-workspace
+      # platform suites are executable by every tenant) without running any
+      # scenario work.
+      assert {:error, :no_scenarios} =
+               Benchmark.run_suite(%{
+                 "suite" => "vibe_failures_v1",
+                 "workspace_id" => ws_a.id,
+                 "subjects" => "controlkeel_validate",
+                 "scenario_slugs" => "no_such_scenario"
+               })
     end
   end
 end

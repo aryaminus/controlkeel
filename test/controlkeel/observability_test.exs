@@ -5,7 +5,7 @@ defmodule ControlKeel.ObservabilityTest do
   import ControlKeel.MissionFixtures
   import Ecto.Query
 
-  alias ControlKeel.Benchmark.{Run, Scenario}
+  alias ControlKeel.Benchmark.{Run, Scenario, Suite}
   alias ControlKeel.Memory.Record, as: MemoryRecord
   alias ControlKeel.Mission
   alias ControlKeel.Mission.{Finding, Invocation, Session, SessionEvent}
@@ -960,6 +960,62 @@ defmodule ControlKeel.ObservabilityTest do
     drafts = Observability.benchmark_drafts(workspace_id: session.workspace_id)
     assert [%{metadata: %{"materialized_scenario_id" => scenario_id}}] = drafts.drafts
     assert scenario_id == scenario.id
+  end
+
+  # Benchmark tenancy (#259 follow-up): suites materialized from drafts are
+  # tenant data. Two workspaces deriving the same suite_slug (same finding
+  # category → same candidate slug) must get independent, workspace-stamped
+  # suites instead of sharing one platform-visible row.
+  test "materialize_benchmark_drafts/1 isolates identically-slugged suites per workspace" do
+    ws_a_session = session_fixture()
+    ws_b_session = session_fixture()
+
+    for {session, rule} <- [
+          {ws_a_session, "security.materialize_a"},
+          {ws_b_session, "security.materialize_b"}
+        ] do
+      finding_fixture(%{
+        session: session,
+        title: "Materialize finding",
+        severity: "critical",
+        status: "blocked",
+        category: "security",
+        rule_id: rule
+      })
+
+      assert %{stored: 1} = Observability.save_eval_candidates(workspace_id: session.workspace_id)
+
+      assert %{stored: 1, drafts: [%{id: draft_id}]} =
+               Observability.generate_benchmark_drafts(workspace_id: session.workspace_id)
+
+      assert {:ok, _result} =
+               Observability.update_benchmark_draft_status(draft_id, "approved",
+                 reviewed_by: "test"
+               )
+
+      assert %{materialized: 1, existing: 0} =
+               Observability.materialize_benchmark_drafts(workspace_id: session.workspace_id)
+    end
+
+    # Same derived suite_slug in both workspaces, two distinct workspace-stamped suites.
+    suites = Repo.all(from s in Suite, where: s.slug == "observability-security-regression")
+    assert length(suites) == 2
+    workspace_ids = Enum.map(suites, & &1.workspace_id) |> Enum.sort()
+    assert workspace_ids == Enum.sort([ws_a_session.workspace_id, ws_b_session.workspace_id])
+
+    # Each workspace's benchmark page sees only its own scenario.
+    for session <- [ws_a_session, ws_b_session] do
+      scenarios =
+        Observability.observability_benchmark_scenarios(workspace_id: session.workspace_id)
+
+      assert scenarios.count == 1
+    end
+
+    # Re-materializing within the same workspace reuses its suite (idempotent).
+    assert %{materialized: 0, existing: 1} =
+             Observability.materialize_benchmark_drafts(
+               workspace_id: ws_a_session.workspace_id
+             )
   end
 
   test "generate_benchmark_drafts/1 creates human-gated drafts idempotently" do
