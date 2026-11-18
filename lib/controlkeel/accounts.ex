@@ -13,6 +13,8 @@ defmodule ControlKeel.Accounts do
 
   import Ecto.Query, warn: false
 
+  require Logger
+
   alias Ecto.Multi
   alias ControlKeel.Accounts.Membership
   alias ControlKeel.Accounts.Org
@@ -244,30 +246,40 @@ defmodule ControlKeel.Accounts do
   # ──────────────── Memberships ────────────
 
   defp invitation_expiry(opts, now) do
-    days =
-      case Keyword.get(opts, :expires_in_days) do
-        d when is_integer(d) and d > 0 ->
-          d
+    days = invitation_expiry_days(Keyword.get(opts, :expires_in_days))
+    DateTime.add(now, days * 24 * 60 * 60, :second)
+  end
 
-        d when is_binary(d) ->
-          case Integer.parse(d) do
-            {parsed, ""} when parsed > 0 -> parsed
-            _ -> nil
-          end
+  # Explicit `expires_in_days:` is programmer input: bad values are a bug and
+  # must fail loudly. The app-env default is operator input: warn and fall back
+  # to 14 days rather than silently issuing an immortal invitation.
+  defp invitation_expiry_days(nil) do
+    configured =
+      Application.get_env(:controlkeel, :invitation_expiry_days, @default_invitation_expiry_days)
 
-        _ ->
-          Application.get_env(
-            :controlkeel,
-            :invitation_expiry_days,
-            @default_invitation_expiry_days
-          )
-      end
-
-    if is_integer(days) and days > 0 do
-      DateTime.add(now, days * 24 * 60 * 60, :second)
+    if is_integer(configured) and configured > 0 do
+      configured
     else
-      nil
+      Logger.warning(
+        "invalid :controlkeel, :invitation_expiry_days #{inspect(configured)}; " <>
+          "falling back to #{@default_invitation_expiry_days} days"
+      )
+
+      @default_invitation_expiry_days
     end
+  end
+
+  defp invitation_expiry_days(days) when is_integer(days) and days > 0, do: days
+
+  defp invitation_expiry_days(other) do
+    raise ArgumentError,
+          "invite_member/3 :expires_in_days must be a positive integer, got: #{inspect(other)}"
+  end
+
+  # A pending invitation past `expires_at` is dead: report it exactly like an
+  # unknown token so probing cannot distinguish expired from never-existed.
+  defp ensure_invitation_fresh(%Membership{} = membership) do
+    if Membership.invitation_expired?(membership), do: {:error, :invalid_token}, else: :ok
   end
 
   @doc """
@@ -330,6 +342,9 @@ defmodule ControlKeel.Accounts do
             status: "pending",
             invitation_token_hash: token_hash(raw_token),
             invited_at: now,
+            # Re-issues must carry a fresh deadline: keeping the old one would
+            # produce an invitation that is already expired on arrival.
+            expires_at: expires_at,
             invited_by_user_id: invited_by,
             mission_workspace_id: mission_workspace_id,
             accepted_at: nil,
@@ -403,11 +418,7 @@ defmodule ControlKeel.Accounts do
         {:error, :invalid_token}
 
       %Membership{status: "pending"} = membership ->
-        if Membership.invitation_expired?(membership) do
-          # Expired: report invalid, matching accept_invitation, so token
-          # probing cannot distinguish expired from nonexistent.
-          {:error, :invalid_token}
-        else
+        with :ok <- ensure_invitation_fresh(membership) do
           {:ok,
            %{
              membership: membership,
@@ -440,9 +451,7 @@ defmodule ControlKeel.Accounts do
 
     case Repo.get_by(Membership, invitation_token_hash: hash) do
       %Membership{status: "pending"} = membership ->
-        if Membership.invitation_expired?(membership) do
-          {:error, :invalid_token}
-        else
+        with :ok <- ensure_invitation_fresh(membership) do
           {:ok, {updated, org}} =
             Repo.transaction(fn ->
               updated_membership =
@@ -486,11 +495,7 @@ defmodule ControlKeel.Accounts do
         {:error, :invalid_token}
 
       %Membership{user_id: ^user_id, status: "pending"} = membership ->
-        # An expired invitation is dead: report it as invalid so the caller
-        # cannot distinguish "expired" from "never existed" by probing tokens.
-        if Membership.invitation_expired?(membership) do
-          {:error, :invalid_token}
-        else
+        with :ok <- ensure_invitation_fresh(membership) do
           membership
           |> Membership.changeset(%{
             status: "active",

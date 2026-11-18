@@ -23,15 +23,22 @@ defmodule ControlKeelWeb.InvitationLive do
   use ControlKeelWeb, :live_view
 
   alias ControlKeel.Accounts
+  alias ControlKeelWeb.ClientIp
+  alias ControlKeelWeb.Plugs.IpRateLimit
+
+  # The invitation preview is intentionally unauthenticated and distinguishes
+  # ready / already-accepted / invalid, so it is a token oracle. Both the HTTP
+  # dead render and the WebSocket mount run `mount/3` (and every reconnect
+  # runs it again), and both render the oracle — so every pass is throttled
+  # per client IP. The budget covers two hits per page view.
+  @throttle_burst 40
+  @throttle_refill_per_sec 1.0
 
   @impl true
   def mount(%{"token" => token}, session, socket) do
-    # The invitation preview page is intentionally unauthenticated and
-    # distinguishes ready/accepted/invalid, so throttle per IP on the HTTP
-    # (mount) pass. The WebSocket reconnect does not re-run mount.
-    case ControlKeel.Cloud.RateLimiter.hit_key("ip:invitation:#{remote_ip(socket)}",
-           burst: 20,
-           refill_per_sec: 0.5
+    case IpRateLimit.hit("invitation", ClientIp.from_socket(socket),
+           burst: @throttle_burst,
+           refill_per_sec: @throttle_refill_per_sec
          ) do
       :ok ->
         mount_invitation(token, session, socket)
@@ -41,17 +48,12 @@ defmodule ControlKeelWeb.InvitationLive do
           socket
           |> put_flash(:error, "Too many invitation lookups. Try again shortly.")
           |> assign(:page_title, "Invitation")
-          |> assign(:rate_limited, true)
+          |> assign(:state, :rate_limited)
+          |> assign(:retry_path, "/invitations/#{token}")
 
         {:ok, socket}
     end
   end
-
-  defp remote_ip(%Phoenix.LiveView.Socket{private: %{connect_info: %{remote_ip: ip}}})
-       when is_tuple(ip),
-       do: ip |> Tuple.to_list() |> Enum.join(".")
-
-  defp remote_ip(_socket), do: "unknown"
 
   defp mount_invitation(token, session, socket) do
     socket = assign(socket, :page_title, "Invitation")
@@ -118,6 +120,11 @@ defmodule ControlKeelWeb.InvitationLive do
               You've been invited as
               <span class="font-semibold text-primary">{@membership.role}</span>
             </p>
+            <%= if @membership.expires_at do %>
+              <p class="mt-1 text-xs text-muted-foreground">
+                Expires {format_date(@membership.expires_at)}
+              </p>
+            <% end %>
           </div>
         <% end %>
 
@@ -318,6 +325,34 @@ defmodule ControlKeelWeb.InvitationLive do
           >
             <.icon name="hero-arrow-left" class="size-4" />
             {if @current_user, do: "Back to your organization", else: "Back to home"}
+          </a>
+        </div>
+      </section>
+    </div>
+    """
+  end
+
+  def render(%{state: :rate_limited} = assigns) do
+    ~H"""
+    <div class="min-h-screen bg-background text-foreground">
+      <div class="pointer-events-none absolute inset-0 overflow-hidden">
+        <div class="absolute left-1/2 top-8 h-80 w-80 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+      </div>
+
+      <section class="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-16 sm:px-6 lg:px-8">
+        <div class="overflow-hidden rounded-[2rem] border bg-card/95 p-8 text-center shadow-[0_45px_120px_-40px_rgba(0,0,0,0.9)]">
+          <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border bg-muted">
+            <.icon name="hero-clock" class="size-7 text-muted-foreground" />
+          </div>
+          <h1 class="text-2xl font-semibold tracking-tight text-foreground">Too many requests</h1>
+          <p class="mt-3 text-sm text-muted-foreground">
+            We're limiting invitation lookups from your network. Wait a moment, then try again.
+          </p>
+          <a
+            href={@retry_path}
+            class="mt-6 inline-flex items-center gap-2 rounded-2xl border bg-muted px-5 py-3 text-sm font-semibold text-foreground transition duration-200 hover:-translate-y-0.5 hover:bg-muted"
+          >
+            <.icon name="hero-arrow-path" class="size-4" /> Try again
           </a>
         </div>
       </section>

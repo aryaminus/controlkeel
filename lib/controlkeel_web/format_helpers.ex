@@ -44,6 +44,21 @@ defmodule ControlKeelWeb.FormatHelpers do
   def format_datetime(value, _fallback), do: to_string(value)
 
   @doc """
+  Formats a date without a time component, e.g. `2026-11-25`.
+
+  Used where only the day matters (invitation expiry). Accepts a `DateTime`,
+  `NaiveDateTime`, `Date`, or `nil`; `fallback` is returned for nil/unknown
+  input so callers can preserve page-specific copy.
+  """
+  def format_date(value, fallback \\ "unknown")
+
+  def format_date(nil, fallback), do: fallback
+  def format_date(%DateTime{} = dt, _fallback), do: Calendar.strftime(dt, "%Y-%m-%d")
+  def format_date(%NaiveDateTime{} = ndt, _fallback), do: Calendar.strftime(ndt, "%Y-%m-%d")
+  def format_date(%Date{} = date, _fallback), do: Calendar.strftime(date, "%Y-%m-%d")
+  def format_date(_value, fallback), do: fallback
+
+  @doc """
   CSS class string for a neutral pill/badge used in observability pages.
   Consolidated here to eliminate duplication across eight LiveViews.
   """

@@ -161,14 +161,17 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
          # disabled account is refused (its invitation token could never be
          # redeemed, because login is blocked).
          {:ok, user, _created?} <- Accounts.find_or_create_user(email),
-         {:ok, _membership, raw_token} <-
+         {:ok, membership, raw_token} <-
            Accounts.invite_member(user.id, socket.assigns.org.id,
              role: role,
              invited_by_user_id: socket.assigns.current_user.id
            ) do
       # Best-effort email delivery. Token banner remains as visible fallback,
       # so a mailer failure does not block the operator from completing the invite.
-      _ = ControlKeel.Mailer.deliver_invitation(%{email: user.email}, raw_token)
+      _ =
+        ControlKeel.Mailer.deliver_invitation(%{email: user.email}, raw_token,
+          expires_at: membership.expires_at
+        )
 
       {:noreply,
        socket
@@ -1042,6 +1045,11 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
                         <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset #{status_pill_class(m.status)}">
                           {m.status}
                         </span>
+                        <%= if m.status == "pending" && m.expires_at do %>
+                          <p class="mt-1 text-xs text-muted-foreground">
+                            expires {format_date(m.expires_at)}
+                          </p>
+                        <% end %>
                       </td>
                       <td class="px-4 py-4 text-right whitespace-nowrap w-px">
                         <div class="flex items-center justify-end gap-3">
