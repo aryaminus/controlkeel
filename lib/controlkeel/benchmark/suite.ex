@@ -34,6 +34,8 @@ defmodule ControlKeel.Benchmark.Suite do
     ])
     |> validate_required([:slug, :name, :description, :version, :status, :metadata])
     |> validate_number(:version, greater_than: 0)
-    |> unique_constraint(:slug)
+    # Slug uniqueness is scoped per workspace (NULL = platform content); see
+    # the scope_benchmark_suite_slugs_by_workspace migration.
+    |> unique_constraint([:workspace_id, :slug])
   end
 end
