@@ -24,7 +24,8 @@ defmodule ControlKeel.Accounts.OAuthProviders do
       Returns `{:ok, %{url:, session_params:}}`. The caller MUST persist
       `session_params` and pass them to `callback/3`.
     * `callback/3` — exchanges the code for tokens and returns
-      `%{email:, name:}`. Provider-aware.
+      `%{email:, name:, email_verified:}`. Provider-aware. Sign-in is refused
+      unless the provider asserts the email is verified (PR #244).
 
   ## Adapter
 
@@ -32,6 +33,12 @@ defmodule ControlKeel.Accounts.OAuthProviders do
   adapter via `Application.get_env(:controlkeel, :oauth_provider_adapter)`.
   The adapter must export `authorize_url/3` and `callback/4` with the same
   signatures as the default.
+
+  Adapters **must** return `email_verified` in the claims map, and its
+  absence denies sign-in — fail closed. The callback controller
+  pattern-matches the full claims map, so an adapter returning
+  `%{email:, name:}` without the key produces a generic
+  "Authentication failed" error rather than a session.
   """
 
   @type provider :: :google | :github
