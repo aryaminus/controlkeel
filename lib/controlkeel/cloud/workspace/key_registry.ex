@@ -9,11 +9,14 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistry do
 
   Public API:
 
-    - `enroll/1` — store or refresh a registration (idempotent on fingerprint).
+    - `enroll/1` — store or refresh a registration (idempotent on fingerprint;
+      refuses to resurrect a revoked one).
     - `fetch/1` — look up the active registration for a workspace_id.
-    - `revoke/1` — soft-delete a registration so its tokens stop verifying.
-    - `list_for_org/1` — list workspaces visible to a given org_id (used by
-      the org-scoped projects LiveView).
+    - `revoke/1` — soft-delete a registration so its tokens stop verifying,
+      broadcasting an eviction event on `workspace_key_topic/1`.
+    - `list_for_org/2` — list registrations bound to a given org_id (used by
+      the Organization Settings devices tab); pass `include_revoked: true` to
+      include revoked rows for audit.
     - `fetch_by_mission_workspace/1` — resolve the cloud enrollment for a
       local mission workspace (bridges the `ws_` ULID to `workspaces.id`).
     - `touch_last_seen/1` — update last_seen_at on successful token verify.
@@ -41,9 +44,16 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistry do
   @doc """
   Insert or refresh a registration.
 
-  When a row already exists for `workspace_id`, the public key, fingerprint,
-  algorithm, name, and (optionally) org binding are updated and `revoked_at`
-  is cleared. Otherwise a new row is inserted.
+  When a live (non-revoked) row already exists for `workspace_id`, the
+  public key, fingerprint, algorithm, name, and (optionally) org binding are
+  refreshed. Otherwise a new row is inserted.
+
+  Revocation is terminal. Enrolling against a revoked registration returns
+  `{:error, :revoked}` — `revoked_at` is never cleared by this function, so
+  a caller holding the old private key cannot un-revoke itself through the
+  unauthenticated register endpoint. Re-provisioning a revoked device is an
+  explicit operator action: the device enrols again as a fresh registration
+  with a new invitation.
 
   Callers must compute the fingerprint themselves (hex SHA256 of the raw
   public key bytes) before calling. This keeps the registry agnostic to
@@ -71,8 +81,9 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistry do
         # A revoked registration stays revoked. Previously this branch cleared
         # `revoked_at`, which let a caller holding the old private key silently
         # un-revoke itself by re-posting to the (unauthenticated) register
-        # endpoint — revocation has to be terminal to mean anything. An operator
-        # can re-provision by removing the row, which is an explicit action.
+        # endpoint — revocation has to be terminal to mean anything. The only
+        # way back is an explicit operator action: enrol the device afresh as a
+        # new registration with a new invitation (or remove the row directly).
         {:error, :revoked}
     end
   end
@@ -92,7 +103,14 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistry do
     end
   end
 
-  @doc "Soft-delete a registration."
+  @doc """
+  Soft-delete a registration.
+
+  On success an eviction event (`{:workspace_key_revoked, key}`) is
+  broadcast on `workspace_key_topic/1`, so connected surfaces — and the
+  revoked device's next sync — observe the revocation immediately instead of
+  discovering it through a failed token verify.
+  """
   @spec revoke(String.t()) :: {:ok, %Key{}} | {:error, :not_found | Ecto.Changeset.t()}
   def revoke(workspace_id) when is_binary(workspace_id) do
     case Repo.get_by(Key, workspace_id: workspace_id) do
@@ -105,19 +123,64 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistry do
           revoked_at: DateTime.utc_now() |> DateTime.truncate(:second)
         })
         |> Repo.update()
+        |> broadcast_on_ok()
     end
   end
 
-  @doc "All active registrations bound to the given org."
-  @spec list_for_org(integer() | nil) :: [%Key{}]
-  def list_for_org(nil), do: []
+  @doc """
+  PubSub topic for workspace-key events affecting `workspace_id`.
 
-  def list_for_org(org_id) when is_integer(org_id) do
-    from(k in Key,
-      where: k.org_id == ^org_id and is_nil(k.revoked_at),
-      order_by: [desc: k.last_seen_at, desc: k.inserted_at]
+  Revocation broadcasts `{:workspace_key_revoked, key}` on this topic;
+  subscribers can react the moment an operator revokes a device instead of
+  waiting for the device's next failed token verify.
+  """
+  @spec workspace_key_topic(String.t()) :: String.t()
+  def workspace_key_topic(workspace_id) when is_binary(workspace_id),
+    do: "workspace_key:#{workspace_id}"
+
+  # Convenience tap mirroring `Accounts.broadcast_on_ok/1`: broadcast the
+  # eviction event on successful revocation, pass errors through unchanged.
+  defp broadcast_on_ok({:ok, %Key{} = key} = result) do
+    Phoenix.PubSub.broadcast(
+      ControlKeel.PubSub,
+      workspace_key_topic(key.workspace_id),
+      {:workspace_key_revoked, key}
     )
-    |> Repo.all()
+
+    result
+  end
+
+  defp broadcast_on_ok(other), do: other
+
+  @doc """
+  All registrations bound to the given org.
+
+  By default only active (non-revoked) rows are returned. Pass
+  `include_revoked: true` to also return revoked rows — the Organization
+  Settings devices tab uses that for its audit view.
+  """
+  @spec list_for_org(integer() | nil, keyword()) :: [%Key{}]
+  def list_for_org(org_id, opts \\ [])
+
+  def list_for_org(nil, _opts), do: []
+
+  def list_for_org(org_id, opts) when is_integer(org_id) do
+    include_revoked? = Keyword.get(opts, :include_revoked, false)
+
+    query =
+      from(k in Key,
+        where: k.org_id == ^org_id,
+        order_by: [desc: k.last_seen_at, desc: k.inserted_at]
+      )
+
+    query =
+      if include_revoked? do
+        query
+      else
+        where(query, [k], is_nil(k.revoked_at))
+      end
+
+    Repo.all(query)
   end
 
   @doc "Refresh `last_seen_at` on the row for `workspace_id` (best-effort)."

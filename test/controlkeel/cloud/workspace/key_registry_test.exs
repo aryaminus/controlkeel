@@ -93,7 +93,31 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistryTest do
     end
   end
 
-  describe "list_for_org/1" do
+  describe "revoke/1" do
+    test "revokes the registration and broadcasts an eviction event" do
+      attrs = sample_key()
+      {:ok, _key} = KeyRegistry.enroll(attrs)
+
+      Phoenix.PubSub.subscribe(
+        ControlKeel.PubSub,
+        KeyRegistry.workspace_key_topic(attrs.workspace_id)
+      )
+
+      assert {:ok, revoked} = KeyRegistry.revoke(attrs.workspace_id)
+      refute is_nil(revoked.revoked_at)
+
+      assert_received {:workspace_key_revoked, broadcast}
+      assert broadcast.id == revoked.id
+      assert broadcast.workspace_id == attrs.workspace_id
+      refute is_nil(broadcast.revoked_at)
+    end
+
+    test "returns :not_found for an unknown workspace" do
+      assert {:error, :not_found} = KeyRegistry.revoke("ws_does_not_exist")
+    end
+  end
+
+  describe "list_for_org/2" do
     test "returns only active keys bound to the given org" do
       org_a = insert_org()
       org_b = insert_org()
@@ -107,6 +131,28 @@ defmodule ControlKeel.Cloud.Workspace.KeyRegistryTest do
       keys = KeyRegistry.list_for_org(org_a.id)
       assert length(keys) == 2
       assert Enum.all?(keys, &(&1.org_id == org_a.id))
+    end
+
+    test "include_revoked: true also returns revoked rows for audit" do
+      org_a = insert_org()
+      org_b = insert_org()
+
+      {:ok, live} = KeyRegistry.enroll(sample_key(%{org_id: org_a.id}))
+      {:ok, gone} = KeyRegistry.enroll(sample_key(%{org_id: org_a.id}))
+      {:ok, _} = KeyRegistry.enroll(sample_key(%{org_id: org_b.id}))
+      {:ok, _} = KeyRegistry.revoke(gone.workspace_id)
+
+      keys = KeyRegistry.list_for_org(org_a.id, include_revoked: true)
+      assert length(keys) == 2
+
+      assert Enum.any?(keys, &(&1.workspace_id == gone.workspace_id))
+      assert Enum.any?(keys, &(&1.workspace_id == live.workspace_id and is_nil(&1.revoked_at)))
+
+      # The default view still hides the revoked row.
+      refute Enum.any?(
+               KeyRegistry.list_for_org(org_a.id),
+               &(&1.workspace_id == gone.workspace_id)
+             )
     end
 
     test "nil org returns empty" do
