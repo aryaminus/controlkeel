@@ -1093,6 +1093,7 @@ defmodule ControlKeelWeb.OrganizationLayouts do
   # and HEEx then compiles it as a component.
   defp settings_tab_icon("general"), do: "hero-cog-6-tooth"
   defp settings_tab_icon("members"), do: "hero-users"
+  defp settings_tab_icon("devices"), do: "hero-cpu-chip"
   defp settings_tab_icon("policy_sets"), do: "hero-shield-check"
   defp settings_tab_icon(_tab), do: "hero-squares-2x2"
 

@@ -5,6 +5,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.Membership
+  alias ControlKeel.Cloud.Workspace.Key
+  alias ControlKeel.Cloud.Workspace.KeyRegistry
   alias ControlKeel.MissionFixtures
   alias ControlKeel.Platform
   alias ControlKeel.Repo
@@ -44,6 +46,27 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
   defp conn_for(user),
     do: build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+
+  defp enroll_device!(org_id, attrs) do
+    {pub, _priv} = :crypto.generate_key(:eddsa, :ed25519)
+
+    attrs =
+      Map.merge(
+        %{
+          workspace_id:
+            "ws_" <> Base.encode32(:crypto.strong_rand_bytes(8), padding: false, case: :lower),
+          public_key: Base.encode64(pub),
+          algorithm: "ed25519",
+          fingerprint: :crypto.hash(:sha256, pub) |> Base.encode16(case: :lower),
+          name: "test-laptop",
+          org_id: org_id
+        },
+        attrs
+      )
+
+    {:ok, key} = KeyRegistry.enroll(attrs)
+    key
+  end
 
   # --- Tab layout ---------------------------------------------------------
 
@@ -888,6 +911,181 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
       assert html =~ "You don&#39;t have permission to manage policy sets."
       assert Enum.empty?(Platform.list_policy_sets(org.id))
+    end
+  end
+
+  # --- Enrolled devices tab (workspace-key revocation, PR #256's operator surface) ---
+
+  describe "enrolled devices tab in cloud mode" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      n = System.unique_integer([:positive])
+
+      owner = create_user!("owner-#{n}@example.com")
+
+      {:ok, org} =
+        Accounts.create_org_with_owner(owner.id, %{name: "Devices", slug: "devices-#{n}"})
+
+      viewer = create_user!("viewer-#{n}@example.com")
+      add_active_membership(viewer.id, org.id, "viewer")
+
+      {:ok, org: org, owner: owner, viewer: viewer}
+    end
+
+    test "lists enrolled devices with name, workspace id, fingerprint, and last seen", %{
+      org: org,
+      owner: owner
+    } do
+      device = enroll_device!(org.id, %{name: "sara-mbp"})
+
+      {:ok, view, html} = live(conn_for(owner), ~p"/#{org.slug}/settings?tab=devices")
+
+      assert html =~ "Enrolled devices"
+      assert html =~ "sara-mbp"
+      assert html =~ device.workspace_id
+      assert html =~ String.slice(device.fingerprint, 0, 12)
+      assert has_element?(view, "button[phx-click='confirm_revoke_device']")
+    end
+
+    test "revoked devices stay listed with a revoked marker and no revoke action", %{
+      org: org,
+      owner: owner
+    } do
+      live_device = enroll_device!(org.id, %{name: "still-here"})
+      revoked_device = enroll_device!(org.id, %{name: "lost-laptop"})
+      {:ok, _} = KeyRegistry.revoke(revoked_device.workspace_id)
+
+      {:ok, view, html} = live(conn_for(owner), ~p"/#{org.slug}/settings?tab=devices")
+
+      # Audit view: both devices remain visible; only the live one is revocable.
+      assert html =~ "still-here"
+      assert html =~ "lost-laptop"
+      assert has_element?(view, "#device-#{revoked_device.id}", "revoked")
+
+      refute has_element?(
+               view,
+               "#device-#{revoked_device.id} button[phx-click='confirm_revoke_device']"
+             )
+
+      assert has_element?(
+               view,
+               "#device-#{live_device.id} button[phx-click='confirm_revoke_device']"
+             )
+    end
+
+    test "owner revokes a device after confirmation and the eviction broadcast fires", %{
+      org: org,
+      owner: owner
+    } do
+      device = enroll_device!(org.id, %{name: "stolen-mbp"})
+
+      Phoenix.PubSub.subscribe(
+        ControlKeel.PubSub,
+        KeyRegistry.workspace_key_topic(device.workspace_id)
+      )
+
+      {:ok, view, _html} = live(conn_for(owner), ~p"/#{org.slug}/settings?tab=devices")
+
+      view
+      |> element("button[phx-value-key-id='#{device.workspace_id}']")
+      |> render_click()
+
+      assert has_element?(view, "#revoke-device-modal")
+
+      view
+      |> element("#revoke-device-modal button[phx-click='execute_revoke_device']")
+      |> render_click()
+
+      assert render(view) =~ "Device revoked."
+
+      revoked = Repo.get!(Key, device.id)
+      refute is_nil(revoked.revoked_at)
+
+      assert_received {:workspace_key_revoked, broadcast}
+      assert broadcast.id == revoked.id
+    end
+
+    test "cancel keeps the device active", %{org: org, owner: owner} do
+      device = enroll_device!(org.id, %{name: "second-thoughts"})
+
+      {:ok, view, _html} = live(conn_for(owner), ~p"/#{org.slug}/settings?tab=devices")
+
+      view
+      |> element("button[phx-value-key-id='#{device.workspace_id}']")
+      |> render_click()
+
+      assert has_element?(view, "#revoke-device-modal")
+
+      view
+      |> element("#revoke-device-modal button[phx-click='cancel_revoke_device']")
+      |> render_click()
+
+      refute has_element?(view, "#revoke-device-modal")
+      assert is_nil(Repo.get!(Key, device.id).revoked_at)
+    end
+
+    test "a forged execute for another org's workspace_id is refused and revokes nothing", %{
+      org: org,
+      owner: owner
+    } do
+      {:ok, other_org} =
+        Accounts.create_org(%{
+          name: "Other",
+          slug: "other-org-#{System.unique_integer([:positive])}"
+        })
+
+      foreign = enroll_device!(other_org.id, %{name: "foreign-laptop"})
+      own = enroll_device!(org.id, %{name: "own-laptop"})
+
+      {:ok, view, _html} = live(conn_for(owner), ~p"/#{org.slug}/settings?tab=devices")
+
+      html = render_submit(view, "execute_revoke_device", %{"key-id" => foreign.workspace_id})
+
+      assert html =~ "Device not found."
+      assert is_nil(Repo.get!(Key, foreign.id).revoked_at)
+      assert is_nil(Repo.get!(Key, own.id).revoked_at)
+    end
+
+    test "a viewer sees the roster read-only and crafted revocations are refused", %{
+      org: org,
+      viewer: viewer
+    } do
+      device = enroll_device!(org.id, %{name: "viewer-laptop"})
+
+      {:ok, view, _html} = live(conn_for(viewer), ~p"/#{org.slug}/settings?tab=devices")
+
+      assert render(view) =~ "viewer-laptop"
+      refute has_element?(view, "button[phx-click='confirm_revoke_device']")
+
+      html = render_submit(view, "execute_revoke_device", %{"key-id" => device.workspace_id})
+
+      assert html =~ "You don&#39;t have permission to revoke devices."
+      assert is_nil(Repo.get!(Key, device.id).revoked_at)
+    end
+  end
+
+  describe "devices tab in local mode" do
+    test "shows the local-mode notice and refuses crafted revoke events" do
+      Application.put_env(:controlkeel, :runtime_mode, :local)
+      org = create_org!()
+
+      {:ok, view, html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=devices")
+
+      assert html =~ "Device management is not available in local mode."
+
+      html = render_submit(view, "execute_revoke_device", %{"key-id" => "ws_whatever"})
+
+      assert html =~ "Device management is not available in local mode."
     end
   end
 end
