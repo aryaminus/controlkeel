@@ -100,6 +100,17 @@ defmodule ControlKeelWeb.OAuthLoginController do
         |> put_flash(:error, "This account has been disabled. Contact your administrator.")
         |> redirect(to: ~p"/auth/login")
 
+      # An adapter that returns claims without the `email_verified` key (the
+      # PR #244 contract) fails the pattern match above, and the
+      # with-expression hands the raw `{:ok, claims}` tuple here. Fail closed
+      # with the generic denial instead of crashing with a WithClauseError —
+      # only a complete, provider-verified claims map may sign in.
+      {:ok, _claims} ->
+        conn
+        |> clear_oauth_session()
+        |> put_flash(:error, "Authentication failed. Please try again.")
+        |> redirect(to: ~p"/auth/login")
+
       {:error, %Ecto.Changeset{}} ->
         conn
         |> clear_oauth_session()
@@ -123,6 +134,7 @@ defmodule ControlKeelWeb.OAuthLoginController do
   # (see #241). Fails closed when the provider sends no verification claim.
   defp require_verified_email(_provider, true), do: :ok
   defp require_verified_email(_provider, _unverified), do: {:error, :email_not_verified}
+
   @doc "Phase 1 — redirect to a tenant's own OIDC provider"
   def oidc_request(conn, %{"slug" => slug}) do
     with {:ok, provider} <- OrgIdentityProviders.fetch_by_slug(slug),

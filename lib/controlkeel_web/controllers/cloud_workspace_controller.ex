@@ -27,10 +27,16 @@ defmodule ControlKeelWeb.CloudWorkspaceController do
   Responses:
 
     - `201 Created` on first enrolment
-    - `200 OK` on re-enrolment of an existing workspace_id (idempotent)
+    - `200 OK` when a live (non-revoked) registration is refreshed —
+      idempotent re-enrolment of an existing workspace_id
     - `400 Bad Request` on malformed envelope, missing fields, or unsupported algorithm
     - `401 Unauthorized` on proof signature failure
-    - `409 Conflict` on fingerprint clash with a different workspace_id
+    - `409 Conflict` on fingerprint clash with a different workspace_id, or on
+      re-enrolment of a revoked registration (`workspace_registration_revoked`).
+      Revocation is terminal — re-enrolment never resurrects a revoked key, even
+      for a caller still holding the old private key. Re-provisioning is an
+      explicit operator action: the device enrols afresh as a new registration
+      with a new invitation (see Organization Settings → Devices).
     - `422 Unprocessable Entity` on persistence errors
   """
 
