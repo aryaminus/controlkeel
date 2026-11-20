@@ -170,6 +170,38 @@ defmodule ControlKeelWeb.LiveAuth do
      |> push_navigate(to: "/auth/login")}
   end
 
+  # Accounts.update_org/2 broadcasts an org status change on every active
+  # member's topic, so suspension evicts that org's mounted pages in real time
+  # (#245 kill switch) rather than only blocking the next navigation. The
+  # member lands on their first remaining active organization —
+  # `Accounts.list_orgs_for_user/2` excludes suspended orgs in cloud mode — or
+  # on `/new/org` when none is left. Other orgs' status changes need no action.
+  defp handle_membership_event(
+         {:org_status_changed, %{org_id: org_id, status: status}},
+         %{assigns: %{current_user: %{id: uid}}} = socket
+       )
+       when status != "active" do
+    case socket.assigns[:current_membership] do
+      %Accounts.Membership{org_id: ^org_id} ->
+        case Accounts.list_orgs_for_user(uid) do
+          [%{org: org} | _] ->
+            {:halt,
+             socket
+             |> put_flash(:error, "This organization is currently unavailable.")
+             |> push_navigate(to: "/" <> org.slug)}
+
+          [] ->
+            {:halt,
+             socket
+             |> put_flash(:error, "This organization is currently unavailable.")
+             |> push_navigate(to: "/new/org")}
+        end
+
+      _ ->
+        {:halt, socket}
+    end
+  end
+
   defp handle_membership_event(_msg, socket), do: {:cont, socket}
 
   # A revoked membership is a context switch, not a dead end: accounts are
