@@ -58,6 +58,25 @@ defmodule ControlKeel.Platform do
   def get_service_account(id), do: Repo.get(ServiceAccount, id)
 
   @doc """
+  Fetches a service account only when it belongs to `workspace_id`.
+
+  Credential mutations take client-supplied ids on both the admin UI and the
+  JSON API, so the lookup itself must be workspace-scoped — an
+  authorize-after-fetch step is easy to forget on a new surface, and the
+  LiveView revoke/rotate handlers shipped without one. Returns `nil` for a
+  missing or foreign id without distinguishing the two.
+  """
+  @spec get_service_account_for_workspace(integer(), integer()) ::
+          ServiceAccount.t() | nil
+  def get_service_account_for_workspace(id, workspace_id)
+      when is_integer(id) and is_integer(workspace_id) do
+    case Repo.get(ServiceAccount, id) do
+      %ServiceAccount{workspace_id: ^workspace_id} = account -> account
+      _other -> nil
+    end
+  end
+
+  @doc """
   Provisions a service account and returns its plaintext token exactly once.
 
   Callers may bound the credential lifetime with either key:
