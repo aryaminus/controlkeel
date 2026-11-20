@@ -6,7 +6,11 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
   service accounts. Plaintext tokens are shown exactly once at creation
   and rotation time; the DB stores only a hash.
 
-  Cross-org access is rejected at mount.
+  Cross-org access is rejected at mount, and every mutation re-checks that
+  the target service account belongs to this workspace (LiveView event
+  payloads are client-controlled, so an id alone must never authorize an
+  action). Plaintext tokens are shown exactly once at creation
+  and rotation time; the DB stores only a hash.
   """
 
   use ControlKeelWeb, :live_view
@@ -75,6 +79,8 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
 
   def handle_event("revoke", %{"id" => id}, socket) do
     with {sa_id, ""} <- Integer.parse(id),
+         %ServiceAccount{} <-
+           Platform.get_service_account_for_workspace(sa_id, socket.assigns.workspace.id),
          {:ok, _} <- Platform.revoke_agent_identity(sa_id, actor: nhi_actor(socket)) do
       {:noreply,
        socket
@@ -87,6 +93,8 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
 
   def handle_event("rotate", %{"id" => id}, socket) do
     with {sa_id, ""} <- Integer.parse(id),
+         %ServiceAccount{} <-
+           Platform.get_service_account_for_workspace(sa_id, socket.assigns.workspace.id),
          {:ok, %{service_account: sa, token: token}} <-
            Platform.rotate_agent_identity_token(sa_id, actor: nhi_actor(socket)) do
       {:noreply,
@@ -96,7 +104,16 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
        |> assign(:new_token_for, sa.name)
        |> put_flash(:info, "Rotated token for #{sa.name}.")}
     else
-      _ -> {:noreply, put_flash(socket, :error, "Could not rotate token.")}
+      {:error, :expired} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "This token has expired and cannot be rotated. Create a new service account or extend its expiry first."
+         )}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not rotate token.")}
     end
   end
 
@@ -144,26 +161,13 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
       <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
         <h2>Create service account</h2>
         <.form for={@create_form} phx-submit="create" class="flex flex-col gap-3">
+          <.input field={@create_form[:name]} type="text" label="Name" required />
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-            <input
+            <.input
+              field={@create_form[:scopes]}
               type="text"
-              name="sa[name]"
-              value={@create_form[:name].value || ""}
-              required
-              class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">
-              Scopes (space or comma separated)
-            </label>
-            <input
-              type="text"
-              name="sa[scopes]"
-              value={@create_form[:scopes].value || ""}
+              label="Scopes (space or comma separated)"
               placeholder="mcp:access context:read findings:write"
-              class="w-full rounded-lg border bg-card px-4 py-2 text-foreground"
             />
             <p class="mt-1 text-xs text-muted-foreground">
               Use <code>admin</code> for full access, or scope strings like <code>mcp:access</code>.
@@ -177,7 +181,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
       </div>
 
       <div class="border bg-card rounded-3xl backdrop-blur-[18px] shadow-[0_24px_80px_rgba(0,0,0,0.22)] p-6 mt-6">
-        <h2>Active service accounts</h2>
+        <h2>Service accounts</h2>
         <%= if @accounts == [] do %>
           <p class="max-w-[48rem]">No service accounts yet.</p>
         <% else %>
@@ -187,6 +191,7 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
                 <th>Name</th>
                 <th>Scopes</th>
                 <th>Status</th>
+                <th>Expires</th>
                 <th>Last used</th>
                 <th></th>
               </tr>
@@ -196,18 +201,32 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
                 <tr id={"sa-#{sa.id}"}>
                   <td>{sa.name}</td>
                   <td><code>{ServiceAccount.scope_list(sa) |> Enum.join(" ")}</code></td>
-                  <td>{sa.status}</td>
-                  <td>{format_dt(sa.last_used_at)}</td>
+                  <td>
+                    <%= if ServiceAccount.expired?(sa) do %>
+                      <span
+                        data-sa-status="expired"
+                        class="inline-flex items-center rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20"
+                      >
+                        expired
+                      </span>
+                    <% else %>
+                      {sa.status}
+                    <% end %>
+                  </td>
+                  <td>{format_datetime(sa.expires_at, "never")}</td>
+                  <td>{format_datetime(sa.last_used_at, "never")}</td>
                   <td>
                     <%= if sa.status == "active" do %>
-                      <.button
-                        type="button"
-                        variant="secondary"
-                        phx-click="rotate"
-                        phx-value-id={sa.id}
-                      >
-                        Rotate
-                      </.button>
+                      <%= if not ServiceAccount.expired?(sa) do %>
+                        <.button
+                          type="button"
+                          variant="secondary"
+                          phx-click="rotate"
+                          phx-value-id={sa.id}
+                        >
+                          Rotate
+                        </.button>
+                      <% end %>
                       <.button
                         type="button"
                         variant="destructive"
@@ -239,9 +258,6 @@ defmodule ControlKeelWeb.WorkspaceServiceAccountsLive do
   end
 
   defp parse_scopes(_), do: []
-
-  defp format_dt(nil), do: "never"
-  defp format_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M UTC")
 
   # Credential lifecycle is exactly what a customer audits, so these mutations go
   # through the NHI-audited wrappers (provision/revoke/rotate_agent_identity) rather

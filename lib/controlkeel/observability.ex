@@ -1147,7 +1147,7 @@ defmodule ControlKeel.Observability do
     |> Repo.all()
   end
 
-  defp maybe_filter_memory_workspace(query, nil), do: query
+  defp maybe_filter_memory_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_memory_workspace(query, workspace_id),
     do: where(query, [m], m.workspace_id == ^workspace_id)
@@ -1464,7 +1464,7 @@ defmodule ControlKeel.Observability do
     |> Repo.aggregate(:count, :id)
   end
 
-  defp maybe_filter_import_workspace(query, nil), do: query
+  defp maybe_filter_import_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_import_workspace(query, workspace_id),
     do: where(query, [i], i.workspace_id == ^workspace_id)
@@ -1542,7 +1542,7 @@ defmodule ControlKeel.Observability do
   defp maybe_filter_event_session(query, session_id),
     do: where(query, [e, _s], e.session_id == ^session_id)
 
-  defp maybe_filter_event_workspace(query, nil), do: query
+  defp maybe_filter_event_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_event_workspace(query, workspace_id),
     do: where(query, [_e, s], s.workspace_id == ^workspace_id)
@@ -1896,7 +1896,7 @@ defmodule ControlKeel.Observability do
   defp maybe_filter_aggregate_session(query, session_id),
     do: where(query, [f, _s], f.session_id == ^session_id)
 
-  defp maybe_filter_aggregate_workspace(query, nil), do: query
+  defp maybe_filter_aggregate_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_aggregate_workspace(query, workspace_id),
     do: where(query, [_f, s], s.workspace_id == ^workspace_id)
@@ -2386,7 +2386,7 @@ defmodule ControlKeel.Observability do
     |> Repo.aggregate(:count, :id)
   end
 
-  defp maybe_filter_observability_scenario_workspace(query, nil), do: query
+  defp maybe_filter_observability_scenario_workspace(query, nil), do: unfiltered(query)
 
   defp maybe_filter_observability_scenario_workspace(query, workspace_id) do
     draft_ids =

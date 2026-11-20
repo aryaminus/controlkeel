@@ -15,10 +15,16 @@ defmodule ControlKeelWeb.OrgSuspensionTest do
   use ControlKeelWeb.ConnCase, async: false
 
   import ControlKeel.MissionFixtures
+  import Phoenix.LiveViewTest
 
   alias ControlKeel.Accounts
+  alias ControlKeel.Mission
   alias ControlKeelWeb.OrgAccess
   alias ControlKeelWeb.WorkspaceAccess
+
+  defp conn_for(user) do
+    build_conn() |> Plug.Test.init_test_session(%{"current_user_id" => user.id})
+  end
 
   setup do
     previous = Application.get_env(:controlkeel, :runtime_mode, :local)
@@ -92,6 +98,39 @@ defmodule ControlKeelWeb.OrgSuspensionTest do
       conn = build_conn() |> Plug.Conn.assign(:api_auth, %{type: :local})
 
       assert ControlKeelWeb.APIHelpers.authorize_workspace_for_conn(conn, 1, "read") == :ok
+    end
+  end
+
+  describe "live suspension eviction" do
+    test "suspending the org evicts a member's mounted page" do
+      %{owner: owner, org: org, workspace: workspace} = org_with_owner()
+
+      {:ok, view, _html} =
+        live(conn_for(owner), ~p"/#{org.slug}/workspaces/#{workspace.slug}")
+
+      {:ok, _} = Accounts.update_org(org, %{status: "disabled"})
+
+      # The owner's only org is now suspended and `list_orgs_for_user/2`
+      # excludes suspended orgs in cloud mode, so the handoff lands on
+      # /new/org rather than another organization.
+      assert %{"error" => "This organization is currently unavailable."} =
+               assert_redirect(view, "/new/org")
+    end
+  end
+
+  describe "suspended orgs on user-scoped surfaces" do
+    test "list_orgs_for_user and recent sessions exclude a suspended org in cloud mode" do
+      %{owner: owner, org: org, workspace: workspace} = org_with_owner()
+      _session = session_fixture(%{workspace: workspace})
+
+      assert [%{org: %{id: org_id}}] = Accounts.list_orgs_for_user(owner.id)
+      assert org_id == org.id
+      assert [_recent] = Mission.list_recent_sessions_for_user(owner, 10)
+
+      {:ok, _} = Accounts.update_org(org, %{status: "disabled"})
+
+      assert Accounts.list_orgs_for_user(owner.id) == []
+      assert Mission.list_recent_sessions_for_user(owner, 10) == []
     end
   end
 end

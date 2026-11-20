@@ -164,19 +164,6 @@ defmodule ControlKeel.Accounts do
   @spec get_org(integer()) :: Org.t() | nil
   def get_org(id), do: Repo.get(Org, id)
 
-  @doc """
-  Whether an org is active. A non-active org is suspended: its API traffic is
-  already refused by `authorize_cloud_execution/2`, and the browser gates
-  (`OrgAccess`/`WorkspaceAccess`) use this so suspension is a real kill switch
-  across both tiers.
-  """
-  def org_active?(org_id) when is_integer(org_id) do
-    case Repo.get(Org, org_id) do
-      %Org{status: "active"} -> true
-      _ -> false
-    end
-  end
-
   @spec get_org_by_slug(String.t()) :: Org.t() | nil
   def get_org_by_slug(slug) when is_binary(slug) do
     Repo.get_by(Org, slug: String.downcase(String.trim(slug)))
@@ -234,10 +221,24 @@ defmodule ControlKeel.Accounts do
   """
   @spec list_orgs_for_user(integer(), String.t() | nil) :: [%{org: Org.t(), role: String.t()}]
   def list_orgs_for_user(user_id, min_role \\ nil) when is_integer(user_id) do
-    Membership
-    |> join(:inner, [m], o in Org, on: o.id == m.org_id)
-    |> where([m], m.user_id == ^user_id and m.status == "active")
-    |> order_by([_, o], asc: o.name)
+    base =
+      Membership
+      |> join(:inner, [m], o in Org, on: o.id == m.org_id)
+      |> where([m], m.user_id == ^user_id and m.status == "active")
+
+    # Suspension is the hosted kill switch (#245): every cloud/self_hosted
+    # surface built on this lookup (org switcher, dashboard scoping via
+    # accessible_workspace_ids) must treat a suspended org like a deleted one.
+    # Local mode has no suspension concept and keeps the historical behavior.
+    base =
+      if ControlKeel.Runtime.Mode.current() == :local do
+        base
+      else
+        where(base, [_m, o], o.status == "active")
+      end
+
+    base
+    |> order_by([_m, o], asc: o.name)
     |> select([m, o], %{org: o, role: m.role})
     |> Repo.all()
     |> Enum.filter(fn row -> is_nil(min_role) or role_at_least?(row.role, min_role) end)
@@ -654,9 +655,51 @@ defmodule ControlKeel.Accounts do
   @doc "Update an Org's mutable fields (name, status, settings)."
   @spec update_org(Org.t(), map()) :: {:ok, Org.t()} | {:error, Ecto.Changeset.t()}
   def update_org(%Org{} = org, attrs) do
-    org
-    |> Org.changeset(attrs)
-    |> Repo.update()
+    with {:ok, updated} <- org |> Org.changeset(attrs) |> Repo.update() do
+      maybe_broadcast_org_status_change(org, updated)
+      {:ok, updated}
+    end
+  end
+
+  # Suspending an org must be a live kill switch on the browser tier (#245):
+  # members with pages already mounted have to be evicted, not just blocked at
+  # the next navigation. The broadcast rides each active member's
+  # `membership:user:<id>` topic so ControlKeelWeb.LiveAuth handles it with the
+  # same hook it uses for membership changes and account disabling.
+
+  @doc """
+  Broadcasts `{:org_status_changed, %{org_id:, status:}}` to every active
+  member of the org so mounted LiveViews can react (LiveAuth evicts on
+  non-active statuses).
+  """
+  @spec broadcast_org_status_changed(integer(), String.t()) :: :ok
+  def broadcast_org_status_changed(org_id, status) when is_integer(org_id) do
+    org_id
+    |> active_member_user_ids()
+    |> Enum.each(fn user_id ->
+      Phoenix.PubSub.broadcast(
+        ControlKeel.PubSub,
+        membership_topic(user_id),
+        {:org_status_changed, %{org_id: org_id, status: status}}
+      )
+    end)
+
+    :ok
+  end
+
+  defp maybe_broadcast_org_status_change(%Org{status: old_status}, %Org{status: new_status})
+       when old_status == new_status,
+       do: :ok
+
+  # Bind from the UPDATED org: the broadcast must carry the new status.
+  defp maybe_broadcast_org_status_change(_before, %Org{id: org_id, status: status}),
+    do: broadcast_org_status_changed(org_id, status)
+
+  defp active_member_user_ids(org_id) do
+    Membership
+    |> where([m], m.org_id == ^org_id and m.status == "active")
+    |> select([m], m.user_id)
+    |> Repo.all()
   end
 
   # ──────────────── Real-time membership broadcasts ──────

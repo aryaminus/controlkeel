@@ -66,26 +66,6 @@ defmodule ControlKeelWeb.TenantIsolationTest do
     end
   end
 
-  describe "list_findings_browser_sessions_for_user/2" do
-    test "does not leak sessions from another org" do
-      %{user: viewer, workspace: ws_a} = viewer_with_workspace()
-      session_a = session_fixture(%{workspace: ws_a})
-      {_org_b, _ws_b, session_b} = org_bound_session_fixture()
-
-      ids = Mission.list_findings_browser_sessions_for_user(viewer, 30) |> Enum.map(& &1.id)
-
-      assert session_a.id in ids
-      refute session_b.id in ids
-    end
-
-    test "returns no rows for a user with no memberships" do
-      viewer = fixture_user("no-members-#{System.unique_integer([:positive])}@example.com")
-      {_org, _ws, _session} = org_bound_session_fixture()
-
-      assert Mission.list_findings_browser_sessions_for_user(viewer, 30) == []
-    end
-  end
-
   describe "list_recent_sessions_for_user/2" do
     test "does not leak sessions from another org" do
       %{user: viewer, workspace: ws_a} = viewer_with_workspace()
@@ -152,12 +132,57 @@ defmodule ControlKeelWeb.TenantIsolationTest do
 
   describe "observability context layer fails closed" do
     test "workspace_overview with no filter yields no cross-tenant rows in cloud mode" do
-      # A foreign session exists; a caller with no accessible workspace must not see it.
-      {_org, _ws, _session} = org_bound_session_fixture()
+      # A foreign session AND a foreign finding exist; a caller with no
+      # accessible workspace must see neither — runs stay empty and the
+      # problems aggregate must not leak other tenants' findings.
+      {_org, _ws, session} = org_bound_session_fixture()
+      {:ok, _finding} = create_foreign_finding(session)
 
       overview = ControlKeel.Observability.workspace_overview(limit: 6)
 
       assert overview.runs.recent == []
+      assert overview.problems.count == 0
+      assert overview.problems.total_findings == 0
+      assert overview.problems.top == []
+    end
+
+    test "problems with no filter yields no cross-tenant rows in cloud mode" do
+      {_org, _ws, session} = org_bound_session_fixture()
+      {:ok, _finding} = create_foreign_finding(session)
+
+      problems = ControlKeel.Observability.problems(limit: 5)
+
+      assert problems.count == 0
+      assert problems.total_findings == 0
+      assert problems.problems == []
+    end
+
+    test "imports with no filter yields no cross-tenant rows in cloud mode" do
+      insert_foreign_import_envelope()
+
+      imports = ControlKeel.Observability.imports([])
+
+      assert imports.count == 0
+      assert imports.recent == []
+    end
+
+    test "loop diagnostics with no filter yields no cross-tenant events in cloud mode" do
+      {_org, _ws, session} = org_bound_session_fixture()
+      insert_foreign_session_event(session)
+
+      diagnostics = ControlKeel.Observability.loop_diagnostics([])
+
+      assert diagnostics.totals.event_runs == 0
+      assert diagnostics.repeated_tool_events == []
+    end
+
+    test "memory quality with no filter yields no cross-tenant records in cloud mode" do
+      {_org, _ws, session} = org_bound_session_fixture()
+      memory_record_fixture(%{session: session})
+
+      quality = ControlKeel.Observability.memory_quality([])
+
+      assert quality.totals.records == 0
     end
 
     test "trends with no filter yields no cross-tenant totals in cloud mode" do
@@ -188,5 +213,65 @@ defmodule ControlKeelWeb.TenantIsolationTest do
       summary = ControlKeel.Analytics.funnel_summary(limit: 50)
       assert summary.recent_session_count == 0
     end
+  end
+
+  # ── Foreign-row fixtures ────────────────────────────────────────────────
+  #
+  # The fail-closed assertions must run against tables that actually contain
+  # another tenant's rows: a filter that collapses to "unfiltered" is only
+  # detectable when foreign data exists to leak (the original PR's tests ran
+  # against empty tables and therefore could not catch it).
+
+  defp create_foreign_finding(session) do
+    Mission.create_finding(%{
+      session_id: session.id,
+      title: "Foreign tenant finding",
+      rule_id: "foreign-probe",
+      category: "security",
+      severity: "high",
+      status: "open",
+      auto_resolved: false,
+      metadata: %{},
+      plain_message: "Foreign tenant finding"
+    })
+  end
+
+  defp insert_foreign_import_envelope do
+    {_org, ws, _session} = org_bound_session_fixture()
+
+    payload_sha256 =
+      :crypto.hash(:sha256, "foreign-#{System.unique_integer([:positive])}")
+      |> Base.encode16(case: :lower)
+
+    %ControlKeel.Observability.ImportedEnvelope{}
+    |> ControlKeel.Observability.ImportedEnvelope.changeset(%{
+      schema_version: "controlkeel.observability.v1",
+      source: %{"product" => "controlkeel", "surface" => "cli"},
+      original_session_title: "foreign envelope",
+      health: "healthy",
+      problem_groups: 0,
+      total_problem_findings: 0,
+      redaction_policy: "summary_only",
+      integrity_status: "verified",
+      payload_sha256: payload_sha256,
+      import_mode: "local_persist",
+      imported_at: DateTime.utc_now() |> DateTime.truncate(:second),
+      envelope: %{},
+      workspace_id: ws.id
+    })
+    |> ControlKeel.Repo.insert!()
+  end
+
+  defp insert_foreign_session_event(session) do
+    %ControlKeel.Mission.SessionEvent{}
+    |> ControlKeel.Mission.SessionEvent.changeset(%{
+      session_id: session.id,
+      event_type: "tool_call",
+      actor: "fixture",
+      summary: "foreign tenant event",
+      payload: %{},
+      metadata: %{}
+    })
+    |> ControlKeel.Repo.insert!()
   end
 end

@@ -10,6 +10,15 @@ defmodule ControlKeelWeb.Endpoint do
       s -> String.to_integer(s)
     end
 
+  # Session cookies must carry the `Secure` attribute wherever the app is
+  # served over TLS (controlkeel.com). Guarded by config so local dev over
+  # http://localhost keeps working; production sets :secure_cookies
+  # (config/prod.exs).
+  secure_cookie_opts =
+    if Application.compile_env(:controlkeel, :secure_cookies, false),
+      do: [secure: true],
+      else: []
+
   @session_options [
                      store: :cookie,
                      key: "_controlkeel_key",
@@ -20,7 +29,9 @@ defmodule ControlKeelWeb.Endpoint do
                      # invitation tokens (issue #247).
                      encryption_salt: "9kZ2r7Wp",
                      same_site: "Lax"
-                   ] ++ if(session_max_age, do: [max_age: session_max_age], else: [])
+                   ] ++
+                     secure_cookie_opts ++
+                     if(session_max_age, do: [max_age: session_max_age], else: [])
 
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [:peer_data, :x_headers, session: @session_options]],
