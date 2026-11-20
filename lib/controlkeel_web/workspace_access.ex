@@ -14,8 +14,11 @@ defmodule ControlKeelWeb.WorkspaceAccess do
       admin tabs).
 
   `check/3` returns `:ok` or `{:error, reason}` with `:unbound` (workspace has
-  no org), `:forbidden` (no active membership — includes missing user), or
-  `:needs_admin` (member below the required role). Callers map these to
+  no org), `:suspended` (the org exists but is not active — the operator kill
+  switch; `OrgAccess`/`WorkspaceScope` render it with `:not_found`'s public
+  copy so the org's lifecycle state is not enumerable), `:forbidden` (no
+  active membership — includes missing user), or `:needs_admin` (member below
+  the required role). Callers map these to
   their page's user-facing messages.
 
   `check_membership/3` returns `{:ok, membership}` on success so a page can

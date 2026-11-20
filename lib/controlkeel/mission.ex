@@ -1262,37 +1262,6 @@ defmodule ControlKeel.Mission do
     }
   end
 
-  def list_findings_browser_sessions do
-    Session
-    |> order_by(desc: :inserted_at)
-    |> preload(:workspace)
-    |> Repo.all()
-  end
-
-  @doc """
-  Sessions the viewer may filter findings by.
-
-  Cloud mode scopes to the viewer's accessible workspaces; an empty accessible
-  set yields no rows rather than every session in the database. Local
-  single-user mode stays unscoped.
-  """
-  def list_findings_browser_sessions_for_user(user, limit \\ 30) do
-    if ControlKeel.Runtime.Mode.current() == :local do
-      list_findings_browser_sessions()
-    else
-      case user do
-        %{id: user_id} ->
-          user_id
-          |> accessible_workspace_ids()
-          |> list_recent_sessions_in_workspaces(limit)
-          |> Enum.map(&Map.put(&1, :workspace, &1.workspace))
-
-        _ ->
-          []
-      end
-    end
-  end
-
   def list_finding_categories do
     Finding
     |> group_by([f], f.category)

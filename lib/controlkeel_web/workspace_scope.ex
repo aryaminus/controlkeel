@@ -153,6 +153,11 @@ defmodule ControlKeelWeb.WorkspaceScope do
       case reason do
         :forbidden -> :forbidden
         :needs_admin -> :needs_admin
+        # A suspended org's workspace URLs render exactly like a missing one
+        # (#245: the org's lifecycle state is not enumerable). OrgAccess maps
+        # the same condition to `:forbidden`, which shares `:not_found`'s copy.
+        :suspended -> :not_found
+        :unbound -> :not_found
         _ -> :not_found
       end
 
