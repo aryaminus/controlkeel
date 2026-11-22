@@ -304,6 +304,10 @@ defmodule ControlKeel.Skills.Installer do
       copy_tree_contents(hooks_src, hooks_dst)
     end
 
+    Enum.each(ControlKeel.Skills.ClaudeHooks.retired_hooks(), fn name ->
+      _ = File.rm(Path.join(hooks_dst, name))
+    end)
+
     settings_path = Path.join(base, "settings.json")
     merge_claude_settings(settings_path, Exporter.claude_manual_settings())
 
@@ -1152,14 +1156,65 @@ defmodule ControlKeel.Skills.Installer do
 
     merged =
       Map.merge(existing, new_settings, fn
-        "hooks", old_hooks, new_hooks ->
-          Map.merge(old_hooks, new_hooks)
+        "hooks", old_hooks, new_hooks when is_map(old_hooks) ->
+          merge_claude_hook_events(old_hooks, new_hooks)
 
         _key, _old, new_val ->
           new_val
       end)
 
     File.write!(path, Jason.encode!(merged, pretty: true) <> "\n")
+  end
+
+  # Replace only ControlKeel-owned hook entries. User-authored hooks on the
+  # same event survive, and CK events a newer release no longer generates are
+  # removed instead of lingering from an earlier attach.
+  defp merge_claude_hook_events(old_hooks, new_hooks) do
+    kept =
+      old_hooks
+      |> Enum.map(fn {event, groups} -> {event, strip_ck_hook_groups(groups)} end)
+      |> Enum.reject(fn {_event, groups} -> groups == [] end)
+      |> Map.new()
+
+    Map.merge(kept, new_hooks, fn _event, user_groups, ck_groups -> user_groups ++ ck_groups end)
+  end
+
+  defp strip_ck_hook_groups(groups) when is_list(groups) do
+    groups
+    |> Enum.map(fn
+      %{"hooks" => hooks} = group when is_list(hooks) ->
+        Map.put(group, "hooks", Enum.reject(hooks, &ck_owned_claude_hook?/1))
+
+      group ->
+        group
+    end)
+    |> Enum.reject(fn
+      %{"hooks" => []} -> true
+      _ -> false
+    end)
+  end
+
+  defp strip_ck_hook_groups(groups), do: groups
+
+  defp ck_owned_claude_hook?(%{"command" => command}) when is_binary(command) do
+    String.contains?(command, ".claude/hooks/") and
+      Enum.any?(ck_claude_hook_scripts(), &String.contains?(command, ".claude/hooks/" <> &1))
+  end
+
+  defp ck_owned_claude_hook?(_hook), do: false
+
+  defp ck_claude_hook_scripts do
+    current =
+      Exporter.claude_manual_settings()
+      |> Map.get("hooks", %{})
+      |> Enum.flat_map(fn {_event, groups} -> groups end)
+      |> Enum.flat_map(&Map.get(&1, "hooks", []))
+      |> Enum.flat_map(fn %{"command" => command} ->
+        Regex.scan(~r{\.claude/hooks/([A-Za-z0-9_.-]+\.sh)}, command, capture: :all_but_first)
+      end)
+      |> List.flatten()
+
+    Enum.uniq(current ++ ControlKeel.Skills.ClaudeHooks.retired_hooks())
   end
 
   # Check whether .agents/skills/ already has all the skills we'd write,
