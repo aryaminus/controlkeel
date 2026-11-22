@@ -78,31 +78,47 @@ defmodule ControlKeel.Project.Root do
   end
 
   # Resolve symlinks in the path without shelling out to `pwd -P`.
-  # Walks each path component and resolves symlinks via :file.read_link/1.
-  # Falls back to the expanded path if any step fails.
+  # Walks each path component and fully resolves symlink chains via
+  # :file.read_link/1, re-walking each link target so links that point at
+  # other links (or through linked directories) land on the final target.
+  # Falls back to the expanded path on loops or unexpected errors.
+  @max_link_hops 40
+
   defp resolve_symlinks(path) do
-    [root | components] = Path.split(path)
-
-    Enum.reduce_while(components, root, fn component, acc ->
-      candidate = Path.join(acc, component)
-
-      case :file.read_link(String.to_charlist(candidate)) do
-        {:ok, target_charlist} ->
-          target = List.to_string(target_charlist)
-
-          absolute =
-            if Path.type(target) == :absolute,
-              do: target,
-              else: Path.join(Path.dirname(candidate), target)
-
-          {:cont, Path.expand(absolute)}
-
-        {:error, _} ->
-          # Not a symlink — keep accumulating.
-          {:cont, candidate}
-      end
-    end)
+    case resolve_symlinks(path, @max_link_hops) do
+      {:ok, resolved} -> resolved
+      :error -> path
+    end
   rescue
     _ -> path
+  end
+
+  defp resolve_symlinks(path, hops) do
+    [root | components] = Path.split(path)
+    walk_components(components, root, hops)
+  end
+
+  defp walk_components([], acc, _hops), do: {:ok, acc}
+  defp walk_components(_components, _acc, hops) when hops < 0, do: :error
+
+  defp walk_components([component | rest], acc, hops) do
+    candidate = Path.join(acc, component)
+
+    case :file.read_link(String.to_charlist(candidate)) do
+      {:ok, target_charlist} ->
+        target = List.to_string(target_charlist)
+
+        absolute =
+          if Path.type(target) == :absolute,
+            do: target,
+            else: Path.join(Path.dirname(candidate), target)
+
+        with {:ok, resolved} <- resolve_symlinks(Path.expand(absolute), hops - 1) do
+          walk_components(rest, resolved, hops - 1)
+        end
+
+      {:error, _} ->
+        walk_components(rest, candidate, hops)
+    end
   end
 end

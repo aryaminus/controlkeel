@@ -81,6 +81,46 @@ defmodule ControlKeel.Runtime.DefaultsTest do
     end)
   end
 
+  test "prod runtime config does not copy the legacy database into a new project",
+       %{tmp_home: tmp_home} do
+    root = Path.join(tmp_home, "fresh-project")
+    File.mkdir_p!(root)
+    File.write!(Path.join(root, "package.json"), "{}")
+
+    with_envs(
+      %{
+        "DATABASE_PATH" => nil,
+        "DATABASE_URL" => nil,
+        "CONTROLKEEL_RUNTIME_MODE" => nil,
+        "CONTROLKEEL_HOME" => tmp_home,
+        "SECRET_KEY_BASE" => String.duplicate("k", 64)
+      },
+      fn ->
+        global = Defaults.global_database_path()
+
+        for suffix <- ["", "-wal", "-shm"] do
+          File.write!(global <> suffix, "legacy data")
+        end
+
+        runtime_config = Path.expand("../../../config/runtime.exs", __DIR__)
+
+        File.cd!(root, fn ->
+          config = Config.Reader.read!(runtime_config, env: :prod)
+          db_path = get_in(config, [:controlkeel, ControlKeel.Repo.Local, :database])
+          project_db = Path.join([File.cwd!(), "controlkeel", "controlkeel.db"])
+
+          assert db_path == project_db
+
+          for suffix <- ["", "-wal", "-shm"] do
+            refute File.exists?(project_db <> suffix)
+          end
+        end)
+
+        assert File.read!(global) == "legacy data"
+      end
+    )
+  end
+
   test "secret_key_base is generated once and then reused", %{tmp_home: tmp_home} do
     with_envs(%{"SECRET_KEY_BASE" => nil, "HOME" => tmp_home}, fn ->
       first = Defaults.secret_key_base()

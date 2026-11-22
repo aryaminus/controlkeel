@@ -28,6 +28,52 @@ defmodule ControlKeel.Project.RootTest do
     end
   end
 
+  test "chained symlinks resolve to the final target project" do
+    if :os.type() != {:win32, :nt} do
+      tmp_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "controlkeel-chained-root-#{System.unique_integer([:positive])}"
+        )
+
+      outer = Path.join(tmp_dir, "outer")
+      inner = Path.join(outer, "apps/inner")
+      source = Path.join(inner, "src")
+      File.mkdir_p!(source)
+      File.write!(Path.join(outer, "mix.exs"), "")
+      File.write!(Path.join(inner, "package.json"), "{}")
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      alias_link = Path.join(outer, "alias")
+      link = Path.join(outer, "link")
+      File.ln_s!("apps/inner/src", alias_link)
+      File.ln_s!(alias_link, link)
+
+      assert Root.resolve(link) == Root.resolve(inner)
+      assert Root.resolve(Path.join(link, ".")) == Root.resolve(inner)
+    end
+  end
+
+  test "symlink loops fall back instead of hanging" do
+    if :os.type() != {:win32, :nt} do
+      tmp_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "controlkeel-loop-root-#{System.unique_integer([:positive])}"
+        )
+
+      File.mkdir_p!(tmp_dir)
+      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+
+      a = Path.join(tmp_dir, "a")
+      b = Path.join(tmp_dir, "b")
+      File.ln_s!(b, a)
+      File.ln_s!(a, b)
+
+      assert is_binary(Root.resolve(a))
+    end
+  end
+
   test "resolve walks up to the nearest project marker" do
     tmp_dir =
       Path.join(
