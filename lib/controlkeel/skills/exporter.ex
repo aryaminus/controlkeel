@@ -1890,28 +1890,6 @@ defmodule ControlKeel.Skills.Exporter do
                 "timeout" => 15
               }
             ]
-          },
-          %{
-            "matcher" => "mcp__controlkeel__ck_validate",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => repo_hook_command(".codex/hooks/ck-nudge-validate.sh"),
-                "statusMessage" => "ControlKeel validation nudge",
-                "timeout" => 5
-              }
-            ]
-          },
-          %{
-            "matcher" => "mcp__controlkeel__ck_finding",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => repo_hook_command(".codex/hooks/ck-nudge-finding.sh"),
-                "statusMessage" => "ControlKeel finding nudge",
-                "timeout" => 5
-              }
-            ]
           }
         ],
         "UserPromptSubmit" => [
@@ -1920,17 +1898,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => repo_hook_command(".codex/hooks/ck-user-prompt-submit.sh"),
-                "timeout" => 10
-              }
-            ]
-          }
-        ],
-        "Stop" => [
-          %{
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => repo_hook_command(".codex/hooks/ck-stop.sh"),
                 "timeout" => 10
               }
             ]
@@ -2400,7 +2367,12 @@ defmodule ControlKeel.Skills.Exporter do
       session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null || printf '')
     fi
 
-    context=$(CONTROLKEEL_HOOK_TIMEOUT_SECONDS="${CONTROLKEEL_STOP_HOOK_TIMEOUT_SECONDS:-3}" ck_run context --session-id "${session_id:-1}" --json 2>/dev/null || true)
+    [ "$stop_hook_active" = "false" ] || exit 0
+    case "$session_id" in
+      ''|*[!0-9]*|0) exit 0 ;;
+    esac
+
+    context=$(CONTROLKEEL_HOOK_TIMEOUT_SECONDS="${CONTROLKEEL_STOP_HOOK_TIMEOUT_SECONDS:-3}" ck_run context --session-id "$session_id" --json 2>/dev/null || true)
 
     if [ -n "$context" ]; then
       if command -v jq >/dev/null 2>&1; then
