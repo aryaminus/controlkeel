@@ -47,14 +47,12 @@ ControlKeel hooks are the hard enforcement layer between the agent host and the 
 | **PreToolUse (shell)** | Runs `ck_validate --kind shell` on Bash commands | **Deny** when scanner returns block |
 | **PreToolUse (sensitive write)** | Checks writes to `.env`, `.key`, `.pem`, credentials | **Deny** when scanner returns block |
 | **UserPromptSubmit (secrets)** | Detects AWS keys, API keys, private keys in prompts | **Block** the prompt entirely |
-| **UserPromptSubmit (blocked findings)** | Checks active blocked finding count | Advisory nudge to resolve first |
-| **UserPromptSubmit (budget)** | Checks budget utilization | Advisory nudge when >= 80% |
-| **PostToolUse (after ck_validate)** | Reads the validation decision | Advisory nudge (allow/warn/block) |
-| **PostToolUse (after ck_finding)** | Reads finding severity | Advisory nudge (high=stop, medium=batch) |
-| **PostToolUse (after write)** | Auto-records info-level finding for file writes | Automatic memory |
-| **PostToolUse (tool failure)** | Auto-records finding on tool errors | Automatic memory |
-| **SessionStart** | Calls `ck_run context` to load mission state | System message injection |
-| **SubagentStart** | Injects governance constraints | System message injection |
+| **PreToolUse (deploy-like shell, standalone)** | Flags deploy, publish, and push commands | Advisory context to the agent |
+| **Stop** | Reads the project's blocked-finding count | Advisory message only when the count rises; never blocks the turn |
+| **PreCompact / PostCompact** | Preserves the active gate and reloads governance after compaction | Advisory context |
+| **PermissionRequest (ExitPlanMode)** | Routes the plan to ControlKeel review | Waits for the review decision |
+
+Hooks stay silent unless they gate an action or report a change. ControlKeel does not register hooks that repeat static reminders (session start, tool batches, subagents, tasks, config changes), and it does not record findings for routine writes or tool failures. Re-attaching removes those hooks from earlier installs and preserves user-authored hooks on the same events.
 
 ## Typed Memory Lifecycle
 Memory records are written automatically on every significant lifecycle event and retrieved automatically when context is loaded:

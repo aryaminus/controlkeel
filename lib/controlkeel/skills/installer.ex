@@ -304,6 +304,8 @@ defmodule ControlKeel.Skills.Installer do
       copy_tree_contents(hooks_src, hooks_dst)
     end
 
+    ControlKeel.Skills.ClaudeHooks.remove_retired_hooks(hooks_dst)
+
     settings_path = Path.join(base, "settings.json")
     merge_claude_settings(settings_path, Exporter.claude_manual_settings())
 
@@ -1152,14 +1154,80 @@ defmodule ControlKeel.Skills.Installer do
 
     merged =
       Map.merge(existing, new_settings, fn
-        "hooks", old_hooks, new_hooks ->
-          Map.merge(old_hooks, new_hooks)
+        "hooks", old_hooks, new_hooks when is_map(old_hooks) ->
+          merge_claude_hook_events(old_hooks, new_hooks)
 
         _key, _old, new_val ->
           new_val
       end)
 
     File.write!(path, Jason.encode!(merged, pretty: true) <> "\n")
+  end
+
+  # Replace only ControlKeel-owned hook entries. User-authored hooks on the
+  # same event survive, and CK events a newer release no longer generates are
+  # removed instead of lingering from an earlier attach.
+  defp merge_claude_hook_events(old_hooks, new_hooks) do
+    kept =
+      old_hooks
+      |> Enum.map(fn {event, groups} -> {event, strip_ck_hook_groups(groups)} end)
+      |> Enum.reject(fn {_event, groups} -> groups == [] end)
+      |> Map.new()
+
+    Map.merge(kept, new_hooks, fn _event, user_groups, ck_groups -> user_groups ++ ck_groups end)
+  end
+
+  defp strip_ck_hook_groups(groups) when is_list(groups) do
+    groups
+    |> Enum.map(fn
+      %{"hooks" => hooks} = group when is_list(hooks) ->
+        Map.put(group, "hooks", Enum.reject(hooks, &ck_owned_claude_hook?/1))
+
+      group ->
+        group
+    end)
+    |> Enum.reject(fn
+      %{"hooks" => []} -> true
+      _ -> false
+    end)
+  end
+
+  defp strip_ck_hook_groups(groups), do: groups
+
+  defp ck_owned_claude_hook?(%{"command" => command}) when is_binary(command) do
+    command in ck_claude_hook_commands()
+  end
+
+  defp ck_owned_claude_hook?(_hook), do: false
+
+  # Exact command strings ControlKeel releases have generated for their Claude
+  # hooks: the current project-then-$HOME resolver, the earlier project-only
+  # resolver, and the $HOME form. Bare commands such as `sh .claude/hooks/x.sh`
+  # are never treated as CK-owned, so a user's own registration survives.
+  defp ck_claude_hook_commands do
+    Enum.flat_map(ck_claude_hook_scripts(), fn script ->
+      rel = ".claude/hooks/" <> script
+
+      [
+        ControlKeel.Skills.Exporter.Shared.repo_hook_command(rel),
+        "sh -c 'root=${CK_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}; exec sh \"$root/#{rel}\"'",
+        ControlKeel.Skills.Exporter.Shared.global_hook_command(rel)
+      ]
+    end)
+  end
+
+  defp ck_claude_hook_scripts do
+    current =
+      Exporter.claude_manual_settings()
+      |> Map.get("hooks", %{})
+      |> Enum.flat_map(fn {_event, groups} -> groups end)
+      |> Enum.flat_map(&Map.get(&1, "hooks", []))
+      |> Enum.flat_map(fn %{"command" => command} ->
+        Regex.scan(~r{\.claude/hooks/([A-Za-z0-9_.-]+\.sh)}, command, capture: :all_but_first)
+      end)
+      |> List.flatten()
+
+    Enum.uniq(current ++ ControlKeel.Skills.ClaudeHooks.retired_hooks())
   end
 
   # Check whether .agents/skills/ already has all the skills we'd write,

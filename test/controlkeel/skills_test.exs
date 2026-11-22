@@ -3,6 +3,7 @@ defmodule ControlKeel.SkillsTest do
 
   alias ControlKeel.Skills
   alias ControlKeel.Skills.Activation
+  alias ControlKeel.Skills.Exporter
   alias ControlKeel.Skills.Parser
   alias ControlKeel.Skills.Renderer
 
@@ -750,9 +751,8 @@ defmodule ControlKeel.SkillsTest do
     codex_session_hook =
       File.read!(Path.join(codex_plan.output_dir, ".codex/hooks/ck-session-start.sh"))
 
-    assert codex_session_hook =~ "ck_run context --session-id"
-    assert codex_session_hook =~ "CONTROLKEEL_HOOK_TIMEOUT_SECONDS"
-    refute codex_session_hook =~ "set -eu"
+    refute codex_session_hook =~ "systemMessage"
+    refute codex_session_hook =~ "ck_run"
 
     codex_validate_hook =
       File.read!(Path.join(codex_plan.output_dir, ".codex/hooks/ck-validate-shell.sh"))
@@ -817,7 +817,7 @@ defmodule ControlKeel.SkillsTest do
 
     codex_hooks_json = Jason.encode!(codex_hooks)
     assert codex_hooks_json =~ "CK_PROJECT_ROOT"
-    assert codex_hooks_json =~ ".codex/hooks/ck-session-start.sh"
+    refute codex_hooks_json =~ "SessionStart"
     assert codex_hooks_json =~ ".codex/hooks/ck-user-prompt-submit.sh"
     refute codex_hooks_json =~ "sh .codex/hooks"
 
@@ -879,11 +879,11 @@ defmodule ControlKeel.SkillsTest do
     assert claude_validate_shell =~ "CONTROLKEEL_HOOK_TIMEOUT_SECONDS"
     refute claude_validate_shell =~ "set -eu"
 
-    claude_session_end =
-      File.read!(Path.join(claude_plan.output_dir, "hooks/ck-session-end.sh"))
+    refute File.exists?(Path.join(claude_plan.output_dir, "hooks/ck-session-end.sh"))
 
-    assert claude_session_end =~ "ck_run context --session-id"
-    refute claude_session_end =~ "set -eu"
+    claude_stop = File.read!(Path.join(claude_plan.output_dir, "hooks/ck-stop.sh"))
+    refute claude_stop =~ "--session-id"
+    refute claude_stop =~ ~s("decision":"block")
     assert File.exists?(Path.join(claude_plan.output_dir, "hooks/controlkeel-review.ps1"))
     assert File.exists?(Path.join(claude_plan.output_dir, "commands/controlkeel-review.md"))
 
@@ -1107,6 +1107,169 @@ defmodule ControlKeel.SkillsTest do
         )
 
       assert output =~ "blocked findings"
+    end
+  end
+
+  describe "quiet Claude Code hooks" do
+    test "the plugin and standalone manifests register only gating or rare events" do
+      quiet = ~w(PostToolBatch SubagentStart SubagentStop TaskCreated TaskCompleted
+                 ConfigChange SessionStart SessionEnd PostToolUseFailure PermissionDenied)
+
+      plugin_events = Map.keys(Exporter.claude_hooks_manifest()["hooks"])
+      standalone_events = Map.keys(Exporter.claude_manual_settings()["hooks"])
+
+      for event <- quiet do
+        refute event in plugin_events, "plugin still registers #{event}"
+        refute event in standalone_events, "standalone still registers #{event}"
+      end
+
+      refute Map.has_key?(Exporter.claude_hooks_manifest()["hooks"], "PostToolUse")
+      assert "PreToolUse" in plugin_events
+      assert "Stop" in standalone_events
+
+      script_names = Enum.map(Exporter.claude_plugin_hook_scripts(), &elem(&1, 0))
+      refute "ck-post-write.sh" in script_names
+      refute "ck-post-tool-use-failure.sh" in script_names
+    end
+
+    test "attach keeps user hooks and drops retired ControlKeel hooks", %{tmp_dir: tmp_dir} do
+      settings_path = Path.join(tmp_dir, ".claude/settings.json")
+      File.mkdir_p!(Path.dirname(settings_path))
+      hooks_dir = Path.join(tmp_dir, ".claude/hooks")
+      File.mkdir_p!(hooks_dir)
+
+      File.write!(
+        Path.join(hooks_dir, "post-tool-batch.sh"),
+        "#!/usr/bin/env sh\nprintf '{\"additionalContext\":\"Tool batch completed. Call ck_validate.\"}'\n"
+      )
+
+      File.write!(
+        Path.join(hooks_dir, "session-start.sh"),
+        "#!/usr/bin/env sh\necho my own hook\n"
+      )
+
+      user_hook = %{"type" => "command", "command" => "./scripts/my-lint.sh"}
+
+      custom_hook = %{
+        "type" => "command",
+        "command" => "sh .claude/hooks/session-start.sh.custom"
+      }
+
+      user_named_hook = %{"type" => "command", "command" => "sh .claude/hooks/session-start.sh"}
+
+      legacy_resolver =
+        "sh -c 'root=${CK_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}; exec sh \"$root/.claude/hooks/permission-request.sh\"'"
+
+      File.write!(
+        settings_path,
+        Jason.encode!(%{
+          "hooks" => %{
+            "PreToolUse" => [%{"matcher" => "Bash", "hooks" => [user_hook]}],
+            "SessionStart" => [%{"hooks" => [custom_hook, user_named_hook]}],
+            "PermissionRequest" => [
+              %{
+                "matcher" => "ExitPlanMode",
+                "hooks" => [%{"type" => "command", "command" => legacy_resolver}]
+              }
+            ],
+            "PostToolBatch" => [
+              %{
+                "hooks" => [
+                  %{
+                    "type" => "command",
+                    "command" =>
+                      ControlKeel.Skills.Exporter.Shared.repo_hook_command(
+                        ".claude/hooks/post-tool-batch.sh"
+                      )
+                  }
+                ]
+              }
+            ]
+          }
+        })
+      )
+
+      assert {:ok, _} = Skills.install("claude-standalone", tmp_dir, scope: "project")
+
+      hooks = settings_path |> File.read!() |> Jason.decode!() |> Map.fetch!("hooks")
+
+      refute Map.has_key?(hooks, "PostToolBatch")
+      refute File.exists?(Path.join(hooks_dir, "post-tool-batch.sh"))
+      assert File.read!(Path.join(hooks_dir, "session-start.sh")) =~ "my own hook"
+      assert [%{"hooks" => [^custom_hook, ^user_named_hook]}] = hooks["SessionStart"]
+
+      permission_commands =
+        for g <- hooks["PermissionRequest"], h <- g["hooks"], do: h["command"]
+
+      refute legacy_resolver in permission_commands
+      assert length(permission_commands) == 1
+
+      pre_tool_commands =
+        hooks["PreToolUse"]
+        |> Enum.flat_map(& &1["hooks"])
+        |> Enum.map(& &1["command"])
+
+      assert "./scripts/my-lint.sh" in pre_tool_commands
+      assert Enum.any?(pre_tool_commands, &(&1 =~ "pre-tool-use-bash.sh"))
+      assert length(pre_tool_commands) == length(Enum.uniq(pre_tool_commands))
+
+      assert {:ok, _} = Skills.install("claude-standalone", tmp_dir, scope: "project")
+      again = settings_path |> File.read!() |> Jason.decode!() |> Map.fetch!("hooks")
+      assert again == hooks
+    end
+
+    test "the Claude stop hook never blocks and warns only when blocked findings rise",
+         %{tmp_dir: tmp_dir} do
+      hook = Path.join(tmp_dir, "stop.sh")
+      File.write!(hook, Exporter.claude_stop_hook_contents())
+      File.chmod!(hook, 0o755)
+
+      count_file = Path.join(tmp_dir, "blocked")
+      stub = Path.join(tmp_dir, "controlkeel-stub")
+
+      File.write!(stub, """
+      #!/bin/sh
+      printf '{"active_findings":{"blocked":%s}}' "$(cat #{count_file})"
+      """)
+
+      File.chmod!(stub, 0o755)
+      state_dir = Path.join(tmp_dir, "state")
+      File.mkdir_p!(state_dir)
+
+      run = fn blocked, active ->
+        File.write!(count_file, Integer.to_string(blocked))
+
+        payload =
+          Jason.encode!(%{"session_id" => "3f2a-uuid", "stop_hook_active" => active})
+
+        {out, 0} =
+          System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
+            env: [
+              {"CK_TEST_INPUT", payload},
+              {"CK_HOOK_PATH", hook},
+              {"CONTROLKEEL_BIN", stub},
+              {"CONTROLKEEL_HOOK_STATE_DIR", state_dir}
+            ]
+          )
+
+        out
+      end
+
+      first = run.(3, false)
+      assert first =~ "3 blocked finding"
+      refute first =~ "\"decision\""
+
+      assert run.(3, false) == ""
+      assert run.(2, false) == ""
+      assert run.(3, false) == "", "fluctuating back to the reported count stays quiet"
+      assert run.(4, false) =~ "4 blocked finding"
+      assert run.(9, true) == ""
+      assert run.(0, false) == ""
+      assert run.(1, false) =~ "1 blocked finding", "clearing findings resets the baseline"
+
+      state_file = Path.join(state_dir, "stop-3f2a-uuid")
+      assert File.read!(state_file) == "1"
+      assert File.stat!(state_dir).access == :read_write
     end
   end
 
