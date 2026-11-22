@@ -5,9 +5,7 @@ defmodule ControlKeel.Skills.Exporter.DevinTerminalNative do
 
   def write(root, project_root, skills, opts) do
     compat_skill_root = Path.join(root, ".agents/skills")
-    native_skill_root = Path.join(root, ".devin/skills")
     E.write_skill_tree(skills, compat_skill_root)
-    E.write_skill_tree(skills, native_skill_root)
 
     agent_path = Path.join(root, ".devin/agents/controlkeel-operator/AGENT.md")
     File.mkdir_p!(Path.dirname(agent_path))
@@ -70,7 +68,6 @@ defmodule ControlKeel.Skills.Exporter.DevinTerminalNative do
       opts,
       [
         %{"path" => compat_skill_root, "kind" => "skills"},
-        %{"path" => native_skill_root, "kind" => "skills"},
         %{"path" => agent_path, "kind" => "agent"},
         %{"path" => hook_manifest_path, "kind" => "hooks"},
         %{"path" => hook_dir, "kind" => "hooks"},

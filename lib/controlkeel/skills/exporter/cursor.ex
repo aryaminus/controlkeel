@@ -7,9 +7,6 @@ defmodule ControlKeel.Skills.Exporter.Cursor do
     skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
-    cursor_skill_root = Path.join(root, ".cursor/skills")
-    E.write_cursor_skill_tree(skills, cursor_skill_root)
-
     rule_path = Path.join(root, ".cursor/rules/controlkeel.mdc")
     File.mkdir_p!(Path.dirname(rule_path))
     File.write!(rule_path, E.cursor_rule_contents())
@@ -82,7 +79,6 @@ defmodule ControlKeel.Skills.Exporter.Cursor do
       opts,
       [
         %{"path" => skill_root, "kind" => "skills"},
-        %{"path" => cursor_skill_root, "kind" => "skills"},
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},

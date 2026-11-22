@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.DroidBundle do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".factory/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     droid_path = Path.join(root, ".factory/droids/controlkeel.md")

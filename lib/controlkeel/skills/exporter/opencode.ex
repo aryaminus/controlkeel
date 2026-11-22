@@ -4,9 +4,7 @@ defmodule ControlKeel.Skills.Exporter.OpenCode do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    native_skill_root = Path.join(root, ".opencode/skills")
     compat_skill_root = Path.join(root, ".agents/skills")
-    E.write_skill_tree(skills, native_skill_root)
     E.write_skill_tree(skills, compat_skill_root)
 
     plugin_path = Path.join(root, ".opencode/plugins/controlkeel-governance.ts")
@@ -63,7 +61,6 @@ defmodule ControlKeel.Skills.Exporter.OpenCode do
       project_root,
       opts,
       [
-        %{"path" => native_skill_root, "kind" => "skills"},
         %{"path" => compat_skill_root, "kind" => "skills"},
         %{"path" => plugin_path, "kind" => "plugin"},
         %{"path" => agent_path, "kind" => "agent"},

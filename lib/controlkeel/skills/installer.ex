@@ -18,7 +18,8 @@ defmodule ControlKeel.Skills.Installer do
          {:ok, scope} <- normalize_scope(target, Keyword.get(opts, :scope, target.default_scope)),
          analysis <- Registry.analyze(project_root, trust_project_skills: true),
          skills = canonical_skills(analysis.skills, project_root),
-         {:ok, result} <- do_install(target, scope, project_root, skills, opts) do
+         {:ok, result} <- do_install(target, scope, project_root, skills, opts),
+         result <- install_shared_skills(target.id, scope, project_root, skills, result) do
       :telemetry.execute(
         [:controlkeel, :skills, :installed],
         %{count: 1},
@@ -43,6 +44,66 @@ defmodule ControlKeel.Skills.Installer do
   # to the managed .gitignore block. Specific subpaths (not parent dirs) are
   # used so shared dirs like .github/.vscode are never wholesale-ignored.
   # Best-effort: a gitignore failure must never fail the install itself.
+  # Hosts read skills from two places: `.claude/skills` (Claude Code) and the
+  # open `.agents/skills` path (Codex, Cursor, Copilot, Antigravity, and the
+  # MCP-only tier, which also reach skills through `ck_skill_load`). Every
+  # non-Claude install writes the shared path, then retires the per-host copy
+  # earlier releases wrote. Only names in CK's own manifest are removed.
+  @legacy_skill_dirs %{
+    "codex" => [".codex/skills"],
+    "github-repo" => [".github/skills"],
+    "copilot-plugin" => [".github/skills"],
+    "cursor-native" => [".cursor/skills"],
+    "cline-native" => [".cline/skills"],
+    "continue-native" => [".continue/skills"],
+    "roo-native" => [".roo/skills"],
+    "warp-native" => [".warp/skills"],
+    "kiro-native" => [".kiro/skills"],
+    "kilo-native" => [".kilo/skills"],
+    "augment-native" => [".augment/skills"],
+    "droid-bundle" => [".factory/skills"],
+    "goose-native" => ["goose/skills"],
+    "opencode-native" => [".opencode/skills"],
+    "devin-terminal-native" => [".devin/skills", ".config/devin/skills"]
+  }
+
+  @no_shared_skills ~w(claude-standalone claude-plugin devin-runtime open-standard)
+
+  defp install_shared_skills(target_id, scope, project_root, skills, result)
+       when scope in ["user", "project"] and target_id not in @no_shared_skills and
+              is_map(result) do
+    base = if scope == "user", do: user_home(), else: Path.expand(project_root)
+    shared_root = Path.join(base, ".agents/skills")
+    copy_skills(skills, shared_root)
+
+    @legacy_skill_dirs
+    |> Map.get(target_id, [])
+    |> Enum.each(&retire_skill_dir(Path.join(base, &1)))
+
+    Map.put(result, :shared_skills_destination, shared_root)
+  end
+
+  defp install_shared_skills(_target_id, _scope, _project_root, _skills, result), do: result
+
+  defp retire_skill_dir(dir) do
+    names = read_skills_manifest(dir)
+
+    if names != [] do
+      Enum.each(names, fn name ->
+        if safe_skill_name?(name), do: File.rm_rf!(Path.join(dir, name))
+      end)
+
+      _ = File.rm(Path.join(dir, @skills_manifest_file))
+
+      case File.ls(dir) do
+        {:ok, []} -> File.rmdir(dir)
+        _ -> :ok
+      end
+    end
+
+    :ok
+  end
+
   defp maybe_ignore_project_artifacts("project", project_root, result) do
     root = Path.expand(project_root)
 
@@ -195,21 +256,14 @@ defmodule ControlKeel.Skills.Installer do
         do: Path.join(user_home(), ".agents/skills"),
         else: Path.join(project_root, ".agents/skills")
 
-    native_skill_root =
-      if scope == "user",
-        do: Path.join(user_home(), ".codex/skills"),
-        else: Path.join(project_root, ".codex/skills")
+    native_skill_root = compat_skill_root
 
     agent_root =
       if scope == "user",
         do: Path.join(user_home(), ".codex/agents"),
         else: Path.join(project_root, ".codex/agents")
 
-    unless compat_skills_already_populated?(compat_skill_root, skills) do
-      copy_skills(skills, compat_skill_root)
-    end
-
-    copy_skills(skills, native_skill_root)
+    copy_skills(skills, compat_skill_root)
     File.mkdir_p!(agent_root)
 
     {:ok, plan} = Exporter.export("codex", project_root, scope: scope)
@@ -234,18 +288,24 @@ defmodule ControlKeel.Skills.Installer do
     File.mkdir_p!(hooks_root)
     copy_tree_contents(Path.join(plan.output_dir, ".codex/hooks"), hooks_root)
 
-    File.cp!(
-      Path.join(plan.output_dir, ".codex/config.toml"),
-      Path.join(config_root, "config.toml")
-    )
+    {:ok, _} =
+      ControlKeel.CLI.CodexConfig.merge_export(
+        Path.join(config_root, "config.toml"),
+        File.read!(Path.join(plan.output_dir, ".codex/config.toml"))
+      )
 
-    File.cp!(
+    merge_hooks_json!(
       Path.join(plan.output_dir, ".codex/hooks.json"),
-      Path.join(config_root, "hooks.json")
+      Path.join(config_root, "hooks.json"),
+      ".codex/hooks/"
     )
 
     if scope == "project" do
-      File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+      merge_json_file!(
+        Path.join(plan.output_dir, ".mcp.json"),
+        Path.join(project_root, ".mcp.json")
+      )
+
       maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
     end
 
@@ -359,7 +419,7 @@ defmodule ControlKeel.Skills.Installer do
         {Path.join(project_root, ".devin"), Path.join(project_root, ".agents/skills")}
       end
 
-    native_skill_root = Path.join(devin_root, "skills")
+    native_skill_root = compat_root
     agent_root = Path.join(devin_root, "agents")
     hooks_root = Path.join(devin_root, "hooks")
 
@@ -372,10 +432,6 @@ defmodule ControlKeel.Skills.Installer do
     copy_skills(skills, native_skill_root)
     copy_tree_contents(Path.join(plan.output_dir, ".devin/agents"), agent_root)
     copy_tree_contents(Path.join(plan.output_dir, ".devin/hooks"), hooks_root)
-
-    unless compat_dir_populated?(compat_root) do
-      copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), compat_root)
-    end
 
     merge_json_file!(
       Path.join(plan.output_dir, ".devin/config.json"),
@@ -458,7 +514,7 @@ defmodule ControlKeel.Skills.Installer do
          }}
 
       "project" ->
-        skill_root = Path.join(project_root, ".cline/skills")
+        skill_root = Path.join(project_root, ".agents/skills")
         rules_root = Path.join(project_root, ".clinerules")
 
         copy_skills(skills, skill_root)
@@ -493,10 +549,9 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
     copy_tree_contents(Path.join(plan.output_dir, ".cursor"), Path.join(project_root, ".cursor"))
-    # The tree copy above writes `.cursor/skills` from the export plan without
-    # an ownership manifest; re-run it through copy_skills so the destination
-    # records CK ownership and future installs can prune stale names there.
-    copy_skills(skills, Path.join(project_root, ".cursor/skills"))
+    # Record CK ownership of the shared skill tree so later installs can prune
+    # stale names there.
+    copy_skills(skills, Path.join(project_root, ".agents/skills"))
 
     # Guard: do not overwrite an existing plugin.json if the exported version is
     # older than what is already on disk. This prevents the installed binary
@@ -559,7 +614,7 @@ defmodule ControlKeel.Skills.Installer do
   defp do_install(%SkillTarget{id: "continue-native"}, "project", project_root, skills, opts) do
     {:ok, plan} = Exporter.export("continue-native", project_root, scope: "project")
 
-    copy_skills(skills, Path.join(project_root, ".continue/skills"))
+    copy_skills(skills, Path.join(project_root, ".agents/skills"))
 
     copy_tree_contents(
       Path.join(plan.output_dir, ".continue"),
@@ -584,7 +639,12 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_skills(skills, skill_root)
     copy_tree_contents(Path.join(plan.output_dir, ".letta"), letta_root)
-    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+
+    merge_json_file!(
+      Path.join(plan.output_dir, ".mcp.json"),
+      Path.join(project_root, ".mcp.json")
+    )
+
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
 
     {:ok,
@@ -621,13 +681,18 @@ defmodule ControlKeel.Skills.Installer do
   defp do_install(%SkillTarget{id: "roo-native"}, "project", project_root, skills, opts) do
     {:ok, plan} = Exporter.export("roo-native", project_root, scope: "project")
 
-    skill_root = Path.join(project_root, ".roo/skills")
+    skill_root = Path.join(project_root, ".agents/skills")
     roo_root = Path.join(project_root, ".roo")
 
     copy_skills(skills, skill_root)
     copy_tree_contents(Path.join(plan.output_dir, ".roo"), roo_root)
     File.cp!(Path.join(plan.output_dir, ".roomodes"), Path.join(project_root, ".roomodes"))
-    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+
+    merge_json_file!(
+      Path.join(plan.output_dir, ".mcp.json"),
+      Path.join(project_root, ".mcp.json")
+    )
+
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
 
     {:ok,
@@ -641,7 +706,7 @@ defmodule ControlKeel.Skills.Installer do
      }}
   end
 
-  defp do_install(%SkillTarget{id: "warp-native"}, scope, project_root, _skills, opts)
+  defp do_install(%SkillTarget{id: "warp-native"}, scope, project_root, skills, opts)
        when scope in ["user", "project"] do
     {:ok, plan} = Exporter.export("warp-native", project_root, scope: scope)
 
@@ -652,17 +717,10 @@ defmodule ControlKeel.Skills.Installer do
         {Path.join(project_root, ".warp"), Path.join(project_root, ".agents/skills")}
       end
 
-    native_skill_root = Path.join(warp_root, "skills")
+    native_skill_root = compat_root
 
     File.mkdir_p!(warp_root)
-    File.mkdir_p!(native_skill_root)
-    File.mkdir_p!(compat_root)
-
-    copy_tree_contents(Path.join(plan.output_dir, ".warp/skills"), native_skill_root)
-
-    unless compat_dir_populated?(compat_root) do
-      copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), compat_root)
-    end
+    copy_skills(skills, compat_root)
 
     File.cp!(
       Path.join(plan.output_dir, ".warp/controlkeel-mcp.json"),
@@ -693,7 +751,12 @@ defmodule ControlKeel.Skills.Installer do
     File.mkdir_p!(workflow_root)
     copy_tree_contents(Path.join(plan.output_dir, "goose"), Path.join(project_root, "goose"))
     File.cp!(Path.join(plan.output_dir, ".goosehints"), Path.join(project_root, ".goosehints"))
-    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+
+    merge_json_file!(
+      Path.join(plan.output_dir, ".mcp.json"),
+      Path.join(project_root, ".mcp.json")
+    )
+
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
 
     {:ok,
@@ -710,18 +773,13 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("opencode-native", project_root, scope: "project")
 
     opencode_root = Path.join(project_root, ".opencode")
-    native_skills_root = Path.join(opencode_root, "skills")
     compat_skills_root = Path.join(project_root, ".agents/skills")
+    native_skills_root = compat_skills_root
     plugins_root = Path.join(opencode_root, "plugins")
     agents_root = Path.join(opencode_root, "agents")
     commands_root = Path.join(opencode_root, "commands")
 
-    copy_skills(skills, native_skills_root)
-    # Only write compat .agents/skills/ if not already populated by another
-    # agent with native skill support — avoids redundant copies wasting tokens.
-    unless compat_skills_already_populated?(compat_skills_root, skills) do
-      copy_skills(skills, compat_skills_root)
-    end
+    copy_skills(skills, compat_skills_root)
 
     File.mkdir_p!(plugins_root)
     File.mkdir_p!(agents_root)
@@ -733,7 +791,7 @@ defmodule ControlKeel.Skills.Installer do
 
     mcp_path = Path.join(opencode_root, "mcp.json")
 
-    File.cp!(
+    merge_json_file!(
       Path.join(plan.output_dir, ".opencode/mcp.json"),
       mcp_path
     )
@@ -772,7 +830,7 @@ defmodule ControlKeel.Skills.Installer do
     copy_tree_contents(Path.join(plan.output_dir, ".kiro/settings"), settings_root)
     copy_tree_contents(Path.join(plan.output_dir, ".kiro/commands"), commands_root)
 
-    File.cp!(
+    merge_json_file!(
       Path.join(plan.output_dir, ".kiro/mcp.json"),
       Path.join(kiro_root, "mcp.json")
     )
@@ -793,7 +851,7 @@ defmodule ControlKeel.Skills.Installer do
 
   defp do_install(%SkillTarget{id: "kilo-native"}, "project", project_root, skills, opts) do
     kilo_root = Path.join(project_root, ".kilo")
-    skills_root = Path.join(kilo_root, "skills")
+    skills_root = Path.join(project_root, ".agents/skills")
 
     copy_skills(skills, skills_root)
 
@@ -804,7 +862,7 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_tree_contents(Path.join(plan.output_dir, ".kilo/commands"), commands_root)
 
-    File.cp!(
+    merge_json_file!(
       Path.join(plan.output_dir, ".kilo/kilo.json"),
       Path.join(kilo_root, "kilo.json")
     )
@@ -831,7 +889,12 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_tree_contents(Path.join(plan.output_dir, ".amp"), amp_root)
     copy_tree_contents(Path.join(plan.output_dir, ".agents/skills"), skill_root)
-    File.cp!(Path.join(plan.output_dir, ".mcp.json"), Path.join(project_root, ".mcp.json"))
+
+    merge_json_file!(
+      Path.join(plan.output_dir, ".mcp.json"),
+      Path.join(project_root, ".mcp.json")
+    )
+
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
 
     {:ok,
@@ -860,7 +923,7 @@ defmodule ControlKeel.Skills.Installer do
        target: "augment-native",
        scope: "project",
        destination: augment_root,
-       skills_destination: Path.join(augment_root, "skills"),
+       skills_destination: Path.join(project_root, ".agents/skills"),
        agents_destination: Path.join(augment_root, "agents"),
        commands_destination: Path.join(augment_root, "commands"),
        rules_destination: Path.join(augment_root, "rules")
@@ -870,7 +933,7 @@ defmodule ControlKeel.Skills.Installer do
   defp do_install(%SkillTarget{id: "github-repo"}, scope, project_root, skills, _opts)
        when scope in ["project", "export"] do
     if scope == "project" do
-      skill_root = Path.join(project_root, ".github/skills")
+      skill_root = Path.join(project_root, ".agents/skills")
       copy_skills(skills, skill_root)
 
       {:ok, plan} = Exporter.export("github-repo", project_root, scope: scope)
@@ -899,7 +962,10 @@ defmodule ControlKeel.Skills.Installer do
         else: Path.join(project_root, ".factory")
       )
 
-    skill_root = Path.join(base, "skills")
+    skill_root =
+      if scope == "user",
+        do: Path.join(user_home(), ".agents/skills"),
+        else: Path.join(project_root, ".agents/skills")
 
     copy_skills(skills, skill_root)
 
@@ -1053,22 +1119,6 @@ defmodule ControlKeel.Skills.Installer do
     Enum.uniq(current ++ ControlKeel.Skills.ClaudeHooks.retired_hooks())
   end
 
-  # Check whether .agents/skills/ already has all the skills we'd write,
-  # meaning another agent with native skill support already populated it.
-  # Avoids redundant copies that waste MCP host context tokens.
-  defp compat_skills_already_populated?(compat_root, skills) do
-    manifest = read_skills_manifest(compat_root)
-    current_names = Enum.map(skills, & &1.name)
-    Enum.all?(current_names, &(&1 in manifest))
-  end
-
-  # Variant for copy_tree_contents-based flows that don't have a skills list.
-  # Checks if the compat dir already has any CK-managed skill directories.
-  defp compat_dir_populated?(compat_root) do
-    manifest = read_skills_manifest(compat_root)
-    length(manifest) > 0
-  end
-
   defp copy_skills(skills, destination_root) do
     File.mkdir_p!(destination_root)
 
@@ -1202,6 +1252,67 @@ defmodule ControlKeel.Skills.Installer do
         File.mkdir_p!(Path.dirname(destination))
         File.cp!(source, destination)
     end
+  end
+
+  # Merge a generated `{"hooks": {event => groups}}` file into an existing one,
+  # replacing only entries whose command runs a ControlKeel script under
+  # `script_prefix` (for example `.codex/hooks/ck-`). User hooks survive.
+  defp merge_hooks_json!(source_path, destination_path, script_prefix) do
+    source = source_path |> File.read!() |> Jason.decode!()
+
+    existing =
+      case File.read(destination_path) do
+        {:ok, contents} ->
+          case Jason.decode(contents) do
+            {:ok, %{} = decoded} -> decoded
+            _ -> %{}
+          end
+
+        _ ->
+          %{}
+      end
+
+    owned? = fn
+      %{"command" => command} when is_binary(command) ->
+        String.contains?(command, script_prefix <> "ck-") or
+          String.contains?(command, script_prefix <> "controlkeel-")
+
+      _ ->
+        false
+    end
+
+    kept =
+      existing
+      |> Map.get("hooks", %{})
+      |> Enum.map(fn {event, groups} ->
+        groups =
+          groups
+          |> List.wrap()
+          |> Enum.map(fn
+            %{"hooks" => hooks} = group when is_list(hooks) ->
+              Map.put(group, "hooks", Enum.reject(hooks, owned?))
+
+            group ->
+              group
+          end)
+          |> Enum.reject(&match?(%{"hooks" => []}, &1))
+
+        {event, groups}
+      end)
+      |> Enum.reject(fn {_event, groups} -> groups == [] end)
+      |> Map.new()
+
+    hooks =
+      Map.merge(kept, Map.get(source, "hooks", %{}), fn _event, user, ck -> user ++ ck end)
+
+    File.mkdir_p!(Path.dirname(destination_path))
+
+    File.write!(
+      destination_path,
+      Jason.encode!(Map.put(Map.merge(existing, Map.delete(source, "hooks")), "hooks", hooks),
+        pretty: true
+      ) <> "\n"
+    )
   end
 
   defp merge_json_file!(source_path, destination_path) do

@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.ClineNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".cline/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     mcp_path = Path.join(root, ".cline/data/settings/cline_mcp_settings.json")
