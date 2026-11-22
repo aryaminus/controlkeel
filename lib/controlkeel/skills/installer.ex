@@ -1200,22 +1200,18 @@ defmodule ControlKeel.Skills.Installer do
 
   defp ck_owned_claude_hook?(_hook), do: false
 
-  # Exact command strings ControlKeel has generated for its Claude hooks:
-  # the current resolver form plus the bare relative forms older releases
-  # wrote. Matching whole commands keeps user entries that merely mention a
-  # similar path.
+  # Exact command strings ControlKeel releases have generated for their Claude
+  # hooks: the current project-then-$HOME resolver, the earlier project-only
+  # resolver, and the $HOME form. Bare commands such as `sh .claude/hooks/x.sh`
+  # are never treated as CK-owned, so a user's own registration survives.
   defp ck_claude_hook_commands do
     Enum.flat_map(ck_claude_hook_scripts(), fn script ->
       rel = ".claude/hooks/" <> script
 
       [
         ControlKeel.Skills.Exporter.Shared.repo_hook_command(rel),
-        rel,
-        "./" <> rel,
-        "sh " <> rel,
-        "bash " <> rel,
-        ~s(sh "$CLAUDE_PROJECT_DIR"/) <> rel,
-        ~s("$CLAUDE_PROJECT_DIR"/) <> rel
+        "sh -c 'root=${CK_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}; exec sh \"$root/#{rel}\"'",
+        ControlKeel.Skills.Exporter.Shared.global_hook_command(rel)
       ]
     end)
   end

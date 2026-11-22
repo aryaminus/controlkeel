@@ -1155,12 +1155,23 @@ defmodule ControlKeel.SkillsTest do
         "command" => "sh .claude/hooks/session-start.sh.custom"
       }
 
+      user_named_hook = %{"type" => "command", "command" => "sh .claude/hooks/session-start.sh"}
+
+      legacy_resolver =
+        "sh -c 'root=${CK_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}; exec sh \"$root/.claude/hooks/permission-request.sh\"'"
+
       File.write!(
         settings_path,
         Jason.encode!(%{
           "hooks" => %{
             "PreToolUse" => [%{"matcher" => "Bash", "hooks" => [user_hook]}],
-            "SessionStart" => [%{"hooks" => [custom_hook]}],
+            "SessionStart" => [%{"hooks" => [custom_hook, user_named_hook]}],
+            "PermissionRequest" => [
+              %{
+                "matcher" => "ExitPlanMode",
+                "hooks" => [%{"type" => "command", "command" => legacy_resolver}]
+              }
+            ],
             "PostToolBatch" => [
               %{
                 "hooks" => [
@@ -1185,7 +1196,13 @@ defmodule ControlKeel.SkillsTest do
       refute Map.has_key?(hooks, "PostToolBatch")
       refute File.exists?(Path.join(hooks_dir, "post-tool-batch.sh"))
       assert File.read!(Path.join(hooks_dir, "session-start.sh")) =~ "my own hook"
-      assert [%{"hooks" => [^custom_hook]}] = hooks["SessionStart"]
+      assert [%{"hooks" => [^custom_hook, ^user_named_hook]}] = hooks["SessionStart"]
+
+      permission_commands =
+        for g <- hooks["PermissionRequest"], h <- g["hooks"], do: h["command"]
+
+      refute legacy_resolver in permission_commands
+      assert length(permission_commands) == 1
 
       pre_tool_commands =
         hooks["PreToolUse"]
