@@ -13,6 +13,25 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
   end
 
   describe "controlkeel run cloud-agent <task-id>" do
+    test "explains why a task in an unbound workspace cannot use cloud execution" do
+      workspace = MissionFixtures.workspace_fixture(%{org_id: nil})
+      session = MissionFixtures.session_fixture(%{workspace: workspace})
+      task = MissionFixtures.task_fixture(%{session: session})
+
+      assert {:error, message} =
+               CLI.run_command(
+                 %{
+                   command: :run_cloud_agent,
+                   options: %{runtime: "devin", budget_cents: 0},
+                   args: [Integer.to_string(task.id)]
+                 },
+                 File.cwd!()
+               )
+
+      assert message =~ "Cloud execution requires an organization-bound workspace"
+      assert RuntimeContext.list_for_workspace(workspace.id) == []
+    end
+
     test "creates a run package, prints token and metadata", %{
       task: task,
       user: user,
