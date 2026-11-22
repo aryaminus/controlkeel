@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".augment/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     agent_path = Path.join(root, ".augment/agents/controlkeel-operator.md")

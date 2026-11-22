@@ -5,7 +5,7 @@ defmodule ControlKeel.Skills.Exporter.KiroNative do
 
   def write(root, project_root, skills, opts) do
     # 0. Skill tree
-    skill_root = Path.join(root, ".kiro/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     # 1. Agent Hook — post-tool validation

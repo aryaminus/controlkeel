@@ -770,9 +770,7 @@ defmodule ControlKeel.SkillsTest do
              Path.join(codex_plan.output_dir, ".agents/skills/controlkeel-governance/SKILL.md")
            )
 
-    assert File.exists?(
-             Path.join(codex_plan.output_dir, ".codex/skills/controlkeel-governance/SKILL.md")
-           )
+    refute File.exists?(Path.join(codex_plan.output_dir, ".codex/skills"))
 
     assert File.exists?(Path.join(codex_plan.output_dir, "AGENTS.md"))
     assert File.exists?(Path.join(codex_plan.output_dir, "CONTROLKEEL_INSTALL.md"))
@@ -1609,6 +1607,87 @@ defmodule ControlKeel.SkillsTest do
       assert match?({:error, {:unsupported_scope, ^plugin, "project", _}}, result) ||
                match?({:error, {:unsupported_install, ^plugin, "project"}}, result),
              "expected #{plugin} to reject project scope, got: #{inspect(result)}"
+    end
+  end
+
+  describe "shared skill storage" do
+    test "non-Claude installs write .agents/skills and retire CK copies in legacy dirs",
+         %{tmp_dir: tmp_dir} do
+      legacy = Path.join(tmp_dir, ".codex/skills")
+      File.mkdir_p!(Path.join(legacy, "controlkeel-governance"))
+      File.write!(Path.join(legacy, "controlkeel-governance/SKILL.md"), "stale\n")
+      File.mkdir_p!(Path.join(legacy, "my-own-skill"))
+      File.write!(Path.join(legacy, "my-own-skill/SKILL.md"), "mine\n")
+
+      File.write!(
+        Path.join(legacy, ".controlkeel-skills.json"),
+        Jason.encode!(%{"skills" => ["controlkeel-governance"]})
+      )
+
+      assert {:ok, result} = Skills.install("codex", tmp_dir, scope: "project")
+
+      assert result.shared_skills_destination == Path.join(tmp_dir, ".agents/skills")
+      assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+      refute File.exists?(Path.join(legacy, "controlkeel-governance"))
+      refute File.exists?(Path.join(legacy, ".controlkeel-skills.json"))
+      assert File.read!(Path.join(legacy, "my-own-skill/SKILL.md")) == "mine\n"
+    end
+
+    test "legacy dirs CK fully owned are removed, and Claude keeps .claude/skills",
+         %{tmp_dir: tmp_dir} do
+      legacy = Path.join(tmp_dir, ".cursor/skills")
+      File.mkdir_p!(Path.join(legacy, "align"))
+      File.write!(Path.join(legacy, "align/SKILL.md"), "stale\n")
+
+      File.write!(
+        Path.join(legacy, ".controlkeel-skills.json"),
+        Jason.encode!(%{"skills" => ["align"]})
+      )
+
+      assert {:ok, _} = Skills.install("cursor-native", tmp_dir, scope: "project")
+      refute File.exists?(legacy)
+
+      assert {:ok, claude} = Skills.install("claude-standalone", tmp_dir, scope: "project")
+      refute Map.has_key?(claude, :shared_skills_destination)
+      assert File.exists?(Path.join(tmp_dir, ".claude/skills/align/SKILL.md"))
+    end
+
+    test "a stale shared tree is refreshed on reinstall", %{tmp_dir: tmp_dir} do
+      assert {:ok, _} = Skills.install("cursor-native", tmp_dir, scope: "project")
+      skill = Path.join(tmp_dir, ".agents/skills/align/SKILL.md")
+      File.write!(skill, "stale\n")
+
+      assert {:ok, _} = Skills.install("codex", tmp_dir, scope: "project")
+      refute File.read!(skill) == "stale\n"
+    end
+
+    test "codex install merges into existing config, MCP, and hooks files", %{tmp_dir: tmp_dir} do
+      File.mkdir_p!(Path.join(tmp_dir, ".codex"))
+      config = Path.join(tmp_dir, ".codex/config.toml")
+      File.write!(config, ~s(model = "o3"\n[mcp_servers.github]\ncommand = "gh-mcp"\n))
+      File.write!(Path.join(tmp_dir, ".mcp.json"), ~s({"mcpServers":{"other":{"command":"x"}}}))
+
+      File.write!(
+        Path.join(tmp_dir, ".codex/hooks.json"),
+        ~s({"hooks":{"Stop":[{"hooks":[{"type":"command","command":"./mine.sh"}]}]}})
+      )
+
+      for _ <- 1..2, do: assert({:ok, _} = Skills.install("codex", tmp_dir, scope: "project"))
+
+      toml = File.read!(config)
+      assert toml =~ ~s(model = "o3")
+      assert toml =~ "[mcp_servers.github]"
+      assert length(String.split(toml, "# controlkeel:start")) == 2
+
+      servers = tmp_dir |> Path.join(".mcp.json") |> File.read!() |> Jason.decode!()
+      assert Map.keys(servers["mcpServers"]) |> Enum.sort() == ["controlkeel", "other"]
+
+      hooks = tmp_dir |> Path.join(".codex/hooks.json") |> File.read!() |> Jason.decode!()
+      stop_commands = for g <- hooks["hooks"]["Stop"], h <- g["hooks"], do: h["command"]
+      assert "./mine.sh" in stop_commands
+
+      all_commands = for {_e, gs} <- hooks["hooks"], g <- gs, h <- g["hooks"], do: h["command"]
+      assert length(all_commands) == length(Enum.uniq(all_commands))
     end
   end
 

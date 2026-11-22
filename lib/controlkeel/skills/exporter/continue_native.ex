@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.ContinueNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".continue/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     prompt_path = Path.join(root, ".continue/prompts/controlkeel.md")

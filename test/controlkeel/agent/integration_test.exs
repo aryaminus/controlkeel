@@ -135,7 +135,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert codex.runtime_transport == "codex_sdk"
     assert codex.runtime_auth_owner == "agent"
     assert codex.auth_mode == "agent_runtime"
-    assert ".codex/skills" in codex.artifact_surfaces
+    assert ".agents/skills" in codex.artifact_surfaces
     assert ".codex/config.toml" in codex.artifact_surfaces
     assert ".codex/commands/controlkeel-review.md" in codex.artifact_surfaces
     refute codex.runtime_session_support["fork"]
@@ -157,7 +157,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert devin_terminal.review_experience == "native_review"
     assert ".devin/config.json" in devin_terminal.artifact_surfaces
     assert ".devin/hooks.v1.json" in devin_terminal.artifact_surfaces
-    assert ".devin/skills" in devin_terminal.artifact_surfaces
+    assert ".agents/skills" in devin_terminal.artifact_surfaces
     assert ".devin/agents" in devin_terminal.artifact_surfaces
 
     assert warp.label == "Warp"
@@ -167,7 +167,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert warp.auth_mode == "agent_runtime"
     assert warp.mcp_mode == "config_reference"
     assert warp.review_experience == "native_review"
-    assert ".warp/skills" in warp.artifact_surfaces
+    assert ".agents/skills" in warp.artifact_surfaces
     assert ".warp/controlkeel-mcp.json" in warp.artifact_surfaces
     assert ".warp/README.md" in warp.artifact_surfaces
     assert ".agents/skills" in warp.artifact_surfaces
@@ -220,7 +220,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     opencode = Integration.get("opencode")
     assert opencode.support_class == "attach_client"
     assert opencode.preferred_target == "opencode-native"
-    assert ".opencode/skills" in opencode.artifact_surfaces
+    assert ".agents/skills" in opencode.artifact_surfaces
     assert ".agents/skills" in opencode.artifact_surfaces
     assert ".opencode/plugins/controlkeel-governance.ts" in opencode.artifact_surfaces
 
@@ -242,7 +242,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
 
     assert cursor.submission_mode == "command"
     assert ".cursor/background-agents" in cursor.artifact_surfaces
-    assert ".cursor/skills" in cursor.artifact_surfaces
+    assert ".agents/skills" in cursor.artifact_surfaces
     assert ".cursor/agents" in cursor.artifact_surfaces
     assert "hooks" in cursor.agent_uses_ck_via
     assert "plugin" in cursor.agent_uses_ck_via
@@ -255,7 +255,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert kilo.preferred_target == "kilo-native"
     assert kilo.auth_mode == "ck_owned"
     assert kilo.skills_mode == "native"
-    assert ".kilo/skills" in kilo.artifact_surfaces
+    assert ".agents/skills" in kilo.artifact_surfaces
     assert ".kilo/commands" in kilo.artifact_surfaces
     assert ".kilo/kilo.json" in kilo.artifact_surfaces
     assert Enum.any?(kilo.direct_install_methods, &(&1["command"] == "controlkeel attach kilo"))
@@ -299,7 +299,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert droid.preferred_target == "droid-bundle"
     assert "native_skills" in droid.agent_uses_ck_via
     assert "commands" in droid.agent_uses_ck_via
-    assert ".factory/skills" in droid.artifact_surfaces
+    assert ".agents/skills" in droid.artifact_surfaces
     assert ".factory/droids" in droid.artifact_surfaces
     assert ".factory/commands" in droid.artifact_surfaces
     assert "mcp.json" in droid.artifact_surfaces
@@ -325,7 +325,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert t3code.runtime_transport == "t3code_provider_runtime"
     assert t3code.runtime_review_transport == "orchestration_domain_event"
     assert t3code.runtime_session_support["fork"]
-    assert ".codex/skills" in t3code.artifact_surfaces
+    assert ".agents/skills" in t3code.artifact_surfaces
     assert t3code.runtime_capabilities[:policy_gate] == true
     assert t3code.runtime_capabilities[:tool_approval] == true
     assert t3code.runtime_capabilities[:deterministic_event_ids] == true

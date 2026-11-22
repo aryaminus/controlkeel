@@ -48,6 +48,39 @@ defmodule ControlKeel.CLI.CodexConfig do
   end
 
   @doc """
+  Merges an exported Codex `config.toml` into `config_path`: only the
+  ControlKeel managed block is replaced, and the hooks feature flag is
+  ensured. Everything the user wrote outside the block is preserved.
+  """
+  def merge_export(config_path, export_contents) when is_binary(export_contents) do
+    block =
+      case split_managed_block(export_contents) do
+        {:ok, _prefix, _suffix} ->
+          [_, rest] = String.split(export_contents, @managed_start, parts: 2)
+          [inner, _] = String.split(rest, @managed_end, parts: 2)
+          @managed_start <> inner <> @managed_end
+
+        :error ->
+          nil
+      end
+
+    existing =
+      case File.read(config_path) do
+        {:ok, contents} -> contents
+        _ -> ""
+      end
+
+    updated =
+      if(block, do: upsert_managed_block(existing, block), else: existing)
+      |> ensure_feature_flag("codex_hooks", "true")
+
+    with :ok <- File.mkdir_p(Path.dirname(config_path)),
+         :ok <- File.write(config_path, updated) do
+      {:ok, config_path}
+    end
+  end
+
+  @doc """
   Reverse of write/3: strip the controlkeel managed block from config.toml,
   preserving any user-authored content outside the block. Deletes the file if
   nothing else remains. Idempotent and best-effort.

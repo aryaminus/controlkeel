@@ -154,7 +154,6 @@ defmodule ControlKeel.Agent.Integration do
         export_targets: ["codex", "codex-plugin", "open-standard"],
         artifact_surfaces: [
           ".agents/skills",
-          ".codex/skills",
           ".codex/config.toml",
           ".codex/hooks.json",
           ".codex/hooks",
@@ -215,7 +214,7 @@ defmodule ControlKeel.Agent.Integration do
         export_targets: ["github-repo", "copilot-plugin"],
         submission_mode: "command",
         artifact_surfaces: [
-          ".github/skills",
+          ".agents/skills",
           ".github/agents",
           ".github/mcp.json",
           ".vscode/mcp.json"
@@ -244,7 +243,7 @@ defmodule ControlKeel.Agent.Integration do
         export_targets: ["github-repo", "copilot-plugin"],
         review_experience: "native_review",
         artifact_surfaces: [
-          ".github/skills",
+          ".agents/skills",
           ".github/agents",
           ".github/mcp.json",
           ".github/copilot-instructions.md",
@@ -472,7 +471,7 @@ defmodule ControlKeel.Agent.Integration do
         supported_scopes: ["project", "export"],
         export_targets: ["augment-native"],
         artifact_surfaces: [
-          ".augment/skills/controlkeel-governance/SKILL.md",
+          ".agents/skills/controlkeel-governance/SKILL.md",
           ".augment/agents/controlkeel-operator.md",
           ".augment/commands/controlkeel-review.md",
           ".augment/commands/controlkeel-submit-plan.md",
@@ -532,7 +531,6 @@ defmodule ControlKeel.Agent.Integration do
         export_targets: ["opencode-native"],
         feedback_mode: "command_reply",
         artifact_surfaces: [
-          ".opencode/skills",
           ".agents/skills",
           ".opencode/plugins/controlkeel-governance.ts",
           ".opencode/agents/controlkeel-operator.md",
@@ -1835,7 +1833,6 @@ defmodule ControlKeel.Agent.Integration do
   defp default_artifact_surfaces(%{id: "codex-cli"}),
     do: [
       ".agents/skills",
-      ".codex/skills",
       ".codex/config.toml",
       ".codex/hooks.json",
       ".codex/hooks",
@@ -1851,7 +1848,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: id}) when id in ["vscode", "copilot"] do
     [
-      ".github/skills",
+      ".agents/skills",
       ".github/agents",
       ".github/commands",
       ".github/mcp.json",
@@ -1863,7 +1860,6 @@ defmodule ControlKeel.Agent.Integration do
   defp default_artifact_surfaces(%{id: "cursor"}),
     do: [
       ".agents/skills",
-      ".cursor/skills",
       ".cursor/rules/controlkeel.mdc",
       ".cursor/commands",
       ".cursor/agents",
@@ -1895,7 +1891,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "continue"}),
     do: [
-      ".continue/skills",
+      ".agents/skills",
       ".continue/prompts",
       ".continue/commands",
       ".continue/mcpServers/controlkeel.yaml",
@@ -1916,7 +1912,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "cline"}),
     do: [
-      ".cline/skills",
+      ".agents/skills",
       ".clinerules",
       ".cline/commands",
       ".cline/hooks",
@@ -1938,18 +1934,16 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "devin-terminal"}),
     do: [
-      ".agents/skills",
       ".devin/config.json",
       ".devin/hooks.v1.json",
       ".devin/hooks",
-      ".devin/skills",
+      ".agents/skills",
       ".devin/agents",
       "AGENTS.md"
     ]
 
   defp default_artifact_surfaces(%{id: "warp"}),
     do: [
-      ".warp/skills",
       ".agents/skills",
       ".warp/controlkeel-mcp.json",
       ".warp/README.md",
@@ -1968,7 +1962,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "kilo"}),
     do: [
-      ".kilo/skills",
+      ".agents/skills",
       ".kilo/commands",
       ".kilo/kilo.json",
       "AGENTS.md"
@@ -1991,7 +1985,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "augment"}),
     do: [
-      ".augment/skills",
+      ".agents/skills",
       ".augment/agents",
       ".augment/commands",
       ".augment/rules",
@@ -2004,7 +1998,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "roo-code"}),
     do: [
-      ".roo/skills",
+      ".agents/skills",
       ".roo/rules",
       ".roo/commands",
       ".roo/guidance",
@@ -2015,7 +2009,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "droid"}),
     do: [
-      ".factory/skills",
+      ".agents/skills",
       ".factory/droids",
       ".factory/commands",
       ".factory/mcp.json",
