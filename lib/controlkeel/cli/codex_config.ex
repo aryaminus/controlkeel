@@ -159,6 +159,9 @@ defmodule ControlKeel.CLI.CodexConfig do
     kept |> Enum.reverse() |> Enum.join("\n")
   end
 
+  # Normalized table header: comments, whitespace, and quotes around key
+  # segments are dropped, so `[ mcp_servers."controlkeel" ]` and
+  # `[mcp_servers.controlkeel]` compare equal (they name the same table).
   defp toml_header(line) do
     header =
       line
@@ -166,7 +169,9 @@ defmodule ControlKeel.CLI.CodexConfig do
       |> hd()
       |> String.trim()
 
-    if String.starts_with?(header, "[") and String.ends_with?(header, "]"), do: header
+    if String.starts_with?(header, "[") and String.ends_with?(header, "]") do
+      String.replace(header, ~r/["'\s]/, "")
+    end
   end
 
   defp split_managed_block(existing) do

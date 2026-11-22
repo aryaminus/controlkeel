@@ -408,7 +408,7 @@ defmodule ControlKeel.Skills.Registry do
         ".config/devin/skills",
         ".warp/skills",
         ".roo/skills",
-            ".factory/skills",
+        ".factory/skills",
         ".openclaw/skills"
       ],
       &Path.join(user_home(), &1)

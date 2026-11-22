@@ -816,11 +816,40 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
     _ -> []
   end
 
+  # Remove only the skills CK's manifest lists, then the manifest, then the
+  # directory if nothing else is left. User-authored skills sharing the tree
+  # survive unless --force is given.
   defp do_cleanup_artifact(:skill_dir, path, force) do
+    manifest = Path.join(path, ".controlkeel-skills.json")
+
     cond do
-      force -> remove_path(path)
-      File.exists?(Path.join(path, ".controlkeel-skills.json")) -> remove_path(path)
-      true -> []
+      force ->
+        remove_path(path)
+
+      File.exists?(manifest) ->
+        names =
+          with {:ok, body} <- File.read(manifest),
+               {:ok, %{"skills" => skills}} when is_list(skills) <- Jason.decode(body) do
+            Enum.filter(
+              skills,
+              &(is_binary(&1) and &1 not in ["", ".", ".."] and not String.contains?(&1, "/"))
+            )
+          else
+            _ -> []
+          end
+
+        removed =
+          names
+          |> Enum.map(&Path.join(path, &1))
+          |> Enum.filter(&File.exists?/1)
+          |> Enum.flat_map(&remove_path/1)
+
+        removed = removed ++ remove_path(manifest)
+        remove_dir_if_empty(path)
+        removed
+
+      true ->
+        []
     end
   end
 

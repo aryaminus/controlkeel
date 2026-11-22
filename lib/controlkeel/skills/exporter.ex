@@ -903,7 +903,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     - Keep `.devin/config.json` checked in for project-scoped MCP and governance defaults.
     - Keep `.devin/hooks.v1.json` and `.devin/hooks/` checked in so lifecycle guidance stays repo-visible.
-    - Keep `.devin/skills/` and `.devin/agents/` checked in so Devin can discover CK skills and governed subagents.
+    - Keep `.agents/skills/` and `.devin/agents/` checked in so Devin can discover CK skills and governed subagents.
     - Use `devin mcp get controlkeel` to inspect the ControlKeel MCP registration after attach.
     """
   end
@@ -935,8 +935,7 @@ defmodule ControlKeel.Skills.Exporter do
 
     ## Recommended Warp setup
 
-    - Keep `.warp/skills/` checked in so Warp local agents can discover governed skills natively.
-    - Keep `.agents/skills/` checked in because Warp also scans open-standard AgentSkills directories.
+    - Keep `.agents/skills/` checked in; Warp scans open-standard Agent Skills directories.
     - Import or copy `.warp/controlkeel-mcp.json` into Warp Settings > MCP Servers or Warp Drive > MCP Servers.
     - #{project_root_note}
     - If you already use Claude Code, Codex CLI, Gemini CLI, or OpenCode inside Warp's third-party utility bar, keep using the existing CK attach flow for those hosts separately. This bundle is for Warp's own local Oz agents.
@@ -3993,7 +3992,7 @@ defmodule ControlKeel.Skills.Exporter do
       "dependencies" => %{
         "@opencode-ai/plugin" => "1.3.13"
       },
-      "files" => [".opencode", "AGENTS.md", "README.md", "index.js"],
+      "files" => [".opencode", ".agents/skills", "AGENTS.md", "README.md", "index.js"],
       "publishConfig" => %{"access" => "public"},
       "license" => "Apache-2.0"
     }

@@ -1634,6 +1634,10 @@ defmodule ControlKeel.SkillsTest do
       refute "custom" in manifest["skills"]
     end
 
+    test "the OpenCode npm package publishes the shared skill tree" do
+      assert ".agents/skills" in Exporter.opencode_package_manifest()["files"]
+    end
+
     test "cursor plugin bundle ships skills from the shared tree", %{tmp_dir: tmp_dir} do
       assert {:ok, plan} = Skills.export("cursor-native", tmp_dir, scope: "export")
 
@@ -1653,6 +1657,9 @@ defmodule ControlKeel.SkillsTest do
       command = "controlkeel"
       args = ["mcp"]
 
+      [ mcp_servers."controlkeel".env ]
+      FOO = "1"
+
       [features] # toggles
       web_search = true
       """)
@@ -1669,6 +1676,7 @@ defmodule ControlKeel.SkillsTest do
       toml = File.read!(config)
 
       assert length(String.split(toml, "[mcp_servers.controlkeel]")) == 2
+      refute toml =~ ~s(mcp_servers."controlkeel")
       assert length(Regex.scan(~r/^\[features\]/m, toml)) == 1
       assert toml =~ "web_search = true"
       assert toml =~ "codex_hooks = true"

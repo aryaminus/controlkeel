@@ -83,6 +83,29 @@ defmodule ControlKeel.CLI.DetachTest do
     assert File.exists?(Path.join(shared, "align/SKILL.md"))
   end
 
+  test "detaching the last host removes CK skills but keeps user skills", %{
+    tmp: tmp,
+    binding: binding
+  } do
+    shared = Path.join(tmp, ".agents/skills")
+    File.mkdir_p!(Path.join(shared, "align"))
+    File.mkdir_p!(Path.join(shared, "custom"))
+    File.write!(Path.join(shared, "align/SKILL.md"), "ck\n")
+    File.write!(Path.join(shared, "custom/SKILL.md"), "mine\n")
+    File.write!(Path.join(shared, ".controlkeel-skills.json"), ~s({"skills":["align"]}))
+
+    :ok =
+      attach_two(binding, tmp, [
+        {"kiro", %{"ide" => "kiro", "scope" => "project", "shared_skills_destination" => shared}}
+      ])
+
+    run_detach(tmp, "kiro", %{keep_binding: true})
+
+    refute File.exists?(Path.join(shared, "align"))
+    refute File.exists?(Path.join(shared, ".controlkeel-skills.json"))
+    assert File.read!(Path.join(shared, "custom/SKILL.md")) == "mine\n"
+  end
+
   test "detach removes only the controlkeel MCP entry, keeping other servers", %{
     tmp: tmp,
     binding: binding

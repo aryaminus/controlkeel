@@ -45,7 +45,7 @@ defmodule ControlKeel.Skills.Exporter.DroidBundle do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.factory/` into the repo or your user Factory config directory.",
+        "Copy `.factory/` and `.agents/skills/` into the repo, or into your user Factory config and `~/.agents/skills`.",
         "Use the generated droid profile plus the review, submit-plan, annotate, and last commands as the governed ControlKeel entry point."
       ]
     )
