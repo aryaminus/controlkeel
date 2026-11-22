@@ -2528,7 +2528,7 @@ defmodule ControlKeel.Skills.Exporter do
       exit 0
     fi
 
-    if printf '%s' "$prompt" | grep -Eiq '(^|[^A-Za-z0-9_-])(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|BEGIN (RSA|OPENSSH|PGP) PRIVATE KEY|api[_-]?key[[:space:]]*[:=]|password[[:space:]]*[:=])'; then
+    if printf '%s' "$prompt" | grep -Eiq '(^|[^A-Za-z0-9_-])(AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|BEGIN (RSA|OPENSSH|PGP) PRIVATE KEY)'; then
       printf '%s\n' '{"decision":"block","reason":"Potential secret material detected in the prompt. Remove credentials or private keys before continuing."}'
       exit 0
     fi

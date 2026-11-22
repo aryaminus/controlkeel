@@ -824,6 +824,8 @@ defmodule ControlKeel.SkillsTest do
     codex_prompt_hook = Path.join(codex_plan.output_dir, ".codex/hooks/ck-user-prompt-submit.sh")
 
     assert prompt_hook_output(codex_prompt_hook, "Use task-scoped review context") == ""
+    assert prompt_hook_output(codex_prompt_hook, "Document api_key: and password= placeholders") ==
+             ""
 
     assert prompt_hook_output(
              codex_prompt_hook,
