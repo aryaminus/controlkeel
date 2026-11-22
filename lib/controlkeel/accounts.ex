@@ -660,7 +660,7 @@ defmodule ControlKeel.Accounts do
   @doc """
   Broadcast a membership-revoked event for a membership that was removed
   outright — e.g. by `DataLifecycle.delete_user/1` erasing its user, or
-  `delete_org/1` erasing its org — where no persisted row survives to
+  `delete_org/2` erasing its org — where no persisted row survives to
   broadcast. Subscribers in `ControlKeelWeb.LiveAuth` treat it exactly like a
   revocation: the affected member's page navigates away and re-runs its
   access check.
