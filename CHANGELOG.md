@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.28 — 2026-11-22
+
+### What's changed
+
+- Keep routine Codex governance hooks quiet (#356)
+- Stop copying legacy session data into new projects (#357)
+- Explain cloud execution denial for unbound workspaces (#355)
+
 ## v0.4.27 — 2026-11-15
 
 ### What's changed
