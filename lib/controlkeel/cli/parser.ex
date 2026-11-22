@@ -459,11 +459,14 @@ defmodule ControlKeel.CLI.Parser do
           resolved -> parse_attach(resolved, rest)
         end
 
+      # Detach keeps the name as given: bindings from earlier releases store
+      # agents under their own ids (including aliases and hosts that are no
+      # longer supported), and detach resolves the stored key itself.
+      ["detach", "-" <> _ | _rest] ->
+        {:error, ControlKeel.CLI.usage_text()}
+
       ["detach", agent | rest] ->
-        case Integration.resolve_attach_id(agent) do
-          nil -> {:error, ControlKeel.CLI.usage_text()}
-          resolved -> parse_detach(resolved, rest)
-        end
+        parse_detach(agent, rest)
 
       ["runtime", "export", runtime_id | rest] ->
         parse_runtime_export(runtime_id, rest)

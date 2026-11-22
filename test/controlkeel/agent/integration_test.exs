@@ -52,8 +52,11 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert {:ok, %{command: :attach, args: ["antigravity-cli"]}} =
              ControlKeel.CLI.Parser.parse(["attach", "gemini-cli"])
 
-    assert {:ok, %{command: :detach, args: ["codex-cli"]}} =
-             ControlKeel.CLI.Parser.parse(["detach", "codex"])
+    assert {:ok, %{command: :detach, args: ["gemini-cli"]}} =
+             ControlKeel.CLI.Parser.parse(["detach", "gemini-cli"])
+
+    assert {:ok, %{command: :detach, args: ["aider"]}} =
+             ControlKeel.CLI.Parser.parse(["detach", "aider"])
 
     assert {:error, _usage} = ControlKeel.CLI.Parser.parse(["attach", "aider"])
   end

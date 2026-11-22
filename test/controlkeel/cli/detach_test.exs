@@ -43,6 +43,27 @@ defmodule ControlKeel.CLI.DetachTest do
     :ok
   end
 
+  test "detach works for agents attached under a now-aliased or removed id", %{
+    tmp: tmp,
+    binding: binding
+  } do
+    :ok =
+      attach_two(binding, tmp, [
+        {"gemini-cli", %{"ide" => "gemini-cli"}},
+        {"aider", %{"ide" => "aider"}},
+        {"cursor", %{"ide" => "cursor"}}
+      ])
+
+    {:ok, argv_detach} = ControlKeel.CLI.Parser.parse(["detach", "gemini-cli"])
+    assert argv_detach.args == ["gemini-cli"]
+
+    run_detach(tmp, "gemini-cli")
+    run_detach(tmp, "aider")
+
+    {:ok, reloaded, _session} = Local.load(tmp)
+    assert Map.keys(reloaded["attached_agents"]) == ["cursor"]
+  end
+
   test "detach removes only the controlkeel MCP entry, keeping other servers", %{
     tmp: tmp,
     binding: binding
