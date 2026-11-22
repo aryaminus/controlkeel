@@ -26,10 +26,10 @@ Only `attach_client` rows produce real `controlkeel attach <id>` commands. The o
 
 Attach clients fall into two tiers:
 
-- **Full:** Claude Code, Codex (CLI, app server, t3code), Cursor, Copilot / VS Code, Antigravity (CLI and IDE), and OpenCode. CK installs MCP config, native skills, instructions, and hooks or a plugin where the host supports them.
-- **MCP-only:** Windsurf, Cline, Kiro, Kilo, Amp, Goose, Droid, Pi, Warp, Augment, Continue, Letta Code, Roo Code, and Devin terminal. CK installs MCP config, `AGENTS.md`-style instructions, and skills; it does not register hooks.
+- **Full:** Claude Code, Codex (CLI, app server, t3code), Cursor, Copilot / VS Code, Antigravity (CLI and IDE), and OpenCode. CK installs MCP config, skills, instructions, and a plugin or hooks bundle, and these paths are exercised end to end in CI.
+- **Standard:** Windsurf, Cline, Kiro, Kilo, Amp, Goose, Droid, Pi, Warp, Augment, Continue, Letta Code, Roo Code, and Devin terminal. CK installs MCP config, instructions, and skills in `.agents/skills`. Hosts with a native hooks file (Windsurf, Cline, Kiro, Letta Code, Devin terminal) also get CK hooks.
 
-Gemini CLI is an alias of Antigravity CLI. Hosts that are not listed can use the open-standard export (`AGENTS.md`, `.mcp.json`, `.agents/skills`).
+Gemini CLI is an alias of Antigravity CLI. Hosts that are not listed can use the open-standard target (`controlkeel skills install --target open-standard --scope project`), which writes `.agents/skills`, merges `.mcp.json`, and adds a managed `AGENTS.md` block.
 
 Every shipped row also carries the stricter parity contract exposed in `/skills` and `GET /api/v1/skills/targets`:
 
@@ -79,7 +79,7 @@ These are the first-class host adapters that currently implement the richer revi
 | `claude-code` | `controlkeel attach claude-code` | `host_plan_mode` | `native_review` via Claude hooks | `external` | `primary_only` | `controlkeel-claude-plugin.tar.gz` |
 | `copilot` | `controlkeel attach copilot` | `host_plan_mode` | `native_review` via repo/plugin hooks | `external` | `primary_only` | `controlkeel-copilot-plugin.tar.gz` |
 | `opencode` | `controlkeel attach opencode` | `host_plan_mode` | `native_review` via plugin tool call | `external` | `primary_only` | `controlkeel-opencode-native.tar.gz`, `controlkeel-opencode-native.tgz` |
-| `augment` | `controlkeel attach augment` | `host_plan_mode` | `native_review` via Auggie plugin hooks and command loop | `external` | `all` | `controlkeel-augment-native.tar.gz`, `controlkeel-augment-plugin.tar.gz` |
+| `augment` | `controlkeel attach augment` | `host_plan_mode` | `browser_review` via the `ck_review_submit` tool call | `external` | `all` | `controlkeel-augment-native.tar.gz` |
 | `pi` | `controlkeel attach pi` | `file_plan_mode` | `browser_review` with persisted plan file state | `external` | `primary_only` | `controlkeel-pi-native.tar.gz`, `controlkeel-pi-native.tgz` |
 | `vscode` | `controlkeel attach vscode` | `review_only` | `browser_review` | `external` | `none` | `controlkeel-github-repo.tar.gz` |
 | `codex-cli` | `controlkeel attach codex-cli` | `review_only` | `browser_review` through native commands | `none` | `primary_only` | `controlkeel-codex.tar.gz`, `controlkeel-codex-plugin.tar.gz` |
@@ -111,7 +111,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | `kiro` | hooks, steering, tool-policy settings, commands, and MCP config |
 | `kilo` | Agent Skills, slash-command workflows, `.kilo/kilo.json`, and `AGENTS.md` |
 | `amp` | Amp Neo TypeScript Plugin API permission hooks, native skill bundle, custom tool/command surface, queue/steer-aware commands, and package scaffold |
-| `augment` | workspace commands, subagents, rules, MCP config, local plugin hooks, and ACP-compatible runtime metadata |
+| `augment` | workspace commands, subagents, rules, MCP config, and ACP-compatible runtime metadata |
 | `warp` | `.warp/skills`, `.agents/skills`, `.warp/controlkeel-mcp.json`, `.warp/README.md`, and `AGENTS.md` |
 | `devin-terminal` | `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks`, `.devin/skills`, `.devin/agents`, `.agents/skills`, and `AGENTS.md` |
 | `cursor` | rules, Agent Skills (`.cursor/skills`), slash commands, governed agent prompts, background-agent guidance, repo `hooks.json` + hook scripts, MCP config, and `.cursor-plugin/` bundle |
@@ -132,7 +132,7 @@ For hosts with a stronger native capability container, CK now prefers that too i
 - **Compaction provenance**: Amp Neo auto-compacts at 90% context fill using its own harness, not the model provider's native context management. CK tracks compaction source as `host_harness`, `provider_native`, or `ck_resume_packet` for proof/memory trust and audit trails. Host-harness compaction is visible to the host but opaque to CK's typed storage; ck_resume_packet preserves full provenance.
 - **Remote control and CK-gated execution**: Amp removed manual bash invocation ($/$$) partly due to destructive-command risk. CK's stance is reinforced: no manual remote bash affordance by default. If remote-control commands need shell execution, they must go through CK-gated tool calls (ck_validate, ck_review_submit), not raw remote shell. Remote-control messages are treated as operator inputs with the same governance semantics as any other human intervention.
 - Amp ships a native `controlkeel-governance` skill bundle with MCP wiring in addition to the Plugin API permission hook and command layer. CK does not treat Amp's no-prompt default as a governed permission policy; CK validation and findings remain the policy gate.
-- Augment ships a repo-native `.augment/` workspace bundle plus a local `.augment-plugin` hook bundle, so CK can be used by the agent through either workspace commands or hook-native interception.
+- Augment ships a repo-native `.augment/` workspace bundle; plan review goes through the `ck_review_submit` MCP tool.
 
 This keeps the product aligned with CK’s intent: agents should be able to invoke ControlKeel directly during autonomous work, rather than depending on the human operator to manually drive review state transitions.
 
@@ -153,7 +153,7 @@ Runtime transport truth for those first-class hosts:
 | `claude-code` | `claude_agent_sdk` | `agent` | `hook_sdk` | create, fork, resume, streaming |
 | `copilot` | `hook_session_parser` | `agent` | `hook_session_state` | no CK-owned session lifecycle claims |
 | `opencode` | `opencode_sdk` | `agent` | `plugin_session_tool` | create, fork, resume, streaming |
-| `augment` | `auggie_sdk_acp` | `agent` | `plugin_hook_acp` | create, resume, streaming; no fork claims |
+| `augment` | `auggie_sdk_acp` | `agent` | `mcp_tool_call` | create, resume, streaming; no fork claims |
 | `pi` | `pi_rpc` | `agent` | `extension_rpc` | create and streaming; no fork claims |
 | `codex-cli` | `codex_sdk` | `agent` | `command_thread` | create, resume, streaming; no fork claims |
 
@@ -169,7 +169,7 @@ Runtime transport truth for those first-class hosts:
 | `kiro` | attach_client | `controlkeel attach kiro` | `local_mcp`, `native_skills`, `hooks`, `rules`, `commands` | `handoff` | `handoff` | `ck_owned` / `native` | `kiro-native` |
 | `kilo` | attach_client | `controlkeel attach kilo` | `local_mcp` | `none` | `inbound_only` | `ck_owned` / `native` | `kilo-native` |
 | `amp` | attach_client | `controlkeel attach amp` | `local_mcp`, `plugin`, `native_skills`, `commands`, `tool_call`, `remote_control`, `queue_steer`, `auto_compaction` | `handoff` | `handoff` | `ck_owned` / `native` | `amp-native` |
-| `augment` | attach_client | `controlkeel attach augment` | `local_mcp`, `plugin`, `native_skills`, `rules`, `commands`, `hooks` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
+| `augment` | attach_client | `controlkeel attach augment` | `local_mcp`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `agent_runtime` / `native` | `augment-native` |
 | `opencode` | attach_client | `controlkeel attach opencode` | `local_mcp`, `plugin`, `native_skills`, `rules`, `commands` | `embedded` | `direct` | `agent_runtime` / `native` | `opencode-native` |
 | `continue` | attach_client | `controlkeel attach continue` | `local_mcp`, `native_skills`, `rules`, `workflows`, `commands` | `embedded` | `direct` | `ck_owned` / `native` | `continue-native` |
 | `letta-code` | attach_client | `controlkeel attach letta-code` | `local_mcp`, `native_skills`, `hooks` | `embedded` | `direct` | `ck_owned` / `native` | `letta-code-native` |

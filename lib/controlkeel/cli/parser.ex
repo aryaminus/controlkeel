@@ -454,17 +454,15 @@ defmodule ControlKeel.CLI.Parser do
         parse_with_switches(:attach_doctor, rest, @agents_doctor_switches)
 
       ["attach", agent | rest] ->
-        if agent in Integration.attachable_ids() do
-          parse_attach(agent, rest)
-        else
-          {:error, ControlKeel.CLI.usage_text()}
+        case Integration.resolve_attach_id(agent) do
+          nil -> {:error, ControlKeel.CLI.usage_text()}
+          resolved -> parse_attach(resolved, rest)
         end
 
       ["detach", agent | rest] ->
-        if agent in Integration.attachable_ids() do
-          parse_detach(agent, rest)
-        else
-          {:error, ControlKeel.CLI.usage_text()}
+        case Integration.resolve_attach_id(agent) do
+          nil -> {:error, ControlKeel.CLI.usage_text()}
+          resolved -> parse_detach(resolved, rest)
         end
 
       ["runtime", "export", runtime_id | rest] ->

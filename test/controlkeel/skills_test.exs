@@ -1561,6 +1561,22 @@ defmodule ControlKeel.SkillsTest do
     refute File.exists?(Path.join(tmp_dir, ".cursor"))
   end
 
+  test "open-standard installs skills, merges MCP, and keeps the user's AGENTS.md",
+       %{tmp_dir: tmp_dir} do
+    File.write!(Path.join(tmp_dir, "AGENTS.md"), "# Mine\n")
+    File.write!(Path.join(tmp_dir, ".mcp.json"), ~s({"mcpServers":{"other":{"command":"x"}}}))
+
+    assert {:ok, _} = Skills.install("open-standard", tmp_dir, scope: "project")
+
+    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
+    agents = File.read!(Path.join(tmp_dir, "AGENTS.md"))
+    assert agents =~ "# Mine"
+    assert agents =~ "<!-- controlkeel:start -->"
+
+    servers = tmp_dir |> Path.join(".mcp.json") |> File.read!() |> Jason.decode!()
+    assert Map.keys(servers["mcpServers"]) |> Enum.sort() == ["controlkeel", "other"]
+  end
+
   test "antigravity installs its workspace-native bundle", %{tmp_dir: tmp_dir} do
     assert {:ok, install} =
              Skills.install("antigravity-cli-native", tmp_dir, scope: "project")

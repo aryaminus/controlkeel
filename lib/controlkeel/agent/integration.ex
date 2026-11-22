@@ -1066,6 +1066,30 @@ defmodule ControlKeel.Agent.Integration do
 
   def attachable_ids, do: Enum.map(attach_catalog(), & &1.id)
 
+  @doc """
+  Resolves an attach or detach name to the attach client that handles it.
+  Aliases such as `codex`, `gemini-cli`, or `roo` resolve to their canonical
+  attach client; unknown names return `nil`.
+  """
+  def resolve_attach_id(id) when is_binary(id) do
+    case get(id) do
+      %__MODULE__{} = integration ->
+        if attachable?(integration) do
+          integration.id
+        else
+          case integration.alias_of && get(integration.alias_of) do
+            %__MODULE__{} = target -> if attachable?(target), do: target.id
+            _ -> nil
+          end
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  def resolve_attach_id(_id), do: nil
+
   def product_catalog do
     catalog()
     |> Enum.filter(&product_supported?/1)

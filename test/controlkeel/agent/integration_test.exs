@@ -40,6 +40,24 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert Integration.get("gemini-cli").alias_of == "antigravity-cli"
   end
 
+  test "attach names resolve aliases to their canonical attach client" do
+    assert Integration.resolve_attach_id("gemini-cli") == "antigravity-cli"
+    assert Integration.resolve_attach_id("gemini") == "antigravity-cli"
+    assert Integration.resolve_attach_id("codex") == "codex-cli"
+    assert Integration.resolve_attach_id("roo") == "roo-code"
+    assert Integration.resolve_attach_id("claude-code") == "claude-code"
+    assert Integration.resolve_attach_id("devin") == nil
+    assert Integration.resolve_attach_id("aider") == nil
+
+    assert {:ok, %{command: :attach, args: ["antigravity-cli"]}} =
+             ControlKeel.CLI.Parser.parse(["attach", "gemini-cli"])
+
+    assert {:ok, %{command: :detach, args: ["codex-cli"]}} =
+             ControlKeel.CLI.Parser.parse(["detach", "codex"])
+
+    assert {:error, _usage} = ControlKeel.CLI.Parser.parse(["attach", "aider"])
+  end
+
   test "product catalog excludes aliases" do
     product = Integration.product_catalog()
     ids = Enum.map(product, & &1.id)

@@ -25,7 +25,7 @@ Release artifacts and `controlkeel runtime export <target>` generate bundles for
 
 - host-native integrations for the hosts listed in [support-matrix.md](support-matrix.md)
 - the Devin runtime bundle (`controlkeel runtime export devin`)
-- a generic open-standard bundle (`AGENTS.md`, `.mcp.json`, `.agents/skills`) for hosts without a named integration
+- the open-standard bundle for hosts without a named integration: `.agents/skills`, `.mcp.json`, and `AGENTS.md`
 
 A release bundle may contain a plugin or marketplace manifest so a host can install it locally. That does not mean the bundle has been published to, reviewed by, or listed in that host's public marketplace. Treat marketplace publication as a separate channel and verify the listing in the marketplace itself.
 

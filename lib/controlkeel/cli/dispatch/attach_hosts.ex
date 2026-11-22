@@ -279,8 +279,7 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
              "devin-terminal",
              "warp",
              "antigravity-cli",
-             "antigravity-ide",
-             "gemini-cli"
+             "antigravity-ide"
            ] do
     root = options[:project_root] || project_root
 
@@ -293,8 +292,7 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
         "devin-terminal" => "devin-terminal-native",
         "warp" => "warp-native",
         "antigravity-cli" => "antigravity-cli-native",
-        "antigravity-ide" => "antigravity-cli-native",
-        "gemini-cli" => "antigravity-cli-native"
+        "antigravity-ide" => "antigravity-cli-native"
       }[agent]
 
     with {:ok, binding, _session, _mode} <-

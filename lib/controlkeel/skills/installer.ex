@@ -159,7 +159,7 @@ defmodule ControlKeel.Skills.Installer do
     if File.dir?(path), do: "/" <> rel <> "/", else: "/" <> rel
   end
 
-  defp do_install(%SkillTarget{id: "open-standard"}, scope, project_root, skills, _opts)
+  defp do_install(%SkillTarget{id: "open-standard"}, scope, project_root, skills, opts)
        when scope in ["user", "project"] do
     root =
       if scope == "user",
@@ -167,6 +167,17 @@ defmodule ControlKeel.Skills.Installer do
         else: Path.join(project_root, ".agents/skills")
 
     copy_skills(skills, root)
+
+    if scope == "project" do
+      {:ok, plan} = Exporter.export("open-standard", project_root, scope: "export")
+
+      merge_json_file!(
+        Path.join(plan.output_dir, ".mcp.json"),
+        Path.join(project_root, ".mcp.json")
+      )
+
+      maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
+    end
 
     {:ok,
      %{
