@@ -53,7 +53,7 @@ defmodule ControlKeel.Skills.Exporter.KiloNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.kilo/skills/` into your repo or `~/.kilo/skills/` for Kilo Agent Skills discovery.",
+        "Copy `.agents/skills/` into your repo (or `~/.agents/skills/`) for Agent Skills discovery.",
         "Copy `.kilo/commands/` into the project root so Kilo can expose `/controlkeel-review`, `/controlkeel-submit-plan`, `/controlkeel-annotate`, and `/controlkeel-last`.",
         "Merge `.kilo/kilo.json` into `kilo.json` or `~/.config/kilo/kilo.json` to register the ControlKeel MCP server."
       ]

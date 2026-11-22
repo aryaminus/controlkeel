@@ -2228,7 +2228,7 @@ defmodule ControlKeel.Skills.Exporter do
       Enum.each(
         [
           {Path.join(root, ".cursor/rules"), Path.join(root, ".cursor-plugin/rules")},
-          {Path.join(root, ".cursor/skills"), Path.join(root, ".cursor-plugin/skills")},
+          {Path.join(root, ".agents/skills"), Path.join(root, ".cursor-plugin/skills")},
           {Path.join(root, ".cursor/agents"), Path.join(root, ".cursor-plugin/agents")},
           {Path.join(root, ".cursor/commands"), Path.join(root, ".cursor-plugin/commands")}
         ],

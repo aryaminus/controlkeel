@@ -99,7 +99,7 @@ defmodule ControlKeel.Skills.Exporter.Cursor do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.cursor/rules`, `.cursor/commands`, `.cursor/hooks`, `.cursor/skills`, `.cursor/agents`, and `.cursor/background-agents` in the repo so Cursor loads ControlKeel governance.",
+        "Keep `.cursor/rules`, `.cursor/commands`, `.cursor/hooks`, `.agents/skills`, `.cursor/agents`, and `.cursor/background-agents` in the repo so Cursor loads ControlKeel governance.",
         "Use .cursor/mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template.",
         "The `.cursor-plugin/` directory is a distributable Cursor plugin bundle: manifest, mirrored rules/skills/agents/commands, and `hooks/hooks.json` with the same gate scripts as `.cursor/hooks/`."
       ]

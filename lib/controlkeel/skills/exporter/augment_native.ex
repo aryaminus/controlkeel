@@ -66,7 +66,7 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.augment/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
+        "Keep `.agents/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
         "Use `.augment/mcp.json` with `auggie --mcp-config ./.augment/mcp.json` for ephemeral MCP wiring or merge `.augment/settings.controlkeel.json` into `~/.augment/settings.json` for persistence."
       ]
     )

@@ -81,7 +81,7 @@ defmodule ControlKeel.Skills.Exporter.Codex do
         %{"path" => instructions_path, "kind" => "instructions"}
       ] ++ Enum.map(agent_paths, &%{"path" => &1, "kind" => "agent"}),
       [
-        "Use .codex/skills for Codex-native skill loading and keep .agents/skills for open-standard compatibility.",
+        "Codex loads skills from .agents/skills.",
         "Use .codex/config.toml to register the ControlKeel MCP server and operator role with Codex.",
         "Copy the generated `.codex/agents/*.toml` files into your Codex agents directory if you want preconfigured CK operator, reviewer, or docs-researcher agents.",
         "Use .codex/commands/ for browser-reviewed review, annotate, last, diff, and completion approval flows.",

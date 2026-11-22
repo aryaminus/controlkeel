@@ -62,7 +62,7 @@ defmodule ControlKeel.Skills.Exporter.RooNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.roo/` and `.roomodes` into the repo root so Roo Code can discover ControlKeel skills and governed modes.",
+        "Copy `.agents/`, `.roo/` and `.roomodes` into the repo root so Roo Code can discover ControlKeel skills and governed modes.",
         "Merge `.mcp.json` or register the same MCP server through Roo's MCP flow if you manage MCP outside the repo."
       ]
     )

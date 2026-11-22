@@ -70,7 +70,7 @@ defmodule ControlKeel.Skills.Exporter.ContinueNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.continue/skills`, `.continue/prompts`, and `.continue/commands` into the repo for Continue-native plan, review, and headless guidance.",
+        "Copy `.agents/skills`, `.continue/prompts`, and `.continue/commands` into the repo for Continue-native plan, review, and headless guidance.",
         "Use `.continue/mcpServers/controlkeel.yaml` for MCP registration or `.continue/mcp.json` as the portable fallback."
       ]
     )

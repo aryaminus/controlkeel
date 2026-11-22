@@ -67,7 +67,7 @@ defmodule ControlKeel.Skills.Exporter.GithubRepo do
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
       [
-        "Copy the .github and .vscode folders into your repository root.",
+        "Copy the .agents, .github and .vscode folders into your repository root.",
         "VS Code and Copilot can then discover the skills, custom agent, command prompts, and MCP server config from the repo."
       ]
     )

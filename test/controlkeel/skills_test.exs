@@ -1610,6 +1610,77 @@ defmodule ControlKeel.SkillsTest do
     end
   end
 
+  describe "shared skill storage edge cases" do
+    test "a user's own skill in .agents/skills is never claimed or pruned", %{tmp_dir: tmp_dir} do
+      custom = Path.join(tmp_dir, ".agents/skills/custom")
+      File.mkdir_p!(custom)
+
+      File.write!(
+        Path.join(custom, "SKILL.md"),
+        "---\nname: custom\ndescription: mine\n---\n\nMy skill.\n"
+      )
+
+      for _ <- 1..2,
+          do: assert({:ok, _} = Skills.install("goose-native", tmp_dir, scope: "project"))
+
+      assert File.exists?(Path.join(custom, "SKILL.md"))
+
+      manifest =
+        tmp_dir
+        |> Path.join(".agents/skills/.controlkeel-skills.json")
+        |> File.read!()
+        |> Jason.decode!()
+
+      refute "custom" in manifest["skills"]
+    end
+
+    test "cursor plugin bundle ships skills from the shared tree", %{tmp_dir: tmp_dir} do
+      assert {:ok, plan} = Skills.export("cursor-native", tmp_dir, scope: "export")
+
+      assert File.exists?(
+               Path.join(plan.output_dir, ".cursor-plugin/skills/controlkeel-governance/SKILL.md")
+             )
+    end
+
+    test "codex merge replaces unmarked CK tables and honors commented headers",
+         %{tmp_dir: tmp_dir} do
+      config = Path.join(tmp_dir, "config.toml")
+
+      File.write!(config, """
+      model = "o3"
+
+      [mcp_servers.controlkeel]
+      command = "controlkeel"
+      args = ["mcp"]
+
+      [features] # toggles
+      web_search = true
+      """)
+
+      export = """
+      # controlkeel:start
+      [mcp_servers.controlkeel]
+      command = "controlkeel"
+      args = ["mcp", "--project-root", "."]
+      # controlkeel:end
+      """
+
+      assert {:ok, _} = ControlKeel.CLI.CodexConfig.merge_export(config, export)
+      toml = File.read!(config)
+
+      assert length(String.split(toml, "[mcp_servers.controlkeel]")) == 2
+      assert length(Regex.scan(~r/^\[features\]/m, toml)) == 1
+      assert toml =~ "web_search = true"
+      assert toml =~ "codex_hooks = true"
+      assert toml =~ ~s(model = "o3")
+    end
+
+    test "project installs gitignore the shared skill tree", %{tmp_dir: tmp_dir} do
+      assert {:ok, _} = Skills.install("kiro-native", tmp_dir, scope: "project")
+      assert File.read!(Path.join(tmp_dir, ".gitignore")) =~ ".agents/skills"
+    end
+  end
+
   describe "shared skill storage" do
     test "non-Claude installs write .agents/skills and retire CK copies in legacy dirs",
          %{tmp_dir: tmp_dir} do

@@ -201,7 +201,7 @@ defmodule ControlKeel.Skills.Installer do
     agent_destination agents_destination commands_destination plugins_destination
     rules_destination guidance_destination workflows_destination hooks_destination
     config_destination settings_destination instructions_destination marketplace_destination
-    mcp_destination
+    mcp_destination shared_skills_destination
   )
 
   defp collect_destination_paths(result) when is_map(result) do
@@ -469,7 +469,7 @@ defmodule ControlKeel.Skills.Installer do
     case scope do
       "user" ->
         cline_root = cline_home()
-        skill_root = Path.join(cline_root, "skills")
+        skill_root = Path.join(user_home(), ".agents/skills")
         rules_root = cline_documents_dir("Rules")
         workflows_root = cline_documents_dir("Workflows")
         config_root = Path.join([cline_root, "data", "settings"])
@@ -477,6 +477,8 @@ defmodule ControlKeel.Skills.Installer do
         hooks_root = Path.join(cline_root, "hooks")
 
         copy_skills(skills, skill_root)
+        # CLINE_DIR may point outside ~/.cline; retire its CK copy as well.
+        retire_skill_dir(Path.join(cline_root, "skills"))
         File.mkdir_p!(rules_root)
         File.mkdir_p!(workflows_root)
         File.mkdir_p!(config_root)
@@ -1123,9 +1125,20 @@ defmodule ControlKeel.Skills.Installer do
     File.mkdir_p!(destination_root)
 
     current_names = Enum.map(skills, & &1.name)
+    previously_owned = read_skills_manifest(destination_root)
     prune_orphaned_skills(destination_root, current_names)
 
-    Enum.each(skills, fn skill ->
+    # A skill whose source already is this destination was discovered here
+    # (a user-authored skill in the shared tree). Leave it in place and do not
+    # claim it, unless an earlier CK install already owned that name.
+    owned =
+      skills
+      |> Enum.reject(fn skill ->
+        same_path?(skill.skill_dir, Path.join(destination_root, skill.name)) and
+          skill.name not in previously_owned
+      end)
+
+    Enum.each(owned, fn skill ->
       destination = Path.join(destination_root, skill.name)
 
       unless same_path?(skill.skill_dir, destination) do
@@ -1133,7 +1146,7 @@ defmodule ControlKeel.Skills.Installer do
       end
     end)
 
-    write_skills_manifest(destination_root, current_names)
+    write_skills_manifest(destination_root, Enum.map(owned, & &1.name))
   end
 
   # Remove skill dirs CK installed on a previous run but is no longer

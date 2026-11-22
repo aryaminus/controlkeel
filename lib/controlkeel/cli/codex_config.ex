@@ -128,9 +128,45 @@ defmodule ControlKeel.CLI.CodexConfig do
 
   defp upsert_managed_block(existing, block) do
     case split_managed_block(existing) do
-      {:ok, prefix, suffix} -> join_sections(prefix, block, suffix)
-      :error -> join_sections(existing, block, "")
+      {:ok, prefix, suffix} ->
+        join_sections(strip_unmarked_ck_tables(prefix), block, strip_unmarked_ck_tables(suffix))
+
+      :error ->
+        join_sections(strip_unmarked_ck_tables(existing), block, "")
     end
+  end
+
+  # TOML forbids declaring a table twice. A ControlKeel table written without
+  # the managed markers (for example by `Integration.mcp_install_command/1`)
+  # would otherwise sit beside the managed block and break the whole file, so
+  # the managed block becomes the only declaration.
+  @ck_tables ~r/^\[(mcp_servers\.controlkeel|agents\.controlkeel_operator)(\.[^\]]*)?\]$/
+
+  defp strip_unmarked_ck_tables(text) do
+    {kept, _skipping} =
+      text
+      |> String.split("\n", trim: false)
+      |> Enum.reduce({[], false}, fn line, {acc, skipping} ->
+        case toml_header(line) do
+          nil ->
+            if skipping, do: {acc, true}, else: {[line | acc], false}
+
+          header ->
+            if Regex.match?(@ck_tables, header), do: {acc, true}, else: {[line | acc], false}
+        end
+      end)
+
+    kept |> Enum.reverse() |> Enum.join("\n")
+  end
+
+  defp toml_header(line) do
+    header =
+      line
+      |> String.split("#", parts: 2)
+      |> hd()
+      |> String.trim()
+
+    if String.starts_with?(header, "[") and String.ends_with?(header, "]"), do: header
   end
 
   defp split_managed_block(existing) do
@@ -161,8 +197,9 @@ defmodule ControlKeel.CLI.CodexConfig do
                                                        {acc, in_features?, found_flag?,
                                                         found_features?} ->
         trimmed = String.trim(line)
-        table_header? = String.starts_with?(trimmed, "[") and String.ends_with?(trimmed, "]")
-        entering_features? = trimmed == "[features]"
+        header = toml_header(line)
+        table_header? = header != nil
+        entering_features? = header == "[features]"
         leaving_features? = in_features? and table_header? and not entering_features?
         flag_line? = in_features? and String.match?(trimmed, ~r/^#{Regex.escape(flag)}\s*=/)
 

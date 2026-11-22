@@ -80,8 +80,8 @@ defmodule ControlKeel.Skills.Exporter.DevinTerminalNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks/`, `.devin/skills/`, and `.devin/agents/` in the repo so Devin for Terminal can load ControlKeel natively.",
-        "Keep `.agents/skills/` as the compatibility mirror because Devin also imports open-standard AgentSkills directories.",
+        "Keep `.devin/config.json`, `.devin/hooks.v1.json`, `.devin/hooks/`, and `.devin/agents/` in the repo so Devin for Terminal can load ControlKeel natively.",
+        "Keep `.agents/skills/` in the repo; Devin imports open-standard Agent Skills directories.",
         "Use `devin mcp get controlkeel` or inspect `.devin/config.json` to confirm the local ControlKeel MCP registration."
       ]
     )

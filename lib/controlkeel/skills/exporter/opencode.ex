@@ -75,8 +75,7 @@ defmodule ControlKeel.Skills.Exporter.OpenCode do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.opencode/skills/` into your project's `.opencode/skills/` directory for OpenCode-native skill discovery.",
-        "Copy `.agents/skills/` into your project's `.agents/skills/` directory for compatibility with OpenCode and other AgentSkills consumers.",
+        "Copy `.agents/skills/` into your project for OpenCode skill discovery.",
         "Copy `.opencode/plugins/` into your project's `.opencode/plugins/` directory (loaded automatically at startup).",
         "Copy `.opencode/agents/` into your project's `.opencode/agents/` directory for the governed review agent.",
         "Copy `.opencode/commands/` into your project's `.opencode/commands/` directory for the `/controlkeel-review`, `/controlkeel-submit-plan`, `/controlkeel-annotate`, and `/controlkeel-last` commands.",

@@ -57,8 +57,7 @@ defmodule ControlKeel.Skills.Exporter.WarpNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.warp/skills/` checked in so Warp local agents can discover governed skills natively.",
-        "Keep `.agents/skills/` checked in as the compatibility mirror because Warp also scans open-standard AgentSkills directories.",
+        "Keep `.agents/skills/` in the repo; Warp scans open-standard Agent Skills directories.",
         "Import or copy `.warp/controlkeel-mcp.json` into Warp Settings > MCP Servers or Warp Drive > MCP Servers; Warp local MCP is app-managed, not repo-auto-loaded.",
         "Keep `AGENTS.md` at the repo root so Warp project rules apply automatically."
       ]
