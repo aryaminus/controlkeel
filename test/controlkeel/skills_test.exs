@@ -879,11 +879,11 @@ defmodule ControlKeel.SkillsTest do
     assert claude_validate_shell =~ "CONTROLKEEL_HOOK_TIMEOUT_SECONDS"
     refute claude_validate_shell =~ "set -eu"
 
-    claude_session_end =
-      File.read!(Path.join(claude_plan.output_dir, "hooks/ck-session-end.sh"))
+    refute File.exists?(Path.join(claude_plan.output_dir, "hooks/ck-session-end.sh"))
 
-    assert claude_session_end =~ "ck_run context --session-id"
-    refute claude_session_end =~ "set -eu"
+    claude_stop = File.read!(Path.join(claude_plan.output_dir, "hooks/ck-stop.sh"))
+    refute claude_stop =~ "--session-id"
+    refute claude_stop =~ ~s("decision":"block")
     assert File.exists?(Path.join(claude_plan.output_dir, "hooks/controlkeel-review.ps1"))
     assert File.exists?(Path.join(claude_plan.output_dir, "commands/controlkeel-review.md"))
 
