@@ -1359,9 +1359,14 @@ defmodule ControlKeel.Accounts do
   @doc """
   Authorize a cloud execution request for a workspace.
 
-  When the workspace belongs to an org, the caller must present a user_id with
-  an active membership at or above `required_role` (default `"member"`).
-  Workspaces without an organization cannot authorize cloud execution.
+  In cloud and self-hosted modes, an org-bound workspace requires a user_id
+  with an active membership at or above `required_role` (default `"member"`),
+  and workspaces without an organization cannot authorize cloud execution.
+
+  Local mode is single-user: the operator running the local binary is the
+  trust anchor, so a request that claims no user identity is authorized for
+  any workspace in the local database unless its org is suspended. A request
+  that does claim a `user_id` is still verified against memberships.
 
   Returns `{:ok, :authorized}` or `{:error, reason}`.
   """
@@ -1376,6 +1381,29 @@ defmodule ControlKeel.Accounts do
       nil ->
         {:error, :not_found}
 
+      %Workspace{} = workspace when is_nil(user_id) ->
+        if ControlKeel.Runtime.Mode.current() == :local do
+          authorize_local_operator(workspace)
+        else
+          authorize_remote_execution(workspace, user_id, required_role)
+        end
+
+      %Workspace{} = workspace ->
+        authorize_remote_execution(workspace, user_id, required_role)
+    end
+  end
+
+  defp authorize_local_operator(%Workspace{org_id: nil}), do: {:ok, :authorized}
+
+  defp authorize_local_operator(%Workspace{org_id: org_id}) do
+    case Repo.get(Org, org_id) do
+      %Org{status: "active"} -> {:ok, :authorized}
+      _ -> {:error, :org_suspended}
+    end
+  end
+
+  defp authorize_remote_execution(workspace, user_id, required_role) do
+    case workspace do
       %Workspace{org_id: nil} ->
         # Fail closed. A workspace with no org has no tenant to authorize
         # against, so treating it as authorized let any caller (or no caller)
