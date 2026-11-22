@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.29 — 2026-11-22
+
+### What's changed
+
+- Let local cloud-agent runs authorize the local operator (#358)
+
 ## v0.4.28 — 2026-11-22
 
 ### What's changed
