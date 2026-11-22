@@ -9,9 +9,10 @@ defmodule ControlKeel.Skills.ClaudeHooks do
       {"permission-request.sh", permission_request_hook()},
       {"post-compact.sh", post_compact_hook()},
       {"pre-compact.sh", pre_compact_hook()},
-      {"pre-tool-use-bash.sh", pre_tool_use_bash_hook()},
-      {"pre-tool-use-write.sh", pre_tool_use_write_hook()},
-      {"stop.sh", ControlKeel.Skills.Exporter.claude_stop_hook_contents()},
+      {"pre-tool-use-bash.sh", ControlKeel.Skills.Exporter.shell_gate_hook_contents()},
+      {"pre-tool-use-write.sh",
+       ControlKeel.Skills.Exporter.claude_plugin_validate_write_hook_contents()},
+      {"stop.sh", ControlKeel.Skills.Exporter.stop_hook_contents()},
       {"user-prompt-submit.sh", user_prompt_submit_hook()}
     ]
 
@@ -103,28 +104,6 @@ defmodule ControlKeel.Skills.ClaudeHooks do
     """
     #!/usr/bin/env sh
     printf '{"systemMessage":"Context compaction is about to run. Preserve the active ControlKeel gate, approved decisions, blocked findings, proof obligations, and next valid action in the compacted summary."}'
-    """
-  end
-
-  defp pre_tool_use_bash_hook do
-    """
-    #!/usr/bin/env sh
-    TOOL_INPUT=$(cat)
-    if command -v jq >/dev/null 2>&1; then
-      CMD=$(printf '%s' "$TOOL_INPUT" | jq -r '.tool_input.command // .command // empty' 2>/dev/null)
-    else
-      CMD=$(printf '%s' "$TOOL_INPUT" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("tool_input",{}).get("command") or d.get("command", ""))' 2>/dev/null || true)
-    fi
-    printf '%s' "$CMD" | grep -qE '(^|[;&|(][[:space:]]*)(fly[[:space:]]+deploy|wrangler[[:space:]]+(deploy|publish)|docker[[:space:]]+push|git[[:space:]]+push|heroku[[:space:]]|kubectl[[:space:]]+apply|terraform[[:space:]]+apply|vercel[[:space:]]+(deploy|--prod)|netlify[[:space:]]+deploy)' && printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"Deploy-like command detected. Confirm ck_validate and ck_review_submit were called this turn before proceeding."}}' || true
-    """
-  end
-
-  defp pre_tool_use_write_hook do
-    """
-    #!/usr/bin/env sh
-    fp=$(cat | python3 -c 'import sys,json; print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))' 2>/dev/null || true)
-    [ -z "$fp" ] && exit 0
-    printf '%s' "$fp" | grep -qiE '(\\.env$|credentials|secret|\\.pem$|\\.key$|id_rsa|passw)' && printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"Writing to potentially sensitive file: %s. Verify ck_validate approved this change."}}\\n' "$fp" || true
     """
   end
 

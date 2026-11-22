@@ -332,18 +332,6 @@ defmodule ControlKeel.Skills.Exporter do
   def devin_terminal_hooks_manifest do
     %{
       "hooks" => %{
-        "SessionStart" => [
-          %{
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" =>
-                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-session-start.sh"|,
-                "timeout" => 10
-              }
-            ]
-          }
-        ],
         "PreToolUse" => [
           %{
             "matcher" => ".*",
@@ -353,43 +341,6 @@ defmodule ControlKeel.Skills.Exporter do
                 "command" =>
                   ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-validate-shell.sh"|,
                 "timeout" => 15
-              }
-            ]
-          }
-        ],
-        "PostToolUse" => [
-          %{
-            "matcher" => ".*",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" =>
-                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-post-tool-use.sh"|,
-                "timeout" => 15
-              }
-            ]
-          },
-          %{
-            "matcher" => "mcp__controlkeel__ck_validate",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" =>
-                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-nudge-validate.sh"|,
-                "statusMessage" => "ControlKeel validation nudge",
-                "timeout" => 5
-              }
-            ]
-          },
-          %{
-            "matcher" => "mcp__controlkeel__ck_finding",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" =>
-                  ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-nudge-finding.sh"|,
-                "statusMessage" => "ControlKeel finding nudge",
-                "timeout" => 5
               }
             ]
           }
@@ -416,17 +367,6 @@ defmodule ControlKeel.Skills.Exporter do
               }
             ]
           }
-        ],
-        "SessionEnd" => [
-          %{
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => ~s|sh "${DEVIN_PROJECT_DIR:-$(pwd)}/.devin/hooks/ck-session-end.sh"|,
-                "timeout" => 10
-              }
-            ]
-          }
         ]
       }
     }
@@ -434,14 +374,9 @@ defmodule ControlKeel.Skills.Exporter do
 
   def devin_terminal_hook_scripts do
     [
-      {"ck-session-start.sh", &codex_session_start_hook_contents/0},
-      {"ck-validate-shell.sh", &codex_validate_shell_hook_contents/0},
-      {"ck-post-tool-use.sh", &codex_post_tool_use_hook_contents/0},
+      {"ck-validate-shell.sh", &shell_gate_hook_contents/0},
       {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
-      {"ck-stop.sh", &codex_stop_hook_contents/0},
-      {"ck-session-end.sh", &claude_plugin_session_end_hook_contents/0},
-      {"ck-nudge-validate.sh", &claude_plugin_nudge_validate_hook_contents/0},
-      {"ck-nudge-finding.sh", &claude_plugin_nudge_finding_hook_contents/0}
+      {"ck-stop.sh", &stop_hook_contents/0}
     ]
   end
 
@@ -1084,7 +1019,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => "./hooks/ck-validate-shell.sh",
-                "statusMessage" => "Checking Bash command with ControlKeel",
                 "timeout" => 15
               }
             ]
@@ -1095,7 +1029,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => "./hooks/ck-validate-write.sh",
-                "statusMessage" => "Validating file write with ControlKeel",
                 "timeout" => 10
               }
             ]
@@ -1129,7 +1062,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => "./hooks/ck-post-compact.sh",
-                "statusMessage" => "Re-initializing ControlKeel governance context",
                 "timeout" => 10
               }
             ]
@@ -1168,7 +1100,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => repo_hook_command(".claude/hooks/pre-tool-use-bash.sh"),
-                "statusMessage" => "Checking Bash command with ControlKeel",
                 "timeout" => 10
               }
             ]
@@ -1179,7 +1110,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => repo_hook_command(".claude/hooks/pre-tool-use-write.sh"),
-                "statusMessage" => "Validating file write with ControlKeel",
                 "timeout" => 10
               }
             ]
@@ -1202,7 +1132,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => repo_hook_command(".claude/hooks/post-compact.sh"),
-                "statusMessage" => "Re-initializing ControlKeel governance context",
                 "timeout" => 5
               }
             ]
@@ -1252,10 +1181,10 @@ defmodule ControlKeel.Skills.Exporter do
         "preToolUse" => [
           %{
             "type" => "command",
-            "bash" => "./bin/controlkeel-review.sh",
-            "powershell" => "./bin/controlkeel-review.ps1",
-            "timeoutSec" => 345_600,
-            "comment" => "Intercepts plan-mode exit and waits for ControlKeel browser review."
+            "bash" => "./bin/ck-validate-shell.sh",
+            "timeoutSec" => 15,
+            "comment" =>
+              "Validates shell commands with ControlKeel; silent unless a command is blocked."
           }
         ]
       }
@@ -1277,20 +1206,6 @@ defmodule ControlKeel.Skills.Exporter do
               %{
                 "type" => "command",
                 "command" => repo_hook_command(".codex/hooks/ck-validate-shell.sh"),
-                "statusMessage" => "Checking Bash command with ControlKeel",
-                "timeout" => 15
-              }
-            ]
-          }
-        ],
-        "PostToolUse" => [
-          %{
-            "matcher" => "Bash",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => repo_hook_command(".codex/hooks/ck-post-tool-use.sh"),
-                "statusMessage" => "Reviewing Bash output with ControlKeel",
                 "timeout" => 15
               }
             ]
@@ -1306,6 +1221,17 @@ defmodule ControlKeel.Skills.Exporter do
               }
             ]
           }
+        ],
+        "Stop" => [
+          %{
+            "hooks" => [
+              %{
+                "type" => "command",
+                "command" => repo_hook_command(".codex/hooks/ck-stop.sh"),
+                "timeout" => 10
+              }
+            ]
+          }
         ]
       }
     }
@@ -1314,55 +1240,61 @@ defmodule ControlKeel.Skills.Exporter do
   @doc false
   def codex_hook_scripts do
     [
-      {"ck-session-start.sh", &codex_session_start_hook_contents/0},
-      {"ck-validate-shell.sh", &codex_validate_shell_hook_contents/0},
-      {"ck-post-tool-use.sh", &codex_post_tool_use_hook_contents/0},
+      {"ck-validate-shell.sh", &shell_gate_hook_contents/0},
       {"ck-user-prompt-submit.sh", &codex_user_prompt_submit_hook_contents/0},
-      {"ck-stop.sh", &codex_stop_hook_contents/0},
-      {"ck-nudge-validate.sh", &claude_plugin_nudge_validate_hook_contents/0},
-      {"ck-nudge-finding.sh", &claude_plugin_nudge_finding_hook_contents/0}
+      {"ck-stop.sh", &stop_hook_contents/0}
     ]
   end
 
   @doc false
   def claude_plugin_hook_scripts do
     [
-      {"ck-validate-shell.sh", &codex_validate_shell_hook_contents/0},
+      {"ck-validate-shell.sh", &shell_gate_hook_contents/0},
       {"ck-validate-write.sh", &claude_plugin_validate_write_hook_contents/0},
       {"ck-user-prompt-submit.sh", &claude_plugin_user_prompt_submit_hook_contents/0},
-      {"ck-stop.sh", &claude_stop_hook_contents/0},
+      {"ck-stop.sh", &stop_hook_contents/0},
       {"ck-post-compact.sh", &claude_plugin_post_compact_hook_contents/0},
       {"ck-pre-compact.sh", &claude_plugin_pre_compact_hook_contents/0}
     ]
   end
 
   @doc """
-  Claude Code stop hook. It never blocks the turn and stays silent unless the
-  project's blocked-finding count has risen since the last warning in this
-  Claude session, so stale findings do not nag on every stop and long-running
-  or auto-approved loops can always finish.
+  Stop hook shared by every host. It never blocks the turn and stays silent
+  unless the project's blocked-finding count has risen since the last report
+  in this host session, so stale findings do not nag on every stop and
+  long-running or auto-approved loops can always finish.
+
+  `format` selects the host's reply shape: `:system_message` (Claude Code,
+  Codex, Devin, Antigravity) or `:cursor_followup` (Cursor, whose stop hook
+  can only answer with a follow-up prompt, so it fires at most once per rise).
   """
-  def claude_stop_hook_contents do
+  def stop_hook_contents(format \\ :system_message) do
+    reply =
+      case format do
+        :cursor_followup ->
+          ~S|printf '{"followup_message":"ControlKeel recorded %s blocked finding(s) for this project. Review them with ck_context before treating the work as done."}\n' "$blocked"|
+
+        :system_message ->
+          ~S|printf '{"systemMessage":"ControlKeel has %s blocked finding(s) for this project. Review them with ck_context or the findings page before treating the work as done."}\n' "$blocked"|
+      end
+
     """
     #!/usr/bin/env sh
     #{hook_runtime_helpers()}
 
     input=$(cat)
-    stop_hook_active="false"
+    continuing="false"
     host_session=""
 
     if command -v jq >/dev/null 2>&1; then
-      stop_hook_active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null || printf 'false')
-      host_session=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null || printf '')
+      continuing=$(printf '%s' "$input" | jq -r 'if (.stop_hook_active == true) or ((.loop_count // 0) > 0) then "true" else "false" end' 2>/dev/null || printf 'false')
+      host_session=$(printf '%s' "$input" | jq -r '.session_id // .conversation_id // empty' 2>/dev/null || printf '')
     elif command -v python3 >/dev/null 2>&1; then
-      stop_hook_active=$(printf '%s' "$input" | python3 -c "import sys,json; print('true' if json.load(sys.stdin).get('stop_hook_active') else 'false')" 2>/dev/null || printf 'false')
-      host_session=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null || printf '')
+      continuing=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('stop_hook_active') or (d.get('loop_count') or 0) > 0 else 'false')" 2>/dev/null || printf 'false')
+      host_session=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id') or d.get('conversation_id') or '')" 2>/dev/null || printf '')
     fi
 
-    case "$stop_hook_active" in
-      false|False|'') ;;
-      *) exit 0 ;;
-    esac
+    [ "$continuing" = "false" ] || exit 0
 
     context=$(CONTROLKEEL_HOOK_TIMEOUT_SECONDS="${CONTROLKEEL_STOP_HOOK_TIMEOUT_SECONDS:-3}" ck_run context --json 2>/dev/null || true)
     [ -n "$context" ] || exit 0
@@ -1378,17 +1310,11 @@ defmodule ControlKeel.Skills.Exporter do
       ''|*[!0-9]*) exit 0 ;;
     esac
 
-    # Remember the last count reported to this Claude session in a private,
+    # Remember the last count reported to this host session in a private,
     # user-owned directory. Resetting to 0 when findings clear means a new
-    # blocked finding is reported; staying at the last reported count means
-    # fluctuations below it stay quiet.
-    state_dir="${CONTROLKEEL_HOOK_STATE_DIR:-${XDG_STATE_HOME:-${HOME:-}/.local/state}/controlkeel/hooks}"
-    [ -n "${HOME:-}${CONTROLKEEL_HOOK_STATE_DIR:-}${XDG_STATE_HOME:-}" ] || exit 0
-    (umask 077 && mkdir -p "$state_dir") 2>/dev/null || exit 0
-    if [ -L "$state_dir" ] || [ ! -O "$state_dir" ]; then
-      exit 0
-    fi
-
+    # blocked finding is reported; staying at the last reported count keeps
+    # fluctuations below it quiet.
+    state_dir=$(ck_state_dir) || exit 0
     state_key=$(printf '%s' "${host_session:-default}" | tr -c 'A-Za-z0-9_-' '_')
     state_file="$state_dir/stop-${state_key}"
     reported=$(cat "$state_file" 2>/dev/null || printf '0')
@@ -1396,21 +1322,15 @@ defmodule ControlKeel.Skills.Exporter do
       ''|*[!0-9]*) reported=0 ;;
     esac
 
-    record_reported() {
-      tmp_state="$state_file.$$"
-      (umask 077 && printf '%s' "$1" > "$tmp_state") 2>/dev/null && mv -f "$tmp_state" "$state_file" 2>/dev/null
-      rm -f "$tmp_state" 2>/dev/null
-    }
-
     if [ "$blocked" -eq 0 ]; then
-      [ "$reported" -eq 0 ] || record_reported 0
+      [ "$reported" -eq 0 ] || ck_write_state "$state_file" 0
       exit 0
     fi
 
     [ "$blocked" -gt "$reported" ] || exit 0
-    record_reported "$blocked"
+    ck_write_state "$state_file" "$blocked"
 
-    printf '{"systemMessage":"ControlKeel has %s blocked finding(s) for this project. Review them with ck_context or the findings page before treating the work as done."}\n' "$blocked"
+    #{reply}
     exit 0
     """
   end
@@ -1431,90 +1351,6 @@ defmodule ControlKeel.Skills.Exporter do
     set -u
 
     printf '%s\n' '{"systemMessage":"Context compaction is starting. Preserve the active ControlKeel decision gate, approved decisions, blocked findings, proof obligations, governed manifest, and next valid action in the compaction summary."}'
-    exit 0
-    """
-  end
-
-  def claude_plugin_session_end_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-    session_id=""
-
-    if command -v jq >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
-    elif command -v python3 >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
-    fi
-
-    ck_run context --session-id "${session_id:-1}" --json >/dev/null 2>&1 || true
-
-    exit 0
-    """
-  end
-
-  def claude_plugin_nudge_validate_hook_contents do
-    ~S"""
-    #!/usr/bin/env sh
-    set -u
-
-    input=$(cat)
-    decision="unknown"
-
-    if command -v jq >/dev/null 2>&1; then
-      decision=$(printf '%s' "$input" | jq -r '.tool_response.decision // .tool_result.decision // "unknown"' 2>/dev/null || printf 'unknown')
-    elif command -v python3 >/dev/null 2>&1; then
-      decision=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print((d.get('tool_response') or d.get('tool_result') or {}).get('decision','unknown'))" 2>/dev/null || printf 'unknown')
-    fi
-
-    case "$decision" in
-      allow)
-        ;;
-      warn)
-        printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"ck_validate returned a warning. Review the findings before proceeding. If the warning is expected, document it with ck_finding before continuing."}}\n'
-        ;;
-      block)
-        printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"ck_validate blocked this action. Do not proceed with the blocked operation. Record the issue with ck_finding and call ck_review_submit if human approval is needed."}}\n'
-        ;;
-      *)
-        ;;
-    esac
-
-    exit 0
-    """
-  end
-
-  def claude_plugin_nudge_finding_hook_contents do
-    ~S"""
-    #!/usr/bin/env sh
-    set -u
-
-    input=$(cat)
-    severity="unknown"
-
-    if command -v jq >/dev/null 2>&1; then
-      severity=$(printf '%s' "$input" | jq -r '.tool_input.severity // "unknown"' 2>/dev/null || printf 'unknown')
-    elif command -v python3 >/dev/null 2>&1; then
-      severity=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('severity','unknown'))" 2>/dev/null || printf 'unknown')
-    fi
-
-    case "$severity" in
-      critical|high)
-        printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"High-severity finding recorded. Stop all non-remediation work. Call ck_review_submit immediately for human approval before continuing."}}\n'
-        ;;
-      medium)
-        printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"Medium-severity finding recorded. Group any remaining low-severity findings before calling ck_review_submit — do not submit one finding at a time."}}\n'
-        ;;
-      low|info)
-        printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"Low-severity finding recorded. Continue work and batch additional low-severity findings before submitting for review."}}\n'
-        ;;
-      *)
-        printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"Finding recorded. Batch related findings before calling ck_review_submit to avoid unnecessary review round-trips."}}\n'
-        ;;
-    esac
-
     exit 0
     """
   end
@@ -1589,222 +1425,92 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  def codex_session_start_hook_contents do
-    # Kept silent: the static "start with ck_context" reminder duplicated the
-    # instruction files on every session and surfaced as a user-visible
-    # message. Hosts that still register SessionStart get a no-op.
-    """
-    #!/usr/bin/env sh
-    cat >/dev/null 2>&1 || true
-    exit 0
-    """
-  end
+  @doc """
+  Shell gate shared by every host with a pre-shell hook. Read-only commands
+  skip validation, a ControlKeel block denies the command, a warning goes to
+  the agent rather than the person, and an unreachable ControlKeel is
+  mentioned once per host session instead of on every command.
 
-  def codex_validate_shell_hook_contents do
+  `format` is `:claude` (Claude Code, Codex, Devin, Antigravity), `:cursor`,
+  or `:copilot`, matching each host's hook reply shape.
+  """
+  def shell_gate_hook_contents(format \\ :claude) do
+    {deny, warn, unavailable, allow} =
+      case format do
+        :claude ->
+          {~S|'{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"ControlKeel blocked this shell command. Review ck_validate findings before retrying."}}'|,
+           ~S|'{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"ControlKeel flagged this shell command with a warning. Check ck_validate if the risk matters for this task."}}'|,
+           ~S|'{"systemMessage":"ControlKeel is not reachable, so shell commands are not being validated in this session."}'|,
+           nil}
+
+        :cursor ->
+          {~S|'{"permission":"deny","user_message":"ControlKeel blocked this shell command.","agent_message":"ControlKeel blocked this shell command. Check ck_validate for details."}'|,
+           ~S|'{"permission":"allow","agent_message":"ControlKeel flagged this shell command with a warning. Check ck_validate if the risk matters for this task."}'|,
+           ~S|'{"permission":"allow","user_message":"ControlKeel is not reachable, so shell commands are not being validated in this session."}'|,
+           ~S|'{"permission":"allow"}'|}
+
+        :copilot ->
+          {~S|'{"permissionDecision":"deny","permissionDecisionReason":"ControlKeel blocked this shell command. Review ck_validate findings before retrying."}'|,
+           nil, nil, nil}
+      end
+
+    emit = fn
+      nil -> "exit 0"
+      json -> "printf '%s\\n' #{json}\n      exit 0"
+    end
+
     """
     #!/usr/bin/env sh
     #{hook_runtime_helpers()}
 
     input=$(cat)
     command_text=""
+    host_session=""
 
     if command -v jq >/dev/null 2>&1; then
-      command_text=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
+      command_text=$(printf '%s' "$input" | jq -r '
+        (.tool_input.command // .command // .input.command //
+          (if ((.toolName // "") | test("^(bash|shell|powershell)$")) then
+            ((.toolArgs // "{}") | (try fromjson catch {}) | .command)
+          else empty end)) // empty' 2>/dev/null)
+      host_session=$(printf '%s' "$input" | jq -r '.session_id // .conversation_id // .sessionId // empty' 2>/dev/null)
     elif command -v python3 >/dev/null 2>&1; then
-      command_text=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input', {}).get('command', ''))" 2>/dev/null)
+      command_text=$(printf '%s' "$input" | python3 -c "
+    import sys, json
+    d = json.load(sys.stdin)
+    c = (d.get('tool_input') or {}).get('command') or d.get('command') or (d.get('input') or {}).get('command')
+    if not c and str(d.get('toolName', '')) in ('bash', 'shell', 'powershell'):
+        try:
+            c = json.loads(d.get('toolArgs') or '{}').get('command')
+        except Exception:
+            c = None
+    print(c or '')
+    " 2>/dev/null)
+      host_session=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id') or d.get('conversation_id') or d.get('sessionId') or '')" 2>/dev/null)
     fi
 
-    if [ -z "$command_text" ]; then
-      exit 0
+    if [ -z "$command_text" ] || ck_readonly_command "$command_text"; then
+      #{emit.(allow)}
     fi
 
     result=$(ck_run validate --content "$command_text" --kind shell --json 2>/dev/null)
     validation_status=$?
-    if [ -n "$result" ]; then
-      if printf '%s' "$result" | grep -q '"decision":"block"'; then
-        printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"ControlKeel blocked this Bash command. Review ck_validate findings before retrying."}}'
-        exit 0
-      fi
 
-      if printf '%s' "$result" | grep -q '"decision":"warn"'; then
-        printf '%s\n' '{"systemMessage":"ControlKeel flagged this Bash command with a warning. Review ck_validate details before proceeding."}'
-        exit 0
-      fi
+    if printf '%s' "$result" | grep -q '"decision":"block"'; then
+      #{emit.(deny)}
+    fi
+
+    if printf '%s' "$result" | grep -q '"decision":"warn"'; then
+      #{emit.(warn || allow)}
     fi
 
     if [ "$validation_status" -ne 0 ] || ! printf '%s' "$result" | grep -q '"decision":"allow"'; then
-      printf '%s\\n' '{"systemMessage":"ControlKeel could not complete shell validation. This command has not been validated; check ControlKeel availability before continuing."}'
-    fi
-    exit 0
-    """
-  end
-
-  def codex_stop_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-    blocked_count="0"
-    stop_hook_active="false"
-
-    if command -v jq >/dev/null 2>&1; then
-      stop_hook_active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null || printf 'false')
-    elif command -v python3 >/dev/null 2>&1; then
-      stop_hook_active=$(printf '%s' "$input" | python3 -c "import sys,json; print('true' if json.load(sys.stdin).get('stop_hook_active') else 'false')" 2>/dev/null || printf 'false')
-    fi
-
-    session_id=""
-
-    if command -v jq >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null || printf '')
-    elif command -v python3 >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null || printf '')
-    fi
-
-    case "$stop_hook_active" in
-      false|False|'') ;;
-      *) exit 0 ;;
-    esac
-    case "$session_id" in
-      ''|*[!0-9]*|0) exit 0 ;;
-    esac
-
-    context=$(CONTROLKEEL_HOOK_TIMEOUT_SECONDS="${CONTROLKEEL_STOP_HOOK_TIMEOUT_SECONDS:-3}" ck_run context --session-id "$session_id" --json 2>/dev/null || true)
-
-    if [ -n "$context" ]; then
-      if command -v jq >/dev/null 2>&1; then
-        blocked_count=$(printf '%s' "$context" | jq -r '.active_findings.blocked // 0' 2>/dev/null || printf '0')
-      elif command -v python3 >/dev/null 2>&1; then
-        blocked_count=$(printf '%s' "$context" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('active_findings', {}).get('blocked', 0))" 2>/dev/null || printf '0')
+      if ck_first_time "unreachable-${host_session:-$PPID}"; then
+        #{emit.(unavailable || allow)}
       fi
     fi
 
-    if [ "${blocked_count:-0}" != "0" ]; then
-      printf '%s\n' '{"systemMessage":"ControlKeel still has blocked findings in this session. Call ck_context before treating the task as complete."}'
-    fi
-
-    exit 0
-    """
-  end
-
-  def codex_post_tool_use_hook_contents do
-    ~S"""
-    #!/usr/bin/env sh
-    set -u
-
-    input=$(cat)
-    command_text=""
-    tool_failed="false"
-
-    if command -v jq >/dev/null 2>&1; then
-      command_text=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
-      tool_failed=$(
-        printf '%s' "$input" | jq -r '
-          def nonzero_exit:
-            [
-              .exit_code?,
-              .exitCode?,
-              .tool_response.exit_code?,
-              .tool_response.exitCode?,
-              .tool_result.exit_code?,
-              .tool_result.exitCode?,
-              .tool_output.exit_code?,
-              .tool_output.exitCode?
-            ]
-            | map(select(type == "number" or type == "string"))
-            | map(try tonumber catch null)
-            | map(select(. != null))
-            | any(. != 0);
-          def failed_status:
-            [
-              .status?,
-              .result.status?,
-              .tool_response.status?,
-              .tool_result.status?,
-              .tool_output.status?
-            ]
-            | map(select(type == "string"))
-            | map(ascii_downcase)
-            | any(. == "failed" or . == "error");
-          if (nonzero_exit or failed_status) then "true" else "false" end
-        ' 2>/dev/null || printf 'false'
-      )
-    elif command -v python3 >/dev/null 2>&1; then
-      command_text=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input', {}).get('command', ''))" 2>/dev/null)
-      tool_failed=$(
-        printf '%s' "$input" | python3 -c "import json,sys,textwrap; exec(textwrap.dedent('''\
-          try:
-              d = json.load(sys.stdin)
-          except Exception:
-              print(\"false\")
-              raise SystemExit(0)
-
-          def nested(obj, *path):
-              cur = obj
-              for key in path:
-                  if not isinstance(cur, dict):
-                      return None
-                  cur = cur.get(key)
-              return cur
-
-          exit_candidates = [
-              d.get(\"exit_code\"),
-              d.get(\"exitCode\"),
-              nested(d, \"tool_response\", \"exit_code\"),
-              nested(d, \"tool_response\", \"exitCode\"),
-              nested(d, \"tool_result\", \"exit_code\"),
-              nested(d, \"tool_result\", \"exitCode\"),
-              nested(d, \"tool_output\", \"exit_code\"),
-              nested(d, \"tool_output\", \"exitCode\"),
-          ]
-
-          status_candidates = [
-              d.get(\"status\"),
-              nested(d, \"result\", \"status\"),
-              nested(d, \"tool_response\", \"status\"),
-              nested(d, \"tool_result\", \"status\"),
-              nested(d, \"tool_output\", \"status\"),
-          ]
-
-          failed = False
-
-          for value in exit_candidates:
-              if value is None:
-                  continue
-              try:
-                  if int(value) != 0:
-                      failed = True
-                      break
-              except Exception:
-                  pass
-
-          if not failed:
-              for value in status_candidates:
-                  if isinstance(value, str) and value.lower() in (\"failed\", \"error\"):
-                      failed = True
-                      break
-
-          print(\"true\" if failed else \"false\")
-        '''))" 2>/dev/null || printf 'false'
-      )
-    fi
-
-    message=""
-
-    if [ "$tool_failed" = "true" ]; then
-      if printf '%s' "$command_text" | grep -Eq '(^|[[:space:]])(mix[[:space:]]+test|mix[[:space:]]+precommit|npm[[:space:]]+test|pnpm[[:space:]]+test|yarn[[:space:]]+test|pytest)([[:space:]]|$)'; then
-        message="ControlKeel reviewed a test-oriented shell step. Summarize failures clearly before moving on, and do not treat the task as complete if the command failed."
-      else
-        message="ControlKeel noticed failing shell output. Re-check the command result before continuing and run ck_validate again if the next step changes code or config."
-      fi
-    fi
-
-    if [ -n "$message" ]; then
-      printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$message"
-    fi
-
-    exit 0
+    #{emit.(allow)}
     """
   end
 
@@ -1958,30 +1664,6 @@ defmodule ControlKeel.Skills.Exporter do
     4. Present the plan summary to the user and ask for approval in this conversation.
     5. After the user approves, record it with `controlkeel review plan respond <review_id> --decision approved --feedback-notes "User approved in chat" --json`.
     6. Do not execute until the review is approved.
-    """
-  end
-
-  def cline_taskstart_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    ck_run status >/dev/null 2>&1 || true
-
-    update_report=$(ck_run update --json 2>/dev/null || true)
-
-    if [ -n "$update_report" ]; then
-      update_available=$(printf '%s' "$update_report" | grep -o '"update_available":[[:space:]]*[^,}]*' | head -n1 | cut -d: -f2 | tr -d '[:space:]')
-      latest_version=$(printf '%s' "$update_report" | grep -o '"latest_version":[[:space:]]*"[^"]*"' | head -n1 | sed 's/.*"latest_version":[[:space:]]*"\([^"]*\)"/\1/')
-
-      if [ "$update_available" = "true" ]; then
-        if [ -n "$latest_version" ]; then
-          printf 'ControlKeel update available: %s. Consider `controlkeel update --sync-attached` after upgrading.\n' "$latest_version"
-        else
-          printf 'ControlKeel update available. Consider `controlkeel update --sync-attached` after upgrading.\n'
-        fi
-      fi
-    fi
     """
   end
 
@@ -2286,38 +1968,10 @@ defmodule ControlKeel.Skills.Exporter do
   end
 
   @doc false
-  def write_cursor_skill_tree(skills, cursor_skill_root) do
-    File.mkdir_p!(cursor_skill_root)
-
-    Enum.each(skills, fn skill ->
-      destination = Path.join(cursor_skill_root, skill.name)
-
-      unless same_path?(skill.skill_dir, destination) do
-        File.rm_rf!(destination)
-        File.cp_r!(skill.skill_dir, destination)
-      end
-    end)
-  end
-
-  @doc false
   def cursor_hooks_manifest do
     %{
       "version" => 1,
       "hooks" => %{
-        "sessionStart" => [
-          %{
-            "command" => repo_hook_command(".cursor/hooks/ck-session-start.sh"),
-            "timeout" => 10,
-            "failClosed" => false
-          }
-        ],
-        "sessionEnd" => [
-          %{
-            "command" => repo_hook_command(".cursor/hooks/ck-session-end.sh"),
-            "timeout" => 10,
-            "failClosed" => false
-          }
-        ],
         "beforeShellExecution" => [
           %{
             "command" => repo_hook_command(".cursor/hooks/ck-validate-shell.sh"),
@@ -2329,34 +1983,6 @@ defmodule ControlKeel.Skills.Exporter do
           %{
             "command" => repo_hook_command(".cursor/hooks/ck-validate-write.sh"),
             "matcher" => "Write|StrReplace|Delete",
-            "timeout" => 15,
-            "failClosed" => false
-          }
-        ],
-        "beforeMCPExecution" => [
-          %{
-            "command" => repo_hook_command(".cursor/hooks/ck-mcp-gate.sh"),
-            "timeout" => 15,
-            "failClosed" => false
-          }
-        ],
-        "afterMCPExecution" => [
-          %{
-            "matcher" => "mcp__controlkeel__ck_validate",
-            "command" => repo_hook_command(".cursor/hooks/ck-nudge-validate.sh"),
-            "timeout" => 5,
-            "failClosed" => false
-          },
-          %{
-            "matcher" => "mcp__controlkeel__ck_finding",
-            "command" => repo_hook_command(".cursor/hooks/ck-nudge-finding.sh"),
-            "timeout" => 5,
-            "failClosed" => false
-          }
-        ],
-        "subagentStart" => [
-          %{
-            "command" => repo_hook_command(".cursor/hooks/ck-subagent-start.sh"),
             "timeout" => 15,
             "failClosed" => false
           }
@@ -2377,20 +2003,6 @@ defmodule ControlKeel.Skills.Exporter do
     %{
       "version" => 1,
       "hooks" => %{
-        "sessionStart" => [
-          %{
-            "command" => repo_hook_command(".cursor-plugin/hooks/ck-session-start.sh"),
-            "timeout" => 10,
-            "failClosed" => false
-          }
-        ],
-        "sessionEnd" => [
-          %{
-            "command" => repo_hook_command(".cursor-plugin/hooks/ck-session-end.sh"),
-            "timeout" => 10,
-            "failClosed" => false
-          }
-        ],
         "beforeShellExecution" => [
           %{
             "command" => repo_hook_command(".cursor-plugin/hooks/ck-validate-shell.sh"),
@@ -2402,34 +2014,6 @@ defmodule ControlKeel.Skills.Exporter do
           %{
             "command" => repo_hook_command(".cursor-plugin/hooks/ck-validate-write.sh"),
             "matcher" => "Write|StrReplace|Delete",
-            "timeout" => 15,
-            "failClosed" => false
-          }
-        ],
-        "beforeMCPExecution" => [
-          %{
-            "command" => repo_hook_command(".cursor-plugin/hooks/ck-mcp-gate.sh"),
-            "timeout" => 15,
-            "failClosed" => false
-          }
-        ],
-        "afterMCPExecution" => [
-          %{
-            "matcher" => "mcp__controlkeel__ck_validate",
-            "command" => repo_hook_command(".cursor-plugin/hooks/ck-nudge-validate.sh"),
-            "timeout" => 5,
-            "failClosed" => false
-          },
-          %{
-            "matcher" => "mcp__controlkeel__ck_finding",
-            "command" => repo_hook_command(".cursor-plugin/hooks/ck-nudge-finding.sh"),
-            "timeout" => 5,
-            "failClosed" => false
-          }
-        ],
-        "subagentStart" => [
-          %{
-            "command" => repo_hook_command(".cursor-plugin/hooks/ck-subagent-start.sh"),
             "timeout" => 15,
             "failClosed" => false
           }
@@ -2451,19 +2035,67 @@ defmodule ControlKeel.Skills.Exporter do
     [
       {"ck-validate-shell.sh", &cursor_validate_shell_hook_contents/0},
       {"ck-validate-write.sh", &cursor_validate_write_hook_contents/0},
-      {"ck-session-start.sh", &cursor_session_start_hook_contents/0},
-      {"ck-session-end.sh", &cursor_session_end_hook_contents/0},
-      {"ck-subagent-start.sh", &cursor_subagent_start_hook_contents/0},
-      {"ck-mcp-gate.sh", &cursor_mcp_gate_hook_contents/0},
-      {"ck-stop.sh", &cursor_stop_hook_contents/0},
-      {"ck-nudge-validate.sh", &claude_plugin_nudge_validate_hook_contents/0},
-      {"ck-nudge-finding.sh", &claude_plugin_nudge_finding_hook_contents/0}
+      {"ck-stop.sh", &cursor_stop_hook_contents/0}
     ]
   end
 
   def hook_runtime_helpers do
     ~S"""
     set -u
+
+    # Private, user-owned state for hooks that must remember something across
+    # invocations (the last reported finding count, one-time notices).
+    ck_state_dir() {
+      ck_dir="${CONTROLKEEL_HOOK_STATE_DIR:-${XDG_STATE_HOME:-${HOME:-}/.local/state}/controlkeel/hooks}"
+      [ -n "${HOME:-}${CONTROLKEEL_HOOK_STATE_DIR:-}${XDG_STATE_HOME:-}" ] || return 1
+      (umask 077 && mkdir -p "$ck_dir") 2>/dev/null || return 1
+      if [ -L "$ck_dir" ] || [ ! -O "$ck_dir" ]; then return 1; fi
+      printf '%s' "$ck_dir"
+    }
+
+    ck_write_state() {
+      ck_tmp="$1.$$"
+      (umask 077 && printf '%s' "$2" > "$ck_tmp") 2>/dev/null && mv -f "$ck_tmp" "$1" 2>/dev/null
+      rm -f "$ck_tmp" 2>/dev/null
+      return 0
+    }
+
+    # Succeeds only the first time <key> is seen, so a notice shows once.
+    ck_first_time() {
+      ck_once_dir=$(ck_state_dir) || return 1
+      ck_once_key=$(printf '%s' "$1" | tr -c 'A-Za-z0-9_-' '_')
+      [ -e "$ck_once_dir/once-$ck_once_key" ] && return 1
+      ck_write_state "$ck_once_dir/once-$ck_once_key" 1
+      return 0
+    }
+
+    # Plain read-only commands skip validation: no shell metacharacters and a
+    # first word that only reads. Anything else goes through ck_validate.
+    ck_readonly_command() {
+      case "$1" in
+        *[\;\&\|\>\<\`\$\(\)]*|'') return 1 ;;
+      esac
+      set -f
+      # shellcheck disable=SC2086
+      set -- $1
+      set +f
+      case "$1" in
+        ls|cat|head|tail|wc|pwd|grep|rg|which|type|file|stat|du|df|tree|sort|uniq|cut|diff|less|more) ;;
+        find)
+          case " $* " in
+            *" -delete "*|*" -exec "*|*" -execdir "*|*" -ok "*|*" -okdir "*|*" -fprint"*) return 1 ;;
+          esac
+          ;;
+        git)
+          case "${2:-}" in
+            status|diff|log|show|blame|rev-parse|ls-files|grep|shortlog|describe) ;;
+            *) return 1 ;;
+          esac
+          ;;
+        *) return 1 ;;
+      esac
+      return 0
+    }
 
     ck_bin() {
       if [ -n "${CONTROLKEEL_BIN:-}" ] && [ -x "${CONTROLKEEL_BIN:-}" ]; then
@@ -2507,43 +2139,7 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  def cursor_validate_shell_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-
-    command_text=""
-    if command -v jq >/dev/null 2>&1; then
-      command_text=$(printf '%s' "$input" | jq -r '.command // empty')
-    elif command -v python3 >/dev/null 2>&1; then
-      command_text=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('command',''))")
-    fi
-
-    if [ -z "$command_text" ]; then
-      printf '{"permission":"allow"}\n'
-      exit 0
-    fi
-
-    result=$(ck_run validate --content "$command_text" --kind shell --json 2>/dev/null || true)
-    if [ -n "$result" ]; then
-
-      if printf '%s' "$result" | grep -q '"decision":"block"'; then
-        printf '{"permission":"deny","user_message":"ControlKeel blocked this shell command.","agent_message":"CK governance blocked this shell command. Check ck_validate for details."}\n'
-        exit 0
-      fi
-
-      if printf '%s' "$result" | grep -q '"decision":"warn"'; then
-        printf '{"permission":"ask","user_message":"ControlKeel flagged this command with a warning.","agent_message":"CK flagged this command. Proceed with caution."}\n'
-        exit 0
-      fi
-    fi
-
-    printf '{"permission":"allow"}\n'
-    exit 0
-    """
-  end
+  def cursor_validate_shell_hook_contents, do: shell_gate_hook_contents(:cursor)
 
   def cursor_validate_write_hook_contents do
     """
@@ -2568,7 +2164,7 @@ defmodule ControlKeel.Skills.Exporter do
           exit 0
         fi
       fi
-      printf '{"permission":"ask","user_message":"Writing to potentially sensitive file: %s"}\n' "$file_path"
+      printf '{"permission":"allow","agent_message":"Writing to potentially sensitive file %s. Make sure this change is intended."}\n' "$file_path"
       exit 0
     fi
 
@@ -2577,210 +2173,7 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  def cursor_session_start_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-
-    session_id=""
-    if command -v jq >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | jq -r '.session_id // .conversation_id // empty')
-    elif command -v python3 >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id', d.get('conversation_id', '')))" 2>/dev/null)
-    fi
-
-    context=""
-    context=$(ck_run context --session-id "${session_id:-1}" --json 2>/dev/null || true)
-
-    context_ok=""
-    if [ -n "$context" ]; then
-      if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$context" | jq -e '.session_id != null' >/dev/null 2>&1 && context_ok=1
-      elif command -v python3 >/dev/null 2>&1; then
-        if printf '%s' "$context" | python3 -c "import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if isinstance(d,dict) and d.get('session_id') is not None else 1)" >/dev/null 2>&1; then
-          context_ok=1
-        fi
-      else
-        case "$context" in
-          *\"session_id\":*) context_ok=1 ;;
-        esac
-      fi
-    fi
-
-    update_available=""
-    update_report=$(ck_run update --json 2>/dev/null || true)
-
-    if [ -n "$update_report" ]; then
-      if command -v jq >/dev/null 2>&1; then
-        printf '%s' "$update_report" | jq -e '.update_available == true' >/dev/null 2>&1 && update_available=1
-      elif command -v python3 >/dev/null 2>&1; then
-        if printf '%s' "$update_report" | python3 -c "import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get('update_available') is True else 1)" >/dev/null 2>&1; then
-          update_available=1
-        fi
-      else
-        case "$update_report" in
-          *\"update_available\":true*) update_available=1 ;;
-        esac
-      fi
-    fi
-
-    if [ -n "$context_ok" ]; then
-      if [ -n "$update_available" ]; then
-        printf '{"env":{"CK_SESSION_ACTIVE":"true","CK_UPDATE_AVAILABLE":"true"},"additional_context":"ControlKeel session active. Governance protocol: call ck_validate before risky edits, ck_budget before expensive ops, ck_route before delegation. A newer ControlKeel release is available; surface that proactively and consider `controlkeel update` or `controlkeel update --sync-attached` before risky work."}\n'
-      else
-        printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel session active. Governance protocol: call ck_validate before risky edits, ck_budget before expensive ops, ck_route before delegation."}\n'
-      fi
-    else
-      if [ -n "$update_available" ]; then
-        printf '{"env":{"CK_SESSION_ACTIVE":"true","CK_UPDATE_AVAILABLE":"true"},"additional_context":"ControlKeel available. Start with ck_context to load mission state. A newer ControlKeel release is available; surface that proactively and consider `controlkeel update` or `controlkeel update --sync-attached` before risky work."}\n'
-      else
-        printf '{"env":{"CK_SESSION_ACTIVE":"true"},"additional_context":"ControlKeel available. Start with ck_context to load mission state."}\n'
-      fi
-    fi
-    exit 0
-    """
-  end
-
-  def cursor_session_end_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-
-    session_id=""
-    if command -v jq >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
-    elif command -v python3 >/dev/null 2>&1; then
-      session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
-    fi
-    ck_run context --session-id "${session_id:-1}" --json >/dev/null 2>&1 || true
-
-    exit 0
-    """
-  end
-
-  def cursor_subagent_start_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-
-    subagent_type=""
-    task=""
-    if command -v jq >/dev/null 2>&1; then
-      subagent_type=$(printf '%s' "$input" | jq -r '.subagent_type // empty')
-      task=$(printf '%s' "$input" | jq -r '.task // empty')
-    elif command -v python3 >/dev/null 2>&1; then
-      subagent_type=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('subagent_type',''))" 2>/dev/null)
-      task=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('task',''))" 2>/dev/null)
-    fi
-
-    if [ -z "$subagent_type" ]; then
-      printf '{"permission":"allow"}\n'
-      exit 0
-    fi
-
-    result=$(ck_run validate --content "Delegating to $subagent_type subagent: $task" --kind text --json 2>/dev/null || true)
-    if [ -n "$result" ]; then
-
-      if printf '%s' "$result" | grep -q '"decision":"block"'; then
-        printf '{"permission":"deny","user_message":"ControlKeel blocked subagent delegation: %s"}\n' "$subagent_type"
-        exit 0
-      fi
-    fi
-
-    printf '{"permission":"allow"}\n'
-    exit 0
-    """
-  end
-
-  def cursor_mcp_gate_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-
-    tool_name=""
-    if command -v jq >/dev/null 2>&1; then
-      tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
-    elif command -v python3 >/dev/null 2>&1; then
-      tool_name=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null)
-    fi
-
-    case "$tool_name" in
-      ck_*)
-        printf '{"permission":"allow"}\n'
-        exit 0
-        ;;
-    esac
-
-    if [ -z "$tool_name" ]; then
-      printf '{"permission":"allow"}\n'
-      exit 0
-    fi
-
-    result=$(ck_run validate --content "MCP tool call: $tool_name" --kind text --json 2>/dev/null || true)
-    if [ -n "$result" ]; then
-
-      if printf '%s' "$result" | grep -q '"decision":"block"'; then
-        printf '{"permission":"deny","user_message":"ControlKeel blocked MCP tool: %s"}\n' "$tool_name"
-        exit 0
-      fi
-
-      if printf '%s' "$result" | grep -q '"decision":"warn"'; then
-        printf '{"permission":"ask","user_message":"ControlKeel flagged MCP tool: %s"}\n' "$tool_name"
-        exit 0
-      fi
-    fi
-
-    printf '{"permission":"allow"}\n'
-    exit 0
-    """
-  end
-
-  def cursor_stop_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    input=$(cat)
-
-    status=""
-    loop_count=""
-    if command -v jq >/dev/null 2>&1; then
-      status=$(printf '%s' "$input" | jq -r '.status // empty')
-      loop_count=$(printf '%s' "$input" | jq -r '.loop_count // "0"')
-    elif command -v python3 >/dev/null 2>&1; then
-      status=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null)
-      loop_count=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('loop_count',0))" 2>/dev/null)
-    fi
-
-    if [ "$loop_count" != "0" ]; then
-      exit 0
-    fi
-
-    if [ "$status" = "completed" ]; then
-      context=$(CONTROLKEEL_HOOK_TIMEOUT_SECONDS="${CONTROLKEEL_STOP_HOOK_TIMEOUT_SECONDS:-3}" ck_run context --session-id 1 --json 2>/dev/null || true)
-
-      if printf '%s' "$context" | grep -q '"active_findings"' 2>/dev/null; then
-        has_blocked=$(printf '%s' "$context" | sed -n 's/.*"blocked":[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n 1)
-        has_blocked="${has_blocked:-0}"
-
-        if [ "$has_blocked" -gt 0 ] 2>/dev/null; then
-          printf '{"followup_message":"There are unresolved blocked findings from ControlKeel governance. Please call ck_context to review them before closing."}\n'
-          exit 0
-        fi
-      fi
-    fi
-
-    exit 0
-    """
-  end
+  def cursor_stop_hook_contents, do: stop_hook_contents(:cursor_followup)
 
   @doc false
   def windsurf_rule_contents do
@@ -2947,99 +2340,6 @@ defmodule ControlKeel.Skills.Exporter do
     description: Submit the current plan to ControlKeel and wait for review.
     prompt: |
       Save the plan to `.continue/review-plan.md`, run `controlkeel review plan submit --body-file .continue/review-plan.md --submitted-by continue --json`. Read the returned review.id and browser_url. Present the plan summary to the user and ask for approval in this conversation. After the user approves, record it with `controlkeel review plan respond <review_id> --decision approved --feedback-notes "User approved in chat" --json`.
-    """
-  end
-
-  def letta_settings_manifest do
-    %{
-      "hooks" => %{
-        "SessionStart" => [
-          %{
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => repo_hook_command(".letta/hooks/controlkeel-session-start.sh"),
-                "timeout" => 5_000
-              }
-            ]
-          }
-        ],
-        "PostToolUse" => [
-          %{
-            "matcher" => "Bash|Edit|Write|TodoWrite|Task",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => repo_hook_command(".letta/hooks/controlkeel-findings.sh"),
-                "timeout" => 5_000
-              }
-            ]
-          }
-        ],
-        "PermissionRequest" => [
-          %{
-            "matcher" => "*",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => repo_hook_command(".letta/hooks/controlkeel-findings.sh"),
-                "timeout" => 5_000
-              }
-            ]
-          }
-        ]
-      }
-    }
-  end
-
-  def letta_local_settings_example_manifest do
-    %{
-      "permissions" => %{
-        "allow" => ["Read(*)", "Glob(*)", "Grep(*)"],
-        "ask" => ["Bash(*)", "Edit(*)", "Write(*)", "Task(*)"]
-      }
-    }
-  end
-
-  def letta_findings_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    ck_run findings --format summary --quiet 2>/dev/null || true
-    exit 0
-    """
-  end
-
-  def letta_session_start_hook_contents do
-    """
-    #!/usr/bin/env sh
-    #{hook_runtime_helpers()}
-
-    update_notice=""
-    update_report=$(ck_run update --json 2>/dev/null || true)
-
-    if [ -n "$update_report" ]; then
-      update_available=$(printf '%s' "$update_report" | grep -o '"update_available":[[:space:]]*[^,}]*' | head -n1 | cut -d: -f2 | tr -d '[:space:]')
-      latest_version=$(printf '%s' "$update_report" | grep -o '"latest_version":[[:space:]]*"[^"]*"' | head -n1 | sed 's/.*"latest_version":[[:space:]]*"\([^"]*\)"/\1/')
-
-      if [ "$update_available" = "true" ]; then
-        if [ -n "$latest_version" ]; then
-          update_notice="ControlKeel update available: ${latest_version}. Consider `controlkeel update --sync-attached` after upgrading."
-        else
-          update_notice="ControlKeel update available. Consider `controlkeel update --sync-attached` after upgrading."
-        fi
-      fi
-    fi
-
-    cat <<'EOF'
-    ControlKeel: prefer ck_context before risky work, ck_validate before writes or shell, and ck_review_submit/ck_review_status for non-trivial plans.
-    MCP registration helper: ./.letta/controlkeel-mcp.sh
-    EOF
-
-    if [ -n "$update_notice" ]; then
-      printf '%s\n' "$update_notice"
-    fi
     """
   end
 
@@ -3864,7 +3164,7 @@ defmodule ControlKeel.Skills.Exporter do
 
         "experimental.chat.system.transform": async (_input, output) => {
           output.system.push(
-            "Use submit_plan when you are ready for human review. Do not proceed with implementation until ControlKeel approves the plan."
+            "For multi-step, destructive, or deploy-related work, submit the plan with submit_plan and wait for ControlKeel approval. Small, low-risk edits can proceed directly."
           )
         },
 
@@ -4528,7 +3828,7 @@ defmodule ControlKeel.Skills.Exporter do
 
         "experimental.chat.system.transform": async (_input, output) => {
           output.system.push(
-            "Use submit_plan when you are ready for human review. Do not proceed with implementation until ControlKeel approves the plan."
+            "For multi-step, destructive, or deploy-related work, submit the plan with submit_plan and wait for ControlKeel approval. Small, low-risk edits can proceed directly."
           )
         },
 
@@ -4913,96 +4213,6 @@ defmodule ControlKeel.Skills.Exporter do
 
   # ── Kiro native helpers ────────────────────────────────────────────────────
 
-  def kiro_hook_spec do
-    %{
-      "name" => "ControlKeel Governance Validation",
-      "description" =>
-        "Runs ControlKeel governance checks after tool invocations to ensure compliance.",
-      "version" => "1.0",
-      "enabled" => true,
-      "when" => %{
-        "type" => "postToolUse",
-        "tool" => "write"
-      },
-      "then" => %{
-        "type" => "runCommand",
-        "command" => "controlkeel findings --format summary --quiet"
-      }
-    }
-  end
-
-  def kiro_nudge_validate_hook_spec do
-    %{
-      "name" => "ControlKeel Validate Nudge",
-      "description" =>
-        "Injects governance guidance after ck_validate completes so the agent acts on the result.",
-      "version" => "1.0",
-      "enabled" => true,
-      "when" => %{
-        "type" => "postToolUse",
-        "tool" => "mcp__controlkeel__ck_validate"
-      },
-      "then" => %{
-        "type" => "injectContext",
-        "message" =>
-          "ck_validate completed. Check the decision: allow=proceed and batch writes, warn=document with ck_finding before continuing, block=stop and call ck_review_submit for human approval."
-      }
-    }
-  end
-
-  def kiro_nudge_finding_hook_spec do
-    %{
-      "name" => "ControlKeel Finding Nudge",
-      "description" =>
-        "Injects governance guidance after ck_finding to steer severity-appropriate escalation.",
-      "version" => "1.0",
-      "enabled" => true,
-      "when" => %{
-        "type" => "postToolUse",
-        "tool" => "mcp__controlkeel__ck_finding"
-      },
-      "then" => %{
-        "type" => "injectContext",
-        "message" =>
-          "Finding recorded. For critical/high severity: stop and call ck_review_submit immediately. For medium/low: batch related findings before submitting to avoid unnecessary review round-trips."
-      }
-    }
-  end
-
-  def kiro_review_hook_spec do
-    %{
-      "name" => "ControlKeel Plan Review Gate",
-      "description" =>
-        "Submits a plan review packet through ControlKeel before implementation leaves plan mode.",
-      "version" => "1.0",
-      "enabled" => true,
-      "triggers" => [
-        %{
-          "type" => "PreToolUse",
-          "toolNames" => ["write_file", "replace_in_file", "run_terminal_command"]
-        }
-      ],
-      "actions" => [
-        %{
-          "type" => "command",
-          "command" => "controlkeel review plan submit --stdin --submitted-by kiro --json"
-        }
-      ]
-    }
-  end
-
-  def kiro_tool_policy_manifest do
-    %{
-      "planning" => %{
-        "allowed" => ["read_file", "search", "list_directory", "controlkeel"],
-        "blocked" => ["write_file", "replace_in_file"]
-      },
-      "execution" => %{
-        "allowed" => ["read_file", "search", "list_directory", "write_file", "replace_in_file"]
-      }
-    }
-  end
-
   def kiro_steering_contents do
     """
     # ControlKeel Governance
@@ -5305,50 +4515,16 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
-  def antigravity_agent_contents do
-    """
-    ---
-    name: controlkeel-operator
-    description: |
-      Governed code review and validation agent. Use for pre-commit validation,
-      security review, policy checks, and governed commit flows.
-      Invoke when code changes need governance review before merging.
-    ---
-
-    # ControlKeel Governance Operator
-
-    You are a governed code review and validation agent operating inside Antigravity.
-
-    ## Core Workflow
-
-    1. **Context First**: Call `ck_context` at the start of every review session.
-    2. **Validate Before Action**: Use `ck_validate` on all proposed code changes, shell commands, and config edits.
-    3. **Record Findings**: Use `ck_finding` for any security, compliance, or quality issues discovered.
-    4. **Review Gates**: Submit plans via `ck_review_submit` before broad mutations. Poll `ck_review_status` until approved.
-    5. **Budget Awareness**: Check `ck_budget` before expensive multi-phase work.
-    6. **Commit Governance**: Use `ck_git_commit` instead of raw git commit.
-
-    ## Available Tools
-
-    All 48 ControlKeel MCP tools are available through the CK MCP server:
-    - Governance: ck_validate, ck_context, ck_finding, ck_review_submit, ck_review_status
-    - Memory: ck_memory_record, ck_memory_search, ck_memory_archive
-    - Git: ck_git_status, ck_git_diff, ck_git_commit
-    - Budget: ck_budget, ck_cost_optimizer, ck_route
-    - Execution: ck_execute_code (sandboxed), ck_delegate
-
-    ## Constraints
-
-    - Never proceed past blocked critical or high findings.
-    - Always wait for review approval before implementing.
-    - Record all decisions and findings for audit trail.
-    - Respect budget limits and escalate when approaching limits.
-    """
+  def antigravity_hook_scripts do
+    [
+      {"ck-validate-shell.sh", &shell_gate_hook_contents/0},
+      {"ck-stop.sh", &stop_hook_contents/0}
+    ]
   end
 
-  def antigravity_hooks_manifest(_project_root, _opts) do
-    ck_bin = "controlkeel"
-
+  # One named group so attach can replace ControlKeel's entries without
+  # touching other groups in the workspace `hooks.json`.
+  def antigravity_hooks_manifest do
     %{
       "controlkeel-governance" => %{
         "PreToolUse" => [
@@ -5357,19 +4533,7 @@ defmodule ControlKeel.Skills.Exporter do
             "hooks" => [
               %{
                 "type" => "command",
-                "command" => "#{ck_bin} hook pre-tool-use --project-root ${workspacePaths[0]}",
-                "timeout" => 15
-              }
-            ]
-          }
-        ],
-        "PostToolUse" => [
-          %{
-            "matcher" => "write_to_file|replace_file_content|multi_replace_file_content",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => "#{ck_bin} hook post-tool-use --project-root ${workspacePaths[0]}",
+                "command" => repo_hook_command(".agents/hooks/ck-validate-shell.sh"),
                 "timeout" => 15
               }
             ]
@@ -5380,7 +4544,7 @@ defmodule ControlKeel.Skills.Exporter do
             "hooks" => [
               %{
                 "type" => "command",
-                "command" => "#{ck_bin} hook stop --project-root ${workspacePaths[0]}",
+                "command" => repo_hook_command(".agents/hooks/ck-stop.sh"),
                 "timeout" => 10
               }
             ]

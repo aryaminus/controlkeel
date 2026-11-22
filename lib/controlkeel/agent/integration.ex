@@ -382,7 +382,7 @@ defmodule ControlKeel.Agent.Integration do
         description:
           "Attaches MCP server and delivers native governance via Kiro Agent Hooks, steering files, command guides, tool controls, and MCP config.",
         attach_command: "controlkeel attach kiro",
-        config_location: "Kiro MCP config and `.kiro/hooks/`, `.kiro/steering/`.",
+        config_location: "Kiro MCP config and `.kiro/steering/`.",
         companion_delivery:
           "Exports governance hooks, steering files, review commands, tool policy settings, MCP config, and `AGENTS.md` instructions.",
         preferred_target: "kiro-native",
@@ -481,7 +481,6 @@ defmodule ControlKeel.Agent.Integration do
           ".augment/mcp.json",
           ".augment/settings.controlkeel.json",
           "AGENTS.md",
-          "AUGMENT.md",
           "README.md"
         ],
         runtime_transport: "auggie_sdk_acp",
@@ -611,7 +610,7 @@ defmodule ControlKeel.Agent.Integration do
         config_location:
           "Letta project config lives in `.letta/settings.json` with optional local overrides in `.letta/settings.local.json`; MCP servers are added through Letta's `/mcp` flow and skills load from `.agents/skills`.",
         companion_delivery:
-          "Installs `.agents/skills`, `.letta/settings.json`, `.letta/hooks`, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, and portable `.mcp.json` guidance for Letta-native MCP, hooks, remote, and headless use.",
+          "Installs `.agents/skills`, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, and portable `.mcp.json` guidance for Letta-native MCP, remote, and headless use.",
         preferred_target: "letta-code-native",
         default_scope: "project",
         router_agent_id: nil,
@@ -632,9 +631,9 @@ defmodule ControlKeel.Agent.Integration do
           "Registers ControlKeel as an MCP server for Cline and installs Cline-native skills, rules, commands, hooks, and workflow guidance.",
         attach_command: "controlkeel attach cline",
         config_location:
-          "Cline CLI MCP settings live in `~/.cline/data/settings/cline_mcp_settings.json` or `<CLINE_DIR>/data/settings/cline_mcp_settings.json`; project rules live in `.clinerules/` and project skills in `.cline/skills/`.",
+          "Cline CLI MCP settings live in `~/.cline/data/settings/cline_mcp_settings.json` or `<CLINE_DIR>/data/settings/cline_mcp_settings.json`; project rules live in `.clinerules/` and project skills in `.agents/skills/`.",
         companion_delivery:
-          "Installs `.cline/skills`, `.cline/commands`, `.cline/hooks`, emits `.clinerules` guidance plus a workflow, and prepares a Cline MCP config snippet.",
+          "Installs `.agents/skills` and `.cline/commands`, emits `.clinerules` guidance plus a workflow, and prepares a Cline MCP config snippet.",
         preferred_target: "cline-native",
         default_scope: "project",
         router_agent_id: nil,
@@ -999,9 +998,9 @@ defmodule ControlKeel.Agent.Integration do
           "Attaches MCP server and delivers native governance via Antigravity CLI plugins, skills, agents, hooks, rules, and MCP config. AGY is the terminal-first surface of the Antigravity ecosystem with full plugin support.",
         attach_command: "controlkeel attach antigravity-cli",
         config_location:
-          "Antigravity CLI config lives in ~/.gemini/antigravity-cli/ (settings.json, mcp_config.json). Workspace config uses .agents/ (skills, rules, hooks, mcp_config.json). Global plugins live in ~/.gemini/config/plugins/.",
+          "Antigravity CLI config lives in ~/.gemini/antigravity-cli/ (settings.json, mcp_config.json). Workspace config uses .agents/ (skills, rules, hooks, mcp_config.json).",
         companion_delivery:
-          "Installs .agents/skills, .agents/rules, .agents/hooks.json, .agents/mcp_config.json, AGENTS.md, GEMINI.md, and a .agents/plugins/controlkeel/ plugin bundle with manifest, agents, skills, rules, hooks, and MCP config.",
+          "Installs .agents/skills, .agents/rules, .agents/hooks.json with a shell gate and stop hook, .agents/mcp_config.json, and a managed AGENTS.md block.",
         preferred_target: "antigravity-cli-native",
         default_scope: "project",
         router_agent_id: "antigravity",
@@ -1031,9 +1030,9 @@ defmodule ControlKeel.Agent.Integration do
           "Prepares Antigravity 2.0 IDE workspace-native skills, rules, hooks, MCP config, and a distributable plugin bundle for governed repo work. Shares the same .agents/ workspace structure as Antigravity CLI.",
         attach_command: "controlkeel attach antigravity-ide",
         config_location:
-          "Antigravity IDE config lives in ~/.gemini/antigravity/ (mcp_config.json, skills/). Workspace config uses .agents/ (skills, rules, hooks, mcp_config.json). Global plugins live in ~/.gemini/config/plugins/.",
+          "Antigravity IDE config lives in ~/.gemini/antigravity/ (mcp_config.json, skills/). Workspace config uses .agents/ (skills, rules, hooks, mcp_config.json).",
         companion_delivery:
-          "Installs .agents/skills, .agents/rules, .agents/hooks.json, .agents/mcp_config.json, AGENTS.md, GEMINI.md, and a .agents/plugins/controlkeel/ plugin bundle.",
+          "Installs .agents/skills, .agents/rules, .agents/hooks.json with a shell gate and stop hook, .agents/mcp_config.json, and a managed AGENTS.md block.",
         preferred_target: "antigravity-cli-native",
         default_scope: "project",
         router_agent_id: "antigravity",
@@ -1491,12 +1490,9 @@ defmodule ControlKeel.Agent.Integration do
               "claude-code",
               "opencode",
               "windsurf",
-              "cline",
-              "kiro",
               "amp",
               "devin-terminal",
-              "warp",
-              "letta-code"
+              "warp"
             ] do
     "native_review"
   end
@@ -1506,12 +1502,24 @@ defmodule ControlKeel.Agent.Integration do
   defp default_review_experience(_attrs), do: "feedback_only"
 
   defp default_submission_mode(%{id: id})
-       when id in ["claude-code", "amp", "augment", "opencode", "devin-terminal", "warp"] do
+       when id in [
+              "claude-code",
+              "amp",
+              "augment",
+              "opencode",
+              "devin-terminal",
+              "warp",
+              "vscode",
+              "copilot",
+              "cline",
+              "kiro",
+              "letta-code"
+            ] do
     "tool_call"
   end
 
   defp default_submission_mode(%{id: id})
-       when id in ["vscode", "copilot", "windsurf", "cline", "kiro", "letta-code"] do
+       when id in ["windsurf"] do
     "hook"
   end
 
@@ -1524,8 +1532,6 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_submission_mode(%{support_class: "headless_runtime"}), do: "file_watch"
   defp default_submission_mode(_attrs), do: "manual"
-
-  defp default_feedback_mode(%{support_class: "unverified"}), do: "manual"
 
   defp default_feedback_mode(%{id: id})
        when id in ["claude-code", "codex-cli", "amp", "opencode", "devin-terminal", "warp"] do
@@ -1553,21 +1559,10 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_feedback_mode(_attrs), do: "command_reply"
 
-  defp default_plan_phase_support(%{support_class: "unverified"}) do
-    []
-  end
-
-  defp default_plan_phase_support(%{support_class: "framework_adapter"}),
-    do: ["planning", "review"]
-
   defp default_plan_phase_support(_attrs), do: ["planning", "review", "execution"]
 
-  defp default_confidence_level(%{support_class: "unverified"}), do: "research"
-  defp default_confidence_level(%{support_class: "framework_adapter"}), do: "experimental"
   defp default_confidence_level(_attrs), do: "shipped"
 
-  defp default_phase_model(%{support_class: "unverified"}), do: "review_only"
-  defp default_phase_model(%{support_class: "framework_adapter"}), do: "review_only"
   defp default_phase_model(%{id: "pi"}), do: "file_plan_mode"
   defp default_phase_model(%{id: "codex-cli"}), do: "review_only"
   defp default_phase_model(%{id: "t3code"}), do: "review_only"
@@ -1814,7 +1809,6 @@ defmodule ControlKeel.Agent.Integration do
   end
 
   defp default_direct_install_methods(%{support_class: "headless_runtime"}), do: []
-  defp default_direct_install_methods(%{support_class: "framework_adapter"}), do: []
   defp default_direct_install_methods(%{support_class: "alias"}), do: []
   defp default_direct_install_methods(_attrs), do: []
 
@@ -1856,6 +1850,16 @@ defmodule ControlKeel.Agent.Integration do
       ".vscode/mcp.json"
     ]
   end
+
+  defp default_artifact_surfaces(%{id: id}) when id in ["antigravity-cli", "antigravity-ide"],
+    do: [
+      ".agents/skills",
+      ".agents/rules/controlkeel.md",
+      ".agents/hooks.json",
+      ".agents/hooks",
+      ".agents/mcp_config.json",
+      "AGENTS.md"
+    ]
 
   defp default_artifact_surfaces(%{id: "cursor"}),
     do: [
@@ -1902,8 +1906,6 @@ defmodule ControlKeel.Agent.Integration do
   defp default_artifact_surfaces(%{id: "letta-code"}),
     do: [
       ".agents/skills",
-      ".letta/settings.json",
-      ".letta/hooks",
       ".letta/controlkeel-mcp.sh",
       ".letta/README.md",
       ".mcp.json",
@@ -1915,7 +1917,6 @@ defmodule ControlKeel.Agent.Integration do
       ".agents/skills",
       ".clinerules",
       ".cline/commands",
-      ".cline/hooks",
       ".cline/data/settings/cline_mcp_settings.json",
       "AGENTS.md"
     ]
@@ -1952,9 +1953,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_artifact_surfaces(%{id: "kiro"}),
     do: [
-      ".kiro/hooks",
       ".kiro/steering",
-      ".kiro/settings",
       ".kiro/commands",
       ".kiro/mcp.json",
       "AGENTS.md"
@@ -1992,7 +1991,6 @@ defmodule ControlKeel.Agent.Integration do
       ".augment/mcp.json",
       ".augment/settings.controlkeel.json",
       "AGENTS.md",
-      "AUGMENT.md",
       "README.md"
     ]
 

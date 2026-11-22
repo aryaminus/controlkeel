@@ -7,28 +7,7 @@ defmodule ControlKeel.Skills.Exporter.LettaCodeNative do
     skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
-    settings_path = Path.join(root, ".letta/settings.json")
-    File.mkdir_p!(Path.dirname(settings_path))
-    File.write!(settings_path, Jason.encode!(E.letta_settings_manifest(), pretty: true) <> "\n")
-
-    local_settings_example_path = Path.join(root, ".letta/settings.local.example.json")
-
-    File.write!(
-      local_settings_example_path,
-      Jason.encode!(E.letta_local_settings_example_manifest(), pretty: true) <> "\n"
-    )
-
-    hooks_root = Path.join(root, ".letta/hooks")
-    File.mkdir_p!(hooks_root)
-
-    findings_hook_path = Path.join(hooks_root, "controlkeel-findings.sh")
-    File.write!(findings_hook_path, E.letta_findings_hook_contents())
-    File.chmod!(findings_hook_path, 0o755)
-
-    session_hook_path = Path.join(hooks_root, "controlkeel-session-start.sh")
-    File.write!(session_hook_path, E.letta_session_start_hook_contents())
-    File.chmod!(session_hook_path, 0o755)
-
+    File.mkdir_p!(Path.join(root, ".letta"))
     mcp_helper_path = Path.join(root, ".letta/controlkeel-mcp.sh")
     File.write!(mcp_helper_path, E.letta_mcp_helper_contents(project_root, opts))
     File.chmod!(mcp_helper_path, 0o755)
@@ -69,10 +48,6 @@ defmodule ControlKeel.Skills.Exporter.LettaCodeNative do
       opts,
       [
         %{"path" => skill_root, "kind" => "skills"},
-        %{"path" => settings_path, "kind" => "settings"},
-        %{"path" => local_settings_example_path, "kind" => "settings"},
-        %{"path" => findings_hook_path, "kind" => "hook"},
-        %{"path" => session_hook_path, "kind" => "hook"},
         %{"path" => mcp_helper_path, "kind" => "mcp"},
         %{"path" => readme_path, "kind" => "instructions"},
         %{"path" => review_command_path, "kind" => "command"},
@@ -84,7 +59,6 @@ defmodule ControlKeel.Skills.Exporter.LettaCodeNative do
       ],
       [
         "Keep `.agents/skills` in the repo so Letta discovers ControlKeel skills through its primary project skill path.",
-        "Commit `.letta/settings.json` for shared hook defaults; keep personal overrides in `.letta/settings.local.json` based on the included example file.",
         "Register ControlKeel with Letta through `/mcp add --transport stdio controlkeel ./.letta/controlkeel-mcp.sh` or the hosted HTTP variant described in `.letta/README.md`.",
         "Use `letta -p` for headless runs and `letta server` for remote/listener workflows; the included README documents both without claiming a CK-owned runtime."
       ]

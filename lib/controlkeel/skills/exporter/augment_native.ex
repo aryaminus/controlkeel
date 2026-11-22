@@ -42,9 +42,6 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
       Jason.encode!(E.augment_settings_snippet(project_root, opts), pretty: true) <> "\n"
     )
 
-    instructions_path = Path.join(root, "AUGMENT.md")
-    File.write!(instructions_path, E.instructions_only_contents("augment", project_root, opts))
-
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, E.instructions_only_contents("augment", project_root, opts))
 
@@ -62,7 +59,6 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => settings_path, "kind" => "settings"},
-        %{"path" => instructions_path, "kind" => "instructions"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [

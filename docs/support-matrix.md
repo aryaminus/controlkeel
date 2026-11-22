@@ -27,7 +27,7 @@ Only `attach_client` rows produce real `controlkeel attach <id>` commands. The o
 Attach clients fall into two tiers:
 
 - **Full:** Claude Code, Codex (CLI, app server, t3code), Cursor, Copilot / VS Code, Antigravity (CLI and IDE), and OpenCode. CK installs MCP config, skills, instructions, and a plugin or hooks bundle, and these paths are exercised end to end in CI.
-- **Standard:** Windsurf, Cline, Kiro, Kilo, Amp, Goose, Droid, Pi, Warp, Augment, Continue, Letta Code, Roo Code, and Devin terminal. CK installs MCP config, instructions, and skills in `.agents/skills`. Hosts with a native hooks file (Windsurf, Cline, Kiro, Letta Code, Devin terminal) also get CK hooks.
+- **Standard:** Windsurf, Cline, Kiro, Kilo, Amp, Goose, Droid, Pi, Warp, Augment, Continue, Letta Code, Roo Code, and Devin terminal. CK installs MCP config, instructions, and skills in `.agents/skills`. Windsurf also gets the plan-review hook and Devin terminal gets the shell gate and stop hook; the other Standard hosts use MCP tools only.
 
 Gemini CLI is an alias of Antigravity CLI. Hosts that are not listed can use the open-standard target (`controlkeel skills install --target open-standard --scope project`), which writes `.agents/skills`, merges `.mcp.json`, and adds a managed `AGENTS.md` block.
 
@@ -105,7 +105,7 @@ The broader native matrix now also tracks the strongest official surfaces CK exp
 | ---- | ---------------------------------- |
 | `windsurf` | Cascade hooks, workflows, commands, and MCP config |
 | `continue` | prompts, command prompts, headless guidance, and `.continue/mcpServers/controlkeel.yaml` |
-| `letta-code` | `.agents/skills`, `.letta/settings.json` hooks, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, and portable `.mcp.json` guidance |
+| `letta-code` | `.agents/skills`, `.letta/controlkeel-mcp.sh`, `.letta/README.md`, and portable `.mcp.json` guidance |
 | `cline` | rules, workflows, commands, hook scripts, and CLI MCP config |
 | `goose` | repo hints, workflow recipes, commands, and Goose extension YAML |
 | `kiro` | hooks, steering, tool-policy settings, commands, and MCP config |
