@@ -12,16 +12,24 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
     {:ok, workspace: workspace, session: session, task: task, user: user}
   end
 
+  defp with_runtime_mode(mode) do
+    previous = Application.get_env(:controlkeel, :runtime_mode)
+    previous_env = System.get_env("CONTROLKEEL_RUNTIME_MODE")
+    Application.put_env(:controlkeel, :runtime_mode, mode)
+    System.delete_env("CONTROLKEEL_RUNTIME_MODE")
+
+    on_exit(fn ->
+      if previous,
+        do: Application.put_env(:controlkeel, :runtime_mode, previous),
+        else: Application.delete_env(:controlkeel, :runtime_mode)
+
+      if previous_env, do: System.put_env("CONTROLKEEL_RUNTIME_MODE", previous_env)
+    end)
+  end
+
   describe "controlkeel run cloud-agent <task-id>" do
     test "local mode runs a task in an unbound workspace without a user identity" do
-      previous = Application.get_env(:controlkeel, :runtime_mode)
-      Application.put_env(:controlkeel, :runtime_mode, :local)
-
-      on_exit(fn ->
-        if previous,
-          do: Application.put_env(:controlkeel, :runtime_mode, previous),
-          else: Application.delete_env(:controlkeel, :runtime_mode)
-      end)
+      with_runtime_mode(:local)
 
       workspace = MissionFixtures.workspace_fixture(%{org_id: nil})
       session = MissionFixtures.session_fixture(%{workspace: workspace})
@@ -42,14 +50,7 @@ defmodule ControlKeel.CLI.RunCloudAgentTest do
     end
 
     test "explains why a task in an unbound workspace cannot use cloud execution" do
-      previous = Application.get_env(:controlkeel, :runtime_mode)
-      Application.put_env(:controlkeel, :runtime_mode, :cloud)
-
-      on_exit(fn ->
-        if previous,
-          do: Application.put_env(:controlkeel, :runtime_mode, previous),
-          else: Application.delete_env(:controlkeel, :runtime_mode)
-      end)
+      with_runtime_mode(:cloud)
 
       workspace = MissionFixtures.workspace_fixture(%{org_id: nil})
       session = MissionFixtures.session_fixture(%{workspace: workspace})
