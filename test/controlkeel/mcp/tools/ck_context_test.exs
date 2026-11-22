@@ -72,7 +72,11 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
     assert {:ok, _proof} = Mission.generate_proof_bundle(done_task.id)
 
     assert {:ok, result} =
-             CkContext.call(%{"session_id" => session.id, "task_id" => done_task.id})
+             CkContext.call(%{
+               "session_id" => session.id,
+               "task_id" => done_task.id,
+               "detail_level" => "full"
+             })
 
     assert result["current_task"]["assurance"]["check_summary"]["passed"] == 1
     assert result["current_task"]["assurance"]["context_integrity"]["status"] == "degraded"
@@ -216,7 +220,12 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
 
     task = task_fixture(%{session: session})
 
-    assert {:ok, result} = CkContext.call(%{"session_id" => session.id, "task_id" => task.id})
+    assert {:ok, result} =
+             CkContext.call(%{
+               "session_id" => session.id,
+               "task_id" => task.id,
+               "detail_level" => "full"
+             })
 
     assert result["boundary_summary"]["harness_policy"]["context_contract"]["tool_schema_posture"] ==
              "versioned_and_additive"
@@ -320,7 +329,11 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
                )
 
       assert {:ok, result} =
-               CkContext.call(%{"session_id" => session.id, "project_root" => tmp_dir})
+               CkContext.call(%{
+                 "session_id" => session.id,
+                 "project_root" => tmp_dir,
+                 "detail_level" => "full"
+               })
 
       advisory = result["attach_advisory"]
       assert advisory["status"] == "attached"
@@ -355,7 +368,11 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
                )
 
       assert {:ok, result} =
-               CkContext.call(%{"session_id" => session.id, "project_root" => tmp_dir})
+               CkContext.call(%{
+                 "session_id" => session.id,
+                 "project_root" => tmp_dir,
+                 "detail_level" => "full"
+               })
 
       advisory = result["attach_advisory"]
       assert advisory["status"] in ["mcp_only", "unbound"]

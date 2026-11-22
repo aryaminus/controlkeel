@@ -163,7 +163,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       task = task_fixture(%{session: session, status: "in_progress"})
 
-      conn = get(conn, ~p"/api/v1/context?session_id=#{session.id}&task_id=#{task.id}")
+      conn =
+        get(
+          conn,
+          ~p"/api/v1/context?session_id=#{session.id}&task_id=#{task.id}&detail_level=full"
+        )
+
       body = json_response(conn, 200)
 
       assert body["context"]["session_id"] == session.id
@@ -182,7 +187,12 @@ defmodule ControlKeelWeb.ApiControllerTest do
              ]
 
       conn =
-        build_conn() |> post(~p"/api/v1/context", %{session_id: session.id, task_id: task.id})
+        build_conn()
+        |> post(~p"/api/v1/context", %{
+          session_id: session.id,
+          task_id: task.id,
+          detail_level: "full"
+        })
 
       post_body = json_response(conn, 200)
 

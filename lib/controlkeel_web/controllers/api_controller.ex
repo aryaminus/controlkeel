@@ -242,7 +242,7 @@ defmodule ControlKeelWeb.ApiController do
   end
 
   def context(conn, params) do
-    context_params = Map.take(params, ~w(session_id task_id))
+    context_params = Map.take(params, ~w(session_id task_id detail_level))
 
     with :ok <- authorize_context(conn, context_params),
          {:ok, payload} <- CkContext.call(context_params) do

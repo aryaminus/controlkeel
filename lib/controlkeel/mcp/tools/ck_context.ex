@@ -79,80 +79,116 @@ defmodule ControlKeel.MCP.Tools.CkContext do
     end
   end
 
+  # Compact context is what an agent needs to act: open blockers, budget, the
+  # current task and its review gate, a short recent history, and the next
+  # step. Static policy (harness posture, instruction hierarchy) and copies
+  # nested in the resume packet live only in `detail_level: full`.
   defp compact_context(context) do
-    context
-    |> Map.put("detail_level", "compact")
-    |> Map.put(
-      "detail_hint",
-      "Compact context keeps agents in the smart zone. Pass detail_level: full only when raw workspace, resume, or transcript payloads are required."
-    )
-    |> Map.update("workspace_context", %{}, &compact_workspace_context/1)
-    |> Map.update("resume_packet", nil, &compact_resume_packet/1)
-    |> Map.update("task_augmentation", %{}, &compact_task_augmentation/1)
-    |> Map.update("memory_hits", [], &compact_list(&1, 3))
-    |> Map.update("precedent", [], &compact_list(&1, 5))
-    |> Map.update("recent_events", [], &compact_list(&1, 10))
+    task = context["current_task"]
+    planning = context["planning_context"] || %{}
+    gate = planning["review_gate"] || %{}
+    loop = context["improvement_loop"] || %{}
+
+    %{
+      "detail_level" => "compact",
+      "detail_hint" =>
+        "Pass detail_level: full for policy posture, workspace and transcript detail.",
+      "session_id" => context["session_id"],
+      "project_root" => context["project_root"],
+      "session_title" => context["session_title"],
+      "risk_tier" => context["risk_tier"],
+      "compliance_profile" => context["compliance_profile"],
+      "active_findings" => context["active_findings"],
+      "budget_summary" => context["budget_summary"],
+      "current_task" => compact_task(task),
+      "planning_context" => %{
+        "review_gate" =>
+          Map.take(gate, [
+            "phase",
+            "execution_ready",
+            "latest_review_id",
+            "latest_review_status",
+            "latest_review_type"
+          ])
+      },
+      "improvement_loop" =>
+        %{
+          "recommended_next_step" => loop["recommended_next_step"],
+          "bottleneck" => get_in(loop, ["bottleneck_summary", "primary"]),
+          "deploy_ready" => loop["deploy_ready"]
+        }
+        |> reject_nil_values(),
+      "autonomy_profile" => Map.take(context["autonomy_profile"] || %{}, ["mode", "label"]),
+      "memory_hits" =>
+        context["memory_hits"]
+        |> compact_list(3)
+        |> Enum.map(&take_keys(&1, ["id", "title", "summary", "record_type"])),
+      "precedent" =>
+        context["precedent"]
+        |> compact_list(3)
+        |> Enum.map(&take_keys(&1, ["id", "title", "rule_id", "decision", "summary"])),
+      "recent_events" =>
+        context["recent_events"]
+        |> compact_list(5)
+        |> Enum.map(&take_keys(&1, ["id", "event_type", "summary", "inserted_at"])),
+      "workspace_context" => compact_workspace_context(context["workspace_context"]),
+      "workspace_cache_key" => context["workspace_cache_key"],
+      "provider_status" =>
+        Map.take(context["provider_status"] || %{}, ["source", "provider", "model"])
+    }
+    |> maybe_put_advisory(context["attach_advisory"])
   end
+
+  defp compact_task(%{} = task) do
+    task
+    |> Map.take(["id", "title", "status", "validation_gate"])
+    |> Map.put(
+      "verification_status",
+      get_in(task, ["assurance", "verification", "status"])
+    )
+    |> reject_nil_values()
+  end
+
+  defp compact_task(other), do: other
+
+  # Only surface the attach advisory when it asks for something.
+  defp maybe_put_advisory(map, %{"status" => status} = advisory) when status != "attached",
+    do: Map.put(map, "attach_advisory", Map.take(advisory, ["status", "guidance"]))
+
+  defp maybe_put_advisory(map, _advisory), do: map
+
+  # Records may carry string or atom keys depending on their source.
+  defp take_keys(%{} = record, keys) do
+    for key <- keys,
+        value = Map.get(record, key, Map.get(record, String.to_atom(key))),
+        not is_nil(value),
+        into: %{},
+        do: {key, value}
+  end
+
+  defp take_keys(other, _keys), do: other
+
+  defp reject_nil_values(map), do: map |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Map.new()
 
   defp compact_workspace_context(workspace_context) when is_map(workspace_context) do
     %{
       "cache_key" => workspace_context["cache_key"],
-      "orientation" => %{
-        "recent_commits" =>
-          workspace_context
-          |> get_in(["orientation", "recent_commits"])
-          |> compact_list(5),
-        "active_assumptions" =>
-          workspace_context
-          |> get_in(["orientation", "active_assumptions"])
-          |> compact_list(5)
-      },
-      "design_drift" => %{
-        "summary" => get_in(workspace_context, ["design_drift", "summary"]),
-        "high_risk" => get_in(workspace_context, ["design_drift", "high_risk"])
-      }
+      "recent_commits" =>
+        workspace_context
+        |> get_in(["orientation", "recent_commits"])
+        |> compact_list(3)
+        |> Enum.map(fn
+          %{} = commit -> Map.take(commit, ["short_sha", "subject"])
+          other -> other
+        end),
+      "design_drift_high_risk" => get_in(workspace_context, ["design_drift", "high_risk"])
     }
   end
 
   defp compact_workspace_context(value), do: value
 
-  defp compact_resume_packet(nil), do: nil
-
-  defp compact_resume_packet(packet) when is_map(packet) do
-    packet
-    |> Map.take(["task_id", "generated_at", "summary", "status", "checkpoint_id"])
-    |> Map.put("memory_hits", packet |> Map.get("memory_hits", []) |> compact_list(3))
-    |> Map.put("recent_events", packet |> Map.get("recent_events", []) |> compact_list(5))
-    |> Map.put(
-      "workspace_context",
-      packet |> Map.get("workspace_context", %{}) |> compact_workspace_context()
-    )
-  end
-
-  defp compact_resume_packet(value), do: value
-
-  defp compact_task_augmentation(augmentation) when is_map(augmentation) do
-    augmentation
-    |> Map.take(["available", "search_terms", "risk_notes", "constraints", "recommended_checks"])
-    |> Map.update("search_terms", [], &compact_list(&1, 10))
-    |> maybe_put_truncated("augmented_brief", Map.get(augmentation, "augmented_brief"), 2_000)
-  end
-
-  defp compact_task_augmentation(value), do: value
-
   defp compact_list(list, limit) when is_list(list), do: Enum.take(list, limit)
   defp compact_list(_value, _limit), do: []
-
-  defp maybe_put_truncated(map, _key, value, _limit) when value in [nil, ""], do: map
-
-  defp maybe_put_truncated(map, key, value, limit) when is_binary(value) do
-    Map.put(map, key, truncate_binary(value, limit))
-  end
-
-  defp maybe_put_truncated(map, key, value, _limit), do: Map.put(map, key, value)
-
-  defp truncate_binary(value, limit) when byte_size(value) <= limit, do: value
-  defp truncate_binary(value, limit), do: binary_part(value, 0, limit) <> "…"
 
   defp fetch_session(session_id, arguments) do
     case Mission.get_session_context(session_id) do
@@ -202,7 +238,20 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       "blocked" => blocked,
       "open" => open,
       "escalated" => escalated,
-      "categories" => MapSet.to_list(categories)
+      "categories" => MapSet.to_list(categories),
+      "top_blocked" =>
+        findings
+        |> Enum.filter(&(&1.status == "blocked"))
+        |> Enum.sort_by(& &1.id, :desc)
+        |> Enum.take(5)
+        |> Enum.map(fn finding ->
+          %{
+            "id" => finding.id,
+            "severity" => finding.severity,
+            "rule_id" => finding.rule_id,
+            "title" => finding.title
+          }
+        end)
     }
   end
 
