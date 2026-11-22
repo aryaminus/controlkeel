@@ -60,113 +60,25 @@ defmodule ControlKeel.Runtime.DefaultsTest do
     end)
   end
 
-  test "maybe_seed_project_database seeds a fresh project db from the global db",
-       %{tmp_home: tmp_home} do
-    tmp_dir =
-      Path.join(
-        System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-#{System.unique_integer([:positive])}"
-      )
-
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
-
-    with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
-      # Seed a legacy global db with a WAL sidecar and content.
-      global = Defaults.global_database_path()
-      File.write!(global, "GLOBAL-DB-BYTES")
-      File.write!(global <> "-wal", "WAL-BYTES")
-
-      File.cd!(tmp_dir, fn ->
-        project_path = Defaults.database_path()
-        refute File.exists?(project_path)
-
-        assert Defaults.maybe_seed_project_database() == :seeded
-
-        assert File.read!(project_path) == "GLOBAL-DB-BYTES"
-        assert File.read!(project_path <> "-wal") == "WAL-BYTES"
-      end)
-    end)
-  end
-
-  test "maybe_seed_project_database is a no-op when the project db already exists",
-       %{tmp_home: tmp_home} do
-    tmp_dir =
-      Path.join(
-        System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-existing-#{System.unique_integer([:positive])}"
-      )
-
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
-
+  test "separate projects do not inherit the legacy database", %{tmp_home: tmp_home} do
     with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
       global = Defaults.global_database_path()
-      File.write!(global, "GLOBAL-DB-BYTES")
+      File.write!(global, "legacy data")
 
-      File.cd!(tmp_dir, fn ->
-        project_path = Defaults.database_path()
-        File.mkdir_p!(Path.dirname(project_path))
-        File.write!(project_path, "PROJECT-LOCAL-BYTES")
+      for name <- ["first-project", "second-project"] do
+        root = Path.join(tmp_home, name)
+        File.mkdir_p!(root)
+        File.write!(Path.join(root, "package.json"), "{}")
 
-        assert Defaults.maybe_seed_project_database() == :noop
-        # Existing project db is left untouched.
-        assert File.read!(project_path) == "PROJECT-LOCAL-BYTES"
-      end)
-    end)
-  end
-
-  test "maybe_seed_project_database is a no-op without a global db", %{tmp_home: tmp_home} do
-    tmp_dir =
-      Path.join(
-        System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-noglobal-#{System.unique_integer([:positive])}"
-      )
-
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
-
-    with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
-      File.cd!(tmp_dir, fn ->
-        project_path = Defaults.database_path()
-
-        assert Defaults.maybe_seed_project_database() == :noop
-        refute File.exists?(project_path)
-      end)
-    end)
-  end
-
-  test "maybe_seed_project_database is a no-op when DATABASE_PATH is set",
-       %{tmp_home: tmp_home} do
-    tmp_dir =
-      Path.join(
-        System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-explicit-#{System.unique_integer([:positive])}"
-      )
-
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
-
-    with_envs(
-      %{"DATABASE_PATH" => Path.join(tmp_dir, "explicit.db"), "CONTROLKEEL_HOME" => tmp_home},
-      fn ->
-        global = Defaults.global_database_path()
-        File.write!(global, "GLOBAL-DB-BYTES")
-
-        File.cd!(tmp_dir, fn ->
-          assert Defaults.maybe_seed_project_database() == :noop
-          refute File.exists?(Path.join([tmp_dir, "controlkeel", "controlkeel.db"]))
+        File.cd!(root, fn ->
+          path = Defaults.database_path()
+          assert path == Path.join([File.cwd!(), "controlkeel", "controlkeel.db"])
+          refute File.exists?(path)
         end)
       end
-    )
+
+      assert File.read!(global) == "legacy data"
+    end)
   end
 
   test "secret_key_base is generated once and then reused", %{tmp_home: tmp_home} do

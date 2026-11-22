@@ -33,7 +33,7 @@ defmodule ControlKeel.Project.Root do
   ]
 
   def resolve(path \\ File.cwd!()) do
-    start_path = normalize_start_path(path)
+    start_path = path |> normalize_start_path() |> realpath()
 
     start_path
     |> find_project_root(start_path)
