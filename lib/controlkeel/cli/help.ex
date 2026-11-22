@@ -80,8 +80,7 @@ defmodule ControlKeel.CLI.Help do
         "kiro",
         "windsurf",
         "goose",
-        "continue",
-        "aider"
+        "continue"
       ],
       phrases: ["connect codex", "attach codex", "attach agent", "set up codex"],
       commands: [

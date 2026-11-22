@@ -120,11 +120,9 @@ defmodule ControlKeel.Mission.Planner do
     "augment" => "Augment Code",
     "amp" => "Amp (Sourcegraph)",
     # Local CLIs
-    "aider" => "Aider",
     "opencode" => "OpenCode",
     "codex" => "Codex CLI",
     "codex-cli" => "Codex CLI",
-    "gemini-cli" => "Gemini CLI",
     "antigravity" => "Antigravity",
     "continue" => "Continue",
     "ollama" => "Ollama (local)",

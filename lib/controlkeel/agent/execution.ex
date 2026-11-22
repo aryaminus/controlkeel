@@ -28,9 +28,7 @@ defmodule ControlKeel.Agent.Execution do
     "copilot-cli" => ["copilot"],
     "cline" => ["cline"],
     "continue" => ["continue"],
-    "aider" => ["aider"],
-    "opencode" => ["opencode"],
-    "gemini-cli" => ["gemini", "gemini-cli"]
+    "opencode" => ["opencode"]
   }
 
   def list_agents(project_root \\ File.cwd!()) do

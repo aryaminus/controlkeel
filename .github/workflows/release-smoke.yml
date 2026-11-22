@@ -287,10 +287,6 @@ jobs:
           done
       - name: Package adapter companion artifacts
         run: |
-          if [ -d controlkeel/dist/vscode-companion/extension ]; then
-            (cd controlkeel/dist/vscode-companion/extension && npx --yes @vscode/vsce package --out "$PWD/../../../dist/controlkeel-vscode-companion.vsix")
-          fi
-
           if [ -d controlkeel/dist/opencode-native ]; then
             tar -C controlkeel/dist/opencode-native -czf dist/controlkeel-opencode-native.tgz .
           fi

@@ -887,10 +887,8 @@ defmodule ControlKeel.Intent.Domains do
     {"augment", "Augment Code"},
     {"amp", "Amp (Sourcegraph)"},
     # Local CLIs
-    {"aider", "Aider"},
     {"opencode", "OpenCode"},
     {"codex-cli", "Codex CLI"},
-    {"gemini-cli", "Gemini CLI"},
     {"antigravity", "Antigravity"},
     {"continue", "Continue"},
     {"ollama", "Ollama (local)"},

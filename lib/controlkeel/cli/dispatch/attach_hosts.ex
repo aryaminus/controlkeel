@@ -157,14 +157,13 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
   end
 
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
-      when agent in ["kiro", "kilo", "amp", "augment", "opencode", "gemini-cli", "cline"] do
+      when agent in ["kiro", "kilo", "amp", "augment", "opencode", "cline"] do
     config_path_fn = %{
       "kiro" => &kiro_mcp_config_path/0,
       "kilo" => &kilo_config_path/0,
       "amp" => &amp_mcp_config_path/0,
       "augment" => &augment_mcp_config_path/0,
       "opencode" => &opencode_mcp_config_path/0,
-      "gemini-cli" => &gemini_cli_config_path/0,
       "cline" => &cline_mcp_config_path/0
     }
 
@@ -174,7 +173,6 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
       "amp" => "Amp",
       "augment" => "Augment / Auggie CLI",
       "opencode" => "OpenCode",
-      "gemini-cli" => "Gemini CLI",
       "cline" => "Cline"
     }
 
@@ -272,46 +270,14 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
     end
   end
 
-  def run_command(%{command: :attach, args: ["aider"], options: options}, project_root) do
-    root = options[:project_root] || project_root
-
-    with {:ok, binding, _session, _mode} <-
-           ensure_attach_project(root, %{"agent" => "aider"}),
-         {:ok, _scope} <- validate_attach_scope("aider", options),
-         command_spec <- Binding.mcp_command_spec(root),
-         {:ok, attached} <- attach_to_aider(command_spec, root),
-         updated <- Binding.update_attached_agent(binding, "aider", attached),
-         {:ok, _} <-
-           Binding.write_effective(updated, root, mode: binding_write_mode(binding)) do
-      {:ok,
-       [
-         "Attached ControlKeel to Aider.",
-         "MCP config written to #{attached["config_path"]}."
-       ] ++
-         bootstrap_lines(root) ++
-         native_attach_lines("aider", root, options) ++
-         attach_guidance_lines("aider")}
-    else
-      {:error, message} when is_binary(message) ->
-        {:error, message}
-
-      {:error, reason} ->
-        {:error, "Failed to attach ControlKeel to Aider: #{inspect(reason)}"}
-    end
-  end
-
   def run_command(%{command: :attach, args: [agent], options: options}, project_root)
       when agent in [
              "roo-code",
-             "hermes-agent",
-             "openclaw",
              "droid",
-             "forge",
              "pi",
              "letta-code",
              "devin-terminal",
              "warp",
-             "multica",
              "antigravity-cli",
              "antigravity-ide"
            ] do
@@ -320,15 +286,11 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
     target =
       %{
         "roo-code" => "roo-native",
-        "hermes-agent" => "hermes-native",
-        "openclaw" => "openclaw-native",
         "droid" => "droid-bundle",
-        "forge" => "forge-acp",
         "pi" => "pi-native",
         "letta-code" => "letta-code-native",
         "devin-terminal" => "devin-terminal-native",
         "warp" => "warp-native",
-        "multica" => "multica-native",
         "antigravity-cli" => "antigravity-cli-native",
         "antigravity-ide" => "antigravity-cli-native"
       }[agent]
@@ -621,15 +583,7 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
            ]}
 
         {:ok, plan} ->
-          if target == "instructions-only" do
-            {:ok, %{"target" => target, "scope" => scope},
-             [
-               "Prepared native instruction snippets for #{display_attach_agent(agent)}.",
-               "Instructions bundle: #{plan.output_dir}"
-             ]}
-          else
-            {:error, {:unexpected_export_plan, target, plan.output_dir}}
-          end
+          {:error, {:unexpected_export_plan, target, plan.output_dir}}
 
         {:error, reason} ->
           {:error, reason}
@@ -644,7 +598,6 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
       "amp" => "amp-native",
       "augment" => "augment-native",
       "opencode" => "opencode-native",
-      "gemini-cli" => "gemini-cli-native",
       "cline" => "cline-native"
     }[agent]
   end

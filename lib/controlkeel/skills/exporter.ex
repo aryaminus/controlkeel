@@ -98,10 +98,6 @@ defmodule ControlKeel.Skills.Exporter do
     ControlKeel.Skills.Exporter.ClaudeCode.write(root, project_root, skills, opts)
   end
 
-  defp write_target(%SkillTarget{id: "claude-sdk"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.ClaudeSdk.write(root, project_root, skills, opts)
-  end
-
   defp write_target(%SkillTarget{id: "cline-native"}, root, project_root, skills, opts) do
     ControlKeel.Skills.Exporter.ClineNative.write(root, project_root, skills, opts)
   end
@@ -134,60 +130,20 @@ defmodule ControlKeel.Skills.Exporter do
     ControlKeel.Skills.Exporter.GooseNative.write(root, project_root, skills, opts)
   end
 
-  defp write_target(%SkillTarget{id: "hermes-native"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.HermesNative.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "multica-native"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.MulticaNative.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "multica-cloud-runtime"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.MulticaCloudRuntime.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "openclaw-native"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.OpenclawNative.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "openclaw-plugin"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.OpenclawPlugin.write(root, project_root, skills, opts)
-  end
-
   defp write_target(%SkillTarget{id: "copilot-plugin"}, root, project_root, skills, opts) do
     ControlKeel.Skills.Exporter.CopilotPlugin.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "augment-plugin"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.AugmentPlugin.write(root, project_root, skills, opts)
   end
 
   defp write_target(%SkillTarget{id: "github-repo"}, root, project_root, skills, opts) do
     ControlKeel.Skills.Exporter.GithubRepo.write(root, project_root, skills, opts)
   end
 
-  defp write_target(%SkillTarget{id: "vscode-companion"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.VscodeCompanion.write(root, project_root, skills, opts)
-  end
-
   defp write_target(%SkillTarget{id: "droid-bundle"}, root, project_root, skills, opts) do
     ControlKeel.Skills.Exporter.DroidBundle.write(root, project_root, skills, opts)
   end
 
-  defp write_target(%SkillTarget{id: "droid-plugin"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.DroidPlugin.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "forge-acp"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.ForgeAcp.write(root, project_root, skills, opts)
-  end
-
   defp write_target(%SkillTarget{id: "opencode-native"}, root, project_root, skills, opts) do
     ControlKeel.Skills.Exporter.OpenCode.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "gemini-cli-native"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.GeminiCliNative.write(root, project_root, skills, opts)
   end
 
   defp write_target(%SkillTarget{id: "kiro-native"}, root, project_root, skills, opts) do
@@ -206,14 +162,6 @@ defmodule ControlKeel.Skills.Exporter do
     ControlKeel.Skills.Exporter.AugmentNative.write(root, project_root, skills, opts)
   end
 
-  defp write_target(%SkillTarget{id: "instructions-only"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.InstructionsOnly.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "open-swe-runtime"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.OpenSweRuntime.write(root, project_root, skills, opts)
-  end
-
   defp write_target(%SkillTarget{id: "devin-runtime"}, root, project_root, skills, opts) do
     ControlKeel.Skills.Exporter.DevinRuntime.write(root, project_root, skills, opts)
   end
@@ -226,34 +174,8 @@ defmodule ControlKeel.Skills.Exporter do
     ControlKeel.Skills.Exporter.DevinTerminalNative.write(root, project_root, skills, opts)
   end
 
-  defp write_target(%SkillTarget{id: "warp-oz-runtime"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.WarpOzRuntime.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "executor-runtime"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.ExecutorRuntime.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "virtual-bash-runtime"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.VirtualBashRuntime.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(
-         %SkillTarget{id: "cloudflare-workers-runtime"},
-         root,
-         project_root,
-         skills,
-         opts
-       ) do
-    ControlKeel.Skills.Exporter.CloudflareWorkersRuntime.write(root, project_root, skills, opts)
-  end
-
   defp write_target(%SkillTarget{id: "antigravity-cli-native"}, root, project_root, skills, opts) do
     ControlKeel.Skills.Exporter.AntigravityCliNative.write(root, project_root, skills, opts)
-  end
-
-  defp write_target(%SkillTarget{id: "antigravity-cli-plugin"}, root, project_root, skills, opts) do
-    ControlKeel.Skills.Exporter.AntigravityCliPlugin.write(root, project_root, skills, opts)
   end
 
   @doc false
@@ -555,41 +477,6 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
-  def warp_oz_agent_config_payload do
-    %{
-      "name" => "controlkeel-governed-run",
-      "model_id" => "claude-sonnet-4",
-      "system_prompt" =>
-        "Use repository AGENTS.md guidance and call the ControlKeel MCP server before high-impact changes.",
-      "environment_id" => "<ENV_ID>",
-      "mcp_servers" => %{
-        "controlkeel" => %{
-          "command" => "controlkeel",
-          "args" => ["mcp", "--project-root", "<PROJECT_ROOT>"],
-          "env" => %{}
-        }
-      }
-    }
-  end
-
-  def warp_oz_api_request_payload do
-    %{
-      "prompt" =>
-        "Review the repository, follow AGENTS.md, and summarize proposed changes before editing.",
-      "config" => %{
-        "environment_id" => "<ENV_ID>",
-        "skill_spec" => "owner/repo:controlkeel-governance",
-        "mcp_servers" => %{
-          "controlkeel" => %{
-            "command" => "controlkeel",
-            "args" => ["mcp", "--project-root", "<PROJECT_ROOT>"],
-            "env" => %{}
-          }
-        }
-      }
-    }
-  end
-
   def hosted_mcp_payload(opts) do
     base_url = Keyword.get(opts, :hosted_base_url, "https://your-controlkeel.example")
     client_id = Keyword.get(opts, :oauth_client_id, "ck-sa-<service-account-id>")
@@ -867,22 +754,6 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
-  def openclaw_config_snippet(project_root, opts) do
-    %{
-      "mcpServers" => %{
-        "controlkeel" => %{
-          "command" => mcp_command(project_root, opts),
-          "args" => mcp_args(project_root, opts)
-        }
-      },
-      "skills" => %{
-        "load" => %{
-          "extraDirs" => ["./skills"]
-        }
-      }
-    }
-  end
-
   def kilo_config_snippet(project_root, opts) do
     %{
       "mcp" => %{
@@ -892,29 +763,6 @@ defmodule ControlKeel.Skills.Exporter do
           "enabled" => true
         }
       }
-    }
-  end
-
-  def openclaw_plugin_manifest do
-    %{
-      "name" => "controlkeel",
-      "version" => app_version(),
-      "description" => "ControlKeel governance skills and MCP companion for OpenClaw.",
-      "skills" => "skills",
-      "mcpServers" => ".mcp.json"
-    }
-  end
-
-  def droid_plugin_manifest do
-    %{
-      "name" => "controlkeel",
-      "description" =>
-        "ControlKeel governance skills, droids, commands, and MCP bridge for Factory Droid.",
-      "version" => app_version(),
-      "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
-      "homepage" => "https://github.com/aryaminus/controlkeel",
-      "repository" => "https://github.com/aryaminus/controlkeel",
-      "license" => "Apache-2.0"
     }
   end
 
@@ -1011,61 +859,6 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  def droid_plugin_readme_contents do
-    """
-    # ControlKeel Factory Plugin
-
-    This bundle packages ControlKeel for Factory Droid as a shareable plugin.
-
-    It ships:
-    - `skills/` for governed ControlKeel skills
-    - `droids/` for a reusable `controlkeel` droid
-    - `commands/` for review, submit-plan, annotate, and last flows
-    - `mcp.json` for the local ControlKeel MCP bridge
-    - `hooks/hooks.json` as the plugin hook entrypoint
-
-    Local testing flow:
-
-    1. `controlkeel plugin export droid`
-    2. `droid plugin marketplace add ./controlkeel/dist/droid-plugin`
-    3. `droid plugin install controlkeel@droid-plugin`
-    """
-  end
-
-  def forge_acp_manifest(project_root, opts) do
-    %{
-      "agent" => "controlkeel",
-      "transport" => "stdio",
-      "command" => mcp_command(project_root, opts),
-      "args" => mcp_args(project_root, opts),
-      "note" => "Fallback to the bundled .mcp.json when ACP session setup is unavailable."
-    }
-  end
-
-  def open_swe_runtime_contents(project_root, opts) do
-    project_root =
-      if portable_project_root?(opts),
-        do: Distribution.portable_project_root(),
-        else: Path.expand(project_root)
-
-    """
-    # Open SWE + ControlKeel
-
-    Use this runtime export when Open SWE is triggered from GitHub, Slack, or Linear instead of a local editor attach flow.
-
-    ## Repo context
-
-    - Repo root: `#{project_root}`
-    - Keep `AGENTS.md` at the repo root so Open SWE can ingest ControlKeel policy and workflow context.
-
-    ## Recommended ControlKeel touchpoints
-
-    - `controlkeel mcp --project-root #{project_root}` for MCP-capable local debugging
-    - Webhook events: `finding.created`, `task.completed`, `task.failed`, `proof.generated`
-    - Repo automation: run validation and proof generation before final PR handoff
-    """
-  end
-
   def devin_runtime_contents(project_root, opts) do
     project_root =
       if portable_project_root?(opts),
@@ -1147,102 +940,6 @@ defmodule ControlKeel.Skills.Exporter do
     - Import or copy `.warp/controlkeel-mcp.json` into Warp Settings > MCP Servers or Warp Drive > MCP Servers.
     - #{project_root_note}
     - If you already use Claude Code, Codex CLI, Gemini CLI, or OpenCode inside Warp's third-party utility bar, keep using the existing CK attach flow for those hosts separately. This bundle is for Warp's own local Oz agents.
-    """
-  end
-
-  def warp_oz_runtime_contents(project_root, opts) do
-    project_root =
-      if portable_project_root?(opts),
-        do: Distribution.portable_project_root(),
-        else: Path.expand(project_root)
-
-    """
-    # Warp Oz Cloud Agents + ControlKeel
-
-    Use this runtime export when you want Oz cloud agents, schedules, integrations, or API-driven runs to inherit ControlKeel governance.
-
-    ## Repo context
-
-    - Repo root: `#{project_root}`
-    - Keep `AGENTS.md` at the repo root so cloud runs inherit ControlKeel workflow guidance.
-    - Add this repository to an Oz environment so `.warp/skills/` and `.agents/skills/` become available to cloud agents.
-
-    ## Recommended Oz setup
-
-    - Install the Oz CLI with `brew tap warpdotdev/warp && brew update && brew install --cask oz`, or use the copy bundled with the Warp desktop app.
-    - Use `oz login` for interactive machines, or set `WARP_API_KEY` for CI, remote runners, or other headless environments.
-    - Start repeatable MCP-enabled runs with `oz agent run-cloud --environment <ENV_ID> -f warp-oz/controlkeel-agent-config.json --prompt "..."`.
-    - Create recurring jobs with `oz schedule create --name "CK review" --cron "0 10 * * 1" --environment <ENV_ID> --prompt "..."`.
-    - Connect Slack or Linear trigger surfaces with `oz integration create slack --environment <ENV_ID>` or the Oz web app at `oz.warp.dev`.
-    - Use `warp-oz/controlkeel-api-request.json` with `curl -X POST https://app.warp.dev/api/v1/agent/run -H "Authorization: Bearer $WARP_API_KEY" -H "Content-Type: application/json" -d @warp-oz/controlkeel-api-request.json`.
-
-    ## Important notes
-
-    - Replace `<ENV_ID>` with your Oz environment id.
-    - Replace `<PROJECT_ROOT>` with the repository path inside the cloud environment before using the stdio MCP example.
-    - Warp's cloud MCP config supports `command`, `args`, `env`, `url`, `headers`, and `warp_id`, but not the desktop-only `working_directory` field.
-    """
-  end
-
-  def executor_runtime_contents(project_root, opts) do
-    project_root =
-      if portable_project_root?(opts),
-        do: Distribution.portable_project_root(),
-        else: Path.expand(project_root)
-
-    """
-    # Executor + ControlKeel
-
-    Use this runtime export when you want a typed integration layer for OpenAPI, GraphQL, MCP, Google Discovery, or custom JS functions instead of pushing tool schemas and results directly through transcript context.
-
-    ## Repo context
-
-    - Repo root: `#{project_root}`
-    - Keep `AGENTS.md` at the repo root so Executor-driven runs inherit ControlKeel governance context.
-
-    ## Recommended Executor setup
-
-    - Start Executor with its local web/runtime flow or run `executor call --file ...` in the governed project root
-    - Add ControlKeel as an MCP-backed source using the bundled `executor/controlkeel-sources.example.ts`
-    - Let Executor handle auth or approval pauses, then sync final task/finding/proof outcomes back through CK webhooks
-    - Prefer Executor for large integration surfaces where typed discovery and execution are better than broad shell usage
-
-    ## ControlKeel fit
-
-    - Typed discovery: use Executor to discover and describe tools by intent before execution
-    - Governed execution: keep CK as the approval, findings, budget, and proof authority around the runtime
-    - Runtime boundary: use shell only for repo mutation, package commands, and tests that do not fit the typed runtime
-    """
-  end
-
-  def virtual_bash_runtime_contents(project_root, opts) do
-    project_root =
-      if portable_project_root?(opts),
-        do: Distribution.portable_project_root(),
-        else: Path.expand(project_root)
-
-    """
-    # Virtual Bash Runtime + ControlKeel
-
-    Use this runtime export when you want a just-bash-style outer loop, but you want ControlKeel to keep discovery on the read-only virtual workspace and reserve shell for governed fallback only.
-
-    ## Repo context
-
-    - Repo root: `#{project_root}`
-    - Keep `AGENTS.md` at the repo root so the runtime inherits ControlKeel workflow guidance.
-
-    ## Recommended runtime shape
-
-    - Discovery first: browse the repo with `ck_fs_ls`, `ck_fs_read`, `ck_fs_find`, and `ck_fs_grep`
-    - Use the bundled `virtual-bash/controlkeel-runtime.json` as the machine-readable contract for the loop
-    - Use shell only for repo mutation, package commands, and tests that do not fit the virtual workspace
-    - Prefer a configured sandbox adapter such as `nono`, `docker`, or `e2b` when broader shell authority is needed
-
-    ## ControlKeel fit
-
-    - Honest scope: this is a governed virtual-workspace recipe, not a magical universal host
-    - Context hygiene: filesystem discovery stays outside the transcript until the agent asks for specific content
-    - Fallback boundary: shell remains broad fallback only, with stronger approval pressure than read-only discovery
     """
   end
 
@@ -1374,24 +1071,6 @@ defmodule ControlKeel.Skills.Exporter do
       "hooks" => "hooks.json",
       "mcpServers" => ".mcp.json",
       "tags" => ["governance", "security", "skills"]
-    }
-  end
-
-  def augment_plugin_manifest do
-    %{
-      "name" => "controlkeel",
-      "description" => "ControlKeel governance bundle for Augment / Auggie CLI.",
-      "version" => app_version(),
-      "author" => %{"name" => "ControlKeel", "url" => "https://github.com/aryaminus/controlkeel"},
-      "homepage" => "https://github.com/aryaminus/controlkeel",
-      "repository" => "https://github.com/aryaminus/controlkeel",
-      "license" => "Apache-2.0",
-      "keywords" => ["augment", "auggie", "governance", "mcp", "skills"],
-      "skills" => "./skills/",
-      "agents" => "./agents/",
-      "commands" => "./commands/",
-      "hooks" => "./hooks/hooks.json",
-      "mcpServers" => "./.mcp.json"
     }
   end
 
@@ -1578,25 +1257,6 @@ defmodule ControlKeel.Skills.Exporter do
             "powershell" => "./bin/controlkeel-review.ps1",
             "timeoutSec" => 345_600,
             "comment" => "Intercepts plan-mode exit and waits for ControlKeel browser review."
-          }
-        ]
-      }
-    }
-  end
-
-  def augment_hooks_manifest do
-    %{
-      "hooks" => %{
-        "PreToolUse" => [
-          %{
-            "matcher" => "str-replace-editor|save-file|launch-process",
-            "hooks" => [
-              %{
-                "type" => "command",
-                "command" => "./hooks/controlkeel-review.sh",
-                "timeout" => 345_600
-              }
-            ]
           }
         ]
       }
@@ -2181,63 +1841,6 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  def vscode_extensions_manifest do
-    %{
-      "recommendations" => ["aryaminus.controlkeel-review"],
-      "unwantedRecommendations" => []
-    }
-  end
-
-  def vscode_companion_manifest do
-    %{
-      "name" => "controlkeel-review",
-      "displayName" => "ControlKeel Review",
-      "description" =>
-        "Open ControlKeel review URLs in VS Code and route browser review into editor webviews.",
-      "version" => app_version(),
-      "publisher" => "aryaminus",
-      "homepage" => "https://github.com/aryaminus/controlkeel",
-      "repository" => %{
-        "type" => "git",
-        "url" => "https://github.com/aryaminus/controlkeel.git"
-      },
-      "categories" => ["Other", "Testing"],
-      "keywords" => ["controlkeel", "review", "governance", "mcp"],
-      "engines" => %{"vscode" => "^1.85.0"},
-      "main" => "./extension.js",
-      "license" => "MIT",
-      "files" => ["extension.js", "README.md", "package.json", "LICENSE"],
-      "activationEvents" => ["onStartupFinished"],
-      "contributes" => %{
-        "commands" => [
-          %{
-            "command" => "controlkeel-review.openUrl",
-            "title" => "ControlKeel: Open review URL in editor"
-          },
-          %{
-            "command" => "controlkeel-review.openPayload",
-            "title" => "ControlKeel: Open review payload in editor"
-          },
-          %{
-            "command" => "controlkeel-review.annotateSelection",
-            "title" => "ControlKeel: Annotate current selection"
-          }
-        ],
-        "configuration" => %{
-          "title" => "ControlKeel Review",
-          "properties" => %{
-            "controlkeelReview.injectBrowser" => %{
-              "type" => "boolean",
-              "default" => true,
-              "description" =>
-                "Inject browser routing environment variables into integrated terminals."
-            }
-          }
-        }
-      }
-    }
-  end
-
   @doc false
   def review_bridge_shell_contents(submitted_by) do
     """
@@ -2608,16 +2211,6 @@ defmodule ControlKeel.Skills.Exporter do
           # /private/var symlinks and leak machine-specific absolute paths.
           "controlkeel"
       end
-    end
-  end
-
-  def maybe_cursor_ide_mcp_command!(server, project_root, opts) do
-    case Map.fetch(server, "command") do
-      {:ok, _} ->
-        Map.put(server, "command", cursor_ide_mcp_command(project_root, opts))
-
-      :error ->
-        server
     end
   end
 
@@ -3300,22 +2893,6 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
-  def augment_plugin_readme_contents do
-    """
-    # ControlKeel Augment Plugin Bundle
-
-    Use this bundle with:
-
-    `auggie --plugin-dir ./controlkeel/dist/augment-plugin`
-
-    The bundle ships:
-    - hook-native plan interception
-    - ControlKeel review, submit-plan, annotate, and last commands
-    - a ControlKeel operator subagent
-    - a local MCP bridge
-    """
-  end
-
   def continue_prompt_contents do
     """
     # ControlKeel Continue Prompt
@@ -3660,150 +3237,6 @@ defmodule ControlKeel.Skills.Exporter do
     """
   end
 
-  def claude_sdk_typescript_contents do
-    ~S"""
-    import { query } from "@anthropic-ai/claude-agent-sdk";
-
-    const options = {
-      // Wire the ControlKeel MCP server programmatically.
-      // Alternatively, keep a .mcp.json in the project and set settingSources: ["project"].
-      mcpServers: {
-        controlkeel: {
-          command: "controlkeel",
-          args: ["mcp"],
-          env: { CK_PROJECT_ROOT: process.cwd() },
-        },
-      },
-
-      // Discover CK skills, subagents, and lifecycle hooks from .claude/ directories.
-      // WARNING: removing this or setting [] bypasses CK governance in SDK deployments.
-      settingSources: ["user", "project"],
-
-      // Allow all built-in tools, all CK MCP tools, and skill invocations.
-      // Narrow to explicit tool names to lock down further.
-      allowedTools: [
-        "Bash", "Read", "Write", "Edit", "Glob", "Grep",
-        "WebSearch", "WebFetch", "Agent", "Skill",
-        "mcp__controlkeel__*",
-      ],
-
-      // Headless: deny any tool not in allowedTools without prompting.
-      permissionMode: "dontAsk",
-
-      systemPrompt: `You are a ControlKeel-governed agent.
-    Required workflow:
-    1. Call ck_context at the start of every task.
-    2. Call ck_validate before writing code, config, shell, or deploy content.
-    3. Submit plans with ck_review_submit and check ck_review_status before execution.
-    4. Record issues with ck_finding.
-    5. Check ck_budget before expensive model or multi-agent work.
-    6. Use ck_route, ck_skill_list, and ck_skill_load to delegate.`,
-    };
-
-    for await (const message of query({ prompt: "Your task here", options })) {
-      if (message.type === "result") {
-        console.log(message.result);
-      }
-    }
-    """
-  end
-
-  def claude_sdk_typescript_plugin_contents do
-    ~S"""
-    import { query } from "@anthropic-ai/claude-agent-sdk";
-    import path from "path";
-
-    // Load the full CK claude-plugin bundle.
-    // Export it first: `controlkeel export claude-plugin --output /path/to/dist`
-    const ckPluginDir = path.resolve("/path/to/controlkeel-dist/claude-plugin");
-
-    const options = {
-      // The plugin bundle provides CK skills, lifecycle hooks, and the
-      // controlkeel-operator agent. The MCP server still needs explicit wiring.
-      plugins: [{ type: "local", path: ckPluginDir }],
-
-      mcpServers: {
-        controlkeel: {
-          command: "controlkeel",
-          args: ["mcp"],
-          env: { CK_PROJECT_ROOT: process.cwd() },
-        },
-      },
-
-      allowedTools: ["*"],
-      permissionMode: "dontAsk",
-    };
-
-    for await (const message of query({ prompt: "Your task here", options })) {
-      if (message.type === "result") {
-        console.log(message.result);
-      }
-    }
-    """
-  end
-
-  def claude_sdk_python_contents do
-    ~S"""
-    import asyncio
-    from pathlib import Path
-
-    from claude_agent_sdk import (
-        query,
-        ClaudeAgentOptions,
-        AssistantMessage,
-        ResultMessage,
-        TextBlock,
-    )
-
-    SYSTEM_PROMPT = \"""You are a ControlKeel-governed agent.
-    Required workflow:
-    1. Call ck_context at the start of every task.
-    2. Call ck_validate before writing code, config, shell, or deploy content.
-    3. Submit plans with ck_review_submit and check ck_review_status before execution.
-    4. Record issues with ck_finding.
-    5. Check ck_budget before expensive model or multi-agent work.
-    6. Use ck_route, ck_skill_list, and ck_skill_load to delegate.\"""
-
-
-    async def main() -> None:
-        options = ClaudeAgentOptions(
-            # Wire the ControlKeel MCP server programmatically.
-            mcp_servers={
-                "controlkeel": {
-                    "command": "controlkeel",
-                    "args": ["mcp"],
-                    "env": {"CK_PROJECT_ROOT": str(Path.cwd())},
-                }
-            },
-            # Discover CK skills, subagents, and lifecycle hooks from .claude/ directories.
-            # WARNING: removing this or setting [] bypasses CK governance in SDK deployments.
-            setting_sources=["user", "project"],
-            # Allow all built-in tools, all CK MCP tools, and skill invocations.
-            # Narrow to explicit tool names to lock down further.
-            allowed_tools=[
-                "Bash", "Read", "Write", "Edit", "Glob", "Grep",
-                "WebSearch", "WebFetch", "Agent", "Skill",
-                "mcp__controlkeel__*",
-            ],
-            # Headless: deny any tool not in allowed_tools without prompting.
-            permission_mode="dontAsk",
-            system_prompt=SYSTEM_PROMPT,
-        )
-
-        async for message in query(prompt="Your task here", options=options):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        print(block.text)
-            elif isinstance(message, ResultMessage):
-                print(f"Done: {message.subtype}")
-
-
-    if __name__ == "__main__":
-        asyncio.run(main())
-    """
-  end
-
   def copilot_agent_contents(skills) do
     """
     ---
@@ -3876,163 +3309,6 @@ defmodule ControlKeel.Skills.Exporter do
     #{Enum.map_join(Distribution.install_channels(), "\n", fn channel -> "- #{channel.label}: `#{channel.command}`" end)}
 
     ControlKeel auto-bootstraps project binding on first use. Provider access resolves through agent bridge, CK-owned provider profiles, local Ollama, then heuristic fallback.
-    """
-  end
-
-  def cloudflare_workers_runtime_contents(project_root, opts) do
-    project_root =
-      if portable_project_root?(opts),
-        do: Distribution.portable_project_root(),
-        else: Path.expand(project_root)
-
-    """
-    # Cloudflare Workers Agent + ControlKeel
-
-    This export provides a governed Cloudflare Workers AI agent with built-in MCP governance tools.
-
-    ## Project Context
-
-    - Repo root: `#{project_root}`
-    - Keep `AGENTS.md` at the repo root for shared governance context
-
-    ## Architecture
-
-    - **Runtime**: Cloudflare Workers (serverless)
-    - **AI**: Workers AI (default) or BYOM (bring your own model)
-    - **Storage**: D1 (SQLite), KV, R2 (file system)
-    - **Governance**: MCP server via npx
-
-    ## Setup
-
-    1. Install dependencies:
-       ```bash
-       cd cloudflare-workers
-       npm install
-       ```
-
-    2. Copy `.env.example` to `.dev.vars` and add your CK_API_KEY
-
-    3. Deploy:
-       ```bash
-       npm run deploy
-       ```
-
-    ## ControlKeel Integration
-
-    - Use `ck_context`, `ck_validate`, `ck_finding`, `ck_budget` via MCP
-    - `ck_context` returns bounded workspace and transcript state alongside governance data
-    - The agent includes built-in governance tools wired to the MCP server
-    - All AI requests pass through ControlKeel policy gates
-
-    ## Available Tools
-
-    - D1 SQL: `env.DB` from Cloudflare
-    - R2: `env.BUCKET` for file storage
-    - KV: `env.KV` for key-value
-    - AI: Workers AI or custom model via BYOM
-    """
-  end
-
-  def cloudflare_workers_wrangler_contents(_project_root, _opts) do
-    """
-    name = "controlkeel-agent"
-    main = "src/agent.ts"
-    compatibility_date = "2024-01-01"
-    compatibility_flags = ["nodejs_compat"]
-
-    [observability]
-    enabled = true
-
-    [[d1_databases]]
-    binding = "DB"
-    database_name = "controlkeel-agent"
-    database_id = "your-database-id"
-
-    [[kv_namespaces]]
-    binding = "KV"
-    id = "your-kv-namespace-id"
-
-    [[r2_buckets]]
-    binding = "BUCKET"
-    bucket_name = "controlkeel-agent"
-
-    [ai]
-    binding = "AI"
-    """
-  end
-
-  def cloudflare_workers_agent_contents(_opts) do
-    """
-    import { Agents } from "agents";
-    import type { AssistantMessage, TextDelta } from "@cloudflare/workers-types";
-
-    export interface Env {
-      DB: D1Database;
-      KV: KVNamespace;
-      BUCKET: R2Bucket;
-      AI: Ai;
-      CK_API_KEY: string;
-    }
-
-    export default {
-      async fetch(request: Request, env: Env): Promise<Response> {
-        const url = new URL(request.url);
-
-        if (url.pathname === "/health") {
-          return new Response(JSON.stringify({ status: "ok" }), {
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-
-        if (url.pathname === "/chat" && request.method === "POST") {
-          const { messages, sessionId } = await request.json();
-          
-          // Initialize governance context
-          const governanceResult = await this.runGovernance("context", {
-            project_root: "/",
-            task: "chat"
-          }, env);
-
-          // Run AI with governance
-          const response = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-            messages,
-            governance_context: governanceResult
-          });
-
-          // Record findings if any
-          await this.runGovernance("finding", {
-            session_id: sessionId,
-            response: response.response
-          }, env);
-
-          return new Response(JSON.stringify({ 
-            response: response.response,
-            governance: governanceResult
-          }), {
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-
-        return new Response("Not Found", { status: 404 });
-      },
-
-      async runGovernance(action: string, payload: any, env: Env): Promise<any> {
-        // MCP governance calls via npx
-        const mcpResult = await fetch("http://localhost:3000/mcp", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${env.CK_API_KEY}`
-          },
-          body: JSON.stringify({
-            action,
-            payload
-          })
-        });
-
-        return mcpResult.json();
-      }
-    } satisfies ExportedHandler<Env>;
     """
   end
 
@@ -5318,25 +4594,6 @@ defmodule ControlKeel.Skills.Exporter do
 
   # ── Gemini CLI native helpers ──────────────────────────────────────────────
 
-  def gemini_extension_manifest(project_root, opts) do
-    %{
-      "name" => "controlkeel-governance",
-      "version" => "1.0.0",
-      "contextFileName" => "GEMINI.md",
-      "settings" => [
-        %{
-          "name" => "ControlKeel API Key",
-          "description" => "API key for the ControlKeel governance proxy (optional).",
-          "envVar" => "CONTROLKEEL_API_KEY",
-          "sensitive" => true
-        }
-      ],
-      "mcpServers" =>
-        mcp_payload(project_root, opts)
-        |> Map.get("mcpServers", %{})
-    }
-  end
-
   def pi_extension_manifest(project_root, opts) do
     project_root =
       if portable_project_root?(opts),
@@ -5471,82 +4728,6 @@ defmodule ControlKeel.Skills.Exporter do
     - `/controlkeel-submit-plan`
     - `/controlkeel-annotate`
     - `/controlkeel-last`
-    """
-  end
-
-  def gemini_command_contents do
-    """
-    description = "Run a ControlKeel governance review on this project"
-    prompt = \"\"\"
-    Run a ControlKeel governance review on this project.
-
-    Execute the following shell command and summarize the results:
-    !{controlkeel findings --format json}
-
-    Focus on:
-    1. Open findings by severity (critical > high > medium > low)
-    2. Budget remaining vs. spent
-    3. Proof coverage for completed tasks
-    4. Any policy violations that block release
-
-    {{args}}
-    \"\"\"
-    """
-  end
-
-  def gemini_submit_plan_command_contents do
-    """
-    description = "Submit the current plan to ControlKeel for governance review"
-    prompt = \"\"\"
-    Save the current plan to `.gemini/review-plan.md`, then submit it with:
-    !{controlkeel review plan submit --body-file .gemini/review-plan.md --submitted-by gemini-cli --json}
-
-    Read the returned review id and browser_url. Present the plan summary to the user and ask for approval in this conversation.
-
-    After the user approves, record it with:
-    !{controlkeel review plan respond <review_id> --decision approved --feedback-notes "User approved in chat" --json}
-
-    Do not continue until the review is approved.
-    \"\"\"
-    """
-  end
-
-  def gemini_annotate_command_contents do
-    """
-    description = "Annotate a file for ControlKeel review"
-    prompt = \"\"\"
-    Save focused annotation notes for {{args}} to `.gemini/annotate.md`, then submit them with:
-    !{controlkeel review plan submit --title "File annotation review" --body-file .gemini/annotate.md --submitted-by gemini-cli --json}
-
-    Wait for the review decision before making risky follow-up edits.
-    \"\"\"
-    """
-  end
-
-  def gemini_last_command_contents do
-    """
-    description = "Re-open or wait for the last ControlKeel review"
-    prompt = \"\"\"
-    Re-open the most recent ControlKeel review you are tracking for this task:
-    !{controlkeel review plan open --id <review_id> --json}
-
-    If the review is still pending, ask the user for approval in this conversation, then record it with:
-    !{controlkeel review plan respond <review_id> --decision approved --json}
-    \"\"\"
-    """
-  end
-
-  def gemini_extension_readme_contents do
-    """
-    # ControlKeel Gemini extension
-
-    This extension provides:
-    - `/controlkeel:review`
-    - `/controlkeel:submit-plan`
-    - `/controlkeel:annotate`
-    - `/controlkeel:last`
-    - the `controlkeel-governance` skill
-    - MCP registration through `gemini-extension.json`
     """
   end
 
@@ -5728,175 +4909,6 @@ defmodule ControlKeel.Skills.Exporter do
     3. Present the plan summary to the user and ask for approval in this conversation.
     4. After approval, record it with `controlkeel review plan respond <review_id> --decision approved --json`.
     5. Do not implement until the review is approved.
-    """
-  end
-
-  def vscode_companion_extension_contents do
-    """
-    const vscode = require("vscode")
-
-    function setEnv(collection, key, value) {
-      collection.replace(key, value)
-    }
-
-    async function openUrl(url, title = "ControlKeel Review") {
-      const panel = vscode.window.createWebviewPanel(
-        "controlkeel-review",
-        title,
-        vscode.ViewColumn.Beside,
-        { enableScripts: true }
-      )
-
-      panel.webview.html = `
-      <!doctype html>
-      <html>
-        <body style="padding:0;margin:0">
-          <iframe src="${url}" style="border:0;width:100vw;height:100vh"></iframe>
-        </body>
-      </html>`
-    }
-
-    async function openPayload(payload) {
-      const data = typeof payload === "string" ? JSON.parse(payload) : payload
-      const url = data.browser_url || data.url || data.review?.browser_url
-      const title = data.review?.title || data.title || "ControlKeel Review"
-
-      if (!url) {
-        throw new Error("Payload did not include a browser_url")
-      }
-
-      await openUrl(url, title)
-    }
-
-    function activate(context) {
-      const openCommand = vscode.commands.registerCommand("controlkeel-review.openUrl", async () => {
-        const url = await vscode.window.showInputBox({
-          prompt: "Enter the ControlKeel review URL",
-          placeHolder: "https://..."
-        })
-
-        if (url) {
-          await openUrl(url)
-        }
-      })
-
-      const openPayloadCommand = vscode.commands.registerCommand(
-        "controlkeel-review.openPayload",
-        async payload => {
-          if (!payload) {
-            const raw = await vscode.window.showInputBox({
-              prompt: "Paste ControlKeel review JSON",
-              placeHolder: '{"browser_url":"https://..."}'
-            })
-
-            if (!raw) {
-              return
-            }
-
-            payload = raw
-          }
-
-          await openPayload(payload)
-        }
-      )
-
-      const annotateSelectionCommand = vscode.commands.registerCommand(
-        "controlkeel-review.annotateSelection",
-        async () => {
-          const editor = vscode.window.activeTextEditor
-          if (!editor || editor.selection.isEmpty) {
-            vscode.window.showInformationMessage("Select text to attach a ControlKeel review note.")
-            return
-          }
-
-          const note = await vscode.window.showInputBox({
-            prompt: "ControlKeel review note for the selected code",
-            placeHolder: "Needs a follow-up review before merge"
-          })
-
-          if (!note) {
-            return
-          }
-
-          const key = `controlkeel.annotation.${Date.now()}`
-          await context.workspaceState.update(key, {
-            note,
-            path: editor.document.uri.fsPath,
-            selection: editor.selection
-          })
-
-          vscode.window.showInformationMessage("Stored ControlKeel annotation locally in the workspace.")
-        }
-      )
-
-      context.subscriptions.push(openCommand, openPayloadCommand, annotateSelectionCommand)
-
-      const config = vscode.workspace.getConfiguration("controlkeelReview")
-      if (config.get("injectBrowser", true)) {
-        setEnv(context.environmentVariableCollection, "CONTROLKEEL_REVIEW_EMBED", "vscode_webview")
-        setEnv(context.environmentVariableCollection, "CONTROLKEEL_BROWSER_EMBED", "vscode_webview")
-        setEnv(context.environmentVariableCollection, "CONTROLKEEL_VSCODE_WEBVIEW", "1")
-
-        const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-        if (workspace) {
-          setEnv(context.environmentVariableCollection, "CONTROLKEEL_VSCODE_WORKSPACE", workspace)
-        }
-      }
-    }
-
-    function deactivate() {}
-
-    module.exports = { activate, deactivate }
-    """
-  end
-
-  def vscode_companion_readme_contents do
-    """
-    # ControlKeel VS Code Companion
-
-    This companion extension opens ControlKeel review URLs in a VS Code webview and
-    injects terminal environment variables so ControlKeel-aware commands can prefer
-    editor embedding over an external browser when appropriate.
-    """
-  end
-
-  def gemini_skill_contents do
-    """
-    ---
-    name: controlkeel-governance
-    description: "Operate inside a ControlKeel-governed session. Use this before code edits, shell execution, delegation, deploy work, or any task that needs CK validation, findings, budget, proof, or routing context."
-    license: Apache-2.0
-    compatibility:
-      - codex
-      - claude-standalone
-      - claude-plugin
-      - copilot-plugin
-      - github-repo
-      - open-standard
-    allowed-tools:
-      - ck_validate
-      - ck_context
-      - ck_finding
-      - ck_budget
-      - ck_route
-      - ck_skill_list
-      - ck_skill_load
-    metadata:
-      author: controlkeel
-      version: "2.0"
-      category: governance
-    ---
-
-    # ControlKeel Governance Operator
-
-    You are a governance review specialist. When auditing code:
-
-    1. Run `controlkeel findings --format json` to get the current status.
-    2. Report findings by severity: critical > high > medium > low.
-    3. Never approve changes that have unresolved critical or high findings.
-    4. Reference specific policy rules when flagging issues.
-    5. Summarize budget impact if token/cost tracking is enabled.
-    6. Check proof coverage for completed tasks.
     """
   end
 
@@ -6294,39 +5306,6 @@ defmodule ControlKeel.Skills.Exporter do
     }
   end
 
-  def aider_instructions_contents do
-    """
-    # ControlKeel + Aider
-
-    Use Aider for execution and ControlKeel for governance:
-
-    1. Keep `AGENTS.md` in the repo root.
-    2. Use `.aider/commands/controlkeel-review.md` for governed review flow.
-    3. Use MCP plus command-driven review packets rather than pretending Aider has native plugin hooks.
-    """
-  end
-
-  def aider_config_contents(project_root, opts) do
-    """
-    mcpservers:
-      controlkeel:
-        command: #{mcp_command(project_root, opts)}
-        args: [#{Enum.map_join(mcp_args(project_root, opts), ", ", &~s("#{&1}"))}]
-    """
-  end
-
-  def aider_command_contents do
-    """
-    # ControlKeel review
-
-    1. Save the current plan or diff to a markdown file.
-    2. Run `controlkeel review plan submit --body-file <file> --submitted-by aider --json`.
-    3. Present the plan summary to the user and ask for approval in this conversation.
-    4. After approval, record it with `controlkeel review plan respond <review_id> --decision approved --json`.
-    5. Summarize blocked findings and proof status before completion.
-    """
-  end
-
   def antigravity_agent_contents do
     """
     ---
@@ -6442,41 +5421,6 @@ defmodule ControlKeel.Skills.Exporter do
     - Submit plans via `ck_review_submit` for human approval before implementation.
     - Poll `ck_review_status` until approved/denied before proceeding.
     - Record outcomes with `ck_outcome_tracker` before ending the session.
-    """
-  end
-
-  def antigravity_plugin_readme_contents do
-    """
-    # ControlKeel Governance Plugin for Antigravity
-
-    This plugin brings full ControlKeel governance to Antigravity CLI and IDE.
-
-    ## What's Included
-
-    - **Skills**: Governance workflows (review, validate, commit, deploy)
-    - **Agent**: `controlkeel-operator` — guided governance agent profile
-    - **Rules**: Security, code quality, and review gate policies
-    - **Hooks**: Pre-tool-use governance gates and post-write validation
-    - **MCP**: ControlKeel MCP server for tool access
-
-    ## Installation
-
-    ### Global (all workspaces)
-    Copy the `controlkeel/` directory to `~/.gemini/config/plugins/controlkeel/`.
-
-    ### Per-workspace
-    Copy the `controlkeel/` directory to `.agents/plugins/controlkeel/` in your project.
-
-    ## Verification
-
-    Run `agy plugin list` and confirm `controlkeel` appears.
-
-    ## Usage
-
-    The plugin auto-loads when Antigravity starts. Use `ck_validate`, `ck_review_submit`,
-    `ck_finding`, and other governance tools through the Antigravity agent.
-
-    For full documentation, see https://github.com/aryaminus/controlkeel.
     """
   end
 

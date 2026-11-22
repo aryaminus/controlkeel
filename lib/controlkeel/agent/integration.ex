@@ -197,11 +197,11 @@ defmodule ControlKeel.Agent.Integration do
         label: "VS Code agent mode",
         category: "repo-native",
         description:
-          "Prepares repository-native skill, agent, and MCP files for VS Code discovery and ships a packaged review companion extension.",
+          "Prepares repository-native skill, agent, and MCP files for VS Code agent mode discovery.",
         attach_command: "controlkeel attach vscode",
         config_location: "Repository MCP config in `.github/mcp.json` and `.vscode/mcp.json`.",
         companion_delivery:
-          "Writes `.github/skills`, `.github/agents`, and repo MCP config; can also export a VS Code companion `.vsix` and a Copilot / VS Code plugin bundle.",
+          "Writes `.github/skills`, `.github/agents`, and repo MCP config; can also export a Copilot / VS Code plugin bundle.",
         preferred_target: "github-repo",
         default_scope: "project",
         router_agent_id: nil,
@@ -212,33 +212,14 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["github-repo", "copilot-plugin", "vscode-companion"],
+        export_targets: ["github-repo", "copilot-plugin"],
         submission_mode: "command",
         artifact_surfaces: [
           ".github/skills",
           ".github/agents",
           ".github/mcp.json",
-          ".vscode/mcp.json",
-          ".vscode/extensions.json",
-          "extension/package.json",
-          "extension/extension.js"
-        ],
-        runtime_transport: "vscode_companion",
-        runtime_auth_owner: "workspace",
-        runtime_session_support: %{
-          "create" => false,
-          "fork" => false,
-          "resume" => false,
-          "streaming" => false
-        },
-        runtime_review_transport: "vscode_ipc",
-        runtime_capabilities: %{
-          policy_gate: true,
-          tool_approval: false,
-          user_input_pause_resume: false,
-          deterministic_event_ids: false,
-          replay_safe_delivery: false
-        }
+          ".vscode/mcp.json"
+        ]
       }),
       attach_client(%{
         id: "copilot",
@@ -269,7 +250,6 @@ defmodule ControlKeel.Agent.Integration do
           ".github/copilot-instructions.md",
           ".github/commands/controlkeel-plan-review.md",
           ".vscode/mcp.json",
-          ".vscode/extensions.json",
           "plugin.json",
           "hooks.json"
         ],
@@ -314,7 +294,7 @@ defmodule ControlKeel.Agent.Integration do
         skills_mode: "native",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project", "export"],
-        export_targets: ["pi-native", "instructions-only"],
+        export_targets: ["pi-native"],
         review_experience: "browser_review",
         submission_mode: "command",
         feedback_mode: "command_reply",
@@ -372,7 +352,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://cursor.com",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["cursor-native", "instructions-only"]
+        export_targets: ["cursor-native"]
       }),
       attach_client(%{
         id: "windsurf",
@@ -394,7 +374,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://windsurf.com",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["windsurf-native", "instructions-only"]
+        export_targets: ["windsurf-native"]
       }),
       attach_client(%{
         id: "kiro",
@@ -416,7 +396,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://kiro.dev",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project", "export"],
-        export_targets: ["kiro-native", "instructions-only"]
+        export_targets: ["kiro-native"]
       }),
       attach_client(%{
         id: "kilo",
@@ -439,7 +419,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://kilo.ai/docs",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project", "export"],
-        export_targets: ["kilo-native", "instructions-only"]
+        export_targets: ["kilo-native"]
       }),
       attach_client(%{
         id: "amp",
@@ -462,19 +442,19 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://ampcode.com/manual/plugin-api",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project", "export"],
-        export_targets: ["amp-native", "instructions-only"]
+        export_targets: ["amp-native"]
       }),
       attach_client(%{
         id: "augment",
         label: "Augment / Auggie CLI",
         category: "native-first",
         description:
-          "Attaches MCP server and delivers native governance via Auggie workspace commands, subagents, rules, plugin hooks, and ACP-compatible runtime transport.",
+          "Attaches MCP server and delivers native governance via Auggie workspace commands, subagents, rules, and ACP-compatible runtime transport.",
         attach_command: "controlkeel attach augment",
         config_location:
           "Workspace assets under `.augment/`; persistent MCP and permission settings live in `~/.augment/settings.json` when configured outside a plugin.",
         companion_delivery:
-          "Exports `.augment/skills`, `.augment/agents`, `.augment/commands`, `.augment/rules`, `.augment/mcp.json`, a settings snippet, and a local `.augment-plugin` bundle with hooks and MCP bridge.",
+          "Exports `.augment/skills`, `.augment/agents`, `.augment/commands`, `.augment/rules`, `.augment/mcp.json`, a settings snippet, and an MCP bridge.",
         preferred_target: "augment-native",
         default_scope: "project",
         router_agent_id: "augment",
@@ -490,7 +470,7 @@ defmodule ControlKeel.Agent.Integration do
           owner: "agent"
         },
         supported_scopes: ["project", "export"],
-        export_targets: ["augment-native", "augment-plugin", "instructions-only"],
+        export_targets: ["augment-native"],
         artifact_surfaces: [
           ".augment/skills/controlkeel-governance/SKILL.md",
           ".augment/agents/controlkeel-operator.md",
@@ -501,9 +481,6 @@ defmodule ControlKeel.Agent.Integration do
           ".augment/rules/controlkeel.md",
           ".augment/mcp.json",
           ".augment/settings.controlkeel.json",
-          ".augment-plugin/plugin.json",
-          "hooks/hooks.json",
-          "hooks/controlkeel-review.sh",
           "AGENTS.md",
           "AUGMENT.md",
           "README.md"
@@ -516,7 +493,7 @@ defmodule ControlKeel.Agent.Integration do
           "resume" => true,
           "streaming" => true
         },
-        runtime_review_transport: "plugin_hook_acp",
+        runtime_review_transport: "mcp_tool_call",
         runtime_capabilities: %{
           policy_gate: true,
           tool_approval: true,
@@ -552,7 +529,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://opencode.ai",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project", "export"],
-        export_targets: ["opencode-native", "instructions-only"],
+        export_targets: ["opencode-native"],
         feedback_mode: "command_reply",
         artifact_surfaces: [
           ".opencode/skills",
@@ -590,28 +567,19 @@ defmodule ControlKeel.Agent.Integration do
           "auth_owner" => "agent"
         }
       }),
-      attach_client(%{
+      alias_entry(%{
         id: "gemini-cli",
         label: "Gemini CLI",
-        category: "native-first",
+        category: "alias",
         description:
-          "Attaches MCP server and delivers native governance via Gemini CLI extensions with manifest, multiple custom commands, agent skills, and GEMINI.md context.",
-        attach_command: "controlkeel attach gemini-cli",
-        config_location:
-          "Gemini CLI extension directory and `.gemini/commands/`, `skills/`, `GEMINI.md`.",
-        companion_delivery:
-          "Exports a `gemini-extension.json` manifest, submit-plan and review TOML commands, `controlkeel-governance` agent skill, extension README, and `GEMINI.md` instructions.",
-        preferred_target: "gemini-cli-native",
-        default_scope: "project",
-        router_agent_id: "gemini-cli",
+          "Gemini CLI is moving to Antigravity CLI. Attaching it installs the Antigravity CLI integration, which reads `.agents/skills`, `.agents/mcp_config.json`, and `AGENTS.md`.",
+        alias_of: "antigravity-cli",
         auth_mode: "ck_owned",
-        mcp_mode: "native",
-        skills_mode: "native",
         upstream_slug: "google-gemini/gemini-cli",
         upstream_docs_url: "https://github.com/google-gemini/gemini-cli",
-        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project", "export"],
-        export_targets: ["gemini-cli-native", "instructions-only"]
+        preferred_target: "antigravity-cli-native",
+        export_targets: ["antigravity-cli-native"]
       }),
       attach_client(%{
         id: "continue",
@@ -633,7 +601,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://docs.continue.dev",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project"],
-        export_targets: ["continue-native", "instructions-only"]
+        export_targets: ["continue-native"]
       }),
       attach_client(%{
         id: "letta-code",
@@ -656,29 +624,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://docs.letta.com/letta-code/cli-reference",
         provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
         supported_scopes: ["project", "export"],
-        export_targets: ["letta-code-native", "instructions-only"]
-      }),
-      attach_client(%{
-        id: "aider",
-        label: "Aider",
-        category: "mcp-plus-instructions",
-        description:
-          "Attaches the MCP server and prepares command-driven Aider instructions, config, and review helpers for governed repo workflows.",
-        attach_command: "controlkeel attach aider",
-        config_location: "Aider MCP config file in the current project.",
-        companion_delivery:
-          "Installs `AIDER.md`, `.aider.conf.yml`, `.aider/commands`, and shared instruction snippets for command-driven review flows.",
-        preferred_target: "instructions-only",
-        default_scope: "project",
-        router_agent_id: "aider",
-        auth_mode: "ck_owned",
-        mcp_mode: "native",
-        skills_mode: "instructions_only",
-        upstream_slug: "aider",
-        upstream_docs_url: "https://aider.chat",
-        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project"],
-        export_targets: ["instructions-only"]
+        export_targets: ["letta-code-native"]
       }),
       attach_client(%{
         id: "cline",
@@ -750,72 +696,16 @@ defmodule ControlKeel.Agent.Integration do
         export_targets: ["goose-native"]
       }),
       attach_client(%{
-        id: "hermes-agent",
-        label: "Hermes Agent",
-        category: "native-first",
-        description:
-          "Registers ControlKeel as an MCP server for Hermes and installs native Hermes-compatible skills.",
-        attach_command: "controlkeel attach hermes-agent",
-        config_location:
-          "Hermes settings live under `~/.hermes/`; provider/model config is in `config.yaml`, keys in `.env`, and MCP servers use the Hermes MCP integration.",
-        companion_delivery:
-          "Installs `.hermes/skills`, emits `AGENTS.md` context, and generates Hermes MCP config snippets.",
-        preferred_target: "hermes-native",
-        default_scope: "user",
-        router_agent_id: nil,
-        auth_mode: "config_reference",
-        mcp_mode: "native",
-        skills_mode: "native",
-        upstream_slug: "NousResearch/hermes-agent",
-        upstream_docs_url: "https://hermes-agent.nousresearch.com/docs/",
-        provider_bridge: %{
-          supported: true,
-          mode: "config_reference",
-          owner: "agent",
-          config_paths: ["~/.hermes/config.yaml", "~/.hermes/.env"]
-        },
-        supported_scopes: ["user", "project"],
-        export_targets: ["hermes-native"]
-      }),
-      attach_client(%{
-        id: "openclaw",
-        label: "OpenClaw",
-        category: "native-first",
-        description:
-          "Installs OpenClaw-compatible skills, emits plugin bundles, and writes MCP companion config through documented OpenClaw paths.",
-        attach_command: "controlkeel attach openclaw",
-        config_location:
-          "Managed config lives in `~/.openclaw/openclaw.json`; model provider metadata is merged into per-agent `models.json` and skills live in `~/.openclaw/skills` or `<workspace>/skills`.",
-        companion_delivery:
-          "Installs workspace or managed skills, emits `openclaw.plugin.json`, and prepares MCP-ready bundle files.",
-        preferred_target: "openclaw-native",
-        default_scope: "project",
-        router_agent_id: nil,
-        auth_mode: "config_reference",
-        mcp_mode: "native",
-        skills_mode: "plugin_bundle",
-        upstream_slug: "openclaw",
-        upstream_docs_url: "https://docs.openclaw.ai",
-        provider_bridge: %{
-          supported: true,
-          mode: "config_reference",
-          owner: "agent",
-          config_paths: ["~/.openclaw/openclaw.json", "~/.openclaw/agents/*/models.json"]
-        },
-        supported_scopes: ["user", "project"],
-        export_targets: ["openclaw-native", "openclaw-plugin"]
-      }),
-      attach_client(%{
         id: "droid",
         label: "Factory Droid",
         category: "native-first",
         description:
-          "Generates repo-local `.factory` skills, droids, commands, and MCP config aligned with Droid's user/project hierarchy, and can also export a shareable Factory plugin bundle.",
+          "Generates repo-local `.factory` skills, droids, commands, and MCP config aligned with Droid's user/project hierarchy.",
         attach_command: "controlkeel attach droid",
         config_location:
           "Factory settings live in `~/.factory/settings.json` or `<repo>/.factory/settings.local.json`; MCP config is layered through `~/.factory/mcp.json` and `<repo>/.factory/mcp.json`.",
         companion_delivery:
-          "Installs `.factory/skills`, `.factory/droids`, `.factory/commands`, and `.factory/mcp.json` bundles for user or project scope, and can export a `.factory-plugin` bundle for Droid's marketplace/plugin flow.",
+          "Installs `.factory/skills`, `.factory/droids`, `.factory/commands`, and `.factory/mcp.json` bundles for user or project scope.",
         preferred_target: "droid-bundle",
         default_scope: "project",
         router_agent_id: nil,
@@ -831,34 +721,7 @@ defmodule ControlKeel.Agent.Integration do
           config_paths: ["~/.factory/settings.json", "<repo>/.factory/settings.local.json"]
         },
         supported_scopes: ["user", "project"],
-        export_targets: ["droid-bundle", "droid-plugin"]
-      }),
-      attach_client(%{
-        id: "forge",
-        label: "Forge",
-        category: "native-first",
-        description:
-          "Exports ControlKeel as an ACP-aware companion bundle for Forge while preserving MCP fallback files.",
-        attach_command: "controlkeel attach forge",
-        config_location:
-          "Forge is an ACP client; session/auth capabilities come from the Agent Client Protocol and Forge's agent runtime.",
-        companion_delivery:
-          "Generates an ACP session companion plus portable MCP fallback files under `controlkeel/dist/forge-acp`.",
-        preferred_target: "forge-acp",
-        default_scope: "user",
-        router_agent_id: nil,
-        auth_mode: "acp_session",
-        mcp_mode: "export_only",
-        skills_mode: "instructions_only",
-        upstream_slug: "forgeagents/forge",
-        upstream_docs_url: "https://forgeagents.dev",
-        provider_bridge: %{
-          supported: true,
-          mode: "acp_session",
-          owner: "agent"
-        },
-        supported_scopes: ["user", "project"],
-        export_targets: ["forge-acp", "instructions-only"]
+        export_targets: ["droid-bundle"]
       }),
       attach_client(%{
         id: "warp",
@@ -887,28 +750,6 @@ defmodule ControlKeel.Agent.Integration do
         },
         supported_scopes: ["user", "project"],
         export_targets: ["warp-native"]
-      }),
-      headless_runtime(%{
-        id: "warp-oz",
-        label: "Warp Oz Cloud Agents",
-        category: "headless-runtime",
-        description:
-          "Headless export for Oz cloud agents with repo `AGENTS.md`, cloud MCP config examples, schedule/integration guidance, and API/SDK run templates.",
-        runtime_export_command: "controlkeel runtime export warp-oz",
-        config_location:
-          "Oz cloud agents run through the Oz CLI, Oz web app, schedules, integrations, or API/SDK with YAML/JSON agent config files and environment IDs.",
-        companion_delivery:
-          "Emits repo `AGENTS.md`, Oz runtime README, cloud agent config examples, and API request templates instead of a local attach target.",
-        preferred_target: "warp-oz-runtime",
-        default_scope: "project",
-        auth_mode: "oauth_runtime",
-        mcp_mode: "export_only",
-        skills_mode: "instructions_only",
-        upstream_slug: "warpdotdev/Warp",
-        upstream_docs_url: "https://docs.warp.dev/agent-platform/cloud-agents/platform",
-        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project", "export"],
-        export_targets: ["warp-oz-runtime"]
       }),
       headless_runtime(%{
         id: "devin",
@@ -960,156 +801,6 @@ defmodule ControlKeel.Agent.Integration do
         supported_scopes: ["user", "project"],
         export_targets: ["devin-terminal-native"]
       }),
-      headless_runtime(%{
-        id: "open-swe",
-        label: "Open SWE",
-        category: "headless-runtime",
-        description:
-          "Headless export for LangChain's asynchronous coding runtime using repo `AGENTS.md`, webhook, and issue/PR integration guidance.",
-        runtime_export_command: "controlkeel runtime export open-swe",
-        config_location:
-          "Open SWE runs through GitHub, Slack, Linear, or web triggers rather than a local MCP attach flow.",
-        companion_delivery:
-          "Emits repo `AGENTS.md`, CK webhook guidance, and CI/headless recipes instead of a local attach target.",
-        preferred_target: "open-swe-runtime",
-        default_scope: "project",
-        auth_mode: "ck_owned",
-        mcp_mode: "export_only",
-        skills_mode: "instructions_only",
-        upstream_slug: "langchain-ai/open-swe",
-        upstream_docs_url: "https://github.com/langchain-ai/open-swe",
-        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project", "export"],
-        export_targets: ["open-swe-runtime"]
-      }),
-      attach_client(%{
-        id: "multica",
-        label: "Multica",
-        category: "native-first",
-        description:
-          "Attaches ControlKeel to the Multica local daemon, which orchestrates Claude Code, Codex, OpenCode, Hermes, Kiro, and other coding agents as managed team members with issue-tracking, skills, and autopilots.",
-        attach_command: "controlkeel attach multica",
-        config_location:
-          "Multica daemon config at `~/.multica/` with per-profile directories at `~/.multica/profiles/<name>/`. MCP servers are configured per-agent via the Multica web UI or CLI (`multica agent list`).",
-        companion_delivery:
-          "Installs `.agents/skills`, repo `AGENTS.md`, and a `.multica/controlkeel-mcp.json` snippet for importing into the Multica agent MCP settings. Daemon must already be running (`multica daemon start`).",
-        preferred_target: "multica-native",
-        default_scope: "project",
-        router_agent_id: nil,
-        auth_mode: "agent_runtime",
-        mcp_mode: "config_reference",
-        skills_mode: "native",
-        upstream_slug: "multica-ai/multica",
-        upstream_docs_url: "https://github.com/multica-ai/multica",
-        provider_bridge: %{
-          supported: true,
-          provider: "multica",
-          mode: "agent_runtime",
-          owner: "agent"
-        },
-        supported_scopes: ["user", "project"],
-        export_targets: ["multica-native"]
-      }),
-      headless_runtime(%{
-        id: "multica-cloud",
-        label: "Multica Cloud",
-        category: "headless-runtime",
-        description:
-          "Headless export for Multica Cloud-hosted agent workspaces, autopilots, and issue-triggered agent runs with repo `AGENTS.md` and MCP config guidance.",
-        runtime_export_command: "controlkeel runtime export multica-cloud",
-        config_location:
-          "Multica Cloud agents are managed via the Multica web app and CLI. Autopilots (cron-triggered agent tasks) and issue assignments are configured through the Multica workspace settings.",
-        companion_delivery:
-          "Emits repo `AGENTS.md`, a Multica cloud MCP config snippet, autopilot guidance, and skills delivery notes instead of a local attach target.",
-        preferred_target: "multica-cloud-runtime",
-        default_scope: "project",
-        auth_mode: "oauth_runtime",
-        mcp_mode: "export_only",
-        skills_mode: "instructions_only",
-        upstream_slug: "multica-ai/multica",
-        upstream_docs_url: "https://github.com/multica-ai/multica",
-        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project", "export"],
-        export_targets: ["multica-cloud-runtime"]
-      }),
-      headless_runtime(%{
-        id: "executor",
-        label: "Executor",
-        category: "headless-runtime",
-        description:
-          "Typed integration runtime for OpenAPI, GraphQL, MCP, Google Discovery, and custom JS functions with auth/approval resume flows.",
-        runtime_export_command: "controlkeel runtime export executor",
-        config_location:
-          "Executor runs as a hosted or local runtime/UI surface rather than a repo-local native attach target.",
-        companion_delivery:
-          "Emits repo `AGENTS.md`, an Executor runtime README, source/bootstrap snippets, and approval/webhook guidance instead of a local attach target.",
-        preferred_target: "executor-runtime",
-        default_scope: "project",
-        auth_mode: "oauth_runtime",
-        mcp_mode: "export_only",
-        skills_mode: "instructions_only",
-        upstream_slug: "RhysSullivan/executor",
-        upstream_docs_url: "https://github.com/RhysSullivan/executor",
-        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project", "export"],
-        export_targets: ["executor-runtime"]
-      }),
-      headless_runtime(%{
-        id: "virtual-bash",
-        label: "Virtual Bash Runtime",
-        category: "headless-runtime",
-        description:
-          "CK-owned virtual-workspace runtime for just-bash-style discovery, repo search, and governed shell fallback through configured sandbox adapters.",
-        runtime_export_command: "controlkeel runtime export virtual-bash",
-        config_location:
-          "Runs as a repo-local or hosted outer loop around CK virtual-workspace MCP tools plus sandboxed shell execution, not a local attach target.",
-        companion_delivery:
-          "Emits repo `AGENTS.md`, a virtual-runtime README, a machine-readable runtime manifest, and shell bootstrap guidance instead of a host-specific attach file.",
-        preferred_target: "virtual-bash-runtime",
-        default_scope: "project",
-        auth_mode: "ck_owned",
-        mcp_mode: "export_only",
-        skills_mode: "instructions_only",
-        provider_bridge: %{supported: false, mode: "ck_owned", owner: "controlkeel"},
-        supported_scopes: ["project", "export"],
-        export_targets: ["virtual-bash-runtime"]
-      }),
-      framework_adapter(%{
-        id: "conductor",
-        label: "Conductor",
-        category: "framework-adapter",
-        description:
-          "Desktop orchestration app that runs bundled Claude Code and Codex in isolated workspaces. Not a first-class `controlkeel attach` target, but it can consume the same repo-local Claude Code MCP, `CLAUDE.md`, and slash-command surfaces that CK already ships.",
-        companion_delivery:
-          "Use the Claude Code CK attach/install surfaces inside repositories opened by Conductor. The same `.mcp.json`, `CLAUDE.md`, and `.claude/commands` assets are what Conductor documents today.",
-        preferred_target: "claude-standalone",
-        default_scope: "project",
-        auth_mode: "heuristic",
-        mcp_mode: "native",
-        skills_mode: "native",
-        upstream_slug: "conductor/build",
-        upstream_docs_url: "https://docs.conductor.build/",
-        provider_bridge: %{
-          supported: true,
-          provider: "anthropic",
-          mode: "env_bridge",
-          owner: "agent"
-        },
-        supported_scopes: ["user", "project"],
-        export_targets: ["claude-standalone", "claude-plugin", "instructions-only"],
-        agent_uses_ck_via: ["local_mcp", "native_skills", "commands"],
-        artifact_surfaces: [".mcp.json", "CLAUDE.md", ".claude/commands"],
-        review_experience: "browser_review",
-        submission_mode: "command",
-        feedback_mode: "command_reply",
-        install_experience: "guided",
-        confidence_level: "experimental",
-        phase_model: "host_plan_mode",
-        browser_embed: "external",
-        subagent_visibility: "primary_only",
-        execution_support: "inbound_only",
-        ck_runs_agent_via: "none"
-      }),
       alias_entry(%{
         id: "claude-dispatch",
         label: "Claude Dispatch",
@@ -1135,7 +826,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://cursor.com",
         supported_scopes: ["project"],
         preferred_target: "cursor-native",
-        export_targets: ["cursor-native", "instructions-only"]
+        export_targets: ["cursor-native"]
       }),
       alias_entry(%{
         id: "codex",
@@ -1216,32 +907,18 @@ defmodule ControlKeel.Agent.Integration do
         export_targets: ["github-repo", "copilot-plugin"]
       }),
       alias_entry(%{
-        id: "conductor-web",
-        label: "Conductor web",
-        category: "alias",
-        description:
-          "Alias for the Conductor app/web surface. CK resolves this to the Conductor compatibility row rather than a direct attach target.",
-        alias_of: "conductor",
-        auth_mode: "heuristic",
-        upstream_slug: "conductor/build-web",
-        upstream_docs_url: "https://docs.conductor.build/",
-        supported_scopes: ["user", "project"],
-        preferred_target: "claude-standalone",
-        export_targets: ["claude-standalone", "claude-plugin", "instructions-only"]
-      }),
-      alias_entry(%{
         id: "gemini",
         label: "Gemini",
         category: "alias",
         description:
-          "Alias to the shipped Gemini CLI integration for skill ecosystems that label the agent surface as Gemini.",
-        alias_of: "gemini-cli",
+          "Alias to the Antigravity CLI integration for skill ecosystems that label the agent surface as Gemini.",
+        alias_of: "antigravity-cli",
         auth_mode: "ck_owned",
         upstream_slug: "google-gemini/gemini-cli",
         upstream_docs_url: "https://github.com/google-gemini/gemini-cli",
         supported_scopes: ["project", "export"],
-        preferred_target: "gemini-cli-native",
-        export_targets: ["gemini-cli-native", "instructions-only"]
+        preferred_target: "antigravity-cli-native",
+        export_targets: ["antigravity-cli-native"]
       }),
       alias_entry(%{
         id: "kiro-cli",
@@ -1255,7 +932,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://kiro.dev/cli",
         supported_scopes: ["project", "export"],
         preferred_target: "kiro-native",
-        export_targets: ["kiro-native", "instructions-only"]
+        export_targets: ["kiro-native"]
       }),
       alias_entry(%{
         id: "roo",
@@ -1269,7 +946,7 @@ defmodule ControlKeel.Agent.Integration do
         upstream_docs_url: "https://roocode.com/",
         supported_scopes: ["project"],
         preferred_target: "roo-native",
-        export_targets: ["roo-native", "instructions-only"]
+        export_targets: ["roo-native"]
       }),
       attach_client(%{
         id: "t3code",
@@ -1316,39 +993,6 @@ defmodule ControlKeel.Agent.Integration do
           "auth_owner" => "agent"
         }
       }),
-      unverified_entry(%{
-        id: "jcode",
-        label: "jcode",
-        category: "research-compatible",
-        description:
-          "jcode is a distinct coding-agent harness with its own runtime and config model. CK can currently meet it through repo-local instructions and MCP wiring, but does not yet ship a native `attach jcode` installer/export path.",
-        auth_mode: "none",
-        upstream_slug: "1jehuang/jcode",
-        upstream_docs_url: "https://github.com/1jehuang/jcode",
-        provider_bridge: %{supported: false, mode: "none", owner: "none"},
-        mcp_mode: "native",
-        skills_mode: "instructions_only",
-        preferred_target: "instructions-only",
-        export_targets: ["instructions-only"],
-        agent_uses_ck_via: ["local_mcp"],
-        artifact_surfaces: ["AGENTS.md", ".jcode/mcp.json", ".jcode/prompt-overlay.md"],
-        direct_install_methods: [
-          %{
-            "kind" => "upstream_install",
-            "label" => "Install jcode upstream",
-            "command" =>
-              "curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh | bash",
-            "availability" => "research"
-          },
-          %{
-            "kind" => "local_mcp",
-            "label" => "Point jcode at local CK MCP",
-            "command" =>
-              ~s|Add {"servers":{"controlkeel":{"command":"controlkeel","args":["mcp","--project-root","/abs/path"]}}} to .jcode/mcp.json|,
-            "availability" => "research"
-          }
-        ]
-      }),
       attach_client(%{
         id: "antigravity-cli",
         label: "Antigravity CLI (AGY)",
@@ -1375,7 +1019,7 @@ defmodule ControlKeel.Agent.Integration do
           owner: "agent"
         },
         supported_scopes: ["project"],
-        export_targets: ["antigravity-cli-native", "antigravity-cli-plugin"],
+        export_targets: ["antigravity-cli-native"],
         review_experience: "native_review",
         submission_mode: "tool_call",
         feedback_mode: "tool_call",
@@ -1407,148 +1051,11 @@ defmodule ControlKeel.Agent.Integration do
           owner: "agent"
         },
         supported_scopes: ["project"],
-        export_targets: ["antigravity-cli-native", "antigravity-cli-plugin"],
+        export_targets: ["antigravity-cli-native"],
         review_experience: "browser_review",
         submission_mode: "command",
         feedback_mode: "command_reply",
         phase_model: "host_plan_mode"
-      }),
-      unverified_entry(%{
-        id: "clawdbot",
-        label: "ClawdBot",
-        category: "skills-compatible",
-        description:
-          "No verified native CK attach/runtime contract yet. ControlKeel support for ClawdBot is currently through open-standard AgentSkills installs such as the skills.sh flow.",
-        auth_mode: "none",
-        upstream_slug: "unverified/clawdbot",
-        upstream_docs_url: "https://clawd.bot/",
-        provider_bridge: %{supported: false, mode: "none", owner: "none"},
-        mcp_mode: "none",
-        skills_mode: "native",
-        preferred_target: "open-standard",
-        export_targets: ["open-standard"],
-        agent_uses_ck_via: ["native_skills"],
-        direct_install_methods: [
-          %{
-            "kind" => "skills_sh",
-            "label" => "skills.sh install",
-            "command" =>
-              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
-            "availability" => "supported"
-          }
-        ]
-      }),
-      unverified_entry(%{
-        id: "nous-research",
-        label: "Nous Research",
-        category: "skills-compatible",
-        description:
-          "No verified generic CK attach/runtime contract exists for the broader Nous Research brand surface. CK's verified Nous path remains `hermes-agent`; broader compatibility is currently through open-standard AgentSkills installs such as the skills.sh flow.",
-        auth_mode: "none",
-        upstream_slug: "unverified/nous-research",
-        upstream_docs_url: "https://nousresearch.com/",
-        provider_bridge: %{supported: false, mode: "none", owner: "none"},
-        mcp_mode: "none",
-        skills_mode: "native",
-        preferred_target: "open-standard",
-        export_targets: ["open-standard"],
-        agent_uses_ck_via: ["native_skills"],
-        direct_install_methods: [
-          %{
-            "kind" => "skills_sh",
-            "label" => "skills.sh install",
-            "command" =>
-              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
-            "availability" => "supported"
-          }
-        ]
-      }),
-      unverified_entry(%{
-        id: "trae",
-        label: "Trae",
-        category: "skills-compatible",
-        description:
-          "No verified native CK attach/runtime contract yet. ControlKeel support for Trae is currently through open-standard AgentSkills installs such as the skills.sh flow.",
-        auth_mode: "none",
-        upstream_slug: "unverified/trae",
-        upstream_docs_url: "https://www.trae.ai/",
-        provider_bridge: %{supported: false, mode: "none", owner: "none"},
-        mcp_mode: "none",
-        skills_mode: "native",
-        preferred_target: "open-standard",
-        export_targets: ["open-standard"],
-        agent_uses_ck_via: ["native_skills"],
-        direct_install_methods: [
-          %{
-            "kind" => "skills_sh",
-            "label" => "skills.sh install",
-            "command" =>
-              "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance",
-            "availability" => "supported"
-          }
-        ]
-      }),
-      unverified_entry(%{
-        id: "z-ai-cli",
-        label: "Z.AI CLI ecosystem",
-        category: "unverified",
-        description:
-          "Z.AI coding-agent CLI surfaces are evolving across official docs and community implementations; no single stable CK integration contract is verified yet.",
-        auth_mode: "none",
-        upstream_slug: "z-ai/cli-ecosystem",
-        upstream_docs_url: "https://docs.z.ai/devpack/using5.1",
-        provider_bridge: %{supported: false, mode: "none", owner: "none"},
-        mcp_mode: "none",
-        skills_mode: "none"
-      }),
-      framework_adapter(%{
-        id: "open-agents",
-        label: "Open Agents (Vercel)",
-        category: "framework-adapter",
-        description:
-          "Cloud coding agent platform by Vercel Labs built on AI SDK, durable workflows, and sandboxed VMs. CK integrates via `.agents/skills/` discovery and CLI commands run through the agent's bash tool.",
-        companion_delivery:
-          "Drop `controlkeel-governance` skill into `.agents/skills/` for automatic discovery. Agent uses bash to run CK CLI. For fork-level integration, spread CK MCP tools into the agent's tool set via AI SDK.",
-        preferred_target: "open-standard",
-        default_scope: "project",
-        auth_mode: "heuristic",
-        mcp_mode: "hosted_optional",
-        skills_mode: "native",
-        upstream_slug: "vercel-labs/open-agents",
-        upstream_docs_url: "https://github.com/vercel-labs/open-agents",
-        provider_bridge: %{supported: true, mode: "byom", owner: "agent"},
-        supported_scopes: ["project", "export"],
-        export_targets: ["open-standard", "instructions-only"],
-        dist_bundle: "controlkeel/dist/open-agents-runtime",
-        install_experience: "guided",
-        confidence_level: "experimental",
-        phase_model: "host_plan_mode",
-        browser_embed: "none",
-        subagent_visibility: "all",
-        execution_support: "inbound_only",
-        ck_runs_agent_via: "none"
-      }),
-      headless_runtime(%{
-        id: "cloudflare-workers",
-        label: "Cloudflare Workers Agent",
-        category: "headless-runtime",
-        description:
-          "Governed Cloudflare Workers Agent with D1, R2, Workers AI, and MCP governance tools.",
-        runtime_export_command: "controlkeel runtime export cloudflare-workers",
-        config_location:
-          "Deploy as Cloudflare Worker with D1 database and R2 bucket for stateful agent execution.",
-        companion_delivery:
-          "Generates complete Worker project with CK governance integration, MCP tools, and deployment config.",
-        preferred_target: "cloudflare-workers-runtime",
-        default_scope: "project",
-        auth_mode: "ck_owned",
-        mcp_mode: "export_only",
-        skills_mode: "instructions_only",
-        upstream_slug: "cloudflare/workers-sdk",
-        upstream_docs_url: "https://developers.cloudflare.com/agents/",
-        provider_bridge: %{supported: true, mode: "byom", owner: "user"},
-        supported_scopes: ["project", "export"],
-        export_targets: ["cloudflare-workers-runtime"]
       })
     ]
   end
@@ -1558,6 +1065,30 @@ defmodule ControlKeel.Agent.Integration do
   end
 
   def attachable_ids, do: Enum.map(attach_catalog(), & &1.id)
+
+  @doc """
+  Resolves an attach or detach name to the attach client that handles it.
+  Aliases such as `codex`, `gemini-cli`, or `roo` resolve to their canonical
+  attach client; unknown names return `nil`.
+  """
+  def resolve_attach_id(id) when is_binary(id) do
+    case get(id) do
+      %__MODULE__{} = integration ->
+        if attachable?(integration) do
+          integration.id
+        else
+          case integration.alias_of && get(integration.alias_of) do
+            %__MODULE__{} = target -> if attachable?(target), do: target.id
+            _ -> nil
+          end
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  def resolve_attach_id(_id), do: nil
 
   def product_catalog do
     catalog()
@@ -1671,14 +1202,6 @@ defmodule ControlKeel.Agent.Integration do
     )
   end
 
-  defp framework_adapter(attrs) do
-    entry(
-      attrs
-      |> Map.put(:support_class, "framework_adapter")
-      |> Map.put(:auto_bootstrap, false)
-    )
-  end
-
   defp alias_entry(attrs) do
     entry(
       attrs
@@ -1688,20 +1211,6 @@ defmodule ControlKeel.Agent.Integration do
       |> Map.put_new(:skills_mode, "native")
       |> Map.put_new(:provider_bridge, %{supported: false, mode: "none", owner: "none"})
       |> Map.put(:companion_delivery, "Use the canonical target named in `alias_of`.")
-    )
-  end
-
-  defp unverified_entry(attrs) do
-    entry(
-      attrs
-      |> Map.put(:support_class, "unverified")
-      |> Map.put(:auto_bootstrap, false)
-      |> Map.put(
-        :companion_delivery,
-        "No shipped attach path. Treat as research-only until a documented upstream contract exists."
-      )
-      |> Map.put_new(:supported_scopes, [])
-      |> Map.put_new(:export_targets, [])
     )
   end
 
@@ -1755,11 +1264,7 @@ defmodule ControlKeel.Agent.Integration do
       direct_install_methods:
         attrs[:direct_install_methods] || default_direct_install_methods(attrs),
       supported_scopes: attrs[:supported_scopes] || [],
-      required_mcp_tools:
-        if(attrs[:support_class] in ["framework_adapter", "unverified"],
-          do: [],
-          else: Distribution.required_mcp_tools()
-        ),
+      required_mcp_tools: Distribution.required_mcp_tools(),
       install_channels: install_channels,
       export_targets: attrs[:export_targets] || [],
       runtime_transport: attrs[:runtime_transport],
@@ -1785,8 +1290,6 @@ defmodule ControlKeel.Agent.Integration do
     }
   end
 
-  defp default_cost_profile(%{support_class: "unverified"}, _auth_owner), do: "unknown"
-
   defp default_cost_profile(_attrs, "agent"), do: "host_subscription_or_agent_metered"
   defp default_cost_profile(_attrs, "controlkeel"), do: "ck_budget_metered"
   defp default_cost_profile(_attrs, "workspace"), do: "workspace_subscription"
@@ -1795,18 +1298,13 @@ defmodule ControlKeel.Agent.Integration do
   defp default_performance_profile("headless_runtime", _execution_support),
     do: "background_runtime"
 
-  defp default_performance_profile("framework_adapter", _execution_support),
-    do: "adapter_dependent"
-
-  defp default_performance_profile("unverified", _execution_support), do: "unknown"
   defp default_performance_profile(_support_class, "direct"), do: "interactive_direct"
   defp default_performance_profile(_support_class, "handoff"), do: "human_handoff"
   defp default_performance_profile(_support_class, "runtime"), do: "background_runtime"
   defp default_performance_profile(_support_class, _execution_support), do: "manual"
 
-  defp default_token_pressure_profile(attrs, auth_owner) do
+  defp default_token_pressure_profile(_attrs, auth_owner) do
     cond do
-      attrs[:support_class] in ["unverified", "framework_adapter"] -> "unknown"
       auth_owner == "agent" -> "host_quota_sensitive"
       auth_owner == "workspace" -> "workspace_quota_sensitive"
       true -> "ck_budget_sensitive"
@@ -1814,13 +1312,11 @@ defmodule ControlKeel.Agent.Integration do
   end
 
   defp default_time_profile("headless_runtime", _execution_support), do: "long_running_ok"
-  defp default_time_profile("unverified", _execution_support), do: "manual_research"
   defp default_time_profile(_support_class, "direct"), do: "fast_feedback"
   defp default_time_profile(_support_class, "handoff"), do: "checkpoint_driven"
   defp default_time_profile(_support_class, "runtime"), do: "long_running_ok"
   defp default_time_profile(_support_class, _execution_support), do: "manual"
 
-  defp default_ux_profile(_attrs, "unverified"), do: "research_only"
   defp default_ux_profile(_attrs, "headless_runtime"), do: "runtime_export"
 
   defp default_ux_profile(attrs, _support_class) do
@@ -1883,11 +1379,8 @@ defmodule ControlKeel.Agent.Integration do
       "goose" ->
         ["local_mcp", "workflows", "hooks", "commands"]
 
-      id when id in ["hermes-agent", "openclaw"] ->
-        ["local_mcp", "plugin", "native_skills"]
-
       "droid" ->
-        ["local_mcp", "native_skills", "commands", "plugin"]
+        ["local_mcp", "native_skills", "commands"]
 
       "kiro" ->
         ["local_mcp", "native_skills", "hooks", "rules", "commands"]
@@ -1905,7 +1398,7 @@ defmodule ControlKeel.Agent.Integration do
         ]
 
       "augment" ->
-        ["local_mcp", "plugin", "native_skills", "rules", "commands", "hooks"]
+        ["local_mcp", "native_skills", "rules", "commands"]
 
       "devin-terminal" ->
         ["local_mcp", "native_skills", "rules", "hooks"]
@@ -1913,26 +1406,14 @@ defmodule ControlKeel.Agent.Integration do
       "warp" ->
         ["local_mcp", "native_skills", "rules"]
 
-      "aider" ->
-        ["local_mcp", "commands"]
-
       "opencode" ->
         ["local_mcp", "plugin", "native_skills", "rules", "commands"]
-
-      "gemini-cli" ->
-        ["local_mcp", "native_skills", "rules", "commands"]
 
       "pi" ->
         ["local_mcp", "native_skills", "commands", "rules"]
 
-      id when id in ["forge", "devin", "open-swe"] ->
+      id when id in ["devin"] ->
         ["hosted_mcp", "a2a"]
-
-      "warp-oz" ->
-        ["hosted_mcp", "native_skills", "rules"]
-
-      "open-agents" ->
-        ["native_skills", "cli_bash"]
 
       _ ->
         fallback_agent_uses_ck_via(attrs)
@@ -1959,10 +1440,8 @@ defmodule ControlKeel.Agent.Integration do
              "devin-terminal",
              "warp",
              "letta-code",
-             "aider",
              "augment",
-             "opencode",
-             "gemini-cli"
+             "opencode"
            ] ->
         "direct"
 
@@ -1977,13 +1456,11 @@ defmodule ControlKeel.Agent.Integration do
              "kiro",
              "amp",
              "pi",
-             "hermes-agent",
-             "openclaw",
              "droid"
            ] ->
         "handoff"
 
-      id when id in ["devin", "open-swe", "forge", "cognition"] ->
+      id when id in ["devin"] ->
         "runtime"
 
       _ ->
@@ -2005,18 +1482,11 @@ defmodule ControlKeel.Agent.Integration do
   end
 
   defp default_install_experience(%{support_class: support_class})
-       when support_class in ["unverified", "alias"] do
+       when support_class == "alias" do
     "fallback"
   end
 
-  defp default_install_experience(%{support_class: "framework_adapter"}) do
-    "guided"
-  end
-
   defp default_install_experience(_attrs), do: "first_class"
-
-  defp default_review_experience(%{support_class: "unverified"}), do: "none"
-  defp default_review_experience(%{support_class: "framework_adapter"}), do: "feedback_only"
 
   defp default_review_experience(%{id: id})
        when id in [
@@ -2026,7 +1496,6 @@ defmodule ControlKeel.Agent.Integration do
               "cline",
               "kiro",
               "amp",
-              "augment",
               "devin-terminal",
               "warp",
               "letta-code"
@@ -2038,21 +1507,18 @@ defmodule ControlKeel.Agent.Integration do
   defp default_review_experience(%{support_class: "headless_runtime"}), do: "browser_review"
   defp default_review_experience(_attrs), do: "feedback_only"
 
-  defp default_submission_mode(%{support_class: "unverified"}), do: "manual"
-  defp default_submission_mode(%{support_class: "framework_adapter"}), do: "manual"
-
   defp default_submission_mode(%{id: id})
-       when id in ["claude-code", "amp", "opencode", "devin-terminal", "warp"] do
+       when id in ["claude-code", "amp", "augment", "opencode", "devin-terminal", "warp"] do
     "tool_call"
   end
 
   defp default_submission_mode(%{id: id})
-       when id in ["vscode", "copilot", "windsurf", "cline", "kiro", "augment", "letta-code"] do
+       when id in ["vscode", "copilot", "windsurf", "cline", "kiro", "letta-code"] do
     "hook"
   end
 
   defp default_submission_mode(%{id: id})
-       when id in ["cursor", "continue", "roo-code", "goose", "gemini-cli", "pi", "aider"] do
+       when id in ["cursor", "continue", "roo-code", "goose", "pi"] do
     "command"
   end
 
@@ -2082,9 +1548,7 @@ defmodule ControlKeel.Agent.Integration do
               "goose",
               "kiro",
               "augment",
-              "gemini-cli",
-              "roo-code",
-              "aider"
+              "roo-code"
             ] do
     "command_reply"
   end
@@ -2111,13 +1575,12 @@ defmodule ControlKeel.Agent.Integration do
   defp default_phase_model(%{id: "t3code"}), do: "review_only"
   defp default_phase_model(%{id: "vscode"}), do: "review_only"
 
-  defp default_phase_model(%{id: id}) when id in ["goose", "gemini-cli", "roo-code", "aider"],
+  defp default_phase_model(%{id: id}) when id in ["goose", "roo-code"],
     do: "review_only"
 
   defp default_phase_model(%{support_class: "attach_client"}), do: "host_plan_mode"
   defp default_phase_model(_attrs), do: "review_only"
 
-  defp default_browser_embed(%{id: "vscode"}), do: "vscode_webview"
   defp default_browser_embed(%{support_class: "attach_client"}), do: "external"
   defp default_browser_embed(_attrs), do: "none"
 
@@ -2146,11 +1609,6 @@ defmodule ControlKeel.Agent.Integration do
         "kind" => "release_bundle",
         "name" => "augment-native",
         "artifact" => "controlkeel-augment-native.tar.gz"
-      },
-      %{
-        "kind" => "release_bundle",
-        "name" => "augment-plugin",
-        "artifact" => "controlkeel-augment-plugin.tar.gz"
       }
     ]
   end
@@ -2216,11 +1674,6 @@ defmodule ControlKeel.Agent.Integration do
         "kind" => "release_bundle",
         "name" => "github-repo",
         "artifact" => "controlkeel-github-repo.tar.gz"
-      },
-      %{
-        "kind" => "vsix",
-        "name" => "vscode-companion",
-        "artifact" => "controlkeel-vscode-companion.vsix"
       }
     ]
   end
@@ -2295,17 +1748,6 @@ defmodule ControlKeel.Agent.Integration do
     ]
   end
 
-  defp default_direct_install_methods(%{id: "warp-oz"}) do
-    [
-      direct_install(
-        "host_cli",
-        "Install Oz CLI",
-        "brew tap warpdotdev/warp && brew update && brew install --cask oz"
-      ),
-      direct_install("ck_export", "CK runtime export", "controlkeel runtime export warp-oz")
-    ]
-  end
-
   defp default_direct_install_methods(%{id: "pi"}) do
     [
       direct_install("ck_attach", "CK attach", "controlkeel attach pi"),
@@ -2324,23 +1766,7 @@ defmodule ControlKeel.Agent.Integration do
 
   defp default_direct_install_methods(%{id: "vscode"}) do
     [
-      direct_install("ck_attach", "CK attach", "controlkeel attach vscode"),
-      direct_install(
-        "vsix",
-        "VS Code VSIX",
-        "code --install-extension controlkeel-vscode-companion.vsix"
-      )
-    ]
-  end
-
-  defp default_direct_install_methods(%{id: "gemini-cli"}) do
-    [
-      direct_install("ck_attach", "CK attach", "controlkeel attach gemini-cli"),
-      direct_install(
-        "extension_link",
-        "Gemini extension link",
-        "gemini extensions link ./controlkeel/dist/gemini-cli-native"
-      )
+      direct_install("ck_attach", "CK attach", "controlkeel attach vscode")
     ]
   end
 
@@ -2362,12 +1788,7 @@ defmodule ControlKeel.Agent.Integration do
   defp default_direct_install_methods(%{id: "augment"}) do
     [
       direct_install("ck_attach", "CK attach", "controlkeel attach augment"),
-      direct_install("host_cli", "Install Auggie CLI", "npm install -g @augmentcode/auggie"),
-      direct_install(
-        "local_plugin_dir",
-        "Augment plugin dir",
-        "auggie --plugin-dir ./controlkeel/dist/augment-plugin"
-      )
+      direct_install("host_cli", "Install Auggie CLI", "npm install -g @augmentcode/auggie")
     ]
   end
 
@@ -2375,13 +1796,6 @@ defmodule ControlKeel.Agent.Integration do
     [
       direct_install("npm_cli", "Letta Code via npm", "npm install -g @letta-ai/letta-code"),
       direct_install("ck_attach", "CK attach", "controlkeel attach letta-code")
-    ]
-  end
-
-  defp default_direct_install_methods(%{id: "openclaw"}) do
-    [
-      direct_install("ck_attach", "CK attach", "controlkeel attach openclaw"),
-      direct_install("local_plugin", "OpenClaw plugin", "controlkeel plugin install openclaw")
     ]
   end
 
@@ -2395,10 +1809,7 @@ defmodule ControlKeel.Agent.Integration do
               "kiro",
               "augment",
               "roo-code",
-              "aider",
-              "hermes-agent",
               "droid",
-              "forge",
               "devin-terminal"
             ] do
     [direct_install("ck_attach", "CK attach", "controlkeel attach #{id}")]
@@ -2445,8 +1856,7 @@ defmodule ControlKeel.Agent.Integration do
       ".github/commands",
       ".github/mcp.json",
       ".github/copilot-instructions.md",
-      ".vscode/mcp.json",
-      ".vscode/extensions.json"
+      ".vscode/mcp.json"
     ]
   end
 
@@ -2546,23 +1956,6 @@ defmodule ControlKeel.Agent.Integration do
       "AGENTS.md"
     ]
 
-  defp default_artifact_surfaces(%{id: "warp-oz"}),
-    do: [
-      "warp-oz/controlkeel-agent-config.json",
-      "warp-oz/controlkeel-api-request.json",
-      "warp-oz/README.md",
-      "AGENTS.md"
-    ]
-
-  defp default_artifact_surfaces(%{id: "gemini-cli"}),
-    do: [
-      "gemini-extension.json",
-      ".gemini/commands/controlkeel",
-      "skills/controlkeel-governance/SKILL.md",
-      "GEMINI.md",
-      "README.md"
-    ]
-
   defp default_artifact_surfaces(%{id: "kiro"}),
     do: [
       ".kiro/hooks",
@@ -2604,7 +1997,6 @@ defmodule ControlKeel.Agent.Integration do
       ".augment/rules",
       ".augment/mcp.json",
       ".augment/settings.controlkeel.json",
-      ".augment-plugin",
       "AGENTS.md",
       "AUGMENT.md",
       "README.md"
@@ -2621,26 +2013,15 @@ defmodule ControlKeel.Agent.Integration do
       "AGENTS.md"
     ]
 
-  defp default_artifact_surfaces(%{id: "aider"}),
-    do: ["AGENTS.md", "AIDER.md", ".aider.conf.yml", ".aider/commands"]
-
   defp default_artifact_surfaces(%{id: "droid"}),
     do: [
       ".factory/skills",
       ".factory/droids",
       ".factory/commands",
       ".factory/mcp.json",
-      ".factory-plugin/plugin.json",
       "mcp.json",
       "README.md",
       "AGENTS.md"
-    ]
-
-  defp default_artifact_surfaces(%{id: "open-agents"}),
-    do: [
-      ".agents/skills",
-      "AGENTS.md",
-      "controlkeel/dist/open-agents-runtime"
     ]
 
   defp default_artifact_surfaces(%{support_class: "headless_runtime"}),

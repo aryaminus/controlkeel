@@ -20,7 +20,7 @@ defmodule ControlKeel.Cloud.RuntimeDispatcher do
 
       config :controlkeel, :cloud_dispatchers, %{
         "devin" => MyApp.DevinDispatcher,
-        "open-swe" => MyApp.OpenSweDispatcher
+        "devin" => MyApp.DevinDispatcher
       }
 
   Unmapped runtimes fall back to `Manual` so the audit trail still shows

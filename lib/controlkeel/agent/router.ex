@@ -89,14 +89,6 @@ defmodule ControlKeel.Agent.Router do
       local: true
     },
     # ── Category B: Local CLIs ───────────────────────────────────────────────
-    "aider" => %{
-      name: "Aider",
-      capabilities: [:repo_edit, :file_write, :git, :bash],
-      cost_tier: :free,
-      security_tier: :critical,
-      swe_bench_score: 0.56,
-      local: true
-    },
     "opencode" => %{
       name: "OpenCode",
       capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
@@ -140,15 +132,6 @@ defmodule ControlKeel.Agent.Router do
       local: true
     },
     # ── Category C: Cloud Platforms & Scaffolders ────────────────────────────
-    # gemini-cli calls Google's remote API by default, so local: false
-    "gemini-cli" => %{
-      name: "Gemini CLI",
-      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
-      cost_tier: :medium,
-      security_tier: :medium,
-      swe_bench_score: 0.57,
-      local: false
-    },
     "bolt" => %{
       name: "Bolt",
       capabilities: [:ui_prototype, :full_stack_scaffold],
