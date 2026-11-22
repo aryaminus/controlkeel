@@ -1360,14 +1360,14 @@ defmodule ControlKeel.Accounts do
   Authorize a cloud execution request for a workspace.
 
   When the workspace belongs to an org, the caller must present a user_id with
-  an active membership at or above `required_role` (default `"member"`). Solo
-  workspaces (no org) are always authorized — the local-first trust anchor
-  applies.
+  an active membership at or above `required_role` (default `"member"`).
+  Workspaces without an organization cannot authorize cloud execution.
 
   Returns `{:ok, :authorized}` or `{:error, reason}`.
   """
   @spec authorize_cloud_execution(integer(), keyword()) ::
-          {:ok, :authorized} | {:error, :not_found | :unauthorized | :org_suspended}
+          {:ok, :authorized}
+          | {:error, :not_found | :unauthorized | :org_suspended | :unbound_workspace}
   def authorize_cloud_execution(workspace_id, opts \\ []) when is_integer(workspace_id) do
     required_role = Keyword.get(opts, :required_role, "member")
     user_id = Keyword.get(opts, :user_id)
@@ -1376,10 +1376,6 @@ defmodule ControlKeel.Accounts do
       nil ->
         {:error, :not_found}
 
-      # NOTE: an org-less workspace currently authorizes unconditionally here, which
-      # is a real gap (no owner can vouch for it, and even the caller's identity
-      # is unchecked). Tracked separately for a focused fix with fixture
-      # migration; see the cloud execution authz follow-up.
       %Workspace{org_id: nil} ->
         # Fail closed. A workspace with no org has no tenant to authorize
         # against, so treating it as authorized let any caller (or no caller)
