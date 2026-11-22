@@ -824,6 +824,7 @@ defmodule ControlKeel.SkillsTest do
     codex_prompt_hook = Path.join(codex_plan.output_dir, ".codex/hooks/ck-user-prompt-submit.sh")
 
     assert prompt_hook_output(codex_prompt_hook, "Use task-scoped review context") == ""
+
     assert prompt_hook_output(codex_prompt_hook, "Document api_key: and password= placeholders") ==
              ""
 
@@ -1071,6 +1072,42 @@ defmodule ControlKeel.SkillsTest do
     refute output =~ "\"decision\":\"block\""
     assert output =~ "\"systemMessage\""
     assert output =~ "blocked findings"
+  end
+
+  test "codex stop hook still warns when only the python3 fallback is available", %{
+    tmp_dir: tmp_dir
+  } do
+    python3 = System.find_executable("python3")
+    sh = System.find_executable("sh")
+    cat = System.find_executable("cat")
+
+    if python3 && sh && cat do
+      assert {:ok, _install} = Skills.install("codex", tmp_dir, scope: "project")
+
+      hook_path = Path.join(tmp_dir, ".codex/hooks/ck-stop.sh")
+      bin_dir = Path.join(tmp_dir, "nojq-bin")
+      File.mkdir_p!(bin_dir)
+
+      for exe <- [python3, sh, cat], do: File.ln_s!(exe, Path.join(bin_dir, Path.basename(exe)))
+
+      stub = Path.join(tmp_dir, "controlkeel-stub")
+      File.write!(stub, "#!#{sh}\nprintf '%s' '{\"active_findings\":{\"blocked\":2}}'\n")
+      File.chmod!(stub, 0o755)
+
+      payload = Jason.encode!(%{"session_id" => 7, "stop_hook_active" => false})
+
+      {output, 0} =
+        System.cmd(sh, ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
+          env: [
+            {"CK_TEST_INPUT", payload},
+            {"CK_HOOK_PATH", hook_path},
+            {"CONTROLKEEL_BIN", stub},
+            {"PATH", bin_dir}
+          ]
+        )
+
+      assert output =~ "blocked findings"
+    end
   end
 
   test "codex stop hook tolerates malformed hook input", %{tmp_dir: tmp_dir} do

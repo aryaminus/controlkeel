@@ -2356,7 +2356,7 @@ defmodule ControlKeel.Skills.Exporter do
     if command -v jq >/dev/null 2>&1; then
       stop_hook_active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null || printf 'false')
     elif command -v python3 >/dev/null 2>&1; then
-      stop_hook_active=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_hook_active', False))" 2>/dev/null || printf 'false')
+      stop_hook_active=$(printf '%s' "$input" | python3 -c "import sys,json; print('true' if json.load(sys.stdin).get('stop_hook_active') else 'false')" 2>/dev/null || printf 'false')
     fi
 
     session_id=""
@@ -2367,7 +2367,10 @@ defmodule ControlKeel.Skills.Exporter do
       session_id=$(printf '%s' "$input" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null || printf '')
     fi
 
-    [ "$stop_hook_active" = "false" ] || exit 0
+    case "$stop_hook_active" in
+      false|False|'') ;;
+      *) exit 0 ;;
+    esac
     case "$session_id" in
       ''|*[!0-9]*|0) exit 0 ;;
     esac
