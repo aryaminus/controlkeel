@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.31 — 2026-11-22
+
+### What's changed
+
+- Support only fully integrated agent hosts (#360)
+
 ## v0.4.30 — 2026-11-22
 
 ### What's changed
