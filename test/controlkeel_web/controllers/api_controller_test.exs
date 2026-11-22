@@ -695,7 +695,6 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert Enum.any?(targets, &(&1["id"] == "claude-plugin"))
       assert Enum.any?(targets, &(&1["id"] == "copilot-plugin"))
-      assert Enum.any?(targets, &(&1["id"] == "vscode-companion"))
       assert Enum.any?(targets, &(&1["id"] == "cline-native"))
       assert Enum.any?(targets, &(&1["id"] == "roo-native"))
       assert Enum.any?(targets, &(&1["id"] == "goose-native"))
@@ -704,12 +703,8 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert Enum.any?(agents, &(&1["id"] == "roo-code"))
       assert Enum.any?(agents, &(&1["id"] == "goose"))
       assert Enum.any?(agents, &(&1["id"] == "cursor"))
-      assert Enum.any?(agents, &(&1["id"] == "open-swe"))
       assert Enum.any?(agents, &(&1["id"] == "warp"))
-      assert Enum.any?(agents, &(&1["id"] == "warp-oz"))
       assert Enum.any?(agents, &(&1["id"] == "devin"))
-      assert Enum.any?(agents, &(&1["id"] == "executor"))
-      assert Enum.any?(agents, &(&1["id"] == "virtual-bash"))
       assert Enum.any?(agents, &(&1["id"] == "letta-code"))
       refute Enum.any?(agents, &(&1["id"] == "jcode"))
       refute Enum.any?(agents, &(&1["id"] == "vllm"))
@@ -748,14 +743,6 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert Map.has_key?(response["provider_status"], "project_root")
 
-      open_swe =
-        Enum.find(agents, fn agent ->
-          agent["id"] == "open-swe"
-        end)
-
-      assert open_swe["support_class"] == "headless_runtime"
-      assert open_swe["runtime_export_command"] == "controlkeel runtime export open-swe"
-
       devin =
         Enum.find(agents, fn agent ->
           agent["id"] == "devin"
@@ -772,30 +759,6 @@ defmodule ControlKeelWeb.ApiControllerTest do
       assert warp["support_class"] == "attach_client"
       assert warp["attach_command"] == "controlkeel attach warp"
       assert warp["preferred_target"] == "warp-native"
-
-      warp_oz =
-        Enum.find(agents, fn agent ->
-          agent["id"] == "warp-oz"
-        end)
-
-      assert warp_oz["support_class"] == "headless_runtime"
-      assert warp_oz["runtime_export_command"] == "controlkeel runtime export warp-oz"
-
-      executor =
-        Enum.find(agents, fn agent ->
-          agent["id"] == "executor"
-        end)
-
-      assert executor["support_class"] == "headless_runtime"
-      assert executor["runtime_export_command"] == "controlkeel runtime export executor"
-
-      virtual_bash =
-        Enum.find(agents, fn agent ->
-          agent["id"] == "virtual-bash"
-        end)
-
-      assert virtual_bash["support_class"] == "headless_runtime"
-      assert virtual_bash["runtime_export_command"] == "controlkeel runtime export virtual-bash"
 
       opencode =
         Enum.find(agents, fn agent ->
@@ -819,23 +782,13 @@ defmodule ControlKeelWeb.ApiControllerTest do
 
       assert augment["preferred_target"] == "augment-native"
       assert augment["phase_model"] == "host_plan_mode"
-      assert augment["review_experience"] == "native_review"
+      assert augment["review_experience"] == "browser_review"
       assert augment["runtime_transport"] == "auggie_sdk_acp"
       assert augment["runtime_auth_owner"] == "agent"
-      assert augment["runtime_review_transport"] == "plugin_hook_acp"
+      assert augment["runtime_review_transport"] == "mcp_tool_call"
       assert augment["runtime_session_support"]["resume"] == true
-      assert "hooks" in augment["agent_uses_ck_via"]
+      refute "hooks" in augment["agent_uses_ck_via"]
       assert ".augment/commands/controlkeel-review.md" in augment["artifact_surfaces"]
-
-      assert Enum.any?(
-               augment["package_outputs"],
-               &(&1["artifact"] == "controlkeel-augment-plugin.tar.gz")
-             )
-
-      assert Enum.any?(
-               augment["direct_install_methods"],
-               &(&1["command"] == "auggie --plugin-dir ./controlkeel/dist/augment-plugin")
-             )
 
       vscode =
         Enum.find(agents, fn agent ->
@@ -843,8 +796,6 @@ defmodule ControlKeelWeb.ApiControllerTest do
         end)
 
       assert vscode["phase_model"] == "review_only"
-      assert vscode["runtime_transport"] == "vscode_companion"
-      assert vscode["runtime_review_transport"] == "vscode_ipc"
 
       cline =
         Enum.find(agents, fn agent ->

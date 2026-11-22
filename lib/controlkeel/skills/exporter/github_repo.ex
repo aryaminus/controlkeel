@@ -47,13 +47,6 @@ defmodule ControlKeel.Skills.Exporter.GithubRepo do
       Jason.encode!(E.mcp_payload(project_root, opts), pretty: true) <> "\n"
     )
 
-    vscode_extensions = Path.join(root, ".vscode/extensions.json")
-
-    File.write!(
-      vscode_extensions,
-      Jason.encode!(E.vscode_extensions_manifest(), pretty: true) <> "\n"
-    )
-
     instructions_path = Path.join(root, ".github/copilot-instructions.md")
     File.mkdir_p!(Path.dirname(instructions_path))
     File.write!(instructions_path, E.instructions_only_contents("copilot", project_root, opts))
@@ -71,7 +64,6 @@ defmodule ControlKeel.Skills.Exporter.GithubRepo do
         %{"path" => last_command_path, "kind" => "command"},
         %{"path" => github_mcp, "kind" => "mcp"},
         %{"path" => vscode_mcp, "kind" => "mcp"},
-        %{"path" => vscode_extensions, "kind" => "settings"},
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
       [

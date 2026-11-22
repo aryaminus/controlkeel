@@ -50,15 +50,6 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
-        "claude-sdk",
-        "Claude Agent SDK bundle",
-        "TypeScript and Python SDK starter files wiring CK MCP, skills, and lifecycle hooks for headless Agent SDK deployments.",
-        false,
-        "export",
-        ["export"],
-        true
-      ),
-      target(
         "cline-native",
         "Cline native bundle",
         "Cline-native skills, `.clinerules` guidance, workflows, and MCP companion config.",
@@ -140,15 +131,6 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
-        "gemini-cli-native",
-        "Gemini CLI extension bundle",
-        "Gemini CLI extension with manifest, MCP server, custom commands, agent skills, and GEMINI.md context.",
-        true,
-        "project",
-        ["project", "export"],
-        true
-      ),
-      target(
         "kiro-native",
         "Kiro native bundle",
         "Kiro Agent Hooks, steering files, MCP config, and governance instructions.",
@@ -185,60 +167,6 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
-        "augment-plugin",
-        "Augment plugin bundle",
-        "Local Auggie plugin bundle with hooks, agents, commands, rules, skills, and MCP bridge.",
-        true,
-        "export",
-        ["export"],
-        true
-      ),
-      target(
-        "hermes-native",
-        "Hermes Agent bundle",
-        "Hermes-native skills, AGENTS context, and MCP companion config.",
-        true,
-        "user",
-        ["user", "project", "export"],
-        true
-      ),
-      target(
-        "multica-native",
-        "Multica native bundle",
-        "Multica daemon bundle with `.agents/skills`, repo `AGENTS.md`, and MCP companion config for Multica-orchestrated coding agents.",
-        true,
-        "project",
-        ["user", "project", "export"],
-        true
-      ),
-      target(
-        "multica-cloud-runtime",
-        "Multica Cloud runtime",
-        "Headless export for Multica Cloud-hosted agent workspaces, autopilots, and issue-triggered agent runs.",
-        true,
-        "export",
-        ["project", "export"],
-        true
-      ),
-      target(
-        "openclaw-native",
-        "OpenClaw native bundle",
-        "Workspace or managed OpenClaw skills plus MCP companion config.",
-        true,
-        "project",
-        ["user", "project", "export"],
-        true
-      ),
-      target(
-        "openclaw-plugin",
-        "OpenClaw plugin bundle",
-        "Plugin-ready OpenClaw bundle with skills, manifest, and MCP companion config.",
-        true,
-        "export",
-        ["export"],
-        true
-      ),
-      target(
         "copilot-plugin",
         "Copilot / VS Code plugin bundle",
         "Plugin bundle for GitHub Copilot CLI and VS Code agent mode.",
@@ -266,48 +194,12 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
-        "droid-plugin",
-        "Factory Droid plugin bundle",
-        "Shareable Factory plugin bundle with plugin manifest, skills, commands, droids, hooks, and MCP config.",
-        true,
-        "export",
-        ["export"],
-        true
-      ),
-      target(
-        "forge-acp",
-        "Forge ACP bundle",
-        "ACP companion bundle plus portable MCP fallback files for Forge.",
-        true,
-        "user",
-        ["user", "project", "export"],
-        true
-      ),
-      target(
         "open-standard",
         "Open-standard skills",
         "Portable AgentSkills bundle for any client that supports SKILL.md directories.",
         true,
         "project",
         ["user", "project", "export"],
-        true
-      ),
-      target(
-        "instructions-only",
-        "Instructions only",
-        "Companion AGENTS / CLAUDE / Copilot instruction snippets for MCP-only tools.",
-        false,
-        "project",
-        ["project", "export"],
-        true
-      ),
-      target(
-        "open-swe-runtime",
-        "Open SWE runtime export",
-        "Headless runtime export with AGENTS context, webhook, and CI recipes for Open SWE.",
-        false,
-        "export",
-        ["project", "export"],
         true
       ),
       target(
@@ -338,71 +230,12 @@ defmodule ControlKeel.Skills.SkillTarget do
         true
       ),
       target(
-        "warp-oz-runtime",
-        "Warp Oz runtime export",
-        "Oz cloud-agent runtime export with AGENTS context, MCP config examples, schedule/integration guidance, and API request templates.",
-        false,
-        "export",
-        ["project", "export"],
-        true
-      ),
-      target(
-        "cloudflare-workers-runtime",
-        "Cloudflare Workers runtime export",
-        "Governed Cloudflare Workers AI agent with D1, KV, R2, and MCP governance integration.",
-        false,
-        "export",
-        ["project", "export"],
-        true
-      ),
-      target(
-        "executor-runtime",
-        "Executor runtime export",
-        "Typed integration-runtime export for OpenAPI, GraphQL, MCP, and custom JS functions through Executor.",
-        false,
-        "export",
-        ["project", "export"],
-        true
-      ),
-      target(
-        "virtual-bash-runtime",
-        "Virtual bash runtime export",
-        "CK-owned virtual-workspace runtime export for just-bash-style discovery with governed shell fallback.",
-        false,
-        "export",
-        ["project", "export"],
-        true
-      ),
-      target(
         "antigravity-cli-native",
         "Antigravity CLI native bundle",
         "Full 7-surface CK governance bundle for Antigravity CLI: plugin manifest, skills, agents, rules, hooks, MCP config, and instructions.",
         true,
         "project",
         ["project", "export"],
-        true
-      ),
-      target(
-        "antigravity-cli-plugin",
-        "Antigravity CLI portable plugin",
-        "Portable CK governance plugin for Antigravity CLI global install via plugin directory.",
-        false,
-        "export",
-        ["export"],
-        true
-      )
-    ] ++ vscode_companion_targets()
-  end
-
-  defp vscode_companion_targets do
-    [
-      target(
-        "vscode-companion",
-        "VS Code companion extension",
-        "VS Code webview companion that opens ControlKeel browser reviews inside the editor and injects terminal routing env vars.",
-        true,
-        "export",
-        ["export"],
         true
       )
     ]

@@ -13,10 +13,7 @@ defmodule ControlKeel.Skills.TargetFamily do
     "goose" => ["goose", "goose-native"],
     "kilo" => ["kilo", "kilo-native"],
     "open-standard" => ["open-standard"],
-    "openclaw" => ["openclaw", "openclaw-native", "openclaw-plugin"],
-    "hermes" => ["hermes-agent", "hermes-native"],
-    "droid" => ["droid", "droid-bundle", "droid-plugin"],
-    "forge" => ["forge", "forge-acp"]
+    "droid" => ["droid", "droid-bundle"]
   }
 
   @render_fallback_order Map.keys(@family_targets)

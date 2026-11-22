@@ -626,7 +626,6 @@ defmodule ControlKeel.SkillsTest do
              "bounded-loop",
              "challenge",
              "cli-for-agents",
-             "cloudflare-agent",
              "communication-style",
              "compliance-audit",
              "continual-learning",
@@ -915,9 +914,9 @@ defmodule ControlKeel.SkillsTest do
     assert second_plan.output_dir == first_plan.output_dir
     refute File.exists?(Path.join(second_plan.output_dir, "stale.txt"))
 
-    stale_cloudflare_root = Path.join(tmp_dir, ".claude/skills/cloudflare-agent")
-    File.mkdir_p!(stale_cloudflare_root)
-    File.write!(Path.join(stale_cloudflare_root, "SKILL.md"), "stale\n")
+    stale_skill_root = Path.join(tmp_dir, ".claude/skills/agent-integration")
+    File.mkdir_p!(stale_skill_root)
+    File.write!(Path.join(stale_skill_root, "SKILL.md"), "stale\n")
 
     assert {:ok, install} = Skills.install("claude-standalone", tmp_dir, scope: "project")
     assert install.destination == Path.join(tmp_dir, ".claude/skills")
@@ -925,7 +924,7 @@ defmodule ControlKeel.SkillsTest do
     assert File.exists?(
              Path.join(
                tmp_dir,
-               ".claude/skills/cloudflare-agent/references/cloudflare-integration.md"
+               ".claude/skills/agent-integration/references/target-matrix.md"
              )
            )
   end
@@ -1550,9 +1549,9 @@ defmodule ControlKeel.SkillsTest do
     assert failures == [],
            "export targets that failed to produce a plan: #{inspect(failures)}"
 
-    # Guards against the decomposition silently dropping a host (handlers were
-    # lost-and-restored twice during the exporter/CLI refactors).
-    assert length(ids) >= 40
+    # Guards against silently dropping or re-adding a host: the target set is
+    # the approved full and MCP-only tiers plus Devin and the open standard.
+    assert length(ids) == 25
   end
 
   test "invalid install scopes return an error instead of falling back", %{tmp_dir: tmp_dir} do
@@ -1560,26 +1559,6 @@ defmodule ControlKeel.SkillsTest do
              Skills.install("cursor-native", tmp_dir, scope: "user")
 
     refute File.exists?(Path.join(tmp_dir, ".cursor"))
-  end
-
-  test "multica installs concrete native artifacts for project and user scopes", %{
-    tmp_dir: tmp_dir
-  } do
-    project = Path.join(tmp_dir, "project")
-    File.mkdir_p!(project)
-
-    assert {:ok, project_install} = Skills.install("multica-native", project, scope: "project")
-    assert project_install.destination == Path.join(project, ".multica")
-    assert project_install.skills_destination == Path.join(project, ".agents/skills")
-    assert File.exists?(Path.join(project, ".multica/controlkeel-mcp.json"))
-    assert File.exists?(Path.join(project, ".multica/commands/controlkeel-review.md"))
-    assert File.exists?(Path.join(project, ".agents/skills/controlkeel-governance/SKILL.md"))
-
-    assert {:ok, user_install} = Skills.install("multica-native", project, scope: "user")
-    assert user_install.destination == Path.join(tmp_dir, ".multica")
-    assert user_install.skills_destination == Path.join(tmp_dir, ".agents/skills")
-    assert File.exists?(Path.join(tmp_dir, ".multica/controlkeel-mcp.json"))
-    assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
   end
 
   test "antigravity installs its workspace-native bundle", %{tmp_dir: tmp_dir} do
@@ -1599,8 +1578,7 @@ defmodule ControlKeel.SkillsTest do
   test "runtime targets with project scope return unsupported_install instead of crashing", %{
     tmp_dir: tmp_dir
   } do
-    for target <- ~w(open-swe-runtime devin-runtime warp-oz-runtime executor-runtime
-                     cloudflare-workers-runtime virtual-bash-runtime multica-cloud-runtime) do
+    for target <- ~w(devin-runtime) do
       assert {:error, {:unsupported_install, ^target, "project"}} =
                Skills.install(target, tmp_dir, scope: "project"),
              "expected #{target} to return unsupported_install for project scope"
@@ -1609,7 +1587,7 @@ defmodule ControlKeel.SkillsTest do
 
   test "export-only plugin targets reject project install scope", %{tmp_dir: tmp_dir} do
     for plugin <-
-          ~w(claude-plugin augment-plugin openclaw-plugin droid-plugin antigravity-cli-plugin) do
+          ~w(claude-plugin) do
       result = Skills.install(plugin, tmp_dir, scope: "project")
 
       assert match?({:error, {:unsupported_scope, ^plugin, "project", _}}, result) ||

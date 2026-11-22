@@ -930,9 +930,6 @@ defmodule ControlKeel.CLI do
   def plugin_target("codex"), do: {:ok, "codex-plugin"}
   def plugin_target("claude"), do: {:ok, "claude-plugin"}
   def plugin_target("copilot"), do: {:ok, "copilot-plugin"}
-  def plugin_target("openclaw"), do: {:ok, "openclaw-plugin"}
-  def plugin_target("augment"), do: {:ok, "augment-plugin"}
-  def plugin_target("droid"), do: {:ok, "droid-plugin"}
   def plugin_target(_plugin), do: {:error, :unknown_plugin}
 
   def plugin_mcp_hint("hosted"), do: ".mcp.hosted.json"
@@ -2600,9 +2597,7 @@ defmodule ControlKeel.CLI do
              "amp",
              "augment",
              "opencode",
-             "gemini-cli",
-             "continue",
-             "aider"
+             "continue"
            ] do
     if native_attach_skipped?(options) do
       []
@@ -2616,15 +2611,10 @@ defmodule ControlKeel.CLI do
           "amp" => "amp-native",
           "augment" => "augment-native",
           "opencode" => "opencode-native",
-          "gemini-cli" => "gemini-cli-native",
-          "continue" => "continue-native",
-          "aider" => "instructions-only"
+          "continue" => "continue-native"
         }[agent]
 
-      case if(target,
-             do: Skills.install(target, project_root, scope: "project"),
-             else: Skills.export("instructions-only", project_root, scope: "export")
-           ) do
+      case Skills.install(target, project_root, scope: "project") do
         {:ok, %{destination: destination}} ->
           [
             "Prepared native companion files for #{display_attach_agent(agent)}.",
@@ -2916,10 +2906,6 @@ defmodule ControlKeel.CLI do
     Path.join([user_home(), ".config", "opencode", "opencode.json"])
   end
 
-  def gemini_cli_config_path do
-    Path.join([user_home(), ".gemini", "settings.json"])
-  end
-
   def cline_mcp_config_path do
     base = System.get_env("CLINE_DIR") || Path.join(user_home(), ".cline")
     Path.join([base, "data", "settings", "cline_mcp_settings.json"])
@@ -2959,48 +2945,6 @@ defmodule ControlKeel.CLI do
        %{
          "server_name" => server_name,
          "ide" => "continue",
-         "config_path" => config_path,
-         "command" => command,
-         "args" => args,
-         "attached_at" =>
-           DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
-       }}
-    end
-  end
-
-  # Aider uses a YAML config file (.aider.conf.yml) at the project root
-  def attach_to_aider(command_spec, project_root) do
-    command = command_spec[:command] || command_spec["command"]
-    args = command_spec[:args] || command_spec["args"] || []
-    config_path = Path.join(project_root, ".aider.conf.yml")
-
-    existing =
-      case File.read(config_path) do
-        {:ok, c} -> c
-        _ -> ""
-      end
-
-    # Remove any prior controlkeel block, then append the new one
-    cleaned =
-      Regex.replace(
-        ~r/\nmcpservers:(\n  controlkeel:[^\n]*(\n    [^\n]+)*)+/,
-        existing,
-        ""
-      )
-
-    args_line =
-      case args do
-        [] -> ""
-        values -> "    args: [#{Enum.map_join(values, ", ", &~s(\"#{&1}\"))}]\n"
-      end
-
-    entry = "\nmcpservers:\n  controlkeel:\n    command: #{command}\n" <> args_line
-
-    with :ok <- File.write(config_path, String.trim_trailing(cleaned) <> entry) do
-      {:ok,
-       %{
-         "server_name" => "controlkeel",
-         "ide" => "aider",
          "config_path" => config_path,
          "command" => command,
          "args" => args,

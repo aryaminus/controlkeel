@@ -105,8 +105,6 @@ defmodule ControlKeel.Cloud.AgentInventory do
       kind: :file,
       evidence: "CLAUDE.md project instructions"
     },
-    %{host: "aider", relative_path: ".aider.conf.yml", kind: :file, evidence: "aider config"},
-    %{host: "aider", relative_path: "AIDER.md", kind: :file, evidence: "aider project doc"},
     %{host: "kilo", relative_path: ".kilo/kilo.json", kind: :file, evidence: "kilo config"},
     %{
       host: "letta-code",

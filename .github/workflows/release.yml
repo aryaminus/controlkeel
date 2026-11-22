@@ -372,37 +372,6 @@ jobs:
 
           npm publish --registry=https://npm.pkg.github.com
 
-  publish-vscode-marketplace:
-    needs: release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-candidate-dist
-          path: dist
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Check VS Code marketplace publish configuration
-        id: vscode_gate
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: |
-          if [ -z "${VSCE_PAT}" ]; then
-            echo "VSCE_PAT is not configured; skipping VS Code marketplace publish."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Publish VS Code companion
-        if: steps.vscode_gate.outputs.enabled == 'true'
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: |
-          npx --yes @vscode/vsce publish --packagePath dist/controlkeel-vscode-companion.vsix -p "${VSCE_PAT}"
-
   verify-channels:
     needs: [release, publish-npm, publish-github-packages]
     runs-on: ubuntu-latest
@@ -468,7 +437,6 @@ jobs:
             echo "SKIP  Homebrew formula not found (optional channel, skipped)"
           fi
 
-          echo "SKIP  VS Code marketplace (optional channel, only publishes when VSCE_PAT configured)"
 
           echo "=== Summary ==="
           if [ "$FAIL" -ne 0 ]; then

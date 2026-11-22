@@ -67,8 +67,7 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
       ],
       [
         "Keep `.augment/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
-        "Use `.augment/mcp.json` with `auggie --mcp-config ./.augment/mcp.json` for ephemeral MCP wiring or merge `.augment/settings.controlkeel.json` into `~/.augment/settings.json` for persistence.",
-        "For hook-native review interception, run Auggie with the local plugin bundle from `controlkeel/dist/augment-plugin`."
+        "Use `.augment/mcp.json` with `auggie --mcp-config ./.augment/mcp.json` for ephemeral MCP wiring or merge `.augment/settings.controlkeel.json` into `~/.augment/settings.json` for persistence."
       ]
     )
   end

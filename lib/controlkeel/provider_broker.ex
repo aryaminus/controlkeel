@@ -358,30 +358,6 @@ defmodule ControlKeel.ProviderBroker do
   end
 
   defp bridge_resolution_for_integration(
-         %Integration{id: "hermes-agent", provider_bridge: %{supported: true}} = integration,
-         opts
-       ) do
-    opts
-    |> hermes_provider_hint()
-    |> resolution_from_hint(
-      integration,
-      "Attached Hermes provider config selected a compatible provider."
-    )
-  end
-
-  defp bridge_resolution_for_integration(
-         %Integration{id: "openclaw", provider_bridge: %{supported: true}} = integration,
-         opts
-       ) do
-    opts
-    |> openclaw_provider_hint()
-    |> resolution_from_hint(
-      integration,
-      "Attached OpenClaw config selected a compatible provider."
-    )
-  end
-
-  defp bridge_resolution_for_integration(
          %Integration{id: "droid", provider_bridge: %{supported: true}} = integration,
          opts
        ) do
@@ -391,41 +367,6 @@ defmodule ControlKeel.ProviderBroker do
       integration,
       "Attached Factory Droid settings selected a compatible provider."
     )
-  end
-
-  defp bridge_resolution_for_integration(
-         %Integration{id: "forge", provider_bridge: %{supported: true, mode: "acp_session"}},
-         opts
-       ) do
-    case Keyword.get(opts, :acp_session) do
-      %{provider: provider} = session ->
-        provider = normalize_provider(provider)
-        allowed_providers = Map.keys(@hosted_provider_envs)
-
-        api_key =
-          session[:api_key] ||
-            session["api_key"] ||
-            present_env(Map.get(@hosted_provider_envs, provider))
-
-        if provider in allowed_providers and present?(api_key) do
-          config =
-            provider_config(provider, api_key, opts, :agent_bridge)
-            |> maybe_put_config("base_url", session[:base_url] || session["base_url"])
-            |> maybe_put_config("model", session[:model] || session["model"])
-
-          resolution(
-            "agent_bridge",
-            provider,
-            config,
-            "Attached Forge ACP session exposed a compatible provider.",
-            "acp_session",
-            "agent"
-          )
-        end
-
-      _ ->
-        nil
-    end
   end
 
   defp bridge_resolution_for_integration(_integration, _opts), do: nil
@@ -639,46 +580,6 @@ defmodule ControlKeel.ProviderBroker do
     end
   end
 
-  defp hermes_provider_hint(opts) do
-    config_path =
-      Keyword.get(opts, :hermes_config_path) ||
-        Path.join(user_home(), ".hermes/config.yaml")
-
-    env_path =
-      Keyword.get(opts, :hermes_env_path) ||
-        Path.join(user_home(), ".hermes/.env")
-
-    yaml = read_yaml_hints(config_path)
-    env_map = read_env_file(env_path)
-
-    provider = normalize_provider(yaml["provider"] || yaml["model_provider"])
-    model = yaml["model"]
-    env_key = env_map["OPENROUTER_API_KEY"] && "OPENROUTER_API_KEY"
-    env_key = env_key || provider_env_key(provider)
-
-    if provider && env_key do
-      %{"provider" => provider, "model" => model, "api_key" => present_env(env_key)}
-    end
-  end
-
-  defp openclaw_provider_hint(opts) do
-    config_path =
-      Keyword.get(opts, :openclaw_config_path) ||
-        Path.join(user_home(), ".openclaw/openclaw.json")
-
-    with {:ok, contents} <- File.read(config_path),
-         {:ok, decoded} <- Jason.decode(contents) do
-      providers =
-        get_in(decoded, ["models", "providers"]) ||
-          decoded["providers"] ||
-          %{}
-
-      find_provider_hint(providers, decoded["model"])
-    else
-      _ -> nil
-    end
-  end
-
   defp droid_provider_hint(opts) do
     settings_path =
       Keyword.get(opts, :droid_settings_path) ||
@@ -703,82 +604,6 @@ defmodule ControlKeel.ProviderBroker do
       end
     else
       _ -> nil
-    end
-  end
-
-  defp find_provider_hint(providers, default_model) when is_map(providers) do
-    providers
-    |> Enum.find_value(fn {name, config} ->
-      provider =
-        normalize_provider(name) ||
-          normalize_provider(config["provider"]) ||
-          if(present?(config["baseUrl"] || config["base_url"]), do: "openai", else: nil)
-
-      env_key =
-        config["apiKeyEnv"] ||
-          config["api_key_env"] ||
-          get_in(config, ["apiKey", "env"]) ||
-          provider_env_key(provider)
-
-      if provider && present?(env_key) && present?(present_env(env_key)) do
-        %{
-          "provider" => provider,
-          "model" => config["model"] || config["defaultModel"] || default_model,
-          "base_url" => config["baseUrl"] || config["base_url"],
-          "api_key" => present_env(env_key)
-        }
-      end
-    end)
-  end
-
-  defp find_provider_hint(_providers, _default_model), do: nil
-
-  defp read_yaml_hints(path) do
-    case File.read(path) do
-      {:ok, contents} ->
-        contents
-        |> String.split("\n")
-        |> Enum.map(&String.trim/1)
-        |> Enum.reduce(%{}, fn line, acc ->
-          case String.split(line, ":", parts: 2) do
-            [key, value] ->
-              value = value |> String.trim() |> String.trim("\"'")
-
-              if value == "" or String.starts_with?(key, "#") do
-                acc
-              else
-                Map.put(acc, String.trim(key), value)
-              end
-
-            _ ->
-              acc
-          end
-        end)
-
-      _ ->
-        %{}
-    end
-  end
-
-  defp read_env_file(path) do
-    case File.read(path) do
-      {:ok, contents} ->
-        contents
-        |> String.split("\n")
-        |> Enum.map(&String.trim/1)
-        |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))
-        |> Enum.reduce(%{}, fn line, acc ->
-          case String.split(line, "=", parts: 2) do
-            [key, value] ->
-              Map.put(acc, String.trim(key), String.trim(value) |> String.trim("\"'"))
-
-            _ ->
-              acc
-          end
-        end)
-
-      _ ->
-        %{}
     end
   end
 

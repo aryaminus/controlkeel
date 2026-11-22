@@ -6,7 +6,6 @@ defmodule ControlKeel.Agent.RouterTest do
   # All agents that pass critical security tier (local: true + security_tier :critical or :high)
   @critical_ok [
     "ollama",
-    "aider",
     "opencode",
     "claude-code",
     "cursor",
@@ -142,7 +141,6 @@ defmodule ControlKeel.Agent.RouterTest do
 
       assert rec.agent in [
                "ollama",
-               "aider",
                "opencode",
                "continue"
              ]
@@ -206,16 +204,6 @@ defmodule ControlKeel.Agent.RouterTest do
   end
 
   describe "route/2 — local CLI category" do
-    test "aider passes critical risk tier" do
-      assert {:ok, rec} =
-               Router.route("Update patient records",
-                 risk_tier: "critical",
-                 allowed_agents: ["aider"]
-               )
-
-      assert rec.agent == "aider"
-    end
-
     test "opencode passes critical risk tier" do
       assert {:ok, rec} =
                Router.route("Update PHI data",
@@ -250,7 +238,7 @@ defmodule ControlKeel.Agent.RouterTest do
   describe "list_agents/0" do
     test "returns all supported agents" do
       agents = Router.list_agents()
-      assert map_size(agents) == 28
+      assert map_size(agents) == 26
     end
 
     test "contains all expected categories" do
@@ -265,7 +253,6 @@ defmodule ControlKeel.Agent.RouterTest do
       assert Map.has_key?(agents, "amp")
 
       # Local CLIs
-      assert Map.has_key?(agents, "aider")
       assert Map.has_key?(agents, "opencode")
       assert Map.has_key?(agents, "codex-cli")
       assert Map.has_key?(agents, "antigravity")
@@ -281,7 +268,7 @@ defmodule ControlKeel.Agent.RouterTest do
       assert Map.has_key?(agents, "devin")
       assert Map.has_key?(agents, "ai-studio")
       assert Map.has_key?(agents, "codex")
-      assert Map.has_key?(agents, "gemini-cli")
+      refute Map.has_key?(agents, "gemini-cli")
       assert Map.has_key?(agents, "generic-cli")
 
       # Review & spec
