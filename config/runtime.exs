@@ -186,11 +186,6 @@ config :controlkeel, ControlKeel.Intent,
 if config_env() == :prod do
   database_path = ControlKeel.Runtime.Defaults.database_path()
 
-  # One-time global -> project-local migration: if we resolved to a project DB
-  # that doesn't exist yet, seed it from the legacy global DB before the Repo
-  # opens. No-op for already-migrated projects or explicit DATABASE_PATH.
-  ControlKeel.Runtime.Defaults.maybe_seed_project_database()
-
   # Postgres is configured whenever a remote mode (`:cloud` or `:self_hosted`)
   # is paired with a `DATABASE_URL`. In that case the local SQLite repo is
   # intentionally NOT configured — the dispatcher (lib/controlkeel/repo.ex)
