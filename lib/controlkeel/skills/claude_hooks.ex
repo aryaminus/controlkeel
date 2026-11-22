@@ -18,9 +18,7 @@ defmodule ControlKeel.Skills.ClaudeHooks do
     # Hooks earlier releases installed that only repeated static reminders
     # (or booted the CLI on every event). Remove them so an upgrade stops
     # firing them even when an older settings.json still references them.
-    Enum.each(retired_hooks(), fn filename ->
-      _ = File.rm(Path.join(hooks_dir, filename))
-    end)
+    remove_retired_hooks(hooks_dir)
 
     paths =
       for {filename, content} <- hooks do
@@ -31,6 +29,27 @@ defmodule ControlKeel.Skills.ClaudeHooks do
       end
 
     paths
+  end
+
+  @doc """
+  Removes hook scripts earlier releases generated, but only when the file's
+  contents show ControlKeel wrote it. A user script that happens to share a
+  retired name is left alone.
+  """
+  def remove_retired_hooks(hooks_dir) do
+    Enum.each(retired_hooks(), fn filename ->
+      path = Path.join(hooks_dir, filename)
+
+      with {:ok, contents} <- File.read(path),
+           true <- ck_generated?(contents) do
+        _ = File.rm(path)
+      end
+    end)
+  end
+
+  defp ck_generated?(contents) do
+    String.starts_with?(contents, "#!/usr/bin/env sh") and
+      Regex.match?(~r/ControlKeel|ck_context|ck_validate|ck_bin\(\)/, contents)
   end
 
   @doc false

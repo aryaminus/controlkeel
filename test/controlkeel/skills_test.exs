@@ -1137,15 +1137,30 @@ defmodule ControlKeel.SkillsTest do
       File.mkdir_p!(Path.dirname(settings_path))
       hooks_dir = Path.join(tmp_dir, ".claude/hooks")
       File.mkdir_p!(hooks_dir)
-      File.write!(Path.join(hooks_dir, "post-tool-batch.sh"), "#!/bin/sh\n")
+
+      File.write!(
+        Path.join(hooks_dir, "post-tool-batch.sh"),
+        "#!/usr/bin/env sh\nprintf '{\"additionalContext\":\"Tool batch completed. Call ck_validate.\"}'\n"
+      )
+
+      File.write!(
+        Path.join(hooks_dir, "session-start.sh"),
+        "#!/usr/bin/env sh\necho my own hook\n"
+      )
 
       user_hook = %{"type" => "command", "command" => "./scripts/my-lint.sh"}
+
+      custom_hook = %{
+        "type" => "command",
+        "command" => "sh .claude/hooks/session-start.sh.custom"
+      }
 
       File.write!(
         settings_path,
         Jason.encode!(%{
           "hooks" => %{
             "PreToolUse" => [%{"matcher" => "Bash", "hooks" => [user_hook]}],
+            "SessionStart" => [%{"hooks" => [custom_hook]}],
             "PostToolBatch" => [
               %{
                 "hooks" => [
@@ -1169,6 +1184,8 @@ defmodule ControlKeel.SkillsTest do
 
       refute Map.has_key?(hooks, "PostToolBatch")
       refute File.exists?(Path.join(hooks_dir, "post-tool-batch.sh"))
+      assert File.read!(Path.join(hooks_dir, "session-start.sh")) =~ "my own hook"
+      assert [%{"hooks" => [^custom_hook]}] = hooks["SessionStart"]
 
       pre_tool_commands =
         hooks["PreToolUse"]
@@ -1214,7 +1231,7 @@ defmodule ControlKeel.SkillsTest do
               {"CK_TEST_INPUT", payload},
               {"CK_HOOK_PATH", hook},
               {"CONTROLKEEL_BIN", stub},
-              {"TMPDIR", state_dir}
+              {"CONTROLKEEL_HOOK_STATE_DIR", state_dir}
             ]
           )
 
@@ -1227,9 +1244,15 @@ defmodule ControlKeel.SkillsTest do
 
       assert run.(3, false) == ""
       assert run.(2, false) == ""
+      assert run.(3, false) == "", "fluctuating back to the reported count stays quiet"
       assert run.(4, false) =~ "4 blocked finding"
       assert run.(9, true) == ""
       assert run.(0, false) == ""
+      assert run.(1, false) =~ "1 blocked finding", "clearing findings resets the baseline"
+
+      state_file = Path.join(state_dir, "stop-3f2a-uuid")
+      assert File.read!(state_file) == "1"
+      assert File.stat!(state_dir).access == :read_write
     end
   end
 

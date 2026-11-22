@@ -304,9 +304,7 @@ defmodule ControlKeel.Skills.Installer do
       copy_tree_contents(hooks_src, hooks_dst)
     end
 
-    Enum.each(ControlKeel.Skills.ClaudeHooks.retired_hooks(), fn name ->
-      _ = File.rm(Path.join(hooks_dst, name))
-    end)
+    ControlKeel.Skills.ClaudeHooks.remove_retired_hooks(hooks_dst)
 
     settings_path = Path.join(base, "settings.json")
     merge_claude_settings(settings_path, Exporter.claude_manual_settings())
@@ -1197,11 +1195,30 @@ defmodule ControlKeel.Skills.Installer do
   defp strip_ck_hook_groups(groups), do: groups
 
   defp ck_owned_claude_hook?(%{"command" => command}) when is_binary(command) do
-    String.contains?(command, ".claude/hooks/") and
-      Enum.any?(ck_claude_hook_scripts(), &String.contains?(command, ".claude/hooks/" <> &1))
+    command in ck_claude_hook_commands()
   end
 
   defp ck_owned_claude_hook?(_hook), do: false
+
+  # Exact command strings ControlKeel has generated for its Claude hooks:
+  # the current resolver form plus the bare relative forms older releases
+  # wrote. Matching whole commands keeps user entries that merely mention a
+  # similar path.
+  defp ck_claude_hook_commands do
+    Enum.flat_map(ck_claude_hook_scripts(), fn script ->
+      rel = ".claude/hooks/" <> script
+
+      [
+        ControlKeel.Skills.Exporter.Shared.repo_hook_command(rel),
+        rel,
+        "./" <> rel,
+        "sh " <> rel,
+        "bash " <> rel,
+        ~s(sh "$CLAUDE_PROJECT_DIR"/) <> rel,
+        ~s("$CLAUDE_PROJECT_DIR"/) <> rel
+      ]
+    end)
+  end
 
   defp ck_claude_hook_scripts do
     current =

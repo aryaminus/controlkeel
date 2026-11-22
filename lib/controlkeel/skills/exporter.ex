@@ -1718,17 +1718,38 @@ defmodule ControlKeel.Skills.Exporter do
     case "$blocked" in
       ''|*[!0-9]*) exit 0 ;;
     esac
-    [ "$blocked" -gt 0 ] || exit 0
+
+    # Remember the last count reported to this Claude session in a private,
+    # user-owned directory. Resetting to 0 when findings clear means a new
+    # blocked finding is reported; staying at the last reported count means
+    # fluctuations below it stay quiet.
+    state_dir="${CONTROLKEEL_HOOK_STATE_DIR:-${XDG_STATE_HOME:-${HOME:-}/.local/state}/controlkeel/hooks}"
+    [ -n "${HOME:-}${CONTROLKEEL_HOOK_STATE_DIR:-}${XDG_STATE_HOME:-}" ] || exit 0
+    (umask 077 && mkdir -p "$state_dir") 2>/dev/null || exit 0
+    if [ -L "$state_dir" ] || [ ! -O "$state_dir" ]; then
+      exit 0
+    fi
 
     state_key=$(printf '%s' "${host_session:-default}" | tr -c 'A-Za-z0-9_-' '_')
-    state_file="${TMPDIR:-/tmp}/controlkeel-stop-${state_key}"
-    previous=$(cat "$state_file" 2>/dev/null || printf '0')
-    case "$previous" in
-      ''|*[!0-9]*) previous=0 ;;
+    state_file="$state_dir/stop-${state_key}"
+    reported=$(cat "$state_file" 2>/dev/null || printf '0')
+    case "$reported" in
+      ''|*[!0-9]*) reported=0 ;;
     esac
 
-    printf '%s' "$blocked" > "$state_file" 2>/dev/null || true
-    [ "$blocked" -gt "$previous" ] || exit 0
+    record_reported() {
+      tmp_state="$state_file.$$"
+      (umask 077 && printf '%s' "$1" > "$tmp_state") 2>/dev/null && mv -f "$tmp_state" "$state_file" 2>/dev/null
+      rm -f "$tmp_state" 2>/dev/null
+    }
+
+    if [ "$blocked" -eq 0 ]; then
+      [ "$reported" -eq 0 ] || record_reported 0
+      exit 0
+    fi
+
+    [ "$blocked" -gt "$reported" ] || exit 0
+    record_reported "$blocked"
 
     printf '{"systemMessage":"ControlKeel has %s blocked finding(s) for this project. Review them with ck_context or the findings page before treating the work as done."}\n' "$blocked"
     exit 0
