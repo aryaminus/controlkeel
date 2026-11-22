@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.30 — 2026-11-22
+
+### What's changed
+
+- Keep Claude Code hooks quiet unless they gate an action (#359)
+
 ## v0.4.29 — 2026-11-22
 
 ### What's changed
