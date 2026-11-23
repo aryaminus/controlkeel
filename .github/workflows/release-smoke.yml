@@ -66,8 +66,11 @@ jobs:
           BURRITO_TARGET=linux_arm64 mix release --overwrite
           cp burrito_out/controlkeel_linux_arm64 release_stage/raw/linux-arm/controlkeel-linux-arm64
 
-          sudo apt-get install -y qemu-user-static
-          qemu-aarch64-static burrito_out/controlkeel_linux_arm64 version | grep -q "ControlKeel"
+          # Newer Ubuntu images ship qemu-user as static binaries and make
+          # qemu-user-static a virtual package, so install whichever exists.
+          sudo apt-get install -y qemu-user || sudo apt-get install -y qemu-user-static
+          QEMU_AARCH64="$(command -v qemu-aarch64-static || command -v qemu-aarch64)"
+          "$QEMU_AARCH64" burrito_out/controlkeel_linux_arm64 version | grep -q "ControlKeel"
 
       - uses: actions/upload-artifact@v4
         with:
