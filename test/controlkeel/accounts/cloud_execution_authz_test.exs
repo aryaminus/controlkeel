@@ -118,6 +118,17 @@ defmodule ControlKeel.Accounts.CloudExecutionAuthzTest do
                Accounts.authorize_cloud_execution(workspace.id, user_id: user.id)
     end
 
+    test "rejects a disabled user even with an active membership" do
+      org = insert_org()
+      workspace = MissionFixtures.workspace_fixture(%{org_id: org.id})
+      user = insert_user("offboarded@example.com")
+      insert_active_membership(user.id, org.id, "owner")
+      {:ok, _} = Accounts.disable_user(user.id)
+
+      assert {:error, :unauthorized} =
+               Accounts.authorize_cloud_execution(workspace.id, user_id: user.id)
+    end
+
     test "authorizes owner role" do
       org = insert_org()
       workspace = MissionFixtures.workspace_fixture(%{org_id: org.id})

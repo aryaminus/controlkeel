@@ -66,6 +66,53 @@ defmodule ControlKeelWeb.DeviceAuthControllerTest do
     assert json_response(replay, 400)["error"] == "expired_token"
   end
 
+  test "a user disabled after approval gets no token and the code is burned", %{
+    conn: conn,
+    user: user
+  } do
+    payload =
+      conn
+      |> json_post("/device_authorization", %{client_id: "controlkeel-cli", scope: "cli"})
+      |> json_response(200)
+
+    {:ok, auth} = DeviceAuth.fetch_by_user_code(payload["user_code"])
+    {:ok, _approved} = DeviceAuth.approve(auth, user.id)
+    {:ok, _} = Accounts.disable_user(user.id)
+
+    poll = fn ->
+      json_post(build_conn(), "/oauth/device_token", %{
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: payload["device_code"]
+      })
+    end
+
+    assert json_response(poll.(), 400)["error"] == "access_denied"
+    assert json_response(poll.(), 400)["error"] == "expired_token"
+  end
+
+  test "access tokens stop verifying once the user is disabled", %{conn: conn, user: user} do
+    payload =
+      conn
+      |> json_post("/device_authorization", %{client_id: "controlkeel-cli", scope: "cli"})
+      |> json_response(200)
+
+    {:ok, auth} = DeviceAuth.fetch_by_user_code(payload["user_code"])
+    {:ok, _approved} = DeviceAuth.approve(auth, user.id)
+
+    token =
+      build_conn()
+      |> json_post("/oauth/device_token", %{
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: payload["device_code"]
+      })
+      |> json_response(200)
+      |> Map.fetch!("access_token")
+
+    assert {:ok, _claims} = ControlKeelWeb.DeviceAuthController.verify_access_token(token)
+    {:ok, _} = Accounts.disable_user(user.id)
+    assert :error = ControlKeelWeb.DeviceAuthController.verify_access_token(token)
+  end
+
   test "a denied flow returns access_denied", %{conn: conn, user: user} do
     conn = json_post(conn, "/device_authorization", %{client_id: "controlkeel-cli"})
     payload = json_response(conn, 200)

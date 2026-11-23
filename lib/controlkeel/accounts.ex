@@ -1424,7 +1424,9 @@ defmodule ControlKeel.Accounts do
           true ->
             case get_active_membership(user_id, org_id) do
               %Membership{role: role} when is_binary(role) ->
-                if role_at_least?(role, required_role) do
+                # An active membership is not enough: an offboarded (disabled)
+                # user must not authorize cloud execution either.
+                if role_at_least?(role, required_role) and user_active?(get_user(user_id)) do
                   {:ok, :authorized}
                 else
                   {:error, :unauthorized}
