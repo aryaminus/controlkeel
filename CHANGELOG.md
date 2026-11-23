@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.35 — 2026-11-23
+
+### What's changed
+
+- Stop flagging plain paths as secrets; say why the shell gate blocked (#368)
+
 ## v0.4.34 — 2026-11-23
 
 ### What's changed
