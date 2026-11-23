@@ -32,8 +32,9 @@ defmodule ControlKeel.Agent.Router do
   # :prompt_management — prompt versioning, evaluation, deployment ops
   # :skills            — supports AgentSkills discovery and activation via ck_skill_list/ck_skill_load
 
+  # Routing only names agents ControlKeel integrates with (see
+  # `Agent.Integration.catalog/0`), so a recommendation is always attachable.
   @agents %{
-    # ── Category A: Local IDEs ───────────────────────────────────────────────
     "claude-code" => %{
       name: "Claude Code",
       capabilities: [:repo_edit, :file_write, :bash, :mcp, :git],
@@ -43,12 +44,46 @@ defmodule ControlKeel.Agent.Router do
       context_window_k: 200,
       local: true
     },
+    "codex-cli" => %{
+      name: "Codex CLI",
+      capabilities: [:repo_edit, :file_write, :bash],
+      cost_tier: :low,
+      security_tier: :high,
+      swe_bench_score: 0.64,
+      context_window_k: 128,
+      local: true
+    },
     "cursor" => %{
       name: "Cursor",
       capabilities: [:repo_edit, :file_write, :bash, :mcp],
       cost_tier: :medium,
       security_tier: :high,
       swe_bench_score: 0.65,
+      context_window_k: 200,
+      local: true
+    },
+    "copilot" => %{
+      name: "GitHub Copilot",
+      capabilities: [:repo_edit, :code_review, :pr_review],
+      cost_tier: :medium,
+      security_tier: :medium,
+      swe_bench_score: 0.64,
+      local: false
+    },
+    "antigravity" => %{
+      name: "Antigravity",
+      capabilities: [:repo_edit, :file_write, :bash],
+      cost_tier: :low,
+      security_tier: :medium,
+      swe_bench_score: 0.44,
+      local: true
+    },
+    "opencode" => %{
+      name: "OpenCode",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
+      cost_tier: :free,
+      security_tier: :critical,
+      swe_bench_score: 0.52,
       context_window_k: 200,
       local: true
     },
@@ -70,15 +105,6 @@ defmodule ControlKeel.Agent.Router do
       context_window_k: 128,
       local: true
     },
-    "augment" => %{
-      name: "Augment Code",
-      capabilities: [:repo_edit, :file_write, :mcp],
-      cost_tier: :medium,
-      security_tier: :high,
-      swe_bench_score: 0.58,
-      context_window_k: 200,
-      local: true
-    },
     "amp" => %{
       name: "Amp (Sourcegraph)",
       capabilities: [:repo_edit, :file_write, :bash, :mcp, :git, :skills],
@@ -88,31 +114,13 @@ defmodule ControlKeel.Agent.Router do
       context_window_k: 200,
       local: true
     },
-    # ── Category B: Local CLIs ───────────────────────────────────────────────
-    "opencode" => %{
-      name: "OpenCode",
-      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
-      cost_tier: :free,
-      security_tier: :critical,
-      swe_bench_score: 0.52,
-      context_window_k: 200,
-      local: true
-    },
-    "codex-cli" => %{
-      name: "Codex CLI",
-      capabilities: [:repo_edit, :file_write, :bash],
-      cost_tier: :low,
+    "augment" => %{
+      name: "Augment Code",
+      capabilities: [:repo_edit, :file_write, :mcp],
+      cost_tier: :medium,
       security_tier: :high,
-      swe_bench_score: 0.64,
-      context_window_k: 128,
-      local: true
-    },
-    "antigravity" => %{
-      name: "Antigravity",
-      capabilities: [:repo_edit, :file_write, :bash],
-      cost_tier: :low,
-      security_tier: :medium,
-      swe_bench_score: 0.44,
+      swe_bench_score: 0.58,
+      context_window_k: 200,
       local: true
     },
     "continue" => %{
@@ -123,55 +131,6 @@ defmodule ControlKeel.Agent.Router do
       swe_bench_score: 0.50,
       local: true
     },
-    "ollama" => %{
-      name: "Ollama (local)",
-      capabilities: [:repo_edit, :file_write],
-      cost_tier: :free,
-      security_tier: :critical,
-      swe_bench_score: 0.45,
-      local: true
-    },
-    # ── Category C: Cloud Platforms & Scaffolders ────────────────────────────
-    "bolt" => %{
-      name: "Bolt",
-      capabilities: [:ui_prototype, :full_stack_scaffold],
-      cost_tier: :low,
-      security_tier: :low,
-      swe_bench_score: 0.40,
-      local: false
-    },
-    "replit" => %{
-      name: "Replit",
-      capabilities: [:ui_prototype, :full_stack_scaffold, :deploy],
-      cost_tier: :low,
-      security_tier: :low,
-      swe_bench_score: 0.38,
-      local: false
-    },
-    "lovable" => %{
-      name: "Lovable",
-      capabilities: [:ui_prototype, :full_stack_scaffold],
-      cost_tier: :low,
-      security_tier: :low,
-      swe_bench_score: 0.41,
-      local: false
-    },
-    "v0" => %{
-      name: "v0 (Vercel)",
-      capabilities: [:ui_prototype],
-      cost_tier: :low,
-      security_tier: :low,
-      swe_bench_score: 0.36,
-      local: false
-    },
-    "factory" => %{
-      name: "Factory",
-      capabilities: [:repo_edit, :full_stack_scaffold, :deploy],
-      cost_tier: :medium,
-      security_tier: :medium,
-      swe_bench_score: 0.54,
-      local: false
-    },
     "devin" => %{
       name: "Devin (Cognition)",
       capabilities: [:repo_edit, :file_write, :bash, :deploy],
@@ -180,87 +139,73 @@ defmodule ControlKeel.Agent.Router do
       swe_bench_score: 0.51,
       local: false
     },
-    "ai-studio" => %{
-      name: "Google AI Studio",
-      capabilities: [:ui_prototype, :full_stack_scaffold],
+    "droid" => %{
+      name: "Factory Droid",
+      capabilities: [:repo_edit, :full_stack_scaffold, :deploy],
+      cost_tier: :medium,
+      security_tier: :medium,
+      swe_bench_score: 0.54,
+      local: false
+    },
+    "cline" => %{
+      name: "Cline",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
+      cost_tier: :medium,
+      security_tier: :high,
+      swe_bench_score: 0.55,
+      local: true
+    },
+    "kilo" => %{
+      name: "Kilo Code",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
+      cost_tier: :medium,
+      security_tier: :high,
+      swe_bench_score: 0.55,
+      local: true
+    },
+    "roo-code" => %{
+      name: "Roo Code",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
+      cost_tier: :medium,
+      security_tier: :high,
+      swe_bench_score: 0.55,
+      local: true
+    },
+    "goose" => %{
+      name: "Goose",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
       cost_tier: :low,
-      security_tier: :low,
-      swe_bench_score: 0.40,
-      local: false
-    },
-    "codex" => %{
-      name: "OpenAI Codex",
-      capabilities: [:repo_edit, :file_write, :bash],
-      cost_tier: :medium,
-      security_tier: :medium,
-      swe_bench_score: 0.68,
-      local: false
-    },
-    "generic-cli" => %{
-      name: "Generic CLI",
-      capabilities: [:repo_edit, :file_write, :bash],
-      cost_tier: :medium,
-      security_tier: :medium,
+      security_tier: :high,
       swe_bench_score: 0.50,
-      local: false
+      local: true
     },
-    # ── Category D: Code Review & Spec Tools ─────────────────────────────────
-    "coderabbit" => %{
-      name: "CodeRabbit",
-      capabilities: [:code_review, :pr_review],
+    "pi" => %{
+      name: "Pi",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
       cost_tier: :low,
-      security_tier: :medium,
-      swe_bench_score: 0.72,
-      local: false
+      security_tier: :high,
+      swe_bench_score: 0.50,
+      local: true
     },
-    "copilot" => %{
-      name: "GitHub Copilot",
-      capabilities: [:repo_edit, :code_review, :pr_review],
+    "warp" => %{
+      name: "Warp",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
       cost_tier: :medium,
-      security_tier: :medium,
-      swe_bench_score: 0.64,
-      local: false
-    },
-    "qodo" => %{
-      name: "Qodo",
-      capabilities: [:code_review, :test_gen],
-      cost_tier: :low,
-      security_tier: :medium,
-      swe_bench_score: 0.66,
-      local: false
-    },
-    "specpilot" => %{
-      name: "SpecPilot",
-      capabilities: [:spec_gen, :code_review],
-      cost_tier: :low,
       security_tier: :medium,
       swe_bench_score: 0.55,
       local: false
     },
-    "chatprd" => %{
-      name: "ChatPRD",
-      capabilities: [:spec_gen],
-      cost_tier: :low,
-      security_tier: :low,
-      swe_bench_score: 0.50,
-      local: false
-    },
-    "specced" => %{
-      name: "Specced",
-      capabilities: [:spec_gen],
-      cost_tier: :low,
-      security_tier: :low,
-      swe_bench_score: 0.48,
+    "letta-code" => %{
+      name: "Letta Code",
+      capabilities: [:repo_edit, :file_write, :bash, :mcp, :skills],
+      cost_tier: :medium,
+      security_tier: :medium,
+      swe_bench_score: 0.55,
       local: false
     }
   }
 
-  @routable_agent_ids ~w(
-    claude-code cursor windsurf kiro augment amp
-    aider opencode codex-cli antigravity continue ollama
-    bolt replit lovable v0 factory devin ai-studio codex gemini-cli generic-cli
-    coderabbit copilot qodo specpilot chatprd specced
-  )
+  @routable_agent_ids Map.keys(@agents)
 
   @doc """
   Route a task to the best agent.
@@ -293,7 +238,7 @@ defmodule ControlKeel.Agent.Router do
     case candidates do
       [] ->
         {:error, :no_suitable_agent,
-         "No agent satisfies the security tier (#{risk_tier}) and task type (#{task_type}) constraints. Consider using ollama or aider for high-sensitivity tasks."}
+         "No agent satisfies the security tier (#{risk_tier}) and task type (#{task_type}) constraints. Lower the risk tier or allow a critical-tier agent such as OpenCode for high-sensitivity tasks."}
 
       ranked ->
         scored = rank_candidates(ranked, task_type, risk_tier, budget_remaining, domain_pack)

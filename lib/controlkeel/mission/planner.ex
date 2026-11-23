@@ -111,38 +111,29 @@ defmodule ControlKeel.Mission.Planner do
   }
 
   @agent_labels %{
-    # Local IDEs
     "claude" => "Claude Code",
     "claude-code" => "Claude Code",
+    "codex" => "Codex",
+    "codex-cli" => "Codex",
     "cursor" => "Cursor",
-    "windsurf" => "Windsurf",
-    "kiro" => "Kiro (Amazon)",
-    "augment" => "Augment Code",
-    "amp" => "Amp (Sourcegraph)",
-    # Local CLIs
-    "opencode" => "OpenCode",
-    "codex" => "Codex CLI",
-    "codex-cli" => "Codex CLI",
-    "antigravity" => "Antigravity",
-    "continue" => "Continue",
-    "ollama" => "Ollama (local)",
-    # Cloud platforms
-    "bolt" => "Bolt",
-    "lovable" => "Lovable",
-    "replit" => "Replit",
-    "v0" => "v0 (Vercel)",
-    "factory" => "Factory",
-    "devin" => "Devin (Cognition)",
-    "ai-studio" => "Google AI Studio",
-    "generic" => "Generic Agent",
-    "generic-cli" => "Generic CLI",
-    # Review & spec tools
     "copilot" => "GitHub Copilot",
-    "coderabbit" => "CodeRabbit",
-    "qodo" => "Qodo",
-    "specpilot" => "SpecPilot",
-    "chatprd" => "ChatPRD",
-    "specced" => "Specced"
+    "antigravity" => "Antigravity",
+    "opencode" => "OpenCode",
+    "windsurf" => "Windsurf",
+    "cline" => "Cline",
+    "kiro" => "Kiro",
+    "kilo" => "Kilo Code",
+    "amp" => "Amp",
+    "augment" => "Augment",
+    "continue" => "Continue",
+    "roo-code" => "Roo Code",
+    "goose" => "Goose",
+    "droid" => "Factory Droid",
+    "pi" => "Pi",
+    "warp" => "Warp",
+    "letta-code" => "Letta Code",
+    "devin" => "Devin",
+    "generic" => "Generic Agent"
   }
 
   def build(attrs) do
