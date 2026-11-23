@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.37 — 2026-11-23
+
+### What's changed
+
+- Publish releases again: dispatch smoke and release after the bump (#370)
+
 ## v0.4.36 — 2026-11-23
 
 ### What's changed
