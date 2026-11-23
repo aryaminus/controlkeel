@@ -64,7 +64,7 @@ defmodule ControlKeel.CLI do
 
     project_root =
       opts
-      |> Keyword.get(:project_root, File.cwd!())
+      |> Keyword.get_lazy(:project_root, &ControlKeel.Runtime.Defaults.governed_root/0)
       |> Root.resolve()
 
     case run_command(parsed, project_root) do

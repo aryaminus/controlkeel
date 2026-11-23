@@ -25,8 +25,21 @@ defmodule ControlKeel.Runtime.Defaults do
 
   def database_path do
     System.get_env("DATABASE_PATH") ||
-      project_database_path(File.cwd!()) ||
+      project_database_path(governed_root()) ||
       global_database_path()
+  end
+
+  @doc """
+  The directory of the project being governed: `CK_PROJECT_ROOT` when set
+  (agent hosts and the source-checkout launchers export it), otherwise the
+  working directory. The project binding and the database both resolve from
+  here, so they always belong to the same project.
+  """
+  def governed_root do
+    case System.get_env("CK_PROJECT_ROOT") do
+      root when is_binary(root) and root != "" -> root
+      _ -> File.cwd!()
+    end
   end
 
   @doc """
@@ -173,8 +186,12 @@ defmodule ControlKeel.Runtime.Defaults do
     end
   end
 
-  defp project_database_path(cwd) do
-    root = ControlKeel.Project.Root.resolve(cwd)
+  @doc """
+  The governed project's database (`<root>/controlkeel/controlkeel.db`) for the
+  project containing `path`, or `nil` when `path` is not inside a project.
+  """
+  def project_database_path(path) do
+    root = ControlKeel.Project.Root.resolve(path)
 
     if ControlKeel.Project.Root.project_root?(root) do
       Path.join([root, "controlkeel", "controlkeel.db"])
