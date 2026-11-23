@@ -126,7 +126,7 @@ defmodule ControlKeel.MCP.Tools.CkContext do
       "precedent" =>
         context["precedent"]
         |> compact_list(3)
-        |> Enum.map(&take_keys(&1, ["id", "title", "rule_id", "decision", "summary"])),
+        |> Enum.map(&take_keys(&1, ["id", "title", "rule_id", "disposition", "summary"])),
       "recent_events" =>
         context["recent_events"]
         |> compact_list(5)

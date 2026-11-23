@@ -45,6 +45,9 @@ defmodule ControlKeel.MCP.Tools.CkContextTest do
 
     assert {:ok, result} = CkContext.call(%{"session_id" => session.id})
     assert Enum.any?(result["precedent"], &(&1["rule_id"] == "security.sql_injection"))
+
+    # Compact keeps the prior outcome so agents can tell approvals from rejections.
+    assert Enum.any?(result["precedent"], &(&1["disposition"] == "approved"))
   end
 
   test "returns task assurance with verification and context integrity" do
