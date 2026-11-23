@@ -70,8 +70,15 @@ defmodule ControlKeel.Agent.RouterTest do
       assert rec.agent in @critical_ok
     end
 
-    test "excludes low-security agents for high-risk tasks" do
+    test "excludes medium-security agents for high-risk tasks" do
       assert {:ok, rec} = Router.route("Edit HIPAA-covered data", risk_tier: "high")
+      refute rec.agent in ["warp", "letta-code"]
+
+      assert {:error, :no_suitable_agent, _} =
+               Router.route("Edit HIPAA-covered data",
+                 risk_tier: "high",
+                 allowed_agents: ["warp", "letta-code"]
+               )
     end
 
     test "raw LLM providers are not routable agents" do
