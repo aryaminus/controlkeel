@@ -1769,10 +1769,9 @@ defmodule ControlKeel.SkillsTest do
       File.mkdir_p!(plugin)
       File.write!(Path.join(plugin, "plugin.json"), ~s({"name":"controlkeel"}))
 
-      File.write!(
-        Path.join(tmp_dir, "GEMINI.md"),
-        "# ControlKeel Companion Instructions\n\nold\n"
-      )
+      {:ok, plan} = Skills.export("antigravity-cli-native", tmp_dir, scope: "export")
+      generated = File.read!(Path.join(plan.output_dir, "AGENTS.md"))
+      File.write!(Path.join(tmp_dir, "GEMINI.md"), generated)
 
       File.write!(Path.join(tmp_dir, ".agents/mcp_config.json"), ~s({"mcpServers":{"other":{}}}))
 
@@ -1786,9 +1785,55 @@ defmodule ControlKeel.SkillsTest do
 
       assert Map.has_key?(servers["mcpServers"], "other")
 
-      File.write!(Path.join(tmp_dir, "GEMINI.md"), "# My notes\n")
+      edited = generated <> "\n## My notes\n"
+      File.write!(Path.join(tmp_dir, "GEMINI.md"), edited)
       assert {:ok, _} = Skills.install("antigravity-cli-native", tmp_dir, scope: "project")
-      assert File.read!(Path.join(tmp_dir, "GEMINI.md")) == "# My notes\n"
+      assert File.read!(Path.join(tmp_dir, "GEMINI.md")) == edited
+    end
+
+    test "roo replaces an existing CK mode with blank lines inside it", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, ".roomodes"), """
+      customModes:
+        - slug: controlkeel-operator
+          name: Old
+
+          roleDefinition: old role
+          groups:
+            - read
+        - slug: my-mode
+          name: Mine
+      """)
+
+      assert {:ok, _} = Skills.install("roo-native", tmp_dir, scope: "project")
+      modes = File.read!(Path.join(tmp_dir, ".roomodes"))
+
+      refute modes =~ "old role"
+      refute modes =~ "name: Old"
+      assert modes =~ "slug: my-mode"
+      assert length(String.split(modes, "slug: controlkeel-operator")) == 2
+    end
+
+    test "the shell gate validates multi-line and write-capable commands" do
+      helpers = Exporter.hook_runtime_helpers()
+
+      classify = fn command ->
+        {out, 0} =
+          System.cmd("sh", [
+            "-c",
+            helpers <> "\nck_readonly_command \"$1\" && echo ro || echo check",
+            "_",
+            command
+          ])
+
+        String.trim(out)
+      end
+
+      assert classify.("git status") == "ro"
+      assert classify.("ls -la") == "ro"
+      assert classify.("pwd\ngit push") == "check"
+      assert classify.("sort -o out.txt in.txt") == "check"
+      assert classify.("git diff --output=patch") == "check"
+      assert classify.("less file") == "check"
     end
 
     test "roo install keeps the user's custom modes", %{tmp_dir: tmp_dir} do

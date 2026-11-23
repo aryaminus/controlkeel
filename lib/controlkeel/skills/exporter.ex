@@ -2072,7 +2072,10 @@ defmodule ControlKeel.Skills.Exporter do
     # Plain read-only commands skip validation: no shell metacharacters and a
     # first word that only reads. Anything else goes through ck_validate.
     ck_readonly_command() {
+      ck_nl='
+    '
       case "$1" in
+        *"$ck_nl"*|*"$(printf '\r')"*) return 1 ;;
         *[\;\&\|\>\<\`\$\(\)]*|'') return 1 ;;
       esac
       set -f
@@ -2080,7 +2083,12 @@ defmodule ControlKeel.Skills.Exporter do
       set -- $1
       set +f
       case "$1" in
-        ls|cat|head|tail|wc|pwd|grep|rg|which|type|file|stat|du|df|tree|sort|uniq|cut|diff|less|more) ;;
+        ls|cat|head|tail|wc|pwd|grep|rg|which|type|file|stat|du|df|uniq|cut|diff) ;;
+        sort|tree)
+          case " $* " in
+            *" -o"*|*" --output"*) return 1 ;;
+          esac
+          ;;
         find)
           case " $* " in
             *" -delete "*|*" -exec "*|*" -execdir "*|*" -ok "*|*" -okdir "*|*" -fprint"*) return 1 ;;
@@ -2088,7 +2096,11 @@ defmodule ControlKeel.Skills.Exporter do
           ;;
         git)
           case "${2:-}" in
-            status|diff|log|show|blame|rev-parse|ls-files|grep|shortlog|describe) ;;
+            status|diff|log|show|blame|rev-parse|ls-files|grep|shortlog|describe)
+              case " $* " in
+                *" --output"*|*" -o "*) return 1 ;;
+              esac
+              ;;
             *) return 1 ;;
           esac
           ;;

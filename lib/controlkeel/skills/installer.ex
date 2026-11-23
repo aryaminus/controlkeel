@@ -956,7 +956,11 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_tree_merging!(Path.join(plan.output_dir, ".augment"), augment_root, json: ["mcp.json"])
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
-    retire_ck_instruction_copy!(Path.join(project_root, "AUGMENT.md"))
+
+    retire_ck_instruction_copy!(
+      Path.join(project_root, "AUGMENT.md"),
+      Path.join(plan.output_dir, "AGENTS.md")
+    )
 
     {:ok,
      %{
@@ -1041,7 +1045,7 @@ defmodule ControlKeel.Skills.Installer do
     replace_json_keys!(Path.join(out, "hooks.json"), Path.join(agents_root, "hooks.json"))
     merge_json_file!(Path.join(out, "mcp_config.json"), Path.join(agents_root, "mcp_config.json"))
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
-    retire_antigravity_duplicates!(project_root)
+    retire_antigravity_duplicates!(project_root, Path.join(plan.output_dir, "AGENTS.md"))
 
     {:ok,
      %{
@@ -1400,7 +1404,7 @@ defmodule ControlKeel.Skills.Installer do
   # second registration of the same hooks and MCP server) and a whole-file
   # `GEMINI.md` copy of the AGENTS.md instructions. Remove both when they are
   # ControlKeel's own output.
-  defp retire_antigravity_duplicates!(project_root) do
+  defp retire_antigravity_duplicates!(project_root, generated_agents_md) do
     plugin_root = Path.join(project_root, ".agents/plugins/controlkeel")
 
     with {:ok, body} <- File.read(Path.join(plugin_root, "plugin.json")),
@@ -1408,14 +1412,16 @@ defmodule ControlKeel.Skills.Installer do
       File.rm_rf!(plugin_root)
     end
 
-    retire_ck_instruction_copy!(Path.join(project_root, "GEMINI.md"))
+    retire_ck_instruction_copy!(Path.join(project_root, "GEMINI.md"), generated_agents_md)
   end
 
-  # Remove a host-specific instructions file only when it is a whole-file copy
-  # ControlKeel wrote earlier; AGENTS.md now carries the managed block.
-  defp retire_ck_instruction_copy!(path) do
+  # Remove a host-specific instructions file only when it is still exactly the
+  # copy ControlKeel would write (the same text now lands in AGENTS.md). A file
+  # with any user edits is kept.
+  defp retire_ck_instruction_copy!(path, generated_path) do
     with {:ok, contents} <- File.read(path),
-         true <- String.starts_with?(contents, "# ControlKeel Companion Instructions") do
+         {:ok, generated} <- File.read(generated_path),
+         true <- String.trim(contents) == String.trim(generated) do
       File.rm!(path)
     end
 
@@ -1499,8 +1505,12 @@ defmodule ControlKeel.Skills.Installer do
           end)
 
         cond do
-          String.contains?(existing, "slug: controlkeel-operator") ->
+          Enum.any?(lines, &String.starts_with?(&1, "  - slug: controlkeel-operator")) ->
             File.write!(destination_path, replace_roo_mode(lines, ck_entry))
+
+          String.contains?(existing, "controlkeel-operator") ->
+            # An unfamiliar layout; leave the user's file untouched.
+            :ok
 
           top_level == ["customModes:"] ->
             File.write!(
@@ -1524,9 +1534,7 @@ defmodule ControlKeel.Skills.Installer do
     after_block =
       rest
       |> Enum.drop(1)
-      |> Enum.drop_while(fn line ->
-        not String.starts_with?(line, "  - ") and String.starts_with?(line, "    ")
-      end)
+      |> Enum.drop_while(fn line -> line == "" or String.starts_with?(line, "    ") end)
 
     (before ++ [ck_entry] ++ after_block)
     |> Enum.join("\n")
