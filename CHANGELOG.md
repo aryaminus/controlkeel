@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.32 — 2026-11-23
+
+### What's changed
+
+- Shrink compact ck_context from ~46 KB to ~4 KB (#364)
+- Route only to agents ControlKeel integrates with (#365)
+- Refuse device tokens and cloud runs for disabled users (#366)
+- Store skills only in shared host paths and stop overwriting host config (#362)
+
 ## v0.4.31 — 2026-11-22
 
 ### What's changed
