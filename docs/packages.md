@@ -23,10 +23,9 @@ Install this first before using companion packages or generated bundles.
 
 Release artifacts and `controlkeel runtime export <target>` generate bundles for:
 
-- host-native integrations such as OpenCode, Claude Code, Codex CLI, Copilot, Cursor, Windsurf, and others listed in [support-matrix.md](support-matrix.md)
-- headless/runtime targets such as Devin, Open SWE, Executor, virtual-bash, and Cloudflare Workers
-- framework adapters and instructions-only bundles
-- VS Code companion extension and release tarballs
+- host-native integrations for the hosts listed in [support-matrix.md](support-matrix.md)
+- the Devin runtime bundle (`controlkeel runtime export devin`)
+- the open-standard bundle for hosts without a named integration: `.agents/skills`, `.mcp.json`, and `AGENTS.md`
 
 A release bundle may contain a plugin or marketplace manifest so a host can install it locally. That does not mean the bundle has been published to, reviewed by, or listed in that host's public marketplace. Treat marketplace publication as a separate channel and verify the listing in the marketplace itself.
 
@@ -73,7 +72,7 @@ controlkeel runtime export <runtime>
 ## Versioning and supply chain
 
 - Keep bootstrap, companion packages, and generated bundles on the same ControlKeel version.
-- GitHub Releases are the canonical source for binaries, checksums, plugin tarballs, exported native bundles, and the VS Code companion `.vsix`.
+- GitHub Releases are the canonical source for binaries, checksums, plugin tarballs, and exported native bundles.
 - Direct CLI updates pin downloads to `aryaminus/controlkeel` and require the release checksum before atomic replacement. The checksum detects corruption or mismatch within a release; it is not independent proof against a compromised release origin. Shell, PowerShell, and npm installers can additionally verify keyless cosign provenance when cosign is available.
 - A successful CI run only authorizes a version bump while its exact commit remains current `main`. Native release-smoke evidence is created later by the commit-bound release-candidate workflow and is required by the tag release workflow before publication.
 - The `releases/latest/download/...` installers are versioned release assets selected by GitHub's latest-release redirect. The `raw.githubusercontent.com/.../main/...` installers are mutable snapshots of the current default branch and can change before the next release.

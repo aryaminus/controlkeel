@@ -5,43 +5,13 @@ defmodule ControlKeel.Skills.Exporter.KiroNative do
 
   def write(root, project_root, skills, opts) do
     # 0. Skill tree
-    skill_root = Path.join(root, ".kiro/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
-
-    # 1. Agent Hook — post-tool validation
-    hook_path = Path.join(root, ".kiro/hooks/controlkeel-validate.json")
-    File.mkdir_p!(Path.dirname(hook_path))
-    File.write!(hook_path, Jason.encode!(E.kiro_hook_spec(), pretty: true) <> "\n")
-
-    review_hook_path = Path.join(root, ".kiro/hooks/controlkeel-review.json")
-    File.write!(review_hook_path, Jason.encode!(E.kiro_review_hook_spec(), pretty: true) <> "\n")
-
-    nudge_validate_hook_path = Path.join(root, ".kiro/hooks/controlkeel-nudge-validate.json")
-
-    File.write!(
-      nudge_validate_hook_path,
-      Jason.encode!(E.kiro_nudge_validate_hook_spec(), pretty: true) <> "\n"
-    )
-
-    nudge_finding_hook_path = Path.join(root, ".kiro/hooks/controlkeel-nudge-finding.json")
-
-    File.write!(
-      nudge_finding_hook_path,
-      Jason.encode!(E.kiro_nudge_finding_hook_spec(), pretty: true) <> "\n"
-    )
 
     # 2. Steering file
     steering_path = Path.join(root, ".kiro/steering/controlkeel.md")
     File.mkdir_p!(Path.dirname(steering_path))
     File.write!(steering_path, E.kiro_steering_contents())
-
-    tool_policy_path = Path.join(root, ".kiro/settings/controlkeel-tools.json")
-    File.mkdir_p!(Path.dirname(tool_policy_path))
-
-    File.write!(
-      tool_policy_path,
-      Jason.encode!(E.kiro_tool_policy_manifest(), pretty: true) <> "\n"
-    )
 
     command_path = Path.join(root, ".kiro/commands/controlkeel-review.md")
     File.mkdir_p!(Path.dirname(command_path))
@@ -78,12 +48,7 @@ defmodule ControlKeel.Skills.Exporter.KiroNative do
       opts,
       [
         %{"path" => skill_root, "kind" => "skills"},
-        %{"path" => hook_path, "kind" => "hook"},
-        %{"path" => review_hook_path, "kind" => "hook"},
-        %{"path" => nudge_validate_hook_path, "kind" => "hook"},
-        %{"path" => nudge_finding_hook_path, "kind" => "hook"},
         %{"path" => steering_path, "kind" => "instructions"},
-        %{"path" => tool_policy_path, "kind" => "settings"},
         %{"path" => command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
         %{"path" => annotate_command_path, "kind" => "command"},
@@ -92,8 +57,7 @@ defmodule ControlKeel.Skills.Exporter.KiroNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.kiro/hooks/` into your project root for Agent Hook auto-discovery and review interception.",
-        "Copy `.kiro/steering/`, `.kiro/settings/`, and `.kiro/commands/` for governed agent behavioral guidance and tool controls.",
+        "Copy `.kiro/steering/` and `.kiro/commands/` for governed agent guidance.",
         "Merge `.kiro/mcp.json` into your Kiro MCP settings."
       ]
     )

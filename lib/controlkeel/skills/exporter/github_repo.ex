@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.GithubRepo do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".github/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     agent_path = Path.join(root, ".github/agents/controlkeel-operator.agent.md")
@@ -47,13 +47,6 @@ defmodule ControlKeel.Skills.Exporter.GithubRepo do
       Jason.encode!(E.mcp_payload(project_root, opts), pretty: true) <> "\n"
     )
 
-    vscode_extensions = Path.join(root, ".vscode/extensions.json")
-
-    File.write!(
-      vscode_extensions,
-      Jason.encode!(E.vscode_extensions_manifest(), pretty: true) <> "\n"
-    )
-
     instructions_path = Path.join(root, ".github/copilot-instructions.md")
     File.mkdir_p!(Path.dirname(instructions_path))
     File.write!(instructions_path, E.instructions_only_contents("copilot", project_root, opts))
@@ -71,11 +64,10 @@ defmodule ControlKeel.Skills.Exporter.GithubRepo do
         %{"path" => last_command_path, "kind" => "command"},
         %{"path" => github_mcp, "kind" => "mcp"},
         %{"path" => vscode_mcp, "kind" => "mcp"},
-        %{"path" => vscode_extensions, "kind" => "settings"},
         %{"path" => instructions_path, "kind" => "instructions"}
       ],
       [
-        "Copy the .github and .vscode folders into your repository root.",
+        "Copy the .agents, .github and .vscode folders into your repository root.",
         "VS Code and Copilot can then discover the skills, custom agent, command prompts, and MCP server config from the repo."
       ]
     )

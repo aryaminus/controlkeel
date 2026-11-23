@@ -5,7 +5,59 @@ defmodule ControlKeel.Accounts.CloudExecutionAuthzTest do
   alias ControlKeel.MissionFixtures
   alias ControlKeel.Repo
 
+  defp with_runtime_mode(mode) do
+    previous = Application.get_env(:controlkeel, :runtime_mode)
+    previous_env = System.get_env("CONTROLKEEL_RUNTIME_MODE")
+    Application.put_env(:controlkeel, :runtime_mode, mode)
+    System.delete_env("CONTROLKEEL_RUNTIME_MODE")
+
+    on_exit(fn ->
+      if previous,
+        do: Application.put_env(:controlkeel, :runtime_mode, previous),
+        else: Application.delete_env(:controlkeel, :runtime_mode)
+
+      if previous_env, do: System.put_env("CONTROLKEEL_RUNTIME_MODE", previous_env)
+    end)
+  end
+
+  describe "authorize_cloud_execution/2 in local mode" do
+    setup do
+      with_runtime_mode(:local)
+      :ok
+    end
+
+    test "the local operator is authorized without a user identity" do
+      unbound = MissionFixtures.workspace_fixture(%{org_id: nil})
+      bound = MissionFixtures.workspace_fixture(%{org_id: insert_org().id})
+
+      assert {:ok, :authorized} = Accounts.authorize_cloud_execution(unbound.id)
+      assert {:ok, :authorized} = Accounts.authorize_cloud_execution(bound.id)
+    end
+
+    test "a claimed user identity is still verified" do
+      org = insert_org()
+      workspace = MissionFixtures.workspace_fixture(%{org_id: org.id})
+      user = insert_user("local-claim@example.com")
+
+      assert {:error, :unauthorized} =
+               Accounts.authorize_cloud_execution(workspace.id, user_id: user.id)
+    end
+
+    test "a suspended org stays refused" do
+      org = insert_org()
+      {:ok, _} = org |> Accounts.Org.changeset(%{status: "disabled"}) |> Repo.update()
+      workspace = MissionFixtures.workspace_fixture(%{org_id: org.id})
+
+      assert {:error, :org_suspended} = Accounts.authorize_cloud_execution(workspace.id)
+    end
+  end
+
   describe "authorize_cloud_execution/2" do
+    setup do
+      with_runtime_mode(:cloud)
+      :ok
+    end
+
     test "rejects a workspace with no org, with or without a user_id" do
       # An org-less workspace has no tenant to authorize against. Treating it
       # as authorized (the pre-#269 behavior) let any caller, or no caller,
@@ -63,6 +115,17 @@ defmodule ControlKeel.Accounts.CloudExecutionAuthzTest do
       insert_active_membership(user.id, org.id, "admin")
 
       assert {:ok, :authorized} =
+               Accounts.authorize_cloud_execution(workspace.id, user_id: user.id)
+    end
+
+    test "rejects a disabled user even with an active membership" do
+      org = insert_org()
+      workspace = MissionFixtures.workspace_fixture(%{org_id: org.id})
+      user = insert_user("offboarded@example.com")
+      insert_active_membership(user.id, org.id, "owner")
+      {:ok, _} = Accounts.disable_user(user.id)
+
+      assert {:error, :unauthorized} =
                Accounts.authorize_cloud_execution(workspace.id, user_id: user.id)
     end
 

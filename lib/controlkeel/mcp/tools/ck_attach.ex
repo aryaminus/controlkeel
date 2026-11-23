@@ -39,8 +39,8 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
   alias ControlKeel.CLI
 
   def call(arguments) when is_map(arguments) do
-    with {:ok, host} <- require_host(arguments),
-         {:ok, _integration} <- validate_host(host),
+    with {:ok, requested_host} <- require_host(arguments),
+         {:ok, %Integration{id: host}} <- validate_host(requested_host),
          {:ok, scope} <- validate_scope(arguments),
          {:ok, project_root} <- resolve_project_root(arguments) do
       options =
@@ -80,6 +80,7 @@ defmodule ControlKeel.MCP.Tools.CkAttach do
 
   defp validate_host(host) do
     attachable = Integration.attachable_ids()
+    host = Integration.resolve_attach_id(host) || host
 
     cond do
       host not in attachable ->

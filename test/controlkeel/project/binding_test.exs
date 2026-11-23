@@ -266,5 +266,32 @@ defmodule ControlKeel.Project.BindingTest do
       assert refreshed =~ "/.cline/"
       assert [_, _] = String.split(refreshed, "# ControlKeel managed", parts: 2)
     end
+
+    test "skips entries already covered by an ignored parent directory", %{tmp: tmp} do
+      File.write!(Path.join(tmp, ".gitignore"), "/.claude/\n")
+
+      assert :ok =
+               Binding.ensure_gitignore(tmp, [
+                 "/.claude/settings.json",
+                 "/.claude/agents/",
+                 "/.cline/"
+               ])
+
+      contents = File.read!(Path.join(tmp, ".gitignore"))
+      refute contents =~ "/.claude/settings.json"
+      refute contents =~ "/.claude/agents/"
+      assert contents =~ "/.cline/"
+      assert contents =~ "/.claude/\n"
+    end
+
+    test "keeps child entries when the parent rule is negated or indented", %{tmp: tmp} do
+      for user_rules <- ["/.claude/\n!/.claude/\n", " /.claude/\n"] do
+        File.write!(Path.join(tmp, ".gitignore"), user_rules)
+        assert :ok = Binding.ensure_gitignore(tmp, ["/.claude/settings.json"])
+
+        contents = File.read!(Path.join(tmp, ".gitignore"))
+        assert contents =~ "\n/.claude/settings.json\n", inspect(user_rules)
+      end
+    end
   end
 end

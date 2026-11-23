@@ -40,21 +40,20 @@ For OpenCode, the `controlkeel-governance.ts` plugin injects a `submit_plan` too
 Budgets form another layer of bounded autonomy. Agents are assigned specific limits (tokens, API calls, time). `ck_budget` returns `allowed: false` when projected spend exceeds session or daily limits. If an agent burns budget unproductively, a budget circuit-breaker trips, emitting a finding, recording a budget memory record, and pausing the run.
 
 ## Hook Enforcement
-ControlKeel hooks are the hard enforcement layer between the agent host and the filesystem/shell:
+ControlKeel hooks are the enforcement layer between the agent host and the shell or filesystem. The same rules apply on every host: a hook either gates an action or reports a change, and otherwise stays silent.
 
-| Hook | What it does | Enforcement |
+| Hook | Hosts | What it does |
 | --- | --- | --- |
-| **PreToolUse (shell)** | Runs `ck_validate --kind shell` on Bash commands | **Deny** when scanner returns block |
-| **PreToolUse (sensitive write)** | Checks writes to `.env`, `.key`, `.pem`, credentials | **Deny** when scanner returns block |
-| **UserPromptSubmit (secrets)** | Detects AWS keys, API keys, private keys in prompts | **Block** the prompt entirely |
-| **UserPromptSubmit (blocked findings)** | Checks active blocked finding count | Advisory nudge to resolve first |
-| **UserPromptSubmit (budget)** | Checks budget utilization | Advisory nudge when >= 80% |
-| **PostToolUse (after ck_validate)** | Reads the validation decision | Advisory nudge (allow/warn/block) |
-| **PostToolUse (after ck_finding)** | Reads finding severity | Advisory nudge (high=stop, medium=batch) |
-| **PostToolUse (after write)** | Auto-records info-level finding for file writes | Automatic memory |
-| **PostToolUse (tool failure)** | Auto-records finding on tool errors | Automatic memory |
-| **SessionStart** | Calls `ck_run context` to load mission state | System message injection |
-| **SubagentStart** | Injects governance constraints | System message injection |
+| **Shell gate** | Claude Code, Codex, Cursor, Copilot, Antigravity, Devin terminal | Plain read-only commands (`ls`, `cat`, `git status`, …) skip validation. Other commands run `ck_validate --kind shell`: a block **denies** the command, a warning goes to the agent as context, and an unreachable ControlKeel is mentioned once per session. |
+| **Sensitive write check** | Claude Code, Cursor | Writes to `.env`, keys, certificates and credential files are validated; a block **denies** the write, otherwise the agent gets a note. It never asks the person for permission. |
+| **Prompt secret check** | Claude Code, Codex, Devin terminal | Blocks prompts that contain AWS keys, API keys, or private keys. No CLI call. |
+| **Stop** | Claude Code, Codex, Cursor, Antigravity, Devin terminal | Reads the project's blocked-finding count. It never blocks the turn and speaks only when the count rises in that session; on Cursor that is a single follow-up. |
+| **Pre/PostCompact** | Claude Code | Preserves the active gate and reloads governance after compaction. |
+| **Plan review** | Claude Code (ExitPlanMode), Windsurf (ExitPlanMode) | Routes an exited plan to ControlKeel review. Other hosts submit plans with the `ck_review_submit` tool. |
+
+ControlKeel does not register hooks that repeat static reminders (session start/end, tool batches, subagents, tasks, config changes), gate every MCP call, record findings for routine writes or tool failures, or send every tool call through plan review. Hook state (the last reported count, one-time notices) lives in a private `$XDG_STATE_HOME/controlkeel/hooks` directory.
+
+Attaching again replaces only ControlKeel's own hook entries and merges `hooks.json`, `mcp.json`, `config.toml`, `.roomodes` and similar shared files instead of overwriting them, so user hooks, MCP servers and settings survive. Retired ControlKeel hook files from earlier releases are removed.
 
 ## Typed Memory Lifecycle
 Memory records are written automatically on every significant lifecycle event and retrieved automatically when context is loaded:

@@ -99,7 +99,6 @@ defmodule ControlKeel.ExecutionSandbox.Nono do
       "claude" -> "claude-code"
       "codex" -> "codex"
       "opencode" -> "opencode"
-      "openclaw" -> "openclaw"
       "swival" -> "swival"
       _ -> nil
     end

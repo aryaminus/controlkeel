@@ -1091,7 +1091,7 @@ defmodule ControlKeel.MCP.ProtocolTest do
         "method" => "tools/call",
         "params" => %{
           "name" => "ck_context",
-          "arguments" => %{"session_id" => session.id}
+          "arguments" => %{"session_id" => session.id, "detail_level" => "full"}
         }
       })
 
@@ -1155,23 +1155,31 @@ defmodule ControlKeel.MCP.ProtocolTest do
              }
            } = response
 
-    payload = get_in(response, ["result", "structuredContent"])
-    assert payload["detail_level"] == "compact"
-    assert payload["detail_hint"] =~ "detail_level: full"
+    full = get_in(response, ["result", "structuredContent"])
+    assert full["detail_level"] == "full"
+    refute Map.has_key?(full, "detail_hint")
 
-    full_response =
+    compact_response =
       Protocol.handle_request(%{
         "jsonrpc" => "2.0",
         "id" => 41,
         "method" => "tools/call",
-        "params" => %{
-          "name" => "ck_context",
-          "arguments" => %{"session_id" => session.id, "detail_level" => "full"}
-        }
+        "params" => %{"name" => "ck_context", "arguments" => %{"session_id" => session.id}}
       })
 
-    assert get_in(full_response, ["result", "structuredContent", "detail_level"]) == "full"
-    refute Map.has_key?(get_in(full_response, ["result", "structuredContent"]), "detail_hint")
+    compact = get_in(compact_response, ["result", "structuredContent"])
+    assert compact["detail_level"] == "compact"
+    assert compact["detail_hint"] =~ "detail_level: full"
+    assert %{"count" => 1, "blocked" => 1, "top_blocked" => [_]} = compact["active_findings"]
+    assert %{"title" => "Implement router"} = compact["current_task"]
+    assert compact["budget_summary"]["spent_cents"] == 250
+
+    for static <- ~w(boundary_summary instruction_hierarchy resume_packet context_reacquisition
+                     transcript_summary security_case_summary task_augmentation) do
+      refute Map.has_key?(compact, static), static
+    end
+
+    assert byte_size(Jason.encode!(compact)) * 3 < byte_size(Jason.encode!(full))
 
     assert is_list(memory_hits)
     assert is_binary(augmented_brief)
@@ -1390,7 +1398,11 @@ defmodule ControlKeel.MCP.ProtocolTest do
         "method" => "tools/call",
         "params" => %{
           "name" => "ck_context",
-          "arguments" => %{"session_id" => "current", "project_root" => tmp_dir}
+          "arguments" => %{
+            "detail_level" => "full",
+            "session_id" => "current",
+            "project_root" => tmp_dir
+          }
         }
       })
 

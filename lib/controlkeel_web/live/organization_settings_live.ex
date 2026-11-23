@@ -19,6 +19,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   below admin they render read-only — management controls are hidden and
   every mutation event is refused server-side (`can_manage?`); non-members
   see the shared access panel.
+  `"admin"` floor; non-admin members see the shared access panel.
 
   Member management lives here (moved from the org overview page when the
   overview became the org dashboard): invite by email, role changes, and
@@ -97,8 +98,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   # ── Organization deletion (docs/dsar-erasure-plan.md, Slice 3) ──────────
 
   # Cloud-only surface: the danger zone is not rendered in local mode, and a
-  # crafted event is refused here. `DataLifecycle.delete_org/1` itself stays
-  # mode-agnostic (it runs against whichever database is configured); local
+  # crafted event is refused here. `DataLifecycle.delete_org/2` re-checks owner
+  # authorization inside its own erase transaction in every mode; local
   # single-user deployments just have no tenant-deletion UI.
   def handle_event("delete_org", _params, %{assigns: %{local_mode: true}} = socket) do
     {:noreply, put_flash(socket, :error, "Organization deletion is not available in local mode.")}
@@ -107,7 +108,13 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   def handle_event("delete_org", %{"delete_org" => %{"confirm_slug" => text}}, socket) do
     if mutation_owner?(socket) do
       if String.trim(text) == socket.assigns.org.slug do
-        case DataLifecycle.delete_org(socket.assigns.org.id) do
+        # mutation_owner?/1 resolved the signed-in actor above, so the boundary
+        # call always has an owner to authorize. delete_org/2 re-checks that
+        # membership *inside* the erase transaction: a demotion or revocation
+        # committed after this read must not destroy the tenant.
+        actor_id = socket.assigns[:current_user].id
+
+        case DataLifecycle.delete_org(socket.assigns.org.id, actor_id) do
           {:ok, _stats} ->
             # The deleted org's members (this caller included) also receive
             # the Slice 2 membership-revoked broadcast; both navigations land
@@ -116,6 +123,9 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
              socket
              |> put_flash(:info, "Organization #{socket.assigns.org.name} deleted.")
              |> push_navigate(to: ~p"/new/org")}
+
+          {:error, :unauthorized} ->
+            owner_refusal(socket)
 
           {:error, reason} ->
             {:noreply,
@@ -132,10 +142,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     else
       # Server-side gate: only owners may erase a tenant, regardless of what
       # the template chose to render.
-      {:noreply,
-       socket
-       |> assign(:delete_org_error, "Only organization owners can delete the organization.")
-       |> put_flash(:error, "Only organization owners can delete the organization.")}
+      owner_refusal(socket)
     end
   end
 
@@ -1430,14 +1437,26 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   # The mount-time `current_membership` assign is a snapshot: a PubSub
   # demotion or revocation broadcast after render leaves the stale assign,
   # so a destructive write must not trust it. Re-resolve authorization from
-  # the URL slug and the authenticated user at the mutation boundary — the
-  # same resolution the page mounts with, tightened to require an active
-  # owner membership (and refusing a suspended or deleted org).
+  # the URL slug and the authenticated user — the same resolution the page
+  # mounts with, tightened to require an active owner membership (and
+  # refusing a suspended or deleted org).
+  #
+  # This is the fast path that decides the flash copy; it is deliberately
+  # *not* the authority. `DataLifecycle.delete_org/2` re-reads the same
+  # membership inside the erase transaction, so a change committed after
+  # this read cannot destroy the tenant.
   defp mutation_owner?(socket) do
     case OrgAccess.resolve(socket.assigns.org.slug, socket.assigns[:current_user], "owner") do
       {:ok, _org, %Accounts.Membership{role: "owner"}} -> true
       _ -> false
     end
+  end
+
+  defp owner_refusal(socket) do
+    {:noreply,
+     socket
+     |> assign(:delete_org_error, "Only organization owners can delete the organization.")
+     |> put_flash(:error, "Only organization owners can delete the organization.")}
   end
 
   attr :org, :map, required: true

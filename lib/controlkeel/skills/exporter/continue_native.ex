@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.ContinueNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".continue/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     prompt_path = Path.join(root, ".continue/prompts/controlkeel.md")
@@ -70,7 +70,7 @@ defmodule ControlKeel.Skills.Exporter.ContinueNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.continue/skills`, `.continue/prompts`, and `.continue/commands` into the repo for Continue-native plan, review, and headless guidance.",
+        "Copy `.agents/skills`, `.continue/prompts`, and `.continue/commands` into the repo for Continue-native plan, review, and headless guidance.",
         "Use `.continue/mcpServers/controlkeel.yaml` for MCP registration or `.continue/mcp.json` as the portable fallback."
       ]
     )
