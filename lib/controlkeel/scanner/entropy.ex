@@ -65,6 +65,10 @@ defmodule ControlKeel.Scanner.Entropy do
 
     Regex.match?(~r/\b(?:bearer|basic)\s+["']?#{escaped}/i, content) or
       Regex.match?(
+        ~r/(?:^|\s)--?[A-Za-z0-9_-]*(?:token|secret|password|passwd|pass|api[_-]?key|auth)[A-Za-z0-9_-]*(?:\s+|=)["']?#{escaped}/i,
+        content
+      ) or
+      Regex.match?(
         ~r/[A-Za-z0-9_-]*(?:token|secret|password|passwd|api[_-]?key|authorization)["']?\s*[:=]\s*["']?#{escaped}/i,
         content
       )
@@ -84,7 +88,7 @@ defmodule ControlKeel.Scanner.Entropy do
     Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, segment) or
       segment
       |> String.split(["-", "_", "."], trim: true)
-      |> Enum.all?(&Regex.match?(~r/^(?:[A-Z]?[a-z]+|[A-Z]+|\d+)$/, &1))
+      |> Enum.all?(&Regex.match?(~r/^(?:[A-Z]?[a-z]+|[A-Z]{1,8}|\d+)$/, &1))
   end
 
   defp migration_path?(content, candidate) do

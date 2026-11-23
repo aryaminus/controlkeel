@@ -47,6 +47,8 @@ defmodule ControlKeel.Scanner.EntropyTest do
       for content <- [
             "curl -H 'Authorization: Bearer AbCdEfGhIjKlMnOp/QrStUvWxYz/012345678901' https://example.test",
             "export TOKEN=AbCdEfGhIjKlMnOp/QrStUvWxYz/012345678901",
+            "docker login --username alice --password 'ABCDEFGHIJKLMNOP/QRSTUVWXYZ/0123456789' registry.example",
+            "tool --api-key qwertyuiopasdfgh/zxcvbnmlkjhg/1234567890",
             "echo QwErTyUiOpAsDf/GhJkLzXcVbNm/123456789012"
           ] do
         assert [_ | _] = Entropy.detect(content, %{"kind" => "shell"}, [@low_rule]), content
