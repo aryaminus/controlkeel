@@ -19,6 +19,7 @@ defmodule ControlKeelWeb.OAuthLoginController do
   alias ControlKeel.Accounts.OrgIdentityProvider
   alias ControlKeel.Accounts.OrgIdentityProviders
   alias ControlKeel.Accounts.OAuthProviders.DefaultAdapter
+  alias ControlKeelWeb.Endpoint
 
   @doc "Phase 1 — redirect the user to the OAuth provider's authorization page"
   def request(conn, %{"provider" => provider_name}) do
@@ -136,16 +137,19 @@ defmodule ControlKeelWeb.OAuthLoginController do
   defp require_verified_email(_provider, _unverified), do: {:error, :email_not_verified}
 
   @doc "Phase 1 — redirect to a tenant's own OIDC provider"
-  def oidc_request(conn, %{"slug" => slug}) do
-    with {:ok, provider} <- OrgIdentityProviders.fetch_by_slug(slug),
+  def oidc_request(conn, %{"org_slug" => org_slug, "provider_slug" => provider_slug}) do
+    with {:ok, provider} <- OrgIdentityProviders.fetch_for_org(org_slug, provider_slug),
          {:ok, cfg} <- OrgIdentityProviders.assent_config(provider) do
-      session_params = %{}
+      redirect_uri =
+        Endpoint.url() <>
+          ~p"/auth/oidc/#{provider.org.slug}/#{provider.slug}/callback"
 
-      case DefaultAdapter.oidc_authorize_url(cfg, session_params) do
+      case DefaultAdapter.oidc_authorize_url(cfg, redirect_uri) do
         {:ok, %{url: url, session_params: sp}} ->
           conn
           |> put_session(:oidc_session_params, sp)
-          |> put_session(:oidc_slug, slug)
+          |> put_session(:oidc_org_slug, provider.org.slug)
+          |> put_session(:oidc_provider_slug, provider.slug)
           |> redirect(external: url)
 
         {:error, _reason} ->
@@ -173,13 +177,26 @@ defmodule ControlKeelWeb.OAuthLoginController do
   end
 
   @doc "Phase 2 — handle a tenant OIDC provider callback"
-  def oidc_callback(conn, %{"slug" => slug} = params) do
-    session_params = get_session(conn, :oidc_session_params) || %{}
+  def oidc_callback(conn, %{"org_slug" => org_slug, "provider_slug" => provider_slug} = params) do
+    session_params = get_session(conn, :oidc_session_params)
+    session_org_slug = get_session(conn, :oidc_org_slug)
+    session_provider_slug = get_session(conn, :oidc_provider_slug)
 
-    with {:ok, provider} <- OrgIdentityProviders.fetch_by_slug(slug),
+    with true <-
+           is_binary(session_org_slug) and session_org_slug == String.downcase(org_slug) and
+             is_binary(session_provider_slug) and
+             session_provider_slug == String.downcase(provider_slug),
+         %{state: state} when is_binary(state) <- session_params,
+         {:ok, provider} <- OrgIdentityProviders.fetch_for_org(org_slug, provider_slug),
          {:ok, cfg} <- OrgIdentityProviders.assent_config(provider),
          {:ok, %{email: email, name: name}} <-
-           DefaultAdapter.oidc_callback(cfg, params, session_params),
+           DefaultAdapter.oidc_callback(
+             cfg,
+             params,
+             session_params,
+             Endpoint.url() <>
+               ~p"/auth/oidc/#{provider.org.slug}/#{provider.slug}/callback"
+           ),
          :ok <- check_domain(provider, email),
          {:ok, user, _created} <- Accounts.find_or_create_user(email, name) do
       conn
@@ -230,7 +247,7 @@ defmodule ControlKeelWeb.OAuthLoginController do
   end
 
   defp provider_name(conn) do
-    case get_session(conn, :oidc_slug) do
+    case get_session(conn, :oidc_provider_slug) do
       nil -> "your identity provider"
       slug -> slug
     end
@@ -245,6 +262,8 @@ defmodule ControlKeelWeb.OAuthLoginController do
     |> delete_session(:oauth_session_params)
     |> delete_session(:oauth_provider)
     |> delete_session(:oidc_session_params)
+    |> delete_session(:oidc_org_slug)
+    |> delete_session(:oidc_provider_slug)
     |> delete_session(:oidc_slug)
   end
 
