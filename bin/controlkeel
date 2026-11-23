@@ -4,6 +4,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Remember the governed project before moving into the checkout, so config
+# resolves that project's database rather than the checkout's dev database.
+export CK_PROJECT_ROOT="${CK_PROJECT_ROOT:-$PWD}"
+
 cd "$ROOT_DIR"
 
 _has_json_flag() {

@@ -37,6 +37,24 @@ if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) or
       pool_size: 2
   end
 
+  # A source checkout runs the CLI and MCP server with MIX_ENV=dev, whose
+  # config points at priv/repo/controlkeel_dev.db. Govern the same database a
+  # release would: the project's own, found from CK_PROJECT_ROOT (exported by
+  # bin/controlkeel and controlkeel-mcp, since both cd into the checkout).
+  # `mix phx.server` and `mix ecto.reset` don't set these modes, so they keep
+  # the dev database and a reset can't wipe governed findings.
+  if config_env() == :dev and System.get_env("DATABASE_PATH") in [nil, ""] do
+    governed_root = System.get_env("CK_PROJECT_ROOT") || File.cwd!()
+
+    if project_db = ControlKeel.Runtime.Defaults.project_database_path(governed_root) do
+      config :controlkeel, ControlKeel.Repo.Local, database: project_db
+    end
+  end
+
+  if config_env() == :dev and System.get_env("DATABASE_PATH") not in [nil, ""] do
+    config :controlkeel, ControlKeel.Repo.Local, database: System.get_env("DATABASE_PATH")
+  end
+
   config :controlkeel, ControlKeelWeb.Endpoint,
     watchers: [],
     server: false,

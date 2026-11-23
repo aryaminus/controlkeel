@@ -173,8 +173,12 @@ defmodule ControlKeel.Runtime.Defaults do
     end
   end
 
-  defp project_database_path(cwd) do
-    root = ControlKeel.Project.Root.resolve(cwd)
+  @doc """
+  The governed project's database (`<root>/controlkeel/controlkeel.db`) for the
+  project containing `path`, or `nil` when `path` is not inside a project.
+  """
+  def project_database_path(path) do
+    root = ControlKeel.Project.Root.resolve(path)
 
     if ControlKeel.Project.Root.project_root?(root) do
       Path.join([root, "controlkeel", "controlkeel.db"])
