@@ -56,11 +56,18 @@ defmodule ControlKeel.Scanner.Entropy do
       (word_path?(candidate) and not credential_context?(content, candidate))
   end
 
+  # The candidate is an auth scheme value (`Bearer <x>`) or is assigned to a
+  # credential-named key (`GITHUB_TOKEN=<x>`, `"secret": "<x>"`). A keyword
+  # inside some other argument, such as a `secret_scan.py` script, does not
+  # count.
   defp credential_context?(content, candidate) do
-    Regex.match?(
-      ~r/(?:bearer|basic|token|secret|password|passwd|api[_-]?key|authorization)\S*[\s:="']+#{Regex.escape(candidate)}/i,
-      content
-    )
+    escaped = Regex.escape(candidate)
+
+    Regex.match?(~r/\b(?:bearer|basic)\s+["']?#{escaped}/i, content) or
+      Regex.match?(
+        ~r/[A-Za-z0-9_-]*(?:token|secret|password|passwd|api[_-]?key|authorization)["']?\s*[:=]\s*["']?#{escaped}/i,
+        content
+      )
   end
 
   # API or file paths made of plain words, plain numbers and UUIDs, such as a

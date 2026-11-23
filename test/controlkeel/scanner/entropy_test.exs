@@ -29,6 +29,8 @@ defmodule ControlKeel.Scanner.EntropyTest do
     test "API and session paths of words, numbers and UUIDs are not tokens" do
       for content <- [
             "gh api repos/acme/widget-service/pulls/367/comments",
+            "python3 scripts/secret_scan.py /private/tmp/claude-501/-Users-dev-project/" <>
+              "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/scratchpad/patch.py",
             "python3 /private/tmp/claude-501/-Users-dev-project/" <>
               "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/scratchpad/patch.py"
           ] do
