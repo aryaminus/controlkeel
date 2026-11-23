@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.38 — 2026-11-23
+
+### What's changed
+
+- Merge pull request #336 from aryaminus/feat/user-org-followup
+- feat/user-org-followup: refactor organization deletion to require actor authorization and update tests for delete_org/2
+- feat/user-org-followup: mutation_owner authorization logic to ensure accurate role checks for organization actions
+- feat/user-org-followup: implement purging of enrolled workspace keys and MCP tool calls during organization deletion, with corresponding tests
+- feat/user-org-followup: refactor organization deletion logic to ensure authorization checks are up-to-date and add tests for demoted/revoked owners
+- feat/user-org-followup: enhance subprocess isolation and add new tests for JSON output
+- feat/user-org-followup: remove obsolete tests for sign-out behavior and local mode erasure eviction
+- feat/user-org-followup: remove flaky subprocess tests for bin wrapper and MCP launcher
+- feat/user-org-followup: remove DSAR erasure planning document as part of data lifecycle updates
+- feat/user-org-followup: add DSAR erasure planning document and implement data lifecycle fixes
+- feat/user-org-followup: ensure pending state is initialized in device authorization
+- feat/user-org-followup: add self-service account endpoints for GDPR compliance
+
 ## v0.4.37 — 2026-11-23
 
 ### What's changed
