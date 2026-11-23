@@ -52,8 +52,22 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
 
     {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
 
-    assert html =~ "Organization settings sections"
+    assert html =~ "Settings sections"
     assert html =~ "org-settings-form"
+  end
+
+  test "settings sidebar has no org switcher header" do
+    org = create_org!()
+
+    {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
+
+    # The settings variant replaces the header with the back row and skips
+    # the breadcrumbs header; the user menu stays (it holds the account
+    # chrome), only the org switcher is org-page-only.
+    refute html =~ "sidebar-org-switcher"
+    refute html =~ "breadcrumbs-header"
+    assert html =~ "sidebar-user-menu"
+    assert html =~ "Settings sections"
   end
 
   test "unknown tab params fall back to the general tab" do
@@ -615,9 +629,9 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       Application.put_env(:controlkeel, :runtime_mode, :local)
       org = create_org!()
 
-      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings")
+      {:ok, _view, html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=general")
 
-      assert html =~ "Organization settings sections"
+      assert html =~ "Settings sections"
       refute html =~ "org-delete-danger-zone"
       refute html =~ "Delete organization"
     end
@@ -626,7 +640,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       Application.put_env(:controlkeel, :runtime_mode, :local)
       org = create_org!()
 
-      {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/settings")
+      {:ok, view, _html} = live(build_conn(), ~p"/#{org.slug}/settings?tab=general")
 
       # The danger zone is not rendered; a crafted event must be refused
       # server-side without touching data.
@@ -665,7 +679,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     end
 
     test "danger zone is hidden from non-owners", %{admin_conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/doomed/settings")
+      {:ok, _view, html} = live(conn, ~p"/doomed/settings?tab=general")
 
       refute html =~ "org-delete-danger-zone"
       assert html =~ "Doomed"
@@ -674,7 +688,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     test "refuses non-owners server-side", %{admin_conn: conn, admin_m: admin_m} do
       assert admin_m.role == "admin"
 
-      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings?tab=general")
 
       # Even a crafted event from a non-owner hits the server-side gate.
       html = render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
@@ -684,7 +698,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
     end
 
     test "owner deletes the organization and lands on /new/org", %{owner_conn: conn, org: org} do
-      {:ok, view, _html} = live(conn, ~p"/doomed/settings")
+      {:ok, view, _html} = live(conn, ~p"/doomed/settings?tab=general")
 
       render_submit(view, "delete_org", %{"delete_org" => %{"confirm_slug" => "doomed"}})
 

@@ -132,6 +132,46 @@ defmodule ControlKeel.Mission do
       )
 
   @doc """
+  All sessions across the organization's workspaces, newest first, with the
+  owning workspace preloaded for display.
+
+  Options:
+
+    * `:limit` — cap the page size (org sessions index streams in pages)
+    * `:before` — `{inserted_at, id}` keyset; returns rows strictly older
+      (lower in the `desc inserted_at, desc id` order), so "load more"
+      pages never overlap or skip rows
+  """
+  def list_sessions_for_org(org_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit)
+    before = Keyword.get(opts, :before)
+
+    query =
+      from s in Session,
+        join: w in assoc(s, :workspace),
+        where: w.org_id == ^org_id,
+        order_by: [desc: s.inserted_at, desc: s.id],
+        preload: [workspace: w]
+
+    query =
+      if before do
+        {ts, id} = before
+
+        where(
+          query,
+          [s],
+          s.inserted_at < ^ts or (s.inserted_at == ^ts and s.id < ^id)
+        )
+      else
+        query
+      end
+
+    query = if limit, do: limit(query, ^limit), else: query
+
+    Repo.all(query)
+  end
+
+  @doc """
   Returns true when a session (mission) already uses `name` as its title,
   case-insensitively. Used by the onboarding wizard to prevent duplicate
   project names before compile.

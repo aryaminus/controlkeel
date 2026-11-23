@@ -30,21 +30,24 @@ defmodule ControlKeelWeb.LiveAuthTest do
     build_conn() |> Plug.Test.init_test_session(%{current_user_id: user.id})
   end
 
-  # Workspace creation is admin-gated on the org overview; a viewer pushing
-  # the event directly must be refused and nothing may be persisted.
+  # Workspace creation is admin-gated on the org's /workspaces page; a
+  # viewer pushing the event directly must be refused and nothing may be
+  # persisted. The refusal flash renders in the framework layout, so the
+  # check is on the persisted state.
   defp viewer_cannot_create_workspaces(view, slug) do
-    html =
-      render_click(view, "save_workspace", %{
-        "workspace" => %{
-          "name" => "Nope",
-          "slug" => slug <> Integer.to_string(System.unique_integer([:positive]))
-        }
-      })
+    ws_slug = slug <> Integer.to_string(System.unique_integer([:positive]))
 
-    if html =~ "have permission to create workspaces" do
+    render_click(view, "save_workspace", %{
+      "workspace" => %{
+        "name" => "Nope",
+        "slug" => ws_slug
+      }
+    })
+
+    if is_nil(ControlKeel.Repo.get_by(ControlKeel.Mission.Workspace, slug: ws_slug)) do
       true
     else
-      flunk("expected viewer save_workspace to be refused, got:\n\n" <> html)
+      flunk("expected viewer save_workspace to be refused, but a workspace was created")
     end
   end
 
@@ -133,12 +136,13 @@ defmodule ControlKeelWeb.LiveAuthTest do
       build_conn()
       |> Plug.Test.init_test_session(%{current_user_id: user.id})
 
-    # The org overview is the canonical require_cloud_auth page since the
-    # /cloud/* surfaces were removed. user is a viewer in org A and an admin
-    # in org B; the page must resolve its membership from org A only. The
-    # New Workspace button renders for everyone, so the role check is
-    # asserted on the server-refused action, not on markup.
-    {:ok, view, _html} = live(conn, ~p"/#{org_a.slug}")
+    # The org's /workspaces page is the canonical require_cloud_auth surface
+    # with a role-gated event since the /cloud/* surfaces were removed (the
+    # workspace-creation UI moved there from the overview). user is a viewer
+    # in org A and an admin in org B; the page must resolve its membership
+    # from org A only. The New Workspace button renders for everyone, so the
+    # role check is asserted on the server-refused action, not on markup.
+    {:ok, view, _html} = live(conn, ~p"/#{org_a.slug}/workspaces")
 
     assert viewer_cannot_create_workspaces(view, "nope")
 
