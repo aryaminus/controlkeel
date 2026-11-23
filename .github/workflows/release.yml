@@ -21,6 +21,15 @@ jobs:
       actions: read
       contents: read
     steps:
+      - name: Require a version tag
+        run: |
+          case "${GITHUB_REF}" in
+            refs/tags/v*) ;;
+            *)
+              echo "Release must run on a v* tag, not ${GITHUB_REF}." >&2
+              exit 1
+              ;;
+          esac
       - name: Find successful Release Smoke run for this SHA
         id: smoke_run
         env:
