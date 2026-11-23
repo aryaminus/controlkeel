@@ -367,7 +367,10 @@ defmodule ControlKeel.Accounts do
       inviter.role == "owner" ->
         :ok
 
-      role == "owner" ->
+      not role_at_least?(inviter.role, "admin") ->
+        {:error, :unauthorized}
+
+      role in ["owner", "admin"] ->
         {:error, :unauthorized}
 
       true ->

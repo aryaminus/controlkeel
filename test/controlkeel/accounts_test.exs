@@ -298,14 +298,43 @@ defmodule ControlKeel.AccountsTest do
       end
     end
 
-    test "admin can invite admin/member/viewer", %{admin: admin, org: org} do
-      for role <- ["admin", "member", "viewer"] do
+    test "admin can invite member/viewer", %{admin: admin, org: org} do
+      for role <- ["member", "viewer"] do
         {:ok, u} = Accounts.create_user(%{email: "invitee-#{role}-a@example.com"})
 
         assert {:ok, m, _} =
                  Accounts.invite_member(u.id, org.id, role: role, invited_by_user_id: admin.id)
 
         assert m.role == role
+      end
+    end
+
+    test "admin cannot invite admin", %{admin: admin, org: org} do
+      {:ok, invitee} = Accounts.create_user(%{email: "invitee-admin@example.com"})
+
+      assert {:error, :unauthorized} =
+               Accounts.invite_member(invitee.id, org.id,
+                 role: "admin",
+                 invited_by_user_id: admin.id
+               )
+    end
+
+    test "viewer and member inviters are rejected", %{owner: owner, org: org} do
+      for role <- ["viewer", "member"] do
+        {:ok, inviter} = Accounts.create_user(%{email: "inviter-#{role}@example.com"})
+        {:ok, _, token} =
+          Accounts.invite_member(inviter.id, org.id,
+            role: role,
+            invited_by_user_id: owner.id
+          )
+        {:ok, _} = Accounts.accept_invitation(token, inviter.id)
+        {:ok, invitee} = Accounts.create_user(%{email: "invitee-from-#{role}@example.com"})
+
+        assert {:error, :unauthorized} =
+                 Accounts.invite_member(invitee.id, org.id,
+                   role: "member",
+                   invited_by_user_id: inviter.id
+                 )
       end
     end
 
