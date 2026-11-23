@@ -1841,6 +1841,48 @@ defmodule ControlKeel.SkillsTest do
       assert classify.("rg pattern lib") == "ro"
     end
 
+    @tag :tmp_dir
+    test "a shell gate deny names the blocking rule", %{tmp_dir: tmp_dir} do
+      fake_bin = Path.join(tmp_dir, "fake-controlkeel")
+
+      File.write!(fake_bin, """
+      #!/bin/sh
+      echo '{"decision":"block","findings":[{"decision":"block","rule_id":"demo.rule","plain_message":"Demo reason."}]}'
+      """)
+
+      File.chmod!(fake_bin, 0o755)
+
+      for {format, path} <- [
+            claude: ["hookSpecificOutput", "permissionDecisionReason"],
+            cursor: ["agent_message"],
+            copilot: ["permissionDecisionReason"]
+          ] do
+        hook = Path.join(tmp_dir, "gate-#{format}.sh")
+        File.write!(hook, Exporter.shell_gate_hook_contents(format))
+
+        input =
+          case format do
+            :copilot -> ~s({"toolName":"bash","toolArgs":"{\\"command\\":\\"git push\\"}"})
+            _ -> ~s({"tool_input":{"command":"git push"}})
+          end
+
+        {out, 0} =
+          System.cmd("sh", ["-c", ~s(printf '%s' "$1" | sh "$2"), "_", input, hook],
+            env: [{"CONTROLKEEL_BIN", fake_bin}]
+          )
+
+        reason = out |> Jason.decode!() |> get_in(path)
+
+        # Without jq the hook falls back to its static denial.
+        expected =
+          if System.find_executable("jq"),
+            do: "demo.rule: Demo reason.",
+            else: "ControlKeel blocked this shell command"
+
+        assert reason =~ expected, "#{format}: #{out}"
+      end
+    end
+
     test "roo install leaves a user's similarly named mode alone", %{tmp_dir: tmp_dir} do
       File.write!(Path.join(tmp_dir, ".roomodes"), """
       customModes:
