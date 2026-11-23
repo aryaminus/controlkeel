@@ -148,7 +148,11 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def handle_event("open_invite", _params, socket) do
-    {:noreply, assign(socket, :show_invite_modal, true)}
+    if can_manage?(socket.assigns) do
+      {:noreply, assign(socket, :show_invite_modal, true)}
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to invite members.")}
+    end
   end
 
   def handle_event("close_invite", _params, socket) do
@@ -160,36 +164,40 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   end
 
   def handle_event("invite", %{"invite" => %{"email" => raw_email, "role" => role}}, socket) do
-    email = raw_email |> to_string() |> String.downcase() |> String.trim()
-    role = if role in @valid_roles, do: role, else: "member"
+    if can_manage?(socket.assigns) do
+      email = raw_email |> to_string() |> String.downcase() |> String.trim()
+      role = if role in @valid_roles, do: role, else: "member"
 
-    with :ok <- validate_email(email),
-         # Accounts-level find-or-create carries the one status policy: a
-         # disabled account is refused (its invitation token could never be
-         # redeemed, because login is blocked).
-         {:ok, user, _created?} <- Accounts.find_or_create_user(email),
-         {:ok, _membership, raw_token} <-
-           Accounts.invite_member(user.id, socket.assigns.org.id,
-             role: role,
-             invited_by_user_id: socket.assigns.current_user.id
-           ) do
-      # Best-effort email delivery. Token banner remains as visible fallback,
-      # so a mailer failure does not block the operator from completing the invite.
-      _ = ControlKeel.Mailer.deliver_invitation(%{email: user.email}, raw_token)
+      with :ok <- validate_email(email),
+           # Accounts-level find-or-create carries the one status policy: a
+           # disabled account is refused (its invitation token could never be
+           # redeemed, because login is blocked).
+           {:ok, user, _created?} <- Accounts.find_or_create_user(email),
+           {:ok, _membership, raw_token} <-
+             Accounts.invite_member(user.id, socket.assigns.org.id,
+               role: role,
+               invited_by_user_id: socket.assigns.current_user.id
+             ) do
+        # Best-effort email delivery. Token banner remains as visible fallback,
+        # so a mailer failure does not block the operator from completing the invite.
+        _ = ControlKeel.Mailer.deliver_invitation(%{email: user.email}, raw_token)
 
-      {:noreply,
-       socket
-       |> refresh_memberships(socket.assigns.org.id)
-       |> assign(:invite_token, raw_token)
-       |> assign(:invite_error, nil)
-       |> assign(:show_invite_modal, false)
-       |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))}
-    else
-      {:error, reason} ->
         {:noreply,
          socket
-         |> assign(:invite_error, format_error(reason))
-         |> assign(:invite_token, nil)}
+         |> refresh_memberships(socket.assigns.org.id)
+         |> assign(:invite_token, raw_token)
+         |> assign(:invite_error, nil)
+         |> assign(:show_invite_modal, false)
+         |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))}
+      else
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> assign(:invite_error, format_error(reason))
+           |> assign(:invite_token, nil)}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to invite members.")}
     end
   end
 

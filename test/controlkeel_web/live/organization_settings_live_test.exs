@@ -822,7 +822,15 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       viewer = create_user!("viewer-#{n}@example.com")
       add_active_membership(viewer.id, org.id, "viewer")
 
-      {:ok, org: org, owner: owner, viewer: viewer, conn: conn_for(viewer)}
+      member = create_user!("member-#{n}@example.com")
+      add_active_membership(member.id, org.id, "member")
+
+      {:ok,
+       org: org,
+       owner: owner,
+       viewer: viewer,
+       member: member,
+       conn: conn_for(viewer)}
     end
 
     test "general tab renders with the form disabled and no save button", %{
@@ -855,6 +863,27 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       refute has_element?(view, "#invite-member-button")
       refute has_element?(view, "select[name='role']")
       refute has_element?(view, "button[phx-click='confirm_revoke']")
+    end
+
+    test "crafted invite events from viewers and members create no user or membership", %{
+      org: org,
+      viewer: viewer,
+      member: member
+    } do
+      for actor <- [viewer, member] do
+        invite_email = "rejected-invite-#{actor.id}@example.com"
+        memberships_before = Accounts.list_memberships_for_org(org.id)
+        {:ok, view, _html} = live(conn_for(actor), ~p"/#{org.slug}/settings?tab=members")
+
+        html =
+          render_submit(view, "invite", %{
+            "invite" => %{"email" => invite_email, "role" => "member"}
+          })
+
+        assert html =~ "You don&#39;t have permission to invite members."
+        assert Accounts.get_user_by_email(invite_email) == nil
+        assert Accounts.list_memberships_for_org(org.id) == memberships_before
+      end
     end
 
     test "policy sets tab renders without the create button", %{
