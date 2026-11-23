@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.40 — 2026-11-23
+
+### What's changed
+
+- Fix release smoke on current GitHub runners (#371)
+
 ## v0.4.39 — 2026-11-23
 
 ### What's changed
