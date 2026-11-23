@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.39 — 2026-11-23
+
+### What's changed
+
+- Merge pull request #337 from aryaminus/refactor/user-org-layout
+- refactor/user-org-layout: add test for tenant isolation in workspace visibility
+- refactor/user-org-layout replace span with native button for better accessibility and keyboard support
+- refactor/user-org-layout: enhance session listing with keyset pagination and load more functionality
+- refactor/user-org-layout: implement account deletion flash handling in user menu and related tests
+- refactor/user-org-layout: user account deletion terminology and update related tests for consistency
+- refactor/user-org-layout: Implement workspace index and management UI
+- refactor/user-org-layout: streamline organization settings and user menu components, removing account tab and enhancing account dialog functionality
+- refactor/user-org-layout: update default tab to account in organization settings and related tests
+- refactor/user-org-layout: update organization and workspace menus for local mode, ensuring proper visibility of settings and navigation options
+- refactor/user-org-layout: add user menu component and enhance organization settings for account management
+- refactor/user-org-layout: Refactor layouts and remove deprecated components
+
 ## v0.4.38 — 2026-11-23
 
 ### What's changed
