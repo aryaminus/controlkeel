@@ -40,6 +40,7 @@ defmodule ControlKeel.CLI.Parser do
   @context_switches [
     session_id: :integer,
     task_id: :integer,
+    detail: :string,
     format: :string,
     json: :boolean,
     project_root: :string

@@ -47,7 +47,7 @@ Use this skill when you need the durable system-of-record view instead of only t
 
 ## Workflow
 
-1. Call `ck_context`.
+1. Call `ck_context` with `detail_level: full`; the default compact view omits proof and resume detail.
 2. Review `proof_summary`, `memory_hits`, `workspace_context`, `context_reacquisition`, `instruction_hierarchy`, `recent_events`, and `resume_packet`.
 3. Use the proof bundle to understand deploy readiness, regression evidence, open findings, and rollback expectations.
 4. Use `ck_memory_search` when prior decisions, checkpoints, or findings need explicit retrieval instead of relying only on passive memory hits.
