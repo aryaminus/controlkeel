@@ -1435,6 +1435,18 @@ defmodule ControlKeel.Skills.Exporter do
   or `:copilot`, matching each host's hook reply shape.
   """
   def shell_gate_hook_contents(format \\ :claude) do
+    deny_template =
+      case format do
+        :claude ->
+          ~S|{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":$r}}|
+
+        :cursor ->
+          ~S|{"permission":"deny","user_message":$r,"agent_message":$r}|
+
+        :copilot ->
+          ~S|{"permissionDecision":"deny","permissionDecisionReason":$r}|
+      end
+
     {deny, warn, unavailable, allow} =
       case format do
         :claude ->
@@ -1497,6 +1509,14 @@ defmodule ControlKeel.Skills.Exporter do
     validation_status=$?
 
     if printf '%s' "$result" | grep -q '"decision":"block"'; then
+      ck_deny_reason=""
+      if command -v jq >/dev/null 2>&1; then
+        ck_deny_reason=$(printf '%s' "$result" | jq -r '[.findings[]? | select(.decision == "block") | "\\(.rule_id): \\(.plain_message)"] | first // empty' 2>/dev/null)
+      fi
+      if [ -n "$ck_deny_reason" ]; then
+        jq -cn --arg r "ControlKeel blocked this shell command (${ck_deny_reason}) If this is a false positive, rephrase the command or ask the user." '#{deny_template}'
+        exit 0
+      fi
       #{emit.(deny)}
     fi
 
