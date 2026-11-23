@@ -878,37 +878,28 @@ defmodule ControlKeel.Intent.Domains do
     }
   }
 
+  # Agents ControlKeel integrates with (`Agent.Integration.catalog/0`).
   @agent_options [
-    # Local IDEs
     {"claude", "Claude Code"},
+    {"codex-cli", "Codex"},
     {"cursor", "Cursor"},
-    {"windsurf", "Windsurf"},
-    {"kiro", "Kiro (Amazon)"},
-    {"augment", "Augment Code"},
-    {"amp", "Amp (Sourcegraph)"},
-    # Local CLIs
-    {"opencode", "OpenCode"},
-    {"codex-cli", "Codex CLI"},
-    {"antigravity", "Antigravity"},
-    {"continue", "Continue"},
-    {"ollama", "Ollama (local)"},
-    # Cloud platforms & scaffolders
-    {"bolt", "Bolt"},
-    {"lovable", "Lovable"},
-    {"replit", "Replit"},
-    {"v0", "v0 (Vercel)"},
-    {"factory", "Factory"},
-    {"devin", "Devin"},
-    {"ai-studio", "Google AI Studio"},
-    {"codex", "OpenAI Codex"},
-    # Code review & spec tools
     {"copilot", "GitHub Copilot"},
-    {"coderabbit", "CodeRabbit"},
-    {"qodo", "Qodo"},
-    {"specpilot", "SpecPilot"},
-    {"chatprd", "ChatPRD"},
-    {"specced", "Specced"},
-    # Other
+    {"antigravity", "Antigravity"},
+    {"opencode", "OpenCode"},
+    {"windsurf", "Windsurf"},
+    {"cline", "Cline"},
+    {"kiro", "Kiro"},
+    {"kilo", "Kilo Code"},
+    {"amp", "Amp"},
+    {"augment", "Augment"},
+    {"continue", "Continue"},
+    {"roo-code", "Roo Code"},
+    {"goose", "Goose"},
+    {"droid", "Factory Droid"},
+    {"pi", "Pi"},
+    {"warp", "Warp"},
+    {"letta-code", "Letta Code"},
+    {"devin", "Devin"},
     {"generic", "Other / custom agent"}
   ]
 
