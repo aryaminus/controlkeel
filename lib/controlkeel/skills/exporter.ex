@@ -2083,10 +2083,15 @@ defmodule ControlKeel.Skills.Exporter do
       set -- $1
       set +f
       case "$1" in
-        ls|cat|head|tail|wc|pwd|grep|rg|which|type|file|stat|du|df|uniq|cut|diff) ;;
+        ls|cat|head|tail|wc|pwd|grep|which|type|stat|du|df|cut|diff) ;;
+        rg)
+          case " $* " in
+            *" --pre"*) return 1 ;;
+          esac
+          ;;
         sort|tree)
           case " $* " in
-            *" -o"*|*" --output"*) return 1 ;;
+            *" -o"*|*" --output"*|*" --compress-program"*) return 1 ;;
           esac
           ;;
         find)
@@ -2098,7 +2103,7 @@ defmodule ControlKeel.Skills.Exporter do
           case "${2:-}" in
             status|diff|log|show|blame|rev-parse|ls-files|grep|shortlog|describe)
               case " $* " in
-                *" --output"*|*" -o "*) return 1 ;;
+                *" --output"*|*" -o "*|*" -O"*|*" --open-files-in-pager"*) return 1 ;;
               esac
               ;;
             *) return 1 ;;

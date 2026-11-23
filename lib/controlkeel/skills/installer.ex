@@ -1488,7 +1488,7 @@ defmodule ControlKeel.Skills.Installer do
     ck_entry =
       ck
       |> String.split("\n")
-      |> Enum.drop_while(&(not String.starts_with?(&1, "  - slug: controlkeel-operator")))
+      |> Enum.drop_while(&(not ck_roo_slug_line?(&1)))
       |> Enum.join("\n")
       |> String.trim_trailing()
 
@@ -1505,10 +1505,10 @@ defmodule ControlKeel.Skills.Installer do
           end)
 
         cond do
-          Enum.any?(lines, &String.starts_with?(&1, "  - slug: controlkeel-operator")) ->
+          Enum.any?(lines, &ck_roo_slug_line?/1) ->
             File.write!(destination_path, replace_roo_mode(lines, ck_entry))
 
-          String.contains?(existing, "controlkeel-operator") ->
+          Regex.match?(~r/slug:\s*["']?controlkeel-operator["']?\s*$/m, existing) ->
             # An unfamiliar layout; leave the user's file untouched.
             :ok
 
@@ -1527,9 +1527,11 @@ defmodule ControlKeel.Skills.Installer do
     end
   end
 
+  defp ck_roo_slug_line?(line), do: String.trim_trailing(line) == "  - slug: controlkeel-operator"
+
   defp replace_roo_mode(lines, ck_entry) do
     {before, rest} =
-      Enum.split_while(lines, &(not String.starts_with?(&1, "  - slug: controlkeel-operator")))
+      Enum.split_while(lines, &(not ck_roo_slug_line?(&1)))
 
     after_block =
       rest

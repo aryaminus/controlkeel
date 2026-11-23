@@ -1834,6 +1834,27 @@ defmodule ControlKeel.SkillsTest do
       assert classify.("sort -o out.txt in.txt") == "check"
       assert classify.("git diff --output=patch") == "check"
       assert classify.("less file") == "check"
+      assert classify.("uniq /dev/null important-file") == "check"
+      assert classify.("rg --pre=./mutate.sh pattern input.txt") == "check"
+      assert classify.("sort --compress-program=./x in.txt") == "check"
+      assert classify.("git grep -Ovim pattern") == "check"
+      assert classify.("rg pattern lib") == "ro"
+    end
+
+    test "roo install leaves a user's similarly named mode alone", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, ".roomodes"), """
+      customModes:
+        - slug: controlkeel-operator-custom
+          name: Mine
+          roleDefinition: my role
+      """)
+
+      assert {:ok, _} = Skills.install("roo-native", tmp_dir, scope: "project")
+      modes = File.read!(Path.join(tmp_dir, ".roomodes"))
+
+      assert modes =~ "slug: controlkeel-operator-custom"
+      assert modes =~ "my role"
+      assert modes =~ ~r/slug: controlkeel-operator\n/
     end
 
     test "roo install keeps the user's custom modes", %{tmp_dir: tmp_dir} do
