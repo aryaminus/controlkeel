@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -71,3 +72,15 @@ jobs:
           test "$(git rev-parse origin/main)" = "${VERIFIED_SHA}"
           git push --force-with-lease="refs/heads/main:${VERIFIED_SHA}" origin HEAD:main
           git push origin "refs/tags/v${VERSION}"
+
+      # Pushes made with GITHUB_TOKEN never trigger other workflows, so the
+      # tag push above starts nothing on its own. workflow_dispatch is the one
+      # event GITHUB_TOKEN may trigger: build the candidate on the tag, then
+      # start the release, which waits for that smoke run to pass.
+      - name: Start release smoke and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(cat /tmp/controlkeel-version.txt)
+          gh workflow run release-smoke.yml --ref "v${VERSION}"
+          gh workflow run release.yml --ref "v${VERSION}"
