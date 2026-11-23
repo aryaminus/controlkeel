@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.41 — 2026-11-23
+
+### What's changed
+
+- Use the governed project's database from a source checkout (#373)
+- Publish the Homebrew formula with a tap deploy key instead of a PAT (#372)
+
 ## v0.4.40 — 2026-11-23
 
 ### What's changed
