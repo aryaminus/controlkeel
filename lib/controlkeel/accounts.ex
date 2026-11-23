@@ -287,9 +287,10 @@ defmodule ControlKeel.Accounts do
   ## Authorization
 
   When `invited_by_user_id` is supplied, the inviter's role is checked: only
-  owners may grant `owner` or `admin`. A `nil` inviter is the trusted operator
-  path (e.g. the CLI `org invite` command) and is unrestricted. Returns
-  `{:error, :unauthorized}` when a named inviter lacks the required role.
+  owners may grant `owner`; admins may grant `admin`, `member`, or `viewer`. A
+  `nil` inviter is the trusted operator path (e.g. the CLI `org invite`
+  command) and is unrestricted. Returns `{:error, :unauthorized}` when a named
+  inviter lacks the required role.
   """
   @spec invite_member(integer(), integer(), keyword()) ::
           {:ok, Membership.t(), String.t()}
@@ -347,14 +348,16 @@ defmodule ControlKeel.Accounts do
     end
   end
 
-  # Invite role authorization. When an inviter is named
-  # (`invited_by_user_id`), enforce the same privilege boundary as role changes:
-  # only owners may grant owner/admin. A `nil` inviter is the trusted operator
-  # path (e.g. the CLI `org invite` command, which has no membership) and is
-  # left unrestricted.
-  defp authorize_invite_role(nil, _org_id, _role), do: :ok
+  @doc """
+  Authorize an invitation role before creating or finding the invitee account.
 
-  defp authorize_invite_role(invited_by_user_id, org_id, role) do
+  `invite_member/3` repeats this check at the membership write boundary.
+  """
+  @spec authorize_invite_role(integer() | nil, integer(), String.t()) ::
+          :ok | {:error, :unauthorized}
+  def authorize_invite_role(nil, _org_id, _role), do: :ok
+
+  def authorize_invite_role(invited_by_user_id, org_id, role) do
     inviter = get_active_membership(invited_by_user_id, org_id)
 
     cond do
@@ -364,7 +367,7 @@ defmodule ControlKeel.Accounts do
       inviter.role == "owner" ->
         :ok
 
-      role in ["owner", "admin"] ->
+      role == "owner" ->
         {:error, :unauthorized}
 
       true ->

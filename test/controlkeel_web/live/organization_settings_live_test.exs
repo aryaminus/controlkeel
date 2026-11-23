@@ -538,9 +538,16 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       member = create_user!("member-a@example.com")
       add_active_membership(member.id, org.id, "member")
 
+      admin = create_user!("admin-a@example.com")
+
+      {:ok, _membership, token} =
+        Accounts.invite_member(admin.id, org.id, role: "admin", invited_by_user_id: owner.id)
+
+      {:ok, _membership} = Accounts.accept_invitation(token, admin.id)
+
       owner_m = Accounts.get_active_membership(owner.id, org.id)
 
-      {:ok, owner_m: owner_m, conn: conn_for(owner)}
+      {:ok, owner_m: owner_m, admin: admin, org: org, conn: conn_for(owner)}
     end
 
     test "sole owner cannot change their own role (locked)", %{conn: conn, owner_m: owner_m} do
@@ -607,6 +614,53 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       |> render_click()
 
       assert has_element?(view, "#invite-member-modal")
+    end
+
+    test "admin can invite an admin and the role is offered in the form", %{
+      admin: admin,
+      org: org
+    } do
+      {:ok, view, _html} = live(conn_for(admin), ~p"/#{org.slug}/settings?tab=members")
+
+      view
+      |> element("#invite-member-button")
+      |> render_click()
+
+      assert has_element?(view, "#invite-form select[name='invite[role]'] option[value='admin']")
+      refute has_element?(view, "#invite-form select[name='invite[role]'] option[value='owner']")
+
+      invite_email = "new-admin@example.com"
+
+      render_submit(view, "invite", %{
+        "invite" => %{"email" => invite_email, "role" => "admin"}
+      })
+
+      invited_user = Accounts.get_user_by_email(invite_email)
+
+      assert [%{role: "admin", status: "pending"}] =
+               Accounts.list_memberships_for_user(invited_user.id)
+    end
+
+    test "crafted admin owner invite is refused before account creation", %{
+      admin: admin,
+      org: org
+    } do
+      invite_email = "rejected-owner-invite@example.com"
+      memberships_before = Accounts.list_memberships_for_org(org.id)
+      {:ok, view, _html} = live(conn_for(admin), ~p"/#{org.slug}/settings?tab=members")
+
+      view
+      |> element("#invite-member-button")
+      |> render_click()
+
+      html =
+        render_submit(view, "invite", %{
+          "invite" => %{"email" => invite_email, "role" => "owner"}
+        })
+
+      assert html =~ "You don&#39;t have permission to invite at that role."
+      assert Accounts.get_user_by_email(invite_email) == nil
+      assert Accounts.list_memberships_for_org(org.id) == memberships_before
     end
   end
 
@@ -825,12 +879,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       member = create_user!("member-#{n}@example.com")
       add_active_membership(member.id, org.id, "member")
 
-      {:ok,
-       org: org,
-       owner: owner,
-       viewer: viewer,
-       member: member,
-       conn: conn_for(viewer)}
+      {:ok, org: org, owner: owner, viewer: viewer, member: member, conn: conn_for(viewer)}
     end
 
     test "general tab renders with the form disabled and no save button", %{

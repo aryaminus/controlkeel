@@ -169,6 +169,12 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       role = if role in @valid_roles, do: role, else: "member"
 
       with :ok <- validate_email(email),
+           :ok <-
+             Accounts.authorize_invite_role(
+               socket.assigns.current_user.id,
+               socket.assigns.org.id,
+               role
+             ),
            # Accounts-level find-or-create carries the one status policy: a
            # disabled account is refused (its invitation token could never be
            # redeemed, because login is blocked).
@@ -632,10 +638,12 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   # No inspect/1 fallback: raw atoms must never surface in the UI.
   defp format_error(_reason), do: "Could not invite member. Please try again."
 
-  # Owners can invite at any role; admins only member/viewer (matches the
-  # role-change matrix and the server-side guard in `invite_member/3`).
+  # Owners can invite at any role; admins can also grant admin, but not owner.
   defp invite_role_options("owner"),
     do: [{"viewer", "viewer"}, {"member", "member"}, {"admin", "admin"}, {"owner", "owner"}]
+
+  defp invite_role_options("admin"),
+    do: [{"viewer", "viewer"}, {"member", "member"}, {"admin", "admin"}]
 
   defp invite_role_options(_), do: [{"viewer", "viewer"}, {"member", "member"}]
 
