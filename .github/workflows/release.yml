@@ -189,10 +189,10 @@ jobs:
       - name: Check Homebrew publish configuration
         id: homebrew_gate
         env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
         run: |
-          if [ -z "${HOMEBREW_TAP_TOKEN}" ]; then
-            echo "HOMEBREW_TAP_TOKEN is not configured; skipping Homebrew publish."
+          if [ -z "${HOMEBREW_TAP_DEPLOY_KEY}" ]; then
+            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY is not configured; Homebrew stays on the previous version."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
@@ -205,7 +205,9 @@ jobs:
       - name: Publish Homebrew formula
         if: steps.homebrew_gate.outputs.enabled == 'true'
         env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # A write deploy key on the tap repo: scoped to that one repo and,
+          # unlike a personal access token, it does not expire.
+          HOMEBREW_TAP_DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
         run: |
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
@@ -252,7 +254,11 @@ jobs:
           end
           EOF
 
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/aryaminus/homebrew-controlkeel.git" /tmp/homebrew-controlkeel
+          KEY_FILE="${RUNNER_TEMP}/homebrew_tap_key"
+          printf '%s\n' "${HOMEBREW_TAP_DEPLOY_KEY}" > "${KEY_FILE}"
+          chmod 600 "${KEY_FILE}"
+          export GIT_SSH_COMMAND="ssh -i ${KEY_FILE} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone git@github.com:aryaminus/homebrew-controlkeel.git /tmp/homebrew-controlkeel
           mkdir -p /tmp/homebrew-controlkeel/Formula
           cp /tmp/controlkeel.rb /tmp/homebrew-controlkeel/Formula/controlkeel.rb
           cd /tmp/homebrew-controlkeel
