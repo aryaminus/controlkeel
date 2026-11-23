@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.36 — 2026-11-23
+
+### What's changed
+
+- Allow one short id segment in a plain path (#369)
+
 ## v0.4.35 — 2026-11-23
 
 ### What's changed
