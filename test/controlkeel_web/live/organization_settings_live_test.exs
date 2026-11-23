@@ -616,7 +616,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       assert has_element?(view, "#invite-member-modal")
     end
 
-    test "admin can invite an admin and the role is offered in the form", %{
+    test "admin cannot invite an admin and the role is not offered in the form", %{
       admin: admin,
       org: org
     } do
@@ -626,19 +626,20 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       |> element("#invite-member-button")
       |> render_click()
 
-      assert has_element?(view, "#invite-form select[name='invite[role]'] option[value='admin']")
+      refute has_element?(view, "#invite-form select[name='invite[role]'] option[value='admin']")
       refute has_element?(view, "#invite-form select[name='invite[role]'] option[value='owner']")
 
       invite_email = "new-admin@example.com"
+      memberships_before = Accounts.list_memberships_for_org(org.id)
 
-      render_submit(view, "invite", %{
-        "invite" => %{"email" => invite_email, "role" => "admin"}
-      })
+      html =
+        render_submit(view, "invite", %{
+          "invite" => %{"email" => invite_email, "role" => "admin"}
+        })
 
-      invited_user = Accounts.get_user_by_email(invite_email)
-
-      assert [%{role: "admin", status: "pending"}] =
-               Accounts.list_memberships_for_user(invited_user.id)
+      assert html =~ "You don&#39;t have permission to invite at that role."
+      assert Accounts.get_user_by_email(invite_email) == nil
+      assert Accounts.list_memberships_for_org(org.id) == memberships_before
     end
 
     test "crafted admin owner invite is refused before account creation", %{
