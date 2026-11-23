@@ -1872,7 +1872,14 @@ defmodule ControlKeel.SkillsTest do
           )
 
         reason = out |> Jason.decode!() |> get_in(path)
-        assert reason =~ "demo.rule: Demo reason.", "#{format}: #{out}"
+
+        # Without jq the hook falls back to its static denial.
+        expected =
+          if System.find_executable("jq"),
+            do: "demo.rule: Demo reason.",
+            else: "ControlKeel blocked this shell command"
+
+        assert reason =~ expected, "#{format}: #{out}"
       end
     end
 

@@ -53,12 +53,21 @@ defmodule ControlKeel.Scanner.Entropy do
     identifier_with_optional_arity?(candidate) or
       migration_path?(content, candidate) or
       url_path_fragment?(content, candidate) or
-      word_path?(candidate)
+      (word_path?(candidate) and not credential_context?(content, candidate))
+  end
+
+  defp credential_context?(content, candidate) do
+    Regex.match?(
+      ~r/(?:bearer|basic|token|secret|password|passwd|api[_-]?key|authorization)\S*[\s:="']+#{Regex.escape(candidate)}/i,
+      content
+    )
   end
 
   # API or file paths made of plain words, plain numbers and UUIDs, such as a
-  # GitHub `pulls/<n>/comments` path or a session directory. Secrets mix
-  # letters and digits inside a run, so they never take this shape.
+  # GitHub `pulls/<n>/comments` path or a session directory. Words must be
+  # lowercase, Capitalized or UPPERCASE; base64 secrets mix case and digits
+  # inside a run, so they don't take this shape. A candidate right after a
+  # credential keyword is never treated as a path.
   defp word_path?(candidate) do
     segments = String.split(candidate, "/", trim: true)
     length(segments) >= 3 and Enum.all?(segments, &path_segment?/1)
@@ -68,7 +77,7 @@ defmodule ControlKeel.Scanner.Entropy do
     Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, segment) or
       segment
       |> String.split(["-", "_", "."], trim: true)
-      |> Enum.all?(&Regex.match?(~r/^(?:[A-Za-z]+|\d+)$/, &1))
+      |> Enum.all?(&Regex.match?(~r/^(?:[A-Z]?[a-z]+|[A-Z]+|\d+)$/, &1))
   end
 
   defp migration_path?(content, candidate) do

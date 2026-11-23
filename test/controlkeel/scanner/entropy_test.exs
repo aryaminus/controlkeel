@@ -40,5 +40,15 @@ defmodule ControlKeel.Scanner.EntropyTest do
       content = "curl repos/acme/aB3dE9fG2hJ4kL6mN8pQ0rS/comments"
       assert [_] = Entropy.detect(content, %{"kind" => "shell"}, [@low_rule])
     end
+
+    test "slash-containing credentials are still detected" do
+      for content <- [
+            "curl -H 'Authorization: Bearer AbCdEfGhIjKlMnOp/QrStUvWxYz/012345678901' https://example.test",
+            "export TOKEN=AbCdEfGhIjKlMnOp/QrStUvWxYz/012345678901",
+            "echo QwErTyUiOpAsDf/GhJkLzXcVbNm/123456789012"
+          ] do
+        assert [_ | _] = Entropy.detect(content, %{"kind" => "shell"}, [@low_rule]), content
+      end
+    end
   end
 end
