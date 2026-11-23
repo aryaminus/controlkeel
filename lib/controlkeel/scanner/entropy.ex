@@ -114,9 +114,12 @@ defmodule ControlKeel.Scanner.Entropy do
     segments = String.split(candidate, "/", trim: true)
     {plain, other} = Enum.split_with(segments, &path_segment?/1)
 
-    length(segments) >= 3 and length(plain) >= 3 and
-      (other == [] or
-         (length(other) == 1 and Regex.match?(~r/^[a-z0-9]{1,12}(?:\.[a-z]+)?$/, hd(other))))
+    length(plain) >= 3 and
+      case other do
+        [] -> true
+        [id] -> Regex.match?(~r/^[a-z0-9]{1,12}(?:\.[a-z]+)?$/, id)
+        _ -> false
+      end
   end
 
   defp path_segment?(segment) do
