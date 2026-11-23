@@ -16,13 +16,10 @@ config :controlkeel, ControlKeelWeb.Endpoint,
     rewrite_on: [:x_forwarded_proto],
     exclude: [
       # paths: ["/health"],
-      hosts: ["localhost", "127.0.0.1"]
+      hosts: ["localhost", "127.0.0.1"],
+      conn: {ControlKeelWeb.Plugs.RuntimeHTTPS, :allow_http?, []}
     ]
   ]
-
-# Session cookies are only ever set over HTTPS in production; mark them
-# `Secure` so browsers never send them on a plain-HTTP request to the domain.
-config :controlkeel, :secure_cookies, true
 
 # Do not print debug messages in production
 config :logger, level: :info
