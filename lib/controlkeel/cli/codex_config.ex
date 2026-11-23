@@ -140,7 +140,6 @@ defmodule ControlKeel.CLI.CodexConfig do
   # the managed markers (for example by `Integration.mcp_install_command/1`)
   # would otherwise sit beside the managed block and break the whole file, so
   # the managed block becomes the only declaration.
-  @ck_tables ~r/^\[(mcp_servers\.controlkeel|agents\.controlkeel_operator)(\.[^\]]*)?\]$/
 
   defp strip_unmarked_ck_tables(text) do
     {kept, _skipping} =
@@ -152,27 +151,76 @@ defmodule ControlKeel.CLI.CodexConfig do
             if skipping, do: {acc, true}, else: {[line | acc], false}
 
           header ->
-            if Regex.match?(@ck_tables, header), do: {acc, true}, else: {[line | acc], false}
+            if ck_table?(header), do: {acc, true}, else: {[line | acc], false}
         end
       end)
 
     kept |> Enum.reverse() |> Enum.join("\n")
   end
 
-  # Normalized table header: comments, whitespace, and quotes around key
-  # segments are dropped, so `[ mcp_servers."controlkeel" ]` and
-  # `[mcp_servers.controlkeel]` compare equal (they name the same table).
+  # A table header as its list of key segments, so `[ mcp_servers."controlkeel" ]`
+  # and `[mcp_servers.controlkeel]` compare equal while a quoted segment such
+  # as `"controlkeel.backup"` stays one segment. Returns nil for non-headers.
   defp toml_header(line) do
-    header =
-      line
-      |> String.split("#", parts: 2)
-      |> hd()
-      |> String.trim()
+    trimmed = String.trim(line)
 
-    if String.starts_with?(header, "[") and String.ends_with?(header, "]") do
-      String.replace(header, ~r/["'\s]/, "")
+    with "[" <> rest <- trimmed,
+         {:ok, segments, tail} <- parse_key_segments(String.trim_leading(rest, "["), []),
+         true <- tail_is_header_end?(tail) do
+      segments
+    else
+      _ -> nil
     end
   end
+
+  defp tail_is_header_end?(tail) do
+    case tail |> String.trim_leading("]") |> String.trim() do
+      "" -> true
+      "#" <> _comment -> true
+      _ -> false
+    end
+  end
+
+  defp parse_key_segments(input, acc) do
+    input = String.trim_leading(input)
+
+    {segment, rest} =
+      case input do
+        "\"" <> quoted -> take_quoted(quoted, "\"")
+        "'" <> quoted -> take_quoted(quoted, "'")
+        bare -> take_bare(bare)
+      end
+
+    case segment do
+      nil ->
+        :error
+
+      segment ->
+        case String.trim_leading(rest) do
+          "." <> more -> parse_key_segments(more, [segment | acc])
+          "]" <> _ = tail -> {:ok, Enum.reverse([segment | acc]), tail}
+          _ -> :error
+        end
+    end
+  end
+
+  defp take_quoted(input, quote) do
+    case String.split(input, quote, parts: 2) do
+      [segment, rest] -> {segment, rest}
+      _ -> {nil, ""}
+    end
+  end
+
+  defp take_bare(input) do
+    case Regex.run(~r/^([A-Za-z0-9_-]+)(.*)$/s, input) do
+      [_, segment, rest] -> {segment, rest}
+      _ -> {nil, ""}
+    end
+  end
+
+  defp ck_table?(["mcp_servers", "controlkeel" | _]), do: true
+  defp ck_table?(["agents", "controlkeel_operator" | _]), do: true
+  defp ck_table?(_segments), do: false
 
   defp split_managed_block(existing) do
     case String.split(existing, @managed_start, parts: 2) do
@@ -204,7 +252,7 @@ defmodule ControlKeel.CLI.CodexConfig do
         trimmed = String.trim(line)
         header = toml_header(line)
         table_header? = header != nil
-        entering_features? = header == "[features]"
+        entering_features? = header == ["features"]
         leaving_features? = in_features? and table_header? and not entering_features?
         flag_line? = in_features? and String.match?(trimmed, ~r/^#{Regex.escape(flag)}\s*=/)
 

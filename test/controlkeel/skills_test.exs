@@ -1660,6 +1660,12 @@ defmodule ControlKeel.SkillsTest do
       [ mcp_servers."controlkeel".env ]
       FOO = "1"
 
+      [mcp_servers."controlkeel.backup"]
+      command = "backup-server"
+
+      [[profiles.list]]
+      name = "a"
+
       [features] # toggles
       web_search = true
       """)
@@ -1676,7 +1682,10 @@ defmodule ControlKeel.SkillsTest do
       toml = File.read!(config)
 
       assert length(String.split(toml, "[mcp_servers.controlkeel]")) == 2
-      refute toml =~ ~s(mcp_servers."controlkeel")
+      refute toml =~ ~s(mcp_servers."controlkeel".env)
+      assert toml =~ ~s([mcp_servers."controlkeel.backup"])
+      assert toml =~ ~s(command = "backup-server")
+      assert toml =~ "[[profiles.list]]"
       assert length(Regex.scan(~r/^\[features\]/m, toml)) == 1
       assert toml =~ "web_search = true"
       assert toml =~ "codex_hooks = true"
