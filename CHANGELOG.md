@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.33 — 2026-11-23
+
+### What's changed
+
+- Keep every host's hooks quiet and stop overwriting host config (#363)
+
 ## v0.4.32 — 2026-11-23
 
 ### What's changed
