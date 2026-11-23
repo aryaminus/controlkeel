@@ -741,17 +741,11 @@ defmodule ControlKeel.SkillsTest do
 
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/commands/controlkeel-last.md"))
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks.json"))
-    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-session-start.sh"))
+    refute File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-session-start.sh"))
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-validate-shell.sh"))
-    assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-post-tool-use.sh"))
+    refute File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-post-tool-use.sh"))
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-user-prompt-submit.sh"))
     assert File.exists?(Path.join(codex_plan.output_dir, ".codex/hooks/ck-stop.sh"))
-
-    codex_session_hook =
-      File.read!(Path.join(codex_plan.output_dir, ".codex/hooks/ck-session-start.sh"))
-
-    refute codex_session_hook =~ "systemMessage"
-    refute codex_session_hook =~ "ck_run"
 
     codex_validate_hook =
       File.read!(Path.join(codex_plan.output_dir, ".codex/hooks/ck-validate-shell.sh"))
@@ -762,7 +756,8 @@ defmodule ControlKeel.SkillsTest do
     codex_stop_hook =
       File.read!(Path.join(codex_plan.output_dir, ".codex/hooks/ck-stop.sh"))
 
-    assert codex_stop_hook =~ "ck_run context --session-id"
+    assert codex_stop_hook =~ "ck_run context --json"
+    refute codex_stop_hook =~ "--session-id"
     assert codex_stop_hook =~ "CONTROLKEEL_STOP_HOOK_TIMEOUT_SECONDS"
     refute codex_stop_hook =~ "set -eu"
 
@@ -807,10 +802,9 @@ defmodule ControlKeel.SkillsTest do
       |> File.read!()
       |> Jason.decode!()
 
-    assert Map.has_key?(codex_hooks["hooks"], "PostToolUse")
+    refute Map.has_key?(codex_hooks["hooks"], "PostToolUse")
     assert Map.has_key?(codex_hooks["hooks"], "UserPromptSubmit")
-    refute Map.has_key?(codex_hooks["hooks"], "Stop")
-    assert [%{"matcher" => "Bash"}] = codex_hooks["hooks"]["PostToolUse"]
+    assert Map.has_key?(codex_hooks["hooks"], "Stop")
 
     codex_hooks_json = Jason.encode!(codex_hooks)
     assert codex_hooks_json =~ "CK_PROJECT_ROOT"
@@ -962,40 +956,6 @@ defmodule ControlKeel.SkillsTest do
     refute Jason.decode!(File.read!(manifest_path))["skills"] |> Enum.member?("retired-ck-skill")
   end
 
-  test "codex post-tool-use hook only warns on explicit failures", %{tmp_dir: tmp_dir} do
-    assert {:ok, _install} = Skills.install("codex", tmp_dir, scope: "project")
-
-    hook_path = Path.join(tmp_dir, ".codex/hooks/ck-post-tool-use.sh")
-
-    success_with_error_word =
-      Jason.encode!(%{
-        "tool_input" => %{"command" => "rg error lib"},
-        "tool_response" => "docs mention error handling",
-        "exit_code" => 0
-      })
-
-    {success_output, 0} =
-      System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
-        env: [{"CK_TEST_INPUT", success_with_error_word}, {"CK_HOOK_PATH", hook_path}]
-      )
-
-    assert success_output == ""
-
-    failing_test_command =
-      Jason.encode!(%{
-        "tool_input" => %{"command" => "mix test"},
-        "tool_response" => "1 failure",
-        "exit_code" => 2
-      })
-
-    {failure_output, 0} =
-      System.cmd("sh", ["-c", "printf '%s' \"$CK_TEST_INPUT\" | sh \"$CK_HOOK_PATH\""],
-        env: [{"CK_TEST_INPUT", failing_test_command}, {"CK_HOOK_PATH", hook_path}]
-      )
-
-    assert failure_output =~ "test-oriented shell step"
-  end
-
   test "codex validation hook reports validator failure", %{tmp_dir: tmp_dir} do
     assert {:ok, _} = Skills.install("codex", tmp_dir, scope: "project")
     stub = Path.join(tmp_dir, "validator")
@@ -1013,7 +973,7 @@ defmodule ControlKeel.SkillsTest do
         ]
       )
 
-    assert Jason.decode!(output)["systemMessage"] =~ "has not been validated"
+    assert Jason.decode!(output)["systemMessage"] =~ "not reachable"
     File.write!(stub, "#!/bin/sh\nprintf '%s' '{\"decision\":\"block\"}'\nexit 1\n")
 
     {denial, 0} =
@@ -1068,7 +1028,7 @@ defmodule ControlKeel.SkillsTest do
 
     refute output =~ "\"decision\":\"block\""
     assert output =~ "\"systemMessage\""
-    assert output =~ "blocked findings"
+    assert output =~ "blocked finding"
   end
 
   test "codex stop hook still warns when only the python3 fallback is available", %{
@@ -1077,15 +1037,17 @@ defmodule ControlKeel.SkillsTest do
     python3 = System.find_executable("python3")
     sh = System.find_executable("sh")
     cat = System.find_executable("cat")
+    coreutils = Enum.map(~w(mkdir tr mv rm), &System.find_executable/1)
 
-    if python3 && sh && cat do
+    if python3 && sh && cat && Enum.all?(coreutils) do
       assert {:ok, _install} = Skills.install("codex", tmp_dir, scope: "project")
 
       hook_path = Path.join(tmp_dir, ".codex/hooks/ck-stop.sh")
       bin_dir = Path.join(tmp_dir, "nojq-bin")
       File.mkdir_p!(bin_dir)
 
-      for exe <- [python3, sh, cat], do: File.ln_s!(exe, Path.join(bin_dir, Path.basename(exe)))
+      for exe <- [python3, sh, cat | coreutils],
+          do: File.ln_s!(exe, Path.join(bin_dir, Path.basename(exe)))
 
       stub = Path.join(tmp_dir, "controlkeel-stub")
       File.write!(stub, "#!#{sh}\nprintf '%s' '{\"active_findings\":{\"blocked\":2}}'\n")
@@ -1103,7 +1065,7 @@ defmodule ControlKeel.SkillsTest do
           ]
         )
 
-      assert output =~ "blocked findings"
+      assert output =~ "blocked finding"
     end
   end
 
@@ -1218,7 +1180,7 @@ defmodule ControlKeel.SkillsTest do
     test "the Claude stop hook never blocks and warns only when blocked findings rise",
          %{tmp_dir: tmp_dir} do
       hook = Path.join(tmp_dir, "stop.sh")
-      File.write!(hook, Exporter.claude_stop_hook_contents())
+      File.write!(hook, Exporter.stop_hook_contents())
       File.chmod!(hook, 0o755)
 
       count_file = Path.join(tmp_dir, "blocked")
@@ -1580,13 +1542,18 @@ defmodule ControlKeel.SkillsTest do
              Skills.install("antigravity-cli-native", tmp_dir, scope: "project")
 
     assert install.destination == Path.join(tmp_dir, ".agents")
-    assert install.plugins_destination == Path.join(tmp_dir, ".agents/plugins/controlkeel")
-    assert File.exists?(Path.join(tmp_dir, ".agents/plugins/controlkeel/plugin.json"))
+    refute Map.has_key?(install, :plugins_destination)
+    refute File.exists?(Path.join(tmp_dir, ".agents/plugins/controlkeel"))
+    assert File.exists?(Path.join(tmp_dir, ".agents/hooks/ck-validate-shell.sh"))
     assert File.exists?(Path.join(tmp_dir, ".agents/skills/controlkeel-governance/SKILL.md"))
     assert File.exists?(Path.join(tmp_dir, ".agents/hooks.json"))
     assert File.exists?(Path.join(tmp_dir, ".agents/mcp_config.json"))
-    assert File.exists?(Path.join(tmp_dir, "GEMINI.md"))
+    refute File.exists?(Path.join(tmp_dir, "GEMINI.md"))
     assert File.exists?(Path.join(tmp_dir, "AGENTS.md"))
+
+    hooks = tmp_dir |> Path.join(".agents/hooks.json") |> File.read!()
+    refute hooks =~ "controlkeel hook"
+    refute hooks =~ "PostToolUse"
   end
 
   test "runtime targets with project scope return unsupported_install instead of crashing", %{
@@ -1695,6 +1662,215 @@ defmodule ControlKeel.SkillsTest do
     test "project installs gitignore the shared skill tree", %{tmp_dir: tmp_dir} do
       assert {:ok, _} = Skills.install("kiro-native", tmp_dir, scope: "project")
       assert File.read!(Path.join(tmp_dir, ".gitignore")) =~ ".agents/skills"
+    end
+  end
+
+  describe "hooks stay quiet and respect user config on every host" do
+    test "no host registers static-reminder or per-tool-call review hooks" do
+      noisy = ~w(SessionStart SessionEnd PostToolBatch SubagentStart SubagentStop TaskCreated
+                 TaskCompleted ConfigChange PermissionDenied PostToolUseFailure PostToolUse
+                 sessionStart sessionEnd subagentStart beforeMCPExecution afterMCPExecution)
+
+      manifests = [
+        Exporter.claude_hooks_manifest()["hooks"],
+        Exporter.claude_manual_settings()["hooks"],
+        Exporter.codex_hooks_manifest()["hooks"],
+        Exporter.devin_terminal_hooks_manifest()["hooks"],
+        Exporter.cursor_hooks_manifest()["hooks"],
+        Exporter.cursor_plugin_hooks_manifest()["hooks"],
+        Exporter.antigravity_hooks_manifest()["controlkeel-governance"]
+      ]
+
+      for hooks <- manifests, event <- noisy, do: refute(Map.has_key?(hooks, event), event)
+
+      [copilot] = Exporter.copilot_hooks_manifest()["hooks"]["preToolUse"]
+      assert copilot["bash"] =~ "ck-validate-shell.sh"
+      refute inspect(Exporter.copilot_hooks_manifest()) =~ "review"
+      refute inspect(Exporter.antigravity_hooks_manifest()) =~ "controlkeel hook"
+    end
+
+    test "cursor install keeps the user's hooks.json and mcp.json entries", %{tmp_dir: tmp_dir} do
+      cursor = Path.join(tmp_dir, ".cursor")
+      File.mkdir_p!(cursor)
+
+      File.write!(
+        Path.join(cursor, "hooks.json"),
+        ~s({"version":1,"hooks":{"stop":[{"command":"./my-stop.sh"}],"sessionStart":[{"command":"sh .cursor/hooks/ck-session-start.sh"}]}})
+      )
+
+      File.write!(Path.join(cursor, "mcp.json"), ~s({"mcpServers":{"other":{"command":"x"}}}))
+
+      for _ <- 1..2,
+          do: assert({:ok, _} = Skills.install("cursor-native", tmp_dir, scope: "project"))
+
+      hooks = cursor |> Path.join("hooks.json") |> File.read!() |> Jason.decode!()
+      stop_commands = Enum.map(hooks["hooks"]["stop"], & &1["command"])
+      assert "./my-stop.sh" in stop_commands
+      assert Enum.count(stop_commands, &(&1 =~ "ck-stop.sh")) == 1
+      refute Map.has_key?(hooks["hooks"], "sessionStart")
+
+      servers = cursor |> Path.join("mcp.json") |> File.read!() |> Jason.decode!()
+      assert Map.keys(servers["mcpServers"]) |> Enum.sort() == ["controlkeel", "other"]
+    end
+
+    test "kiro, cline, and letta installs remove retired ControlKeel hooks", %{tmp_dir: tmp_dir} do
+      retired = [
+        ".kiro/hooks/controlkeel-validate.json",
+        ".kiro/hooks/controlkeel-review.json",
+        ".kiro/settings/controlkeel-tools.json",
+        ".cline/hooks/PreToolUse/controlkeel-review.sh",
+        ".cline/hooks/TaskStart/controlkeel-context.sh",
+        ".letta/hooks/controlkeel-findings.sh"
+      ]
+
+      for rel <- retired do
+        path = Path.join(tmp_dir, rel)
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, "old\n")
+      end
+
+      File.mkdir_p!(Path.join(tmp_dir, ".kiro/hooks"))
+      File.write!(Path.join(tmp_dir, ".kiro/hooks/mine.json"), "{}")
+
+      File.write!(
+        Path.join(tmp_dir, ".letta/settings.json"),
+        Jason.encode!(%{
+          "model" => "x",
+          "hooks" => %{
+            "PostToolUse" => [
+              %{
+                "matcher" => "*",
+                "hooks" => [
+                  %{"type" => "command", "command" => "sh .letta/hooks/controlkeel-findings.sh"},
+                  %{"type" => "command", "command" => "./mine.sh"}
+                ]
+              }
+            ]
+          }
+        })
+      )
+
+      for target <- ~w(kiro-native cline-native letta-code-native) do
+        assert {:ok, _} = Skills.install(target, tmp_dir, scope: "project")
+      end
+
+      for rel <- retired, do: refute(File.exists?(Path.join(tmp_dir, rel)), rel)
+      assert File.exists?(Path.join(tmp_dir, ".kiro/hooks/mine.json"))
+
+      letta = tmp_dir |> Path.join(".letta/settings.json") |> File.read!() |> Jason.decode!()
+      assert letta["model"] == "x"
+
+      assert [%{"hooks" => [%{"command" => "./mine.sh"}]}] = letta["hooks"]["PostToolUse"]
+    end
+
+    test "antigravity retires its duplicate plugin bundle and CK-only GEMINI.md",
+         %{tmp_dir: tmp_dir} do
+      plugin = Path.join(tmp_dir, ".agents/plugins/controlkeel")
+      File.mkdir_p!(plugin)
+      File.write!(Path.join(plugin, "plugin.json"), ~s({"name":"controlkeel"}))
+
+      {:ok, plan} = Skills.export("antigravity-cli-native", tmp_dir, scope: "export")
+      generated = File.read!(Path.join(plan.output_dir, "AGENTS.md"))
+      File.write!(Path.join(tmp_dir, "GEMINI.md"), generated)
+
+      File.write!(Path.join(tmp_dir, ".agents/mcp_config.json"), ~s({"mcpServers":{"other":{}}}))
+
+      assert {:ok, _} = Skills.install("antigravity-cli-native", tmp_dir, scope: "project")
+
+      refute File.exists?(plugin)
+      refute File.exists?(Path.join(tmp_dir, "GEMINI.md"))
+
+      servers =
+        tmp_dir |> Path.join(".agents/mcp_config.json") |> File.read!() |> Jason.decode!()
+
+      assert Map.has_key?(servers["mcpServers"], "other")
+
+      edited = generated <> "\n## My notes\n"
+      File.write!(Path.join(tmp_dir, "GEMINI.md"), edited)
+      assert {:ok, _} = Skills.install("antigravity-cli-native", tmp_dir, scope: "project")
+      assert File.read!(Path.join(tmp_dir, "GEMINI.md")) == edited
+    end
+
+    test "roo replaces an existing CK mode with blank lines inside it", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, ".roomodes"), """
+      customModes:
+        - slug: controlkeel-operator
+          name: Old
+
+          roleDefinition: old role
+          groups:
+            - read
+        - slug: my-mode
+          name: Mine
+      """)
+
+      assert {:ok, _} = Skills.install("roo-native", tmp_dir, scope: "project")
+      modes = File.read!(Path.join(tmp_dir, ".roomodes"))
+
+      refute modes =~ "old role"
+      refute modes =~ "name: Old"
+      assert modes =~ "slug: my-mode"
+      assert length(String.split(modes, "slug: controlkeel-operator")) == 2
+    end
+
+    test "the shell gate validates multi-line and write-capable commands" do
+      helpers = Exporter.hook_runtime_helpers()
+
+      classify = fn command ->
+        {out, 0} =
+          System.cmd("sh", [
+            "-c",
+            helpers <> "\nck_readonly_command \"$1\" && echo ro || echo check",
+            "_",
+            command
+          ])
+
+        String.trim(out)
+      end
+
+      assert classify.("git status") == "ro"
+      assert classify.("ls -la") == "ro"
+      assert classify.("pwd\ngit push") == "check"
+      assert classify.("sort -o out.txt in.txt") == "check"
+      assert classify.("git diff --output=patch") == "check"
+      assert classify.("less file") == "check"
+      assert classify.("uniq /dev/null important-file") == "check"
+      assert classify.("rg --pre=./mutate.sh pattern input.txt") == "check"
+      assert classify.("sort --compress-program=./x in.txt") == "check"
+      assert classify.("git grep -Ovim pattern") == "check"
+      assert classify.("rg pattern lib") == "ro"
+    end
+
+    test "roo install leaves a user's similarly named mode alone", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, ".roomodes"), """
+      customModes:
+        - slug: controlkeel-operator-custom
+          name: Mine
+          roleDefinition: my role
+      """)
+
+      assert {:ok, _} = Skills.install("roo-native", tmp_dir, scope: "project")
+      modes = File.read!(Path.join(tmp_dir, ".roomodes"))
+
+      assert modes =~ "slug: controlkeel-operator-custom"
+      assert modes =~ "my role"
+      assert modes =~ ~r/slug: controlkeel-operator\n/
+    end
+
+    test "roo install keeps the user's custom modes", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, ".roomodes"), """
+      customModes:
+        - slug: my-mode
+          name: Mine
+          roleDefinition: hi
+      """)
+
+      for _ <- 1..2,
+          do: assert({:ok, _} = Skills.install("roo-native", tmp_dir, scope: "project"))
+
+      modes = File.read!(Path.join(tmp_dir, ".roomodes"))
+      assert modes =~ "slug: my-mode"
+      assert length(String.split(modes, "slug: controlkeel-operator")) == 2
     end
   end
 

@@ -19,7 +19,8 @@ defmodule ControlKeel.Skills.Installer do
          analysis <- Registry.analyze(project_root, trust_project_skills: true),
          skills = canonical_skills(analysis.skills, project_root),
          {:ok, result} <- do_install(target, scope, project_root, skills, opts),
-         result <- install_shared_skills(target.id, scope, project_root, skills, result) do
+         result <- install_shared_skills(target.id, scope, project_root, skills, result),
+         :ok <- retire_host_hooks(target.id, scope, project_root) do
       :telemetry.execute(
         [:controlkeel, :skills, :installed],
         %{count: 1},
@@ -68,6 +69,82 @@ defmodule ControlKeel.Skills.Installer do
   }
 
   @no_shared_skills ~w(claude-standalone claude-plugin devin-runtime open-standard)
+
+  # Hook files and entries earlier releases installed that only repeated
+  # reminders, booted the CLI on every event, or gated every tool call on a
+  # plan review. Paths are relative to the project root or the user home and
+  # are ControlKeel-named, so removing them never touches user hooks.
+  @retired_hook_files %{
+    "codex" =>
+      Enum.map(
+        ~w(ck-session-start.sh ck-post-tool-use.sh ck-nudge-validate.sh ck-nudge-finding.sh),
+        &(".codex/hooks/" <> &1)
+      ),
+    "devin-terminal-native" =>
+      for(
+        base <- [".devin/hooks/", ".config/devin/hooks/"],
+        name <-
+          ~w(ck-session-start.sh ck-post-tool-use.sh ck-session-end.sh ck-nudge-validate.sh ck-nudge-finding.sh),
+        do: base <> name
+      ),
+    "cursor-native" =>
+      for(
+        base <- [".cursor/hooks/", ".cursor-plugin/hooks/"],
+        name <-
+          ~w(ck-session-start.sh ck-session-end.sh ck-subagent-start.sh ck-mcp-gate.sh ck-nudge-validate.sh ck-nudge-finding.sh),
+        do: base <> name
+      ),
+    "kiro-native" => [
+      ".kiro/hooks/controlkeel-validate.json",
+      ".kiro/hooks/controlkeel-review.json",
+      ".kiro/hooks/controlkeel-nudge-validate.json",
+      ".kiro/hooks/controlkeel-nudge-finding.json",
+      ".kiro/settings/controlkeel-tools.json"
+    ],
+    "cline-native" => [
+      ".cline/hooks/PreToolUse/controlkeel-review.sh",
+      ".cline/hooks/TaskStart/controlkeel-context.sh"
+    ],
+    "letta-code-native" => [
+      ".letta/hooks/controlkeel-findings.sh",
+      ".letta/hooks/controlkeel-session-start.sh",
+      ".letta/settings.local.example.json"
+    ],
+    "copilot-plugin" => ["bin/controlkeel-review.sh", "bin/controlkeel-review.ps1"]
+  }
+
+  # User-editable hook configs that may still carry ControlKeel entries for
+  # scripts that no longer exist.
+  @stripped_hook_configs %{
+    "letta-code-native" => [{".letta/settings.json", ".letta/hooks/"}]
+  }
+
+  defp retire_host_hooks(target_id, scope, project_root) when scope in ["user", "project"] do
+    base = if scope == "user", do: user_home(), else: Path.expand(project_root)
+
+    remove_ck_files!(base, Map.get(@retired_hook_files, target_id, []))
+
+    for {rel, prefix} <- Map.get(@stripped_hook_configs, target_id, []) do
+      path = Path.join(base, rel)
+      if File.exists?(path), do: merge_hooks_json!(%{}, path, prefix)
+    end
+
+    :ok
+  end
+
+  defp retire_host_hooks(_target_id, _scope, _project_root), do: :ok
+
+  defp remove_ck_files!(base, rel_paths) do
+    Enum.each(rel_paths, fn rel ->
+      path = Path.join(base, rel)
+      _ = File.rm(path)
+
+      case File.ls(Path.dirname(path)) do
+        {:ok, []} -> File.rmdir(Path.dirname(path))
+        _ -> :ok
+      end
+    end)
+  end
 
   defp install_shared_skills(target_id, scope, project_root, skills, result)
        when scope in ["user", "project"] and target_id not in @no_shared_skills and
@@ -122,41 +199,6 @@ defmodule ControlKeel.Skills.Installer do
   end
 
   defp maybe_ignore_project_artifacts(_scope, _project_root, _result), do: :ok
-
-  @doc """
-  Remove CK-installed skill directories that are no longer in the current skill set.
-
-  Uses the per-destination manifest (`.controlkeel-skills.json`) to identify
-  CK-owned skills, then removes any that are not in the current canonical set.
-  User-authored skills are never touched.
-  """
-  def cleanup_stale_skills(project_root, attached_agents) when is_map(attached_agents) do
-    analysis = Registry.analyze(project_root, trust_project_skills: true)
-    current_names = analysis.skills |> canonical_skills(project_root) |> Enum.map(& &1.name)
-
-    skill_dirs =
-      attached_agents
-      |> Enum.flat_map(fn {_key, attrs} ->
-        [
-          Map.get(attrs, "skills_destination"),
-          Map.get(attrs, "compat_skills_destination"),
-          Map.get(attrs, "compat_destination")
-        ]
-        |> Enum.filter(&is_binary/1)
-      end)
-      |> Enum.filter(fn dir ->
-        is_binary(dir) and File.dir?(dir)
-      end)
-      |> Enum.uniq()
-
-    Enum.each(skill_dirs, fn dir ->
-      prune_orphaned_skills(dir, current_names)
-    end)
-
-    :ok
-  rescue
-    _ -> :ok
-  end
 
   @doc """
   Re-sync all attached targets' skill directories from the canonical skill source.
@@ -285,7 +327,6 @@ defmodule ControlKeel.Skills.Installer do
     File.mkdir_p!(config_root)
 
     hooks_root = Path.join(config_root, "hooks")
-    File.mkdir_p!(hooks_root)
     copy_tree_contents(Path.join(plan.output_dir, ".codex/hooks"), hooks_root)
 
     {:ok, _} =
@@ -317,8 +358,7 @@ defmodule ControlKeel.Skills.Installer do
        compat_destination: compat_skill_root,
        agent_destination: agent_root,
        commands_destination: commands_root,
-       config_destination: Path.join(config_root, "config.toml"),
-       hooks_destination: hooks_root
+       config_destination: Path.join(config_root, "config.toml")
      }}
   end
 
@@ -438,9 +478,10 @@ defmodule ControlKeel.Skills.Installer do
       Path.join(devin_root, "config.json")
     )
 
-    merge_json_file!(
+    merge_hooks_json!(
       Path.join(plan.output_dir, ".devin/hooks.v1.json"),
-      Path.join(devin_root, "hooks.v1.json")
+      Path.join(devin_root, "hooks.v1.json"),
+      ".devin/hooks/"
     )
 
     File.cp!(Path.join(plan.output_dir, ".devin/README.md"), Path.join(devin_root, "README.md"))
@@ -457,7 +498,6 @@ defmodule ControlKeel.Skills.Installer do
        skills_destination: native_skill_root,
        compat_skills_destination: compat_root,
        agents_destination: agent_root,
-       hooks_destination: hooks_root,
        config_destination: Path.join(devin_root, "config.json")
      }}
   end
@@ -474,7 +514,6 @@ defmodule ControlKeel.Skills.Installer do
         workflows_root = cline_documents_dir("Workflows")
         config_root = Path.join([cline_root, "data", "settings"])
         commands_root = Path.join(cline_root, "commands")
-        hooks_root = Path.join(cline_root, "hooks")
 
         copy_skills(skills, skill_root)
         # CLINE_DIR may point outside ~/.cline; retire its CK copy as well.
@@ -483,7 +522,6 @@ defmodule ControlKeel.Skills.Installer do
         File.mkdir_p!(workflows_root)
         File.mkdir_p!(config_root)
         File.mkdir_p!(commands_root)
-        File.mkdir_p!(hooks_root)
 
         File.cp!(
           Path.join(plan.output_dir, ".clinerules/controlkeel.md"),
@@ -496,7 +534,11 @@ defmodule ControlKeel.Skills.Installer do
         )
 
         copy_tree_contents(Path.join(plan.output_dir, ".cline/commands"), commands_root)
-        copy_tree_contents(Path.join(plan.output_dir, ".cline/hooks"), hooks_root)
+
+        remove_ck_files!(cline_root, [
+          "hooks/PreToolUse/controlkeel-review.sh",
+          "hooks/TaskStart/controlkeel-context.sh"
+        ])
 
         merge_json_file!(
           Path.join(plan.output_dir, ".cline/data/settings/cline_mcp_settings.json"),
@@ -511,8 +553,7 @@ defmodule ControlKeel.Skills.Installer do
            agent_destination: config_root,
            rules_destination: rules_root,
            workflows_destination: workflows_root,
-           commands_destination: commands_root,
-           hooks_destination: hooks_root
+           commands_destination: commands_root
          }}
 
       "project" ->
@@ -527,11 +568,6 @@ defmodule ControlKeel.Skills.Installer do
           Path.join(project_root, ".cline/commands")
         )
 
-        copy_tree_contents(
-          Path.join(plan.output_dir, ".cline/hooks"),
-          Path.join(project_root, ".cline/hooks")
-        )
-
         maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
 
         {:ok,
@@ -540,8 +576,7 @@ defmodule ControlKeel.Skills.Installer do
            scope: scope,
            destination: skill_root,
            rules_destination: rules_root,
-           commands_destination: Path.join(project_root, ".cline/commands"),
-           hooks_destination: Path.join(project_root, ".cline/hooks")
+           commands_destination: Path.join(project_root, ".cline/commands")
          }}
     end
   end
@@ -550,7 +585,12 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("cursor-native", project_root, scope: "project")
 
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
-    copy_tree_contents(Path.join(plan.output_dir, ".cursor"), Path.join(project_root, ".cursor"))
+
+    copy_tree_merging!(Path.join(plan.output_dir, ".cursor"), Path.join(project_root, ".cursor"),
+      hooks: {"hooks.json", ".cursor/hooks/"},
+      json: ["mcp.json"]
+    )
+
     # Record CK ownership of the shared skill tree so later installs can prune
     # stale names there.
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
@@ -597,9 +637,11 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
 
-    copy_tree_contents(
+    copy_tree_merging!(
       Path.join(plan.output_dir, ".windsurf"),
-      Path.join(project_root, ".windsurf")
+      Path.join(project_root, ".windsurf"),
+      hooks: {"hooks.json", ".windsurf/hooks/"},
+      json: ["mcp.json"]
     )
 
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
@@ -618,9 +660,10 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
 
-    copy_tree_contents(
+    copy_tree_merging!(
       Path.join(plan.output_dir, ".continue"),
-      Path.join(project_root, ".continue")
+      Path.join(project_root, ".continue"),
+      json: ["mcp.json"]
     )
 
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
@@ -662,7 +705,10 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("pi-native", project_root, scope: "project")
 
     copy_skills(skills, Path.join(project_root, ".agents/skills"))
-    copy_tree_contents(Path.join(plan.output_dir, ".pi"), Path.join(project_root, ".pi"))
+
+    copy_tree_merging!(Path.join(plan.output_dir, ".pi"), Path.join(project_root, ".pi"),
+      json: ["mcp.json"]
+    )
 
     File.cp!(
       Path.join(plan.output_dir, "pi-extension.json"),
@@ -688,7 +734,7 @@ defmodule ControlKeel.Skills.Installer do
 
     copy_skills(skills, skill_root)
     copy_tree_contents(Path.join(plan.output_dir, ".roo"), roo_root)
-    File.cp!(Path.join(plan.output_dir, ".roomodes"), Path.join(project_root, ".roomodes"))
+    merge_roomodes!(Path.join(plan.output_dir, ".roomodes"), Path.join(project_root, ".roomodes"))
 
     merge_json_file!(
       Path.join(plan.output_dir, ".mcp.json"),
@@ -817,19 +863,13 @@ defmodule ControlKeel.Skills.Installer do
     {:ok, plan} = Exporter.export("kiro-native", project_root, scope: "project")
 
     kiro_root = Path.join(project_root, ".kiro")
-    hooks_root = Path.join(kiro_root, "hooks")
     steering_root = Path.join(kiro_root, "steering")
-    settings_root = Path.join(kiro_root, "settings")
     commands_root = Path.join(kiro_root, "commands")
 
-    File.mkdir_p!(hooks_root)
     File.mkdir_p!(steering_root)
-    File.mkdir_p!(settings_root)
     File.mkdir_p!(commands_root)
 
-    copy_tree_contents(Path.join(plan.output_dir, ".kiro/hooks"), hooks_root)
     copy_tree_contents(Path.join(plan.output_dir, ".kiro/steering"), steering_root)
-    copy_tree_contents(Path.join(plan.output_dir, ".kiro/settings"), settings_root)
     copy_tree_contents(Path.join(plan.output_dir, ".kiro/commands"), commands_root)
 
     merge_json_file!(
@@ -844,9 +884,7 @@ defmodule ControlKeel.Skills.Installer do
        target: "kiro-native",
        scope: "project",
        destination: kiro_root,
-       hooks_destination: hooks_root,
        steering_destination: steering_root,
-       settings_destination: settings_root,
        commands_destination: commands_root
      }}
   end
@@ -916,9 +954,13 @@ defmodule ControlKeel.Skills.Installer do
     augment_root = Path.join(project_root, ".augment")
     File.mkdir_p!(augment_root)
 
-    copy_tree_contents(Path.join(plan.output_dir, ".augment"), augment_root)
+    copy_tree_merging!(Path.join(plan.output_dir, ".augment"), augment_root, json: ["mcp.json"])
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
-    File.cp!(Path.join(plan.output_dir, "AUGMENT.md"), Path.join(project_root, "AUGMENT.md"))
+
+    retire_ck_instruction_copy!(
+      Path.join(project_root, "AUGMENT.md"),
+      Path.join(plan.output_dir, "AGENTS.md")
+    )
 
     {:ok,
      %{
@@ -972,7 +1014,7 @@ defmodule ControlKeel.Skills.Installer do
     copy_skills(skills, skill_root)
 
     {:ok, plan} = Exporter.export("droid-bundle", project_root, scope: scope)
-    copy_tree_contents(Path.join(plan.output_dir, ".factory"), base)
+    copy_tree_merging!(Path.join(plan.output_dir, ".factory"), base, json: ["mcp.json"])
 
     if scope == "project" do
       maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
@@ -996,10 +1038,14 @@ defmodule ControlKeel.Skills.Installer do
        ) do
     {:ok, plan} = Exporter.export("antigravity-cli-native", project_root, scope: "project")
     agents_root = Path.join(project_root, ".agents")
+    out = Path.join(plan.output_dir, ".agents")
 
-    copy_tree_contents(Path.join(plan.output_dir, ".agents"), agents_root)
-    File.cp!(Path.join(plan.output_dir, "GEMINI.md"), Path.join(project_root, "GEMINI.md"))
+    copy_tree_contents(Path.join(out, "rules"), Path.join(agents_root, "rules"))
+    copy_tree_contents(Path.join(out, "hooks"), Path.join(agents_root, "hooks"))
+    replace_json_keys!(Path.join(out, "hooks.json"), Path.join(agents_root, "hooks.json"))
+    merge_json_file!(Path.join(out, "mcp_config.json"), Path.join(agents_root, "mcp_config.json"))
     maybe_install_project_agents_md!(plan.output_dir, project_root, opts)
+    retire_antigravity_duplicates!(project_root, Path.join(plan.output_dir, "AGENTS.md"))
 
     {:ok,
      %{
@@ -1007,7 +1053,6 @@ defmodule ControlKeel.Skills.Installer do
        scope: "project",
        destination: agents_root,
        skills_destination: Path.join(agents_root, "skills"),
-       plugins_destination: Path.join(agents_root, "plugins/controlkeel"),
        rules_destination: Path.join(agents_root, "rules"),
        hooks_destination: Path.join(agents_root, "hooks.json"),
        config_destination: Path.join(agents_root, "mcp_config.json")
@@ -1267,22 +1312,24 @@ defmodule ControlKeel.Skills.Installer do
     end
   end
 
-  # Merge a generated `{"hooks": {event => groups}}` file into an existing one,
-  # replacing only entries whose command runs a ControlKeel script under
-  # `script_prefix` (for example `.codex/hooks/ck-`). User hooks survive.
-  defp merge_hooks_json!(source_path, destination_path, script_prefix) do
-    source = source_path |> File.read!() |> Jason.decode!()
+  # Merge a generated `{"hooks": {event => entries}}` file into an existing
+  # one, replacing only entries whose command runs a ControlKeel script under
+  # `script_prefix` (for example `.codex/hooks/`). Entries may be Claude-style
+  # groups (`%{"hooks" => [...]}`) or Cursor-style flat commands. User hooks
+  # survive; pass `%{}` as the source to strip ControlKeel's entries only.
+  defp merge_hooks_json!(source, destination_path, script_prefix) do
+    source =
+      case source do
+        %{} = map -> map
+        path when is_binary(path) -> path |> File.read!() |> Jason.decode!()
+      end
 
     existing =
-      case File.read(destination_path) do
-        {:ok, contents} ->
-          case Jason.decode(contents) do
-            {:ok, %{} = decoded} -> decoded
-            _ -> %{}
-          end
-
-        _ ->
-          %{}
+      with {:ok, contents} <- File.read(destination_path),
+           {:ok, %{} = decoded} <- Jason.decode(contents) do
+        decoded
+      else
+        _ -> %{}
       end
 
     owned? = fn
@@ -1294,38 +1341,207 @@ defmodule ControlKeel.Skills.Installer do
         false
     end
 
+    existing_hooks = Map.get(existing, "hooks", %{})
+    source_hooks = Map.get(source, "hooks", %{})
+
+    if is_list(existing_hooks) or is_list(source_hooks) do
+      # List-shaped configs (Windsurf): keep user entries, append ControlKeel's.
+      user = existing_hooks |> List.wrap() |> Enum.reject(owned?)
+
+      write_merged_hooks!(
+        destination_path,
+        existing,
+        source,
+        user ++ List.wrap(source_hooks)
+      )
+    else
+      merge_hook_maps!(destination_path, existing, source, existing_hooks, owned?)
+    end
+  end
+
+  defp write_merged_hooks!(destination_path, existing, source, hooks) do
+    if existing != %{} or source != %{} do
+      File.mkdir_p!(Path.dirname(destination_path))
+
+      File.write!(
+        destination_path,
+        Jason.encode!(Map.put(Map.merge(existing, Map.delete(source, "hooks")), "hooks", hooks),
+          pretty: true
+        ) <> "\n"
+      )
+    end
+  end
+
+  defp merge_hook_maps!(destination_path, existing, source, existing_hooks, owned?) do
     kept =
-      existing
-      |> Map.get("hooks", %{})
-      |> Enum.map(fn {event, groups} ->
-        groups =
-          groups
+      existing_hooks
+      |> then(fn hooks -> if is_map(hooks), do: hooks, else: %{} end)
+      |> Enum.map(fn {event, entries} ->
+        entries =
+          entries
           |> List.wrap()
           |> Enum.map(fn
             %{"hooks" => hooks} = group when is_list(hooks) ->
               Map.put(group, "hooks", Enum.reject(hooks, owned?))
 
-            group ->
-              group
+            entry ->
+              entry
           end)
-          |> Enum.reject(&match?(%{"hooks" => []}, &1))
+          |> Enum.reject(fn entry -> match?(%{"hooks" => []}, entry) or owned?.(entry) end)
 
-        {event, groups}
+        {event, entries}
       end)
-      |> Enum.reject(fn {_event, groups} -> groups == [] end)
+      |> Enum.reject(fn {_event, entries} -> entries == [] end)
       |> Map.new()
 
     hooks =
       Map.merge(kept, Map.get(source, "hooks", %{}), fn _event, user, ck -> user ++ ck end)
 
+    write_merged_hooks!(destination_path, existing, source, hooks)
+  end
+
+  # Earlier releases also wrote a `.agents/plugins/controlkeel` bundle (a
+  # second registration of the same hooks and MCP server) and a whole-file
+  # `GEMINI.md` copy of the AGENTS.md instructions. Remove both when they are
+  # ControlKeel's own output.
+  defp retire_antigravity_duplicates!(project_root, generated_agents_md) do
+    plugin_root = Path.join(project_root, ".agents/plugins/controlkeel")
+
+    with {:ok, body} <- File.read(Path.join(plugin_root, "plugin.json")),
+         {:ok, %{"name" => "controlkeel"}} <- Jason.decode(body) do
+      File.rm_rf!(plugin_root)
+    end
+
+    retire_ck_instruction_copy!(Path.join(project_root, "GEMINI.md"), generated_agents_md)
+  end
+
+  # Remove a host-specific instructions file only when it is still exactly the
+  # copy ControlKeel would write (the same text now lands in AGENTS.md). A file
+  # with any user edits is kept.
+  defp retire_ck_instruction_copy!(path, generated_path) do
+    with {:ok, contents} <- File.read(path),
+         {:ok, generated} <- File.read(generated_path),
+         true <- String.trim(contents) == String.trim(generated) do
+      File.rm!(path)
+    end
+
+    :ok
+  end
+
+  # Replace each top-level key from source outright (ControlKeel owns those
+  # keys) while keeping every other key the user has in the destination.
+  defp replace_json_keys!(source_path, destination_path) do
+    source = source_path |> File.read!() |> Jason.decode!()
+
+    existing =
+      with {:ok, contents} <- File.read(destination_path),
+           {:ok, %{} = decoded} <- Jason.decode(contents) do
+        decoded
+      else
+        _ -> %{}
+      end
+
     File.mkdir_p!(Path.dirname(destination_path))
 
     File.write!(
       destination_path,
-      Jason.encode!(Map.put(Map.merge(existing, Map.delete(source, "hooks")), "hooks", hooks),
-        pretty: true
-      ) <> "\n"
+      Jason.encode!(Map.merge(existing, source), pretty: true) <> "\n"
     )
+  end
+
+  # Copy a generated tree, but merge shared config files the user may already
+  # own instead of replacing them: `json:` files merge their maps and `hooks:`
+  # replaces only ControlKeel's hook entries.
+  defp copy_tree_merging!(source_root, destination_root, opts) do
+    json_files = Keyword.get(opts, :json, [])
+    hooks = Keyword.get(opts, :hooks)
+    shared = json_files ++ if(hooks, do: [elem(hooks, 0)], else: [])
+
+    originals =
+      for name <- shared,
+          {:ok, contents} <- [File.read(Path.join(destination_root, name))],
+          into: %{},
+          do: {name, contents}
+
+    copy_tree_contents(source_root, destination_root)
+
+    for {name, contents} <- originals do
+      destination = Path.join(destination_root, name)
+      File.write!(destination, contents)
+
+      case hooks do
+        {^name, prefix} -> merge_hooks_json!(Path.join(source_root, name), destination, prefix)
+        _ -> merge_json_file!(Path.join(source_root, name), destination)
+      end
+    end
+
+    :ok
+  end
+
+  # `.roomodes` is the user's own list of custom Roo modes (YAML). Replace the
+  # ControlKeel mode in place, append it when `customModes` is the only
+  # top-level key, and otherwise leave the file alone rather than risk
+  # rewriting YAML we cannot parse safely.
+  defp merge_roomodes!(source_path, destination_path) do
+    ck = File.read!(source_path)
+
+    ck_entry =
+      ck
+      |> String.split("\n")
+      |> Enum.drop_while(&(not ck_roo_slug_line?(&1)))
+      |> Enum.join("\n")
+      |> String.trim_trailing()
+
+    case File.read(destination_path) do
+      {:error, _} ->
+        File.write!(destination_path, ck)
+
+      {:ok, existing} ->
+        lines = String.split(existing, "\n")
+
+        top_level =
+          Enum.filter(lines, fn line ->
+            line != "" and not String.starts_with?(line, [" ", "#", "\t"])
+          end)
+
+        cond do
+          Enum.any?(lines, &ck_roo_slug_line?/1) ->
+            File.write!(destination_path, replace_roo_mode(lines, ck_entry))
+
+          Regex.match?(~r/slug:\s*["']?controlkeel-operator["']?\s*$/m, existing) ->
+            # An unfamiliar layout; leave the user's file untouched.
+            :ok
+
+          top_level == ["customModes:"] ->
+            File.write!(
+              destination_path,
+              String.trim_trailing(existing) <> "\n" <> ck_entry <> "\n"
+            )
+
+          String.trim(existing) == "" ->
+            File.write!(destination_path, ck)
+
+          true ->
+            :ok
+        end
+    end
+  end
+
+  defp ck_roo_slug_line?(line), do: String.trim_trailing(line) == "  - slug: controlkeel-operator"
+
+  defp replace_roo_mode(lines, ck_entry) do
+    {before, rest} =
+      Enum.split_while(lines, &(not ck_roo_slug_line?(&1)))
+
+    after_block =
+      rest
+      |> Enum.drop(1)
+      |> Enum.drop_while(fn line -> line == "" or String.starts_with?(line, "    ") end)
+
+    (before ++ [ck_entry] ++ after_block)
+    |> Enum.join("\n")
+    |> String.trim_trailing()
+    |> Kernel.<>("\n")
   end
 
   defp merge_json_file!(source_path, destination_path) do

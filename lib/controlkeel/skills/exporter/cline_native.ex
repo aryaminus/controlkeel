@@ -36,16 +36,6 @@ defmodule ControlKeel.Skills.Exporter.ClineNative do
     last_command_path = Path.join(root, ".cline/commands/controlkeel-last.md")
     File.write!(last_command_path, E.host_last_command_contents("Cline"))
 
-    pretool_hook_path = Path.join(root, ".cline/hooks/PreToolUse/controlkeel-review.sh")
-    File.mkdir_p!(Path.dirname(pretool_hook_path))
-    File.write!(pretool_hook_path, E.review_bridge_shell_contents("cline"))
-    File.chmod!(pretool_hook_path, 0o755)
-
-    taskstart_hook_path = Path.join(root, ".cline/hooks/TaskStart/controlkeel-context.sh")
-    File.mkdir_p!(Path.dirname(taskstart_hook_path))
-    File.write!(taskstart_hook_path, E.cline_taskstart_hook_contents())
-    File.chmod!(taskstart_hook_path, 0o755)
-
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, E.instructions_only_contents("cline", project_root, opts))
 
@@ -62,8 +52,6 @@ defmodule ControlKeel.Skills.Exporter.ClineNative do
         %{"path" => submit_command_path, "kind" => "command"},
         %{"path" => annotate_command_path, "kind" => "command"},
         %{"path" => last_command_path, "kind" => "command"},
-        %{"path" => pretool_hook_path, "kind" => "hook"},
-        %{"path" => taskstart_hook_path, "kind" => "hook"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [

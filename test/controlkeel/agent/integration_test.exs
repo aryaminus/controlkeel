@@ -229,9 +229,9 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert letta.preferred_target == "letta-code-native"
     assert letta.skills_mode == "native"
     assert letta.mcp_mode == "native"
-    assert letta.review_experience == "native_review"
+    assert letta.review_experience == "browser_review"
     assert "hooks" in letta.agent_uses_ck_via
-    assert ".letta/settings.json" in letta.artifact_surfaces
+    refute ".letta/settings.json" in letta.artifact_surfaces
     assert ".letta/controlkeel-mcp.sh" in letta.artifact_surfaces
     assert ".agents/skills" in letta.artifact_surfaces
 
@@ -247,8 +247,8 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert "hooks" in cursor.agent_uses_ck_via
     assert "plugin" in cursor.agent_uses_ck_via
 
-    assert kiro.review_experience == "native_review"
-    assert ".kiro/settings" in kiro.artifact_surfaces
+    assert kiro.review_experience == "browser_review"
+    refute ".kiro/hooks" in kiro.artifact_surfaces
 
     kilo = Integration.get("kilo")
     assert kilo.support_class == "attach_client"

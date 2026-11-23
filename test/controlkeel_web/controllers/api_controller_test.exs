@@ -822,9 +822,9 @@ defmodule ControlKeelWeb.ApiControllerTest do
         end)
 
       assert letta["preferred_target"] == "letta-code-native"
-      assert letta["review_experience"] == "native_review"
+      assert letta["review_experience"] == "browser_review"
       assert "hooks" in letta["agent_uses_ck_via"]
-      assert ".letta/settings.json" in letta["artifact_surfaces"]
+      refute ".letta/settings.json" in letta["artifact_surfaces"]
       assert ".letta/controlkeel-mcp.sh" in letta["artifact_surfaces"]
 
       assert Enum.any?(
