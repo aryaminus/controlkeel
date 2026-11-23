@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.34 — 2026-11-23
+
+### What's changed
+
+- Skip gitignore entries an ignored parent directory already covers (#367)
+
 ## v0.4.33 — 2026-11-23
 
 ### What's changed
