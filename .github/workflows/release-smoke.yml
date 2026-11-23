@@ -135,14 +135,15 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.event.head_commit.message || '', 'chore(release): bump version to ')
-    # Pin to macos-14 (Sonoma). macos-latest migrated to macOS 26 on
+    # Pin to macos-15 (Sequoia). macos-latest migrated to macOS 26 on
     # 2026-06-15; Zig 0.15.2 (required by Burrito 1.5.0) cannot link against
     # the macOS 26 SDK — undefined libSystem symbols (_abort, _free,
     # _malloc_size, _arc4random_buf, _dispatch_*, __availability_version_check).
     # Linux/Windows builds on ubuntu still pass. Burrito cross-compiles both
     # x86_64 and arm64 macOS targets via Zig from one runner, so only the host
-    # SDK matters. macos-14 ships an SDK Zig 0.15.2 supports.
-    runs-on: macos-14
+    # SDK matters. macos-14 has been retired; macos-15 ships the macOS 15 SDK,
+    # which Zig 0.15.2 supports.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
