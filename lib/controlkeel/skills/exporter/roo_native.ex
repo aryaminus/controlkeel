@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.RooNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".roo/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     rule_path = Path.join(root, ".roo/rules/controlkeel.md")
@@ -62,7 +62,7 @@ defmodule ControlKeel.Skills.Exporter.RooNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.roo/` and `.roomodes` into the repo root so Roo Code can discover ControlKeel skills and governed modes.",
+        "Copy `.agents/`, `.roo/` and `.roomodes` into the repo root so Roo Code can discover ControlKeel skills and governed modes.",
         "Merge `.mcp.json` or register the same MCP server through Roo's MCP flow if you manage MCP outside the repo."
       ]
     )

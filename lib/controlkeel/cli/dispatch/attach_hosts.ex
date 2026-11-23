@@ -357,7 +357,8 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
          {:ok, binding, _session, _mode} <- load_binding_for_detach(root),
          {:ok, agent_key, attrs} <- resolve_attached(agent, binding) do
       mcp_removed = remove_mcp_registration(agent_key, attrs, root)
-      removed_paths = cleanup_agent_artifacts(attrs, root, options[:force])
+      shared_in_use = skill_dirs_in_use(binding, agent_key, root)
+      removed_paths = cleanup_agent_artifacts(attrs, root, options[:force], shared_in_use)
 
       updated_binding = remove_agent_from_binding(binding, agent_key)
       remaining = map_size(updated_binding["attached_agents"] || %{})
@@ -720,12 +721,41 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
   # filenames are ControlKeel-specific. User-authored files in shared host dirs
   # are preserved unless --force is supplied. Legacy bindings that lack newer
   # destination metadata are handled by inferring paths from target/destination.
-  defp cleanup_agent_artifacts(attrs, root, force) do
+  # Skill directories other attached agents still read. Every non-Claude
+  # install writes the shared `.agents/skills`, so it stays while any other
+  # agent remains attached, as does any directory another agent recorded.
+  defp skill_dirs_in_use(binding, agent_key, root) do
+    others =
+      binding
+      |> Map.get("attached_agents", %{})
+      |> Map.delete(agent_key)
+
+    recorded =
+      for {_key, other} <- others,
+          key <- [
+            "skills_destination",
+            "compat_skills_destination",
+            "compat_destination",
+            "shared_skills_destination"
+          ],
+          path = other[key],
+          is_binary(path),
+          do: Path.expand(path, root)
+
+    shared = if others == %{}, do: [], else: [Path.expand(".agents/skills", root)]
+    MapSet.new(recorded ++ shared)
+  end
+
+  defp cleanup_agent_artifacts(attrs, root, force, keep_skill_dirs) do
     if (attrs["scope"] || "project") == "project" do
       root_expanded = Path.expand(root)
 
       attrs
       |> artifact_cleanup_targets(root_expanded)
+      |> Enum.reject(fn
+        {:skill_dir, path} -> MapSet.member?(keep_skill_dirs, Path.expand(path, root_expanded))
+        _ -> false
+      end)
       |> Enum.flat_map(&cleanup_artifact_target(&1, root_expanded, force))
       |> Enum.uniq()
     else
@@ -740,6 +770,7 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
       {:skill_dir, attrs["skills_destination"]},
       {:skill_dir, attrs["compat_skills_destination"]},
       {:skill_dir, attrs["compat_destination"]},
+      {:skill_dir, attrs["shared_skills_destination"]},
       {:ck_dir, attrs["agents_destination"]},
       {:ck_dir, attrs["commands_destination"]},
       {:ck_dir, attrs["plugins_destination"]},
@@ -785,11 +816,40 @@ defmodule ControlKeel.CLI.Dispatch.AttachHosts do
     _ -> []
   end
 
+  # Remove only the skills CK's manifest lists, then the manifest, then the
+  # directory if nothing else is left. User-authored skills sharing the tree
+  # survive unless --force is given.
   defp do_cleanup_artifact(:skill_dir, path, force) do
+    manifest = Path.join(path, ".controlkeel-skills.json")
+
     cond do
-      force -> remove_path(path)
-      File.exists?(Path.join(path, ".controlkeel-skills.json")) -> remove_path(path)
-      true -> []
+      force ->
+        remove_path(path)
+
+      File.exists?(manifest) ->
+        names =
+          with {:ok, body} <- File.read(manifest),
+               {:ok, %{"skills" => skills}} when is_list(skills) <- Jason.decode(body) do
+            Enum.filter(
+              skills,
+              &(is_binary(&1) and &1 not in ["", ".", ".."] and not String.contains?(&1, "/"))
+            )
+          else
+            _ -> []
+          end
+
+        removed =
+          names
+          |> Enum.map(&Path.join(path, &1))
+          |> Enum.filter(&File.exists?/1)
+          |> Enum.flat_map(&remove_path/1)
+
+        removed = removed ++ remove_path(manifest)
+        remove_dir_if_empty(path)
+        removed
+
+      true ->
+        []
     end
   end
 

@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.ClineNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".cline/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     mcp_path = Path.join(root, ".cline/data/settings/cline_mcp_settings.json")
@@ -67,7 +67,7 @@ defmodule ControlKeel.Skills.Exporter.ClineNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.cline/skills` into your project or `~/.cline/skills`.",
+        "Copy `.agents/skills` into your project (or `~/.agents/skills`), alongside the `.clinerules` guidance.",
         "Keep `.clinerules/`, `.cline/commands`, and `.cline/hooks` in the repo so Cline loads ControlKeel rules, workflows, commands, and hooks for the governed workspace.",
         "Merge `.cline/data/settings/cline_mcp_settings.json` into Cline MCP settings (`~/.cline/data/settings/cline_mcp_settings.json` or `$CLINE_DIR/data/settings/cline_mcp_settings.json`)."
       ]

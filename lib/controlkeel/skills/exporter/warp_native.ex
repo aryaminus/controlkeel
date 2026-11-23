@@ -5,9 +5,7 @@ defmodule ControlKeel.Skills.Exporter.WarpNative do
 
   def write(root, project_root, skills, opts) do
     compat_skill_root = Path.join(root, ".agents/skills")
-    native_skill_root = Path.join(root, ".warp/skills")
     E.write_skill_tree(skills, compat_skill_root)
-    E.write_skill_tree(skills, native_skill_root)
 
     config_path = Path.join(root, ".warp/controlkeel-mcp.json")
     File.mkdir_p!(Path.dirname(config_path))
@@ -50,7 +48,6 @@ defmodule ControlKeel.Skills.Exporter.WarpNative do
       opts,
       [
         %{"path" => compat_skill_root, "kind" => "skills"},
-        %{"path" => native_skill_root, "kind" => "skills"},
         %{"path" => review_command_path, "kind" => "command"},
         %{"path" => submit_command_path, "kind" => "command"},
         %{"path" => annotate_command_path, "kind" => "command"},
@@ -60,8 +57,7 @@ defmodule ControlKeel.Skills.Exporter.WarpNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.warp/skills/` checked in so Warp local agents can discover governed skills natively.",
-        "Keep `.agents/skills/` checked in as the compatibility mirror because Warp also scans open-standard AgentSkills directories.",
+        "Keep `.agents/skills/` in the repo; Warp scans open-standard Agent Skills directories.",
         "Import or copy `.warp/controlkeel-mcp.json` into Warp Settings > MCP Servers or Warp Drive > MCP Servers; Warp local MCP is app-managed, not repo-auto-loaded.",
         "Keep `AGENTS.md` at the repo root so Warp project rules apply automatically."
       ]

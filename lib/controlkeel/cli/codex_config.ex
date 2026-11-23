@@ -48,6 +48,39 @@ defmodule ControlKeel.CLI.CodexConfig do
   end
 
   @doc """
+  Merges an exported Codex `config.toml` into `config_path`: only the
+  ControlKeel managed block is replaced, and the hooks feature flag is
+  ensured. Everything the user wrote outside the block is preserved.
+  """
+  def merge_export(config_path, export_contents) when is_binary(export_contents) do
+    block =
+      case split_managed_block(export_contents) do
+        {:ok, _prefix, _suffix} ->
+          [_, rest] = String.split(export_contents, @managed_start, parts: 2)
+          [inner, _] = String.split(rest, @managed_end, parts: 2)
+          @managed_start <> inner <> @managed_end
+
+        :error ->
+          nil
+      end
+
+    existing =
+      case File.read(config_path) do
+        {:ok, contents} -> contents
+        _ -> ""
+      end
+
+    updated =
+      if(block, do: upsert_managed_block(existing, block), else: existing)
+      |> ensure_feature_flag("codex_hooks", "true")
+
+    with :ok <- File.mkdir_p(Path.dirname(config_path)),
+         :ok <- File.write(config_path, updated) do
+      {:ok, config_path}
+    end
+  end
+
+  @doc """
   Reverse of write/3: strip the controlkeel managed block from config.toml,
   preserving any user-authored content outside the block. Deletes the file if
   nothing else remains. Idempotent and best-effort.
@@ -95,10 +128,99 @@ defmodule ControlKeel.CLI.CodexConfig do
 
   defp upsert_managed_block(existing, block) do
     case split_managed_block(existing) do
-      {:ok, prefix, suffix} -> join_sections(prefix, block, suffix)
-      :error -> join_sections(existing, block, "")
+      {:ok, prefix, suffix} ->
+        join_sections(strip_unmarked_ck_tables(prefix), block, strip_unmarked_ck_tables(suffix))
+
+      :error ->
+        join_sections(strip_unmarked_ck_tables(existing), block, "")
     end
   end
+
+  # TOML forbids declaring a table twice. A ControlKeel table written without
+  # the managed markers (for example by `Integration.mcp_install_command/1`)
+  # would otherwise sit beside the managed block and break the whole file, so
+  # the managed block becomes the only declaration.
+
+  defp strip_unmarked_ck_tables(text) do
+    {kept, _skipping} =
+      text
+      |> String.split("\n", trim: false)
+      |> Enum.reduce({[], false}, fn line, {acc, skipping} ->
+        case toml_header(line) do
+          nil ->
+            if skipping, do: {acc, true}, else: {[line | acc], false}
+
+          header ->
+            if ck_table?(header), do: {acc, true}, else: {[line | acc], false}
+        end
+      end)
+
+    kept |> Enum.reverse() |> Enum.join("\n")
+  end
+
+  # A table header as its list of key segments, so `[ mcp_servers."controlkeel" ]`
+  # and `[mcp_servers.controlkeel]` compare equal while a quoted segment such
+  # as `"controlkeel.backup"` stays one segment. Returns nil for non-headers.
+  defp toml_header(line) do
+    trimmed = String.trim(line)
+
+    with "[" <> rest <- trimmed,
+         {:ok, segments, tail} <- parse_key_segments(String.trim_leading(rest, "["), []),
+         true <- tail_is_header_end?(tail) do
+      segments
+    else
+      _ -> nil
+    end
+  end
+
+  defp tail_is_header_end?(tail) do
+    case tail |> String.trim_leading("]") |> String.trim() do
+      "" -> true
+      "#" <> _comment -> true
+      _ -> false
+    end
+  end
+
+  defp parse_key_segments(input, acc) do
+    input = String.trim_leading(input)
+
+    {segment, rest} =
+      case input do
+        "\"" <> quoted -> take_quoted(quoted, "\"")
+        "'" <> quoted -> take_quoted(quoted, "'")
+        bare -> take_bare(bare)
+      end
+
+    case segment do
+      nil ->
+        :error
+
+      segment ->
+        case String.trim_leading(rest) do
+          "." <> more -> parse_key_segments(more, [segment | acc])
+          "]" <> _ = tail -> {:ok, Enum.reverse([segment | acc]), tail}
+          _ -> :error
+        end
+    end
+  end
+
+  defp take_quoted(input, quote) do
+    case String.split(input, quote, parts: 2) do
+      [segment, rest] -> {segment, rest}
+      _ -> {nil, ""}
+    end
+  end
+
+  defp take_bare(input) do
+    case Regex.run(~r/^([A-Za-z0-9_-]+)(.*)$/s, input) do
+      [_, segment, rest] -> {segment, rest}
+      _ -> {nil, ""}
+    end
+  end
+
+  defp ck_table?(["mcp_servers", "controlkeel" | _]), do: true
+  defp ck_table?(["agents", "controlkeel_operator" | _]), do: true
+  defp ck_table?(_segments), do: false
 
   defp split_managed_block(existing) do
     case String.split(existing, @managed_start, parts: 2) do
@@ -128,8 +250,9 @@ defmodule ControlKeel.CLI.CodexConfig do
                                                        {acc, in_features?, found_flag?,
                                                         found_features?} ->
         trimmed = String.trim(line)
-        table_header? = String.starts_with?(trimmed, "[") and String.ends_with?(trimmed, "]")
-        entering_features? = trimmed == "[features]"
+        header = toml_header(line)
+        table_header? = header != nil
+        entering_features? = header == ["features"]
         leaving_features? = in_features? and table_header? and not entering_features?
         flag_line? = in_features? and String.match?(trimmed, ~r/^#{Regex.escape(flag)}\s*=/)
 

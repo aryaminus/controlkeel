@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".augment/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     agent_path = Path.join(root, ".augment/agents/controlkeel-operator.md")
@@ -66,7 +66,7 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.augment/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
+        "Keep `.agents/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
         "Use `.augment/mcp.json` with `auggie --mcp-config ./.augment/mcp.json` for ephemeral MCP wiring or merge `.augment/settings.controlkeel.json` into `~/.augment/settings.json` for persistence."
       ]
     )
