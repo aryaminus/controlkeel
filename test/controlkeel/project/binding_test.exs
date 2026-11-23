@@ -283,5 +283,15 @@ defmodule ControlKeel.Project.BindingTest do
       assert contents =~ "/.cline/"
       assert contents =~ "/.claude/\n"
     end
+
+    test "keeps child entries when the parent rule is negated or indented", %{tmp: tmp} do
+      for user_rules <- ["/.claude/\n!/.claude/\n", " /.claude/\n"] do
+        File.write!(Path.join(tmp, ".gitignore"), user_rules)
+        assert :ok = Binding.ensure_gitignore(tmp, ["/.claude/settings.json"])
+
+        contents = File.read!(Path.join(tmp, ".gitignore"))
+        assert contents =~ "\n/.claude/settings.json\n", inspect(user_rules)
+      end
+    end
   end
 end
