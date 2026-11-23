@@ -44,7 +44,7 @@ if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) or
   # `mix phx.server` and `mix ecto.reset` don't set these modes, so they keep
   # the dev database and a reset can't wipe governed findings.
   if config_env() == :dev and System.get_env("DATABASE_PATH") in [nil, ""] do
-    governed_root = System.get_env("CK_PROJECT_ROOT") || File.cwd!()
+    governed_root = ControlKeel.Runtime.Defaults.governed_root()
 
     if project_db = ControlKeel.Runtime.Defaults.project_database_path(governed_root) do
       config :controlkeel, ControlKeel.Repo.Local, database: project_db
