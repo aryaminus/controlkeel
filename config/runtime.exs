@@ -69,6 +69,24 @@ end
 config :controlkeel, ControlKeelWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+trusted_ingress_ips =
+  System.get_env("CONTROLKEEL_TRUSTED_INGRESS_IPS", "")
+  |> String.split(",")
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+  |> Enum.map(fn ip ->
+    case :inet.parse_address(String.to_charlist(ip)) do
+      {:ok, address} ->
+        address
+
+      {:error, _} ->
+        raise ArgumentError,
+              "invalid ingress IP in CONTROLKEEL_TRUSTED_INGRESS_IPS: #{inspect(ip)}"
+    end
+  end)
+
+config :controlkeel, ControlKeelWeb.ClientIp, trusted_ingress_ips: trusted_ingress_ips
+
 config :controlkeel, ControlKeel.Proxy,
   openai_upstream:
     System.get_env("CONTROLKEEL_PROXY_OPENAI_UPSTREAM") || "https://api.openai.com",

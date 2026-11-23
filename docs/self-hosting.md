@@ -19,6 +19,18 @@ inside your own infrastructure. For local-only setup, use
 
 ControlKeel ships [`deploy/fly.self-host.toml`](../deploy/fly.self-host.toml) as a starting template.
 
+### Trusted ingress for IP throttling
+
+Requests use the TCP peer address as the IP rate-limit key by default. If the
+app sits behind a reverse proxy and needs per-client throttling, set
+`CONTROLKEEL_TRUSTED_INGRESS_IPS` to a comma-separated list of that proxy's
+exact IPv4 or IPv6 addresses. Forwarded `x-forwarded-for` values are honored
+only when the connecting peer matches this list, and the selected value must
+be a valid IP address. Private or loopback addresses are not trusted by virtue
+of their range. Keep the proxy addresses stable and configure the ingress to
+append the client address to `x-forwarded-for`; otherwise throttling falls
+back to the peer address.
+
 ```bash
 # 1. Copy and edit the template
 cp deploy/fly.self-host.toml fly.toml
