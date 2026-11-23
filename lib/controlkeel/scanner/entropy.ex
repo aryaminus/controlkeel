@@ -108,9 +108,15 @@ defmodule ControlKeel.Scanner.Entropy do
   # lowercase, Capitalized or UPPERCASE; base64 secrets mix case and digits
   # inside a run, so they don't take this shape. A candidate right after a
   # credential keyword is never treated as a path.
+  # One short lowercase id (a task id or short commit SHA) is also allowed;
+  # it is too short to be a credential on its own.
   defp word_path?(candidate) do
     segments = String.split(candidate, "/", trim: true)
-    length(segments) >= 3 and Enum.all?(segments, &path_segment?/1)
+    {plain, other} = Enum.split_with(segments, &path_segment?/1)
+
+    length(segments) >= 3 and length(plain) >= 3 and
+      (other == [] or
+         (length(other) == 1 and Regex.match?(~r/^[a-z0-9]{1,12}(?:\.[a-z]+)?$/, hd(other))))
   end
 
   defp path_segment?(segment) do

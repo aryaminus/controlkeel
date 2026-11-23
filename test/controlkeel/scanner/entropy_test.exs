@@ -29,6 +29,9 @@ defmodule ControlKeel.Scanner.EntropyTest do
     test "API and session paths of words, numbers and UUIDs are not tokens" do
       for content <- [
             "gh api repos/acme/widget-service/pulls/367/comments",
+            "cat /private/tmp/claude-501/-Users-dev-project/" <>
+              "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/tasks/bj4kk839p.output",
+            "open repos/acme/widget-service/blob/a46c78ec/lib/router.ex",
             "python3 scripts/secret_scan.py /private/tmp/claude-501/-Users-dev-project/" <>
               "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/scratchpad/patch.py",
             "gpg --batch --passphrase-file /private/tmp/claude-501/-Users-dev-project/" <>
@@ -43,8 +46,13 @@ defmodule ControlKeel.Scanner.EntropyTest do
     end
 
     test "a token inside a path is still detected" do
-      content = "curl repos/acme/aB3dE9fG2hJ4kL6mN8pQ0rS/comments"
-      assert [_] = Entropy.detect(content, %{"kind" => "shell"}, [@low_rule])
+      for content <- [
+            "curl repos/acme/aB3dE9fG2hJ4kL6mN8pQ0rS/comments",
+            "curl repos/acme/k3j9x8w2v7q1m5n4/comments",
+            "curl repos/acme/x7k2p9/q8m3n6/comments"
+          ] do
+        assert [_] = Entropy.detect(content, %{"kind" => "shell"}, [@low_rule]), content
+      end
     end
 
     test "slash-containing credentials are still detected" do
