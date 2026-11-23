@@ -31,6 +31,10 @@ defmodule ControlKeel.Scanner.EntropyTest do
             "gh api repos/acme/widget-service/pulls/367/comments",
             "python3 scripts/secret_scan.py /private/tmp/claude-501/-Users-dev-project/" <>
               "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/scratchpad/patch.py",
+            "gpg --batch --passphrase-file /private/tmp/claude-501/-Users-dev-project/" <>
+              "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/scratchpad/passphrase --symmetric notes.txt",
+            "PASSWORD_FILE=/private/tmp/claude-501/-Users-dev-project/" <>
+              "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/scratchpad/pw ./run.sh",
             "python3 /private/tmp/claude-501/-Users-dev-project/" <>
               "b9a03b32-c585-4e51-a261-af2dc0fe1bfe/scratchpad/patch.py"
           ] do
