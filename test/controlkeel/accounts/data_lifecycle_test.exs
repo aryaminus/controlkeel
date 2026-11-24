@@ -228,12 +228,12 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
     end
   end
 
-  describe "delete_org/1" do
+  describe "delete_org/2" do
     test "purges the org and its workspaces" do
-      %{org: org} = org_with_owner("del-org")
+      %{org: org, owner: owner} = org_with_owner("del-org")
       workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
 
-      assert {:ok, result} = DataLifecycle.delete_org(org.id)
+      assert {:ok, result} = DataLifecycle.delete_org(org.id, owner.id)
       assert result.org_deleted
       assert result.workspaces == 1
 
@@ -242,9 +242,9 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
     end
 
     test "records a durable org_erased audit event" do
-      %{org: org} = org_with_owner("erased-event-org")
+      %{org: org, owner: owner} = org_with_owner("erased-event-org")
 
-      assert {:ok, _} = DataLifecycle.delete_org(org.id)
+      assert {:ok, _} = DataLifecycle.delete_org(org.id, owner.id)
 
       event = Repo.get_by!(DataLifecycleEvent, event_type: "org_erased")
       assert event.subject == Integer.to_string(org.id)
@@ -260,7 +260,7 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
         Phoenix.PubSub.subscribe(ControlKeel.PubSub, Accounts.membership_topic(uid))
       end
 
-      assert {:ok, result} = DataLifecycle.delete_org(org.id)
+      assert {:ok, result} = DataLifecycle.delete_org(org.id, owner.id)
       assert result.memberships_affected == 2
 
       # Both members receive the revocation (order across topics is not
@@ -272,11 +272,11 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
     end
 
     test "purges sessions and findings under the org" do
-      %{org: org} = org_with_owner("cascade-org")
+      %{org: org, owner: owner} = org_with_owner("cascade-org")
       workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
       session = ControlKeel.MissionFixtures.session_fixture(%{workspace: workspace})
 
-      assert {:ok, _} = DataLifecycle.delete_org(org.id)
+      assert {:ok, _} = DataLifecycle.delete_org(org.id, owner.id)
 
       assert Repo.get(ControlKeel.Mission.Session, session.id) == nil
     end
@@ -287,7 +287,7 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
     # and tool-call audit rows. Populated two-tenant data proves the purge
     # is scoped to the deleted org.
     test "purges enrolled workspace keys and MCP tool calls of the deleted org only" do
-      %{org: doomed} = org_with_owner("purge-keys-org")
+      %{org: doomed, owner: doomed_owner} = org_with_owner("purge-keys-org")
       %{org: surviving} = org_with_owner("survivor-keys-org")
 
       doomed_ws = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: doomed.id})
@@ -333,7 +333,7 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
           requested_at: now
         })
 
-      assert {:ok, result} = DataLifecycle.delete_org(doomed.id)
+      assert {:ok, result} = DataLifecycle.delete_org(doomed.id, doomed_owner.id)
       assert result.workspace_keys_deleted == 1
       assert result.cloud_mcp_tool_calls_deleted == 1
 
@@ -347,7 +347,7 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
     end
 
     test "the org_erased audit event records the cloud-key and tool-call purge" do
-      %{org: org} = org_with_owner("purge-event-org")
+      %{org: org, owner: owner} = org_with_owner("purge-event-org")
       workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
       n = System.unique_integer([:positive])
 
@@ -370,15 +370,29 @@ defmodule ControlKeel.Accounts.DataLifecycleTest do
         requested_at: now
       })
 
-      assert {:ok, _} = DataLifecycle.delete_org(org.id)
+      assert {:ok, _} = DataLifecycle.delete_org(org.id, owner.id)
 
       event = Repo.get_by!(DataLifecycleEvent, event_type: "org_erased")
       assert event.details["workspace_keys"] == 1
       assert event.details["cloud_mcp_tool_calls"] == 1
     end
 
+    test "refuses deletion when the actor was demoted before the erase boundary" do
+      %{org: org, owner: owner} = org_with_owner("demoted-before-erase-org")
+      workspace = ControlKeel.MissionFixtures.workspace_fixture(%{org_id: org.id})
+
+      owner_membership = Repo.get_by!(Membership, org_id: org.id, user_id: owner.id)
+      owner_membership |> Membership.changeset(%{role: "member"}) |> Repo.update!()
+
+      assert {:error, :unauthorized} = DataLifecycle.delete_org(org.id, owner.id)
+
+      assert Repo.get(Accounts.Org, org.id)
+      assert Repo.get(ControlKeel.Mission.Workspace, workspace.id)
+      assert Repo.get_by(DataLifecycleEvent, event_type: "org_erased") == nil
+    end
+
     test "unknown org is not found" do
-      assert {:error, :not_found} = DataLifecycle.delete_org(999_999)
+      assert {:error, :not_found} = DataLifecycle.delete_org(999_999, 999_999)
     end
   end
 

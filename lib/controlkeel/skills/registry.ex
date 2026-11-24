@@ -25,7 +25,6 @@ defmodule ControlKeel.Skills.Registry do
     ".devin/skills",
     ".warp/skills",
     ".roo/skills",
-    ".hermes/skills",
     ".factory/skills",
     "skills"
   ]
@@ -409,7 +408,6 @@ defmodule ControlKeel.Skills.Registry do
         ".config/devin/skills",
         ".warp/skills",
         ".roo/skills",
-        ".hermes/skills",
         ".factory/skills",
         ".openclaw/skills"
       ],

@@ -4,9 +4,7 @@ defmodule ControlKeel.Skills.Exporter.OpenCode do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    native_skill_root = Path.join(root, ".opencode/skills")
     compat_skill_root = Path.join(root, ".agents/skills")
-    E.write_skill_tree(skills, native_skill_root)
     E.write_skill_tree(skills, compat_skill_root)
 
     plugin_path = Path.join(root, ".opencode/plugins/controlkeel-governance.ts")
@@ -63,7 +61,6 @@ defmodule ControlKeel.Skills.Exporter.OpenCode do
       project_root,
       opts,
       [
-        %{"path" => native_skill_root, "kind" => "skills"},
         %{"path" => compat_skill_root, "kind" => "skills"},
         %{"path" => plugin_path, "kind" => "plugin"},
         %{"path" => agent_path, "kind" => "agent"},
@@ -78,8 +75,7 @@ defmodule ControlKeel.Skills.Exporter.OpenCode do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.opencode/skills/` into your project's `.opencode/skills/` directory for OpenCode-native skill discovery.",
-        "Copy `.agents/skills/` into your project's `.agents/skills/` directory for compatibility with OpenCode and other AgentSkills consumers.",
+        "Copy `.agents/skills/` into your project for OpenCode skill discovery.",
         "Copy `.opencode/plugins/` into your project's `.opencode/plugins/` directory (loaded automatically at startup).",
         "Copy `.opencode/agents/` into your project's `.opencode/agents/` directory for the governed review agent.",
         "Copy `.opencode/commands/` into your project's `.opencode/commands/` directory for the `/controlkeel-review`, `/controlkeel-submit-plan`, `/controlkeel-annotate`, and `/controlkeel-last` commands.",

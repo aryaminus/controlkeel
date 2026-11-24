@@ -21,10 +21,8 @@ PLUGIN_MANIFESTS = [
     ROOT / "plugins" / "controlkeel" / ".codex-plugin" / "plugin.json",
     ROOT / "controlkeel" / "dist" / "cursor-native" / ".cursor-plugin" / "plugin.json",
     ROOT / "controlkeel" / "dist" / "codex-plugin" / ".codex-plugin" / "plugin.json",
-    ROOT / "controlkeel" / "dist" / "augment-plugin" / ".augment-plugin" / "plugin.json",
     ROOT / "controlkeel" / "dist" / "claude-plugin" / ".claude-plugin" / "plugin.json",
     ROOT / "controlkeel" / "dist" / "copilot-plugin" / "plugin.json",
-    ROOT / "controlkeel" / "dist" / "droid-plugin" / ".factory-plugin" / "plugin.json",
 ]
 
 

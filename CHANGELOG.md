@@ -1,5 +1,147 @@
 # Changelog
 
+## v0.4.42 — 2026-11-24
+
+### What's changed
+
+- Merge pull request #344 from aryaminus/fix/benchmark-tenancy
+- Merge pull request #341 from aryaminus/fix/web-offboarding
+- fix/web-offboarding restrict admin role invitation in invite member modal
+- fix/web-offboarding: update authorization logic for admin role and enhance tests
+- fix/web-offboarding: update role authorization logic and enhance tests for admin invitations
+- fix/web-offboarding: restrict member invitation permissions and add corresponding tests
+- Merge branch 'main' into fix/web-offboarding
+- Scope benchmark suite lookup before execution
+- fix/benchmark-tenancy: remove outdated documentation for benchmark tenancy follow-ups in CLI/API and web surfaces
+- fix/benchmark-tenancy: streamline workspace and run handling for tenant-specific scenarios
+- fix/benchmark-tenancy: enhance workspace association in benchmark run and suite changesets for tenant-specific handling
+- fix/benchmark-tenancy: enhance tenant-specific suite execution and visibility controls
+- fix/benchmark-tenancy: scope slug uniqueness by workspace to support tenant-specific suites
+- fix/benchmark-tenancy: add follow-up documentation for CLI/API and web surfaces addressing tenancy gaps
+- refactor/user-org-layout: simplify tuple construction in organization settings live test
+- fix/web-offboarding: delete obsolete pre-launch review documents for web and CLI/API
+- fix/web-offboarding: update settings access for non-admin members to read-only
+- fix/web-offboarding: implement account disable/enable functionality with eviction handling
+- fix/web-offboarding: add pre-launch review for PRs #268 and #272, addressing web and CLI issues
+- refactor/user-org-layout: add test for tenant isolation in workspace visibility
+- refactor/user-org-layout replace span with native button for better accessibility and keyboard support
+- refactor/user-org-layout: enhance session listing with keyset pagination and load more functionality
+- refactor/user-org-layout: implement account deletion flash handling in user menu and related tests
+- refactor/user-org-layout: user account deletion terminology and update related tests for consistency
+- refactor/user-org-layout: Implement workspace index and management UI
+
+## v0.4.41 — 2026-11-23
+
+### What's changed
+
+- Use the governed project's database from a source checkout (#373)
+- Publish the Homebrew formula with a tap deploy key instead of a PAT (#372)
+
+## v0.4.40 — 2026-11-23
+
+### What's changed
+
+- Fix release smoke on current GitHub runners (#371)
+
+## v0.4.39 — 2026-11-23
+
+### What's changed
+
+- Merge pull request #337 from aryaminus/refactor/user-org-layout
+- refactor/user-org-layout: add test for tenant isolation in workspace visibility
+- refactor/user-org-layout replace span with native button for better accessibility and keyboard support
+- refactor/user-org-layout: enhance session listing with keyset pagination and load more functionality
+- refactor/user-org-layout: implement account deletion flash handling in user menu and related tests
+- refactor/user-org-layout: user account deletion terminology and update related tests for consistency
+- refactor/user-org-layout: Implement workspace index and management UI
+- refactor/user-org-layout: streamline organization settings and user menu components, removing account tab and enhancing account dialog functionality
+- refactor/user-org-layout: update default tab to account in organization settings and related tests
+- refactor/user-org-layout: update organization and workspace menus for local mode, ensuring proper visibility of settings and navigation options
+- refactor/user-org-layout: add user menu component and enhance organization settings for account management
+- refactor/user-org-layout: Refactor layouts and remove deprecated components
+
+## v0.4.38 — 2026-11-23
+
+### What's changed
+
+- Merge pull request #336 from aryaminus/feat/user-org-followup
+- feat/user-org-followup: refactor organization deletion to require actor authorization and update tests for delete_org/2
+- feat/user-org-followup: mutation_owner authorization logic to ensure accurate role checks for organization actions
+- feat/user-org-followup: implement purging of enrolled workspace keys and MCP tool calls during organization deletion, with corresponding tests
+- feat/user-org-followup: refactor organization deletion logic to ensure authorization checks are up-to-date and add tests for demoted/revoked owners
+- feat/user-org-followup: enhance subprocess isolation and add new tests for JSON output
+- feat/user-org-followup: remove obsolete tests for sign-out behavior and local mode erasure eviction
+- feat/user-org-followup: remove flaky subprocess tests for bin wrapper and MCP launcher
+- feat/user-org-followup: remove DSAR erasure planning document as part of data lifecycle updates
+- feat/user-org-followup: add DSAR erasure planning document and implement data lifecycle fixes
+- feat/user-org-followup: ensure pending state is initialized in device authorization
+- feat/user-org-followup: add self-service account endpoints for GDPR compliance
+
+## v0.4.37 — 2026-11-23
+
+### What's changed
+
+- Publish releases again: dispatch smoke and release after the bump (#370)
+
+## v0.4.36 — 2026-11-23
+
+### What's changed
+
+- Allow one short id segment in a plain path (#369)
+
+## v0.4.35 — 2026-11-23
+
+### What's changed
+
+- Stop flagging plain paths as secrets; say why the shell gate blocked (#368)
+
+## v0.4.34 — 2026-11-23
+
+### What's changed
+
+- Skip gitignore entries an ignored parent directory already covers (#367)
+
+## v0.4.33 — 2026-11-23
+
+### What's changed
+
+- Keep every host's hooks quiet and stop overwriting host config (#363)
+
+## v0.4.32 — 2026-11-23
+
+### What's changed
+
+- Shrink compact ck_context from ~46 KB to ~4 KB (#364)
+- Route only to agents ControlKeel integrates with (#365)
+- Refuse device tokens and cloud runs for disabled users (#366)
+- Store skills only in shared host paths and stop overwriting host config (#362)
+
+## v0.4.31 — 2026-11-22
+
+### What's changed
+
+- Support only fully integrated agent hosts (#360)
+
+## v0.4.30 — 2026-11-22
+
+### What's changed
+
+- Keep Claude Code hooks quiet unless they gate an action (#359)
+
+## v0.4.29 — 2026-11-22
+
+### What's changed
+
+- Let local cloud-agent runs authorize the local operator (#358)
+
+## v0.4.28 — 2026-11-22
+
+### What's changed
+
+- Keep routine Codex governance hooks quiet (#356)
+- Stop copying legacy session data into new projects (#357)
+- Explain cloud execution denial for unbound workspaces (#355)
+
 ## v0.4.27 — 2026-11-15
 
 ### What's changed

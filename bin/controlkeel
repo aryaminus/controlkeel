@@ -4,6 +4,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# Remember the governed project before moving into the checkout, so config
+# resolves that project's database rather than the checkout's dev database.
+export CK_PROJECT_ROOT="${CK_PROJECT_ROOT:-$PWD}"
+
 cd "$ROOT_DIR"
 
 _has_json_flag() {
@@ -45,7 +49,7 @@ fi
 
 CMD="$1"
 if [ -z "$CMD" ]; then
-  mix run -e 'ControlKeel.CLI.parse(["--help"]) |> elem(1) |> ControlKeel.CLI.run_command(File.cwd!()) |> elem(1) |> Enum.each(&IO.puts/1)'
+  mix run -e 'ControlKeel.CLI.parse(["--help"]) |> elem(1) |> ControlKeel.CLI.run_command(ControlKeel.Runtime.Defaults.governed_root()) |> elem(1) |> Enum.each(&IO.puts/1)'
   exit 0
 fi
 
@@ -65,7 +69,11 @@ else
 
     case ControlKeel.CLI.parse(argv) do
       {:ok, parsed} ->
-        System.halt(ControlKeel.CLI.execute(parsed, []))
+        System.halt(
+          ControlKeel.CLI.execute(parsed,
+            project_root: ControlKeel.Runtime.Defaults.governed_root()
+          )
+        )
 
       {:error, message} ->
         if json? do

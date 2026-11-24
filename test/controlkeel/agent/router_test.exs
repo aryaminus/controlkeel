@@ -5,8 +5,6 @@ defmodule ControlKeel.Agent.RouterTest do
 
   # All agents that pass critical security tier (local: true + security_tier :critical or :high)
   @critical_ok [
-    "ollama",
-    "aider",
     "opencode",
     "claude-code",
     "cursor",
@@ -59,36 +57,6 @@ defmodule ControlKeel.Agent.RouterTest do
       assert {:ok, rec} = Router.route("Write a prd for the notification system")
       assert rec.task_type == :spec
     end
-
-    test "coderabbit scores highest for :review at low risk (allowed)" do
-      assert {:ok, rec} =
-               Router.route("Review this PR for security issues",
-                 risk_tier: "low",
-                 allowed_agents: ["coderabbit", "generic-cli"]
-               )
-
-      assert rec.agent == "coderabbit"
-    end
-
-    test "specpilot beats generic-cli for :spec task at low risk" do
-      assert {:ok, rec} =
-               Router.route("Write a prd for the auth module",
-                 risk_tier: "low",
-                 allowed_agents: ["specpilot", "generic-cli"]
-               )
-
-      assert rec.agent == "specpilot"
-    end
-
-    test "qodo beats generic-cli for :review task at medium risk" do
-      assert {:ok, rec} =
-               Router.route("Review the auth module for bugs",
-                 risk_tier: "medium",
-                 allowed_agents: ["qodo", "generic-cli"]
-               )
-
-      assert rec.agent == "qodo"
-    end
   end
 
   describe "route/2 — security tier filtering" do
@@ -102,9 +70,15 @@ defmodule ControlKeel.Agent.RouterTest do
       assert rec.agent in @critical_ok
     end
 
-    test "excludes low-security agents for high-risk tasks" do
+    test "excludes medium-security agents for high-risk tasks" do
       assert {:ok, rec} = Router.route("Edit HIPAA-covered data", risk_tier: "high")
-      refute rec.agent in ["bolt", "replit", "lovable", "v0", "ai-studio", "chatprd", "specced"]
+      refute rec.agent in ["warp", "letta-code"]
+
+      assert {:error, :no_suitable_agent, _} =
+               Router.route("Edit HIPAA-covered data",
+                 risk_tier: "high",
+                 allowed_agents: ["warp", "letta-code"]
+               )
     end
 
     test "raw LLM providers are not routable agents" do
@@ -120,15 +94,15 @@ defmodule ControlKeel.Agent.RouterTest do
 
   describe "route/2 — allowed_agents filtering" do
     test "restricts to allowed agent list" do
-      assert {:ok, rec} = Router.route("Build feature", allowed_agents: ["ollama"])
-      assert rec.agent == "ollama"
+      assert {:ok, rec} = Router.route("Build feature", allowed_agents: ["opencode"])
+      assert rec.agent == "opencode"
     end
 
     test "returns error when no allowed agents satisfy constraints" do
       assert {:error, :no_suitable_agent, msg} =
                Router.route("PHI data update",
                  risk_tier: "critical",
-                 allowed_agents: ["bolt"]
+                 allowed_agents: ["warp"]
                )
 
       assert is_binary(msg)
@@ -141,8 +115,6 @@ defmodule ControlKeel.Agent.RouterTest do
                Router.route("Build feature", budget_remaining_cents: 10, risk_tier: "low")
 
       assert rec.agent in [
-               "ollama",
-               "aider",
                "opencode",
                "continue"
              ]
@@ -162,60 +134,7 @@ defmodule ControlKeel.Agent.RouterTest do
     end
   end
 
-  describe "route/2 — UI task scoring" do
-    test "bolt receives UI capability bonus for UI tasks over generic-cli" do
-      assert {:ok, rec} =
-               Router.route("Build a dashboard UI",
-                 risk_tier: "low",
-                 allowed_agents: ["bolt", "generic-cli"]
-               )
-
-      assert rec.agent == "bolt"
-    end
-
-    test "lovable beats generic-cli for UI task at low risk" do
-      assert {:ok, rec} =
-               Router.route("Build a landing page",
-                 risk_tier: "low",
-                 allowed_agents: ["lovable", "generic-cli"]
-               )
-
-      assert rec.agent == "lovable"
-    end
-
-    test "replit preferred over codex when budget excludes codex" do
-      assert {:ok, rec} =
-               Router.route("Build a landing page",
-                 risk_tier: "low",
-                 allowed_agents: ["replit", "codex"],
-                 budget_remaining_cents: 150
-               )
-
-      assert rec.agent == "replit"
-    end
-
-    test "v0 is a valid UI candidate at low risk" do
-      assert {:ok, rec} =
-               Router.route("Build a dashboard component",
-                 risk_tier: "low",
-                 allowed_agents: ["v0"]
-               )
-
-      assert rec.agent == "v0"
-    end
-  end
-
   describe "route/2 — local CLI category" do
-    test "aider passes critical risk tier" do
-      assert {:ok, rec} =
-               Router.route("Update patient records",
-                 risk_tier: "critical",
-                 allowed_agents: ["aider"]
-               )
-
-      assert rec.agent == "aider"
-    end
-
     test "opencode passes critical risk tier" do
       assert {:ok, rec} =
                Router.route("Update PHI data",
@@ -227,75 +146,24 @@ defmodule ControlKeel.Agent.RouterTest do
     end
   end
 
-  describe "route/2 — cloud scaffolders expanded" do
-    test "lovable is included as a UI candidate at low risk" do
-      assert {:ok, rec} =
-               Router.route("Build a React dashboard",
-                 risk_tier: "low",
-                 allowed_agents: ["lovable", "v0", "bolt"]
-               )
-
-      assert rec.agent in ["lovable", "v0", "bolt"]
-    end
-
-    test "v0 excluded for deploy task (only :ui_prototype — no :bash or :deploy capability)" do
-      assert {:error, :no_suitable_agent, _} =
-               Router.route("Deploy to Kubernetes and configure CI",
-                 risk_tier: "low",
-                 allowed_agents: ["v0"]
-               )
-    end
-  end
-
   describe "list_agents/0" do
     test "returns all supported agents" do
       agents = Router.list_agents()
-      assert map_size(agents) == 28
+      assert map_size(agents) == 20
     end
 
-    test "contains all expected categories" do
-      agents = Router.list_agents()
+    test "only names agents ControlKeel integrates with" do
+      agents = Router.list_agents() |> Map.keys() |> Enum.sort()
 
-      # Local IDEs
-      assert Map.has_key?(agents, "claude-code")
-      assert Map.has_key?(agents, "cursor")
-      assert Map.has_key?(agents, "windsurf")
-      assert Map.has_key?(agents, "kiro")
-      assert Map.has_key?(agents, "augment")
-      assert Map.has_key?(agents, "amp")
+      assert agents ==
+               Enum.sort(~w(claude-code codex-cli cursor copilot antigravity opencode windsurf
+                            cline kiro kilo amp augment continue roo-code goose droid pi warp
+                            letta-code devin))
 
-      # Local CLIs
-      assert Map.has_key?(agents, "aider")
-      assert Map.has_key?(agents, "opencode")
-      assert Map.has_key?(agents, "codex-cli")
-      assert Map.has_key?(agents, "antigravity")
-      assert Map.has_key?(agents, "continue")
-      assert Map.has_key?(agents, "ollama")
-
-      # Cloud platforms
-      assert Map.has_key?(agents, "bolt")
-      assert Map.has_key?(agents, "replit")
-      assert Map.has_key?(agents, "lovable")
-      assert Map.has_key?(agents, "v0")
-      assert Map.has_key?(agents, "factory")
-      assert Map.has_key?(agents, "devin")
-      assert Map.has_key?(agents, "ai-studio")
-      assert Map.has_key?(agents, "codex")
-      assert Map.has_key?(agents, "gemini-cli")
-      assert Map.has_key?(agents, "generic-cli")
-
-      # Review & spec
-      assert Map.has_key?(agents, "coderabbit")
-      assert Map.has_key?(agents, "copilot")
-      assert Map.has_key?(agents, "qodo")
-      assert Map.has_key?(agents, "specpilot")
-      assert Map.has_key?(agents, "chatprd")
-      assert Map.has_key?(agents, "specced")
-
-      # Non-agent providers/frameworks are intentionally excluded from routing.
-      refute Map.has_key?(agents, "openai")
-      refute Map.has_key?(agents, "langchain")
-      refute Map.has_key?(agents, "n8n")
+      for removed <- ~w(ollama bolt lovable replit v0 factory ai-studio codex generic-cli
+                        coderabbit qodo specpilot chatprd specced aider gemini-cli) do
+        refute Map.has_key?(Router.list_agents(), removed), removed
+      end
     end
   end
 
@@ -316,12 +184,6 @@ defmodule ControlKeel.Agent.RouterTest do
       assert agent.name == "Kiro (Amazon)"
       assert agent.local == true
       assert :mcp in agent.capabilities
-    end
-
-    test "returns correct profile for coderabbit" do
-      agent = Router.get_agent("coderabbit")
-      assert :code_review in agent.capabilities
-      assert :pr_review in agent.capabilities
     end
 
     test "non-agent provider, framework, workflow, and observability rows are not routable" do

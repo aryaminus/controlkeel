@@ -20,18 +20,14 @@ compatibility:
   - roo-native
   - goose-native
   - opencode-native
-  - gemini-cli-native
+  - antigravity-cli-native
   - kiro-native
   - kilo-native
   - amp-native
   - augment-native
-  - hermes-native
-  - multica-native
-  - openclaw-native
   - devin-terminal-native
   - warp-native
   - droid-bundle
-  - forge-acp
 allowed-tools:
   - ck_validate
   - ck_execute_code

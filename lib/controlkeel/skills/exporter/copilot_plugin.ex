@@ -38,13 +38,10 @@ defmodule ControlKeel.Skills.Exporter.CopilotPlugin do
     hooks_path = Path.join(root, "hooks.json")
     File.write!(hooks_path, Jason.encode!(E.copilot_hooks_manifest(), pretty: true) <> "\n")
 
-    shell_hook_path = Path.join(root, "bin/controlkeel-review.sh")
+    shell_hook_path = Path.join(root, "bin/ck-validate-shell.sh")
     File.mkdir_p!(Path.dirname(shell_hook_path))
-    File.write!(shell_hook_path, E.review_bridge_shell_contents("copilot"))
+    File.write!(shell_hook_path, E.shell_gate_hook_contents(:copilot))
     File.chmod!(shell_hook_path, 0o755)
-
-    powershell_hook_path = Path.join(root, "bin/controlkeel-review.ps1")
-    File.write!(powershell_hook_path, E.review_bridge_powershell_contents("copilot"))
 
     mcp_path = Path.join(root, ".mcp.json")
     File.write!(mcp_path, Jason.encode!(E.mcp_payload(project_root, opts), pretty: true) <> "\n")
@@ -63,12 +60,11 @@ defmodule ControlKeel.Skills.Exporter.CopilotPlugin do
         %{"path" => last_command_path, "kind" => "command"},
         %{"path" => hooks_path, "kind" => "hooks"},
         %{"path" => shell_hook_path, "kind" => "hook"},
-        %{"path" => powershell_hook_path, "kind" => "hook"},
         %{"path" => mcp_path, "kind" => "mcp"}
       ],
       [
         "Use this bundle as a local Copilot / VS Code plugin or publish it through your plugin workflow.",
-        "The plugin ships `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last` command prompts alongside plan-mode interception.",
+        "The plugin ships `/controlkeel-review`, `/controlkeel-annotate`, and `/controlkeel-last` command prompts and a shell-command gate. Submit plans for review with the `ck_review_submit` tool.",
         "Use .mcp.json for local stdio MCP and .mcp.hosted.json as the hosted MCP template."
       ]
     )

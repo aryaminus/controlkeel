@@ -16,7 +16,7 @@ compatibility:
   - cline-native
   - roo-native
   - goose-native
-  - gemini-cli-native
+  - antigravity-cli-native
   - kiro-native
   - amp-native
   - augment-native
