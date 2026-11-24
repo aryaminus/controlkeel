@@ -304,11 +304,15 @@ if config_env() == :prod do
   config :controlkeel, ControlKeelWeb.Endpoint,
     url: url,
     http: [
-      # Enable IPv6 and bind on all interfaces.
+      # Enable IPv6 by default and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
       # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0}
+      ip:
+        if(fly_proxy_client_ip,
+          do: {0, 0, 0, 0},
+          else: {0, 0, 0, 0, 0, 0, 0, 0}
+        )
     ],
     secret_key_base: secret_key_base
 

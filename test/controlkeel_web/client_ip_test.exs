@@ -194,6 +194,33 @@ defmodule ControlKeelWeb.ClientIpTest do
       assert ClientIp.from_socket(socket, fly_proxy_client_ip: true) == "198.51.100.7"
     end
 
+    test "does not let a forged Fly client IP header choose the socket bucket" do
+      conn = %Plug.Conn{
+        remote_ip: {172, 16, 0, 2},
+        req_headers: [{"x-fly-client-ip", "198.51.100.7"}]
+      }
+
+      conn = ControlKeelWeb.Plugs.FlyClientIp.call(conn, [])
+      assert Plug.Conn.get_req_header(conn, "x-fly-client-ip") == []
+
+      socket = socket(%{peer_data: %{address: conn.remote_ip}, x_headers: conn.req_headers})
+
+      assert ClientIp.from_socket(socket, fly_proxy_client_ip: true) == "172.16.0.2"
+    end
+
+    test "replaces a client-supplied Fly IP with Fly's header" do
+      conn = %Plug.Conn{
+        req_headers: [
+          {"fly-client-ip", "198.51.100.7"},
+          {"x-fly-client-ip", "203.0.113.1"}
+        ]
+      }
+
+      conn = ControlKeelWeb.Plugs.FlyClientIp.call(conn, [])
+
+      assert Plug.Conn.get_req_header(conn, "x-fly-client-ip") == ["198.51.100.7"]
+    end
+
     test "falls back to remote_ip when the header is missing or blank" do
       assert conn_bucket(%Plug.Conn{remote_ip: {192, 0, 2, 5}, req_headers: []}) ==
                "192.0.2.5"
