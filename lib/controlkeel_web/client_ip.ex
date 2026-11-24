@@ -1,4 +1,6 @@
 defmodule ControlKeelWeb.ClientIp do
+  import Bitwise
+
   @moduledoc """
   Derives a stable client-IP string for unauthenticated throttling.
 
@@ -8,15 +10,15 @@ defmodule ControlKeelWeb.ClientIp do
     * the WebSocket mount, where `connect_info` is a map of the keys the
       endpoint forwards (`:peer_data`, `:x_headers`, `:session`)
 
-  Forwarded headers are trusted only when the peer address exactly matches an
-  explicitly configured ingress address (`:trusted_ingress_ips`). Private or
-  loopback address space alone does not establish that a peer is trusted. All
-  other requests use the peer address directly.
+  Forwarded headers are trusted only when the peer address matches an
+  explicitly configured ingress address or CIDR (`:trusted_ingress_ips`), or
+  when Fly proxy mode is enabled and the application listener is restricted to
+  Fly Proxy's IPv4 connection path. Private or loopback address space alone
+  does not establish trust. All other requests use the peer address directly.
 
-  Only `x-forwarded-for` is consulted: Phoenix's socket `:x_headers`
-  connect-info drops headers without an `x-` prefix, so `fly-client-ip` can
-  never reach the connected mount, and using it on one pass only would put the
-  dead render and the WebSocket mount in different buckets.
+  For configured ingress, `x-forwarded-for` is consulted. In Fly proxy mode,
+  the endpoint copies Fly's `fly-client-ip` value into an `x-` header because
+  Phoenix socket `:x_headers` drops headers without that prefix.
 
   The rightmost hop is used, matching the configured ingress contract: the
   ingress appends the address it observed to `x-forwarded-for`. The selected
@@ -58,7 +60,13 @@ defmodule ControlKeelWeb.ClientIp do
   end
 
   defp forwarded_ip(headers, peer_ip, opts) when is_list(headers) and is_tuple(peer_ip) do
-    if peer_ip in trusted_ingress_ips(opts), do: parse_forwarded(headers)
+    peer_ip = normalize_mapped_ip(peer_ip)
+
+    cond do
+      fly_proxy_client_ip?(opts) -> parse_forwarded_header(headers, "x-fly-client-ip")
+      trusted_ingress?(peer_ip, trusted_ingress_ips(opts)) -> parse_forwarded(headers)
+      true -> nil
+    end
   end
 
   defp forwarded_ip(_headers, _peer_ip, _opts), do: nil
@@ -70,9 +78,50 @@ defmodule ControlKeelWeb.ClientIp do
     end)
   end
 
-  defp parse_forwarded(headers) do
-    case List.keyfind(headers, @forwarded_header, 0) do
-      {@forwarded_header, value} ->
+  defp fly_proxy_client_ip?(opts) do
+    Keyword.get_lazy(opts, :fly_proxy_client_ip, fn ->
+      Application.get_env(:controlkeel, __MODULE__, [])
+      |> Keyword.get(:fly_proxy_client_ip, false)
+    end)
+  end
+
+  defp trusted_ingress?(peer_ip, entries) do
+    Enum.any?(entries, fn
+      {address, prefix} -> cidr_match?(peer_ip, address, prefix)
+      address when is_tuple(address) -> normalize_mapped_ip(address) == peer_ip
+    end)
+  end
+
+  defp cidr_match?(peer_ip, network, prefix) do
+    peer_ip = normalize_mapped_ip(peer_ip)
+    network = normalize_mapped_ip(network)
+
+    with true <- tuple_size(peer_ip) == tuple_size(network),
+         bits when prefix <= bits <- tuple_size(peer_ip) * 8 do
+      shift = bits - prefix
+      ip_to_integer(peer_ip) >>> shift == ip_to_integer(network) >>> shift
+    else
+      _ -> false
+    end
+  end
+
+  defp ip_to_integer(address) do
+    address
+    |> Tuple.to_list()
+    |> Enum.reduce(0, fn part, acc -> (acc <<< 8) + part end)
+  end
+
+  defp normalize_mapped_ip({0, 0, 0, 0, 0, 65_535, high, low}) do
+    {high >>> 8, band(high, 255), low >>> 8, band(low, 255)}
+  end
+
+  defp normalize_mapped_ip(address), do: address
+
+  defp parse_forwarded(headers), do: parse_forwarded_header(headers, @forwarded_header)
+
+  defp parse_forwarded_header(headers, header) do
+    case List.keyfind(headers, header, 0) do
+      {^header, value} ->
         value
         |> String.split(",")
         |> List.last()

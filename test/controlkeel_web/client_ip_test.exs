@@ -148,6 +148,52 @@ defmodule ControlKeelWeb.ClientIpTest do
       assert conn_bucket(conn) == "203.0.113.7"
     end
 
+    test "uses the forwarded value from a peer inside a configured CIDR" do
+      conn = %Plug.Conn{
+        remote_ip: {10, 0, 0, 19},
+        req_headers: [{"x-forwarded-for", "198.51.100.7"}]
+      }
+
+      assert conn_bucket(conn, [{{10, 0, 0, 0}, 24}]) == "198.51.100.7"
+    end
+
+    test "ignores the forwarded value from a peer outside a configured CIDR" do
+      conn = %Plug.Conn{
+        remote_ip: {10, 0, 1, 19},
+        req_headers: [{"x-forwarded-for", "198.51.100.7"}]
+      }
+
+      assert conn_bucket(conn, [{{10, 0, 0, 0}, 24}]) == "10.0.1.19"
+    end
+
+    test "matches an IPv4 CIDR when the peer is IPv4-mapped IPv6" do
+      conn = %Plug.Conn{
+        remote_ip: {0, 0, 0, 0, 0, 65_535, 2_560, 19},
+        req_headers: [{"x-forwarded-for", "198.51.100.7"}]
+      }
+
+      assert conn_bucket(conn, [{{10, 0, 0, 0}, 24}]) == "198.51.100.7"
+    end
+
+    test "uses Fly's client IP header when Fly proxy mode is enabled" do
+      conn = %Plug.Conn{
+        remote_ip: {172, 16, 0, 2},
+        req_headers: [{"x-fly-client-ip", "198.51.100.7"}]
+      }
+
+      assert ClientIp.from_conn(conn, fly_proxy_client_ip: true) == "198.51.100.7"
+    end
+
+    test "uses the copied Fly client IP header for the connected LiveView socket" do
+      socket =
+        socket(%{
+          peer_data: %{address: {172, 16, 0, 2}},
+          x_headers: [{"x-fly-client-ip", "198.51.100.7"}]
+        })
+
+      assert ClientIp.from_socket(socket, fly_proxy_client_ip: true) == "198.51.100.7"
+    end
+
     test "falls back to remote_ip when the header is missing or blank" do
       assert conn_bucket(%Plug.Conn{remote_ip: {192, 0, 2, 5}, req_headers: []}) ==
                "192.0.2.5"

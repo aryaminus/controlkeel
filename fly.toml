@@ -42,6 +42,7 @@ kill_timeout = "10s"
   POOL_SIZE = "10"
   ECTO_USE_SSL = "true"
   LOGGER_LEVEL = "info"
+  CONTROLKEEL_FLY_PROXY_CLIENT_IP = "true"
 
 [http_service]
   internal_port = 8080

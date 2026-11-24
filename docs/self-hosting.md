@@ -24,12 +24,17 @@ ControlKeel ships [`deploy/fly.self-host.toml`](../deploy/fly.self-host.toml) as
 Requests use the TCP peer address as the IP rate-limit key by default. If the
 app sits behind a reverse proxy and needs per-client throttling, set
 `CONTROLKEEL_TRUSTED_INGRESS_IPS` to a comma-separated list of that proxy's
-exact IPv4 or IPv6 addresses. Forwarded `x-forwarded-for` values are honored
-only when the connecting peer matches this list, and the selected value must
-be a valid IP address. Private or loopback addresses are not trusted by virtue
-of their range. Keep the proxy addresses stable and configure the ingress to
-append the client address to `x-forwarded-for`; otherwise throttling falls
-back to the peer address.
+exact IPv4 or IPv6 addresses, or CIDRs. Forwarded `x-forwarded-for` values are
+honored only when the connecting peer matches this list, and the selected value
+must be a valid IP address. Private or loopback addresses are not trusted by
+virtue of their range. Keep the proxy addresses stable and configure the
+ingress to append the client address to `x-forwarded-for`; otherwise
+throttling falls back to the peer address.
+
+The canonical Fly deployment uses Fly Proxy's `Fly-Client-IP` header and binds
+the app listener to IPv4 so private IPv6 connections cannot bypass Fly Proxy
+and inject that header. Do not configure a broad private network CIDR as a
+trusted ingress range.
 
 ```bash
 # 1. Copy and edit the template

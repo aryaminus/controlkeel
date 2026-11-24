@@ -66,26 +66,52 @@ if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) or
   end
 end
 
-config :controlkeel, ControlKeelWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+fly_proxy_client_ip =
+  case System.get_env("CONTROLKEEL_FLY_PROXY_CLIENT_IP", "false") do
+    "true" -> true
+    "false" -> false
+    value -> raise ArgumentError, "invalid CONTROLKEEL_FLY_PROXY_CLIENT_IP: #{inspect(value)}"
+  end
+
+http_options = [port: String.to_integer(System.get_env("PORT", "4000"))]
+
+http_options =
+  if fly_proxy_client_ip, do: Keyword.put(http_options, :ip, {0, 0, 0, 0}), else: http_options
+
+config :controlkeel, ControlKeelWeb.Endpoint, http: http_options
 
 trusted_ingress_ips =
   System.get_env("CONTROLKEEL_TRUSTED_INGRESS_IPS", "")
   |> String.split(",")
   |> Enum.map(&String.trim/1)
   |> Enum.reject(&(&1 == ""))
-  |> Enum.map(fn ip ->
-    case :inet.parse_address(String.to_charlist(ip)) do
-      {:ok, address} ->
-        address
+  |> Enum.map(fn entry ->
+    invalid_entry = fn ->
+      raise ArgumentError,
+            "invalid ingress IP or CIDR in CONTROLKEEL_TRUSTED_INGRESS_IPS: #{inspect(entry)}"
+    end
 
-      {:error, _} ->
-        raise ArgumentError,
-              "invalid ingress IP in CONTROLKEEL_TRUSTED_INGRESS_IPS: #{inspect(ip)}"
+    case String.split(entry, "/", parts: 2) do
+      [ip] ->
+        case :inet.parse_address(String.to_charlist(ip)) do
+          {:ok, address} -> address
+          {:error, _} -> invalid_entry.()
+        end
+
+      [ip, prefix] ->
+        with {:ok, address} <- :inet.parse_address(String.to_charlist(ip)),
+             {prefix, ""} <- Integer.parse(prefix),
+             true <- prefix >= 0 and prefix <= tuple_size(address) * 8 do
+          {address, prefix}
+        else
+          _ -> invalid_entry.()
+        end
     end
   end)
 
-config :controlkeel, ControlKeelWeb.ClientIp, trusted_ingress_ips: trusted_ingress_ips
+config :controlkeel, ControlKeelWeb.ClientIp,
+  trusted_ingress_ips: trusted_ingress_ips,
+  fly_proxy_client_ip: fly_proxy_client_ip
 
 config :controlkeel, ControlKeel.Proxy,
   openai_upstream:
