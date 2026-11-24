@@ -246,12 +246,17 @@ defmodule ControlKeelWeb.OrganizationDetailLiveTest do
       assert html =~ "Only owners can change budget."
     end
 
-    test "non-admin members see an access panel on settings", %{member: member} do
+    test "non-admin members can open settings read-only", %{member: member} do
       {:ok, view, html} = live(conn_for(member), ~p"/setco/settings")
 
-      assert has_element?(view, "#scope-not-found[data-scope-error]")
-      refute has_element?(view, "[data-scope-invalid-root]")
-      assert html =~ "Organization unavailable"
+      # Every active member may open the tabs; below admin they render
+      # static — the access panel is reserved for non-members.
+      refute has_element?(view, "#scope-not-found[data-scope-error]")
+      assert has_element?(view, ~s([data-scope-valid][data-scope-root="/setco"]))
+      assert html =~ "Organization Settings"
+      assert has_element?(view, "#org-settings-form input[name='settings[name]'][disabled]")
+      assert render(view) =~ "Settings are read-only for your role."
+      refute render(view) =~ "Save changes"
     end
   end
 

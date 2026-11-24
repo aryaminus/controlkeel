@@ -15,12 +15,19 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   erasure) does **not** live here — it lives in the account dialog opened
   from the shared user menu (`ControlKeelWeb.UserMenu.account_dialog/1`),
   which works over any page in both modes. The page resolves at the
+  `"viewer"` floor: every active member may open all tabs, but for members
+  below admin they render read-only — management controls are hidden and
+  every mutation event is refused server-side (`can_manage?`); non-members
+  see the shared access panel.
   `"admin"` floor; non-admin members see the shared access panel.
 
   Member management lives here (moved from the org overview page when the
   overview became the org dashboard): invite by email, role changes, and
   revocation are admin+ gated by `can_manage?`, with the same last-owner
-  protections as before.
+  protections as before. Account-level disable/enable is intentionally not
+  offered here — accounts are global across organizations, so flipping
+  `users.status` is reserved for a future platform-admin surface; revoking
+  the membership is the org-scoped offboarding action.
   """
 
   use ControlKeelWeb, :live_view
@@ -41,7 +48,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def mount(%{"org_slug" => slug} = params, _session, socket) do
-    case OrgAccess.resolve(slug, socket.assigns[:current_user], "admin") do
+    case OrgAccess.resolve(slug, socket.assigns[:current_user], "viewer") do
       {:ok, org, membership} ->
         mount_ok(socket, org, membership, normalize_tab(params["tab"]))
 
@@ -61,7 +68,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
           socket
 
         _ ->
-          case OrgAccess.resolve(slug, socket.assigns[:current_user], "admin") do
+          case OrgAccess.resolve(slug, socket.assigns[:current_user], "viewer") do
             {:ok, org, membership} ->
               {:ok, socket} = mount_ok(socket, org, membership, nil)
               assign(socket, :scope_error, nil)
@@ -141,7 +148,11 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def handle_event("open_invite", _params, socket) do
-    {:noreply, assign(socket, :show_invite_modal, true)}
+    if can_manage?(socket.assigns) do
+      {:noreply, assign(socket, :show_invite_modal, true)}
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to invite members.")}
+    end
   end
 
   def handle_event("close_invite", _params, socket) do
@@ -153,33 +164,46 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   end
 
   def handle_event("invite", %{"invite" => %{"email" => raw_email, "role" => role}}, socket) do
-    email = raw_email |> to_string() |> String.downcase() |> String.trim()
-    role = if role in @valid_roles, do: role, else: "member"
+    if can_manage?(socket.assigns) do
+      email = raw_email |> to_string() |> String.downcase() |> String.trim()
+      role = if role in @valid_roles, do: role, else: "member"
 
-    with :ok <- validate_email(email),
-         {:ok, user} <- find_or_create_user(email),
-         {:ok, _membership, raw_token} <-
-           Accounts.invite_member(user.id, socket.assigns.org.id,
-             role: role,
-             invited_by_user_id: socket.assigns.current_user.id
-           ) do
-      # Best-effort email delivery. Token banner remains as visible fallback,
-      # so a mailer failure does not block the operator from completing the invite.
-      _ = ControlKeel.Mailer.deliver_invitation(%{email: user.email}, raw_token)
+      with :ok <- validate_email(email),
+           :ok <-
+             Accounts.authorize_invite_role(
+               socket.assigns.current_user.id,
+               socket.assigns.org.id,
+               role
+             ),
+           # Accounts-level find-or-create carries the one status policy: a
+           # disabled account is refused (its invitation token could never be
+           # redeemed, because login is blocked).
+           {:ok, user, _created?} <- Accounts.find_or_create_user(email),
+           {:ok, _membership, raw_token} <-
+             Accounts.invite_member(user.id, socket.assigns.org.id,
+               role: role,
+               invited_by_user_id: socket.assigns.current_user.id
+             ) do
+        # Best-effort email delivery. Token banner remains as visible fallback,
+        # so a mailer failure does not block the operator from completing the invite.
+        _ = ControlKeel.Mailer.deliver_invitation(%{email: user.email}, raw_token)
 
-      {:noreply,
-       socket
-       |> refresh_memberships(socket.assigns.org.id)
-       |> assign(:invite_token, raw_token)
-       |> assign(:invite_error, nil)
-       |> assign(:show_invite_modal, false)
-       |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))}
-    else
-      {:error, reason} ->
         {:noreply,
          socket
-         |> assign(:invite_error, format_error(reason))
-         |> assign(:invite_token, nil)}
+         |> refresh_memberships(socket.assigns.org.id)
+         |> assign(:invite_token, raw_token)
+         |> assign(:invite_error, nil)
+         |> assign(:show_invite_modal, false)
+         |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))}
+      else
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> assign(:invite_error, format_error(reason))
+           |> assign(:invite_token, nil)}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to invite members.")}
     end
   end
 
@@ -375,25 +399,32 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   @impl true
   def handle_event("save_policy_set", %{"policy_set" => params}, socket) do
-    {attrs, changeset, raw, ui_error} = prepare_policy_set(params, :insert)
-    attrs = Map.put(attrs, "org_id", socket.assigns.org.id)
+    # The page mounts at the viewer floor, so management events must gate
+    # server-side here (the create button is hidden below admin, but a
+    # crafted event is not stopped by markup).
+    if can_manage?(socket.assigns) do
+      {attrs, changeset, raw, ui_error} = prepare_policy_set(params, :insert)
+      attrs = Map.put(attrs, "org_id", socket.assigns.org.id)
 
-    if ui_error do
-      {:noreply, assign_policy_set_form(socket, changeset, raw, ui_error)}
-    else
-      case Platform.create_policy_set(attrs) do
-        {:ok, set} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Created policy set ##{set.id}.")
-           |> assign(:show_create_modal, false)
-           |> assign_policy_set_form(empty_policy_set_changeset(), "", nil)
-           |> assign_policy_sets()}
+      if ui_error do
+        {:noreply, assign_policy_set_form(socket, changeset, raw, ui_error)}
+      else
+        case Platform.create_policy_set(attrs) do
+          {:ok, set} ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "Created policy set ##{set.id}.")
+             |> assign(:show_create_modal, false)
+             |> assign_policy_set_form(empty_policy_set_changeset(), "", nil)
+             |> assign_policy_sets()}
 
-        {:error, %Ecto.Changeset{} = changeset} ->
-          {:noreply,
-           assign_policy_set_form(socket, Map.put(changeset, :action, :insert), raw, nil)}
+          {:error, %Ecto.Changeset{} = changeset} ->
+            {:noreply,
+             assign_policy_set_form(socket, Map.put(changeset, :action, :insert), raw, nil)}
+        end
       end
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to manage policy sets.")}
     end
   end
 
@@ -598,21 +629,16 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       else: {:error, "Invalid email format"}
   end
 
-  defp find_or_create_user(email) do
-    case Accounts.get_user_by_email(email) do
-      nil -> Accounts.create_user(%{email: email})
-      user -> {:ok, user}
-    end
-  end
-
   defp format_error(reason) when is_binary(reason), do: reason
+  defp format_error(:account_disabled), do: "This account is disabled and cannot be invited."
   defp format_error(:already_member), do: "This user is already a member or has a pending invite."
   defp format_error(:unauthorized), do: "You don't have permission to invite at that role."
   defp format_error(%Ecto.Changeset{}), do: "Could not invite member."
-  defp format_error(reason), do: inspect(reason)
 
-  # Owners can invite at any role; admins only member/viewer (matches the
-  # role-change matrix and the server-side guard in `invite_member/3`).
+  # No inspect/1 fallback: raw atoms must never surface in the UI.
+  defp format_error(_reason), do: "Could not invite member. Please try again."
+
+  # Owners can invite at any role; admins can invite members and viewers.
   defp invite_role_options("owner"),
     do: [{"viewer", "viewer"}, {"member", "member"}, {"admin", "admin"}, {"owner", "owner"}]
 
@@ -843,6 +869,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
             pack_count={@pack_count}
             rule_count={@rule_count}
             block_count={@block_count}
+            can_manage={can_manage?(assigns)}
           />
         <% "members" -> %>
           <.members_panel
@@ -863,6 +890,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
             delete_org_error={@delete_org_error}
             local_mode={@local_mode}
             current_membership={@current_membership}
+            can_manage={can_manage?(assigns)}
           />
       <% end %>
     </section>
@@ -1036,16 +1064,18 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
                         </span>
                       </td>
                       <td class="px-4 py-4 text-right whitespace-nowrap w-px">
-                        <%= if can_revoke?(@current_role, m, @current_user) do %>
-                          <button
-                            type="button"
-                            phx-click="confirm_revoke"
-                            phx-value-membership-id={m.id}
-                            class="text-sm font-medium text-destructive transition hover:text-destructive"
-                          >
-                            Revoke
-                          </button>
-                        <% end %>
+                        <div class="flex items-center justify-end gap-3">
+                          <%= if can_revoke?(@current_role, m, @current_user) do %>
+                            <button
+                              type="button"
+                              phx-click="confirm_revoke"
+                              phx-value-membership-id={m.id}
+                              class="text-sm font-medium text-destructive transition hover:text-destructive"
+                            >
+                              Revoke
+                            </button>
+                          <% end %>
+                        </div>
                       </td>
                     </tr>
                   <% end %>
@@ -1186,6 +1216,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   attr :delete_org_error, :string, default: nil
   attr :current_membership, :map, default: nil
   attr :local_mode, :boolean, default: false
+  attr :can_manage, :boolean, default: false
 
   defp general_panel(assigns) do
     ~H"""
@@ -1225,10 +1256,16 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
                 name={@settings_form[:name].name || "settings[name]"}
                 value={@settings_form[:name].value}
                 required
-                class="w-full rounded-xl border border-input/60 bg-background/50 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition"
+                disabled={!@can_manage}
+                class="w-full rounded-xl border border-input/60 bg-background/50 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition disabled:cursor-not-allowed disabled:opacity-50"
               />
               <%= for msg <- @settings_form[:name].errors do %>
                 <p class="mt-1 text-xs text-destructive">{msg}</p>
+              <% end %>
+              <%= if not @can_manage do %>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  Only admins can change organization settings.
+                </p>
               <% end %>
             </div>
           </div>
@@ -1337,9 +1374,14 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-1">
           <p class="text-xs sm:text-sm text-muted-foreground">
-            Changes apply to all workspaces.
+            <%= if @can_manage do %>
+              Changes apply to all workspaces.
+            <% else %>
+              Settings are read-only for your role.
+            <% end %>
           </p>
           <button
+            :if={@can_manage}
             type="submit"
             class="inline-flex items-center justify-center rounded-xl bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20 px-5 py-2.5 text-sm font-semibold transition active:scale-[0.98] cursor-pointer shadow-sm disabled:pointer-events-none disabled:opacity-50"
           >
@@ -1435,6 +1477,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   attr :pack_count, :integer, required: true
   attr :rule_count, :integer, required: true
   attr :block_count, :integer, required: true
+  attr :can_manage, :boolean, default: false
 
   defp policy_sets_panel(assigns) do
     ~H"""
@@ -1458,6 +1501,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
             View packs
           </button>
           <button
+            :if={@can_manage}
             type="button"
             phx-click="open_create_modal"
             class="inline-flex items-center justify-center gap-1 rounded-xl bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20 px-4 py-2 text-sm font-semibold transition active:scale-[0.98] cursor-pointer shadow-sm"

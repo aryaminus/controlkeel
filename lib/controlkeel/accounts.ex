@@ -93,11 +93,37 @@ defmodule ControlKeel.Accounts do
     |> Repo.all()
   end
 
+  # ⚠️ No product call site yet. Account-level disable/enable is deliberately
+  # NOT exposed to org admins/owners: accounts are global, and a user may hold
+  # memberships in several organizations, so one org's admin must not be able
+  # to flip global account status. These context functions are reserved for a
+  # future platform-admin surface — if you wire them up, use them carefully:
+  # the effect is account-wide (sign-out everywhere + login refusal), not
+  # org-scoped. Org-scoped offboarding is `revoke_membership/2`.
+  @doc """
+  Disable a user account: the account cannot sign in again and loses access
+  immediately.
+
+  On success the change is broadcast (`broadcast_account_disabled/1`) so the
+  user's mounted LiveViews drop to the login screen at once — the same
+  post-commit eviction `DataLifecycle.delete_user/1` performs, because a flag
+  flip alone leaves mounted pages live until the next navigation.
+  """
   @spec disable_user(integer()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t() | :not_found}
   def disable_user(user_id) do
     case Repo.get(User, user_id) do
-      nil -> {:error, :not_found}
-      user -> user |> User.changeset(%{status: "disabled"}) |> Repo.update()
+      nil ->
+        {:error, :not_found}
+
+      user ->
+        case user |> User.changeset(%{status: "disabled"}) |> Repo.update() do
+          {:ok, disabled} ->
+            broadcast_account_disabled(user_id)
+            {:ok, disabled}
+
+          {:error, _} = err ->
+            err
+        end
     end
   end
 
@@ -261,9 +287,10 @@ defmodule ControlKeel.Accounts do
   ## Authorization
 
   When `invited_by_user_id` is supplied, the inviter's role is checked: only
-  owners may grant `owner` or `admin`. A `nil` inviter is the trusted operator
-  path (e.g. the CLI `org invite` command) and is unrestricted. Returns
-  `{:error, :unauthorized}` when a named inviter lacks the required role.
+  owners may grant `owner`; admins may grant `admin`, `member`, or `viewer`. A
+  `nil` inviter is the trusted operator path (e.g. the CLI `org invite`
+  command) and is unrestricted. Returns `{:error, :unauthorized}` when a named
+  inviter lacks the required role.
   """
   @spec invite_member(integer(), integer(), keyword()) ::
           {:ok, Membership.t(), String.t()}
@@ -321,14 +348,16 @@ defmodule ControlKeel.Accounts do
     end
   end
 
-  # Invite role authorization. When an inviter is named
-  # (`invited_by_user_id`), enforce the same privilege boundary as role changes:
-  # only owners may grant owner/admin. A `nil` inviter is the trusted operator
-  # path (e.g. the CLI `org invite` command, which has no membership) and is
-  # left unrestricted.
-  defp authorize_invite_role(nil, _org_id, _role), do: :ok
+  @doc """
+  Authorize an invitation role before creating or finding the invitee account.
 
-  defp authorize_invite_role(invited_by_user_id, org_id, role) do
+  `invite_member/3` repeats this check at the membership write boundary.
+  """
+  @spec authorize_invite_role(integer() | nil, integer(), String.t()) ::
+          :ok | {:error, :unauthorized}
+  def authorize_invite_role(nil, _org_id, _role), do: :ok
+
+  def authorize_invite_role(invited_by_user_id, org_id, role) do
     inviter = get_active_membership(invited_by_user_id, org_id)
 
     cond do
@@ -337,6 +366,9 @@ defmodule ControlKeel.Accounts do
 
       inviter.role == "owner" ->
         :ok
+
+      not role_at_least?(inviter.role, "admin") ->
+        {:error, :unauthorized}
 
       role in ["owner", "admin"] ->
         {:error, :unauthorized}
@@ -654,6 +686,20 @@ defmodule ControlKeel.Accounts do
   @spec sign_out_everywhere(integer()) :: :ok
   def sign_out_everywhere(user_id) when is_integer(user_id) do
     Phoenix.PubSub.broadcast(ControlKeel.PubSub, signout_topic(user_id), :sign_out_everywhere)
+    :ok
+  end
+
+  @doc """
+  Broadcast an account-disabled event on the sign-out topic of the given user.
+
+  Parity with the `DataLifecycle.delete_user/1` post-commit eviction: mounted
+  LiveViews of the disabled user are pushed to the login screen immediately
+  with an explanatory message, instead of staying live until their next
+  navigation. `ControlKeelWeb.LiveAuth` handles this message.
+  """
+  @spec broadcast_account_disabled(integer()) :: :ok
+  def broadcast_account_disabled(user_id) when is_integer(user_id) do
+    Phoenix.PubSub.broadcast(ControlKeel.PubSub, signout_topic(user_id), :account_disabled)
     :ok
   end
 

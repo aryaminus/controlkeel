@@ -12,7 +12,14 @@ defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
 
   import Plug.Conn
 
+  import Phoenix.Controller, only: [put_flash: 3]
+
   alias ControlKeel.Accounts
+
+  # Shared with the OAuthLoginController's login-refusal copy: the same
+  # explanation a re-attempted sign-in would give, shown when a live session
+  # is cut by an offboarding.
+  @account_disabled_message "This account has been disabled. Contact your administrator."
 
   def init(opts), do: opts
 
@@ -24,27 +31,48 @@ defmodule ControlKeelWeb.Plugs.LoadCurrentUser do
       |> assign(:current_user, nil)
     else
       user_id = get_session(conn, :current_user_id)
-      # A disabled account loses access immediately, even mid-session: loading
-      # the user is the single point every authenticated surface flows through.
-      user =
-        if is_integer(user_id) do
-          case Accounts.get_user(user_id) do
-            %{} = found -> if Accounts.user_active?(found), do: found, else: nil
-            _ -> nil
-          end
-        end
 
-      conn
-      |> maybe_refresh_session_last_active(user)
-      |> assign(:current_user, user)
+      case load_user(user_id) do
+        {:ok, user} ->
+          conn
+          |> put_session(:session_last_active, DateTime.utc_now() |> DateTime.to_iso8601())
+          |> assign(:current_user, user)
+
+        # A disabled account loses access immediately, even mid-session:
+        # loading the user is the single point every authenticated surface
+        # flows through. The session keys are cleared so re-enabling the
+        # account cannot silently restore the old session, and the logout is
+        # explained on the next login render (fetch_live_flash has already
+        # run in the :browser pipeline, so a redirect persists the flash).
+        {:error, :account_disabled} ->
+          conn
+          |> delete_session(:current_user_id)
+          |> delete_session(:session_last_active)
+          |> assign(:current_user, nil)
+          |> put_flash(:error, @account_disabled_message)
+
+        # Unknown/deleted user (e.g. after erasure): drop the stale session
+        # quietly — a missing account is not a disabled one.
+        {:error, :not_found} ->
+          conn
+          |> delete_session(:current_user_id)
+          |> delete_session(:session_last_active)
+          |> assign(:current_user, nil)
+      end
     end
   end
 
-  defp maybe_refresh_session_last_active(conn, nil), do: conn
+  defp load_user(user_id) when is_integer(user_id) do
+    case Accounts.get_user(user_id) do
+      %Accounts.User{} = user ->
+        if Accounts.user_active?(user), do: {:ok, user}, else: {:error, :account_disabled}
 
-  defp maybe_refresh_session_last_active(conn, _user) do
-    put_session(conn, :session_last_active, DateTime.utc_now() |> DateTime.to_iso8601())
+      _ ->
+        {:error, :not_found}
+    end
   end
+
+  defp load_user(_user_id), do: {:error, :not_found}
 
   defp session_expired?(conn) do
     timeout = session_idle_timeout()

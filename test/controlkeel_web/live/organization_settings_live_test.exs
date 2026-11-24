@@ -538,9 +538,16 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       member = create_user!("member-a@example.com")
       add_active_membership(member.id, org.id, "member")
 
+      admin = create_user!("admin-a@example.com")
+
+      {:ok, _membership, token} =
+        Accounts.invite_member(admin.id, org.id, role: "admin", invited_by_user_id: owner.id)
+
+      {:ok, _membership} = Accounts.accept_invitation(token, admin.id)
+
       owner_m = Accounts.get_active_membership(owner.id, org.id)
 
-      {:ok, owner_m: owner_m, conn: conn_for(owner)}
+      {:ok, owner_m: owner_m, admin: admin, org: org, conn: conn_for(owner)}
     end
 
     test "sole owner cannot change their own role (locked)", %{conn: conn, owner_m: owner_m} do
@@ -607,6 +614,54 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
       |> render_click()
 
       assert has_element?(view, "#invite-member-modal")
+    end
+
+    test "admin cannot invite an admin and the role is not offered in the form", %{
+      admin: admin,
+      org: org
+    } do
+      {:ok, view, _html} = live(conn_for(admin), ~p"/#{org.slug}/settings?tab=members")
+
+      view
+      |> element("#invite-member-button")
+      |> render_click()
+
+      refute has_element?(view, "#invite-form select[name='invite[role]'] option[value='admin']")
+      refute has_element?(view, "#invite-form select[name='invite[role]'] option[value='owner']")
+
+      invite_email = "new-admin@example.com"
+      memberships_before = Accounts.list_memberships_for_org(org.id)
+
+      html =
+        render_submit(view, "invite", %{
+          "invite" => %{"email" => invite_email, "role" => "admin"}
+        })
+
+      assert html =~ "You don&#39;t have permission to invite at that role."
+      assert Accounts.get_user_by_email(invite_email) == nil
+      assert Accounts.list_memberships_for_org(org.id) == memberships_before
+    end
+
+    test "crafted admin owner invite is refused before account creation", %{
+      admin: admin,
+      org: org
+    } do
+      invite_email = "rejected-owner-invite@example.com"
+      memberships_before = Accounts.list_memberships_for_org(org.id)
+      {:ok, view, _html} = live(conn_for(admin), ~p"/#{org.slug}/settings?tab=members")
+
+      view
+      |> element("#invite-member-button")
+      |> render_click()
+
+      html =
+        render_submit(view, "invite", %{
+          "invite" => %{"email" => invite_email, "role" => "owner"}
+        })
+
+      assert html =~ "You don&#39;t have permission to invite at that role."
+      assert Accounts.get_user_by_email(invite_email) == nil
+      assert Accounts.list_memberships_for_org(org.id) == memberships_before
     end
   end
 
@@ -736,4 +791,182 @@ defmodule ControlKeelWeb.OrganizationSettingsLiveTest do
   end
 
   defp org_id_from_admin_m(m), do: m.org_id
+
+  # --- Invite flow vs. disabled accounts ------------------------------------
+
+  # There is no org-scoped disable/enable UI: accounts are global across
+  # organizations, so account-level disable/enable is reserved for a future
+  # platform-admin surface. The invite flow still must refuse a disabled
+  # account (its invitation token could never be redeemed), so this test
+  # disables the account directly through the Accounts context.
+  describe "invite flow refuses disabled accounts in cloud mode" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      n = System.unique_integer([:positive])
+
+      owner = create_user!("owner-#{n}@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Acme", slug: "acme-#{n}"})
+
+      member = create_user!("member-#{n}@example.com")
+      member_m = add_active_membership(member.id, org.id, "member")
+
+      {:ok, org: org, member: member, member_m: member_m, conn: conn_for(owner)}
+    end
+
+    test "invite flow refuses a disabled account with a clear message and issues no token", %{
+      conn: conn,
+      org: org,
+      member: member,
+      member_m: member_m
+    } do
+      {:ok, _} = Accounts.disable_user(member.id)
+
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/settings?tab=members")
+
+      view
+      |> element("#invite-member-button")
+      |> render_click()
+
+      render_submit(view, "invite", %{"invite" => %{"email" => member.email, "role" => "member"}})
+
+      html = render(view)
+
+      assert html =~ "This account is disabled and cannot be invited."
+      refute html =~ "Invitation token issued"
+
+      # No new membership row was created for the disabled user.
+      assert Accounts.list_memberships_for_user(member.id) |> Enum.map(& &1.id) == [
+               member_m.id
+             ]
+    end
+  end
+
+  # --- Non-admin members can open settings read-only -------------------------
+
+  # The page mounts at the viewer floor: every active member may open all
+  # three tabs, but below admin the tabs render static — management controls
+  # are hidden and every mutation event is refused server-side.
+  describe "non-admin members can open every settings tab read-only" do
+    setup do
+      original = Application.get_env(:controlkeel, :runtime_mode)
+      Application.put_env(:controlkeel, :runtime_mode, :cloud)
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:controlkeel, :runtime_mode)
+        else
+          Application.put_env(:controlkeel, :runtime_mode, original)
+        end
+      end)
+
+      n = System.unique_integer([:positive])
+
+      owner = create_user!("owner-#{n}@example.com")
+      {:ok, org} = Accounts.create_org_with_owner(owner.id, %{name: "Acme", slug: "acme-#{n}"})
+
+      viewer = create_user!("viewer-#{n}@example.com")
+      add_active_membership(viewer.id, org.id, "viewer")
+
+      member = create_user!("member-#{n}@example.com")
+      add_active_membership(member.id, org.id, "member")
+
+      {:ok, org: org, owner: owner, viewer: viewer, member: member, conn: conn_for(viewer)}
+    end
+
+    test "general tab renders with the form disabled and no save button", %{
+      conn: conn,
+      org: org
+    } do
+      {:ok, view, html} = live(conn, ~p"/#{org.slug}/settings?tab=general")
+
+      assert html =~ "Organization identity, status, and spend limits."
+
+      assert has_element?(
+               view,
+               "#org-settings-form input[name='settings[name]'][disabled]"
+             )
+
+      assert render(view) =~ "Settings are read-only for your role."
+      refute render(view) =~ "Save changes"
+
+      # The owner-only danger zone stays hidden below owner.
+      refute render(view) =~ "Delete this organization permanently."
+    end
+
+    test "members tab renders the roster without management controls", %{
+      conn: conn,
+      org: org
+    } do
+      {:ok, view, html} = live(conn, ~p"/#{org.slug}/settings?tab=members")
+
+      assert html =~ "Manage organization members and their roles."
+      refute has_element?(view, "#invite-member-button")
+      refute has_element?(view, "select[name='role']")
+      refute has_element?(view, "button[phx-click='confirm_revoke']")
+    end
+
+    test "crafted invite events from viewers and members create no user or membership", %{
+      org: org,
+      viewer: viewer,
+      member: member
+    } do
+      for actor <- [viewer, member] do
+        invite_email = "rejected-invite-#{actor.id}@example.com"
+        memberships_before = Accounts.list_memberships_for_org(org.id)
+        {:ok, view, _html} = live(conn_for(actor), ~p"/#{org.slug}/settings?tab=members")
+
+        html =
+          render_submit(view, "invite", %{
+            "invite" => %{"email" => invite_email, "role" => "member"}
+          })
+
+        assert html =~ "You don&#39;t have permission to invite members."
+        assert Accounts.get_user_by_email(invite_email) == nil
+        assert Accounts.list_memberships_for_org(org.id) == memberships_before
+      end
+    end
+
+    test "policy sets tab renders without the create button", %{
+      conn: conn,
+      org: org
+    } do
+      {:ok, view, html} = live(conn, ~p"/#{org.slug}/settings?tab=policy_sets")
+
+      assert html =~ "Every agent action passes through these policy packs"
+      assert has_element?(view, "button", "View packs")
+      refute html =~ "+ New policy set"
+    end
+
+    test "crafted save_settings is refused server-side", %{conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/settings?tab=general")
+
+      html = render_submit(view, "save_settings", %{"settings" => %{"name" => "Hacked"}})
+
+      # The assertion matches the HTML-escaped apostrophe the flash renders with.
+      assert html =~ "You don&#39;t have permission to change organization settings."
+      assert Accounts.get_org_by_slug(org.slug).name == "Acme"
+    end
+
+    test "crafted save_policy_set is refused server-side", %{conn: conn, org: org} do
+      {:ok, view, _html} = live(conn, ~p"/#{org.slug}/settings?tab=policy_sets")
+
+      html =
+        render_submit(view, "save_policy_set", %{
+          "policy_set" => %{"name" => "nope", "rules_json" => ""}
+        })
+
+      assert html =~ "You don&#39;t have permission to manage policy sets."
+      assert Enum.empty?(Platform.list_policy_sets(org.id))
+    end
+  end
 end
