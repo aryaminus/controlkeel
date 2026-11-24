@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.4.42 — 2026-11-24
+
+### What's changed
+
+- Merge pull request #344 from aryaminus/fix/benchmark-tenancy
+- Merge pull request #341 from aryaminus/fix/web-offboarding
+- fix/web-offboarding restrict admin role invitation in invite member modal
+- fix/web-offboarding: update authorization logic for admin role and enhance tests
+- fix/web-offboarding: update role authorization logic and enhance tests for admin invitations
+- fix/web-offboarding: restrict member invitation permissions and add corresponding tests
+- Merge branch 'main' into fix/web-offboarding
+- Scope benchmark suite lookup before execution
+- fix/benchmark-tenancy: remove outdated documentation for benchmark tenancy follow-ups in CLI/API and web surfaces
+- fix/benchmark-tenancy: streamline workspace and run handling for tenant-specific scenarios
+- fix/benchmark-tenancy: enhance workspace association in benchmark run and suite changesets for tenant-specific handling
+- fix/benchmark-tenancy: enhance tenant-specific suite execution and visibility controls
+- fix/benchmark-tenancy: scope slug uniqueness by workspace to support tenant-specific suites
+- fix/benchmark-tenancy: add follow-up documentation for CLI/API and web surfaces addressing tenancy gaps
+- refactor/user-org-layout: simplify tuple construction in organization settings live test
+- fix/web-offboarding: delete obsolete pre-launch review documents for web and CLI/API
+- fix/web-offboarding: update settings access for non-admin members to read-only
+- fix/web-offboarding: implement account disable/enable functionality with eviction handling
+- fix/web-offboarding: add pre-launch review for PRs #268 and #272, addressing web and CLI issues
+- refactor/user-org-layout: add test for tenant isolation in workspace visibility
+- refactor/user-org-layout replace span with native button for better accessibility and keyboard support
+- refactor/user-org-layout: enhance session listing with keyset pagination and load more functionality
+- refactor/user-org-layout: implement account deletion flash handling in user menu and related tests
+- refactor/user-org-layout: user account deletion terminology and update related tests for consistency
+- refactor/user-org-layout: Implement workspace index and management UI
+
 ## v0.4.41 — 2026-11-23
 
 ### What's changed
