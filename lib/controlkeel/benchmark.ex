@@ -63,15 +63,12 @@ defmodule ControlKeel.Benchmark do
   # Local mode has no tenancy: everything is visible.
   defp scope_suites(query, _workspace_ids), do: query
 
-  # Restrict runs to the caller's workspaces. Runs are tenant data, never
-  # platform content, so this is strict: an empty accessible set yields no rows
-  # rather than every run (matches Cloud.Scope semantics).
+  # Restrict runs to the caller's workspaces via the shared Cloud.Scope policy
+  # helpers. Runs are tenant data, never platform content, so an empty
+  # accessible set yields no rows (fail closed); a nil set passes through
+  # unscoped for local single-user mode.
   defp scope_runs(query, workspace_ids) when is_list(workspace_ids) do
-    if workspace_ids == [] do
-      from(r in query, where: false)
-    else
-      from(r in query, where: r.workspace_id in ^workspace_ids)
-    end
+    ControlKeel.Cloud.Scope.scope_workspaces(query, workspace_ids)
   end
 
   # Local mode has no tenancy.
@@ -123,9 +120,10 @@ defmodule ControlKeel.Benchmark do
   def get_suite_by_slug(slug) when is_binary(slug) do
     ensure_builtin_suite(slug)
 
-    Suite
-    |> Repo.get_by(slug: slug)
-    |> Repo.preload(:scenarios)
+    case Suite |> where([suite], suite.slug == ^slug) |> limit(2) |> Repo.all() do
+      [suite] -> Repo.preload(suite, :scenarios)
+      _suites -> Repo.preload(platform_suite(slug), :scenarios)
+    end
   end
 
   def get_run(id) when is_binary(id) do
@@ -200,7 +198,9 @@ defmodule ControlKeel.Benchmark do
       Map.get(attrs, "baseline_subject") || Map.get(attrs, :baseline_subject) ||
         List.first(subject_ids)
 
-    with %Suite{} = suite <- get_suite_by_slug(suite_slug) || {:error, :suite_not_found} do
+    workspace_id = Map.get(attrs, :workspace_id) || Map.get(attrs, "workspace_id")
+
+    with %Suite{} = suite <- suite_for_run(suite_slug, workspace_id) do
       scenarios =
         suite.scenarios
         |> maybe_filter_scenarios(scenario_slugs)
@@ -209,7 +209,6 @@ defmodule ControlKeel.Benchmark do
 
       subjects = SubjectLoader.resolve(subject_ids, project_root)
       metadata = run_metadata(suite, subjects, project_root, domain_pack)
-      workspace_id = Map.get(attrs, :workspace_id) || Map.get(attrs, "workspace_id")
 
       with true <- scenarios != [] || {:error, :no_scenarios},
            {:ok, run} <-
@@ -227,9 +226,30 @@ defmodule ControlKeel.Benchmark do
         {:ok, updated_run}
       end
     else
-      {:error, :suite_not_found} -> {:error, :suite_not_found}
-      {:error, :no_scenarios} -> {:error, :no_scenarios}
+      # suite_for_run/2 returned nil: foreign or unknown suite — report the
+      # same error as an unknown slug so existence is not leaked.
+      nil -> {:error, :suite_not_found}
     end
+  end
+
+  # Run-path tenancy guard (benchmark tenancy, #259 follow-up): a caller
+  # stamped with a workspace may execute platform suites (NULL workspace_id —
+  # built-ins, which every tenant may run) or suites owned by their own
+  # workspace. Anything else reports :suite_not_found so a foreign suite
+  # cannot be executed or probed by slug. Callers without a workspace stamp
+  # (local CLI/API surfaces) keep the unscoped behavior; cloud API tenancy is
+  # tracked as a separate follow-up.
+  defp suite_for_run(slug, nil), do: get_suite_by_slug(slug)
+
+  defp suite_for_run(slug, workspace_id) do
+    suite = Repo.get_by(Suite, slug: slug, workspace_id: workspace_id) || platform_suite(slug)
+    Repo.preload(suite, :scenarios)
+  end
+
+  defp platform_suite(slug) do
+    Suite
+    |> where([suite], suite.slug == ^slug and is_nil(suite.workspace_id))
+    |> Repo.one()
   end
 
   def import_result(run_id, subject, attrs) when is_binary(subject) do
@@ -1079,7 +1099,7 @@ defmodule ControlKeel.Benchmark do
     with {:ok, payload} <- BuiltinSuites.load(slug) do
       expected_scenarios = payload["scenarios"] || []
 
-      case Repo.get_by(Suite, slug: slug) |> Repo.preload(:scenarios) do
+      case platform_suite(slug) |> Repo.preload(:scenarios) do
         %Suite{} = suite ->
           if builtin_suite_current?(suite, payload, expected_scenarios) do
             {:ok, suite}
@@ -1197,7 +1217,7 @@ defmodule ControlKeel.Benchmark do
     RepoRetry.transaction_with_busy_retry(
       fn ->
         suite =
-          Repo.get_by(Suite, slug: payload["slug"]) ||
+          platform_suite(payload["slug"]) ||
             %Suite{}
 
         {:ok, suite} =

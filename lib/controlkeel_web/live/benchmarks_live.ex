@@ -25,6 +25,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
   alias ControlKeel.Benchmark
   alias ControlKeel.Intent
   alias ControlKeel.Mission.Workspace
+  alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.WorkspaceAccess
   alias ControlKeelWeb.WorkspaceScope
 
@@ -771,7 +772,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
         <section class="rounded-2xl border bg-card p-5 shadow-card space-y-6 h-fit">
           <div class="grid grid-cols-2 gap-4 border-b border-border pb-5">
             <div>
-              <p class="text-xs font-medium text-muted-foreground">Suites</p>
+              <p class="text-xs font-medium text-muted-foreground">Built-in suites</p>
               <p class="mt-1 text-xl font-semibold text-foreground/90">{@summary.total_suites}</p>
             </div>
             <div>
@@ -898,9 +899,11 @@ defmodule ControlKeelWeb.BenchmarksLive do
       <%!-- Built-in suites catalog --%>
       <section class="rounded-2xl border bg-card p-5 shadow-card space-y-4">
         <div>
-          <.section_title>Built-in suites</.section_title>
+          <.section_title>Suites</.section_title>
           <p class="text-xs text-muted-foreground mt-1">
-            Built-ins are always present. External subjects appear when the current project has a
+            Built-in suites are platform content and always present. Suites generated in this
+            workspace (observability benchmark drafts) appear alongside them. External subjects
+            appear when the current project has a
             <code class="font-mono text-foreground/80">controlkeel/benchmark_subjects.json</code>
             file.
           </p>
@@ -915,8 +918,22 @@ defmodule ControlKeelWeb.BenchmarksLive do
               <div class="space-y-2">
                 <div class="flex items-center justify-between gap-3">
                   <.card_title>{suite.name}</.card_title>
-                  <span class="inline-flex rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary shrink-0">
-                    v{suite.version}
+                  <span class="inline-flex items-center gap-1.5 shrink-0">
+                    <span
+                      :if={is_nil(suite.workspace_id)}
+                      class="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+                    >
+                      Built-in
+                    </span>
+                    <span
+                      :if={not is_nil(suite.workspace_id)}
+                      class="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                    >
+                      Workspace
+                    </span>
+                    <span class="inline-flex rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                      v{suite.version}
+                    </span>
                   </span>
                 </div>
                 <p class="text-xs text-muted-foreground line-clamp-2">{suite.description}</p>
@@ -1062,8 +1079,9 @@ defmodule ControlKeelWeb.BenchmarksLive do
 
   # Run reads scope to the URL workspace: another workspace's run is not
   # found here even when the viewer could access it elsewhere, so a
-  # workspace page never renders foreign runs. An unscoped read only exists
-  # as a defensive fallback for a page without a resolved workspace.
+  # workspace page never renders foreign runs. A page without a resolved
+  # workspace fails closed in cloud mode (never an unscoped read); only
+  # local single-user mode keeps the unscoped fallback.
   defp fetch_run(id, socket) do
     case socket.assigns[:workspace] do
       %Workspace{} = workspace ->
@@ -1073,7 +1091,7 @@ defmodule ControlKeelWeb.BenchmarksLive do
         end
 
       _ ->
-        Benchmark.get_run(id)
+        if Mode.current() == :local, do: Benchmark.get_run(id)
     end
   end
 

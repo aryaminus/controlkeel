@@ -60,5 +60,7 @@ defmodule ControlKeel.Benchmark.Run do
     |> validate_number(:caught_count, greater_than_or_equal_to: 0)
     |> validate_number(:blocked_count, greater_than_or_equal_to: 0)
     |> assoc_constraint(:suite)
+    # Skipped when workspace_id is nil (platform content / local mode rows).
+    |> assoc_constraint(:workspace)
   end
 end
