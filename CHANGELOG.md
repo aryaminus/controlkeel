@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.4.43 — 2026-11-25
+
+### What's changed
+
+- Merge pull request #347 from aryaminus/fix/security-invitation-lifecycle
+- fix/security-invitation-lifecycle: enhance Fly proxy client IP handling and update related configurations
+- Merge branch 'main' of github.com:aryaminus/controlkeel into fix/security-invitation-lifecycle
+- fix/security-invitation-lifecycle: implement Fly proxy client IP handling and update related configurations
+- fix/security-invitation-lifecycle: implement trusted ingress IP configuration for client IP throttling
+- fix/security-invitation-lifecycle: remove outdated invitation lifecycle review and related documentation
+- fix/security-invitation-lifecycle: render rate-limited invitation state with expiry
+- fix/security-invitation-lifecycle: show invitation expiry on pending members
+- fix/security-invitation-lifecycle: include invitation expiry in payload
+- fix/security-invitation-lifecycle: refresh invitation expiry on re-invite
+- fix/security-invitation-lifecycle: throttle unauthenticated token oracles per client IP
+- fix/security-invitation-lifecycle: derive client IP for rate-limit buckets
+- fix/security-invitation-lifecycle: add format_date helper
+- fix/security-invitation-lifecycle: add PR #258 review and invitation lifecycle follow-up issues
+
 ## v0.4.42 — 2026-11-24
 
 ### What's changed
