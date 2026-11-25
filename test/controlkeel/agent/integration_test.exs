@@ -4,52 +4,71 @@ defmodule ControlKeel.Agent.IntegrationTest do
   alias ControlKeel.Agent.Integration
   alias ControlKeel.Skills.SkillTarget
 
-  test "catalog exposes shipped attach and runtime integrations" do
-    ids = Enum.map(Integration.catalog(), & &1.id)
+  test "catalog is exactly the supported host set" do
+    by_class =
+      Integration.catalog()
+      |> Enum.group_by(& &1.support_class, & &1.id)
+      |> Map.new(fn {class, ids} -> {class, Enum.sort(ids)} end)
 
-    assert "claude-code" in ids
-    assert "codex-cli" in ids
-    assert "vscode" in ids
-    assert "copilot" in ids
-    assert "cursor" in ids
-    assert "aider" in ids
-    assert "cline" in ids
-    assert "roo-code" in ids
-    assert "goose" in ids
-    assert "augment" in ids
-    assert "pi" in ids
-    assert "warp" in ids
-    assert "warp-oz" in ids
-    assert "devin" in ids
-    assert "virtual-bash" in ids
-    assert "codex" in ids
-    assert "gemini" in ids
-    assert "kiro-cli" in ids
-    assert "roo" in ids
-    assert "jcode" in ids
-    assert "antigravity-cli" in ids
-    assert "antigravity-ide" in ids
-    assert "clawdbot" in ids
-    assert "kilo" in ids
-    assert "nous-research" in ids
-    assert "trae" in ids
+    assert by_class["attach_client"] ==
+             Enum.sort(
+               ~w(claude-code codex-cli codex-app-server t3code vscode copilot cursor
+                          antigravity-cli antigravity-ide opencode windsurf cline kiro kilo amp
+                          goose droid pi warp augment continue letta-code roo-code devin-terminal)
+             )
 
-    refute "dmux" in ids
-    refute "paperclip" in ids
-    refute "vllm" in ids
-    refute "huggingface" in ids
+    assert by_class["headless_runtime"] == ["devin"]
+
+    assert by_class["alias"] ==
+             Enum.sort(
+               ~w(claude-dispatch cursor-agent codex copilot-cli gemini gemini-cli kiro-cli roo)
+             )
+
+    assert Map.keys(by_class) |> Enum.sort() == ["alias", "attach_client", "headless_runtime"]
   end
 
-  test "product catalog excludes aliases, unverified rows, and reference-only backends" do
+  test "aliases resolve to a shipped integration with a real target" do
+    targets = SkillTarget.ids()
+
+    for %{support_class: "alias"} = entry <- Integration.catalog() do
+      assert %{support_class: "attach_client"} = Integration.get(entry.alias_of),
+             "#{entry.id} aliases #{inspect(entry.alias_of)}"
+
+      assert entry.preferred_target in targets
+    end
+
+    assert Integration.get("gemini-cli").alias_of == "antigravity-cli"
+  end
+
+  test "attach names resolve aliases to their canonical attach client" do
+    assert Integration.resolve_attach_id("gemini-cli") == "antigravity-cli"
+    assert Integration.resolve_attach_id("gemini") == "antigravity-cli"
+    assert Integration.resolve_attach_id("codex") == "codex-cli"
+    assert Integration.resolve_attach_id("roo") == "roo-code"
+    assert Integration.resolve_attach_id("claude-code") == "claude-code"
+    assert Integration.resolve_attach_id("devin") == nil
+    assert Integration.resolve_attach_id("aider") == nil
+
+    assert {:ok, %{command: :attach, args: ["antigravity-cli"]}} =
+             ControlKeel.CLI.Parser.parse(["attach", "gemini-cli"])
+
+    assert {:ok, %{command: :detach, args: ["gemini-cli"]}} =
+             ControlKeel.CLI.Parser.parse(["detach", "gemini-cli"])
+
+    assert {:ok, %{command: :detach, args: ["aider"]}} =
+             ControlKeel.CLI.Parser.parse(["detach", "aider"])
+
+    assert {:error, _usage} = ControlKeel.CLI.Parser.parse(["attach", "aider"])
+  end
+
+  test "product catalog excludes aliases" do
     product = Integration.product_catalog()
     ids = Enum.map(product, & &1.id)
 
     assert Enum.all?(product, &(&1.support_class in ["attach_client", "headless_runtime"]))
     assert "claude-code" in ids
-    assert "virtual-bash" in ids
+    assert "devin" in ids
     refute "codex" in ids
-    refute "jcode" in ids
-    refute "vllm" in ids
   end
 
   test "labels and targets are available for native-first agents" do
@@ -58,20 +77,15 @@ defmodule ControlKeel.Agent.IntegrationTest do
     cline = Integration.get("cline")
     devin_terminal = Integration.get("devin-terminal")
     warp = Integration.get("warp")
-    warp_oz = Integration.get("warp-oz")
     roo = Integration.get("roo-code")
     goose = Integration.get("goose")
     pi = Integration.get("pi")
     windsurf = Integration.get("windsurf")
     continue = Integration.get("continue")
     cursor = Integration.get("cursor")
-    gemini = Integration.get("gemini-cli")
     kiro = Integration.get("kiro")
     amp = Integration.get("amp")
     augment = Integration.get("augment")
-    aider = Integration.get("aider")
-    conductor = Integration.get("conductor")
-    conductor_web = Integration.get("conductor-web")
 
     assert claude.label == "Claude Code"
     assert claude.support_class == "attach_client"
@@ -121,7 +135,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert codex.runtime_transport == "codex_sdk"
     assert codex.runtime_auth_owner == "agent"
     assert codex.auth_mode == "agent_runtime"
-    assert ".codex/skills" in codex.artifact_surfaces
+    assert ".agents/skills" in codex.artifact_surfaces
     assert ".codex/config.toml" in codex.artifact_surfaces
     assert ".codex/commands/controlkeel-review.md" in codex.artifact_surfaces
     refute codex.runtime_session_support["fork"]
@@ -143,7 +157,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert devin_terminal.review_experience == "native_review"
     assert ".devin/config.json" in devin_terminal.artifact_surfaces
     assert ".devin/hooks.v1.json" in devin_terminal.artifact_surfaces
-    assert ".devin/skills" in devin_terminal.artifact_surfaces
+    assert ".agents/skills" in devin_terminal.artifact_surfaces
     assert ".devin/agents" in devin_terminal.artifact_surfaces
 
     assert warp.label == "Warp"
@@ -153,19 +167,10 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert warp.auth_mode == "agent_runtime"
     assert warp.mcp_mode == "config_reference"
     assert warp.review_experience == "native_review"
-    assert ".warp/skills" in warp.artifact_surfaces
+    assert ".agents/skills" in warp.artifact_surfaces
     assert ".warp/controlkeel-mcp.json" in warp.artifact_surfaces
     assert ".warp/README.md" in warp.artifact_surfaces
     assert ".agents/skills" in warp.artifact_surfaces
-
-    assert warp_oz.label == "Warp Oz Cloud Agents"
-    assert warp_oz.support_class == "headless_runtime"
-    assert warp_oz.runtime_export_command == "controlkeel runtime export warp-oz"
-    assert warp_oz.preferred_target == "warp-oz-runtime"
-    assert warp_oz.auth_mode == "oauth_runtime"
-    assert warp_oz.mcp_mode == "export_only"
-    assert "warp-oz/controlkeel-agent-config.json" in warp_oz.artifact_surfaces
-    assert "warp-oz/controlkeel-api-request.json" in warp_oz.artifact_surfaces
 
     assert cline.label == "Cline"
     assert cline.support_class == "attach_client"
@@ -215,7 +220,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     opencode = Integration.get("opencode")
     assert opencode.support_class == "attach_client"
     assert opencode.preferred_target == "opencode-native"
-    assert ".opencode/skills" in opencode.artifact_surfaces
+    assert ".agents/skills" in opencode.artifact_surfaces
     assert ".agents/skills" in opencode.artifact_surfaces
     assert ".opencode/plugins/controlkeel-governance.ts" in opencode.artifact_surfaces
 
@@ -224,9 +229,9 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert letta.preferred_target == "letta-code-native"
     assert letta.skills_mode == "native"
     assert letta.mcp_mode == "native"
-    assert letta.review_experience == "native_review"
+    assert letta.review_experience == "browser_review"
     assert "hooks" in letta.agent_uses_ck_via
-    assert ".letta/settings.json" in letta.artifact_surfaces
+    refute ".letta/settings.json" in letta.artifact_surfaces
     assert ".letta/controlkeel-mcp.sh" in letta.artifact_surfaces
     assert ".agents/skills" in letta.artifact_surfaces
 
@@ -237,23 +242,20 @@ defmodule ControlKeel.Agent.IntegrationTest do
 
     assert cursor.submission_mode == "command"
     assert ".cursor/background-agents" in cursor.artifact_surfaces
-    assert ".cursor/skills" in cursor.artifact_surfaces
+    assert ".agents/skills" in cursor.artifact_surfaces
     assert ".cursor/agents" in cursor.artifact_surfaces
     assert "hooks" in cursor.agent_uses_ck_via
     assert "plugin" in cursor.agent_uses_ck_via
 
-    assert gemini.phase_model == "review_only"
-    assert ".gemini/commands/controlkeel" in gemini.artifact_surfaces
-
-    assert kiro.review_experience == "native_review"
-    assert ".kiro/settings" in kiro.artifact_surfaces
+    assert kiro.review_experience == "browser_review"
+    refute ".kiro/hooks" in kiro.artifact_surfaces
 
     kilo = Integration.get("kilo")
     assert kilo.support_class == "attach_client"
     assert kilo.preferred_target == "kilo-native"
     assert kilo.auth_mode == "ck_owned"
     assert kilo.skills_mode == "native"
-    assert ".kilo/skills" in kilo.artifact_surfaces
+    assert ".agents/skills" in kilo.artifact_surfaces
     assert ".kilo/commands" in kilo.artifact_surfaces
     assert ".kilo/kilo.json" in kilo.artifact_surfaces
     assert Enum.any?(kilo.direct_install_methods, &(&1["command"] == "controlkeel attach kilo"))
@@ -277,81 +279,30 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert augment.label == "Augment / Auggie CLI"
     assert augment.preferred_target == "augment-native"
     assert augment.install_experience == "first_class"
-    assert augment.review_experience == "native_review"
-    assert augment.submission_mode == "hook"
+    assert augment.review_experience == "browser_review"
+    assert augment.submission_mode == "tool_call"
     assert augment.phase_model == "host_plan_mode"
     assert augment.auth_mode == "agent_runtime"
     assert augment.runtime_transport == "auggie_sdk_acp"
     assert augment.runtime_auth_owner == "agent"
-    assert augment.runtime_review_transport == "plugin_hook_acp"
     assert augment.runtime_session_support["create"]
     assert augment.runtime_session_support["resume"]
     refute augment.runtime_session_support["fork"]
     assert ".augment/commands/controlkeel-review.md" in augment.artifact_surfaces
-    assert ".augment-plugin/plugin.json" in augment.artifact_surfaces
-    assert "hooks/hooks.json" in augment.artifact_surfaces
-    assert "hooks" in augment.agent_uses_ck_via
-    assert "plugin" in augment.agent_uses_ck_via
 
     assert Enum.any?(
              augment.direct_install_methods,
              &(&1["command"] == "npm install -g @augmentcode/auggie")
            )
 
-    assert Enum.any?(
-             augment.direct_install_methods,
-             &(&1["command"] == "auggie --plugin-dir ./controlkeel/dist/augment-plugin")
-           )
-
-    assert Enum.any?(
-             augment.package_outputs,
-             &(&1["artifact"] == "controlkeel-augment-plugin.tar.gz")
-           )
-
-    assert aider.phase_model == "review_only"
-    assert aider.submission_mode == "command"
-    assert "AIDER.md" in aider.artifact_surfaces
-
     droid = Integration.get("droid")
     assert droid.preferred_target == "droid-bundle"
-    assert "droid-plugin" in droid.export_targets
     assert "native_skills" in droid.agent_uses_ck_via
     assert "commands" in droid.agent_uses_ck_via
-    assert "plugin" in droid.agent_uses_ck_via
-    assert ".factory/skills" in droid.artifact_surfaces
+    assert ".agents/skills" in droid.artifact_surfaces
     assert ".factory/droids" in droid.artifact_surfaces
     assert ".factory/commands" in droid.artifact_surfaces
-    assert ".factory-plugin/plugin.json" in droid.artifact_surfaces
     assert "mcp.json" in droid.artifact_surfaces
-
-    assert conductor.support_class == "framework_adapter"
-    assert conductor.preferred_target == "claude-standalone"
-    assert conductor.mcp_mode == "native"
-    assert conductor.skills_mode == "native"
-    assert conductor.agent_uses_ck_via == ["local_mcp", "native_skills", "commands"]
-    assert ".mcp.json" in conductor.artifact_surfaces
-    assert "CLAUDE.md" in conductor.artifact_surfaces
-    assert ".claude/commands" in conductor.artifact_surfaces
-    assert conductor.execution_support == "inbound_only"
-    assert conductor.ck_runs_agent_via == "none"
-
-    assert conductor.provider_bridge == %{
-             supported: true,
-             provider: "anthropic",
-             mode: "env_bridge",
-             owner: "agent"
-           }
-
-    assert conductor_web.support_class == "alias"
-    assert conductor_web.alias_of == "conductor"
-    assert conductor_web.preferred_target == "claude-standalone"
-
-    openclaw = Integration.get("openclaw")
-
-    assert Enum.any?(
-             openclaw.direct_install_methods,
-             &(&1["command"] == "controlkeel plugin install openclaw")
-           )
 
     codex_alias = Integration.get("codex")
     t3code = Integration.get("t3code")
@@ -374,60 +325,21 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert t3code.runtime_transport == "t3code_provider_runtime"
     assert t3code.runtime_review_transport == "orchestration_domain_event"
     assert t3code.runtime_session_support["fork"]
-    assert ".codex/skills" in t3code.artifact_surfaces
+    assert ".agents/skills" in t3code.artifact_surfaces
     assert t3code.runtime_capabilities[:policy_gate] == true
     assert t3code.runtime_capabilities[:tool_approval] == true
     assert t3code.runtime_capabilities[:deterministic_event_ids] == true
     assert t3code.runtime_capabilities[:replay_safe_delivery] == true
 
     assert gemini_alias.support_class == "alias"
-    assert gemini_alias.alias_of == "gemini-cli"
-    assert gemini_alias.preferred_target == "gemini-cli-native"
+    assert gemini_alias.alias_of == "antigravity-cli"
+    assert gemini_alias.preferred_target == "antigravity-cli-native"
 
     assert kiro_cli_alias.support_class == "alias"
     assert kiro_cli_alias.alias_of == "kiro"
 
     assert roo_alias.support_class == "alias"
     assert roo_alias.alias_of == "roo-code"
-  end
-
-  test "skills-compatible agent names stay honest about support tier" do
-    jcode = Integration.get("jcode")
-    clawdbot = Integration.get("clawdbot")
-    nous = Integration.get("nous-research")
-    trae = Integration.get("trae")
-
-    assert jcode.support_class == "unverified"
-    assert jcode.preferred_target == "instructions-only"
-    assert jcode.export_targets == ["instructions-only"]
-    assert jcode.agent_uses_ck_via == ["local_mcp"]
-    assert jcode.mcp_mode == "native"
-    assert jcode.skills_mode == "instructions_only"
-    assert "AGENTS.md" in jcode.artifact_surfaces
-    assert ".jcode/mcp.json" in jcode.artifact_surfaces
-    assert ".jcode/prompt-overlay.md" in jcode.artifact_surfaces
-    assert jcode.required_mcp_tools == []
-
-    assert Enum.any?(
-             jcode.direct_install_methods,
-             &(&1["command"] =~
-                 "raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh")
-           )
-
-    for integration <- [clawdbot, nous, trae] do
-      assert integration.support_class == "unverified"
-      assert integration.preferred_target == "open-standard"
-      assert integration.export_targets == ["open-standard"]
-      assert integration.agent_uses_ck_via == ["native_skills"]
-      assert integration.skills_mode == "native"
-      assert integration.required_mcp_tools == []
-
-      assert Enum.any?(
-               integration.direct_install_methods,
-               &(&1["command"] ==
-                   "npx skills add https://github.com/aryaminus/controlkeel --skill controlkeel-governance")
-             )
-    end
   end
 
   test "every integration references valid targets and install channels" do
@@ -462,7 +374,6 @@ defmodule ControlKeel.Agent.IntegrationTest do
       assert integration.feedback_mode in ["tool_call", "file_patch", "command_reply", "manual"]
       assert integration.confidence_level in ["shipped", "experimental", "research"]
       assert integration.phase_model in ["host_plan_mode", "file_plan_mode", "review_only"]
-      assert integration.browser_embed in ["external", "vscode_webview", "none"]
       assert integration.subagent_visibility in ["primary_only", "all", "none"]
       assert is_binary(integration.runtime_transport) or is_nil(integration.runtime_transport)
       assert is_binary(integration.runtime_auth_owner) or is_nil(integration.runtime_auth_owner)
@@ -557,9 +468,6 @@ defmodule ControlKeel.Agent.IntegrationTest do
     devin = Integration.get("devin")
     devin_terminal = Integration.get("devin-terminal")
     warp = Integration.get("warp")
-    warp_oz = Integration.get("warp-oz")
-    executor = Integration.get("executor")
-    virtual_bash = Integration.get("virtual-bash")
     codex_app = Integration.get("codex-app-server")
     vscode = Integration.get("vscode")
     opencode = Integration.get("opencode")
@@ -574,15 +482,6 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert warp.support_class == "attach_client"
     assert warp.attach_command == "controlkeel attach warp"
     assert warp.preferred_target == "warp-native"
-    assert warp_oz.support_class == "headless_runtime"
-    assert warp_oz.runtime_export_command == "controlkeel runtime export warp-oz"
-    assert warp_oz.preferred_target == "warp-oz-runtime"
-    assert executor.support_class == "headless_runtime"
-    assert executor.runtime_export_command == "controlkeel runtime export executor"
-    assert executor.preferred_target == "executor-runtime"
-    assert virtual_bash.support_class == "headless_runtime"
-    assert virtual_bash.runtime_export_command == "controlkeel runtime export virtual-bash"
-    assert virtual_bash.preferred_target == "virtual-bash-runtime"
     assert Integration.get("letta-code").execution_support == "direct"
 
     assert codex_app.support_class == "attach_client"
@@ -600,11 +499,7 @@ defmodule ControlKeel.Agent.IntegrationTest do
     assert t3code.runtime_capabilities[:policy_gate] == true
     assert t3code.runtime_capabilities[:tool_approval] == true
 
-    assert "vscode-companion" in vscode.export_targets
     assert vscode.phase_model == "review_only"
-    assert vscode.runtime_transport == "vscode_companion"
-    assert vscode.runtime_auth_owner == "workspace"
-    assert vscode.runtime_review_transport == "vscode_ipc"
     assert vscode.auth_mode == "ck_owned"
     assert opencode.auth_mode == "agent_runtime"
     assert opencode.runtime_transport == "opencode_sdk"
@@ -633,7 +528,6 @@ defmodule ControlKeel.Agent.IntegrationTest do
     end
 
     test "returns nil for hosts without a canonical one-liner" do
-      assert Integration.mcp_install_command("aider") == nil
       assert Integration.mcp_install_command("not-a-host") == nil
     end
   end

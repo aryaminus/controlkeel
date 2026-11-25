@@ -76,11 +76,14 @@ defmodule ControlKeel.Project.Binding do
         {:error, :enoent} -> ""
       end
 
+    ignored_dirs = anchored_ignored_dirs(existing)
+
     entries =
       (@gitignore_entries ++
          existing_block_entries(existing) ++
          normalize_gitignore_entries(extra_entries))
       |> Enum.uniq()
+      |> Enum.reject(&covered_by_parent?(&1, ignored_dirs))
 
     updated = upsert_gitignore_block(existing, build_gitignore_block(entries))
 
@@ -99,6 +102,27 @@ defmodule ControlKeel.Project.Binding do
     else
       _ -> []
     end
+  end
+
+  # Anchored directory rules (e.g. `/.claude/`) anywhere in the file. An
+  # entry beneath one of them is already ignored and would only add noise.
+  # Git keeps leading spaces as part of a pattern, so only trailing
+  # whitespace is trimmed. A directory that any `!` rule mentions is not
+  # trusted, because the negation may re-include it or its children.
+  defp anchored_ignored_dirs(existing) do
+    lines = existing |> String.split("\n") |> Enum.map(&String.trim_trailing/1)
+    negations = Enum.filter(lines, &String.starts_with?(&1, "!"))
+
+    lines
+    |> Enum.filter(&(String.starts_with?(&1, "/") and String.ends_with?(&1, "/")))
+    |> Enum.reject(fn dir ->
+      name = String.trim_leading(dir, "/")
+      Enum.any?(negations, &String.contains?(&1, name))
+    end)
+  end
+
+  defp covered_by_parent?(entry, ignored_dirs) do
+    Enum.any?(ignored_dirs, &(&1 != entry and String.starts_with?(entry, &1)))
   end
 
   defp normalize_gitignore_entries(entries) when is_list(entries) do

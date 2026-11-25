@@ -300,9 +300,10 @@ defmodule ControlKeel.Accounts do
   ## Authorization
 
   When `invited_by_user_id` is supplied, the inviter's role is checked: only
-  owners may grant `owner` or `admin`. A `nil` inviter is the trusted operator
-  path (e.g. the CLI `org invite` command) and is unrestricted. Returns
-  `{:error, :unauthorized}` when a named inviter lacks the required role.
+  owners may grant `owner`; admins may grant `admin`, `member`, or `viewer`. A
+  `nil` inviter is the trusted operator path (e.g. the CLI `org invite`
+  command) and is unrestricted. Returns `{:error, :unauthorized}` when a named
+  inviter lacks the required role.
   """
   @spec invite_member(integer(), integer(), keyword()) ::
           {:ok, Membership.t(), String.t()}
@@ -363,14 +364,16 @@ defmodule ControlKeel.Accounts do
     end
   end
 
-  # Invite role authorization. When an inviter is named
-  # (`invited_by_user_id`), enforce the same privilege boundary as role changes:
-  # only owners may grant owner/admin. A `nil` inviter is the trusted operator
-  # path (e.g. the CLI `org invite` command, which has no membership) and is
-  # left unrestricted.
-  defp authorize_invite_role(nil, _org_id, _role), do: :ok
+  @doc """
+  Authorize an invitation role before creating or finding the invitee account.
 
-  defp authorize_invite_role(invited_by_user_id, org_id, role) do
+  `invite_member/3` repeats this check at the membership write boundary.
+  """
+  @spec authorize_invite_role(integer() | nil, integer(), String.t()) ::
+          :ok | {:error, :unauthorized}
+  def authorize_invite_role(nil, _org_id, _role), do: :ok
+
+  def authorize_invite_role(invited_by_user_id, org_id, role) do
     inviter = get_active_membership(invited_by_user_id, org_id)
 
     cond do
@@ -379,6 +382,9 @@ defmodule ControlKeel.Accounts do
 
       inviter.role == "owner" ->
         :ok
+
+      not role_at_least?(inviter.role, "admin") ->
+        {:error, :unauthorized}
 
       role in ["owner", "admin"] ->
         {:error, :unauthorized}
@@ -748,7 +754,7 @@ defmodule ControlKeel.Accounts do
   @doc """
   Broadcast a membership-revoked event for a membership that was removed
   outright — e.g. by `DataLifecycle.delete_user/1` erasing its user, or
-  `delete_org/1` erasing its org — where no persisted row survives to
+  `delete_org/2` erasing its org — where no persisted row survives to
   broadcast. Subscribers in `ControlKeelWeb.LiveAuth` treat it exactly like a
   revocation: the affected member's page navigates away and re-runs its
   access check.
@@ -1468,15 +1474,20 @@ defmodule ControlKeel.Accounts do
   @doc """
   Authorize a cloud execution request for a workspace.
 
-  When the workspace belongs to an org, the caller must present a user_id with
-  an active membership at or above `required_role` (default `"member"`). Solo
-  workspaces (no org) are always authorized — the local-first trust anchor
-  applies.
+  In cloud and self-hosted modes, an org-bound workspace requires a user_id
+  with an active membership at or above `required_role` (default `"member"`),
+  and workspaces without an organization cannot authorize cloud execution.
+
+  Local mode is single-user: the operator running the local binary is the
+  trust anchor, so a request that claims no user identity is authorized for
+  any workspace in the local database unless its org is suspended. A request
+  that does claim a `user_id` is still verified against memberships.
 
   Returns `{:ok, :authorized}` or `{:error, reason}`.
   """
   @spec authorize_cloud_execution(integer(), keyword()) ::
-          {:ok, :authorized} | {:error, :not_found | :unauthorized | :org_suspended}
+          {:ok, :authorized}
+          | {:error, :not_found | :unauthorized | :org_suspended | :unbound_workspace}
   def authorize_cloud_execution(workspace_id, opts \\ []) when is_integer(workspace_id) do
     required_role = Keyword.get(opts, :required_role, "member")
     user_id = Keyword.get(opts, :user_id)
@@ -1485,10 +1496,29 @@ defmodule ControlKeel.Accounts do
       nil ->
         {:error, :not_found}
 
-      # NOTE: an org-less workspace currently authorizes unconditionally here, which
-      # is a real gap (no owner can vouch for it, and even the caller's identity
-      # is unchecked). Tracked separately for a focused fix with fixture
-      # migration; see the cloud execution authz follow-up.
+      %Workspace{} = workspace when is_nil(user_id) ->
+        if ControlKeel.Runtime.Mode.current() == :local do
+          authorize_local_operator(workspace)
+        else
+          authorize_remote_execution(workspace, user_id, required_role)
+        end
+
+      %Workspace{} = workspace ->
+        authorize_remote_execution(workspace, user_id, required_role)
+    end
+  end
+
+  defp authorize_local_operator(%Workspace{org_id: nil}), do: {:ok, :authorized}
+
+  defp authorize_local_operator(%Workspace{org_id: org_id}) do
+    case Repo.get(Org, org_id) do
+      %Org{status: "active"} -> {:ok, :authorized}
+      _ -> {:error, :org_suspended}
+    end
+  end
+
+  defp authorize_remote_execution(workspace, user_id, required_role) do
+    case workspace do
       %Workspace{org_id: nil} ->
         # Fail closed. A workspace with no org has no tenant to authorize
         # against, so treating it as authorized let any caller (or no caller)
@@ -1509,7 +1539,9 @@ defmodule ControlKeel.Accounts do
           true ->
             case get_active_membership(user_id, org_id) do
               %Membership{role: role} when is_binary(role) ->
-                if role_at_least?(role, required_role) do
+                # An active membership is not enough: an offboarded (disabled)
+                # user must not authorize cloud execution either.
+                if role_at_least?(role, required_role) and user_active?(get_user(user_id)) do
                   {:ok, :authorized}
                 else
                   {:error, :unauthorized}

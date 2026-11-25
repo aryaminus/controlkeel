@@ -25,7 +25,7 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   | Free-text identity in audit rows (`actor_identifier`, `actor`, `actor_role`) | **Anonymize** | FK nulling does not touch these; an email here is PII that would outlive the account forever. |
   | Audit `note` / `reason` free text | **Retain** | Cannot be reliably scrubbed without destroying the record's meaning; retained under legitimate interest. Flagged as a known limitation. |
   | Sessions, findings, proofs, memory, benchmarks for the org | **Retain on user delete** | Tenant-owned governance record. Purged only when the **org** is deleted. |
-  | Organization row and everything under it | **Purge** on `delete_org/1` | The tenant asked to be removed; the whole tree goes. |
+  | Organization row and everything under it | **Purge** on `delete_org/2` | The tenant asked to be removed; the whole tree goes. |
 
   ## Pseudonymization
 
@@ -109,7 +109,10 @@ defmodule ControlKeel.Accounts.DataLifecycle do
 
   Refuses when the user is the **last active owner** of any org: deleting them
   would orphan that org with no one able to administer it. The caller must
-  promote another owner or delete the org first.
+  promote another owner or delete the org first. The refusal is enforced both
+  before the transaction (fast path, no write) and again inside it
+  (`enforce_sole_owner!/1`), so the invariant cannot be raced past by a
+  concurrent membership change.
   """
   @spec delete_user(integer()) :: {:ok, map()} | {:error, :sole_owner | :not_found | term()}
   def delete_user(user_id) when is_integer(user_id) do
@@ -119,7 +122,7 @@ defmodule ControlKeel.Accounts.DataLifecycle do
 
       user ->
         with :ok <- refuse_if_sole_owner(user) do
-          stats = Repo.transaction(fn -> erase_user(user) end)
+          stats = erase_transaction(fn -> erase_user(user) end)
 
           case stats do
             {:ok, result} ->
@@ -140,6 +143,11 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   end
 
   defp erase_user(user) do
+    # Checked against the same snapshot that performs the deletion: the
+    # pre-check in delete_user/1 is a separate read, so two owners erasing at
+    # once must not both pass it and leave an org with no active owner.
+    enforce_sole_owner!(user)
+
     anonymize = anonymized_identifier(user)
 
     audit =
@@ -189,10 +197,8 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   end
 
   defp sole_owner_org_ids(user_id) do
-    Membership
-    |> where([m], m.user_id == ^user_id and m.role == "owner" and m.status == "active")
-    |> select([m], m.org_id)
-    |> Repo.all()
+    user_id
+    |> owner_org_ids()
     |> Enum.filter(fn org_id ->
       Repo.aggregate(
         from(m in Membership,
@@ -203,8 +209,42 @@ defmodule ControlKeel.Accounts.DataLifecycle do
     end)
   end
 
+  # Orgs where `user_id` currently holds an active owner membership, in
+  # membership-id order (a stable lock order for the check below).
+  defp owner_org_ids(user_id) do
+    Membership
+    |> where([m], m.user_id == ^user_id and m.role == "owner" and m.status == "active")
+    |> order_by([m], asc: m.id)
+    |> select([m], m.org_id)
+    |> Repo.all()
+  end
+
   defp refuse_if_sole_owner(user) do
     if sole_owner_org_ids(user.id) == [], do: :ok, else: {:error, :sole_owner}
+  end
+
+  # Sole-owner invariant enforced *inside* the erase transaction, against the
+  # same snapshot that deletes the memberships. Every active owner row of the
+  # affected orgs is locked (Postgres) so a concurrent demotion, revocation,
+  # or erase of another owner cannot slip in between this read and the
+  # deletion; on SQLite the IMMEDIATE transaction takes the write lock first.
+  # Owners are read in id order so concurrent erases lock them the same way.
+  defp enforce_sole_owner!(user) do
+    user.id
+    |> owner_org_ids()
+    |> Enum.each(fn org_id ->
+      owners =
+        Membership
+        |> where([m], m.org_id == ^org_id and m.role == "owner" and m.status == "active")
+        |> order_by([m], asc: m.id)
+        |> lock_for_erase()
+        |> Repo.all()
+
+      # `owners` includes `user`: alone means erasing them orphans the org.
+      if length(owners) <= 1, do: Repo.rollback(:sole_owner)
+    end)
+
+    :ok
   end
 
   # ── Anonymization ────────────────────────────────────────────────────────
@@ -324,7 +364,7 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   end
 
   @doc """
-  Erase an organization and everything beneath it.
+  Erase an organization and everything beneath it, on behalf of `actor_id`.
 
   Cascade is handled by the schema's `on_delete: :delete_all` foreign keys
   (workspaces → sessions → findings/proofs/memory). Audit rows that survive
@@ -341,19 +381,33 @@ defmodule ControlKeel.Accounts.DataLifecycle do
   decision: it lands in workspace-scoped tables (sessions, findings,
   observability events), which the workspace delete purges via cascade.
 
+  ## Authorization is enforced at the erase boundary
+
+  `actor_id` must hold an **active owner** membership for this org at erase
+  time, and the check runs *inside* the erase transaction rather than before
+  it. A caller's own check is a separate read, so a demotion or revocation
+  committed between that read and this call must not be able to destroy a
+  tenant — and with no actor in the signature the domain function enforced
+  nothing at all. `authorize_org_owner!/2` locks the membership row on
+  Postgres and the transaction opens IMMEDIATE on SQLite, so the
+  authorization read cannot interleave with a membership change.
+
   After the transaction commits, every active member's connected LiveViews
   receive a membership-revoked broadcast (`ControlKeelWeb.LiveAuth` eviction
   hook), so no open page keeps serving a deleted tenant.
   """
-  @spec delete_org(integer()) :: {:ok, map()} | {:error, :not_found | term()}
-  def delete_org(org_id) when is_integer(org_id) do
+  @spec delete_org(integer(), integer()) ::
+          {:ok, map()} | {:error, :not_found | :unauthorized | term()}
+  def delete_org(org_id, actor_id) when is_integer(org_id) and is_integer(actor_id) do
     case Repo.get(Org, org_id) do
       nil ->
         {:error, :not_found}
 
       org ->
         stats =
-          Repo.transaction(fn ->
+          erase_transaction(fn ->
+            authorize_org_owner!(org, actor_id)
+
             ws_ids = workspace_ids(org.id)
 
             # Captured before the deletes so the post-commit eviction can
@@ -419,6 +473,61 @@ defmodule ControlKeel.Accounts.DataLifecycle do
             {:error, reason}
         end
     end
+  end
+
+  # Authorization at the erase boundary, inside the transaction that destroys
+  # the tenant. Re-reads the org (a concurrent suspension is a kill switch and
+  # must refuse the write too) and the actor's active membership.
+  defp authorize_org_owner!(%Org{id: org_id}, actor_id) do
+    case Repo.get(Org, org_id) do
+      nil ->
+        Repo.rollback(:not_found)
+
+      %Org{status: status} when status != "active" ->
+        Repo.rollback(:unauthorized)
+
+      %Org{} ->
+        membership =
+          Membership
+          |> where([m], m.org_id == ^org_id and m.user_id == ^actor_id and m.status == "active")
+          |> lock_for_erase()
+          |> Repo.one()
+
+        case membership do
+          %Membership{role: "owner"} -> :ok
+          _ -> Repo.rollback(:unauthorized)
+        end
+    end
+  end
+
+  # Serialization differs by adapter, and neither primitive works on both:
+  #   * Postgres: lock the membership row `FOR UPDATE`, so a concurrent
+  #     role/status change blocks until this transaction resolves and the
+  #     locked read then sees the committed state.
+  #   * SQLite: there are no row locks (`lock:` raises there), so the
+  #     transaction is opened IMMEDIATE instead — the database write lock is
+  #     taken before this read, so any concurrent writer waits for the erase.
+  # `mode: :immediate` is SQLite-only (Postgrex has no such transaction mode),
+  # hence the adapter branch in both helpers.
+  defp lock_for_erase(query) do
+    case Repo.__adapter__() do
+      Ecto.Adapters.Postgres -> lock(query, "FOR UPDATE")
+      _ -> query
+    end
+  end
+
+  defp erase_transaction_opts do
+    case Repo.__adapter__() do
+      Ecto.Adapters.SQLite3 -> [mode: :immediate]
+      _ -> []
+    end
+  end
+
+  # Every destructive erase runs through this so the transaction opens with
+  # the adapter's serialization mode: the authorization read inside it then
+  # cannot interleave with a concurrent membership change.
+  defp erase_transaction(fun) do
+    Repo.transaction(fun, erase_transaction_opts())
   end
 
   defp workspace_ids(org_id) do

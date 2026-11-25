@@ -834,25 +834,6 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert release_output =~ "Release readiness: blocked"
   end
 
-  test "runtime export emits the Open SWE headless bundle", %{tmp_dir: tmp_dir} do
-    assert {:ok, export} = CLI.parse(["runtime", "export", "open-swe", "--project-root", tmp_dir])
-
-    output =
-      capture_io(fn ->
-        assert 0 == CLI.execute(export, project_root: tmp_dir)
-      end)
-
-    resolved_root = Root.resolve(tmp_dir)
-
-    assert output =~ "Prepared Open SWE runtime export."
-    assert output =~ "Project root: #{resolved_root}"
-    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/open-swe-runtime/AGENTS.md"))
-
-    assert File.exists?(
-             Path.join(tmp_dir, "controlkeel/dist/open-swe-runtime/open-swe/README.md")
-           )
-  end
-
   test "runtime export emits the Devin headless bundle", %{tmp_dir: tmp_dir} do
     assert {:ok, export} = CLI.parse(["runtime", "export", "devin", "--project-root", tmp_dir])
 
@@ -870,115 +851,6 @@ defmodule ControlKeel.CLIRuntimeTest do
 
     assert File.exists?(
              Path.join(tmp_dir, "controlkeel/dist/devin-runtime/devin/controlkeel-mcp.json")
-           )
-  end
-
-  test "runtime export emits the Executor headless bundle", %{tmp_dir: tmp_dir} do
-    assert {:ok, export} = CLI.parse(["runtime", "export", "executor", "--project-root", tmp_dir])
-
-    output =
-      capture_io(fn ->
-        assert 0 == CLI.execute(export, project_root: tmp_dir)
-      end)
-
-    resolved_root = Root.resolve(tmp_dir)
-
-    assert output =~ "Prepared Executor runtime export."
-    assert output =~ "Project root: #{resolved_root}"
-    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/executor-runtime/AGENTS.md"))
-
-    assert File.exists?(
-             Path.join(tmp_dir, "controlkeel/dist/executor-runtime/executor/README.md")
-           )
-
-    assert File.exists?(
-             Path.join(
-               tmp_dir,
-               "controlkeel/dist/executor-runtime/executor/controlkeel-sources.example.ts"
-             )
-           )
-  end
-
-  test "runtime export emits the Warp Oz headless bundle", %{tmp_dir: tmp_dir} do
-    assert {:ok, export} = CLI.parse(["runtime", "export", "warp-oz", "--project-root", tmp_dir])
-
-    output =
-      capture_io(fn ->
-        assert 0 == CLI.execute(export, project_root: tmp_dir)
-      end)
-
-    resolved_root = Root.resolve(tmp_dir)
-
-    assert output =~ "Prepared Warp Oz runtime export."
-    assert output =~ "Project root: #{resolved_root}"
-    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/warp-oz-runtime/AGENTS.md"))
-    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/warp-oz-runtime/warp-oz/README.md"))
-
-    assert File.exists?(
-             Path.join(
-               tmp_dir,
-               "controlkeel/dist/warp-oz-runtime/warp-oz/controlkeel-agent-config.json"
-             )
-           )
-  end
-
-  test "runtime export emits the Cloudflare Workers headless bundle", %{tmp_dir: tmp_dir} do
-    assert {:ok, export} =
-             CLI.parse(["runtime", "export", "cloudflare-workers", "--project-root", tmp_dir])
-
-    output =
-      capture_io(fn ->
-        assert 0 == CLI.execute(export, project_root: tmp_dir)
-      end)
-
-    resolved_root = Root.resolve(tmp_dir)
-
-    assert output =~ "Prepared Cloudflare Workers runtime export."
-    assert output =~ "Project root: #{resolved_root}"
-
-    assert File.exists?(
-             Path.join(tmp_dir, "controlkeel/dist/cloudflare-workers-runtime/AGENTS.md")
-           )
-
-    assert File.exists?(
-             Path.join(
-               tmp_dir,
-               "controlkeel/dist/cloudflare-workers-runtime/cloudflare-workers/README.md"
-             )
-           )
-
-    assert File.exists?(
-             Path.join(
-               tmp_dir,
-               "controlkeel/dist/cloudflare-workers-runtime/cloudflare-workers/wrangler.toml"
-             )
-           )
-  end
-
-  test "runtime export emits the virtual bash headless bundle", %{tmp_dir: tmp_dir} do
-    assert {:ok, export} =
-             CLI.parse(["runtime", "export", "virtual-bash", "--project-root", tmp_dir])
-
-    output =
-      capture_io(fn ->
-        assert 0 == CLI.execute(export, project_root: tmp_dir)
-      end)
-
-    resolved_root = Root.resolve(tmp_dir)
-
-    assert output =~ "Prepared virtual bash runtime export."
-    assert output =~ "Project root: #{resolved_root}"
-    assert File.exists?(Path.join(tmp_dir, "controlkeel/dist/virtual-bash-runtime/AGENTS.md"))
-
-    assert File.exists?(
-             Path.join(tmp_dir, "controlkeel/dist/virtual-bash-runtime/virtual-bash/README.md")
-           )
-
-    assert File.exists?(
-             Path.join(
-               tmp_dir,
-               "controlkeel/dist/virtual-bash-runtime/virtual-bash/controlkeel-runtime.json"
-             )
            )
   end
 
@@ -1092,10 +964,10 @@ defmodule ControlKeel.CLIRuntimeTest do
     File.mkdir_p!(Path.join(tmp_dir, "controlkeel/dist/codex"))
     File.write!(Path.join(tmp_dir, "controlkeel/dist/codex/stale.txt"), "stale")
 
-    File.mkdir_p!(Path.join(tmp_dir, "home/.claude/skills/cloudflare-agent"))
+    File.mkdir_p!(Path.join(tmp_dir, "home/.claude/skills/agent-integration"))
 
     File.write!(
-      Path.join(tmp_dir, "home/.claude/skills/cloudflare-agent/SKILL.md"),
+      Path.join(tmp_dir, "home/.claude/skills/agent-integration/SKILL.md"),
       "stale\n"
     )
 
@@ -1112,7 +984,7 @@ defmodule ControlKeel.CLIRuntimeTest do
     assert File.exists?(
              Path.join(
                tmp_dir,
-               "home/.claude/skills/cloudflare-agent/references/cloudflare-integration.md"
+               "home/.claude/skills/agent-integration/references/target-matrix.md"
              )
            )
 

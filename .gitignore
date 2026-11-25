@@ -167,16 +167,6 @@ docs/governance-failure-*.md
 # ControlKeel managed (do not edit) - artifacts that must not be committed
 /controlkeel/
 /.controlkeel/
-/.agents/skills/
 /.opencode/
-/.opencode/commands/
-/.opencode/skills/
-/.opencode/agents/
-/.opencode/plugins/
-/.gemini/commands/
 /skills/
-/.devin/agents/
-/.devin/config.json
-/.devin/hooks/
-/.devin/skills/
 # End ControlKeel managed

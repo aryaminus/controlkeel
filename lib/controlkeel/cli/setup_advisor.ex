@@ -19,11 +19,9 @@ defmodule ControlKeel.CLI.SetupAdvisor do
     "amp",
     "continue",
     "goose",
-    "gemini-cli",
     "kiro",
     "pi",
     "roo-code",
-    "aider",
     "copilot",
     "vscode"
   ]
@@ -182,10 +180,6 @@ defmodule ControlKeel.CLI.SetupAdvisor do
 
   defp host_presence("opencode", _agent) do
     detect_directory(Path.join([user_home(), ".config", "opencode"]), "config")
-  end
-
-  defp host_presence("gemini-cli", _agent) do
-    detect_directory(Path.join([user_home(), ".gemini"]), "config")
   end
 
   defp host_presence("cline", _agent) do

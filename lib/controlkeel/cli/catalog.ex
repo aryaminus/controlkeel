@@ -337,7 +337,7 @@ defmodule ControlKeel.CLI.Catalog do
         related_mcp_tools: ["ck_attach", "ck_mcp_discover"],
         related_skills: ["agent-integration"],
         related_hooks: ["SessionStart", "PreToolUse", "PostToolUse", "UserPromptSubmit"],
-        related_plugins: ["codex", "claude", "copilot", "openclaw"],
+        related_plugins: ["codex", "claude", "copilot"],
         examples: ["controlkeel attach codex-cli --scope project", "controlkeel attach doctor"],
         overrides: %{
           detach: %{
@@ -581,7 +581,7 @@ defmodule ControlKeel.CLI.Catalog do
         ],
         related_skills: ["agent-integration", "cli-for-agents"],
         related_hooks: ["SessionStart", "PreToolUse", "PostToolUse", "UserPromptSubmit"],
-        related_plugins: ["codex", "claude", "copilot", "openclaw", "augment", "droid"],
+        related_plugins: ["codex", "claude", "copilot"],
         examples: [
           "controlkeel skills list --json",
           "controlkeel tool groups suggest --format json"
