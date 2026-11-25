@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.4.44 — 2026-11-25
+
+### What's changed
+
+- Merge pull request #350 from aryaminus/fix/web-security-followup
+- fix/web-security-followup: add missing end to function definition
+- Merge branch 'main' of github.com:aryaminus/controlkeel into fix/web-security-followup
+- Merge branch 'main' into fix/web-security-followup
+- fix/web-security-followup: delete obsolete documentation files
+- fix/web-security-followup: document email_verified OAuth adapter contract, fail closed on absent claims (PR #244)
+- fix/web-security-followup: document 409 workspace_registration_revoked and terminal re-enrolment on the register endpoint (PR #256)
+- fix/web-security-followup: add Enrolled devices tab to org settings with admin-gated workspace-key revocation (PR #256 operator surface)
+- fix/web-security-followup: KeyRegistry eviction broadcast, include_revoked audit listing, terminal-revocation docs (PR #256)
+- fix/web-security-followup: rename break_glass_test to hosted_api_authz_test, drop dead break-glass config (PR #257)
+- fix/web-security-followup: address web security residue from PRs #257/#256/#244 ahead of controlkeel.com launch
+
 ## v0.4.43 — 2026-11-25
 
 ### What's changed
