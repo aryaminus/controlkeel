@@ -68,6 +68,11 @@ config :controlkeel, ControlKeelWeb.Endpoint,
   pubsub_server: ControlKeel.PubSub,
   live_view: [signing_salt: "BK4dPDY1"]
 
+# Forwarded client IP headers are trusted only when the socket peer matches
+# one of these explicitly configured ingress addresses. Runtime config may
+# populate this list from CONTROLKEEL_TRUSTED_INGRESS_IPS.
+config :controlkeel, ControlKeelWeb.ClientIp, trusted_ingress_ips: []
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",

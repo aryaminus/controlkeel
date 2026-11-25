@@ -162,6 +162,29 @@ defmodule ControlKeel.Runtime.DefaultsTest do
     )
   end
 
+  test "prod Fly proxy mode keeps the endpoint bound to IPv4", %{tmp_home: tmp_home} do
+    runtime_config = Path.expand("../../../config/runtime.exs", __DIR__)
+
+    with_envs(
+      %{
+        "CONTROLKEEL_FLY_PROXY_CLIENT_IP" => "true",
+        "CONTROLKEEL_RUNTIME_MODE" => "local",
+        "CONTROLKEEL_HOME" => tmp_home,
+        "DATABASE_PATH" => nil,
+        "DATABASE_URL" => nil,
+        "PORT" => "8080",
+        "SECRET_KEY_BASE" => String.duplicate("k", 64)
+      },
+      fn ->
+        config = Config.Reader.read!(runtime_config, env: :prod)
+        endpoint_config = get_in(config, [:controlkeel, ControlKeelWeb.Endpoint])
+
+        assert endpoint_config[:http][:ip] == {0, 0, 0, 0}
+        assert endpoint_config[:http][:port] == 8080
+      end
+    )
+  end
+
   test "secret_key_base is generated once and then reused", %{tmp_home: tmp_home} do
     with_envs(%{"SECRET_KEY_BASE" => nil, "HOME" => tmp_home}, fn ->
       first = Defaults.secret_key_base()

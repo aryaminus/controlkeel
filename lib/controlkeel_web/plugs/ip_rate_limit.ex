@@ -13,8 +13,11 @@ defmodule ControlKeelWeb.Plugs.IpRateLimit do
   With 256-bit tokens brute force is infeasible, so this is defence in depth:
   a throttle layer that absorbs enumeration attempts and would meaningfully
   blunt any future reduction in token entropy. Uses the same token bucket as the
-  cloud limiter via `RateLimiter.hit_key/2`, keyed by a namespaced IP hash so it
-  cannot collide with workspace buckets.
+  cloud limiter via `RateLimiter.hit_key/2`, keyed by a namespaced IP bucket so
+  it cannot collide with workspace buckets.
+
+  LiveViews cannot run plugs on their connect pass, so they call the shared
+  `hit/3` helper directly from `mount/3`.
 
   Returns 429 with `Retry-After` on overflow.
   """
@@ -22,6 +25,7 @@ defmodule ControlKeelWeb.Plugs.IpRateLimit do
   import Plug.Conn
 
   alias ControlKeel.Cloud.RateLimiter
+  alias ControlKeelWeb.ClientIp
 
   @default_burst 20
   @default_refill_per_sec 0.5
@@ -29,12 +33,9 @@ defmodule ControlKeelWeb.Plugs.IpRateLimit do
   def init(opts), do: opts
 
   def call(conn, opts) do
-    key = bucket_key(conn, opts)
+    bucket = Keyword.get(opts, :bucket, "ip")
 
-    case RateLimiter.hit_key(key,
-           burst: Keyword.get(opts, :burst, @default_burst),
-           refill_per_sec: Keyword.get(opts, :refill_per_sec, @default_refill_per_sec)
-         ) do
+    case hit(bucket, ClientIp.from_conn(conn), opts) do
       :ok ->
         conn
 
@@ -47,14 +48,19 @@ defmodule ControlKeelWeb.Plugs.IpRateLimit do
     end
   end
 
-  # Namespace by bucket name so separate oracles have independent budgets.
-  defp bucket_key(conn, opts) do
-    prefix = Keyword.get(opts, :bucket, "ip")
-    "ip:#{prefix}:#{ip(conn)}"
+  @doc """
+  Consume one token for `bucket` + `ip`.
+
+  Shared by the plug (HTTP routes) and LiveView mounts (unauthenticated token
+  oracles) so key namespacing and bucket defaults live in one place. Bucket
+  names are namespaced so separate oracles have independent budgets.
+  """
+  @spec hit(String.t(), String.t(), keyword()) :: RateLimiter.result()
+  def hit(bucket, ip, opts \\ []) do
+    RateLimiter.hit_key(
+      "ip:#{bucket}:#{ip}",
+      burst: Keyword.get(opts, :burst, @default_burst),
+      refill_per_sec: Keyword.get(opts, :refill_per_sec, @default_refill_per_sec)
+    )
   end
-
-  defp ip(%Plug.Conn{remote_ip: ip}) when is_tuple(ip),
-    do: ip |> Tuple.to_list() |> Enum.join(".")
-
-  defp ip(_conn), do: "unknown"
 end

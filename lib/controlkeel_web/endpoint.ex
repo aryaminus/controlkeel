@@ -1,6 +1,14 @@
 defmodule ControlKeelWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :controlkeel
 
+  # Phoenix inserts socket dispatch before endpoint plugs, so sanitize the
+  # proxy header before a LiveView upgrade can build its connect_info.
+  def call(conn, opts) do
+    conn
+    |> ControlKeelWeb.Plugs.FlyClientIp.call([])
+    |> super(opts)
+  end
+
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
@@ -23,8 +31,8 @@ defmodule ControlKeelWeb.Endpoint do
                    ] ++ if(session_max_age, do: [max_age: session_max_age], else: [])
 
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [session: @session_options]],
-    longpoll: [connect_info: [session: @session_options]]
+    websocket: [connect_info: [:peer_data, :x_headers, session: @session_options]],
+    longpoll: [connect_info: [:peer_data, :x_headers, session: @session_options]]
 
   # Serve at "/" the static files from "priv/static" directory.
   #
@@ -63,5 +71,6 @@ defmodule ControlKeelWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+  plug ControlKeelWeb.Plugs.FlyClientIp
   plug ControlKeelWeb.Router
 end

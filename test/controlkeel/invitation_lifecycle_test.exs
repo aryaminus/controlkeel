@@ -86,6 +86,34 @@ defmodule ControlKeel.InvitationLifecycleTest do
       {:ok, m, _token} = Accounts.invite_member(invitee.id, org.id)
       refute is_nil(m.expires_at)
     end
+
+    test "re-inviting a revoked member stamps a fresh expiry" do
+      Application.put_env(:controlkeel, :invitation_expiry_days, 1)
+      {owner, invitee, org} = org_and_invitee()
+
+      {:ok, membership, _token} =
+        Accounts.invite_member(invitee.id, org.id, invited_by_user_id: owner.id)
+
+      {:ok, _revoked} = Accounts.revoke_membership(membership.id, owner.id)
+
+      # Simulate an original invitation that expired long ago.
+      past =
+        DateTime.utc_now()
+        |> DateTime.add(-2 * 24 * 60 * 60, :second)
+        |> DateTime.truncate(:second)
+
+      membership
+      |> Accounts.Membership.changeset(%{expires_at: past})
+      |> Repo.update!()
+
+      {:ok, reissued, token} =
+        Accounts.invite_member(invitee.id, org.id, invited_by_user_id: owner.id)
+
+      assert DateTime.compare(reissued.expires_at, DateTime.utc_now()) == :gt
+
+      assert {:ok, accepted} = Accounts.accept_invitation(token, invitee.id)
+      assert accepted.status == "active"
+    end
   end
 
   describe "cloud enrolment consumes the invite" do

@@ -3,6 +3,7 @@ defmodule ControlKeelWeb.CloudWorkspaceControllerTest do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Cloud.Enrollment
+  alias ControlKeel.Cloud.RateLimiter
   alias ControlKeel.Cloud.Workspace.KeyRegistry
   alias ControlKeel.Repo
 
@@ -52,6 +53,9 @@ defmodule ControlKeelWeb.CloudWorkspaceControllerTest do
   end
 
   setup %{conn: conn} do
+    # The register route is per-IP throttled. Reset the shared ETS buckets so
+    # this file cannot trip the burst by accumulating hits across tests.
+    ControlKeel.Cloud.RateLimiter.reset()
     conn = put_req_header(conn, "content-type", "application/json")
     {:ok, conn: conn}
   end
@@ -222,6 +226,19 @@ defmodule ControlKeelWeb.CloudWorkspaceControllerTest do
 
       {:ok, key} = KeyRegistry.fetch(identity.workspace_id)
       assert key.mission_workspace_id == nil
+    end
+
+    test "returns 429 with Retry-After once the per-IP bucket is exhausted", %{conn: conn} do
+      # Drain the same bucket the router plug uses for this client IP.
+      for _ <- 1..20 do
+        RateLimiter.hit_key("ip:cloud_register:127.0.0.1", burst: 20, refill_per_sec: 0.5)
+      end
+
+      conn = post(conn, ~p"/cloud/v1/workspaces/register", %{})
+
+      assert json_response(conn, 429)["error"] == "rate_limited"
+      assert [retry_after] = get_resp_header(conn, "retry-after")
+      assert String.to_integer(retry_after) >= 1
     end
   end
 
