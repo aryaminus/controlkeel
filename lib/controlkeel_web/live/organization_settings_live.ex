@@ -7,8 +7,9 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   organization sidebar renders a settings variant — a back row to the org
   overview plus the section buttons (`?tab=` query param + `push_patch`
   via the `set_tab` event, mirroring the workspace settings pattern).
-  Three groups, all admin+: General (name, status, budget), Members
-  (roster, roles, invites) and Policy sets (org-owned policy sets — the
+  Four groups: General (name, status, budget), Members (roster, roles,
+  invites), Devices (enrolled workspace keys — the cloud/self-host
+  device-revocation surface) and Policy sets (org-owned policy sets — the
   former global Policy Studio, now scoped to the organization).
 
   Per-user account management (identity info, Art.15 export, Art.17
@@ -34,6 +35,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
 
   alias ControlKeel.Accounts
   alias ControlKeel.Accounts.DataLifecycle
+  alias ControlKeel.Cloud.Workspace.KeyRegistry
   alias ControlKeel.Intent
   alias ControlKeel.Platform
   alias ControlKeel.Platform.PolicySet
@@ -42,7 +44,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   alias ControlKeel.Runtime.Mode
   alias ControlKeelWeb.OrgAccess
 
-  @tabs ["general", "members", "policy_sets"]
+  @tabs ["general", "members", "devices", "policy_sets"]
 
   @valid_roles ~w(owner admin member viewer)
 
@@ -84,6 +86,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   defp normalize_tab("policy_sets"), do: "policy_sets"
+  defp normalize_tab("devices"), do: "devices"
   defp normalize_tab("members"), do: "members"
   # No tab param, garbage params: General is the default section.
   defp normalize_tab(_tab), do: "general"
@@ -310,6 +313,97 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:revoke_target, nil)}
   end
 
+  # ── Enrolled devices (workspace-key revocation, PR #256's operator surface) ─
+
+  def handle_event("confirm_revoke_device", _params, %{assigns: %{local_mode: true}} = socket) do
+    {:noreply, put_flash(socket, :error, "Device management is not available in local mode.")}
+  end
+
+  def handle_event("confirm_revoke_device", %{"key-id" => workspace_id}, socket) do
+    if can_manage?(socket.assigns) do
+      target =
+        Enum.find(socket.assigns.devices, fn key ->
+          key.workspace_id == workspace_id and is_nil(key.revoked_at)
+        end)
+
+      if is_nil(target) do
+        {:noreply, put_flash(socket, :error, "Device not found.")}
+      else
+        {:noreply,
+         socket
+         |> assign(:show_revoke_device_modal, true)
+         |> assign(:revoke_device_target, target)}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to revoke devices.")}
+    end
+  end
+
+  def handle_event("execute_revoke_device", _params, %{assigns: %{local_mode: true}} = socket) do
+    {:noreply, put_flash(socket, :error, "Device management is not available in local mode.")}
+  end
+
+  def handle_event("execute_revoke_device", %{"key-id" => workspace_id}, socket) do
+    # The destructive write re-resolves authorization at the admin floor and
+    # re-resolves the target from the org's live rows: a crafted event must
+    # not revoke a workspace_id bound to a different org, and a revoked
+    # device cannot be revoked again.
+    if mutation_manager?(socket) do
+      target =
+        socket.assigns.org.id
+        |> KeyRegistry.list_for_org(include_revoked: true)
+        |> Enum.find(fn key ->
+          key.workspace_id == workspace_id and is_nil(key.revoked_at)
+        end)
+
+      case target do
+        nil ->
+          {:noreply,
+           socket
+           |> assign(:show_revoke_device_modal, false)
+           |> put_flash(:error, "Device not found.")}
+
+        target ->
+          case KeyRegistry.revoke(target.workspace_id) do
+            {:ok, _revoked} ->
+              {:noreply,
+               socket
+               |> assign(:show_revoke_device_modal, false)
+               |> assign(:revoke_device_target, nil)
+               |> assign(
+                 :devices,
+                 KeyRegistry.list_for_org(socket.assigns.org.id, include_revoked: true)
+               )
+               |> put_flash(:info, "Device revoked.")}
+
+            {:error, :not_found} ->
+              {:noreply,
+               socket
+               |> assign(:show_revoke_device_modal, false)
+               |> put_flash(:error, "Device not found.")}
+
+            {:error, _reason} ->
+              {:noreply,
+               socket
+               |> assign(:show_revoke_device_modal, false)
+               |> put_flash(:error, "Could not revoke the device.")}
+          end
+      end
+    else
+      {:noreply,
+       socket
+       |> assign(:show_revoke_device_modal, false)
+       |> put_flash(:error, "You don't have permission to revoke devices.")}
+    end
+  end
+
+  def handle_event("cancel_revoke_device", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_revoke_device_modal, false)
+     |> assign(:revoke_device_target, nil)}
+  end
+
   def handle_event(
         "change-role",
         %{"membership-id" => id, "role" => new_role},
@@ -478,6 +572,14 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     local_mode = Mode.current() == :local
     budget_cents = Accounts.org_budget_cents(org) || 0
     memberships = if(local_mode, do: [], else: load_memberships(org.id))
+
+    # Enrolled workspace keys (PR #256's operator surface). Local single-user
+    # deployments never enrol device keys, so the registry is not queried.
+    # Revoked rows are included for audit value — the panel marks them so an
+    # operator can see a device was revoked, not wonder where it went.
+    devices =
+      if(local_mode, do: [], else: KeyRegistry.list_for_org(org.id, include_revoked: true))
+
     tabs = @tabs
 
     {:ok,
@@ -489,6 +591,7 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:current_membership, membership)
      |> assign(:current_user, socket.assigns[:current_user])
      |> assign(:memberships, memberships)
+     |> assign(:devices, devices)
      |> assign(:active_owner_count, count_active_owners(memberships))
      |> assign(:invite_form, to_form(%{"email" => "", "role" => "member"}, as: :invite))
      |> assign(:invite_token, nil)
@@ -496,6 +599,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
      |> assign(:show_invite_modal, false)
      |> assign(:show_revoke_modal, false)
      |> assign(:revoke_target, nil)
+     |> assign(:show_revoke_device_modal, false)
+     |> assign(:revoke_device_target, nil)
      |> assign(:settings_form, settings_form(org, budget_cents))
      |> assign(:settings_error, nil)
      |> assign(:delete_org_form, to_form(%{"confirm_slug" => ""}, as: :delete_org))
@@ -884,6 +989,12 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
             can_manage={can_manage?(assigns)}
             current_role={current_role(assigns)}
           />
+        <% "devices" -> %>
+          <.devices_panel
+            devices={@devices}
+            local_mode={@local_mode}
+            can_manage={can_manage?(assigns)}
+          />
         <% _ -> %>
           <.general_panel
             org={@org}
@@ -912,6 +1023,10 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
         revoke_is_self={@revoke_is_self}
         revoke_is_last_owner={@revoke_is_last_owner}
       />
+    <% end %>
+
+    <%= if @show_revoke_device_modal and @revoke_device_target do %>
+      <.revoke_device_modal device={@revoke_device_target} />
     <% end %>
 
     <.packs_dialog :if={@show_packs_dialog} packs={@packs} open_packs={@open_packs} />
@@ -1217,6 +1332,170 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
     """
   end
 
+  # ── Devices panel & revoke modal ----------------------------------------
+
+  attr :devices, :list, required: true
+  attr :local_mode, :boolean, default: false
+  attr :can_manage, :boolean, required: true
+
+  defp devices_panel(assigns) do
+    ~H"""
+    <section>
+      <div class="space-y-1 mb-8">
+        <.section_title>
+          Enrolled devices
+        </.section_title>
+        <p class="text-sm text-muted-foreground">
+          Laptops and workspaces enrolled against this organization. Revoking a device stops its access tokens from verifying immediately.
+        </p>
+      </div>
+
+      <%= if @local_mode do %>
+        <div class="rounded-2xl border border-border/80 bg-card shadow-card p-6">
+          <p class="text-sm text-muted-foreground">
+            Device management is not available in local mode.
+          </p>
+          <p class="text-sm text-muted-foreground">
+            Local single-user deployments connect directly and do not enroll device keys.
+          </p>
+        </div>
+      <% else %>
+        <div class="rounded-2xl border border-border/80 bg-card shadow-card overflow-clip">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-border text-left text-sm">
+              <thead class="bg-muted text-xs uppercase tracking-[0.14em] text-muted-foreground sticky top-0 z-10">
+                <tr>
+                  <th class="px-5 py-3 font-semibold">Device</th>
+                  <th class="px-5 py-3 font-semibold">Workspace</th>
+                  <th class="px-5 py-3 font-semibold">Fingerprint</th>
+                  <th class="px-5 py-3 font-semibold">Last seen</th>
+                  <th class="px-5 py-3 font-semibold">Status</th>
+                  <th class="px-5 py-3 font-semibold w-px whitespace-nowrap"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border">
+                <%= if @devices == [] do %>
+                  <tr>
+                    <td colspan="6" class="px-5 py-12 text-center">
+                      <p class="text-base font-medium text-foreground">No devices enrolled yet.</p>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        Enroll a device with an invitation token and it will be listed here.
+                      </p>
+                    </td>
+                  </tr>
+                <% else %>
+                  <%= for device <- @devices do %>
+                    <% active? = is_nil(device.revoked_at)
+                    status = if active?, do: "active", else: "revoked" %>
+                    <tr id={"device-#{device.id}"} class="transition hover:bg-muted/30">
+                      <td class="max-w-xs px-5 py-4 font-medium text-foreground">
+                        {device.name || "—"}
+                      </td>
+                      <td class="px-5 py-4">
+                        <span class="font-mono text-xs text-foreground">{device.workspace_id}</span>
+                      </td>
+                      <td class="px-5 py-4">
+                        <span class="font-mono text-xs text-muted-foreground">
+                          {String.slice(device.fingerprint || "", 0, 12)}…
+                        </span>
+                      </td>
+                      <td class="px-5 py-4 text-muted-foreground">
+                        {format_datetime(device.last_seen_at)}
+                      </td>
+                      <td class="px-5 py-4">
+                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset #{status_pill_class(status)}">
+                          {status}
+                        </span>
+                        <%= if not active? do %>
+                          <p class="mt-1 text-xs text-muted-foreground">
+                            revoked {format_date(device.revoked_at)}
+                          </p>
+                        <% end %>
+                      </td>
+                      <td class="px-4 py-4 text-right whitespace-nowrap w-px">
+                        <%= if @can_manage and active? do %>
+                          <button
+                            type="button"
+                            phx-click="confirm_revoke_device"
+                            phx-value-key-id={device.workspace_id}
+                            class="text-sm font-medium text-destructive transition hover:text-destructive"
+                          >
+                            Revoke
+                          </button>
+                        <% end %>
+                      </td>
+                    </tr>
+                  <% end %>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% end %>
+    </section>
+    """
+  end
+
+  attr :device, :map, required: true
+
+  defp revoke_device_modal(assigns) do
+    ~H"""
+    <div
+      id="revoke-device-modal"
+      class="relative z-50"
+      phx-mounted={Phoenix.LiveView.JS.show(to: "#revoke-device-modal")}
+      phx-remove={Phoenix.LiveView.JS.hide(to: "#revoke-device-modal")}
+    >
+      <div
+        class="fixed inset-0 bg-overlay/70 backdrop-blur-sm transition-opacity"
+        phx-click="cancel_revoke_device"
+        aria-label="Close modal"
+      />
+
+      <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="w-full max-w-md rounded-2xl border bg-card/95 p-6 shadow-card">
+          <div class="mb-5 flex items-center gap-3">
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/15">
+              <.icon name="hero-exclamation-triangle" class="size-5 text-destructive" />
+            </span>
+            <h2 class="text-lg font-semibold text-foreground">Revoke device</h2>
+          </div>
+
+          <div class="space-y-3">
+            <p class="text-sm text-muted-foreground">
+              You are about to revoke the device key for
+              <strong class="text-foreground">{@device.name || @device.workspace_id}</strong>
+              (<span class="font-mono text-xs">{@device.workspace_id}</span>).
+              Its access tokens stop verifying immediately, and the device is locked out on its next sync.
+            </p>
+            <p class="text-xs text-muted-foreground">
+              This cannot be undone by the device. Re-enrolment requires a new invitation from an admin.
+            </p>
+          </div>
+
+          <div class="mt-6 flex items-center justify-end gap-3 border-t pt-4">
+            <button
+              type="button"
+              phx-click="cancel_revoke_device"
+              class="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              phx-click="execute_revoke_device"
+              phx-value-key-id={@device.workspace_id}
+              class="inline-flex items-center gap-2 rounded-full bg-destructive px-5 py-2 text-sm font-semibold text-foreground shadow-lg shadow-destructive/20 transition hover:-translate-y-0.5 hover:bg-destructive"
+            >
+              <.icon name="hero-trash" class="size-4" /> Revoke device
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   attr :org, :map, required: true
   attr :settings_form, :map, required: true
   attr :settings_error, :string, default: nil
@@ -1469,6 +1748,18 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
   defp mutation_owner?(socket) do
     case OrgAccess.resolve(socket.assigns.org.slug, socket.assigns[:current_user], "owner") do
       {:ok, _org, %Accounts.Membership{role: "owner"}} -> true
+      _ -> false
+    end
+  end
+
+  # Same re-resolution discipline as `mutation_owner?/1`, at the admin floor:
+  # device revocation must not trust the mount-time `current_membership`
+  # snapshot either. Local mode resolves no membership, so it denies here too
+  # (the local-mode event clauses above already refuse earlier with a clearer
+  # message).
+  defp mutation_manager?(socket) do
+    case OrgAccess.resolve(socket.assigns.org.slug, socket.assigns[:current_user], "admin") do
+      {:ok, _org, %Accounts.Membership{role: role}} -> Accounts.role_at_least?(role, "admin")
       _ -> false
     end
   end

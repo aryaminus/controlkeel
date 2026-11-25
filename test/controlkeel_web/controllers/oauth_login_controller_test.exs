@@ -72,6 +72,27 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
     end
   end
 
+  # PR #244 fail-closed contract: a custom adapter that omits the
+  # `email_verified` claim entirely must NOT sign the user in — the callback
+  # controller pattern-matches the full claims map, so the absence-key path
+  # lands in the generic denial. Without this pin, the pattern match could
+  # regress (e.g. to a default of verified) with no test turning red.
+  describe "fail-closed on an absent email_verified claim (PR #244)" do
+    test "claims without email_verified deny sign-in", %{conn: conn} do
+      conn =
+        conn
+        |> init_test_session(%{oauth_provider: "github", oauth_session_params: %{}})
+        |> get("/auth/github/callback", %{"code" => "no_verification_claim"})
+
+      assert redirected_to(conn, 302) == "/auth/login"
+      assert get_session(conn, :current_user_id) == nil
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Authentication failed"
+
+      # The generic denial must not have provisioned the account either.
+      refute Accounts.get_user_by_email("user@example.com")
+    end
+  end
+
   describe "GET /auth/:provider/request" do
     test "redirects to the provider and stores OAuth session data", %{conn: conn} do
       conn = get(conn, "/auth/github/request")
@@ -226,6 +247,12 @@ defmodule ControlKeelWeb.OAuthLoginControllerTest do
     # permits unverified emails). Used to prove the pre-account-hijack guard.
     def callback(:github, _cfg, %{"code" => "unverified"}, _opts) do
       {:ok, %{email: "user@example.com", name: "Attacker", email_verified: false}}
+    end
+
+    # PR #244 fail-closed contract: a claims map WITHOUT the email_verified
+    # key at all must be denied by the controller, not defaulted to verified.
+    def callback(:github, _cfg, %{"code" => "no_verification_claim"}, _opts) do
+      {:ok, %{email: "user@example.com", name: "Attacker"}}
     end
 
     def callback(:github, _cfg, _params, _opts) do
