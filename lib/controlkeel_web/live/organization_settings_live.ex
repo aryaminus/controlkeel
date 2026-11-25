@@ -1762,6 +1762,8 @@ defmodule ControlKeelWeb.OrganizationSettingsLive do
       {:ok, _org, %Accounts.Membership{role: role}} -> Accounts.role_at_least?(role, "admin")
       _ -> false
     end
+  end
+
   defp owner_refusal(socket) do
     {:noreply,
      socket
