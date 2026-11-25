@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.4.45 — 2026-11-25
+
+### What's changed
+
+- Merge pull request #353 from aryaminus/fix/web-security-launch-blockers
+- Merge branch 'main' of github.com:aryaminus/controlkeel into fix/web-security-launch-blockers
+- fix/web-security-launch-blockers: implement runtime HTTPS and session management; configure secure cookies based on request scheme
+- fix/web-security-launch-blockers: update OIDC flow to support organization-specific providers and enhance security measures
+- fix/web-security-launch-blockers: remove obsolete web security review and issue drafts for CLI/API
+- fix/web-security-launch-blockers: mark session cookies Secure in production
+- fix/web-security-launch-blockers: remove dead findings-browser helpers, document :suspended handling
+- fix/web-security-launch-blockers: broadcast org suspension, evict mounted sessions, hide suspended orgs
+- fix/web-security-launch-blockers: fail closed when observability queries run without a workspace filter
+- fix/web-security-launch-blockers: scope service account revoke/rotate to the workspace, surface expiry in the UI
+- fix/web-security-launch-blockers: add pre-launch web security review documentation for PRs #242, #245, #253, #255
+
 ## v0.4.44 — 2026-11-25
 
 ### What's changed
