@@ -10,7 +10,7 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
   use ControlKeel.DataCase, async: false
 
   alias ControlKeel.Benchmark
-  alias ControlKeel.Benchmark.{Run, Suite}
+  alias ControlKeel.Benchmark.{Run, Scenario, Suite}
 
   # Scoping is opt-driven (explicit workspace_ids / workspace_id attrs), not
   # runtime-mode-driven, so these tests deliberately avoid mutating
@@ -33,12 +33,12 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
     ws
   end
 
-  defp suite(ws) do
+  defp suite(ws, slug \\ nil) do
     n = System.unique_integer([:positive])
 
     {:ok, s} =
       Suite.changeset(%Suite{}, %{
-        slug: "custom-suite-#{n}",
+        slug: slug || "custom-suite-#{n}",
         name: "Custom #{n}",
         description: "A tenant suite",
         version: 1,
@@ -141,6 +141,37 @@ defmodule ControlKeel.Benchmark.TenantIsolationTest do
   end
 
   describe "run_suite/2 suite eligibility" do
+    test "runs each workspace's suite when they share a slug" do
+      workspace_a = workspace()
+      workspace_b = workspace()
+      suite_a = suite(workspace_a, "shared-suite")
+      suite_b = suite(workspace_b, "shared-suite")
+
+      for suite <- [suite_a, suite_b] do
+        %Scenario{}
+        |> Scenario.changeset(%{
+          suite_id: suite.id,
+          slug: "simple-check",
+          name: "Simple check",
+          category: "security",
+          content: "true",
+          expected_rules: ["example.rule"],
+          expected_decision: "allow"
+        })
+        |> Repo.insert!()
+
+        assert {:ok, run} =
+                 Benchmark.run_suite(%{
+                   "suite" => suite.slug,
+                   "workspace_id" => suite.workspace_id,
+                   "subjects" => "controlkeel_validate"
+                 })
+
+        assert run.suite_id == suite.id
+        assert run.workspace_id == suite.workspace_id
+      end
+    end
+
     # The run path is guarded server-side (benchmark tenancy, #259 follow-up):
     # a workspace-stamped caller may execute platform suites or their own.
     test "rejects another tenant's suite with :suite_not_found and executes nothing" do

@@ -48,7 +48,7 @@ defmodule ControlKeelWeb.Plugs.IpRateLimitTest do
     assert %{halted: true} = IpRateLimit.call(conn(ip), [bucket: "bucket-a"] ++ opts)
   end
 
-  test "buckets proxied requests by forwarded client IP, not the proxy IP" do
+  test "uses the peer bucket for an unconfigured private peer" do
     opts = [bucket: "plug-proxy", burst: 2, refill_per_sec: 0.001]
     proxy_ip = {10, 0, 0, 1}
 
@@ -58,13 +58,8 @@ defmodule ControlKeelWeb.Plugs.IpRateLimitTest do
       |> put_req_header("x-forwarded-for", client_ip)
     end
 
-    # Two visitors share the edge proxy but must not share a bucket.
     assert %{halted: false} = IpRateLimit.call(forwarded.("198.51.100.1"), opts)
     assert %{halted: false} = IpRateLimit.call(forwarded.("198.51.100.2"), opts)
-    assert %{halted: false} = IpRateLimit.call(forwarded.("198.51.100.1"), opts)
-
-    # The first visitor is now exhausted; the second still has a token.
     assert %{halted: true} = IpRateLimit.call(forwarded.("198.51.100.1"), opts)
-    assert %{halted: false} = IpRateLimit.call(forwarded.("198.51.100.2"), opts)
   end
 end

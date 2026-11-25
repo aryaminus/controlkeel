@@ -120,9 +120,10 @@ defmodule ControlKeel.Benchmark do
   def get_suite_by_slug(slug) when is_binary(slug) do
     ensure_builtin_suite(slug)
 
-    Suite
-    |> Repo.get_by(slug: slug)
-    |> Repo.preload(:scenarios)
+    case Suite |> where([suite], suite.slug == ^slug) |> limit(2) |> Repo.all() do
+      [suite] -> Repo.preload(suite, :scenarios)
+      _suites -> Repo.preload(platform_suite(slug), :scenarios)
+    end
   end
 
   def get_run(id) when is_binary(id) do
@@ -199,7 +200,7 @@ defmodule ControlKeel.Benchmark do
 
     workspace_id = Map.get(attrs, :workspace_id) || Map.get(attrs, "workspace_id")
 
-    with %Suite{} = suite <- suite_for_run(get_suite_by_slug(suite_slug), workspace_id) do
+    with %Suite{} = suite <- suite_for_run(suite_slug, workspace_id) do
       scenarios =
         suite.scenarios
         |> maybe_filter_scenarios(scenario_slugs)
@@ -238,10 +239,18 @@ defmodule ControlKeel.Benchmark do
   # cannot be executed or probed by slug. Callers without a workspace stamp
   # (local CLI/API surfaces) keep the unscoped behavior; cloud API tenancy is
   # tracked as a separate follow-up.
-  defp suite_for_run(%Suite{} = suite, nil), do: suite
-  defp suite_for_run(%Suite{workspace_id: nil} = suite, _workspace_id), do: suite
-  defp suite_for_run(%Suite{workspace_id: workspace_id} = suite, workspace_id), do: suite
-  defp suite_for_run(_suite, _workspace_id), do: nil
+  defp suite_for_run(slug, nil), do: get_suite_by_slug(slug)
+
+  defp suite_for_run(slug, workspace_id) do
+    suite = Repo.get_by(Suite, slug: slug, workspace_id: workspace_id) || platform_suite(slug)
+    Repo.preload(suite, :scenarios)
+  end
+
+  defp platform_suite(slug) do
+    Suite
+    |> where([suite], suite.slug == ^slug and is_nil(suite.workspace_id))
+    |> Repo.one()
+  end
 
   def import_result(run_id, subject, attrs) when is_binary(subject) do
     with %Run{} = run <- get_run(run_id) || {:error, :not_found},
@@ -1090,7 +1099,7 @@ defmodule ControlKeel.Benchmark do
     with {:ok, payload} <- BuiltinSuites.load(slug) do
       expected_scenarios = payload["scenarios"] || []
 
-      case Repo.get_by(Suite, slug: slug) |> Repo.preload(:scenarios) do
+      case platform_suite(slug) |> Repo.preload(:scenarios) do
         %Suite{} = suite ->
           if builtin_suite_current?(suite, payload, expected_scenarios) do
             {:ok, suite}
@@ -1208,7 +1217,7 @@ defmodule ControlKeel.Benchmark do
     RepoRetry.transaction_with_busy_retry(
       fn ->
         suite =
-          Repo.get_by(Suite, slug: payload["slug"]) ||
+          platform_suite(payload["slug"]) ||
             %Suite{}
 
         {:ok, suite} =

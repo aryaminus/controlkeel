@@ -28,15 +28,18 @@ defmodule ControlKeel.Runtime.DefaultsTest do
     File.mkdir_p!(tmp_dir)
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
 
-    with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
-      File.cd!(tmp_dir, fn ->
-        path = Defaults.database_path()
+    with_envs(
+      %{"DATABASE_PATH" => nil, "CK_PROJECT_ROOT" => nil, "CONTROLKEEL_HOME" => tmp_home},
+      fn ->
+        File.cd!(tmp_dir, fn ->
+          path = Defaults.database_path()
 
-        refute String.starts_with?(path, tmp_dir)
-        assert String.ends_with?(path, "controlkeel.db")
-        assert File.dir?(Path.dirname(path))
-      end)
-    end)
+          refute String.starts_with?(path, tmp_dir)
+          assert String.ends_with?(path, "controlkeel.db")
+          assert File.dir?(Path.dirname(path))
+        end)
+      end
+    )
   end
 
   test "database_path prefers a project-local sqlite db when inside a repo", %{tmp_home: tmp_home} do
@@ -51,120 +54,133 @@ defmodule ControlKeel.Runtime.DefaultsTest do
     File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
     on_exit(fn -> File.rm_rf!(tmp_dir) end)
 
-    with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
-      File.cd!(tmp_dir, fn ->
-        path = Defaults.database_path()
+    with_envs(
+      %{"DATABASE_PATH" => nil, "CK_PROJECT_ROOT" => nil, "CONTROLKEEL_HOME" => tmp_home},
+      fn ->
+        File.cd!(tmp_dir, fn ->
+          path = Defaults.database_path()
 
-        assert path == Path.join([File.cwd!(), "controlkeel", "controlkeel.db"])
-      end)
-    end)
+          assert path == Path.join([File.cwd!(), "controlkeel", "controlkeel.db"])
+        end)
+      end
+    )
   end
 
-  test "maybe_seed_project_database seeds a fresh project db from the global db",
+  test "CK_PROJECT_ROOT selects the governed project's database over the working directory",
        %{tmp_home: tmp_home} do
-    tmp_dir =
+    project =
       Path.join(
         System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-#{System.unique_integer([:positive])}"
+        "controlkeel-runtime-defaults-governed-#{System.unique_integer([:positive])}"
       )
 
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    elsewhere = Path.join(tmp_home, "elsewhere")
 
-    with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
-      # Seed a legacy global db with a WAL sidecar and content.
-      global = Defaults.global_database_path()
-      File.write!(global, "GLOBAL-DB-BYTES")
-      File.write!(global <> "-wal", "WAL-BYTES")
-
-      File.cd!(tmp_dir, fn ->
-        project_path = Defaults.database_path()
-        refute File.exists?(project_path)
-
-        assert Defaults.maybe_seed_project_database() == :seeded
-
-        assert File.read!(project_path) == "GLOBAL-DB-BYTES"
-        assert File.read!(project_path <> "-wal") == "WAL-BYTES"
-      end)
-    end)
-  end
-
-  test "maybe_seed_project_database is a no-op when the project db already exists",
-       %{tmp_home: tmp_home} do
-    tmp_dir =
-      Path.join(
-        System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-existing-#{System.unique_integer([:positive])}"
-      )
-
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
-
-    with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
-      global = Defaults.global_database_path()
-      File.write!(global, "GLOBAL-DB-BYTES")
-
-      File.cd!(tmp_dir, fn ->
-        project_path = Defaults.database_path()
-        File.mkdir_p!(Path.dirname(project_path))
-        File.write!(project_path, "PROJECT-LOCAL-BYTES")
-
-        assert Defaults.maybe_seed_project_database() == :noop
-        # Existing project db is left untouched.
-        assert File.read!(project_path) == "PROJECT-LOCAL-BYTES"
-      end)
-    end)
-  end
-
-  test "maybe_seed_project_database is a no-op without a global db", %{tmp_home: tmp_home} do
-    tmp_dir =
-      Path.join(
-        System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-noglobal-#{System.unique_integer([:positive])}"
-      )
-
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
-
-    with_envs(%{"DATABASE_PATH" => nil, "CONTROLKEEL_HOME" => tmp_home}, fn ->
-      File.cd!(tmp_dir, fn ->
-        project_path = Defaults.database_path()
-
-        assert Defaults.maybe_seed_project_database() == :noop
-        refute File.exists?(project_path)
-      end)
-    end)
-  end
-
-  test "maybe_seed_project_database is a no-op when DATABASE_PATH is set",
-       %{tmp_home: tmp_home} do
-    tmp_dir =
-      Path.join(
-        System.tmp_dir!(),
-        "controlkeel-runtime-defaults-seed-explicit-#{System.unique_integer([:positive])}"
-      )
-
-    File.rm_rf!(tmp_dir)
-    File.mkdir_p!(tmp_dir)
-    File.write!(Path.join(tmp_dir, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    File.rm_rf!(project)
+    File.mkdir_p!(Path.join(project, "lib/trial"))
+    # macOS tmp lives under a /var -> /private/var symlink; root resolution
+    # returns the real path, so compare against that.
+    project = File.cd!(project, fn -> File.cwd!() end)
+    File.write!(Path.join(project, "mix.exs"), "defmodule Trial.MixProject do\nend\n")
+    File.mkdir_p!(elsewhere)
+    on_exit(fn -> File.rm_rf!(project) end)
 
     with_envs(
-      %{"DATABASE_PATH" => Path.join(tmp_dir, "explicit.db"), "CONTROLKEEL_HOME" => tmp_home},
+      %{"DATABASE_PATH" => nil, "CK_PROJECT_ROOT" => project, "CONTROLKEEL_HOME" => tmp_home},
+      fn ->
+        File.cd!(elsewhere, fn ->
+          assert Defaults.governed_root() == project
+
+          assert Defaults.database_path() ==
+                   Path.join([project, "controlkeel", "controlkeel.db"])
+        end)
+      end
+    )
+  end
+
+  test "separate projects do not inherit the legacy database", %{tmp_home: tmp_home} do
+    with_envs(
+      %{"DATABASE_PATH" => nil, "CK_PROJECT_ROOT" => nil, "CONTROLKEEL_HOME" => tmp_home},
       fn ->
         global = Defaults.global_database_path()
-        File.write!(global, "GLOBAL-DB-BYTES")
+        File.write!(global, "legacy data")
 
-        File.cd!(tmp_dir, fn ->
-          assert Defaults.maybe_seed_project_database() == :noop
-          refute File.exists?(Path.join([tmp_dir, "controlkeel", "controlkeel.db"]))
+        for name <- ["first-project", "second-project"] do
+          root = Path.join(tmp_home, name)
+          File.mkdir_p!(root)
+          File.write!(Path.join(root, "package.json"), "{}")
+
+          File.cd!(root, fn ->
+            path = Defaults.database_path()
+            assert path == Path.join([File.cwd!(), "controlkeel", "controlkeel.db"])
+            refute File.exists?(path)
+          end)
+        end
+
+        assert File.read!(global) == "legacy data"
+      end
+    )
+  end
+
+  test "prod runtime config does not copy the legacy database into a new project",
+       %{tmp_home: tmp_home} do
+    root = Path.join(tmp_home, "fresh-project")
+    File.mkdir_p!(root)
+    File.write!(Path.join(root, "package.json"), "{}")
+
+    with_envs(
+      %{
+        "DATABASE_PATH" => nil,
+        "DATABASE_URL" => nil,
+        "CONTROLKEEL_RUNTIME_MODE" => nil,
+        "CONTROLKEEL_HOME" => tmp_home,
+        "SECRET_KEY_BASE" => String.duplicate("k", 64)
+      },
+      fn ->
+        global = Defaults.global_database_path()
+
+        for suffix <- ["", "-wal", "-shm"] do
+          File.write!(global <> suffix, "legacy data")
+        end
+
+        runtime_config = Path.expand("../../../config/runtime.exs", __DIR__)
+
+        File.cd!(root, fn ->
+          config = Config.Reader.read!(runtime_config, env: :prod)
+          db_path = get_in(config, [:controlkeel, ControlKeel.Repo.Local, :database])
+          project_db = Path.join([File.cwd!(), "controlkeel", "controlkeel.db"])
+
+          assert db_path == project_db
+
+          for suffix <- ["", "-wal", "-shm"] do
+            refute File.exists?(project_db <> suffix)
+          end
         end)
+
+        assert File.read!(global) == "legacy data"
+      end
+    )
+  end
+
+  test "prod Fly proxy mode keeps the endpoint bound to IPv4", %{tmp_home: tmp_home} do
+    runtime_config = Path.expand("../../../config/runtime.exs", __DIR__)
+
+    with_envs(
+      %{
+        "CONTROLKEEL_FLY_PROXY_CLIENT_IP" => "true",
+        "CONTROLKEEL_RUNTIME_MODE" => "local",
+        "CONTROLKEEL_HOME" => tmp_home,
+        "DATABASE_PATH" => nil,
+        "DATABASE_URL" => nil,
+        "PORT" => "8080",
+        "SECRET_KEY_BASE" => String.duplicate("k", 64)
+      },
+      fn ->
+        config = Config.Reader.read!(runtime_config, env: :prod)
+        endpoint_config = get_in(config, [:controlkeel, ControlKeelWeb.Endpoint])
+
+        assert endpoint_config[:http][:ip] == {0, 0, 0, 0}
+        assert endpoint_config[:http][:port] == 8080
       end
     )
   end

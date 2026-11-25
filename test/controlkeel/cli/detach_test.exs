@@ -43,6 +43,69 @@ defmodule ControlKeel.CLI.DetachTest do
     :ok
   end
 
+  test "detach works for agents attached under a now-aliased or removed id", %{
+    tmp: tmp,
+    binding: binding
+  } do
+    :ok =
+      attach_two(binding, tmp, [
+        {"gemini-cli", %{"ide" => "gemini-cli"}},
+        {"aider", %{"ide" => "aider"}},
+        {"cursor", %{"ide" => "cursor"}}
+      ])
+
+    {:ok, argv_detach} = ControlKeel.CLI.Parser.parse(["detach", "gemini-cli"])
+    assert argv_detach.args == ["gemini-cli"]
+
+    run_detach(tmp, "gemini-cli")
+    run_detach(tmp, "aider")
+
+    {:ok, reloaded, _session} = Local.load(tmp)
+    assert Map.keys(reloaded["attached_agents"]) == ["cursor"]
+  end
+
+  test "detaching one host keeps the shared skill tree other hosts use", %{
+    tmp: tmp,
+    binding: binding
+  } do
+    shared = Path.join(tmp, ".agents/skills")
+    File.mkdir_p!(Path.join(shared, "align"))
+    File.write!(Path.join(shared, "align/SKILL.md"), "x\n")
+    File.write!(Path.join(shared, ".controlkeel-skills.json"), ~s({"skills":["align"]}))
+
+    :ok =
+      attach_two(binding, tmp, [
+        {"kilo", %{"ide" => "kilo", "scope" => "project", "skills_destination" => shared}},
+        {"cursor", %{"ide" => "cursor", "scope" => "project", "skills_destination" => shared}}
+      ])
+
+    run_detach(tmp, "kilo")
+    assert File.exists?(Path.join(shared, "align/SKILL.md"))
+  end
+
+  test "detaching the last host removes CK skills but keeps user skills", %{
+    tmp: tmp,
+    binding: binding
+  } do
+    shared = Path.join(tmp, ".agents/skills")
+    File.mkdir_p!(Path.join(shared, "align"))
+    File.mkdir_p!(Path.join(shared, "custom"))
+    File.write!(Path.join(shared, "align/SKILL.md"), "ck\n")
+    File.write!(Path.join(shared, "custom/SKILL.md"), "mine\n")
+    File.write!(Path.join(shared, ".controlkeel-skills.json"), ~s({"skills":["align"]}))
+
+    :ok =
+      attach_two(binding, tmp, [
+        {"kiro", %{"ide" => "kiro", "scope" => "project", "shared_skills_destination" => shared}}
+      ])
+
+    run_detach(tmp, "kiro", %{keep_binding: true})
+
+    refute File.exists?(Path.join(shared, "align"))
+    refute File.exists?(Path.join(shared, ".controlkeel-skills.json"))
+    assert File.read!(Path.join(shared, "custom/SKILL.md")) == "mine\n"
+  end
+
   test "detach removes only the controlkeel MCP entry, keeping other servers", %{
     tmp: tmp,
     binding: binding

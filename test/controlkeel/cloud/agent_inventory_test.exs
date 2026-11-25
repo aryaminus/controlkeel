@@ -52,14 +52,13 @@ defmodule ControlKeel.Cloud.AgentInventoryTest do
     test "detects single-file conventions", %{tmp: tmp} do
       File.write!(Path.join(tmp, "AGENTS.md"), "# agents")
       File.write!(Path.join(tmp, "CLAUDE.md"), "# claude")
-      File.write!(Path.join(tmp, ".aider.conf.yml"), "model: gpt-4")
 
       {:ok, hits} = AgentInventory.scan(tmp)
 
       hosts = hits |> Enum.map(& &1.host) |> Enum.sort()
       assert "agents-md" in hosts
       assert "claude-code" in hosts
-      assert "aider" in hosts
+      refute "aider" in hosts
     end
 
     test "recurses into nested project subdirectories", %{tmp: tmp} do

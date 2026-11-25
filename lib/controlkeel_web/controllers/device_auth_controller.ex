@@ -84,21 +84,32 @@ defmodule ControlKeelWeb.DeviceAuthController do
         oauth_error(conn, "invalid_request")
 
       user ->
-        case DeviceAuth.consume(authorization) do
-          {:ok, _} ->
-            payload = %{
-              "access_token" => issue_access_token(user),
-              "token_type" => "Bearer",
-              "email" => user.email
-            }
-
-            conn
-            |> put_resp_header("cache-control", "no-store")
-            |> json(payload)
-
-          {:error, _} ->
-            oauth_error(conn, "invalid_request")
+        if Accounts.user_active?(user) do
+          mint_device_token(conn, authorization, user)
+        else
+          # A user disabled between browser approval and the CLI's poll must
+          # not receive a token; burn the code so the poll stops.
+          _ = DeviceAuth.consume(authorization)
+          oauth_error(conn, "access_denied")
         end
+    end
+  end
+
+  defp mint_device_token(conn, authorization, user) do
+    case DeviceAuth.consume(authorization) do
+      {:ok, _} ->
+        payload = %{
+          "access_token" => issue_access_token(user),
+          "token_type" => "Bearer",
+          "email" => user.email
+        }
+
+        conn
+        |> put_resp_header("cache-control", "no-store")
+        |> json(payload)
+
+      {:error, _} ->
+        oauth_error(conn, "invalid_request")
     end
   end
 
@@ -125,10 +136,9 @@ defmodule ControlKeelWeb.DeviceAuthController do
            max_age: 60 * 60 * 24 * 30
          ) do
       {:ok, %{"user_id" => user_id} = claims} ->
-        case Accounts.get_user(user_id) do
-          nil -> :error
-          _user -> {:ok, claims}
-        end
+        if user_id |> Accounts.get_user() |> Accounts.user_active?(),
+          do: {:ok, claims},
+          else: :error
 
       _ ->
         :error

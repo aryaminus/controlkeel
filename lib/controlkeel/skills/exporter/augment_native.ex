@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".augment/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     agent_path = Path.join(root, ".augment/agents/controlkeel-operator.md")
@@ -42,9 +42,6 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
       Jason.encode!(E.augment_settings_snippet(project_root, opts), pretty: true) <> "\n"
     )
 
-    instructions_path = Path.join(root, "AUGMENT.md")
-    File.write!(instructions_path, E.instructions_only_contents("augment", project_root, opts))
-
     agents_path = Path.join(root, "AGENTS.md")
     File.write!(agents_path, E.instructions_only_contents("augment", project_root, opts))
 
@@ -62,13 +59,11 @@ defmodule ControlKeel.Skills.Exporter.AugmentNative do
         %{"path" => rule_path, "kind" => "rules"},
         %{"path" => mcp_path, "kind" => "mcp"},
         %{"path" => settings_path, "kind" => "settings"},
-        %{"path" => instructions_path, "kind" => "instructions"},
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Keep `.augment/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
-        "Use `.augment/mcp.json` with `auggie --mcp-config ./.augment/mcp.json` for ephemeral MCP wiring or merge `.augment/settings.controlkeel.json` into `~/.augment/settings.json` for persistence.",
-        "For hook-native review interception, run Auggie with the local plugin bundle from `controlkeel/dist/augment-plugin`."
+        "Keep `.agents/skills`, `.augment/agents`, `.augment/commands`, and `.augment/rules` in the repo so Auggie loads ControlKeel-native guidance automatically.",
+        "Use `.augment/mcp.json` with `auggie --mcp-config ./.augment/mcp.json` for ephemeral MCP wiring or merge `.augment/settings.controlkeel.json` into `~/.augment/settings.json` for persistence."
       ]
     )
   end

@@ -88,6 +88,10 @@ defmodule ControlKeel.CLI.Dispatch.Execution do
             {:error, :org_suspended} ->
               {:error, "Cloud execution unauthorized: workspace org is suspended."}
 
+            {:error, :unbound_workspace} ->
+              {:error,
+               "Cloud execution requires an organization-bound workspace. Use a task in a workspace that belongs to an organization."}
+
             {:error, :not_found} ->
               {:error, "Cloud execution unauthorized: workspace not found."}
 

@@ -286,7 +286,7 @@ defmodule ControlKeel.AccountsTest do
       {:ok, owner: owner, admin: admin, invitee: invitee, org: org}
     end
 
-    test "owner can invite at any role", %{owner: owner, invitee: invitee, org: org} do
+    test "owner can invite at any role", %{owner: owner, org: org} do
       for role <- ["owner", "admin", "member", "viewer"] do
         # Fresh invitee per role to avoid already_member collisions.
         {:ok, u} = Accounts.create_user(%{email: "invitee-#{role}@example.com"})
@@ -298,7 +298,7 @@ defmodule ControlKeel.AccountsTest do
       end
     end
 
-    test "admin can invite member/viewer", %{admin: admin, invitee: invitee, org: org} do
+    test "admin can invite member/viewer", %{admin: admin, org: org} do
       for role <- ["member", "viewer"] do
         {:ok, u} = Accounts.create_user(%{email: "invitee-#{role}-a@example.com"})
 
@@ -309,18 +309,39 @@ defmodule ControlKeel.AccountsTest do
       end
     end
 
-    test "admin cannot invite owner", %{admin: admin, invitee: invitee, org: org} do
+    test "admin cannot invite admin", %{admin: admin, org: org} do
+      {:ok, invitee} = Accounts.create_user(%{email: "invitee-admin@example.com"})
+
       assert {:error, :unauthorized} =
                Accounts.invite_member(invitee.id, org.id,
-                 role: "owner",
+                 role: "admin",
                  invited_by_user_id: admin.id
                )
     end
 
-    test "admin cannot invite admin", %{admin: admin, invitee: invitee, org: org} do
+    test "viewer and member inviters are rejected", %{owner: owner, org: org} do
+      for role <- ["viewer", "member"] do
+        {:ok, inviter} = Accounts.create_user(%{email: "inviter-#{role}@example.com"})
+        {:ok, _, token} =
+          Accounts.invite_member(inviter.id, org.id,
+            role: role,
+            invited_by_user_id: owner.id
+          )
+        {:ok, _} = Accounts.accept_invitation(token, inviter.id)
+        {:ok, invitee} = Accounts.create_user(%{email: "invitee-from-#{role}@example.com"})
+
+        assert {:error, :unauthorized} =
+                 Accounts.invite_member(invitee.id, org.id,
+                   role: "member",
+                   invited_by_user_id: inviter.id
+                 )
+      end
+    end
+
+    test "admin cannot invite owner", %{admin: admin, invitee: invitee, org: org} do
       assert {:error, :unauthorized} =
                Accounts.invite_member(invitee.id, org.id,
-                 role: "admin",
+                 role: "owner",
                  invited_by_user_id: admin.id
                )
     end

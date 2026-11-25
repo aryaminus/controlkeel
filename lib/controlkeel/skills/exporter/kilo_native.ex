@@ -4,7 +4,7 @@ defmodule ControlKeel.Skills.Exporter.KiloNative do
   alias ControlKeel.Skills.Exporter, as: E
 
   def write(root, project_root, skills, opts) do
-    skill_root = Path.join(root, ".kilo/skills")
+    skill_root = Path.join(root, ".agents/skills")
     E.write_skill_tree(skills, skill_root)
 
     command_path = Path.join(root, ".kilo/commands/controlkeel-review.md")
@@ -53,7 +53,7 @@ defmodule ControlKeel.Skills.Exporter.KiloNative do
         %{"path" => agents_path, "kind" => "instructions"}
       ],
       [
-        "Copy `.kilo/skills/` into your repo or `~/.kilo/skills/` for Kilo Agent Skills discovery.",
+        "Copy `.agents/skills/` into your repo (or `~/.agents/skills/`) for Agent Skills discovery.",
         "Copy `.kilo/commands/` into the project root so Kilo can expose `/controlkeel-review`, `/controlkeel-submit-plan`, `/controlkeel-annotate`, and `/controlkeel-last`.",
         "Merge `.kilo/kilo.json` into `kilo.json` or `~/.config/kilo/kilo.json` to register the ControlKeel MCP server."
       ]

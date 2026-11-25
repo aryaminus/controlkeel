@@ -21,7 +21,6 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
                RuntimeContext.create_package(%{
                  workspace_id: workspace.id,
                  user_id: user.id,
-                 user_id: user.id,
                  session_id: session.id,
                  runtime_target: "devin",
                  budget_cents_allocated: 500,
@@ -44,7 +43,6 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
                RuntimeContext.create_package(%{
                  workspace_id: workspace.id,
                  user_id: user.id,
-                 user_id: user.id,
                  runtime_target: "made-up-runtime",
                  budget_cents_allocated: 0
                })
@@ -56,7 +54,6 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
       assert {:error, changeset} =
                RuntimeContext.create_package(%{
                  workspace_id: workspace.id,
-                 user_id: user.id,
                  user_id: user.id,
                  runtime_target: "open-swe",
                  budget_cents_allocated: -100
@@ -170,18 +167,18 @@ defmodule ControlKeel.Cloud.RuntimeContextTest do
       :ok
     end
 
-    test "lists newest-first capped to limit", %{workspace: workspace, user: user} do
+    test "lists newest-first capped to limit", %{workspace: workspace} do
       packages = RuntimeContext.list_for_workspace(workspace.id, limit: 2)
       assert length(packages) == 2
     end
 
-    test "filters by status", %{workspace: workspace, user: user} do
+    test "filters by status", %{workspace: workspace} do
       pending = RuntimeContext.list_for_workspace(workspace.id, status: "pending")
       assert length(pending) == 3
       assert Enum.all?(pending, &(&1.status == "pending"))
     end
 
-    test "status_counts/1 aggregates", %{workspace: workspace, user: user} do
+    test "status_counts/1 aggregates", %{workspace: workspace} do
       counts = RuntimeContext.status_counts(workspace.id)
       assert counts["pending"] == 3
       assert counts["completed"] == 1

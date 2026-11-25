@@ -37,6 +37,24 @@ if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) or
       pool_size: 2
   end
 
+  # A source checkout runs the CLI and MCP server with MIX_ENV=dev, whose
+  # config points at priv/repo/controlkeel_dev.db. Govern the same database a
+  # release would: the project's own, found from CK_PROJECT_ROOT (exported by
+  # bin/controlkeel and controlkeel-mcp, since both cd into the checkout).
+  # `mix phx.server` and `mix ecto.reset` don't set these modes, so they keep
+  # the dev database and a reset can't wipe governed findings.
+  if config_env() == :dev and System.get_env("DATABASE_PATH") in [nil, ""] do
+    governed_root = ControlKeel.Runtime.Defaults.governed_root()
+
+    if project_db = ControlKeel.Runtime.Defaults.project_database_path(governed_root) do
+      config :controlkeel, ControlKeel.Repo.Local, database: project_db
+    end
+  end
+
+  if config_env() == :dev and System.get_env("DATABASE_PATH") not in [nil, ""] do
+    config :controlkeel, ControlKeel.Repo.Local, database: System.get_env("DATABASE_PATH")
+  end
+
   config :controlkeel, ControlKeelWeb.Endpoint,
     watchers: [],
     server: false,
@@ -66,8 +84,52 @@ if System.get_env("CK_MCP_MODE") in ~w(1 true TRUE yes YES) or
   end
 end
 
-config :controlkeel, ControlKeelWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+fly_proxy_client_ip =
+  case System.get_env("CONTROLKEEL_FLY_PROXY_CLIENT_IP", "false") do
+    "true" -> true
+    "false" -> false
+    value -> raise ArgumentError, "invalid CONTROLKEEL_FLY_PROXY_CLIENT_IP: #{inspect(value)}"
+  end
+
+http_options = [port: String.to_integer(System.get_env("PORT", "4000"))]
+
+http_options =
+  if fly_proxy_client_ip, do: Keyword.put(http_options, :ip, {0, 0, 0, 0}), else: http_options
+
+config :controlkeel, ControlKeelWeb.Endpoint, http: http_options
+
+trusted_ingress_ips =
+  System.get_env("CONTROLKEEL_TRUSTED_INGRESS_IPS", "")
+  |> String.split(",")
+  |> Enum.map(&String.trim/1)
+  |> Enum.reject(&(&1 == ""))
+  |> Enum.map(fn entry ->
+    invalid_entry = fn ->
+      raise ArgumentError,
+            "invalid ingress IP or CIDR in CONTROLKEEL_TRUSTED_INGRESS_IPS: #{inspect(entry)}"
+    end
+
+    case String.split(entry, "/", parts: 2) do
+      [ip] ->
+        case :inet.parse_address(String.to_charlist(ip)) do
+          {:ok, address} -> address
+          {:error, _} -> invalid_entry.()
+        end
+
+      [ip, prefix] ->
+        with {:ok, address} <- :inet.parse_address(String.to_charlist(ip)),
+             {prefix, ""} <- Integer.parse(prefix),
+             true <- prefix >= 0 and prefix <= tuple_size(address) * 8 do
+          {address, prefix}
+        else
+          _ -> invalid_entry.()
+        end
+    end
+  end)
+
+config :controlkeel, ControlKeelWeb.ClientIp,
+  trusted_ingress_ips: trusted_ingress_ips,
+  fly_proxy_client_ip: fly_proxy_client_ip
 
 config :controlkeel, ControlKeel.Proxy,
   openai_upstream:
@@ -186,11 +248,6 @@ config :controlkeel, ControlKeel.Intent,
 if config_env() == :prod do
   database_path = ControlKeel.Runtime.Defaults.database_path()
 
-  # One-time global -> project-local migration: if we resolved to a project DB
-  # that doesn't exist yet, seed it from the legacy global DB before the Repo
-  # opens. No-op for already-migrated projects or explicit DATABASE_PATH.
-  ControlKeel.Runtime.Defaults.maybe_seed_project_database()
-
   # Postgres is configured whenever a remote mode (`:cloud` or `:self_hosted`)
   # is paired with a `DATABASE_URL`. In that case the local SQLite repo is
   # intentionally NOT configured — the dispatcher (lib/controlkeel/repo.ex)
@@ -247,11 +304,15 @@ if config_env() == :prod do
   config :controlkeel, ControlKeelWeb.Endpoint,
     url: url,
     http: [
-      # Enable IPv6 and bind on all interfaces.
+      # Enable IPv6 by default and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
       # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0}
+      ip:
+        if(fly_proxy_client_ip,
+          do: {0, 0, 0, 0},
+          else: {0, 0, 0, 0, 0, 0, 0, 0}
+        )
     ],
     secret_key_base: secret_key_base
 

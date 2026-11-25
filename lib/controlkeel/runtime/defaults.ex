@@ -25,8 +25,21 @@ defmodule ControlKeel.Runtime.Defaults do
 
   def database_path do
     System.get_env("DATABASE_PATH") ||
-      project_database_path(File.cwd!()) ||
+      project_database_path(governed_root()) ||
       global_database_path()
+  end
+
+  @doc """
+  The directory of the project being governed: `CK_PROJECT_ROOT` when set
+  (agent hosts and the source-checkout launchers export it), otherwise the
+  working directory. The project binding and the database both resolve from
+  here, so they always belong to the same project.
+  """
+  def governed_root do
+    case System.get_env("CK_PROJECT_ROOT") do
+      root when is_binary(root) and root != "" -> root
+      _ -> File.cwd!()
+    end
   end
 
   @doc """
@@ -95,76 +108,6 @@ defmodule ControlKeel.Runtime.Defaults do
   def global_database_path do
     Path.join(app_data_dir(), "controlkeel.db")
   end
-
-  @doc """
-  One-time migration for the global -> project-local database pivot.
-
-  When CK resolves to a project-local database that does not exist yet, but a
-  legacy global database with data is present, copy the global database (and its
-  WAL/SHM sidecars) into the project path so upgrading users keep their history
-  instead of landing in an empty database. No-op once the project database
-  exists, when `DATABASE_PATH` is set explicitly, when CK is not inside a
-  project, or when the global database is absent/empty.
-
-  Must run before the Repo opens the database (call it from config/runtime.exs
-  after computing the path, before configuring the Repo). Returns `:seeded`,
-  `:noop`, or `:error`.
-  """
-  def maybe_seed_project_database do
-    if System.get_env("DATABASE_PATH") in [nil, ""] do
-      case project_database_path(File.cwd!()) do
-        nil -> :noop
-        project_path -> maybe_seed(project_path, global_database_path())
-      end
-    else
-      :noop
-    end
-  end
-
-  defp maybe_seed(project_path, global_path) do
-    cond do
-      File.exists?(project_path) -> :noop
-      not regular_file_with_data?(global_path) -> :noop
-      true -> seed_from_global(project_path, global_path)
-    end
-  end
-
-  defp regular_file_with_data?(path) do
-    case File.stat(path) do
-      {:ok, %File.Stat{type: :regular, size: size}} when size > 0 -> true
-      _ -> false
-    end
-  end
-
-  # Copy the global database plus its WAL/SHM sidecars as a set so SQLite can
-  # replay any not-yet-checkpointed transactions. On any failure, remove the
-  # partial copy so the next boot retries (or starts fresh) rather than opening a
-  # half-written database.
-  defp seed_from_global(project_path, global_path) do
-    File.mkdir_p!(Path.dirname(project_path))
-
-    Enum.each(["", "-wal", "-shm"], fn suffix ->
-      src = global_path <> suffix
-      if File.exists?(src), do: File.cp!(src, project_path <> suffix)
-    end)
-
-    notify("[controlkeel] migrated existing data: #{global_path} -> #{project_path}")
-    :seeded
-  rescue
-    error ->
-      Enum.each(["", "-wal", "-shm"], &File.rm_rf!(project_path <> &1))
-
-      notify(
-        "[controlkeel] could not migrate global database (#{Exception.message(error)}); starting with a fresh project database"
-      )
-
-      :error
-  end
-
-  # stdout is reserved for MCP JSON-RPC framing, so migration notices go to
-  # stderr. This also runs during config/runtime.exs evaluation, before the
-  # Logger application is guaranteed to be started.
-  defp notify(message), do: IO.puts(:stderr, message)
 
   def secret_key_base do
     System.get_env("SECRET_KEY_BASE") || read_or_create_secret()
@@ -243,8 +186,12 @@ defmodule ControlKeel.Runtime.Defaults do
     end
   end
 
-  defp project_database_path(cwd) do
-    root = ControlKeel.Project.Root.resolve(cwd)
+  @doc """
+  The governed project's database (`<root>/controlkeel/controlkeel.db`) for the
+  project containing `path`, or `nil` when `path` is not inside a project.
+  """
+  def project_database_path(path) do
+    root = ControlKeel.Project.Root.resolve(path)
 
     if ControlKeel.Project.Root.project_root?(root) do
       Path.join([root, "controlkeel", "controlkeel.db"])

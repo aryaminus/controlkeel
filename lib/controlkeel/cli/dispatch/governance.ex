@@ -37,6 +37,11 @@ defmodule ControlKeel.CLI.Dispatch.Governance do
           "project_root" => Root.resolve(project_root_resolved)
         }
         |> maybe_put_tool_int("task_id", options[:task_id])
+        |> then(fn args ->
+          if options[:detail] in ["full", "compact"],
+            do: Map.put(args, "detail_level", options[:detail]),
+            else: args
+        end)
 
       case CkContext.call(args) do
         {:ok, payload} ->

@@ -9,6 +9,8 @@ export MIX_ENV="${MIX_ENV:-dev}"
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 # Cursor / OpenCode / Copilot MCP hosts set CK_PROJECT_ROOT to the governed workspace.
 PROJECT_ROOT="${CK_PROJECT_ROOT:-$(/bin/pwd -P)}"
+# Config resolves the governed database from this after the cd into a checkout.
+export CK_PROJECT_ROOT="$PROJECT_ROOT"
 
 # Resolve the ControlKeel Elixir checkout when this script is either:
 #   <repo>/bin/controlkeel-mcp           -> checkout is SCRIPT_DIR/..
