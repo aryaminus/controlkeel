@@ -128,8 +128,8 @@ defmodule ControlKeelWeb.Router do
     # Tenant-owned OIDC identity providers (issue #267). Must precede the
     # parameterized `:provider` routes above only if slugs collide - "oidc" is
     # a reserved prefix here, so these are unambiguous.
-    get "/auth/oidc/:slug/request", OAuthLoginController, :oidc_request
-    get "/auth/oidc/:slug/callback", OAuthLoginController, :oidc_callback
+    get "/auth/oidc/:org_slug/:provider_slug/request", OAuthLoginController, :oidc_request
+    get "/auth/oidc/:org_slug/:provider_slug/callback", OAuthLoginController, :oidc_callback
 
     # Public invitation-acceptance page. NOT auth-gated (acceptance requires
     # OAuth but the page itself is viewable to preview the invite).

@@ -68,16 +68,28 @@ defmodule ControlKeel.Accounts.OrgIdentityProviders do
     |> Repo.all()
   end
 
-  @doc "Find a usable provider by its login slug."
-  @spec fetch_by_slug(String.t()) :: {:ok, OrgIdentityProvider.t()} | {:error, :not_found}
-  def fetch_by_slug(slug) when is_binary(slug) do
-    slug = slug |> String.downcase() |> String.trim()
+  @doc "Find a usable provider by its organization slug and provider slug."
+  @spec fetch_for_org(String.t(), String.t()) ::
+          {:ok, OrgIdentityProvider.t()} | {:error, :not_found}
+  def fetch_for_org(org_slug, provider_slug)
+      when is_binary(org_slug) and is_binary(provider_slug) do
+    org_slug = normalize_slug(org_slug)
+    provider_slug = normalize_slug(provider_slug)
 
-    case Repo.get_by(OrgIdentityProvider, slug: slug, status: "active") do
+    query =
+      from provider in OrgIdentityProvider,
+        join: org in assoc(provider, :org),
+        where:
+          provider.status == "active" and provider.slug == ^provider_slug and
+            org.slug == ^org_slug
+
+    case Repo.one(query) do
       %OrgIdentityProvider{} = provider -> {:ok, Repo.preload(provider, :org)}
       _ -> {:error, :not_found}
     end
   end
+
+  def fetch_for_org(_org_slug, _provider_slug), do: {:error, :not_found}
 
   @doc "Soft-delete a provider so any issued sessions can be audited later."
   @spec delete(integer(), integer()) :: {:ok, OrgIdentityProvider.t()} | {:error, :not_found}
@@ -111,7 +123,7 @@ defmodule ControlKeel.Accounts.OrgIdentityProviders do
 
   def client_secret(_provider), do: {:error, :undecryptable_secret}
 
-  @doc "Build the Assent config map for this provider."
+  @doc "Build the tenant OIDC config consumed by the default adapter."
   @spec assent_config(OrgIdentityProvider.t()) ::
           {:ok, map()} | {:error, :undecryptable_secret}
   def assent_config(%OrgIdentityProvider{} = provider) do
@@ -120,10 +132,10 @@ defmodule ControlKeel.Accounts.OrgIdentityProviders do
        %{
          client_id: provider.client_id,
          client_secret: secret,
-         base_url: provider.issuer,
+         issuer: provider.issuer,
          # Generic OIDC always requests these; a provider that cannot supply
          # `email_verified` will fail closed in the caller.
-         scope: provider.scopes
+         scopes: provider.scopes
        }}
     end
   end
@@ -143,4 +155,6 @@ defmodule ControlKeel.Accounts.OrgIdentityProviders do
   defp stringify(map) do
     Map.new(map, fn {k, v} -> {to_string(k), v} end)
   end
+
+  defp normalize_slug(slug), do: slug |> String.downcase() |> String.trim()
 end

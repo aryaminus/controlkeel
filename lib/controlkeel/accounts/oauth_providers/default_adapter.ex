@@ -64,10 +64,15 @@ defmodule ControlKeel.Accounts.OAuthProviders.DefaultAdapter do
   @doc """
   Build the authorization URL for a tenant's generic OIDC provider.
   """
-  def oidc_authorize_url(cfg, session_params) when is_map(cfg) do
-    case OIDC.authorize_url(assent_oidc_config(cfg, session_params)) do
-      {:ok, %{url: url}} -> {:ok, %{url: url, session_params: session_params}}
-      {:error, reason} -> {:error, reason}
+  def oidc_authorize_url(cfg, redirect_uri) when is_map(cfg) and is_binary(redirect_uri) do
+    nonce = secure_nonce()
+
+    case OIDC.authorize_url(assent_oidc_config(cfg, redirect_uri, nonce)) do
+      {:ok, %{url: url, session_params: session_params}} ->
+        {:ok, %{url: url, session_params: session_params}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -80,8 +85,15 @@ defmodule ControlKeel.Accounts.OAuthProviders.DefaultAdapter do
   able to establish an identity, which is the same fail-closed rule applied to
   Google/GitHub in #244.
   """
-  def oidc_callback(cfg, params, session_params) when is_map(cfg) do
-    config = assent_oidc_config(cfg, session_params)
+  def oidc_callback(cfg, params, session_params, redirect_uri)
+      when is_map(cfg) and is_map(params) and is_map(session_params) and
+             is_map_key(session_params, :state) and is_binary(session_params.state) and
+             is_map_key(session_params, :nonce) and is_binary(session_params.nonce) and
+             is_binary(redirect_uri) do
+    config =
+      cfg
+      |> assent_oidc_config(redirect_uri, session_params.nonce)
+      |> Keyword.put(:session_params, session_params)
 
     case OIDC.callback(config, params) do
       {:ok, %{user: user}} when is_map(user) ->
@@ -105,14 +117,30 @@ defmodule ControlKeel.Accounts.OAuthProviders.DefaultAdapter do
     end
   end
 
-  defp assent_oidc_config(cfg, session_params) do
+  def oidc_callback(_cfg, _params, _session_params, _redirect_uri),
+    do: {:error, :invalid_session}
+
+  defp assent_oidc_config(cfg, redirect_uri, nonce) do
+    scopes =
+      cfg.scopes
+      |> String.split()
+      |> Enum.reject(&(&1 == "openid"))
+      |> Enum.join(" ")
+
     [
       client_id: cfg.client_id,
       client_secret: cfg.client_secret,
       base_url: cfg.issuer,
-      scope: cfg.scopes,
-      session_params: session_params
+      authorization_params: [scope: scopes],
+      redirect_uri: redirect_uri,
+      nonce: nonce
     ]
+  end
+
+  defp secure_nonce do
+    32
+    |> :crypto.strong_rand_bytes()
+    |> Base.url_encode64(padding: false)
   end
 
   # ── Private ─────────────────────────────────────────────────────────

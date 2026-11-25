@@ -28,7 +28,8 @@ defmodule ControlKeelWeb.Endpoint do
                      # invitation tokens (issue #247).
                      encryption_salt: "9kZ2r7Wp",
                      same_site: "Lax"
-                   ] ++ if(session_max_age, do: [max_age: session_max_age], else: [])
+                   ] ++
+                     if(session_max_age, do: [max_age: session_max_age], else: [])
 
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [:peer_data, :x_headers, session: @session_options]],
@@ -70,7 +71,7 @@ defmodule ControlKeelWeb.Endpoint do
 
   plug Plug.MethodOverride
   plug Plug.Head
-  plug Plug.Session, @session_options
+  plug ControlKeelWeb.Plugs.RuntimeSession, @session_options
   plug ControlKeelWeb.Plugs.FlyClientIp
   plug ControlKeelWeb.Router
 end

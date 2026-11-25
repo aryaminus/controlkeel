@@ -47,12 +47,13 @@ defmodule ControlKeel.Accounts.OrgIdentityProvidersTest do
 
     test "the secret round-trips for use in the Assent config", %{org: org} do
       {:ok, _} = OrgIdentityProviders.upsert(org.id, attrs("acme"))
-      {:ok, provider} = OrgIdentityProviders.fetch_by_slug("acme")
+      {:ok, provider} = OrgIdentityProviders.fetch_for_org(org.slug, "acme")
 
       assert {:ok, cfg} = OrgIdentityProviders.assent_config(provider)
       assert cfg.client_secret == "super-secret-value"
       assert cfg.client_id == "client-abc"
-      assert cfg.base_url == "https://idp.acme.example"
+      assert cfg.issuer == "https://idp.acme.example"
+      assert cfg.scopes == "openid email profile"
     end
 
     test "a corrupt/rotated secret fails closed rather than raising", %{org: org} do
@@ -96,15 +97,23 @@ defmodule ControlKeel.Accounts.OrgIdentityProvidersTest do
           slug: "dup-org-#{n}"
         })
 
-      assert {:ok, _} = OrgIdentityProviders.upsert(org.id, attrs("shared"))
-      assert {:ok, _} = OrgIdentityProviders.upsert(other_org.id, attrs("shared"))
+      assert {:ok, mine} = OrgIdentityProviders.upsert(org.id, attrs("shared"))
+      assert {:ok, theirs} = OrgIdentityProviders.upsert(other_org.id, attrs("shared"))
+
+      assert {:ok, fetched_mine} = OrgIdentityProviders.fetch_for_org(org.slug, "shared")
+      assert fetched_mine.id == mine.id
+
+      assert {:ok, fetched_theirs} =
+               OrgIdentityProviders.fetch_for_org(other_org.slug, "shared")
+
+      assert fetched_theirs.id == theirs.id
     end
 
     test "deleting a provider disables it so it stops appearing", %{org: org} do
       {:ok, provider} = OrgIdentityProviders.upsert(org.id, attrs("gone"))
       assert {:ok, _} = OrgIdentityProviders.delete(org.id, provider.id)
 
-      assert {:error, :not_found} = OrgIdentityProviders.fetch_by_slug("gone")
+      assert {:error, :not_found} = OrgIdentityProviders.fetch_for_org(org.slug, "gone")
     end
   end
 
